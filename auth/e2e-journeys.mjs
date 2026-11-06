@@ -118,8 +118,11 @@ async function signInPage(context, origin, { username, password, signup }) {
   await withTransport(() => page.goto(`${origin}/v1/auth/login`), "login redirect");
   if (signup) {
     await page.getByRole("link", { name: /create an account/i }).click();
+    await expect(page.locator("form input")).toHaveCount(2);
+    await expect(page.getByLabel("Username", { exact: true })).toHaveAttribute("autocomplete", "username");
+    await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute("autocomplete", "new-password");
+    await expect(page.getByLabel("Display name", { exact: true })).toHaveCount(0);
     await page.locator("#username").fill(username);
-    await page.locator("#name").fill(E2E_SEED.secondDisplay);
     await page.locator("#password").fill(password);
     await page.getByRole("button", { name: /^create account$/i }).click();
   } else {

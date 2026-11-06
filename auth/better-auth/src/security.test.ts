@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setup } from "./setup";
+import { setup } from "../test-support";
 import { createAuth } from "./auth";
 import { openDatabase, closeDatabase } from "./database";
 import { handler } from "./server";
@@ -88,7 +88,7 @@ test("Unicode and email-style usernames work in setup and native signup", async 
           new Request(`${config.issuer}/sign-up`, {
             method: "POST",
             headers: { origin: config.issuer },
-            body: new URLSearchParams({ username, password: "test-password", name: username }),
+            body: new URLSearchParams({ username, password: "test-password" }),
           }),
         );
         expect(response.status).toBe(303);

@@ -44,10 +44,14 @@ Shell/SSH session, which has the attached disk. For a fresh database, execute:
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
 ```
 
-Before guest-data publication, provision the destination row with the issuer
-and guest subject from private `bootstrap.json` (`issuer` and `guest_subject`).
+For a fresh installation, choose a unique reserved guest subject, such as
+`guest-<random UUID>`, without a provider account. Set the same value in
+`NET_WORTH_ESTIMATOR_GUEST_SUBJECT` for API startup and authorization setup.
+Before guest-data publication, provision the destination row with that subject
+and the configured identity issuer. Existing installations retain their exact
+issuer and guest subject through the separate one-time import procedure.
 Otherwise, the first authorized access creates its empty workspace through the
-same path as other users. The provider's viewer group limits guest access.
+same path as other users. Persisted Casbin viewer permissions limit guest access.
 Repeat setup preserves existing database and user rows:
 
 ```sh
@@ -56,8 +60,9 @@ Repeat setup preserves existing database and user rows:
 
 Hosts configured to use `/app/api-boot.sh` run schema setup only before
 the server. That wrapper never provisions guest or other user workspaces.
-Explicit Better Auth setup creates the guest identity. Explicit Casbin setup
-creates the viewer assignment in `NET_WORTH_ESTIMATOR_AUTHZ_DB`.
+Better Auth setup creates schema and the first-party OAuth client, never users.
+The configured anonymous guest subject identifies its workspace. Explicit Casbin
+setup creates its viewer assignment in `NET_WORTH_ESTIMATOR_AUTHZ_DB`.
 
 For existing data, restore a verified current-schema SQLite-safe backup or run a
 separate one-time operator upgrade. `setupdb` only validates an existing schema,

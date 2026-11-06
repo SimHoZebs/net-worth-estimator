@@ -226,7 +226,7 @@ run_gate() {
     echo "gate: frontend, extension"
   fi
   start extension bash -c "bun --filter ./extension test && bun --filter ./extension lint && bun --filter ./extension build"
-  start auth bash -c "bun --filter @waypoint/auth lint && bun --filter @waypoint/auth typecheck && bun --filter @waypoint/auth test && node --test dev/*.test.mjs"
+  start auth bash -c "bun --filter @waypoint/auth lint && bun --filter @waypoint/auth typecheck && bun --filter @waypoint/auth test && bun --filter @waypoint/auth build && node --test dev/*.test.mjs"
   start frontend-lint bun --filter ./frontend lint
   start frontend-checks bash -c "bun --filter ./frontend typecheck && bun --filter ./frontend test:unit && bun --filter ./frontend build"
 

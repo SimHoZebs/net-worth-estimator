@@ -141,9 +141,9 @@ or manual grant. First verified access records member assignment. Explicit setup
 assigns viewer to the provisioned guest.
 Account controls appear above sidebar navigation.
 
-Stable interactive login: the bootstrap owner signs in with its Better Auth
+Disposable development fixtures use an ordinary Better Auth account
 username and the password recorded in `tmp/dev/config.json`
-(`AUTH_USER_PASSWORD`, file mode `0600`). Setup preserves that
+(`TEST_AUTH_USER_PASSWORD`, file mode `0600`). Setup preserves that
 password across re-runs — it is the reusable dev credential, never
 committed anywhere.
 

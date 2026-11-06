@@ -28,7 +28,9 @@ export function handler(auth: Auth, config: Settings) {
         response = await oauthProviderAuthServerMetadata(auth)(request);
       else if (url.pathname.startsWith("/waypoint/account"))
         response = await accountRequest(auth, config, request);
-      else if (url.pathname === "/assets/auth.css" || url.pathname === "/assets/client.js") {
+      else if (
+        ["/assets/auth.css", "/assets/client.js", "/assets/manrope.woff2"].includes(url.pathname)
+      ) {
         response = new Response(
           Bun.file(new URL(`../public/${url.pathname.split("/").pop()}`, import.meta.url)),
         );
@@ -70,7 +72,7 @@ export function handler(auth: Auth, config: Settings) {
                   oauth_query: url.searchParams.has("sig") ? url.search.slice(1) : undefined,
                   callbackURL: `${config.issuer}${callback}`,
                   ...(signup
-                    ? { email: `${crypto.randomUUID()}@users.invalid`, name: form.get("name") }
+                    ? { email: `${crypto.randomUUID()}@users.invalid`, name: username }
                     : {}),
                 };
           const headers = new Headers(request.headers);

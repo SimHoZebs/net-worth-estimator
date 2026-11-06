@@ -1,11 +1,19 @@
 import { createAuthClient } from "better-auth/client";
 import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { registerPasskey, signInPasskey } from "./passkeys";
+import { buttonStyles } from "../../../frontend/src/components/buttonStyles";
 
 const client = createAuthClient({ plugins: [oauthProviderClient()] });
+const colorScheme = matchMedia("(prefers-color-scheme: dark)");
+const applyTheme = () => {
+  document.documentElement.dataset.theme = colorScheme.matches ? "dark" : "light";
+};
+applyTheme();
+colorScheme.addEventListener("change", applyTheme);
 const feedback = document.querySelector("#feedback")!;
-const report = (message: string) => {
+const report = (message: string, tone = "error") => {
   feedback.textContent = message;
+  feedback.setAttribute("data-tone", tone);
 };
 document.querySelector("#show-password")?.addEventListener("click", (event) => {
   const input = document.querySelector<HTMLInputElement>("#password")!;
@@ -45,6 +53,7 @@ async function listPasskeys() {
     label.textContent = key.name || "Passkey";
     const button = document.createElement("button");
     button.type = "button";
+    button.className = buttonStyles({ variant: "ghost", size: "sm" });
     button.textContent = "Remove";
     button.setAttribute("aria-label", `Remove ${key.name || "passkey"}`);
     button.addEventListener("click", async () => {
@@ -64,7 +73,7 @@ document.querySelector("#add-passkey")?.addEventListener("click", async () => {
     const { error } = await registerPasskey(client.$fetch);
     if (error) report(error.message || "Could not add the passkey.");
     else {
-      report("Passkey added.");
+      report("Passkey added.", "success");
       await listPasskeys();
     }
   } catch {

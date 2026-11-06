@@ -78,7 +78,7 @@ jobs:
               paths=(frontend package.json bun.lock extension/package.json)
               ;;
             auth)
-              paths=(auth/better-auth package.json bun.lock frontend/package.json extension/package.json)
+              paths=(auth/better-auth .dockerignore package.json bun.lock frontend/package.json extension/package.json frontend/src/styles frontend/src/components/brandStyles.ts frontend/src/components/buttonStyles.ts frontend/src/components/fieldStyles.ts)
               ;;
             *)
               echo "unknown image component: $COMPONENT" >&2

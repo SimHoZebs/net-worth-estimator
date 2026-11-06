@@ -6,7 +6,9 @@ COPY extension/package.json extension/package.json
 COPY auth/better-auth/package.json auth/better-auth/package.json
 RUN bun install --frozen-lockfile
 COPY auth/better-auth auth/better-auth
-RUN bun build auth/better-auth/src/client.ts --target browser --outfile auth/better-auth/public/client.js --minify
+COPY frontend/src/styles frontend/src/styles
+COPY frontend/src/components/buttonStyles.ts frontend/src/components/fieldStyles.ts frontend/src/components/brandStyles.ts frontend/src/components/
+RUN bun --filter @waypoint/auth build
 
 FROM oven/bun:1.4.4-slim
 WORKDIR /app

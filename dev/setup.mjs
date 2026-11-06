@@ -136,7 +136,7 @@ export async function setupFlow(config, sourceUser, { stateDir, envFile, slot })
     );
   }
   if (!bootstrapExists) {
-    runCommand("bun", ["run", "auth/better-auth/src/setup.ts"], {
+    runCommand("bun", ["run", "auth/better-auth/test-support.ts"], {
       env: {
         ...process.env,
         ...config.identity,
@@ -148,7 +148,7 @@ export async function setupFlow(config, sourceUser, { stateDir, envFile, slot })
   if (
     bootstrap.issuer !== config.identity.AUTH_PUBLIC_URL ||
     bootstrap.client_id !== config.identity.AUTH_CLIENT_ID ||
-    bootstrap.username !== config.identity.AUTH_USER_NAME
+    bootstrap.username !== config.identity.TEST_AUTH_USER_NAME
   ) {
     throw new Error("Dev identity metadata does not match its saved configuration");
   }

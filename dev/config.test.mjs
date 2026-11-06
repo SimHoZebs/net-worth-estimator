@@ -25,7 +25,7 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   assert.equal(env.DEV_OWNER_SUBJECT, undefined);
   assert.equal(env.DEV_GUEST_SUBJECT, "");
   assert.equal(env.DEV_AUTH_CLIENT_SECRET, config.identity.AUTH_CLIENT_SECRET);
-  assert.equal(env.AUTH_USER_PASSWORD, undefined);
+  assert.equal(env.TEST_AUTH_USER_PASSWORD, undefined);
   assert.equal(env.AUTH_STATE_DIR, undefined);
   assert.equal(env.DEV_BETTER_AUTH_SECRET, config.identity.BETTER_AUTH_SECRET);
   const args = composeArgs(["up"]);
@@ -86,7 +86,7 @@ test("runtime environment export is private, repeatable, and preserves existing 
     await writeComposeEnv(config, path);
     const contents = await readFile(path, "utf8");
     assert.equal((await stat(path)).mode & 0o777, 0o600);
-    assert.ok(!contents.includes(config.identity.AUTH_USER_PASSWORD));
+    assert.ok(!contents.includes(config.identity.TEST_AUTH_USER_PASSWORD));
     const modified = (await stat(path)).mtimeMs;
     await writeComposeEnv(config, path);
     assert.equal((await stat(path)).mtimeMs, modified);
@@ -180,8 +180,8 @@ test("generated configuration persists without replacing credentials", async () 
     await saveConfig(dir, config);
     assert.deepEqual((await loadConfig(dir, false)).source, config.source);
     assert.ok(
-      (await loadConfig(dir, false)).identity.AUTH_USER_PASSWORD ===
-        again.identity.AUTH_USER_PASSWORD,
+      (await loadConfig(dir, false)).identity.TEST_AUTH_USER_PASSWORD ===
+        again.identity.TEST_AUTH_USER_PASSWORD,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

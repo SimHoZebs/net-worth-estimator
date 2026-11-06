@@ -30,7 +30,7 @@ test("reuses the last immutable image when a component did not change", () => {
   assert.match(workflow, /steps\.reuse\.outputs\.reuse != 'true'/);
   assert.match(workflow, /paths=\(backend deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
   assert.match(workflow, /paths=\(frontend package\.json bun\.lock extension\/package\.json\)/);
-  assert.match(workflow, /paths=\(auth\/better-auth package\.json bun\.lock frontend\/package\.json extension\/package\.json\)/);
+  assert.match(workflow, /paths=\(auth\/better-auth \.dockerignore package\.json bun\.lock frontend\/package\.json extension\/package\.json frontend\/src\/styles frontend\/src\/components\/brandStyles\.ts frontend\/src\/components\/buttonStyles\.ts frontend\/src\/components\/fieldStyles\.ts\)/);
 });
 
 test("publishes both app images and the Bun identity runtime", () => {

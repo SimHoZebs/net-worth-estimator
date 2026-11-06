@@ -100,7 +100,7 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
   validPort(backendPort, "Backend port");
   if (!hostname && app === issuer) throw new Error("App and auth loopback ports must differ");
   return {
-    version: 2,
+    version: 3,
     source,
     guestSubject: null,
     slot,
@@ -115,18 +115,18 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
       AUTH_CLIENT_ID: "waypoint-dev",
       AUTH_CLIENT_SECRET: secret(),
       BETTER_AUTH_SECRET: secret(),
-      AUTH_USER_NAME: "household",
-      AUTH_USER_PASSWORD: secret(),
-      AUTH_USER_DISPLAY_NAME: "Development owner",
+      TEST_AUTH_USER_NAME: "household",
+      TEST_AUTH_USER_PASSWORD: secret(),
+      TEST_AUTH_USER_DISPLAY_NAME: "Development fixture",
       ...(hostname ? tailnetOrigins(hostname) : {}),
     },
   };
 }
 
 export function settings(config) {
-  if (config.version !== 2)
+  if (config.version !== 3)
     throw new Error(
-      "Unsupported dev configuration version. Use the explicit identity migration before this stack.",
+      "Unsupported dev configuration version. Create a fresh disposable dev slot.",
     );
   sanitizeSlot(config.slot ?? "");
   if (

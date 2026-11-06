@@ -115,9 +115,7 @@ export async function importCasdoor(config: Settings, input: unknown) {
     const owner = manifest.users.find(
       (user) => user.subject !== manifest.guestSubject && !user.disabled,
     )!;
-    const session = await ctx.internalAdapter.createSession(owner.subject);
-    await registerClient(auth, config, session.token);
-    await ctx.internalAdapter.deleteUserSessions(owner.subject);
+    await registerClient(auth, config);
     await sealIdentity(db, config.issuer, config.clientId);
     return {
       issuer: config.issuer,

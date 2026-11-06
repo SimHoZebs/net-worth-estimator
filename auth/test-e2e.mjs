@@ -226,14 +226,14 @@ try {
       AUTH_CLIENT_ID: "e2e-waypoint-client",
       AUTH_CLIENT_SECRET: secret(),
       BETTER_AUTH_SECRET: secret(),
-      AUTH_USER_NAME: E2E_SEED.ownerName,
-      AUTH_USER_PASSWORD: secret(),
+      TEST_AUTH_USER_NAME: E2E_SEED.ownerName,
+      TEST_AUTH_USER_PASSWORD: secret(),
       AUTH_STATE_DIR: identityDir,
       AUTH_DATABASE: resolve(identityDir, "identity.db"),
     };
     const settings = settingsFromEnv(providerEnv);
-    await sh("bun", ["run", "auth/better-auth/src/setup.ts"], { env: providerEnv });
-    const ownerPass = providerEnv.AUTH_USER_PASSWORD;
+    await sh("bun", ["run", "auth/better-auth/test-support.ts"], { env: providerEnv });
+    const ownerPass = providerEnv.TEST_AUTH_USER_PASSWORD;
     const secondPass = secret();
     const envFile = [
       "# E2E TEST-ONLY credentials. Disposable run; never production, never shared.",
@@ -280,7 +280,7 @@ try {
       settings: { publicUrl: settings.publicUrl, appUrl: settings.appUrl },
       subject: bootstrap.subject,
       guestSubject: bootstrap.guest_subject,
-      username: settings.username,
+      username: providerEnv.TEST_AUTH_USER_NAME,
       created: new Date().toISOString(),
     };
     const problems = validateFixtureContract(fixture, { stateDir: await realpath(identityDir), issuer: settings.publicUrl });
@@ -289,7 +289,7 @@ try {
     // Persist runtime secrets beside the fixture for forensics (0600, disposable root only).
     await writeFile(resolve(workRoot, "credentials.json"), JSON.stringify({
       note: "E2E TEST-ONLY credentials for disposable run; the root is removed or kept only for forensics",
-      ownerName: settings.username,
+      ownerName: providerEnv.TEST_AUTH_USER_NAME,
       ownerPass,
       secondName: E2E_SEED.secondName,
       secondPass,
@@ -327,6 +327,7 @@ try {
       });
       record("images", "PASS", args["cold-build"] ? "builds of both images (no cache)" : "builds of both images (layer cache)", (Date.now() - t) / 1000);
     }
+    await sh("docker", ["run", "--rm", "--network", "none", "--entrypoint", "/bin/sh", authTag, "-c", "test ! -e /app/auth/better-auth/test-support.ts && test ! -e /app/auth/better-auth/src/setup.test.ts"], { timeout: 30_000 });
   }
 
   // ---- stack: schema, guest row, boot ----------------------------------------

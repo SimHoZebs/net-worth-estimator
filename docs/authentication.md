@@ -5,6 +5,12 @@ provider sessions, and OAuth/OIDC grants. Go never receives login passwords.
 The account password-change route forwards credentials to Better Auth over the
 private service transport. Authentication setup is in [the auth guide](../auth/README.md).
 
+Deployments never create users. Human accounts use the ordinary signup endpoint
+at any time, independent of infrastructure setup or app age. Exceptional ops
+account creation uses that same endpoint. No bootstrap owner, initial password,
+first-user privilege, or separate account-creation tool exists. Disposable test
+fixtures use normal signup and are excluded from deployment images.
+
 ## Security boundary
 
 The Go API verifies OIDC signatures, issuer, audience, nonce, state, PKCE, and
@@ -20,7 +26,8 @@ always remain mandatory.
 
 Browser mutations require the configured origin. The provider also uses Better
 Auth's CSRF checks and database-backed rate limits. Passwords use bcrypt. Signup
-collects username, display name, and password. Internal `users.invalid` email
+collects only username and password. The username supplies the initial display name.
+Internal `users.invalid` email
 addresses satisfy the provider schema without a mail dependency. They are not
 recovery addresses. Clients cannot assign the provider's disabled flag.
 

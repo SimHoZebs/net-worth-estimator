@@ -18,3 +18,5 @@ coverage
 **/dist
 **/test-results
 **/playwright-report
+auth/better-auth/test-support.ts
+auth/better-auth/**/*.test.ts

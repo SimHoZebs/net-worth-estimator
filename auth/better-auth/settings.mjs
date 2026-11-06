@@ -17,8 +17,5 @@ export function settingsFromEnv(env) {
     clientId: required("AUTH_CLIENT_ID"),
     clientSecret: required("AUTH_CLIENT_SECRET"),
     secret: required("BETTER_AUTH_SECRET"),
-    username: required("AUTH_USER_NAME"),
-    password: required("AUTH_USER_PASSWORD"),
-    displayName: env.AUTH_USER_DISPLAY_NAME || env.AUTH_USER_NAME,
   };
 }

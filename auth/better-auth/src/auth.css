@@ -1,0 +1,31 @@
+@import "../../../frontend/src/styles/index.css";
+
+@font-face {
+  font-family: "Manrope Variable";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/assets/manrope.woff2") format("woff2");
+}
+
+@layer components {
+  #feedback {
+    overflow-wrap: anywhere;
+  }
+  #feedback:empty {
+    display: none;
+  }
+  #feedback:not(:empty) {
+    @apply rounded-control border border-solid border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger-text;
+  }
+  #feedback[data-tone="success"]:not(:empty) {
+    @apply border-success-border bg-success-bg text-success-text;
+  }
+  #passkeys {
+    @apply grid gap-2 p-0;
+    list-style: none;
+  }
+  #passkeys li {
+    @apply flex items-center justify-between gap-3 rounded-control border border-solid border-line px-3 py-2;
+  }
+}

@@ -26,22 +26,29 @@ AUTH_DATABASE=/private/identity.db
 BETTER_AUTH_SECRET=<private-random-secret>
 AUTH_CLIENT_ID=waypoint
 AUTH_CLIENT_SECRET=<different-private-random-secret>
-AUTH_USER_NAME=owner
-AUTH_USER_PASSWORD=<private-owner-password>
 ```
 
 `AUTH_DATABASE` also accepts a PostgreSQL connection URI. Use a fresh database or
 an isolated, explicitly created schema selected through PostgreSQL `search_path`.
-Never reuse the old identity tables. Set `AUTH_BOOTSTRAP_FILE` to a private output
-path for PostgreSQL provisioning. Preserve the auth secret across restarts because
+Never reuse the old identity tables. Preserve the auth secret across restarts because
 it protects signing keys and cookies.
 
 ```bash
 bun run auth/better-auth/src/setup.ts
 ```
 
-The bootstrap file contains the verified owner and guest subjects. Provision the
-application and policy databases before startup:
+This initializes schema and the first-party OAuth client only. It creates no
+users, password credentials, or sessions. The client belongs to the application,
+not a human account. There is no bootstrap owner and no deployment password.
+
+User creation is independent of deployment. Users sign up through `/sign-up` at
+any point. If ops needs to create an account exceptionally, it submits the same
+signup request. There is no separate account-creation CLI or privileged path.
+
+Provision application storage and the configured anonymous guest workspace before
+API startup. Guest workspace provisioning is separate from human account signup.
+An existing disabled guest identity can retain its subject. No deployment creates
+a provider account for it:
 
 ```bash
 go -C backend run ./cmd/setupdb --db /private/application.db
@@ -68,7 +75,7 @@ trust browser-supplied `X-Forwarded-For` or an unverified client-IP header.
 Build the provider browser bundle, then start Bun:
 
 ```bash
-bun build auth/better-auth/src/client.ts --target browser --outfile auth/better-auth/public/client.js --minify
+bun --filter @waypoint/auth build
 bun run auth/better-auth/src/server.ts
 ```
 

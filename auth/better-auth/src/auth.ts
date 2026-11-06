@@ -74,7 +74,7 @@ export function createAuth(config: Settings, database: IdentityDatabase, provisi
         generateClientId: () => config.clientId,
         generateClientSecret: () => config.clientSecret,
         customAccessTokenClaims: ({ user }) => ({ name: user?.name }),
-        // Only the explicit offline setup command can register clients.
+        // The first-party client belongs to infrastructure, not a user.
         canRegisterClient: () => false,
       }),
       oauthDeviceAuthorization({ verificationUri: `${config.issuer}/device` }),
