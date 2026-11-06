@@ -246,7 +246,7 @@ func (s *AccountSet) rateLimitMessage() string {
 }
 
 // Exclusions lists connections and accounts whose errors make their rows
-// unsafe to apply. General errors fail the whole fetch before this runs.
+// unsafe to apply. Fatal general errors fail the fetch before this runs.
 type Exclusions struct {
 	Connections map[string]struct{}
 	Accounts    map[string]struct{}
@@ -288,9 +288,9 @@ func (s *AccountSet) Exclusions() Exclusions {
 	return out
 }
 
-// classifyProtocolErrors returns a whole-run error for general errors,
-// authentication failures, and ambiguous scoped errors. Connection and
-// account errors that can be excluded are left in ErrList for Exclusions.
+// classifyProtocolErrors returns a whole-run error for fatal general errors,
+// authentication failures, and ambiguous scoped errors. Verified range
+// notices remain visible without blocking data. Scoped errors remain for Exclusions.
 func (s *AccountSet) classifyProtocolErrors(host string) error {
 	if s == nil {
 		return nil
@@ -306,7 +306,9 @@ func (s *AccountSet) classifyProtocolErrors(host string) error {
 			if entry.Code == "gen.auth" {
 				return &AuthError{Host: host, Message: authMessage(host, entry)}
 			}
-			general = append(general, entry)
+			if !entry.isRangeNotice() {
+				general = append(general, entry)
+			}
 		case "con":
 			if strings.TrimSpace(entry.ConnID) == "" {
 				general = append(general, entry)
@@ -458,6 +460,7 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 	if err != nil {
 		return nil, err
 	}
+	logAccountSet(ctx, endpoint.Host, start, end, set)
 	if message := set.rateLimitMessage(); message != "" {
 		return nil, &RateLimitedError{
 			Message: fmt.Sprintf("simplefin bridge rate limited from %s: %s", endpoint.Host, sanitizeMessage(message)),

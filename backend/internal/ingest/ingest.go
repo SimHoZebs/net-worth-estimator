@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -55,8 +56,17 @@ type Result struct {
 // for one adapter. Stale links never reach translation.
 func Sync(ctx context.Context, st store.Store, adapter Adapter, now time.Time) (Result, error) {
 	var out Result
-	end := now.Add(24 * time.Hour)
-	start := now.Add(-90 * 24 * time.Hour)
+	lastSync, err := st.GetLastSyncTime()
+	if err != nil {
+		return out, fmt.Errorf("read last sync time: %w", err)
+	}
+	lookback := 90 * 24 * time.Hour
+	if lastSync != "" {
+		lookback = 30 * 24 * time.Hour
+	}
+	// Keep the full request within the Bridge's 90-day range limit.
+	end := now
+	start := now.Add(-lookback)
 	native, err := adapter.Fetch(ctx, start, end)
 	if err != nil {
 		return out, err

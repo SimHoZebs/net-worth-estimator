@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -255,7 +256,9 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	out, err := ingest.Sync(ctx, r.store, bridgeAdapter{runner: r}, r.now())
 	if err != nil {
-		r.recordSyncError(syncErrorFromError(err, r.now()))
+		condition := syncErrorFromError(err, r.now())
+		r.recordSyncError(condition)
+		slog.WarnContext(ctx, "simplefin sync failed", "code", condition.Code)
 		return nil, err
 	}
 	// Stamp successful runs so /v1/status can report the last
@@ -265,6 +268,12 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	}
 	if len(out.Notices) > 0 {
 		first := out.Notices[0]
+		for _, notice := range out.Notices {
+			if notice.Scope == "connection" || notice.Scope == "account" {
+				first = notice
+				break
+			}
+		}
 		r.recordSyncError(store.SyncError{
 			Code:         first.Code,
 			Message:      first.Message,
@@ -280,6 +289,17 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	if skipped == nil {
 		skipped = map[string]int{}
 	}
+	slog.InfoContext(ctx, "simplefin sync applied",
+		"accounts_provisioned", out.Provisioned,
+		"checkpoints_inserted", out.Applied.CheckpointsInserted,
+		"checkpoints_updated", out.Applied.CheckpointsUpdated,
+		"checkpoints_skipped", out.Applied.CheckpointsSkipped,
+		"pending_inserted", out.Applied.PendingInserted,
+		"pending_updated", out.Applied.PendingUpdated,
+		"pending_deleted", out.Applied.PendingDeleted,
+		"settled_inserted", out.Applied.SettledInserted,
+		"settled_converted", out.Applied.SettledConverted,
+		"notices", len(out.Notices), "skipped", skipped)
 	return &Summary{
 		CheckpointsInserted: out.Applied.CheckpointsInserted,
 		CheckpointsUpdated:  out.Applied.CheckpointsUpdated,

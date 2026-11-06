@@ -5,6 +5,10 @@ test.beforeEach(async () => {
 	await resetFixture({ readOnly: true });
 });
 
+test.afterEach(async ({ page }) => {
+	await page.unrouteAll({ behavior: "wait" });
+});
+
 for (const width of [1440, 390]) {
 	test(`sidebar shows provider-neutral sync time at ${width}px`, async ({
 		page,

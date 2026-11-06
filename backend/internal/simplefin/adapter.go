@@ -22,8 +22,8 @@ func (a bridgeAdapter) Key() string {
 	return store.ProviderSimpleFIN
 }
 
-// Notices reports connection- and account-scoped errors that do not fail
-// the run. General errors already failed the fetch.
+// Notices reports non-fatal range notices and scoped errors. Fatal general
+// errors already failed the fetch.
 func (a bridgeAdapter) Notices(native any) []ingest.Notice {
 	set, ok := native.(*AccountSet)
 	if !ok || set == nil {

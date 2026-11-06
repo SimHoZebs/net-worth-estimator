@@ -24,11 +24,14 @@ type fakeAdapter struct {
 	skipped      map[string]int
 	withoutStale []string
 	fetchErr     error
+	fetchStart   time.Time
+	fetchEnd     time.Time
 }
 
 func (a *fakeAdapter) Key() string { return a.key }
 
-func (a *fakeAdapter) Fetch(_ context.Context, _, _ time.Time) (any, error) {
+func (a *fakeAdapter) Fetch(_ context.Context, start, end time.Time) (any, error) {
+	a.fetchStart, a.fetchEnd = start, end
 	return a.snapshot, a.fetchErr
 }
 
@@ -122,6 +125,46 @@ func TestSyncAppliesAndMarksDirty(t *testing.T) {
 	}
 	if state.Revision != 1 || state.DirtyFrom != checkpointAt {
 		t.Fatalf("run with writes must mark the earliest instant: %+v", state)
+	}
+}
+
+func TestSyncRequestWindow(t *testing.T) {
+	now := time.Date(2026, time.November, 6, 17, 30, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name     string
+		lastSync string
+		days     int
+	}{
+		{name: "initial", days: 90},
+		{name: "subsequent", lastSync: now.Add(-6 * time.Hour).Format(time.RFC3339), days: 30},
+		{name: "long gap", lastSync: now.Add(-60 * 24 * time.Hour).Format(time.RFC3339), days: 30},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st := openIngestStore(t)
+			if tc.lastSync != "" {
+				if err := st.SetLastSyncTime(tc.lastSync); err != nil {
+					t.Fatal(err)
+				}
+			}
+			adapter := &fakeAdapter{
+				key:         "fake",
+				checkpoints: func(map[string]string) []store.SyncCheckpoint { return nil },
+				skipped:     map[string]int{},
+			}
+			if _, err := Sync(context.Background(), st, adapter, now); err != nil {
+				t.Fatal(err)
+			}
+			if !adapter.fetchEnd.Equal(now) {
+				t.Fatalf("fetch end = %v, want %v", adapter.fetchEnd, now)
+			}
+			lookback := time.Duration(tc.days) * 24 * time.Hour
+			if want := now.Add(-lookback); !adapter.fetchStart.Equal(want) {
+				t.Fatalf("fetch start = %v, want %v", adapter.fetchStart, want)
+			}
+			if span := adapter.fetchEnd.Sub(adapter.fetchStart); span != lookback {
+				t.Fatalf("fetch window = %v, want %v", span, lookback)
+			}
+		})
 	}
 }
 
