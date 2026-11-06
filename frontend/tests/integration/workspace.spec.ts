@@ -155,7 +155,7 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 test("a schedule ends by recording one transaction and a transaction can start a schedule", async ({
 	page,
 }) => {
-	await page.goto("/transactions?edit-transaction=invest");
+	await page.goto("/transactions?editor=transaction&id=invest");
 	const editor = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(editor.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
@@ -181,7 +181,7 @@ test("a schedule ends by recording one transaction and a transaction can start a
 	// A one-time transaction starts a schedule through the subscription
 	// action; the recorded transaction stays a fact and claims the new
 	// schedule's first occurrence.
-	await page.goto(`/transactions?edit-transaction=${recorded!.id}`);
+	await page.goto(`/#transactions/${recorded!.id}/edit`);
 	const again = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(again.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
@@ -332,7 +332,7 @@ for (const width of [1440, 390]) {
 			"evaluations",
 			"sources",
 		]) {
-			await page.goto(`/${route}`);
+			await page.goto(`/#${route}`);
 			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 			await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 			expect(
@@ -364,7 +364,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 		{ route: "purchases", label: "Planned purchases" },
 		{ route: "sources", label: "Configs" },
 	]) {
-		await page.goto(`/${route}`);
+		await page.goto(`/#${route}`);
 		const openNavigation = page.getByRole("button", {
 			name: "Open navigation",
 		});
@@ -373,7 +373,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 			page.getByRole("dialog", { name: "Workspace navigation" }),
 		).toBeFocused();
 		await page.getByRole("link", { name: label, exact: true }).click();
-		await expect(page).toHaveURL(new RegExp(`/${route}$`));
+		await expect(page).toHaveURL(new RegExp(`#${route}$`));
 		await expect(
 			page.getByRole("dialog", { name: "Workspace navigation" }),
 		).not.toBeVisible();
@@ -585,7 +585,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 			"evaluations",
 			"sources",
 		]) {
-			await page.goto(`/${route}`);
+			await page.goto(`/#${route}`);
 			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 			expect(
 				await page.evaluate(() => document.documentElement.scrollWidth),

@@ -7,7 +7,7 @@ const anchor = process.env.DEMO_ANCHOR ?? new Date().toISOString().slice(0, 10);
 
 test("seeded account demo", async ({ page }) => {
 	await page.clock.setFixedTime(new Date(`${anchor}T12:00:00Z`));
-	await page.goto("/outlook");
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	await expect(
 		page.getByRole("heading", { name: "Safe card spending" }),
 	).toBeVisible();

@@ -20,7 +20,7 @@ test("Configure settings survive in a fresh browser context", async ({
 	browser,
 	request,
 }) => {
-	await page.goto("/outlook?detail=configure");
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	await expect(
 		page
 			.getByRole("dialog", { name: "Safe card spending" })
@@ -67,7 +67,7 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	expect(checkpoint.ok()).toBe(true);
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
-	await page.goto("/outlook?detail=cycle");
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	const drawer = page.getByRole("dialog");
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
 	await page
@@ -180,9 +180,9 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		expect(response.ok()).toBe(true);
 		expect((await response.json()).saved).toBe(true);
 	}
-	await page.goto("/outlook?detail=cycle");
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
-	await expect(page).toHaveURL(/detail=last-cycle$/);
+	await expect(page).toHaveURL(/safe-spending-detail\/last-cycle$/);
 	const last = page.getByRole("dialog", {
 		name: "Safe card spending",
 		exact: true,
@@ -196,7 +196,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	const currentTab = page.getByRole("tab", { name: /This cycle/ });
 	await expect(currentTab).toBeFocused();
 	await expect(currentTab).toHaveAttribute("aria-selected", "true");
-	await expect(page).toHaveURL(/detail=cycle$/);
+	await expect(page).toHaveURL(/safe-spending-detail\/cycle$/);
 	const currentCharges = page.getByRole("table", {
 		name: new RegExp(labels.cycleSpending),
 	});
@@ -207,7 +207,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		"aria-selected",
 		"true",
 	);
-	await page.goto("/outlook?detail=last-cycle");
+	await page.goto("/outlook?detail=safe-spending&tab=last-cycle");
 	await expect(page.getByRole("tab", { name: /Last cycle/ })).toHaveAttribute(
 		"aria-selected",
 		"true",
@@ -260,7 +260,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 		},
 	});
 	expect((await response.json()).saved).toBe(true);
-	await page.goto("/outlook?detail=configure");
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	const sources = page.getByRole("group", { name: "Income sources" });
 	const salary = sources.getByRole("button", { name: /^Salary/ });
 	const partner = sources.getByRole("button", {
@@ -403,8 +403,8 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 		expect(response.ok()).toBe(true);
 		expect((await response.json()).saved).toBe(true);
 	}
-	await page.goto("/outlook");
-	const card = page.getByRole("region", { name: "Safe card spending" });
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
+	const card = page.getByRole("dialog", { name: "Safe card spending" });
 	await expect(
 		card.getByRole("heading", { name: labels.spendingPace }),
 	).toBeVisible();
@@ -497,8 +497,9 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 			statementDaySet: false,
 		},
 	});
-	await page.goto("/outlook");
-	const bills = page.getByRole("table", {
+	await page.goto("/outlook?detail=safe-spending&tab=cycle");
+	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
+	const bills = drawer.getByRole("table", {
 		name: new RegExp(labels.scheduledBills),
 	});
 	await expect(bills).toContainText("Retirement contribution");
@@ -514,7 +515,7 @@ test("outlook shows the spending pace graph above the net worth graph", async ({
 }) => {
 	// The Safe card spending card is the main card on Outlook: its
 	// spending pace graph renders on the page, above the net worth
-	// graph. The drawer keeps the per-cycle transaction lists.
+	// graph. The details drawer keeps its own copy of the same graph.
 	await page.goto("/outlook");
 	const pace = page.getByRole("img", { name: labels.spendingPace });
 	await expect(pace).toBeVisible();
@@ -537,7 +538,7 @@ for (const theme of ["light", "dark"] as const) {
 	}) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.emulateMedia({ colorScheme: theme });
-		await page.goto("/outlook?detail=last-cycle");
+		await page.goto("/outlook?detail=safe-spending&tab=last-cycle");
 		const budget = page.getByRole("region", { name: labels.cashAfterBills });
 		await expect(budget).toBeVisible();
 		const overflowing = await budget.evaluate((root) =>
