@@ -49,11 +49,13 @@ for attempt in 1 2 3 4 5 6; do
   run="$(gh run list --branch "$branch" --workflow tests.yml --event push --limit 20 \
     --json databaseId,headSha --jq ".[] | select(.headSha == \"$sha\") | .databaseId" | head -1)"
   [ -n "$run" ] && break
-  sleep 5
+  sleep 10
 done
 [ -n "$run" ] || { echo "no Tests run for $sha" >&2; exit 1; }
 gh run watch "$run" --exit-status
 ```
+
+- Resolve the run ID once, then let `gh run watch` be the single waiter. Do not run extra `gh run list` or `gh run view` polls alongside it. Repeated list and view calls trigger a secondary GitHub Actions limit with `403`. On `403` or `429`, stop polling for 120 seconds, then retry a single check. Never tight loop list calls.
 
 - Read the failing job log first with `gh run view "$run" --log-failed`. Download the failure artifact when the log prints only a tail: `gh run download "$run" -n gate-artifacts` or `-n integration-artifacts`.
 - Push fixes to the same branch. The workflow reruns for the new commit. Reuse the same feedback loop until it is green. A cancelled watch means a newer push replaced the run; resolve the new SHA instead of debugging the cancelled one.
