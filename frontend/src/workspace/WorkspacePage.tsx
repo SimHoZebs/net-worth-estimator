@@ -1,16 +1,53 @@
+import { lazy } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
-import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
-import { GroupsPage } from "../pages/GroupsPage.tsx";
-import { InboxPage } from "../pages/InboxPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { AccountsPage } from "../pages/AccountsPage.tsx";
-import { FlowsPage } from "../pages/flows/FlowsPage.tsx";
-import { TransactionsPage } from "../pages/TransactionsPage.tsx";
-import { PurchasesPage } from "../pages/PurchasesPage.tsx";
-import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
+
+// Outlook is the landing route and stays in the entry chunk so its summary
+// can render as soon as the shell does. Every other route is a separate
+// chunk: boot transfers and parses only the screen the user opened.
+const AccountsPage = lazy(() =>
+	import("../pages/AccountsPage.tsx").then((module) => ({
+		default: module.AccountsPage,
+	})),
+);
+const TransactionsPage = lazy(() =>
+	import("../pages/TransactionsPage.tsx").then((module) => ({
+		default: module.TransactionsPage,
+	})),
+);
+const PurchasesPage = lazy(() =>
+	import("../pages/PurchasesPage.tsx").then((module) => ({
+		default: module.PurchasesPage,
+	})),
+);
+const FlowsPage = lazy(() =>
+	import("../pages/flows/FlowsPage.tsx").then((module) => ({
+		default: module.FlowsPage,
+	})),
+);
+const EvaluationsPage = lazy(() =>
+	import("../pages/EvaluationsPage.tsx").then((module) => ({
+		default: module.EvaluationsPage,
+	})),
+);
+const GroupsPage = lazy(() =>
+	import("../pages/GroupsPage.tsx").then((module) => ({
+		default: module.GroupsPage,
+	})),
+);
+const InboxPage = lazy(() =>
+	import("../pages/InboxPage.tsx").then((module) => ({
+		default: module.InboxPage,
+	})),
+);
+const SourcesPage = lazy(() =>
+	import("../pages/SourcesPage.tsx").then((module) => ({
+		default: module.SourcesPage,
+	})),
+);
 
 // Pure router: every page subscribes its own data where its queries are
 // declared. Only UI callbacks (overlay and navigation actions) travel as

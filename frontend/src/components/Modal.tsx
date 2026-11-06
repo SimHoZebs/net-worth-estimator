@@ -1,7 +1,9 @@
 import { X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 import {
+	type AnimationEvent,
 	type ReactNode,
+	useCallback,
+	useEffect,
 	useId,
 	useLayoutEffect,
 	useRef,
@@ -11,6 +13,9 @@ import { IconButton } from "./Button.tsx";
 import { useModalRegistration } from "../state/modalPresence.ts";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 import { mergeStyles } from "./mergeStyles.ts";
+import { usePrefersReducedMotion } from "../state/useMediaQuery.ts";
+
+const MODAL_CLOSE_DURATION = 120;
 
 export function Modal({
 	title,
@@ -52,7 +57,8 @@ export function Modal({
 	useModalRegistration(true);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
-	const reduceMotion = useReducedMotion();
+	const closeNotified = useRef(false);
+	const reduceMotion = usePrefersReducedMotion();
 	const id = useId();
 	useLayoutEffect(() => {
 		const dialog = ref.current;
@@ -67,15 +73,35 @@ export function Modal({
 		if (closeRequested.current) return;
 		if (onCloseRequest?.() === false) return;
 		closeRequested.current = true;
+		// No exit frame under reduced motion: unmount in the same event so
+		// closing is instant for users who asked for no animation.
+		if (reduceMotion) {
+			closeNotified.current = true;
+			onClose();
+			return;
+		}
 		setClosing(true);
 	};
-	// Centered dialogs scale/fade. Drawer sheets are the shared Drawer
-	// component; the native <dialog> stays static so showModal top-layer,
-	// focus, and backdrop behavior are unchanged — motion owns only the
-	// inner panel.
-	const enter = { opacity: 1, scale: 1, y: 0 };
-	const initial = { opacity: 0, scale: 0.97, y: 8 };
-	const exit = { opacity: 0, scale: 0.98, y: 8 };
+	// Centered dialogs scale/fade in CSS. Drawer sheets are the shared
+	// Drawer component; the native <dialog> stays static so showModal
+	// top-layer, focus, and backdrop behavior are unchanged.
+	const finishClose = useCallback(() => {
+		if (!closing || closeNotified.current) return;
+		closeNotified.current = true;
+		onClose();
+	}, [closing, onClose]);
+	useEffect(() => {
+		if (!closing) return;
+		const timer = window.setTimeout(
+			finishClose,
+			reduceMotion ? 0 : MODAL_CLOSE_DURATION + 40,
+		);
+		return () => window.clearTimeout(timer);
+	}, [closing, finishClose, reduceMotion]);
+	const handleAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
+		if (event.target !== event.currentTarget) return;
+		finishClose();
+	};
 	return (
 		<dialog
 			ref={ref}
@@ -96,19 +122,12 @@ export function Modal({
 				if (event.target === event.currentTarget) requestClose();
 			}}
 		>
-			<motion.div
+			<div
 				ref={panelRef}
 				tabIndex={focusPanelOnOpen ? -1 : undefined}
-				className="flex flex-col gap-4 focus:outline-none max-sm:min-h-full"
-				initial={initial}
-				animate={closing ? exit : enter}
-				transition={{
-					duration: reduceMotion ? 0 : closing ? 0.12 : 0.15,
-					ease: "easeOut",
-				}}
-				onAnimationComplete={() => {
-					if (closing) onClose();
-				}}
+				className="waypoint-modal-panel flex flex-col gap-4 focus:outline-none max-sm:min-h-full"
+				data-state={closing ? "closed" : "open"}
+				onAnimationEnd={handleAnimationEnd}
 			>
 				<div className={mergeStyles(dialogHeaderStyles, headerClassName)}>
 					<div className="min-w-0 flex-1">
@@ -142,7 +161,7 @@ export function Modal({
 				>
 					{children}
 				</div>
-			</motion.div>
+			</div>
 		</dialog>
 	);
 }

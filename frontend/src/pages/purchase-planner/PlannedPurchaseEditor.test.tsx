@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Account, PlannedPurchase } from "../../domain/model.ts";
-import { plannedPurchaseSchema } from "../../domain/model.ts";
+import { plannedPurchaseSchema } from "../../domain/modelSchemas.ts";
 import {
 	saveNewPurchase,
 	savePurchaseEdit,

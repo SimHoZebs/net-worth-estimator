@@ -39,17 +39,23 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function openInspector(view: ReturnType<typeof render>) {
+async function openInspector(view: ReturnType<typeof render>) {
 	fireEvent.click(
 		view.getByRole("button", {
 			name: "Inspect independence for Financial independence",
 		}),
 	);
-	return within(view.getByRole("dialog", { name: "Financial independence" }));
+	return within(
+		await view.findByRole(
+			"dialog",
+			{ name: "Financial independence" },
+			{ timeout: 5000 },
+		),
+	);
 }
 
 describe("FinancialIndependenceCard", () => {
-	it("presents financial outcomes without exposing engine screening gates", () => {
+	it("presents financial outcomes without exposing engine screening gates", async () => {
 		const item = independenceItem(
 			independenceEnvelope({
 				rows: [independenceRow("2036-02-01", { minimumNetWorth: 0 })],
@@ -58,7 +64,7 @@ describe("FinancialIndependenceCard", () => {
 		const view = render(<FinancialIndependenceCard item={item} />);
 		expect(view.getByText("Not reached")).toBeTruthy();
 		expect(view.queryByRole("button", { name: /Inspect evidence/ })).toBeNull();
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(dialog.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
 			"Overview",
 			"Configure",
@@ -92,7 +98,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(dialog.getByText("Configuration unavailable.")).toBeTruthy();
 	});
 
-	it("keeps the card compact and opens financial evidence without expanding it", () => {
+	it("keeps the card compact and opens financial evidence without expanding it", async () => {
 		const view = render(
 			<FinancialIndependenceCard item={independenceItem()} />,
 		);
@@ -102,7 +108,7 @@ describe("FinancialIndependenceCard", () => {
 		).toBeTruthy();
 		expect(view.queryByRole("slider")).toBeNull();
 		expect(view.queryByRole("table")).toBeNull();
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(
 			dialog
 				.getByRole("tab", { name: "Overview" })
@@ -127,11 +133,11 @@ describe("FinancialIndependenceCard", () => {
 		expect(view.queryByRole("table")).toBeNull();
 	});
 
-	it("keeps the automatic evidence date without date controls", () => {
+	it("keeps the automatic evidence date without date controls", async () => {
 		const view = render(
 			<FinancialIndependenceCard item={independenceItem()} />,
 		);
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
 		expect(dialog.queryByRole("combobox")).toBeNull();
 		fireEvent.click(dialog.getByText("Compare start dates"));
@@ -152,7 +158,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(dialog.queryByRole("slider")).toBeNull();
 	});
 
-	it("uses the engine's detailed date when later financial summaries exist", () => {
+	it("uses the engine's detailed date when later financial summaries exist", async () => {
 		const item = independenceItem(
 			independenceEnvelope({
 				rows: [
@@ -169,7 +175,7 @@ describe("FinancialIndependenceCard", () => {
 			}),
 		);
 		const view = render(<FinancialIndependenceCard item={item} />);
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(dialog.getByText("Funding as of Feb 2026")).toBeTruthy();
 		expect(
 			dialog.getAllByText("$40,000", { exact: true }).length,
@@ -179,7 +185,7 @@ describe("FinancialIndependenceCard", () => {
 		).toBeTruthy();
 	});
 
-	it("retains financial shortfalls, account limits, and projected assets", () => {
+	it("retains financial shortfalls, account limits, and projected assets", async () => {
 		const envelope = independenceEnvelope({
 			rows: [
 				independenceRow("2036-02-01", {
@@ -203,7 +209,7 @@ describe("FinancialIndependenceCard", () => {
 			/>,
 		);
 		expect(view.getByText("Not reached")).toBeTruthy();
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(dialog.queryByText(/Self-sustaining ·/)).toBeNull();
 		expect(
 			dialog.getByRole("heading", {
@@ -223,7 +229,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(dialog.queryByText(/Passed|Failed|Principal|preserved/)).toBeNull();
 	});
 
-	it("distinguishes an insufficient projection horizon from financial failure", () => {
+	it("distinguishes an insufficient projection horizon from financial failure", async () => {
 		const item = independenceItem(
 			independenceEnvelope({ rows: [], runOutcomes: [], milestones: {} }),
 			independenceConfig({ evaluationYears: 30 }),
@@ -235,7 +241,7 @@ describe("FinancialIndependenceCard", () => {
 				.getByRole("progressbar", { name: "Available projection horizon" })
 				.getAttribute("value"),
 		).toBe("67");
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(
 			dialog.getByRole("progressbar", { name: "Required assessment period" }),
 		).toBeTruthy();
@@ -246,7 +252,7 @@ describe("FinancialIndependenceCard", () => {
 		).toBeNull();
 	});
 
-	it("keeps source warnings visible and supports missing evidence and paused evaluations", () => {
+	it("keeps source warnings visible and supports missing evidence and paused evaluations", async () => {
 		const envelope = independenceEnvelope(null);
 		envelope.diagnostics = [
 			{
@@ -278,7 +284,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(view.queryByRole("dialog")).toBeNull();
 	});
 
-	it("separates a self-sustaining projection from modeled scenario probability", () => {
+	it("separates a self-sustaining projection from modeled scenario probability", async () => {
 		const envelope = independenceEnvelope({
 			rows: [independenceRow()],
 			runOutcomes: [],
@@ -298,17 +304,17 @@ describe("FinancialIndependenceCard", () => {
 		expect(view.getByText("Projection")).toBeTruthy();
 		expect(view.queryByText("65%")).toBeNull();
 		expect(view.queryByText(/90% required/)).toBeNull();
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(dialog.getByText("Self-sustaining · Feb 2036")).toBeTruthy();
 		expect(dialog.getByText("90% required · 400 scenarios")).toBeTruthy();
 		expect(dialog.queryByRole("region", { name: "Projection" })).toBeNull();
 	});
 
-	it("keeps the inspector open across a recalculation and only closes it explicitly", () => {
+	it("keeps the inspector open across a recalculation and only closes it explicitly", async () => {
 		const view = render(
 			<FinancialIndependenceCard item={independenceItem()} />,
 		);
-		const dialog = openInspector(view);
+		const dialog = await openInspector(view);
 		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
 		// A recalculation arrives as a new analysis identity for the same
 		// evaluation: the open inspector follows it instead of resetting.

@@ -2,6 +2,7 @@ import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BackendCheckpoint } from "@/api/contracts.ts";
 import { TextButton } from "@/components/Button.tsx";
+import { Notice } from "@/components/Notice.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -472,7 +473,15 @@ export function SafeSpendingPreview({
 	// Saved rows gate rendering, not hooks: every subscription above stays
 	// mounted while rows load.
 	if (!accounts || !transactions || savedRules === null || !startDate)
-		return null;
+		return <SafeSpendingSkeleton />;
+	if (settingsState.pending) return <SafeSpendingSkeleton />;
+	if (settingsState.error)
+		return (
+			<Notice tone="danger" aria-label="Safe card spending settings">
+				<span>Budget settings could not be loaded.</span>
+				<TextButton onClick={settingsState.retry}>Retry</TextButton>
+			</Notice>
+		);
 	if (!projection && !pending) return null;
 	if (!cards.length) {
 		return (
@@ -751,5 +760,29 @@ export function SafeSpendingPreview({
 				</SafeSpendingDetailShell>
 			)}
 		</Card>
+	);
+}
+
+/** Reserve the summary card while saved rows or settings hydrate. */
+function SafeSpendingSkeleton() {
+	return (
+		<div
+			className="rounded-surface border border-line bg-surface p-5"
+			aria-busy="true"
+			aria-label="Loading safe card spending"
+		>
+			<div className="flex items-center gap-2">
+				<Skeleton className="size-4" />
+				<Skeleton className="h-4 w-40" />
+			</div>
+			<Skeleton className="mt-4 h-3 w-64" />
+			<Skeleton className="mt-2 h-3 w-52" />
+			<Skeleton className="mt-6 h-8 w-44" />
+			<div className="mt-6 grid grid-cols-3 gap-4 max-sm:grid-cols-1">
+				<Skeleton className="h-12 w-full" />
+				<Skeleton className="h-12 w-full" />
+				<Skeleton className="h-12 w-full" />
+			</div>
+		</div>
 	);
 }

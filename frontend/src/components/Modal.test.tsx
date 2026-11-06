@@ -68,7 +68,7 @@ describe("modal close requests", () => {
 		await runInteractions([{ click: ["button", "Open dialog"] }]);
 		const panel = () =>
 			screen.getByRole("dialog").firstElementChild as HTMLElement;
-		await waitFor(() => expect(panel().style.opacity).toBe("1"));
+		await waitFor(() => expect(panel().dataset.state).toBe("open"));
 		await runInteractions(
 			[{ click: ["button", "Close dialog"] }, { expectText: "Test dialog" }],
 			dialogScope("Test dialog"),
@@ -76,7 +76,7 @@ describe("modal close requests", () => {
 		expect(guard).toHaveBeenCalledOnce();
 		expect(onClosed).not.toHaveBeenCalled();
 		// The veto must not start the fade or latch the close.
-		expect(panel().style.opacity).toBe("1");
+		expect(panel().dataset.state).toBe("open");
 		allowed = true;
 		await runInteractions(
 			[{ click: ["button", "Close dialog"] }],

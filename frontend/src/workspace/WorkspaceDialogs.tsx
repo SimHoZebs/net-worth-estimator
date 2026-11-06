@@ -1,5 +1,4 @@
 import { Suspense, lazy } from "react";
-import { WorkspaceEditor } from "../components/WorkspaceEditor.tsx";
 import { Skeleton } from "../components/Skeleton.tsx";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
@@ -11,6 +10,13 @@ const EvidenceDialog = lazy(() =>
 const CurrentPositionDialog = lazy(() =>
 	import("../components/evidence/CurrentPositionDialog.tsx").then((module) => ({
 		default: module.CurrentPositionDialog,
+	})),
+);
+// Editors and their row forms are interaction-only: keep them out of the
+// boot chunk and fetch the one the user opens.
+const WorkspaceEditor = lazy(() =>
+	import("../components/WorkspaceEditor.tsx").then((module) => ({
+		default: module.WorkspaceEditor,
 	})),
 );
 
@@ -42,7 +48,13 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	return overlays.editor ? (
-		<WorkspaceEditor target={overlays.editor} onClose={overlays.closeEditor} />
-	) : null;
+	if (!overlays.editor) return null;
+	return (
+		<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+			<WorkspaceEditor
+				target={overlays.editor}
+				onClose={overlays.closeEditor}
+			/>
+		</Suspense>
+	);
 }

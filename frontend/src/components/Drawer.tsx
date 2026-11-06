@@ -1,8 +1,10 @@
 import { X } from "lucide-react";
-import { motion } from "motion/react";
 import {
+	useCallback,
+	type AnimationEvent,
 	type MouseEvent,
 	type ReactNode,
+	useEffect,
 	useId,
 	useLayoutEffect,
 	useRef,
@@ -12,11 +14,11 @@ import { createPortal } from "react-dom";
 import { mergeStyles } from "./mergeStyles.ts";
 import { useModalRegistration } from "../state/modalPresence.ts";
 import {
-	drawerHiddenX,
-	useDrawerTransition,
+	DRAWER_CLOSE_DURATION,
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "../state/drawer.ts";
+import { usePrefersReducedMotion } from "../state/useMediaQuery.ts";
 import { IconButton } from "./Button.tsx";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
@@ -93,13 +95,19 @@ function DrawerSession({
 	const panelEl = useRef<HTMLElement | null>(null);
 	const titleId = useId();
 	const [closing, setClosing] = useState(false);
-	// Once-only close: motion reports completion per animated value, so the
-	// first close completion wins and replayed exits stay silent. Written only
-	// in the animation callback, never mirrored by an effect.
+	// Once-only close: the exit animation and the fallback timer can both
+	// report completion, and only the first report may unmount the panel.
 	const closeNotifiedRef = useRef(false);
-	const drawerTransition = useDrawerTransition(closing);
-	const hiddenX = drawerHiddenX(side);
+	const reduceMotion = usePrefersReducedMotion();
 	const requestClose = () => {
+		if (closeNotifiedRef.current) return;
+		// No exit frame under reduced motion: unmount in the same event so
+		// closing is instant for users who asked for no animation.
+		if (reduceMotion) {
+			closeNotifiedRef.current = true;
+			onClose();
+			return;
+		}
 		setClosing(true);
 	};
 	// The modal sheet is a native dialog: the browser owns the top layer,
@@ -142,19 +150,29 @@ function DrawerSession({
 			? { onSwipeLeft: closeIfOver }
 			: { onSwipeRight: closeIfOver }),
 	});
-	const slide = {
-		initial: { opacity: 0, x: hiddenX },
-		animate: { opacity: 1, x: 0 },
-		exit: { opacity: 0, x: hiddenX },
-	};
-	// Direct render prop: the latest onClose runs once when the exit
-	// animation completes, with no ref mirror in between.
-	const handleAnimationComplete = () => {
+	// Once-only close: the exit animation and the fallback timer can both
+	// report completion, so the first report owns onClose.
+	const finishClose = useCallback(() => {
 		if (!panelEl.current?.isConnected || !closing || closeNotifiedRef.current)
 			return;
 		closeNotifiedRef.current = true;
 		onClose();
+	}, [closing, onClose]);
+	// animationend covers the normal path. The timer covers environments
+	// that never run animations (jsdom) and an interrupted exit.
+	useEffect(() => {
+		if (!closing) return;
+		const timer = window.setTimeout(
+			finishClose,
+			reduceMotion ? 0 : DRAWER_CLOSE_DURATION + 40,
+		);
+		return () => window.clearTimeout(timer);
+	}, [closing, finishClose, reduceMotion]);
+	const handleAnimationEnd = (event: AnimationEvent<HTMLElement>) => {
+		if (event.target !== event.currentTarget) return;
+		finishClose();
 	};
+	const panelState = closing ? "closed" : "open";
 	const panelClassName = mergeStyles(
 		"fixed inset-y-0 touch-pan-y flex-col overflow-y-auto border-0 border-solid border-line bg-surface text-ink focus:outline-none",
 		side === "left"
@@ -200,22 +218,21 @@ function DrawerSession({
 	// The session implies open. Unmount ends its lifetime without a reset.
 	if (modal)
 		return (
-			<motion.dialog
+			<dialog
 				key="drawer_panel"
 				ref={(node) => {
 					panelEl.current = node;
 				}}
 				className={mergeStyles(
 					panelClassName,
-					"m-0 h-auto max-h-none open:flex backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur)",
+					"waypoint-drawer m-0 h-auto max-h-none open:flex backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur)",
 					side === "left" && "max-w-none",
 				)}
+				data-side={side}
+				data-state={panelState}
 				tabIndex={-1}
 				{...accessibleName}
-				initial={slide.initial}
-				animate={closing ? slide.exit : slide.animate}
-				transition={drawerTransition}
-				onAnimationComplete={handleAnimationComplete}
+				onAnimationEnd={handleAnimationEnd}
 				onCancel={(event) => {
 					// React bubbles cancel through portal ancestry, so a
 					// nested sheet must not also start closing.
@@ -226,23 +243,22 @@ function DrawerSession({
 				onClick={closeIfBackdrop}
 			>
 				{body}
-			</motion.dialog>
+			</dialog>
 		);
 	return (
-		<motion.aside
+		<aside
 			key="drawer_panel"
 			ref={(node) => {
 				panelEl.current = node;
 			}}
-			className={mergeStyles(panelClassName, "flex")}
+			className={mergeStyles(panelClassName, "waypoint-drawer flex")}
+			data-side={side}
+			data-state={panelState}
 			tabIndex={-1}
 			aria-label={label}
-			initial={slide.initial}
-			animate={closing ? slide.exit : slide.animate}
-			transition={drawerTransition}
-			onAnimationComplete={handleAnimationComplete}
+			onAnimationEnd={handleAnimationEnd}
 		>
 			{body}
-		</motion.aside>
+		</aside>
 	);
 }

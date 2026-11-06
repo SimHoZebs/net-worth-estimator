@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { ProjectionUpdating } from "../../components/ProjectionUpdating.tsx";
+import { Skeleton } from "../../components/Skeleton.tsx";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
 import {
@@ -48,7 +49,7 @@ export function PlannedPurchasePanel() {
 	const [removeError, setRemoveError] = useState<string | null>(null);
 	const [moveError, setMoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
-	if (!accounts || !purchases || !startDate) return null;
+	if (!accounts || !purchases || !startDate) return <PurchasesSkeleton />;
 	const items = toPurchaseViewItems({ purchases, accounts, schedule });
 	const end = horizonDate({ start: startDate, years });
 
@@ -129,5 +130,26 @@ export function PlannedPurchasePanel() {
 				</ConfirmDialog>
 			)}
 		</>
+	);
+}
+
+/** Reserve the planner while saved purchases and the model hydrate. */
+function PurchasesSkeleton() {
+	return (
+		<section
+			className="grid gap-6"
+			aria-busy="true"
+			aria-label="Loading planned purchases"
+		>
+			<div className="flex items-center justify-between gap-4">
+				<Skeleton className="h-9 w-48" />
+			</div>
+			<div className="grid gap-4 rounded-surface border border-line bg-surface p-5">
+				<Skeleton className="h-4 w-40" />
+				<Skeleton className="h-20 w-full" />
+				<Skeleton className="h-20 w-full" />
+				<Skeleton className="h-20 w-full" />
+			</div>
+		</section>
 	);
 }

@@ -74,7 +74,7 @@ describe("confirm dialog actions", () => {
 		render(<Harness busy onCancel={onCancel} />);
 		const panel = () =>
 			screen.getByRole("dialog").firstElementChild as HTMLElement;
-		await waitFor(() => expect(panel().style.opacity).toBe("1"));
+		await waitFor(() => expect(panel().dataset.state).toBe("open"));
 		await runInteractions(
 			[
 				{ expectDisabled: ["button", "Deleting…"] },
@@ -87,7 +87,7 @@ describe("confirm dialog actions", () => {
 		);
 		expect(onCancel).not.toHaveBeenCalled();
 		// A busy close request must not start the fade or latch the dialog.
-		expect(panel().style.opacity).toBe("1");
+		expect(panel().dataset.state).toBe("open");
 		await runInteractions([{ expectPresent: ["dialog", "Delete item?"] }]);
 	});
 

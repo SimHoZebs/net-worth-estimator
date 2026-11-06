@@ -197,7 +197,7 @@ describe("animated close", () => {
 		view.rerender(sheet(true));
 		const reopened = view.getByRole("dialog", { name: "Context" });
 		expect(reopened).not.toBe(previous);
-		await waitFor(() => expect(reopened.style.opacity).toBe("1"));
+		await waitFor(() => expect(reopened.dataset.state).toBe("open"));
 		expect(onClose).not.toHaveBeenCalled();
 		requestCancel(reopened);
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
@@ -333,7 +333,7 @@ describe("animated close", () => {
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	});
 
-	it("completes the animated close with reduced motion", async () => {
+	it("closes immediately with reduced motion", () => {
 		stubMatchMedia(true);
 		const onClose = vi.fn();
 		const view = render(
@@ -342,8 +342,8 @@ describe("animated close", () => {
 			</Drawer>,
 		);
 		requestCancel(view.getByRole("dialog", { name: "Navigation" }));
-		expect(onClose).not.toHaveBeenCalled();
-		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+		// No exit frame is requested when the user has reduced motion.
+		expect(onClose).toHaveBeenCalledOnce();
 	});
 
 	it("reopens cleanly after an animated close", async () => {

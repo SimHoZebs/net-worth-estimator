@@ -1,5 +1,5 @@
 import { Check, Flag, Pin, TriangleAlert } from "lucide-react";
-import { useId } from "react";
+import { lazy, Suspense, useId } from "react";
 import { Badge } from "@/components/Badge.tsx";
 import { IconButton } from "@/components/Button.tsx";
 import { Card } from "@/components/Card.tsx";
@@ -15,8 +15,14 @@ import {
 } from "@/domain/financialIndependence.ts";
 import { dateLabel, money, percent } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
-import { FinancialIndependenceModal } from "./FinancialIndependenceModal.tsx";
+import { Skeleton } from "@/components/Skeleton.tsx";
 import { IndependenceVerdict } from "./IndependenceVerdict.tsx";
+
+const FinancialIndependenceModal = lazy(() =>
+	import("./FinancialIndependenceModal.tsx").then((module) => ({
+		default: module.FinancialIndependenceModal,
+	})),
+);
 
 function CoveragePreview({ candidate }: { candidate: IndependenceCandidate }) {
 	const funding = independenceFunding(candidate);
@@ -168,12 +174,14 @@ export function FinancialIndependenceCard({
 				)}
 			</Card>
 			{item.enabled && analysis && inspector !== null && (
-				<FinancialIndependenceModal
-					item={item}
-					analysis={analysis}
-					range={range}
-					onClose={() => setInspector(null)}
-				/>
+				<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+					<FinancialIndependenceModal
+						item={item}
+						analysis={analysis}
+						range={range}
+						onClose={() => setInspector(null)}
+					/>
+				</Suspense>
 			)}
 		</>
 	);

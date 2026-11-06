@@ -1,5 +1,5 @@
 import { CircleHelp } from "lucide-react";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
 	TRAILING_NET_WORTH_DAYS,
 	trailingDailyPoints,
@@ -11,19 +11,42 @@ import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
 import { useSavedAccounts } from "../state/savedState.ts";
 import { visibleAccounts } from "../domain/model.ts";
 import { IconButton, TextButton } from "./Button.tsx";
-import { NetWorthTrendPlot } from "./chart/NetWorthTrendPlot.tsx";
-import { AccountLinesPlot } from "./chart/AccountLinesPlot.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
 import { Notice } from "./Notice.tsx";
 import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
 import { Skeleton } from "./Skeleton.tsx";
 import { SegmentedControl } from "./SegmentedControl.tsx";
 
+// Plot modules pull the chart engine (d3 scales and primitives). The
+// summary and its skeleton own the first frame; the engine arrives while
+// the projection is still calculating.
+const NetWorthTrendPlot = lazy(() =>
+	import("./chart/NetWorthTrendPlot.tsx").then((module) => ({
+		default: module.NetWorthTrendPlot,
+	})),
+);
+const AccountLinesPlot = lazy(() =>
+	import("./chart/AccountLinesPlot.tsx").then((module) => ({
+		default: module.AccountLinesPlot,
+	})),
+);
+
+function preloadPlots() {
+	const load = () => {
+		void import("./chart/NetWorthTrendPlot.tsx");
+		void import("./chart/AccountLinesPlot.tsx");
+	};
+	if (typeof requestIdleCallback === "function")
+		requestIdleCallback(load, { timeout: 2000 });
+	else setTimeout(load, 200);
+}
+
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
 	const [view, setView] = useState<"total" | "accounts">("total");
+	useEffect(preloadPlots, []);
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const savedAccounts = useSavedAccounts();
 	const trendAccounts = useMemo(
@@ -57,7 +80,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	);
 	if (!daily || !projection) {
 		// Only data slots skeletonize, and only while data is absent.
-		if (!pending)
+		if (!pending && savedAccounts !== null)
 			return status === "error" ? (
 				<Notice tone="danger" className="mb-4">
 					<span>Could not calculate forecast. {baseError}</span>
@@ -162,7 +185,15 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 				)}
 				{view === "total" ? (
 					<div className="px-2 pb-2">
-						<NetWorthTrendPlot points={daily} days={days} height={300} />
+						<Suspense
+							fallback={
+								<div aria-busy="true">
+									<Skeleton className="h-72 w-full" />
+								</div>
+							}
+						>
+							<NetWorthTrendPlot points={daily} days={days} height={300} />
+						</Suspense>
 					</div>
 				) : (
 					<div className="px-5 pt-2 pb-5">
@@ -171,11 +202,19 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 								<Skeleton className="h-56 w-full" />
 							</div>
 						) : (
-							<AccountLinesPlot
-								points={daily}
-								accounts={trendAccounts}
-								height={300}
-							/>
+							<Suspense
+								fallback={
+									<div aria-busy="true">
+										<Skeleton className="h-72 w-full" />
+									</div>
+								}
+							>
+								<AccountLinesPlot
+									points={daily}
+									accounts={trendAccounts}
+									height={300}
+								/>
+							</Suspense>
 						)}
 					</div>
 				)}

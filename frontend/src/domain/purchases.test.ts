@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-	plannedPurchaseSchema,
-	transactionSchema,
-	type PlannedPurchase,
-} from "./model.ts";
+import type { PlannedPurchase } from "./model.ts";
+import { plannedPurchaseSchema, transactionSchema } from "./modelSchemas.ts";
 import { movePurchase, purchaseQueue } from "./purchases.ts";
 
 function wish(

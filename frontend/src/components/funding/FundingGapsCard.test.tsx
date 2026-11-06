@@ -86,10 +86,10 @@ function cardProps(
 }
 
 describe("FundingGapsCard", () => {
-	it("keeps the inspector open across data refreshes and closes it when its gap scope empties", () => {
+	it("keeps the inspector open across data refreshes and closes it when its gap scope empties", async () => {
 		const view = render(<FundingGapsCard {...cardProps()} />);
 		fireEvent.click(view.getByRole("button", { name: /Inspect cash flow/ }));
-		expect(view.getByTestId("funding-selection").textContent).toBe(
+		expect((await view.findByTestId("funding-selection")).textContent).toBe(
 			"renovation-2026-03-06-0",
 		);
 		// An unrelated refresh arrives with brand-new identities but the same
@@ -115,7 +115,7 @@ describe("FundingGapsCard", () => {
 		expect(view.queryByTestId("funding-selection")).toBeNull();
 	});
 
-	it("closes the inspector when its gap leaves the scope while other gaps remain", () => {
+	it("closes the inspector when its gap leaves the scope while other gaps remain", async () => {
 		const projection = projectionFixture({
 			transactions: [
 				transactionFixture(),
@@ -129,7 +129,7 @@ describe("FundingGapsCard", () => {
 		const view = render(<FundingGapsCard {...cardProps({ projection })} />);
 		fireEvent.click(view.getByRole("button", { name: /Inspect cash flow/ }));
 		// Gaps order by date: the March renovation gap is inspected first.
-		expect(view.getByTestId("funding-selection").textContent).toBe(
+		expect((await view.findByTestId("funding-selection")).textContent).toBe(
 			"renovation-2026-03-06-0",
 		);
 		// Narrowing the scope removes the inspected gap while the April gap
@@ -143,10 +143,10 @@ describe("FundingGapsCard", () => {
 		expect(view.queryByTestId("funding-selection")).toBeNull();
 	});
 
-	it("closes the inspector explicitly", () => {
+	it("closes the inspector explicitly", async () => {
 		const view = render(<FundingGapsCard {...cardProps()} />);
 		fireEvent.click(view.getByRole("button", { name: /Inspect cash flow/ }));
-		expect(view.getByTestId("funding-selection")).toBeTruthy();
+		expect(await view.findByTestId("funding-selection")).toBeTruthy();
 		fireEvent.click(view.getByRole("button", { name: "Close inspector" }));
 		expect(view.queryByTestId("funding-selection")).toBeNull();
 	});

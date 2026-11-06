@@ -1,5 +1,4 @@
 import { PanelLeftClose, Settings } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
@@ -10,10 +9,7 @@ import { useServerStatus } from "../state/workspaceResources.ts";
 import { useInboxUnreadCount } from "../state/inbox.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
-import {
-	navigationActiveSquareClassName,
-	navigationLinkClassName,
-} from "./navigationStyles.ts";
+import { navigationLinkClassName } from "./navigationStyles.ts";
 
 function SidebarNavLink({
 	href,
@@ -26,34 +22,17 @@ function SidebarNavLink({
 	onClose: () => void;
 	children: ReactNode;
 }) {
-	const reduceMotion = useReducedMotion();
 	return (
 		<a
 			className={mergeStyles(
 				navigationLinkClassName,
-				reduceMotion && active ? "bg-active" : undefined,
+				active ? "bg-active" : undefined,
 			)}
 			href={href}
 			onClick={onClose}
 			aria-current={active ? "page" : undefined}
 		>
-			{active && !reduceMotion && (
-				<motion.span
-					layoutId="workspace-nav-active"
-					aria-hidden="true"
-					className={navigationActiveSquareClassName}
-					initial={false}
-					transition={{ type: "spring", stiffness: 550, damping: 40 }}
-				/>
-			)}
-			{/* Content stays above the pill: the pill is owned by the newly
-				active link, so while it travels it overlaps sibling rows. A
-				positive z-index keeps every row's text above it for the whole
-				flight; without this the pill covers the previous tab's text on
-				its way out. */}
-			<span className="relative z-10 flex min-w-0 items-center gap-3">
-				{children}
-			</span>
+			<span className="flex min-w-0 items-center gap-3">{children}</span>
 		</a>
 	);
 }

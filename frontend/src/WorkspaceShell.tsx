@@ -1,4 +1,5 @@
 import type { SafeSpendingDetailTab } from "./pages/outlook/safe-spending/safeSpendingDetailModel.ts";
+import { Suspense } from "react";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./workspace/useWorkspaceOverlays.ts";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "./workspace/WorkspaceLayout.tsx";
 import { WorkspacePage } from "./workspace/WorkspacePage.tsx";
+import { WorkspacePageSkeleton } from "./workspace/WorkspacePageSkeleton.tsx";
 import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar.tsx";
 
 // The shell owns only local interface state (navigation, overlays). Every
@@ -44,15 +46,17 @@ export function WorkspaceShell() {
 				page={navigation.currentPage}
 				headingRef={navigation.headingRef}
 			/>
-			<WorkspacePage
-				page={navigation.page}
-				onEdit={overlays.openEditor}
-				onEvidence={overlays.openEvidence}
-				onNavigate={navigation.navigate}
-				safeSpendingDetail={overlays.safeSpendingDetail}
-				onSafeSpendingDetail={safeSpendingDetail}
-				onSafeSpendingTab={overlays.switchSafeSpendingTab}
-			/>
+			<Suspense fallback={<WorkspacePageSkeleton label="Loading this page" />}>
+				<WorkspacePage
+					page={navigation.page}
+					onEdit={overlays.openEditor}
+					onEvidence={overlays.openEvidence}
+					onNavigate={navigation.navigate}
+					safeSpendingDetail={overlays.safeSpendingDetail}
+					onSafeSpendingDetail={safeSpendingDetail}
+					onSafeSpendingTab={overlays.switchSafeSpendingTab}
+				/>
+			</Suspense>
 			<WorkspaceEvidence overlays={overlays} />
 		</WorkspaceLayout>
 	);

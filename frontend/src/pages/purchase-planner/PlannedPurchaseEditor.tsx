@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
 import type { Account, PlannedPurchase } from "../../domain/model.ts";
-import { plannedPurchaseSchema, visibleAccounts } from "../../domain/model.ts";
+import { visibleAccounts } from "../../domain/model.ts";
+import { plannedPurchaseSchema } from "../../domain/modelSchemas.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import {
 	saveNewPurchase,

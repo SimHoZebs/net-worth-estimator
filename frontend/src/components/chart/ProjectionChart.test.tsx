@@ -71,7 +71,7 @@ afterEach(() => {
 // Sparse engine rows inside the trailing window expand into one daily point
 // per day: 2026-06-02 holds $1,000 through 2026-06-19, $1,400 from 2026-06-20,
 // and $1,800 on 2026-07-01.
-function show() {
+async function show() {
 	const onEvidence = vi.fn();
 	mockChart(
 		projectionFixture({
@@ -83,6 +83,9 @@ function show() {
 		}),
 	);
 	render(<ProjectionChart onEvidence={onEvidence} />);
+	await screen.findByRole("img", {
+		name: "Net worth over the trailing 30 days",
+	});
 	return { onEvidence };
 }
 
@@ -147,13 +150,13 @@ describe("projection chart inspection", () => {
 		},
 	);
 
-	it("hides the sync comparison until a synced baseline exists", () => {
-		show();
+	it("hides the sync comparison until a synced baseline exists", async () => {
+		await show();
 		expect(screen.queryByText(/since first sync/)).toBeNull();
 	});
 
-	it("renders the trailing window as an accessible TanStack chart", () => {
-		show();
+	it("renders the trailing window as an accessible TanStack chart", async () => {
+		await show();
 		const chart = screen.getByRole("img", {
 			name: "Net worth over the trailing 30 days",
 		});
@@ -165,8 +168,8 @@ describe("projection chart inspection", () => {
 		expect(totalDescription()).toContain("The solid $0 line marks no debt.");
 	});
 
-	it("opens the evidence action from the graph", () => {
-		const { onEvidence } = show();
+	it("opens the evidence action from the graph", async () => {
+		const { onEvidence } = await show();
 		fireEvent.click(
 			screen.getByRole("button", {
 				name: "Inspect current net worth evidence",
@@ -175,8 +178,8 @@ describe("projection chart inspection", () => {
 		expect(onEvidence).toHaveBeenCalledOnce();
 	});
 
-	it("switches between 30-day and 90-day windows", () => {
-		show();
+	it("switches between 30-day and 90-day windows", async () => {
+		await show();
 		expect(
 			screen.getByRole("img", {
 				name: "Net worth over the trailing 30 days",
@@ -202,7 +205,7 @@ describe("projection chart inspection", () => {
 		).toBeTruthy();
 	});
 
-	it("hides the $0 line for an all-debt window", () => {
+	it("hides the $0 line for an all-debt window", async () => {
 		mockChart(
 			projectionFixture({
 				points: [
@@ -212,6 +215,9 @@ describe("projection chart inspection", () => {
 			}),
 		);
 		const { container } = render(<ProjectionChart onEvidence={vi.fn()} />);
+		await screen.findByRole("img", {
+			name: "Net worth over the trailing 30 days",
+		});
 		const desc =
 			container.querySelector("svg.ts-chart desc")?.textContent ?? "";
 		// The accessible description carries the zero-line decision, so the
@@ -220,7 +226,7 @@ describe("projection chart inspection", () => {
 		expect(desc).toContain("-$65,800");
 	});
 
-	it("toggles between the total line and the account stack", () => {
+	it("toggles between the total line and the account stack", async () => {
 		mockedAccounts.mockReturnValue(financialModelFixture.accounts);
 		mockChart(
 			projectionFixture({
@@ -241,7 +247,7 @@ describe("projection chart inspection", () => {
 		render(<ProjectionChart onEvidence={vi.fn()} />);
 		// The total line renders first as a TanStack chart.
 		expect(
-			screen.getByRole("img", {
+			await screen.findByRole("img", {
 				name: "Net worth over the trailing 30 days",
 			}),
 		).toBeTruthy();
@@ -253,7 +259,7 @@ describe("projection chart inspection", () => {
 			}),
 		).toBeNull();
 		expect(
-			screen.getByRole("img", {
+			await screen.findByRole("img", {
 				name: "Net worth by account over the trailing window",
 			}),
 		).toBeTruthy();
@@ -265,12 +271,12 @@ describe("projection chart inspection", () => {
 		).toBeTruthy();
 	});
 
-	it("explains an account view with no per-account data", () => {
+	it("explains an account view with no per-account data", async () => {
 		mockedAccounts.mockReturnValue(financialModelFixture.accounts);
-		show();
+		await show();
 		fireEvent.click(screen.getByRole("button", { name: "Accounts" }));
 		expect(
-			screen.getByText("No per-account data in this window."),
+			await screen.findByText("No per-account data in this window."),
 		).toBeTruthy();
 	});
 });

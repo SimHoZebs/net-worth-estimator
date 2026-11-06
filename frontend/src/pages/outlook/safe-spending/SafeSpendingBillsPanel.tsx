@@ -6,7 +6,8 @@ import {
 	ShoppingBag,
 	Wallet,
 } from "lucide-react";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
+import { Skeleton } from "../../../components/Skeleton.tsx";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
@@ -30,7 +31,11 @@ import type {
 } from "./safeSpendingDetailModel.ts";
 import { bundleDatesText } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
-import { SafeSpendingTrendChart } from "./SafeSpendingTrendChart.tsx";
+const SafeSpendingTrendChart = lazy(() =>
+	import("./SafeSpendingTrendChart.tsx").then((module) => ({
+		default: module.SafeSpendingTrendChart,
+	})),
+);
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
 import {
 	householdPanelStyles,
@@ -238,7 +243,15 @@ export function SafeSpendingBillsPanel({
 				</ul>
 				{trend && (
 					<div className="border-t border-line pt-3">
-						<SafeSpendingTrendChart trend={trend} historical={closed} />
+						<Suspense
+							fallback={
+								<div aria-busy="true">
+									<Skeleton className="h-40 w-full" />
+								</div>
+							}
+						>
+							<SafeSpendingTrendChart trend={trend} historical={closed} />
+						</Suspense>
 					</div>
 				)}
 			</section>

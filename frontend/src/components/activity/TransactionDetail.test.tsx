@@ -422,7 +422,7 @@ it("asks before closing a touched edit and keeps the dialog responsive", async (
 		target: { value: "Home renovation updated" },
 	});
 	const panel = screen.getByRole("dialog").firstElementChild as HTMLElement;
-	await waitFor(() => expect(panel.style.opacity).toBe("1"));
+	await waitFor(() => expect(panel.dataset.state).toBe("open"));
 	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
 	const prompt = screen
 		.getByText("Discard the changes in this form?")
@@ -430,7 +430,7 @@ it("asks before closing a touched edit and keeps the dialog responsive", async (
 	expect(prompt).toBeTruthy();
 	expect(onClose).not.toHaveBeenCalled();
 	// The veto runs before the exit animation, so the prompt stays visible.
-	expect(panel.style.opacity).not.toBe("0");
+	expect(panel.dataset.state).not.toBe("closed");
 	// Continue clears the prompt; the next close asks again instead of
 	// being latched off by the first request.
 	fireEvent.click(within(prompt).getByRole("button", { name: "Continue" }));
@@ -477,7 +477,7 @@ it("keeps the discard confirmation after a failed occurrence claim", async () =>
 	await screen.findByText("Discard the changes in this form?");
 	expect(onClose).not.toHaveBeenCalled();
 	// A failed save must not make closing fade the panel and strand the user.
-	expect(panel.style.opacity).not.toBe("0");
+	expect(panel.dataset.state).not.toBe("closed");
 	// Close requests keep the prompt visible; only its Discard button closes.
 	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
 	expect(onClose).not.toHaveBeenCalled();

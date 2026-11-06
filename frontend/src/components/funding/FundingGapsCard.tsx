@@ -6,7 +6,7 @@ import {
 	ShieldCheck,
 	TriangleAlert,
 } from "lucide-react";
-import { useId, useMemo } from "react";
+import { lazy, Suspense, useId, useMemo } from "react";
 import { dateLabel, money } from "@/domain/format.ts";
 import {
 	deriveFundingGaps,
@@ -29,8 +29,14 @@ import { IconButton } from "@/components/Button.tsx";
 import { Badge } from "@/components/Badge.tsx";
 import { Card } from "@/components/Card.tsx";
 import { mergeStyles } from "@/components/mergeStyles.ts";
-import { FundingGapsModal } from "@/components/funding/FundingGapsModal.tsx";
+import { Skeleton } from "@/components/Skeleton.tsx";
 import { useSelectedId } from "@/components/entrySelection.ts";
+
+const FundingGapsModal = lazy(() =>
+	import("@/components/funding/FundingGapsModal.tsx").then((module) => ({
+		default: module.FundingGapsModal,
+	})),
+);
 
 /** The same configured funding-gap preview and inspector on both pages. */
 export function FundingGapsCard({
@@ -245,12 +251,14 @@ export function FundingGapsCard({
 				)}
 			</Card>
 			{selected !== null && (
-				<FundingGapsModal
-					gaps={gaps}
-					selectedId={selected}
-					onSelect={setSelectedId}
-					onClose={() => setSelectedId(null)}
-				/>
+				<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+					<FundingGapsModal
+						gaps={gaps}
+						selectedId={selected}
+						onSelect={setSelectedId}
+						onClose={() => setSelectedId(null)}
+					/>
+				</Suspense>
 			)}
 		</>
 	);

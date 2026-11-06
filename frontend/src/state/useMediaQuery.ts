@@ -4,15 +4,23 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 export const viewportQueries = {
 	belowSm: "(width < 40rem)",
 	belowMd: "(width < 48rem)",
+	reducedMotion: "(prefers-reduced-motion: reduce)",
 } as const;
 
 export function useMediaQuery(
 	query: string,
 	onChange?: (matches: boolean) => void,
 ) {
-	const media = useMemo(() => window.matchMedia(query), [query]);
+	const media = useMemo(
+		() =>
+			typeof window === "undefined" || typeof window.matchMedia !== "function"
+				? null
+				: window.matchMedia(query),
+		[query],
+	);
 	const subscribe = useCallback(
 		(notify: () => void) => {
+			if (!media) return () => {};
 			const update = () => {
 				onChange?.(media.matches);
 				notify();
@@ -24,7 +32,12 @@ export function useMediaQuery(
 	);
 	return useSyncExternalStore(
 		subscribe,
-		() => media.matches,
+		() => media?.matches ?? false,
 		() => false,
 	);
+}
+
+/** Motion preference for components that own a CSS animation fallback. */
+export function usePrefersReducedMotion(): boolean {
+	return useMediaQuery(viewportQueries.reducedMotion);
 }

@@ -1,11 +1,7 @@
 import { Wallet } from "lucide-react";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
-import {
-	useSavedAccounts,
-	useSavedStartDate,
-	useSavedTransactions,
-} from "../state/savedState.ts";
+import { useSavedAccounts } from "../state/savedState.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
@@ -52,15 +48,17 @@ function OutlookContent({
 	onSafeSpendingDetail,
 	onSafeSpendingTab,
 }: OutlookProps) {
-	// Every data input subscribes where it is used; only UI
-	// callbacks arrive as props. Saved rows arrive through the row hooks;
-	// null means not loaded yet, [] means loaded blank.
+	// Every data input subscribes where it is used; only UI callbacks
+	// arrive as props. Saved rows arrive through the row hooks; null means
+	// not loaded yet, [] means loaded blank.
+	//
+	// The sections mount immediately and reserve their own slots. Gating the
+	// whole page on all three row sources would mount their hooks in a second
+	// wave after data arrives, and every "always" refetch policy would then
+	// duplicate the first request.
 	const accounts = useSavedAccounts();
-	const transactions = useSavedTransactions();
-	const startDate = useSavedStartDate();
 	const writeBlocked = useUserReadOnly();
-	if (!accounts || !transactions || !startDate) return null;
-	if (accounts.length === 0) {
+	if (accounts && accounts.length === 0) {
 		const readOnly = writeBlocked;
 		return (
 			<EmptyState

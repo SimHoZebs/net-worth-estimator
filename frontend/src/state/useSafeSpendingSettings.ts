@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useReducer } from "react";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import {
@@ -86,7 +86,10 @@ export function sanitizeSafeSpendingSettings(
 }
 
 interface SafeSpendingSettingsState extends TotalCycleSettings {
+	pending: boolean;
+	error: boolean;
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
+	retry: () => void;
 }
 
 export function safeSpendingSettingsKey(scope = getUserScope()) {
@@ -116,10 +119,6 @@ export function getSafeSpendingSettings(
 		: (serverQueryClient().getQueryData<TotalCycleSettings>(
 				safeSpendingSettingsKey(scope),
 			) ?? defaults);
-}
-
-function subscribeSettings(listener: () => void) {
-	return serverQueryClient().getQueryCache().subscribe(listener);
 }
 
 export function updateSettingsForScope(scope: UserScope = getUserScope()) {
@@ -212,17 +211,28 @@ export async function refreshSafeSpendingSettings() {
 /** Query owns both the saved response and its explicit optimistic updates. */
 export function useSafeSpendingSettings(): SafeSpendingSettingsState {
 	const scope = useUserScope();
-	useQuery(
+	const query = useQuery(
 		{ ...settingsOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
 	);
-	// Controlled inputs need the cache write in the same event, before Query's batched observer notification.
-	const settings = useSyncExternalStore(subscribeSettings, () =>
-		getSafeSpendingSettings(scope),
-	);
+	// The optimistic write must be visible in the same event, before Query
+	// batches its observer notification. Read the cache directly and bump a
+	// local counter after the write; useQuery still owns fetching and the
+	// pending state. A second QueryCache subscription would announce the
+	// same transition twice and can update this component while it renders.
+	const [, bump] = useReducer((version: number) => version + 1, 0);
+	const settings = getSafeSpendingSettings(scope);
 	return {
 		...settings,
-		updateSettings: updateSettingsForScope(scope),
+		pending: query.isPending,
+		error: query.isError,
+		retry: () => {
+			void query.refetch();
+		},
+		updateSettings: (next) => {
+			updateSettingsForScope(scope)(next);
+			bump();
+		},
 	};
 }
 
@@ -235,7 +245,11 @@ function bindFinancialPreferences(): void {
 		void cache.fetchQuery(settingsOptions(scope)).catch(() => {});
 }
 
-/** The session boundary waits for this owner before it mounts financial screens. */
+/**
+ * Await this owner's stored preferences. The session boundary no longer
+ * gates the workspace on them; screens that read financial settings show
+ * their own pending slot until the query resolves.
+ */
 export async function hydrateFinancialPreferences(
 	scope: UserScope,
 ): Promise<boolean> {

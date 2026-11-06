@@ -1,5 +1,6 @@
 import { Flag, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Skeleton } from "@/components/Skeleton.tsx";
 import { Button } from "@/components/Button.tsx";
 import { EmptyState } from "@/components/EmptyState.tsx";
 import { ErrorNotice } from "@/components/ErrorNotice.tsx";
@@ -102,7 +103,7 @@ export function EvaluationsPage({
 				);
 		});
 	};
-	if (!accounts || !transactions || !startDate) return null;
+	if (!accounts || !transactions || !startDate) return <EvaluationsSkeleton />;
 	return (
 		<>
 			{projectionQuery.loading && projection && <ProjectionUpdating />}
@@ -161,5 +162,32 @@ export function EvaluationsPage({
 				))}
 			</div>
 		</>
+	);
+}
+
+/** Keep the add action and card grid stable while rows hydrate. */
+function EvaluationsSkeleton() {
+	return (
+		<section
+			className="grid gap-6"
+			aria-busy="true"
+			aria-label="Loading evaluations"
+		>
+			<div className="flex items-center justify-between gap-4">
+				<Skeleton className="h-9 w-40" />
+			</div>
+			<div className="grid grid-cols-2 gap-6 max-lg:gap-4 max-sm:grid-cols-1">
+				<div className="rounded-surface border border-line bg-surface p-5">
+					<Skeleton className="h-4 w-32" />
+					<Skeleton className="mt-4 h-8 w-44" />
+					<Skeleton className="mt-4 h-24 w-full" />
+				</div>
+				<div className="rounded-surface border border-line bg-surface p-5">
+					<Skeleton className="h-4 w-32" />
+					<Skeleton className="mt-4 h-8 w-44" />
+					<Skeleton className="mt-4 h-24 w-full" />
+				</div>
+			</div>
+		</section>
 	);
 }

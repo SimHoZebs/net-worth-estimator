@@ -1,5 +1,4 @@
 import { useEffect, useEffectEvent } from "react";
-import { useReducedMotion } from "motion/react";
 
 // Shared slide primitives for the single Drawer component: the left
 // navigation sheet and the right context sheet slide the full off-canvas
@@ -7,31 +6,9 @@ import { useReducedMotion } from "motion/react";
 // width on larger viewports. Swipe detection is drawer-agnostic: each call
 // site maps a direction to its own meaning with its own hit-test.
 
-export const DRAWER_EASE = "easeOut" as const;
-export const DRAWER_OPEN_DURATION = 0.2;
-export const DRAWER_CLOSE_DURATION = 0.12;
+export const DRAWER_CLOSE_DURATION = 120;
 
 export type DrawerSide = "left" | "right";
-
-/** Off-canvas resting position for the shared slide animation. */
-export function drawerHiddenX(side: DrawerSide): string {
-	return side === "left" ? "-100%" : "100%";
-}
-
-export function useDrawerTransition(closing: boolean): {
-	duration: number;
-	ease: typeof DRAWER_EASE;
-} {
-	const reduceMotion = useReducedMotion();
-	return {
-		duration: reduceMotion
-			? 0
-			: closing
-				? DRAWER_CLOSE_DURATION
-				: DRAWER_OPEN_DURATION,
-		ease: DRAWER_EASE,
-	};
-}
 
 export function useHorizontalSwipe({
 	enabled,

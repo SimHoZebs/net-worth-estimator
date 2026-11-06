@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
+import { Skeleton } from "../../components/Skeleton.tsx";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { TablePagination } from "../../components/DataTable.tsx";
@@ -281,7 +282,7 @@ function TransactionsView({
 			}),
 		[visible, query, schedule, order],
 	);
-	if (!accounts || !startDate) return null;
+	if (!accounts || !startDate) return <AccountSectionsSkeleton />;
 	const pageCount = Math.max(
 		1,
 		Math.ceil(sortedTransactions.length / TRANSACTIONS_PAGE_SIZE),
@@ -388,5 +389,27 @@ function TransactionsView({
 				/>
 			)}
 		</Tabs>
+	);
+}
+
+/** Reserve the row table while saved accounts hydrate. */
+function AccountSectionsSkeleton() {
+	return (
+		<section
+			className="grid gap-4"
+			aria-busy="true"
+			aria-label="Loading accounts"
+		>
+			<div className="flex min-w-0 items-center justify-between gap-4">
+				<Skeleton className="h-9 w-[60%] max-w-56" />
+				<Skeleton className="h-9 w-[30%] max-w-32" />
+			</div>
+			<div className="grid gap-3 rounded-surface border border-line bg-surface p-5">
+				<Skeleton className="h-4 w-40" />
+				<Skeleton className="h-14 w-full" />
+				<Skeleton className="h-14 w-full" />
+				<Skeleton className="h-14 w-full" />
+			</div>
+		</section>
 	);
 }

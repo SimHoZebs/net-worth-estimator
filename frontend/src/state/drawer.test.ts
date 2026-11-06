@@ -1,11 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	DRAWER_CLOSE_DURATION,
-	DRAWER_OPEN_DURATION,
-	drawerHiddenX,
-	useHorizontalSwipe,
-} from "./drawer.ts";
+import { useHorizontalSwipe } from "./drawer.ts";
 
 beforeEach(() => {
 	vi.spyOn(window, "addEventListener");
@@ -14,17 +9,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
-});
-
-describe("shared drawer slide", () => {
-	it("slides the full off-canvas width, mirrored by side", () => {
-		expect(drawerHiddenX("left")).toBe("-100%");
-		expect(drawerHiddenX("right")).toBe("100%");
-	});
-
-	it("opens slower than it closes", () => {
-		expect(DRAWER_OPEN_DURATION).toBeGreaterThan(DRAWER_CLOSE_DURATION);
-	});
 });
 
 describe("horizontal swipe callbacks", () => {
