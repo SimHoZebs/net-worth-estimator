@@ -40,7 +40,9 @@ test("settled bank history draws recorded flows with exact totals", async ({
 	// history: no fixture rows, no forecast occurrences.
 	await page.getByLabel("From date", { exact: true }).fill("2025-06-01");
 	await page.getByLabel("Through date", { exact: true }).fill("2025-12-31");
-	const status = page.getByRole("status");
+	const status = page.getByRole("status", {
+		name: /from 2025-06-01 through 2025-12-31/,
+	});
 	await expect(status).toContainText(/from 2025-06-01 through 2025-12-31/);
 	await page
 		.getByRole("group", { name: "Diagram or table view" })
