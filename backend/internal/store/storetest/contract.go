@@ -13,7 +13,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const receiptPostingID = "01900000-0000-7000-8000-000000000099"
+const receiptTransactionID = "01900000-0000-7000-8000-000000000099"
 
 // Run proves any Store implementation honors the persistence contract using
 // only the public interface: no SQL, no file paths, no implementation types.
@@ -353,7 +353,7 @@ func testAmountPresetConformanceRoundTrip(t *testing.T, newStore func(*testing.T
 func testPresetFixture(name string) types.AmountPreset {
 	return types.AmountPreset{
 		Name: name, Label: "Label " + name, Enabled: true,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "10"},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -363,7 +363,7 @@ func testPresetFixture(name string) types.AmountPreset {
 
 func testReceiptConformance(t *testing.T, newStore func(*testing.T) store.Store) {
 	s := newStore(t)
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	r, err := s.CreateReceipt(context.Background(), p.ID, "receipt.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
@@ -381,11 +381,11 @@ func testReceiptConformance(t *testing.T, newStore func(*testing.T) store.Store)
 		t.Fatalf("stale review: %v", err)
 	}
 	p.Name = "Updated"
-	if _, err := s.UpdatePosting(p); err != nil {
+	if _, err := s.UpdateTransaction(p); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.GetReceipt(r.ID); err != nil {
-		t.Fatal("posting update removed evidence", err)
+		t.Fatal("transaction update removed evidence", err)
 	}
 	r, err = s.ReplaceReceiptImage(context.Background(), r.ID, r.Revision, "replacement.png", types.ReceiptImage{Bytes: []byte("new pixels"), MediaType: "image/png"})
 	if err != nil || r.Draft != nil || r.Status != "attached" {
@@ -399,10 +399,10 @@ func testReceiptConformance(t *testing.T, newStore func(*testing.T) store.Store)
 	}
 }
 
-func seedReceiptPosting(t *testing.T, s store.Store) types.Posting {
+func seedReceiptTransaction(t *testing.T, s store.Store) types.Transaction {
 	t.Helper()
 	seedAccount(t, s, "checking")
-	p, err := s.CreatePosting(testPostingFixture(receiptPostingID))
+	p, err := s.CreateTransaction(testTransactionFixture(receiptTransactionID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,13 +433,13 @@ func testRowRoundTripsPreserveOrder(t *testing.T, newStore func(*testing.T) stor
 	}
 }
 
-func testPostingFixture(id string) types.Posting {
+func testTransactionFixture(id string) types.Transaction {
 	source := "checking"
-	return types.Posting{
+	return types.Transaction{
 		ID:              id,
-		Name:            "Posting " + id,
+		Name:            "Transaction " + id,
 		SourceAccountID: &source,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1782950400, TransactionTime: 1782950400,
 		Enabled: true,
 	}
@@ -483,7 +483,7 @@ func testStoreRoundTripsCanonicalModelMetadataAndOrder(t *testing.T, newStore fu
 	if err != nil || empty == nil {
 		t.Fatalf("load model = %+v, err %v", empty, err)
 	}
-	if empty.Accounts == nil || empty.Checkpoints == nil || empty.Postings == nil {
+	if empty.Accounts == nil || empty.Checkpoints == nil || empty.Transactions == nil {
 		t.Fatalf("empty collections were not normalized: %+v", empty)
 	}
 
@@ -534,11 +534,11 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	seedSyncState(t, st)
 
 	// UUIDs carry no ownership meaning. Owner writes cannot assert sync metadata.
-	forged := testPostingFixture("01900000-0000-7000-8000-000000000013")
+	forged := testTransactionFixture("01900000-0000-7000-8000-000000000013")
 	forged.Source, forged.Pending = store.SourceBankSync, true
-	created, err := st.CreatePosting(forged)
+	created, err := st.CreateTransaction(forged)
 	if err != nil || created.Source != store.SourceUser || created.Pending {
-		t.Fatalf("owner posting metadata = %+v, err %v", created, err)
+		t.Fatalf("owner transaction metadata = %+v, err %v", created, err)
 	}
 
 	// Sync-owned (void) rows refuse owner updates and deletes.
@@ -546,30 +546,30 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	if err != nil {
 		t.Fatalf("load model: %v", err)
 	}
-	var synced types.Posting
-	for _, posting := range stored.Postings {
-		if posting.Source == store.SourceBankSync {
-			synced = posting
+	var synced types.Transaction
+	for _, transaction := range stored.Transactions {
+		if transaction.Source == store.SourceBankSync {
+			synced = transaction
 		}
 	}
 	// Update refusal is checked on a void sync row (void rows stay
 	// sync-owned for updates).
 	voided := synced
 	if _, err := st.ApplySync(nil, []store.BankDirective{{Void: synced.ID}}); err != nil {
-		t.Fatalf("void sync posting: %v", err)
+		t.Fatalf("void sync transaction: %v", err)
 	}
 	reloaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("reload: %v", err)
 	}
-	for _, posting := range reloaded.Postings {
-		if posting.ID == synced.ID {
-			voided = posting
+	for _, transaction := range reloaded.Transactions {
+		if transaction.ID == synced.ID {
+			voided = transaction
 		}
 	}
 	voided.Name = "Edited"
-	if _, err := st.UpdatePosting(voided); !store.IsSyncOwned(err) {
-		t.Fatalf("update sync posting err = %v, want sync-owned", err)
+	if _, err := st.UpdateTransaction(voided); !store.IsSyncOwned(err) {
+		t.Fatalf("update sync transaction err = %v, want sync-owned", err)
 	}
 	// Pending and settled bank rows are owner-editable (including delete)
 	// now; only void rows stay sync-owned, and those are tested above for
@@ -596,12 +596,12 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 			t.Fatalf("forged checkpoint flag persisted: %+v", checkpoint)
 		}
 	}
-	_, sources := loadPostingIDs(t, st)
+	_, sources := loadTransactionIDs(t, st)
 	if sources[synced.ID] != store.SourceBankSync {
-		t.Fatalf("stored sync posting lost flag: %v", sources)
+		t.Fatalf("stored sync transaction lost flag: %v", sources)
 	}
-	if sources[ownerPostingID] != store.SourceUser || sources[created.ID] != store.SourceUser {
-		t.Fatalf("owner posting flags = %v", sources)
+	if sources[ownerTransactionID] != store.SourceUser || sources[created.ID] != store.SourceUser {
+		t.Fatalf("owner transaction flags = %v", sources)
 	}
 }
 
@@ -708,8 +708,8 @@ func testApplySyncRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.
 	seedAccount(t, st, "prime_card")
 
 	first, err := st.ApplySync(nil, []store.BankDirective{
-		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
-		syncPendingDirective(syncPendingPosting("b", "prime_card", "2026-08-02")),
+		syncPendingDirective(syncPendingTransaction("a", "prime_card", "2026-08-02")),
+		syncPendingDirective(syncPendingTransaction("b", "prime_card", "2026-08-02")),
 	})
 	if err != nil || first.PendingInserted != 2 {
 		t.Fatalf("first apply = %+v, err %v", first, err)
@@ -719,17 +719,17 @@ func testApplySyncRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.
 		t.Fatal(err)
 	}
 	ids := map[string]string{}
-	for _, posting := range loaded.Postings {
-		if posting.Source == store.SourceBankSync && posting.Pending {
-			ids[posting.Name] = posting.ID
+	for _, transaction := range loaded.Transactions {
+		if transaction.Source == store.SourceBankSync && transaction.Pending {
+			ids[transaction.Name] = transaction.ID
 		}
 	}
 	if len(ids) != 2 {
-		t.Fatalf("pending rows = %+v", loaded.Postings)
+		t.Fatalf("pending rows = %+v", loaded.Transactions)
 	}
 	second, err := st.ApplySync(nil, []store.BankDirective{
-		syncPendingDirective(syncPendingPosting("b", "prime_card", "2026-08-03")),
-		syncPendingDirective(syncPendingPosting("c", "prime_card", "2026-08-03")),
+		syncPendingDirective(syncPendingTransaction("b", "prime_card", "2026-08-03")),
+		syncPendingDirective(syncPendingTransaction("c", "prime_card", "2026-08-03")),
 		{Void: ids["Pending a"]},
 	})
 	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
@@ -743,12 +743,12 @@ func testApplySyncRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.
 	if len(got) != 2 {
 		t.Fatalf("pending rows = %+v, want b and c", got)
 	}
-	for _, posting := range reloaded.Postings {
-		if posting.ID == ids["Pending a"] {
+	for _, transaction := range reloaded.Transactions {
+		if transaction.ID == ids["Pending a"] {
 			// A void transition stops participation: pending/void
 			// rows are stored disabled, never as execution gates.
-			if !posting.Void || posting.Pending || posting.Enabled {
-				t.Fatalf("voided row must stay disabled: %+v", posting)
+			if !transaction.Void || transaction.Pending || transaction.Enabled {
+				t.Fatalf("voided row must stay disabled: %+v", transaction)
 			}
 		}
 	}
@@ -768,30 +768,30 @@ func withSourceUser(checkpoints []types.Checkpoint) []types.Checkpoint {
 	return out
 }
 
-func syncPendingPosting(id, accountID, day string) store.SyncPosting {
+func syncPendingTransaction(id, accountID, day string) store.SyncTransaction {
 	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
 	if err != nil {
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
-	return store.SyncPosting{
+	return store.SyncTransaction{
 		ProviderAccountID: "bridge-" + accountID,
 		TransactionID:     id,
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            "Pending " + id,
 			SourceAccountID: &accountID,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
 		},
 	}
 }
 
-func syncPendingDirective(item store.SyncPosting) store.BankDirective {
+func syncPendingDirective(item store.SyncTransaction) store.BankDirective {
 	item.Source = store.SourceBankSync
 	item.Pending = true
 	return store.BankDirective{Upsert: &store.BankUpsert{
-		Posting: item.Posting,
-		Keys:    []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+		Transaction: item.Transaction,
+		Keys:        []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
 	}}
 }
 
@@ -880,7 +880,7 @@ func testApplySyncKeepsProviderCheckpointIdentity(t *testing.T, newStore func(*t
 	}
 }
 
-const ownerPostingID = "01900000-0000-7000-8000-000000000010"
+const ownerTransactionID = "01900000-0000-7000-8000-000000000010"
 
 func seedOwnerModel(t *testing.T, st store.Store) {
 	t.Helper()
@@ -895,9 +895,9 @@ func seedOwnerModel(t *testing.T, st store.Store) {
 			t.Fatalf("seed checkpoint: %v", err)
 		}
 	}
-	for _, posting := range model.Postings {
-		if _, err := st.CreatePosting(posting); err != nil {
-			t.Fatalf("seed posting %s: %v", posting.ID, err)
+	for _, transaction := range model.Transactions {
+		if _, err := st.CreateTransaction(transaction); err != nil {
+			t.Fatalf("seed transaction %s: %v", transaction.ID, err)
 		}
 	}
 }
@@ -907,7 +907,7 @@ func seedSyncState(t *testing.T, st store.Store) {
 	if _, err := st.CreateAccount(types.Account{ID: "prime_card", Name: "Prime", Enabled: true}); err != nil {
 		t.Fatalf("seed card account: %v", err)
 	}
-	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
+	seed := syncPendingTransaction("tx1", "prime_card", "2026-08-02")
 	summary, err := st.ApplySync(
 		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785628799, Balance: 111, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN}},
 		[]store.BankDirective{syncPendingDirective(seed)})
@@ -916,13 +916,13 @@ func seedSyncState(t *testing.T, st store.Store) {
 	}
 }
 
-func loadPostingIDs(t *testing.T, st store.Store) (ids []string, sources map[string]string) {
+func loadTransactionIDs(t *testing.T, st store.Store) (ids []string, sources map[string]string) {
 	t.Helper()
 	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load model: %v", err)
 	}
-	return postingIDsFromModel(loaded)
+	return transactionIDsFromModel(loaded)
 }
 
 func findCheckpoint(model *types.FinancialModel, accountID string, observedAt int64) (types.Checkpoint, bool) {
@@ -948,22 +948,22 @@ func ownerModel() *types.FinancialModel {
 			{ObservedAt: 1782950399, AccountID: "checking", Balance: 500},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
-		Postings: []types.Posting{{
-			ID: ownerPostingID, Name: "Owner", SourceAccountID: &checking,
-			Amount:     types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Transactions: []types.Transaction{{
+			ID: ownerTransactionID, Name: "Owner", SourceAccountID: &checking,
+			Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime: 1782950400, TransactionTime: 1782950400,
 		}},
 	}
 }
 
-func postingIDsFromModel(model *types.FinancialModel) (ids []string, sources map[string]string) {
+func transactionIDsFromModel(model *types.FinancialModel) (ids []string, sources map[string]string) {
 	sources = map[string]string{}
 	if model == nil {
 		return ids, sources
 	}
-	for _, posting := range model.Postings {
-		ids = append(ids, posting.ID)
-		sources[posting.ID] = posting.Source
+	for _, transaction := range model.Transactions {
+		ids = append(ids, transaction.ID)
+		sources[transaction.ID] = transaction.Source
 	}
 	return ids, sources
 }
@@ -973,9 +973,9 @@ func syncedPendingIDs(model *types.FinancialModel) []string {
 	if model == nil {
 		return ids
 	}
-	for _, posting := range model.Postings {
-		if posting.Pending && posting.Source != store.SourceUser {
-			ids = append(ids, posting.ID)
+	for _, transaction := range model.Transactions {
+		if transaction.Pending && transaction.Source != store.SourceUser {
+			ids = append(ids, transaction.ID)
 		}
 	}
 	return ids
@@ -1116,13 +1116,13 @@ func testSettledBankRowRoundTrip(t *testing.T, newStore func(*testing.T) store.S
 	t.Helper()
 	st := newStore(t)
 	seedOwnerModel(t, st)
-	settled := store.SyncPosting{
+	settled := store.SyncTransaction{
 		ProviderAccountID: "bridge-checking",
 		TransactionID:     "posted-1",
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            "Posted",
 			SourceAccountID: strptr("checking"),
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785817200,
 			TransactionTime: 1785817200,
 			Enabled:         true,
@@ -1131,8 +1131,8 @@ func testSettledBankRowRoundTrip(t *testing.T, newStore func(*testing.T) store.S
 	settled.Source = store.SourceBankSync
 	summary, err := st.ApplySync(nil, []store.BankDirective{{
 		Upsert: &store.BankUpsert{
-			Posting: settled.Posting,
-			Keys:    []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: settled.ProviderAccountID, TransactionID: settled.TransactionID}},
+			Transaction: settled.Transaction,
+			Keys:        []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: settled.ProviderAccountID, TransactionID: settled.TransactionID}},
 		},
 	}})
 	if err != nil || summary.SettledInserted != 1 {
@@ -1143,19 +1143,19 @@ func testSettledBankRowRoundTrip(t *testing.T, newStore func(*testing.T) store.S
 		t.Fatalf("load: %v", err)
 	}
 	banked := false
-	for _, posting := range loaded.Postings {
-		if posting.Source == store.SourceBankSync {
+	for _, transaction := range loaded.Transactions {
+		if transaction.Source == store.SourceBankSync {
 			banked = true
-			if posting.Pending || posting.Void {
-				t.Fatalf("settled bank row mislabeled: %+v", posting)
+			if transaction.Pending || transaction.Void {
+				t.Fatalf("settled bank row mislabeled: %+v", transaction)
 			}
-			if !posting.Enabled {
-				t.Fatalf("settled bank row must stay enabled: %+v", posting)
+			if !transaction.Enabled {
+				t.Fatalf("settled bank row must stay enabled: %+v", transaction)
 			}
 		}
 	}
 	if !banked {
-		t.Fatalf("no settled bank row: %+v", loaded.Postings)
+		t.Fatalf("no settled bank row: %+v", loaded.Transactions)
 	}
 }
 

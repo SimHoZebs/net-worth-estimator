@@ -12,7 +12,7 @@ import { parseDisplayNumber } from "./formValues.ts";
  * A transaction is one fact. Its form carries the day it happened and never a
  * cadence. Growth and end dates belong to schedules.
  */
-export interface PostingFormValues {
+export interface TransactionFormValues {
 	name: string;
 	amount: number;
 	fromId: string | null;
@@ -38,7 +38,7 @@ export interface ScheduleFormValues {
 	enabled: boolean;
 }
 
-export interface PostingDraftValues {
+export interface TransactionDraftValues {
 	name: string;
 	amount: string;
 	fromId: string;
@@ -92,7 +92,9 @@ function authoredAmount(amount: number, annualIncrease: number) {
  * Explicit new transaction body for creates. Every authored field is stated
  * outright; lifecycle state belongs to the server.
  */
-export function postingBody(values: PostingFormValues): TransactionRecordBody {
+export function transactionBody(
+	values: TransactionFormValues,
+): TransactionRecordBody {
 	return {
 		name: values.name,
 		amount: authoredAmount(values.amount, 0),
@@ -138,12 +140,12 @@ export function scheduleBody(values: ScheduleFormValues): ScheduleCreateBody {
  * their stored values on the server, so exact timestamps, amount descriptors,
  * and extra destinations never need to be restated.
  */
-export function postingUpdate({
+export function transactionUpdate({
 	baseline,
 	values,
 }: {
 	baseline: Transaction;
-	values: PostingFormValues;
+	values: TransactionFormValues;
 }): TransactionAmendBody {
 	const patch: TransactionAmendBody = {};
 	if (values.name !== baseline.name) patch.name = values.name;
@@ -212,8 +214,8 @@ export function claimUpdate(
 }
 
 /** Shared client-side validation for one-time transaction forms. */
-export function validatePostingValues(
-	values: PostingFormValues,
+export function validateTransactionValues(
+	values: TransactionFormValues,
 ): string | null {
 	if (!values.name.trim()) return "Give the transaction a name.";
 	if (
@@ -258,13 +260,13 @@ export function parseAmountInput(raw: string): number | null {
 }
 
 /** Form values from the in-place one-time transaction draft. */
-export function detailPostingValues({
+export function detailTransactionValues({
 	draft,
 	item,
 }: {
-	draft: PostingDraftValues;
+	draft: TransactionDraftValues;
 	item: Transaction;
-}): PostingFormValues | Error {
+}): TransactionFormValues | Error {
 	const name = draft.name.trim();
 	const amount = parseDisplayNumber(draft.amount);
 	if (name === "") return new Error("Give the transaction a name.");

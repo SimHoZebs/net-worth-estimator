@@ -7,12 +7,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-const feedPostingA = "01900000-0000-7000-8000-0000000000c1"
-const feedPostingB = "01900000-0000-7000-8000-0000000000c2"
-const feedPostingC = "01900000-0000-7000-8000-0000000000c3"
+const feedTransactionA = "01900000-0000-7000-8000-0000000000c1"
+const feedTransactionB = "01900000-0000-7000-8000-0000000000c2"
+const feedTransactionC = "01900000-0000-7000-8000-0000000000c3"
 
 // feedFixture provisions two users sharing one physical file with
-// identical account IDs: Alice owns the shared postings, Bob views them.
+// identical account IDs: Alice owns the shared transactions, Bob views them.
 func feedFixture(t *testing.T) (*Database, string, string, store.Store, store.Store) {
 	t.Helper()
 	d := openSharingTestDB(t)
@@ -21,9 +21,9 @@ func feedFixture(t *testing.T) (*Database, string, string, store.Store, store.St
 	return d, alice, bob, storeA, storeB
 }
 
-func feedGrant(t *testing.T, d *Database, owner, posting, audienceType, audienceID string) {
+func feedGrant(t *testing.T, d *Database, owner, transaction, audienceType, audienceID string) {
 	t.Helper()
-	if _, err := d.GrantSharedPosting(owner, posting, audienceType, audienceID, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(owner, transaction, audienceType, audienceID, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -44,21 +44,21 @@ func feedItems(t *testing.T, d *Database, requester, group string) []store.Group
 	return items
 }
 
-// A group grant puts the owner's posting in the member's group feed with
+// A group grant puts the owner's transaction in the member's group feed with
 // the group display name and audience; outsiders fail closed.
-func TestGroupFeedListsGrantedPosting(t *testing.T) {
+func TestGroupFeedListsGrantedTransaction(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	posting := sharingPosting(t, storeA, feedPostingA)
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceGroup, group)
+	transaction := sharingTransaction(t, storeA, feedTransactionA)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceGroup, group)
 
 	items := feedItems(t, d, bob, group)
 	if len(items) != 1 {
 		t.Fatalf("feed items = %d, want 1", len(items))
 	}
 	item := items[0]
-	if item.OwnerUserID != alice || item.Posting.ID != posting.ID {
-		t.Fatalf("feed item = %+v, want alice posting", item)
+	if item.OwnerUserID != alice || item.Transaction.ID != transaction.ID {
+		t.Fatalf("feed item = %+v, want alice transaction", item)
 	}
 	if item.SourceDisplayName != "alice-feed" {
 		t.Fatalf("source display = %q, want alice-feed", item.SourceDisplayName)
@@ -77,14 +77,14 @@ func TestGroupFeedListsGrantedPosting(t *testing.T) {
 	}
 }
 
-// One posting reachable through a grant, a policy, and a direct share
+// One transaction reachable through a grant, a policy, and a direct share
 // lists once with every authorizing path named.
 func TestGroupFeedDeduplicatesReasons(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	sharingPosting(t, storeA, feedPostingA)
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceGroup, group)
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceUser, bob)
+	sharingTransaction(t, storeA, feedTransactionA)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceGroup, group)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceUser, bob)
 	feedPolicy(t, d, alice, group)
 
 	items := feedItems(t, d, bob, group)
@@ -112,7 +112,7 @@ func TestGroupFeedDeduplicatesReasons(t *testing.T) {
 }
 
 // Friend-specific exclusions deny the feed while the gate still denies
-// detail: user, group, and wildcard exclusions each hide the posting.
+// detail: user, group, and wildcard exclusions each hide the transaction.
 // Each exclusion names a different audience than the surviving grant:
 // an explicit share and exclusion cannot coexist for one audience.
 func TestGroupFeedHonorsExclusions(t *testing.T) {
@@ -137,15 +137,15 @@ func TestGroupFeedHonorsExclusions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			d, alice, bob, storeA, _ := feedFixture(t)
 			group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-			sharingPosting(t, storeA, feedPostingA)
-			feedGrant(t, d, alice, feedPostingA, tc.grantType, tc.grantID(group, bob))
-			if _, err := d.ExcludeSharedPosting(alice, feedPostingA, tc.excludeType, tc.excludeID(group, bob), sharingKey(t)); err != nil {
+			sharingTransaction(t, storeA, feedTransactionA)
+			feedGrant(t, d, alice, feedTransactionA, tc.grantType, tc.grantID(group, bob))
+			if _, err := d.ExcludeSharedTransaction(alice, feedTransactionA, tc.excludeType, tc.excludeID(group, bob), sharingKey(t)); err != nil {
 				t.Fatal(err)
 			}
 			if items := feedItems(t, d, bob, group); len(items) != 0 {
 				t.Fatalf("excluded feed items = %d, want 0", len(items))
 			}
-			if _, err := d.ReadSharedPosting(alice, feedPostingA, bob); !errors.Is(err, store.ErrNotFound) {
+			if _, err := d.ReadSharedTransaction(alice, feedTransactionA, bob); !errors.Is(err, store.ErrNotFound) {
 				t.Fatalf("excluded detail = %v, want not-found", err)
 			}
 		})
@@ -156,15 +156,15 @@ func TestGroupFeedHonorsExclusions(t *testing.T) {
 func TestGroupFeedIncludesPending(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	posting := sharingPosting(t, storeA, feedPostingA)
-	if _, err := d.db.Exec(`UPDATE postings SET pending = 1, source = 'banksync' WHERE user_id = ? AND id = ?`, alice, posting.ID); err != nil {
+	transaction := sharingTransaction(t, storeA, feedTransactionA)
+	if _, err := d.db.Exec(`UPDATE transactions SET pending = 1, source = 'banksync' WHERE user_id = ? AND id = ?`, alice, transaction.ID); err != nil {
 		t.Fatal(err)
 	}
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceGroup, group)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceGroup, group)
 
 	items := feedItems(t, d, bob, group)
-	if len(items) != 1 || !items[0].Posting.Pending {
-		t.Fatalf("pending feed = %+v, want one pending posting", items)
+	if len(items) != 1 || !items[0].Transaction.Pending {
+		t.Fatalf("pending feed = %+v, want one pending transaction", items)
 	}
 }
 
@@ -173,8 +173,8 @@ func TestGroupFeedIncludesPending(t *testing.T) {
 func TestGroupFeedRevokesOnLeaveAndRemoval(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	sharingPosting(t, storeA, feedPostingA)
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceGroup, group)
+	sharingTransaction(t, storeA, feedTransactionA)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceGroup, group)
 	if items := feedItems(t, d, bob, group); len(items) != 1 {
 		t.Fatalf("feed before leave = %d, want 1", len(items))
 	}
@@ -184,14 +184,14 @@ func TestGroupFeedRevokesOnLeaveAndRemoval(t *testing.T) {
 	if _, err := d.ListGroupSharedFeed(bob, group); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("feed after leave = %v, want not-found", err)
 	}
-	if _, err := d.ReadSharedPosting(alice, feedPostingA, bob); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.ReadSharedTransaction(alice, feedTransactionA, bob); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("detail after leave = %v, want not-found", err)
 	}
 
 	d2, alice2, bob2, storeA2, _ := feedFixture(t)
 	group2 := sharingGroup(t, d2, "alice-feed", "Cabin", "bob-feed")
-	sharingPosting(t, storeA2, feedPostingA)
-	feedGrant(t, d2, alice2, feedPostingA, store.SharingAudienceGroup, group2)
+	sharingTransaction(t, storeA2, feedTransactionA)
+	feedGrant(t, d2, alice2, feedTransactionA, store.SharingAudienceGroup, group2)
 	if err := d2.RemoveMember(group2, alice2, bob2); err != nil {
 		t.Fatal(err)
 	}
@@ -205,8 +205,8 @@ func TestGroupFeedRevokesOnLeaveAndRemoval(t *testing.T) {
 func TestGroupFeedFollowsPolicy(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	sharingPosting(t, storeA, feedPostingA)
-	sharingPosting(t, storeA, feedPostingB)
+	sharingTransaction(t, storeA, feedTransactionA)
+	sharingTransaction(t, storeA, feedTransactionB)
 	feedPolicy(t, d, alice, group)
 
 	items := feedItems(t, d, bob, group)
@@ -239,13 +239,13 @@ func TestGroupFeedShowsDirectSharesFromMembers(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
 	carol, storeC := sharingUser(t, d, "carol-feed")
-	sharingPosting(t, storeA, feedPostingA)
-	sharingPosting(t, storeC, feedPostingB)
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceUser, bob)
-	feedGrant(t, d, carol, feedPostingB, store.SharingAudienceUser, bob)
+	sharingTransaction(t, storeA, feedTransactionA)
+	sharingTransaction(t, storeC, feedTransactionB)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceUser, bob)
+	feedGrant(t, d, carol, feedTransactionB, store.SharingAudienceUser, bob)
 
 	items := feedItems(t, d, bob, group)
-	if len(items) != 1 || items[0].Posting.ID != feedPostingA {
+	if len(items) != 1 || items[0].Transaction.ID != feedTransactionA {
 		t.Fatalf("direct feed = %+v, want only the member's direct share", items)
 	}
 	if len(items[0].Audiences) != 1 || items[0].Audiences[0].Type != store.FeedAudienceDirect {
@@ -259,16 +259,16 @@ func TestGroupFeedShowsDirectSharesFromMembers(t *testing.T) {
 func TestGroupFeedListsOwnRows(t *testing.T) {
 	d, alice, bob, _, storeB := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	posting := sharingPosting(t, storeB, feedPostingC)
-	feedGrant(t, d, bob, feedPostingC, store.SharingAudienceGroup, group)
+	transaction := sharingTransaction(t, storeB, feedTransactionC)
+	feedGrant(t, d, bob, feedTransactionC, store.SharingAudienceGroup, group)
 
 	items := feedItems(t, d, bob, group)
 	if len(items) != 1 {
 		t.Fatalf("own feed = %d, want 1", len(items))
 	}
 	item := items[0]
-	if item.OwnerUserID != bob || item.Posting.ID != posting.ID {
-		t.Fatalf("own feed item = %+v, want bob posting", item)
+	if item.OwnerUserID != bob || item.Transaction.ID != transaction.ID {
+		t.Fatalf("own feed item = %+v, want bob transaction", item)
 	}
 	if len(item.Audiences) != 1 || item.Audiences[0].Type != store.FeedAudienceGroup ||
 		item.Audiences[0].ID != group {
@@ -284,7 +284,7 @@ func TestGroupFeedListsOwnRows(t *testing.T) {
 func TestGroupFeedListsOwnPolicyRows(t *testing.T) {
 	d, _, bob, _, storeB := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	sharingPosting(t, storeB, feedPostingC)
+	sharingTransaction(t, storeB, feedTransactionC)
 	feedPolicy(t, d, bob, group)
 
 	if items := feedItems(t, d, bob, group); len(items) != 1 {
@@ -310,18 +310,18 @@ func TestGroupFeedOwnRowsHonorExclusions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			d, alice, bob, _, storeB := feedFixture(t)
 			group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-			sharingPosting(t, storeB, feedPostingC)
+			sharingTransaction(t, storeB, feedTransactionC)
 			feedPolicy(t, d, bob, group)
-			feedGrant(t, d, bob, feedPostingC, store.SharingAudienceGroup, group)
+			feedGrant(t, d, bob, feedTransactionC, store.SharingAudienceGroup, group)
 			if tc.excludeType == store.SharingAudienceGroup {
 				// Exactly one intent per audience: revoke the grant
 				// before excluding the same group. The policy keeps the
 				// row a candidate, so the exclusion does the hiding.
-				if err := d.RevokeSharedPosting(bob, feedPostingC, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
+				if err := d.RevokeSharedTransaction(bob, feedTransactionC, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 					t.Fatal(err)
 				}
 			}
-			if _, err := d.ExcludeSharedPosting(bob, feedPostingC, tc.excludeType, tc.excludeID(group, alice), sharingKey(t)); err != nil {
+			if _, err := d.ExcludeSharedTransaction(bob, feedTransactionC, tc.excludeType, tc.excludeID(group, alice), sharingKey(t)); err != nil {
 				t.Fatal(err)
 			}
 			if items := feedItems(t, d, bob, group); len(items) != tc.wantItems {
@@ -331,17 +331,17 @@ func TestGroupFeedOwnRowsHonorExclusions(t *testing.T) {
 	}
 }
 
-// Feed ordering stays owner then posting so keyset consumers page stably.
-func TestGroupFeedOrdersByOwnerThenPosting(t *testing.T) {
+// Feed ordering stays owner then transaction so keyset consumers page stably.
+func TestGroupFeedOrdersByOwnerThenTransaction(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	carol, storeC := sharingUser(t, d, "carol-feed")
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed", "carol-feed")
-	sharingPosting(t, storeA, feedPostingB)
-	sharingPosting(t, storeA, feedPostingA)
-	sharingPosting(t, storeC, feedPostingC)
-	feedGrant(t, d, alice, feedPostingB, store.SharingAudienceGroup, group)
-	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceGroup, group)
-	feedGrant(t, d, carol, feedPostingC, store.SharingAudienceGroup, group)
+	sharingTransaction(t, storeA, feedTransactionB)
+	sharingTransaction(t, storeA, feedTransactionA)
+	sharingTransaction(t, storeC, feedTransactionC)
+	feedGrant(t, d, alice, feedTransactionB, store.SharingAudienceGroup, group)
+	feedGrant(t, d, alice, feedTransactionA, store.SharingAudienceGroup, group)
+	feedGrant(t, d, carol, feedTransactionC, store.SharingAudienceGroup, group)
 
 	items := feedItems(t, d, bob, group)
 	if len(items) != 3 {
@@ -350,7 +350,7 @@ func TestGroupFeedOrdersByOwnerThenPosting(t *testing.T) {
 	for i := 1; i < len(items); i++ {
 		prev, curr := items[i-1], items[i]
 		if prev.OwnerUserID > curr.OwnerUserID ||
-			(prev.OwnerUserID == curr.OwnerUserID && prev.Posting.ID > curr.Posting.ID) {
+			(prev.OwnerUserID == curr.OwnerUserID && prev.Transaction.ID > curr.Transaction.ID) {
 			t.Fatalf("feed out of order at %d: %+v", i, items)
 		}
 	}

@@ -89,7 +89,7 @@ for (const reducedMotion of ["reduce", "no-preference"] as const) {
 	});
 }
 
-test("an editor can save a purchase with a synced account and pending UUID postings", async ({
+test("an editor can save a purchase with a synced account and pending UUID transactions", async ({
 	page,
 	request,
 }) => {
@@ -104,8 +104,8 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	expect(baselineResponse.ok()).toBe(true);
 	let { model: baseline } =
 		(await baselineResponse.json()) as FinancialModelResponse;
-	const pending = baseline?.postings.find(
-		(posting) => posting.sourceAccountId === "checking",
+	const pending = baseline?.transactions.find(
+		(transaction) => transaction.sourceAccountId === "checking",
 	);
 	if (!pending) throw new Error("The fixture needs a recorded outflow.");
 	expect(pending.id).toMatch(
@@ -144,10 +144,10 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 							? { ...checkpoint, source: "simplefin" }
 							: checkpoint,
 					),
-					postings: body.model.postings.map((posting) =>
-						posting.id === pending.id
-							? { ...posting, source: "simplefin", pending: true }
-							: posting,
+					transactions: body.model.transactions.map((transaction) =>
+						transaction.id === pending.id
+							? { ...transaction, source: "simplefin", pending: true }
+							: transaction,
 					),
 				},
 			},
@@ -188,7 +188,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 				const body = (await response.json()) as FinancialModelResponse;
 				return (
 					body.model?.plannedPurchases?.find(
-						(posting) => posting.name === "Synced-account laptop",
+						(transaction) => transaction.name === "Synced-account laptop",
 					) ?? null
 				);
 			},
@@ -201,7 +201,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		(await savedResponse.json()) as FinancialModelResponse;
 	expect(saved?.accounts).toEqual(baseline?.accounts);
 	expect(saved?.checkpoints).toEqual(baseline?.checkpoints);
-	expect(saved?.postings).toEqual(baseline?.postings);
+	expect(saved?.transactions).toEqual(baseline?.transactions);
 	expect(
 		saved?.plannedPurchases?.find(
 			(purchase) => purchase.name === "Synced-account laptop",
@@ -222,7 +222,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	expect(errors).toEqual([]);
 });
 
-test("standalone purchase CRUD and priority survive reload without posting writes", async ({
+test("standalone purchase CRUD and priority survive reload without transaction writes", async ({
 	page,
 	request,
 }) => {
@@ -230,13 +230,13 @@ test("standalone purchase CRUD and priority survive reload without posting write
 		await request.get(`${FIXTURE_API}/v1/financial-model`)
 	).json()) as FinancialModelResponse;
 	const purchaseWrites: string[] = [];
-	const postingWrites: string[] = [];
+	const transactionWrites: string[] = [];
 	page.on("request", (event) => {
 		if (!/^(POST|PATCH|DELETE)$/.test(event.method())) return;
 		const path = new URL(event.url()).pathname;
 		if (path.startsWith("/v1/planned-purchases"))
 			purchaseWrites.push(event.method());
-		if (path.startsWith("/v1/transactions")) postingWrites.push(path);
+		if (path.startsWith("/v1/transactions")) transactionWrites.push(path);
 	});
 	await openPurchases(page);
 	await addPurchase(page, "API desk", "500");
@@ -288,11 +288,13 @@ test("standalone purchase CRUD and priority survive reload without posting write
 	await expect
 		.poll(async () => (await read()).model?.plannedPurchases?.length)
 		.toBe(1);
-	expect((await read()).model?.postings).toEqual(baseline.model?.postings);
+	expect((await read()).model?.transactions).toEqual(
+		baseline.model?.transactions,
+	);
 	expect(purchaseWrites).toEqual(
 		expect.arrayContaining(["POST", "PATCH", "DELETE"]),
 	);
-	expect(postingWrites).toEqual([]);
+	expect(transactionWrites).toEqual([]);
 });
 
 // The schedule view groups dated purchases under the Purchase schedule
@@ -353,9 +355,9 @@ test("purchase priorities persist and purchases protect all established payments
 	expect(projection.ok()).toBe(true);
 	const { result } = await projection.json();
 	const purchasesInBaseline = result.transactionEvents.filter(
-		(event: { origin: { postingId: string } }) =>
+		(event: { origin: { transactionId: string } }) =>
 			model.plannedPurchases!.some(
-				(purchase) => purchase.id === event.origin.postingId,
+				(purchase) => purchase.id === event.origin.transactionId,
 			),
 	);
 	expect(purchasesInBaseline).toHaveLength(0);

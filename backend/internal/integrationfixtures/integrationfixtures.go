@@ -115,10 +115,10 @@ type GmailCursor struct {
 // SharingStep is one grant, exclusion, revocation, or re-grant applied in
 // order by the loader. AudienceID is empty for wildcard steps.
 type SharingStep struct {
-	Action       string `json:"action"`
-	AudienceType string `json:"audienceType"`
-	AudienceID   string `json:"audienceId"`
-	PostingID    string `json:"postingId"`
+	Action        string `json:"action"`
+	AudienceType  string `json:"audienceType"`
+	AudienceID    string `json:"audienceId"`
+	TransactionID string `json:"transactionId"`
 }
 
 // InviteStep describes one invite the loader creates: expired invites are
@@ -181,10 +181,10 @@ type LedgerExpected struct {
 	// 4 groceries, 1 bookshop, 1 fuel, 1 outlet, 1 corner, 1 cafe,
 	// 1 clothes, 4 payoff.
 	EdgeRows int `json:"edgeRows"`
-	// Listed postings after the phantom deletion: 16 seeded plus 9 bank
+	// Listed transactions after the phantom deletion: 16 seeded plus 9 bank
 	// rows present (4 groceries, fuel, outlet, corner, pending eats,
 	// voided mart).
-	ListedPostings int `json:"listedPostings"`
+	ListedTransactions int `json:"listedTransactions"`
 	// Narrowed-window (January through March) drops April: paycheck, rent,
 	// groceries, corner, clothes, and payoff rows with their sums.
 	NarrowStart string  `json:"narrowStart"`

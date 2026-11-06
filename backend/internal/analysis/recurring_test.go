@@ -15,7 +15,7 @@ import (
 )
 
 func recurringTx(id, description, amount string, stamp int64) types.AnalysisTransaction {
-	return types.AnalysisTransaction{PostingID: id, AccountID: "bank", SourceProvider: "simplefin", Facts: types.TransactionFacts{Description: description, Amount: amount, Currency: "USD", PostedTime: stamp, OccurredAt: stamp, Metadata: map[string]string{}}}
+	return types.AnalysisTransaction{TransactionID: id, AccountID: "bank", SourceProvider: "simplefin", Facts: types.TransactionFacts{Description: description, Amount: amount, Currency: "USD", PostedTime: stamp, OccurredAt: stamp, Metadata: map[string]string{}}}
 }
 
 func recurringDay(year int, month time.Month, day int) int64 {
@@ -58,7 +58,7 @@ func TestRecurringCadences(t *testing.T) {
 				if item.Kind != "recurring" || item.Product != test.cadence || item.Strength != "moderate" || item.Provider != "netflix" || item.Role != "outflow" {
 					t.Fatalf("detection=%+v", item)
 				}
-				if len(item.Evidence) != 1 || item.Evidence[0].Code != "recurring.cadence" || len(item.Evidence[0].PostingIDs) != test.want {
+				if len(item.Evidence) != 1 || item.Evidence[0].Code != "recurring.cadence" || len(item.Evidence[0].TransactionIDs) != test.want {
 					t.Fatalf("evidence=%+v", item.Evidence)
 				}
 				if !strings.Contains(item.Evidence[0].Reason, test.cadence) || !strings.Contains(item.Evidence[0].Reason, "15.99") {
@@ -98,7 +98,7 @@ func TestRecurringMerchantVariantsShareOnePattern(t *testing.T) {
 		recurringTx("c", "NETFLIX.COM", "-16.50", stamps[2]),
 	}
 	result := analyzeRecurring(t, items)
-	if len(result) != 3 || result[0].Evidence[0].PostingIDs[0] != "a" {
+	if len(result) != 3 || result[0].Evidence[0].TransactionIDs[0] != "a" {
 		t.Fatalf("variants=%+v", result)
 	}
 	distinct := []types.AnalysisTransaction{
@@ -235,27 +235,27 @@ func TestRecurringCoexistsWithBNPLAndLeavesModelAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	byPosting := map[string]map[string]types.AnalysisFinding{}
+	byTransaction := map[string]map[string]types.AnalysisFinding{}
 	for _, item := range findings {
 		if item.Status != "active" || item.Stale || len(item.Evidence) == 0 {
 			t.Fatalf("claim without active evidence-backed standing: %+v", item)
 		}
-		if byPosting[item.PostingID] == nil {
-			byPosting[item.PostingID] = map[string]types.AnalysisFinding{}
+		if byTransaction[item.TransactionID] == nil {
+			byTransaction[item.TransactionID] = map[string]types.AnalysisFinding{}
 		}
-		byPosting[item.PostingID][item.AnalysisType+"/"+item.Kind] = item
+		byTransaction[item.TransactionID][item.AnalysisType+"/"+item.Kind] = item
 	}
-	if len(byPosting) != 3 {
+	if len(byTransaction) != 3 {
 		t.Fatalf("patterns split across transactions: %+v", findings)
 	}
-	for posting, claims := range byPosting {
+	for transaction, claims := range byTransaction {
 		bnpl, ok := claims["bnpl/bnpl"]
-		if !ok || bnpl.Strength != "moderate" || len(bnpl.Evidence[0].PostingIDs) != 3 {
+		if !ok || bnpl.Strength != "moderate" || len(bnpl.Evidence[0].TransactionIDs) != 3 {
 			t.Fatalf("bnpl=%+v", claims)
 		}
 		recurring, ok := claims["recurring/recurring"]
-		if !ok || recurring.Product != "biweekly" || len(recurring.Evidence[0].PostingIDs) != 3 {
-			t.Fatalf("recurring=%+v in %s", claims, posting)
+		if !ok || recurring.Product != "biweekly" || len(recurring.Evidence[0].TransactionIDs) != 3 {
+			t.Fatalf("recurring=%+v in %s", claims, transaction)
 		}
 	}
 	if err := runner.RunOnce(context.Background()); err != nil {

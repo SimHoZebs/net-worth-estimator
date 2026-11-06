@@ -83,7 +83,7 @@ function invalidateInbox(scope: ReturnType<typeof getUserScope>) {
 
 export type InboxShareTarget = {
 	ownerUserId: string;
-	postingId: string;
+	transactionId: string;
 };
 
 function useInboxMutation(
@@ -111,37 +111,37 @@ function useInboxMutation(
 }
 
 export function useAcceptInboxShare() {
-	return useInboxMutation("accept", ({ ownerUserId, postingId }) =>
-		acceptInboxShare(ownerUserId, postingId),
+	return useInboxMutation("accept", ({ ownerUserId, transactionId }) =>
+		acceptInboxShare(ownerUserId, transactionId),
 	);
 }
 
 export function useDeclineInboxShare() {
-	return useInboxMutation("decline", ({ ownerUserId, postingId }) =>
-		declineInboxShare(ownerUserId, postingId),
+	return useInboxMutation("decline", ({ ownerUserId, transactionId }) =>
+		declineInboxShare(ownerUserId, transactionId),
 	);
 }
 
 export function useDismissInboxShare() {
-	return useInboxMutation("dismiss", ({ ownerUserId, postingId }) =>
-		dismissInboxShare(ownerUserId, postingId),
+	return useInboxMutation("dismiss", ({ ownerUserId, transactionId }) =>
+		dismissInboxShare(ownerUserId, transactionId),
 	);
 }
 
 export function useUndismissInboxShare() {
-	return useInboxMutation("undismiss", ({ ownerUserId, postingId }) =>
-		dismissInboxShare(ownerUserId, postingId, false),
+	return useInboxMutation("undismiss", ({ ownerUserId, transactionId }) =>
+		dismissInboxShare(ownerUserId, transactionId, false),
 	);
 }
 
 export function useMarkInboxShareRead() {
-	return useInboxMutation("read", ({ ownerUserId, postingId }) =>
-		markInboxShareRead(ownerUserId, postingId, true),
+	return useInboxMutation("read", ({ ownerUserId, transactionId }) =>
+		markInboxShareRead(ownerUserId, transactionId, true),
 	);
 }
 
 export function useMarkInboxShareUnread() {
-	return useInboxMutation("unread", ({ ownerUserId, postingId }) =>
-		markInboxShareRead(ownerUserId, postingId, false),
+	return useInboxMutation("unread", ({ ownerUserId, transactionId }) =>
+		markInboxShareRead(ownerUserId, transactionId, false),
 	);
 }

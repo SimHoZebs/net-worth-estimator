@@ -32,19 +32,19 @@ Per group membership, each member owns one automatic-sharing policy:
 - **Policy version number**: bumped on every policy change, used to fence
   stale lookup references on revocation (see §8).
 
-Eligibility of one posting under one policy (automatic reason):
+Eligibility of one transaction under one policy (automatic reason):
 
 1. Policy enabled.
-2. Posting's **current** source account or any current destination account is
+2. Transaction's **current** source account or any current destination account is
    in the selected set. Transfers follow the same rule; no category filters.
-   At most one automatic reference per posting+group however many accounts
+   At most one automatic reference per transaction+group however many accounts
    match (decision 2).
-3. Posting's canonical date (see §2) falls inside the interval,
+3. Transaction's canonical date (see §2) falls inside the interval,
    inclusive on both ends.
-4. Pending and posted postings are treated identically (decision 5).
+4. Pending and posted transactions are treated identically (decision 5).
 5. No applicable exclusion survives (see §5).
 
-Moving a posting away from all selected accounts, or re-dating it outside the
+Moving a transaction away from all selected accounts, or re-dating it outside the
 window, removes inherited eligibility after commit; moving it back can restore
 it. An independent valid manual grant is never silently revoked by those edits
 (decision 4).
@@ -54,7 +54,7 @@ it. An independent valid manual grant is never silently revoked by those edits
 > **Q1 — canonical date field. DECIDED.** The canonical sharing date is the
 > transaction date, used as the single date source with no fallback logic in
 > group sharing. Both the transaction date and the posted date must always be
-> present on every posting — if either is optional today, that is a defect.
+> present on every transaction — if either is optional today, that is a defect.
 > Guaranteeing both fields is the job of the bank-data sync reconciliation
 > layer, not the sharing derivation. Any missing-date hardening belongs to
 > that sync reconciliation work, cross-referenced here, and is out of scope
@@ -102,7 +102,7 @@ qualifies without extra review, exactly like a pre-existing row.
 - Automatic reason and manual explicit reason are independent. Effective
   access is the **union** of valid reasons minus exclusions minus hard gates
   (membership, ownership, void/deleted).
-- Explicit intent per posting+audience is exactly one state:
+- Explicit intent per transaction+audience is exactly one state:
   `default | shared | excluded`. Share and exclusion for the same audience
   cannot coexist; the exclusion must be removed/narrowed first, enforced in
   one database transaction plus constraints (decision 7, GRP-05).
@@ -114,7 +114,7 @@ qualifies without extra review, exactly like a pre-existing row.
 - Owner-only contextual warning when an excluded friend sits in an otherwise
   authorized group. Never reveal hidden rows to recipients.
 - Multiple matching accounts and multiple valid reasons never duplicate a
-  posting or its amount in feeds, counts, or totals (decisions 2, 11).
+  transaction or its amount in feeds, counts, or totals (decisions 2, 11).
 
 ## 6. Ownership, copies, response shape
 

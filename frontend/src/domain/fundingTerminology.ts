@@ -6,5 +6,7 @@ export const fundingLabels = {
 
 /** Translate the stored default label without changing custom names or data. */
 export function fundingEvaluationName(name: string): string {
-	return !name || name === "Posting fulfillment" ? fundingLabels.title : name;
+	return !name || name === "Transaction fulfillment"
+		? fundingLabels.title
+		: name;
 }

@@ -13,23 +13,23 @@ import (
 // stub producer stands in for the future recurring, transfer, and receipt
 // producers owned by FIN-01, VIS-03, and INT-03; its names are test-only and
 // set no production vocabulary.
-func completeClaim(t *testing.T, s *sqliteStore, analysisType, version, kind, postingID string) types.AnalysisFinding {
+func completeClaim(t *testing.T, s *sqliteStore, analysisType, version, kind, transactionID string) types.AnalysisFinding {
 	t.Helper()
 	run, _, claimed, err := s.ClaimAnalysis(analysisType, version)
 	if err != nil || !claimed {
 		t.Fatalf("claim %s=%v %v", analysisType, claimed, err)
 	}
 	detection := types.AnalysisDetection{
-		PostingID: postingID,
-		Kind:      kind,
-		Provider:  "stub-provider",
-		Strength:  "moderate",
-		Evidence:  []types.AnalysisEvidence{{Code: "stub.independent-claim", Reason: "A second independent producer observed the same transaction.", PostingIDs: []string{postingID}}},
+		TransactionID: transactionID,
+		Kind:          kind,
+		Provider:      "stub-provider",
+		Strength:      "moderate",
+		Evidence:      []types.AnalysisEvidence{{Code: "stub.independent-claim", Reason: "A second independent producer observed the same transaction.", TransactionIDs: []string{transactionID}}},
 	}
 	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{detection}, ""); err != nil {
 		t.Fatal(err)
 	}
-	items, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{postingID}})
+	items, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{transactionID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,10 +42,10 @@ func completeClaim(t *testing.T, s *sqliteStore, analysisType, version, kind, po
 	return types.AnalysisFinding{}
 }
 
-func sourceFactsJSON(t *testing.T, s *sqliteStore, postingID string) string {
+func sourceFactsJSON(t *testing.T, s *sqliteStore, transactionID string) string {
 	t.Helper()
 	var raw string
-	if err := s.db.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE posting_id = ?`, postingID).Scan(&raw); err != nil {
+	if err := s.db.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE transaction_id = ?`, transactionID).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
 	return raw
@@ -53,13 +53,13 @@ func sourceFactsJSON(t *testing.T, s *sqliteStore, postingID string) string {
 
 func TestIndependentClaimsCoexistForOneTransaction(t *testing.T) {
 	s := openSQLiteStore(t)
-	postingID := seedAnalysisEvidence(t, s)
-	bnpl := completeClaim(t, s, "bnpl", "v1", "bnpl", postingID)
-	other := completeClaim(t, s, "stub-claims", "v1", "stub-claim", postingID)
-	if bnpl.PostingID != postingID || other.PostingID != postingID {
+	transactionID := seedAnalysisEvidence(t, s)
+	bnpl := completeClaim(t, s, "bnpl", "v1", "bnpl", transactionID)
+	other := completeClaim(t, s, "stub-claims", "v1", "stub-claim", transactionID)
+	if bnpl.TransactionID != transactionID || other.TransactionID != transactionID {
 		t.Fatalf("claims split across transactions: %+v %+v", bnpl, other)
 	}
-	items, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{postingID}})
+	items, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{transactionID}})
 	if err != nil || len(items) != 2 {
 		t.Fatalf("coexist=%+v err=%v", items, err)
 	}
@@ -80,7 +80,7 @@ func TestIndependentClaimsCoexistForOneTransaction(t *testing.T) {
 	if err := s.CompleteAnalysis(run, nil, ""); err != nil {
 		t.Fatal(err)
 	}
-	items, err = s.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{postingID}})
+	items, err = s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{transactionID}})
 	if err != nil || len(items) != 2 {
 		t.Fatalf("conflicting claims hidden: %+v %v", items, err)
 	}
@@ -102,11 +102,11 @@ func TestIndependentClaimsCoexistForOneTransaction(t *testing.T) {
 
 func TestOwnerCorrectionsApplyToAnyClaimKindWithoutTouchingSourceFacts(t *testing.T) {
 	s := openSQLiteStore(t)
-	postingID := seedAnalysisEvidence(t, s)
-	completeClaim(t, s, "bnpl", "v1", "bnpl", postingID)
-	other := completeClaim(t, s, "stub-claims", "v1", "stub-claim", postingID)
+	transactionID := seedAnalysisEvidence(t, s)
+	completeClaim(t, s, "bnpl", "v1", "bnpl", transactionID)
+	other := completeClaim(t, s, "stub-claims", "v1", "stub-claim", transactionID)
 	beforeModel, _ := s.LoadModel()
-	beforeFacts := sourceFactsJSON(t, s, postingID)
+	beforeFacts := sourceFactsJSON(t, s, transactionID)
 	confirmed, err := s.ReviewAnalysisFinding(other.ID, feedbackInput(t, other, "confirm"))
 	if err != nil || confirmed.Review == nil || confirmed.Review.Decision != "confirmed" {
 		t.Fatalf("generic confirm=%+v err=%v", confirmed, err)
@@ -123,7 +123,7 @@ func TestOwnerCorrectionsApplyToAnyClaimKindWithoutTouchingSourceFacts(t *testin
 	if !reflect.DeepEqual(beforeModel, afterModel) {
 		t.Fatal("owner correction changed the financial model")
 	}
-	if afterFacts := sourceFactsJSON(t, s, postingID); afterFacts != beforeFacts {
+	if afterFacts := sourceFactsJSON(t, s, transactionID); afterFacts != beforeFacts {
 		t.Fatal("owner correction overwrote immutable source facts")
 	}
 }

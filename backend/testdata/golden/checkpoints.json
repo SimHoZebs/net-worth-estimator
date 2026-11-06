@@ -45,9 +45,9 @@
     "evaluations": {
       "financialIndependence": [],
       "netWorthThreshold": [],
-      "postingFulfillment": []
+      "transactionFulfillment": []
     },
-    "postings": [
+    "transactions": [
       {
         "name": "historical_checking",
         "sourceAccountId": null,
@@ -209,13 +209,13 @@
           }
         }
       ],
-      "postingFulfillment": [
+      "transactionFulfillment": [
         {
           "instanceId": "pf-all",
-          "name": "Posting fulfillment",
+          "name": "Transaction fulfillment",
           "enabled": true,
           "config": {
-            "postingIds": null
+            "transactionIds": null
           }
         }
       ]
@@ -223,9 +223,9 @@
   },
   "overrides": {
     "addedAccounts": [],
-    "addedPostings": [],
+    "addedTransactions": [],
     "disabledAccountIds": [],
-    "disabledPostingIds": []
+    "disabledTransactionIds": []
   },
   "path": {
     "rows": [
@@ -282,7 +282,7 @@
             "balance": 2500,
             "impacts": [
               {
-                "postingId": "salary",
+                "transactionId": "salary",
                 "delta": 1000
               }
             ]
@@ -316,7 +316,7 @@
             "balance": 2300,
             "impacts": [
               {
-                "postingId": "spend",
+                "transactionId": "spend",
                 "delta": -200
               }
             ]
@@ -350,7 +350,7 @@
             "balance": 1400,
             "impacts": [
               {
-                "postingId": "invest",
+                "transactionId": "invest",
                 "delta": -900
               }
             ]
@@ -361,7 +361,7 @@
             "balance": 2100,
             "impacts": [
               {
-                "postingId": "invest",
+                "transactionId": "invest",
                 "delta": 900
               }
             ]
@@ -389,7 +389,7 @@
             "balance": 1150,
             "impacts": [
               {
-                "postingId": "paydown",
+                "transactionId": "paydown",
                 "delta": -250
               }
             ]
@@ -406,7 +406,7 @@
             "balance": -50,
             "impacts": [
               {
-                "postingId": "paydown",
+                "transactionId": "paydown",
                 "delta": 250
               }
             ]
@@ -423,8 +423,8 @@
         "date": "2026-02-05",
         "sequence": 0,
         "origin": {
-          "type": "posting",
-          "postingId": "salary"
+          "type": "transaction",
+          "transactionId": "salary"
         },
         "requestedAmount": 1000,
         "realizedAmount": 1000,
@@ -439,8 +439,8 @@
         "date": "2026-02-06",
         "sequence": 1,
         "origin": {
-          "type": "posting",
-          "postingId": "spend"
+          "type": "transaction",
+          "transactionId": "spend"
         },
         "requestedAmount": 200,
         "realizedAmount": 200,
@@ -455,8 +455,8 @@
         "date": "2026-02-10",
         "sequence": 2,
         "origin": {
-          "type": "posting",
-          "postingId": "invest"
+          "type": "transaction",
+          "transactionId": "invest"
         },
         "requestedAmount": 900,
         "realizedAmount": 900,
@@ -475,8 +475,8 @@
         "date": "2026-02-20",
         "sequence": 3,
         "origin": {
-          "type": "posting",
-          "postingId": "paydown"
+          "type": "transaction",
+          "transactionId": "paydown"
         },
         "requestedAmount": 250,
         "realizedAmount": 250,
@@ -538,9 +538,9 @@
       "evaluations": {
         "financialIndependence": [],
         "netWorthThreshold": [],
-        "postingFulfillment": []
+        "transactionFulfillment": []
       },
-      "postings": [
+      "transactions": [
         {
           "name": "historical_checking",
           "sourceAccountId": null,
@@ -694,9 +694,9 @@
         }
       ]
     },
-    "projectionStartPostingState": {
-      "latestRealizedPostingAmounts": {},
-      "realizedPostingAmountsByYear": {}
+    "projectionStartTransactionState": {
+      "latestRealizedTransactionAmounts": {},
+      "realizedTransactionAmountsByYear": {}
     },
     "projectionStartDate": "2026-02-01",
     "projectionEndDate": "2027-02-01"
@@ -757,7 +757,7 @@
               "balance": 2500,
               "impacts": [
                 {
-                  "postingId": "salary",
+                  "transactionId": "salary",
                   "delta": 1000
                 }
               ]
@@ -791,7 +791,7 @@
               "balance": 2300,
               "impacts": [
                 {
-                  "postingId": "spend",
+                  "transactionId": "spend",
                   "delta": -200
                 }
               ]
@@ -825,7 +825,7 @@
               "balance": 1400,
               "impacts": [
                 {
-                  "postingId": "invest",
+                  "transactionId": "invest",
                   "delta": -900
                 }
               ]
@@ -836,7 +836,7 @@
               "balance": 2100,
               "impacts": [
                 {
-                  "postingId": "invest",
+                  "transactionId": "invest",
                   "delta": 900
                 }
               ]
@@ -864,7 +864,7 @@
               "balance": 1150,
               "impacts": [
                 {
-                  "postingId": "paydown",
+                  "transactionId": "paydown",
                   "delta": -250
                 }
               ]
@@ -881,7 +881,7 @@
               "balance": -50,
               "impacts": [
                 {
-                  "postingId": "paydown",
+                  "transactionId": "paydown",
                   "delta": 250
                 }
               ]

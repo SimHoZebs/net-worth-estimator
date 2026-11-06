@@ -58,7 +58,7 @@ func finExplainCopyEvidence(evidence []types.FinancialHealthEvidenceItem) []type
 	for _, item := range evidence {
 		duplicate := item
 		duplicate.AccountIDs = append([]string(nil), item.AccountIDs...)
-		duplicate.PostingIDs = append([]string(nil), item.PostingIDs...)
+		duplicate.TransactionIDs = append([]string(nil), item.TransactionIDs...)
 		copied = append(copied, duplicate)
 	}
 	return copied
@@ -127,7 +127,7 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 	}
 	enabled := finExplainEnabledAccounts(model)
 	coverage := report.FlowCoverage
-	if len(enabled) == 0 && coverage.ResolvedPostings == 0 {
+	if len(enabled) == 0 && coverage.ResolvedTransactions == 0 {
 		return finExplainInsufficient(report, options, "No usable saved state at the as-of cut, so no financial assessment is possible.")
 	}
 
@@ -202,9 +202,9 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 
 	flowSources := finExplainFlowSources(model, report)
 	coverageOut := types.FinancialHealthCoverage{
-		WindowPostings:             coverage.WindowPostings,
-		ResolvedPostings:           coverage.ResolvedPostings,
-		ExcludedPostings:           coverage.ExcludedPostings,
+		WindowTransactions:         coverage.WindowTransactions,
+		ResolvedTransactions:       coverage.ResolvedTransactions,
+		ExcludedTransactions:       coverage.ExcludedTransactions,
 		ExcludedIDs:                append([]string{}, coverage.ExcludedIDs...),
 		MissingIncome:              coverage.InflowTotal <= 0,
 		MissingOutflow:             coverage.OutflowTotal <= 0,
@@ -244,8 +244,8 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 	} else if coverageOut.MissingOutflow {
 		partialReasons = append(partialReasons, "no spending is recorded in the window")
 	}
-	if coverageOut.ExcludedPostings > 0 {
-		partialReasons = append(partialReasons, fmt.Sprintf("%d window posting(s) could not be resolved and are excluded from totals", coverageOut.ExcludedPostings))
+	if coverageOut.ExcludedTransactions > 0 {
+		partialReasons = append(partialReasons, fmt.Sprintf("%d window transaction(s) could not be resolved and are excluded from totals", coverageOut.ExcludedTransactions))
 	}
 
 	completeness := types.FinancialHealthComplete
@@ -338,7 +338,7 @@ func finExplainInsufficient(report types.FinancialHealthReport, options types.Fi
 	}
 }
 
-// finExplainFlowSources counts window flow postings by author. Membership
+// finExplainFlowSources counts window flow transactions by author. Membership
 // mirrors the FIN-03 window (enabled, settled, external flows dated inside
 // it); only the authorship split is new, so totals stay consistent with
 // the report's flow coverage. Owner rows, including rows from before
@@ -348,19 +348,19 @@ func finExplainFlowSources(model *types.FinancialModel, report types.FinancialHe
 	if model == nil || report.WindowStart == "" || report.WindowEnd == "" {
 		return flowSources
 	}
-	for index := range model.Postings {
-		posting := &model.Postings[index]
-		if !posting.Enabled || posting.Pending || posting.Void {
+	for index := range model.Transactions {
+		transaction := &model.Transactions[index]
+		if !transaction.Enabled || transaction.Pending || transaction.Void {
 			continue
 		}
-		day := postingDay(posting)
+		day := transactionDay(transaction)
 		if day == "" || CompareIsoDates(day, report.WindowStart) < 0 || CompareIsoDates(day, report.WindowEnd) > 0 {
 			continue
 		}
-		if !IsExternalInflow(posting) && !IsExternalOutflow(posting) {
+		if !IsExternalInflow(transaction) && !IsExternalOutflow(transaction) {
 			continue
 		}
-		author := posting.Source
+		author := transaction.Source
 		if !IsSyncCheckpoint(author) {
 			author = types.FinancialHealthOriginManual
 		}
@@ -471,22 +471,22 @@ func finExplainActions(model *types.FinancialModel, report types.FinancialHealth
 			Targets:  map[string]float64{"staleAfterDays": float64(options.StaleAfterDays)},
 		})
 	}
-	if coverage.ExcludedPostings > 0 {
+	if coverage.ExcludedTransactions > 0 {
 		evidence := []types.FinancialHealthEvidenceItem{}
 		if check := finExplainCheckByID(report, types.FinancialHealthCheckCashFlowSustainability); check != nil {
 			evidence = finExplainCopyEvidence(check.Evidence)
 		}
 		if len(evidence) == 0 {
 			evidence = []types.FinancialHealthEvidenceItem{{
-				Label:      "Unresolvable amounts",
-				Detail:     "Window postings whose amounts need replay-time state or simulation context and are excluded from both totals.",
-				PostingIDs: append([]string(nil), coverage.ExcludedIDs...),
+				Label:          "Unresolvable amounts",
+				Detail:         "Window transactions whose amounts need replay-time state or simulation context and are excluded from both totals.",
+				TransactionIDs: append([]string(nil), coverage.ExcludedIDs...),
 			}}
 		}
 		actions = append(actions, types.FinancialHealthProposedAction{
 			ID:       "resolve-excluded-amounts",
 			Title:    "Resolve excluded window amounts",
-			Detail:   fmt.Sprintf("%d window posting(s) need replay-time state or simulation context and are excluded from income and spending totals. Replace them with recorded amounts or accept the gap.", coverage.ExcludedPostings),
+			Detail:   fmt.Sprintf("%d window transaction(s) need replay-time state or simulation context and are excluded from income and spending totals. Replace them with recorded amounts or accept the gap.", coverage.ExcludedTransactions),
 			CheckIDs: []string{types.FinancialHealthCheckCashFlowSustainability, types.FinancialHealthCheckSavingsRate, types.FinancialHealthCheckSpendingConsistency},
 			Evidence: evidence,
 			Targets:  map[string]float64{"lookbackDays": lookback},

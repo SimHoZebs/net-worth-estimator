@@ -96,13 +96,13 @@ export function SafeSpendingPreview({
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const { base: projection, pending } = useOutlookProjection();
 	// Rules are their own rows; bills and income read them through the same
-	// display shape as the posting rows.
+	// display shape as the transaction rows.
 	const rules = useMemo(
 		() => (savedRules ?? []).map(scheduleToDisplay),
 		[savedRules],
 	);
 	// Detail mapping spans both row kinds: projected occurrences of a rule
-	// resolve to the rule definition, posted rows to the posting.
+	// resolve to the rule definition, posted rows to the transaction.
 	const savedState = useMemo(
 		() => [...(transactions ?? []), ...rules],
 		[transactions, rules],
@@ -319,7 +319,7 @@ export function SafeSpendingPreview({
 		);
 	}, [historyResults, trackedBillIds]);
 	// Direct cash spend: checking outflows outside the tracked bill set.
-	// Only genuine one-time postings belong here; occurrences owned by a
+	// Only genuine one-time transactions belong here; occurrences owned by a
 	// recurrence rule stay out even when the rule is deselected, since the
 	// rule (not this list) owns its schedule. Card allowance stays
 	// card-only; this list lives beside it under cash. The list covers the

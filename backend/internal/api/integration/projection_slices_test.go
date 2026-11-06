@@ -10,11 +10,11 @@ import (
 func sliceTestModel() *types.FinancialModel {
 	end := "2028-01-01"
 	return &types.FinancialModel{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
-		Postings: []types.Posting{},
+		Accounts:     []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{{
 			ID: "salary", Name: "Salary", Destinations: []string{"checking"},
-			Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
 			Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", EndDate: &end, Priority: 1, Enabled: true,
 		}},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -63,7 +63,7 @@ func TestProjectionSlicesBuildServeAndInvalidate(t *testing.T) {
 	if err != nil || len(rows) == 0 {
 		t.Fatalf("timeline rows must persist: %d %v", len(rows), err)
 	}
-	events, err := database.ListGeneratedPostings([]string{slices[0].ID})
+	events, err := database.ListGeneratedTransactions([]string{slices[0].ID})
 	if err != nil || len(events) == 0 {
 		t.Fatalf("generated transactions must persist: %d %v", len(events), err)
 	}

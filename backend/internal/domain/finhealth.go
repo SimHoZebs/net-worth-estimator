@@ -74,10 +74,10 @@ func NormalizeFinancialHealthStandards(standards types.FinancialHealthStandards)
 
 // finHealthFlow is one realized one-time flow inside the window.
 type finHealthFlow struct {
-	date      string
-	postingID string
-	amount    float64
-	inflow    bool
+	date          string
+	transactionID string
+	amount        float64
+	inflow        bool
 }
 
 // finHealthInputs is the shared descriptive state every check reads.
@@ -99,10 +99,10 @@ type finHealthInputs struct {
 // deterministically from its own literals. Live-balance and history
 // providers (model-value, account-balance, terms-minimum, late-fee,
 // balance-fee) read replay-time state the descriptive layer does not
-// reconstruct, so those postings are excluded evidence instead of silently
+// reconstruct, so those transactions are excluded evidence instead of silently
 // misresolved against as-of balances. occurrence-rate and growth-factor are
-// deterministic for one-time postings (divisor 1, factor 1, base rate).
-func finHealthResolvableAmount(amount types.PostingAmountResolution) bool {
+// deterministic for one-time transactions (divisor 1, factor 1, base rate).
+func finHealthResolvableAmount(amount types.TransactionAmountResolution) bool {
 	for _, binding := range amount.Inputs {
 		if binding.Source == "literal" {
 			continue
@@ -138,40 +138,40 @@ func collectFinHealthFlows(model *types.FinancialModel, balances map[string]floa
 		return inputs
 	}
 	terms := PaymentTermsByAccount(model)
-	for index := range model.Postings {
-		posting := &model.Postings[index]
-		if !posting.Enabled || posting.Pending || posting.Void {
+	for index := range model.Transactions {
+		transaction := &model.Transactions[index]
+		if !transaction.Enabled || transaction.Pending || transaction.Void {
 			continue
 		}
-		day := postingDay(posting)
+		day := transactionDay(transaction)
 		if day == "" || CompareIsoDates(day, windowStart) < 0 || CompareIsoDates(day, asOfDay) > 0 {
 			continue
 		}
-		isInflow := IsExternalInflow(posting)
-		isOutflow := IsExternalOutflow(posting)
+		isInflow := IsExternalInflow(transaction)
+		isOutflow := IsExternalOutflow(transaction)
 		if !isInflow && !isOutflow {
 			continue
 		}
 		inputs.considered++
-		if !finHealthResolvableAmount(posting.Amount) {
-			inputs.excludedIDs = append(inputs.excludedIDs, posting.ID)
+		if !finHealthResolvableAmount(transaction.Amount) {
+			inputs.excludedIDs = append(inputs.excludedIDs, transaction.ID)
 			continue
 		}
 		amount, err := ComputeRequestedAmount(
-			DatedPostingOccurrence{Posting: posting, Index: index},
+			DatedTransactionOccurrence{Transaction: transaction, Index: index},
 			day, map[string]float64{}, map[string]string{}, map[string]map[string]float64{},
 			balances, terms, nil,
 		)
 		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) {
-			inputs.excludedIDs = append(inputs.excludedIDs, posting.ID)
+			inputs.excludedIDs = append(inputs.excludedIDs, transaction.ID)
 			continue
 		}
 		inputs.resolved++
-		flow := finHealthFlow{date: day, postingID: posting.ID, amount: amount, inflow: isInflow}
+		flow := finHealthFlow{date: day, transactionID: transaction.ID, amount: amount, inflow: isInflow}
 		if isInflow {
 			// Inflow totals stay net of investment losses, matching the
 			// projection path's classification of negative realized
-			// amounts on sourceless postings.
+			// amounts on sourceless transactions.
 			inputs.inflows = append(inputs.inflows, flow)
 			inputs.inflowTotal += amount
 		} else {
@@ -271,12 +271,12 @@ func EvaluateFinancialHealth(model *types.FinancialModel, position *types.Curren
 			evaluateSpendingConsistency(&inputs, standards),
 		},
 		FlowCoverage: types.FinancialHealthFlowCoverage{
-			WindowPostings:   inputs.considered,
-			ResolvedPostings: inputs.resolved,
-			ExcludedPostings: len(inputs.excludedIDs),
-			ExcludedIDs:      append([]string(nil), inputs.excludedIDs...),
-			InflowTotal:      roundAmount(inputs.inflowTotal),
-			OutflowTotal:     roundAmount(inputs.outflowTotal),
+			WindowTransactions:   inputs.considered,
+			ResolvedTransactions: inputs.resolved,
+			ExcludedTransactions: len(inputs.excludedIDs),
+			ExcludedIDs:          append([]string(nil), inputs.excludedIDs...),
+			InflowTotal:          roundAmount(inputs.inflowTotal),
+			OutflowTotal:         roundAmount(inputs.outflowTotal),
 		},
 	}
 	return report
@@ -355,9 +355,9 @@ func evaluateCashFlowSustainability(inputs *finHealthInputs, standards types.Fin
 	}
 	if len(inputs.excludedIDs) > 0 {
 		evidence = append(evidence, types.FinancialHealthEvidenceItem{
-			Label:      "Unresolvable amounts",
-			Detail:     "Window postings whose amounts need replay-time state (live balances, realized history) or simulation context and are excluded from both totals.",
-			PostingIDs: append([]string(nil), inputs.excludedIDs...),
+			Label:          "Unresolvable amounts",
+			Detail:         "Window transactions whose amounts need replay-time state (live balances, realized history) or simulation context and are excluded from both totals.",
+			TransactionIDs: append([]string(nil), inputs.excludedIDs...),
 		})
 	}
 	if inputs.inflowTotal <= 0 && inputs.outflowTotal <= 0 {

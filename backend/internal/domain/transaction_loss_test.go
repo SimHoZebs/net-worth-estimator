@@ -6,7 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Regression tests for sampled investment losses. Growth postings are
+// Regression tests for sampled investment losses. Growth transactions are
 // sourceless inflows shaped like `balance * rate`; a negative sampled rate
 // must shrink the destination balance instead of clamping to zero.
 // Clamping discards the entire downside of the return distribution and
@@ -20,7 +20,7 @@ func lossTestModel(minBalance *float64) types.SimulationInputs {
 			{ID: "growth", Name: "Growth", Kind: types.AccountKindInvestment, MinBalance: minBalance, Enabled: true},
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{
 			{
 				ID:   "growth",
@@ -28,7 +28,7 @@ func lossTestModel(minBalance *float64) types.SimulationInputs {
 				Destinations: []string{
 					"growth",
 				},
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "bal * rate"},
 					Inputs: map[string]types.AmountInputBinding{
@@ -48,21 +48,21 @@ func lossTestModel(minBalance *float64) types.SimulationInputs {
 func lossTestRuntime(t *testing.T, model types.SimulationInputs, balances map[string]float64, sample *types.MonteCarloSample) *TransitionRuntime {
 	t.Helper()
 	runtime := CreateTransitionRuntime(model, SimulationState{
-		Balances:                     balances,
-		LatestRealizedPostingAmounts: map[string]float64{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         balances,
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 	}, "2026-01-15", sample)
 	return runtime
 }
 
-func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *types.SimulationInputs, date string) PostingExecutionTransition {
+func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *types.SimulationInputs, date string) TransactionExecutionTransition {
 	t.Helper()
 	if len(model.Schedules) == 0 {
 		t.Fatalf("loss test model has no rules")
 	}
-	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, model.Schedules[0].ID, date), date, false)
+	transition, err := runtime.ExecuteTransaction(resolveTestRuleOccurrence(t, model.Schedules, model.Schedules[0].ID, date), date, false)
 	if err != nil {
-		t.Fatalf("execute posting: %v", err)
+		t.Fatalf("execute transaction: %v", err)
 	}
 	return transition
 }
@@ -70,7 +70,7 @@ func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *type
 func TestNegativeGrowthSampleReducesBalance(t *testing.T) {
 	model := lossTestModel(nil)
 	runtime := lossTestRuntime(t, model, map[string]float64{"growth": 12000}, &types.MonteCarloSample{
-		AnnualRatesByPostingID: map[string][]float64{"growth": {-0.12}},
+		AnnualRatesByTransactionID: map[string][]float64{"growth": {-0.12}},
 	})
 	transition := executeLossOccurrence(t, runtime, &model, "2026-02-01")
 	// 12000 * (-0.12 / 12) = -120, applied in full.
@@ -91,7 +91,7 @@ func TestNegativeGrowthSampleReducesBalance(t *testing.T) {
 func TestNegativeGrowthFlooredAtAccountFloor(t *testing.T) {
 	model := lossTestModel(lossFloatPtr(0))
 	runtime := lossTestRuntime(t, model, map[string]float64{"growth": 50}, &types.MonteCarloSample{
-		AnnualRatesByPostingID: map[string][]float64{"growth": {-24.0}},
+		AnnualRatesByTransactionID: map[string][]float64{"growth": {-24.0}},
 	})
 	transition := executeLossOccurrence(t, runtime, &model, "2026-02-01")
 	// 50 * (-24 / 12) = -100 requested, but only 50 is withdrawable above the floor.
@@ -124,12 +124,12 @@ func TestNegativeSourcedOutflowStillClampsToZero(t *testing.T) {
 		Accounts: []types.Account{
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{
 				ID:              "spend",
 				Name:            "Spend",
 				SourceAccountID: &checking,
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "0 - 50"},
 					Inputs:   map[string]types.AmountInputBinding{},
@@ -141,9 +141,9 @@ func TestNegativeSourcedOutflowStillClampsToZero(t *testing.T) {
 		},
 	}
 	runtime := lossTestRuntime(t, model, map[string]float64{"checking": 1000}, nil)
-	transition, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-02-01", false)
+	transition, err := runtime.ExecuteTransaction(DatedTransactionOccurrence{Transaction: &model.Transactions[0], Index: 0}, "2026-02-01", false)
 	if err != nil {
-		t.Fatalf("execute posting: %v", err)
+		t.Fatalf("execute transaction: %v", err)
 	}
 	if transition.Result.RequestedAmount != 0 || transition.Result.RealizedAmount != 0 {
 		t.Errorf("result = %+v, want requested and realized 0", transition.Result)
@@ -163,7 +163,7 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 		Accounts: []types.Account{
 			{ID: "vault", Name: "Vault", Kind: types.AccountKindInvestment, Enabled: true},
 		},
-		Postings: []types.Posting{},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{
 			{
 				ID:   "capgrowth",
@@ -171,7 +171,7 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 				Destinations: []string{
 					"vault",
 				},
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "bal * rate"},
 					Inputs: map[string]types.AmountInputBinding{
@@ -193,16 +193,16 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 	if loss.Result.RealizedAmount != -6000 {
 		t.Fatalf("loss realized = %v, want -6000", loss.Result.RealizedAmount)
 	}
-	if got := runtime.State.LatestRealizedPostingAmounts["capgrowth"]; got != -6000 {
+	if got := runtime.State.LatestRealizedTransactionAmounts["capgrowth"]; got != -6000 {
 		t.Errorf("latest realized = %v, want -6000", got)
 	}
 	// A later gain in the same year requests 6000 * (12 / 12) = 6000 but
 	// must see only 1000 of cap headroom. If the loss had accrued to the
 	// ledger, headroom would be 7000 and the gain would realize in full.
 	model.Schedules[0].Amount.Inputs["rate"] = types.AmountInputBinding{Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 12.0}}
-	gainTransition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, "capgrowth", "2026-03-01"), "2026-03-01", false)
+	gainTransition, err := runtime.ExecuteTransaction(resolveTestRuleOccurrence(t, model.Schedules, "capgrowth", "2026-03-01"), "2026-03-01", false)
 	if err != nil {
-		t.Fatalf("execute gain posting: %v", err)
+		t.Fatalf("execute gain transaction: %v", err)
 	}
 	if gainTransition.Result.RequestedAmount != 6000 {
 		t.Errorf("gain requested = %v, want 6000", gainTransition.Result.RequestedAmount)

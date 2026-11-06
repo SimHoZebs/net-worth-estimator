@@ -360,7 +360,7 @@ func TestRowWriteNotFoundAndConflict(t *testing.T) {
 // The finance boundary validates the request before the store runs, so a
 // zero posted time (pending seeds carry none) must already read as the
 // bank's transaction instant, matching the editor body.
-func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
+func TestTransactionClaimOnPendingSeedPersists(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 
@@ -386,11 +386,11 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 
 	// Pending seed as the bridge reports it: no posted time yet.
 	if _, err := database.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            "BILTRENT",
 			Source:          store.SourceBankSync,
 			SourceAccountID: &[]string{"checking"}[0],
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "2970.25"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "2970.25"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      0,
 			TransactionTime: 1788220800,
 			Enabled:         false,
@@ -401,10 +401,10 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 		t.Fatalf("seed pending: %v", err)
 	}
 	model, err := database.LoadModel()
-	if err != nil || len(model.Postings) != 1 {
+	if err != nil || len(model.Transactions) != 1 {
 		t.Fatalf("seeded rows = %+v, err %v", model, err)
 	}
-	id := model.Postings[0].ID
+	id := model.Transactions[0].ID
 
 	patch := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/transactions/"+id+"/claim", bytes.NewReader([]byte(
@@ -417,9 +417,9 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 	}
 	var saved struct {
 		Result struct {
-			Pending bool                `json:"pending"`
-			Enabled bool                `json:"enabled"`
-			Claim   *types.PostingClaim `json:"claim"`
+			Pending bool                    `json:"pending"`
+			Enabled bool                    `json:"enabled"`
+			Claim   *types.TransactionClaim `json:"claim"`
 		} `json:"value"`
 		Issues []types.ModelValidationIssue `json:"issues"`
 		Saved  bool                         `json:"saved"`
@@ -440,11 +440,11 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload stored model: %v", err)
 	}
-	if len(stored.Postings) != 1 || stored.Postings[0].ID != id {
-		t.Fatalf("claim changed identity: %+v", stored.Postings)
+	if len(stored.Transactions) != 1 || stored.Transactions[0].ID != id {
+		t.Fatalf("claim changed identity: %+v", stored.Transactions)
 	}
-	if stored.Postings[0].Pending || stored.Postings[0].Claim == nil {
-		t.Fatalf("stored row = %+v", stored.Postings[0])
+	if stored.Transactions[0].Pending || stored.Transactions[0].Claim == nil {
+		t.Fatalf("stored row = %+v", stored.Transactions[0])
 	}
 }
 
@@ -535,7 +535,7 @@ func TestDeterministicResponseIncludesTransactionEvents(t *testing.T) {
 	if event.Date != "2026-02-05" || event.RequestedAmount != 1000 || event.RealizedAmount != 1000 {
 		t.Fatalf("transaction event amounts/date = %+v", event)
 	}
-	if event.Origin.Type != "posting" || event.Origin.PostingID != "salary" {
+	if event.Origin.Type != "transaction" || event.Origin.TransactionID != "salary" {
 		t.Fatalf("transaction event origin = %+v", event.Origin)
 	}
 	if len(event.AccountDeltas) != 1 || event.AccountDeltas[0].AccountID != "checking" || event.AccountDeltas[0].Delta != 1000 {
@@ -585,9 +585,9 @@ func TestDeterministicTransactionEvidenceIncludesBindingConstraints(t *testing.T
 			fixture.Model.Accounts[index].MinBalance = &floor
 		}
 	}
-	for index := range fixture.Model.Postings {
-		if fixture.Model.Postings[index].ID == "spend" {
-			fixture.Model.Postings[index].Amount.Config = map[string]any{"expression": "200.49"}
+	for index := range fixture.Model.Transactions {
+		if fixture.Model.Transactions[index].ID == "spend" {
+			fixture.Model.Transactions[index].Amount.Config = map[string]any{"expression": "200.49"}
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
@@ -695,7 +695,7 @@ func TestDeterministicTransactionEvidenceReportsAnnualCapAvailability(t *testing
 		t.Fatalf("decode projection response: %v", err)
 	}
 	for _, event := range payload.Result.TransactionEvents {
-		if event.Origin.PostingID != "invest" {
+		if event.Origin.TransactionID != "invest" {
 			continue
 		}
 		if event.RealizedAmount != 500 || event.AvailableAmount == nil || *event.AvailableAmount != 500 {
@@ -748,7 +748,7 @@ func TestDeterministicTransactionEvidenceCarriesHistoricalAnnualCapUsage(t *test
 		t.Fatalf("decode projection response: %v", err)
 	}
 	for _, event := range payload.Result.TransactionEvents {
-		if event.Origin.PostingID != "invest" || event.Date <= fixture.Settings.FallbackProjectionStartDate {
+		if event.Origin.TransactionID != "invest" || event.Date <= fixture.Settings.FallbackProjectionStartDate {
 			continue
 		}
 		if event.RealizedAmount != 0 || event.AvailableAmount == nil || *event.AvailableAmount != 0 {
@@ -807,7 +807,7 @@ func TestDeterministicTransactionEvidenceReportsDestinationHeadroom(t *testing.T
 		t.Fatalf("decode projection response: %v", err)
 	}
 	for _, event := range payload.Result.TransactionEvents {
-		if event.Origin.PostingID != "paydown" {
+		if event.Origin.TransactionID != "paydown" {
 			continue
 		}
 		if event.RealizedAmount >= event.RequestedAmount {

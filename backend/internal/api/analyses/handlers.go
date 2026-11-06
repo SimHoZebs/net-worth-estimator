@@ -76,9 +76,9 @@ func (s *handler) listAnalyses(_ context.Context, _ *struct{}) (*struct {
 }
 
 type listAnalysisFindingsInput struct {
-	PostingIDs string `query:"postingIds" maxLength:"7500" doc:"Comma-separated saved transaction UUIDs, at most 200"`
-	Cursor     string `query:"cursor" maxLength:"100"`
-	Limit      int    `query:"limit" default:"50" minimum:"1" maximum:"100"`
+	TransactionIDs string `query:"transactionIds" maxLength:"7500" doc:"Comma-separated saved transaction UUIDs, at most 200"`
+	Cursor         string `query:"cursor" maxLength:"100"`
+	Limit          int    `query:"limit" default:"50" minimum:"1" maximum:"100"`
 }
 
 type analysisFindingsOutput struct {
@@ -91,9 +91,9 @@ type analysisFindingsOutput struct {
 
 func (s *handler) listAnalysisFindings(_ context.Context, input *listAnalysisFindingsInput) (*analysisFindingsOutput, error) {
 	filter := types.AnalysisFindingFilter{Cursor: input.Cursor, Limit: input.Limit + 1}
-	if input.PostingIDs != "" {
-		filter.PostingIDs = strings.Split(input.PostingIDs, ",")
-		if len(filter.PostingIDs) > 200 {
+	if input.TransactionIDs != "" {
+		filter.TransactionIDs = strings.Split(input.TransactionIDs, ",")
+		if len(filter.TransactionIDs) > 200 {
 			return nil, huma.Error422UnprocessableEntity("At most 200 transaction IDs are allowed")
 		}
 	}

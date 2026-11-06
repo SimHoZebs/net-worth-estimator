@@ -1,5 +1,5 @@
 // Automatic sharing-policy preferences (GRP-02). Two users share one
-// physical file throughout: policies, grants, and postings stay
+// physical file throughout: policies, grants, and transactions stay
 // owner-scoped, and revocation lands on commit with no cache.
 package sqlite
 
@@ -35,16 +35,16 @@ func policyMember(t *testing.T, d *Database, subject string, accounts ...string)
 	return user, scoped
 }
 
-func policyRow(t *testing.T, scoped store.Store, id, source string, destinations []string, day string) types.Posting {
+func policyRow(t *testing.T, scoped store.Store, id, source string, destinations []string, day string) types.Transaction {
 	t.Helper()
 	var sourceID *string
 	if source != "" {
 		sourceID = &source
 	}
 	stamp := policyNoon(day)
-	posting, err := scoped.CreatePosting(types.Posting{
+	transaction, err := scoped.CreateTransaction(types.Transaction{
 		ID: id, Name: "Policy " + id, SourceAccountID: sourceID, Destinations: destinations,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      stamp,
 		TransactionTime: stamp,
 		Enabled:         true,
@@ -52,7 +52,7 @@ func policyRow(t *testing.T, scoped store.Store, id, source string, destinations
 	if err != nil {
 		t.Fatal(err)
 	}
-	return posting
+	return transaction
 }
 
 func enablePolicy(t *testing.T, d *Database, owner, group string, input store.SharingPolicyInput) store.SharingPolicy {
@@ -64,23 +64,23 @@ func enablePolicy(t *testing.T, d *Database, owner, group string, input store.Sh
 	return policy
 }
 
-func checkPolicyAccess(t *testing.T, d *Database, owner, posting, requester string) store.SharedPostingAccess {
+func checkPolicyAccess(t *testing.T, d *Database, owner, transaction, requester string) store.SharedTransactionAccess {
 	t.Helper()
-	access, err := d.CheckSharedPostingAccess(owner, posting, requester)
+	access, err := d.CheckSharedTransactionAccess(owner, transaction, requester)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return access
 }
 
-// Automatic sharing is off by default; manual posting shares stay usable
+// Automatic sharing is off by default; manual transaction shares stay usable
 // while it is off.
 func TestSharingPolicyOffByDefault(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := policyMember(t, d, "alice")
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	if _, err := d.GetSharingPolicy(alice, group); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("get absent policy = %v, want not-found", err)
@@ -88,13 +88,13 @@ func TestSharingPolicyOffByDefault(t *testing.T) {
 	if policies, err := d.ListSharingPolicies(alice); err != nil || len(policies) != 0 {
 		t.Fatalf("list = %v, %v, want empty", policies, err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("automatic access allowed with no policy")
 	}
-	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, transaction.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatalf("manual grant with automatic off: %v", err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed || access.Reason != "manual-user" {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); !access.Allowed || access.Reason != "manual-user" {
 		t.Fatalf("manual access = %+v, want manual-user allow", access)
 	}
 }
@@ -146,7 +146,7 @@ func TestSharingPolicyWriteValidation(t *testing.T) {
 }
 
 // Eligibility covers any currently involved account (transfers included),
-// the inclusive interval, and pending rows; one posting lists once.
+// the inclusive interval, and pending rows; one transaction lists once.
 func TestSharingPolicyEligibilityMatrix(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := policyMember(t, d, "alice", "savings", "other", "elsewhere")
@@ -177,29 +177,29 @@ func TestSharingPolicyEligibilityMatrix(t *testing.T) {
 		early: false, late: false, unmatched: false,
 	} {
 		if access := checkPolicyAccess(t, d, alice, id, bob); access.Allowed != want {
-			t.Fatalf("posting %s allowed = %v, want %v", id, access.Allowed, want)
+			t.Fatalf("transaction %s allowed = %v, want %v", id, access.Allowed, want)
 		}
 	}
 	if access := checkPolicyAccess(t, d, alice, srcMatch, bob); access.Reason != store.SharingPolicyReasonAutomatic {
 		t.Fatalf("reason = %q, want automatic-group", access.Reason)
 	}
-	refs, err := d.ListSharedPostings(bob)
+	refs, err := d.ListSharedTransactions(bob)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(refs) != 3 {
-		t.Fatalf("shared list has %d postings, want 3 (multi-match listed once)", len(refs))
+		t.Fatalf("shared list has %d transactions, want 3 (multi-match listed once)", len(refs))
 	}
 	seen := map[string]int{}
 	for _, ref := range refs {
 		if ref.OwnerUserID != alice {
 			t.Fatalf("list owner = %s, want alice", ref.OwnerUserID)
 		}
-		seen[ref.Posting.ID]++
+		seen[ref.Transaction.ID]++
 	}
 	for id, count := range seen {
 		if count != 1 {
-			t.Fatalf("posting %s listed %d times, want once", id, count)
+			t.Fatalf("transaction %s listed %d times, want once", id, count)
 		}
 	}
 }
@@ -225,14 +225,14 @@ func TestSharingPolicyIntervalEdges(t *testing.T) {
 	})
 	for id, want := range map[string]bool{startEdge: true, endEdge: true, future: false} {
 		if access := checkPolicyAccess(t, d, alice, id, bob); access.Allowed != want {
-			t.Fatalf("posting %s allowed = %v, want %v", id, access.Allowed, want)
+			t.Fatalf("transaction %s allowed = %v, want %v", id, access.Allowed, want)
 		}
 	}
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"}, StartDate: "2026-03-01",
 	})
 	if access := checkPolicyAccess(t, d, alice, future, bob); !access.Allowed {
-		t.Fatal("open-ended policy denies a later in-range posting")
+		t.Fatal("open-ended policy denies a later in-range transaction")
 	}
 }
 
@@ -278,40 +278,40 @@ func TestSharingPolicyFollowsCurrentRows(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice", "savings")
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed {
-		t.Fatal("in-range posting denied")
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); !access.Allowed {
+		t.Fatal("in-range transaction denied")
 	}
-	moved := posting
+	moved := transaction
 	other := "savings"
 	moved.SourceAccountID = &other
-	if _, err := storeA.UpdatePosting(moved); err != nil {
+	if _, err := storeA.UpdateTransaction(moved); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
-		t.Fatal("posting moved off selected accounts still shared")
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
+		t.Fatal("transaction moved off selected accounts still shared")
 	}
 	restored := moved
 	checking := "checking"
 	restored.SourceAccountID = &checking
-	if _, err := storeA.UpdatePosting(restored); err != nil {
+	if _, err := storeA.UpdateTransaction(restored); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed {
-		t.Fatal("posting moved back not shared again")
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); !access.Allowed {
+		t.Fatal("transaction moved back not shared again")
 	}
 	redated := restored
 	redated.TransactionTime = policyNoon("2027-02-02")
-	if _, err := storeA.UpdatePosting(redated); err != nil {
+	if _, err := storeA.UpdateTransaction(redated); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
-		t.Fatal("posting re-dated out of range still shared")
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
+		t.Fatal("transaction re-dated out of range still shared")
 	}
 }
 
@@ -327,7 +327,7 @@ func TestSharingPolicyPendingAndLateImported(t *testing.T) {
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	item := syncPendingPosting("policy-pending", "checking", "2026-06-10")
+	item := syncPendingTransaction("policy-pending", "checking", "2026-06-10")
 	if summary := applyDirectives(t, storeA, []BankDirective{syncPendingDirective(item)}); summary.PendingInserted != 1 {
 		t.Fatalf("pending seed = %+v", summary)
 	}
@@ -336,9 +336,9 @@ func TestSharingPolicyPendingAndLateImported(t *testing.T) {
 		t.Fatal(err)
 	}
 	var pendingID string
-	for _, posting := range model.Postings {
-		if posting.Pending && posting.Source != SourceUser {
-			pendingID = posting.ID
+	for _, transaction := range model.Transactions {
+		if transaction.Pending && transaction.Source != SourceUser {
+			pendingID = transaction.ID
 		}
 	}
 	if pendingID == "" {
@@ -347,12 +347,12 @@ func TestSharingPolicyPendingAndLateImported(t *testing.T) {
 	if access := checkPolicyAccess(t, d, alice, pendingID, bob); !access.Allowed || access.Reason != store.SharingPolicyReasonAutomatic {
 		t.Fatalf("pending access = %+v, want automatic-group allow", access)
 	}
-	refs, err := d.ListSharedPostings(bob)
+	refs, err := d.ListSharedTransactions(bob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(refs) != 1 || refs[0].Posting.ID != pendingID {
-		t.Fatalf("shared list = %+v, want the pending posting", refs)
+	if len(refs) != 1 || refs[0].Transaction.ID != pendingID {
+		t.Fatalf("shared list = %+v, want the pending transaction", refs)
 	}
 }
 
@@ -363,30 +363,30 @@ func TestSharingPolicyVoidAndDeletedExcluded(t *testing.T) {
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
 	voidID := seedVoidBankRow(t, storeA, "Voided", "checking", "50.00", "void-key")
-	gone := policyRow(t, storeA, sharingPostingB, "checking", nil, "2026-06-15")
+	gone := policyRow(t, storeA, sharingTransactionB, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
 	if access := checkPolicyAccess(t, d, alice, voidID, bob); access.Allowed {
-		t.Fatal("void posting allowed")
+		t.Fatal("void transaction allowed")
 	}
-	if _, err := d.ReadSharedPosting(alice, voidID, bob); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.ReadSharedTransaction(alice, voidID, bob); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("void read = %v, want not-found", err)
 	}
-	if err := storeA.DeletePosting(gone.ID); err != nil {
+	if err := storeA.DeleteTransaction(gone.ID); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkPolicyAccess(t, d, alice, gone.ID, bob); access.Allowed {
-		t.Fatal("deleted posting allowed")
+		t.Fatal("deleted transaction allowed")
 	}
 	preview, err := d.PreviewSharingPolicy(alice, group)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preview.EligiblePostings != 0 {
-		t.Fatalf("preview counts %d eligible, want 0 (void/deleted excluded)", preview.EligiblePostings)
+	if preview.EligibleTransactions != 0 {
+		t.Fatalf("preview counts %d eligible, want 0 (void/deleted excluded)", preview.EligibleTransactions)
 	}
 }
 
@@ -397,16 +397,16 @@ func TestSharingPolicyRevocationAfterCommit(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice", "savings")
 	bob, storeB := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, transaction.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, posting.ID, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, transaction.ID, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,16 +416,16 @@ func TestSharingPolicyRevocationAfterCommit(t *testing.T) {
 	if disabled.Enabled || disabled.Version != 2 {
 		t.Fatalf("disabled policy = %+v, want disabled version 2", disabled)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed || access.Reason != "manual-user" {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); !access.Allowed || access.Reason != "manual-user" {
 		t.Fatalf("access after disable = %+v, want surviving manual-user grant", access)
 	}
-	if err := d.RevokeSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if err := d.RevokeSharedTransaction(alice, transaction.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("automatic access survives disable")
 	}
-	if refs, err := d.ListSharedPostings(bob); err != nil || len(refs) != 0 {
+	if refs, err := d.ListSharedTransactions(bob); err != nil || len(refs) != 0 {
 		t.Fatalf("shared list = %+v, %v, want empty after revoke", refs, err)
 	}
 	model, err := storeB.LoadModel()
@@ -433,7 +433,7 @@ func TestSharingPolicyRevocationAfterCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := false
-	for _, row := range model.Postings {
+	for _, row := range model.Transactions {
 		if row.ID == copied.ID {
 			found = true
 		}
@@ -449,7 +449,7 @@ func TestSharingPolicyNarrowRevokes(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice", "savings")
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking", "savings"},
@@ -459,14 +459,14 @@ func TestSharingPolicyNarrowRevokes(t *testing.T) {
 		Enabled: true, AccountIDs: []string{"checking", "savings"},
 		StartDate: "2026-01-01", EndDate: "2026-06-14",
 	})
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("narrowed end still shares")
 	}
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"savings"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("deselected account still shares")
 	}
 	policy, err := d.GetSharingPolicy(alice, group)
@@ -484,8 +484,8 @@ func TestSharingPolicyPreviewCounts(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice")
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
-	policyRow(t, storeA, sharingPostingB, "checking", nil, "2026-07-15")
+	policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
+	policyRow(t, storeA, sharingTransactionB, "checking", nil, "2026-07-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
@@ -495,8 +495,8 @@ func TestSharingPolicyPreviewCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preview.EligiblePostings != 1 {
-		t.Fatalf("eligible = %d, want 1", preview.EligiblePostings)
+	if preview.EligibleTransactions != 1 {
+		t.Fatalf("eligible = %d, want 1", preview.EligibleTransactions)
 	}
 	if preview.MemberCount != 2 {
 		t.Fatalf("members = %d, want 2", preview.MemberCount)
@@ -519,17 +519,17 @@ func TestSharingPolicyAccountDeletionStrips(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice")
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	// The posting must move off the doomed account first: financial
+	// The transaction must move off the doomed account first: financial
 	// references stay valid on delete.
-	moved := posting
+	moved := transaction
 	moved.SourceAccountID = nil
-	if _, err := storeA.UpdatePosting(moved); err != nil {
+	if _, err := storeA.UpdateTransaction(moved); err != nil {
 		t.Fatal(err)
 	}
 	if err := storeA.DeleteAccount("checking"); err != nil {
@@ -548,7 +548,7 @@ func TestSharingPolicyAccountDeletionStrips(t *testing.T) {
 	if _, err := storeA.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("recreated account ID silently reattached consent")
 	}
 }
@@ -559,7 +559,7 @@ func TestSharingPolicyGroupDeletionAndClear(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice")
 	bob, _ := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
@@ -571,7 +571,7 @@ func TestSharingPolicyGroupDeletionAndClear(t *testing.T) {
 	if _, err := d.GetSharingPolicy(alice, group); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("policy survives group deletion: %v", err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("automatic access survives group deletion")
 	}
 	regroup := sharingGroup(t, d, "alice", "Reformed", "bob")
@@ -597,28 +597,28 @@ func TestSharingPolicyIsolation(t *testing.T) {
 	alice, storeA := policyMember(t, d, "alice")
 	bob, storeB := policyMember(t, d, "bob")
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
-	policyRow(t, storeB, sharingPostingA, "checking", nil, "2026-06-15")
+	policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
+	policyRow(t, storeB, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, bob, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
 	// Bob's opt-in shares bob's rows with alice, never alice's rows.
-	if access := checkPolicyAccess(t, d, alice, sharingPostingA, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, sharingTransactionA, bob); access.Allowed {
 		t.Fatal("bob's policy shares alice's rows")
 	}
-	if access := checkPolicyAccess(t, d, bob, sharingPostingA, alice); !access.Allowed {
+	if access := checkPolicyAccess(t, d, bob, sharingTransactionA, alice); !access.Allowed {
 		t.Fatal("bob's policy does not share bob's rows with alice")
 	}
-	refs, err := d.ListSharedPostings(alice)
+	refs, err := d.ListSharedTransactions(alice)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(refs) != 1 || refs[0].OwnerUserID != bob {
-		t.Fatalf("alice list = %+v, want bob's posting only", refs)
+		t.Fatalf("alice list = %+v, want bob's transaction only", refs)
 	}
-	if refs, err := d.ListSharedPostings(bob); err != nil || len(refs) != 0 {
+	if refs, err := d.ListSharedTransactions(bob); err != nil || len(refs) != 0 {
 		t.Fatalf("bob list = %+v, %v, want empty", refs, err)
 	}
 	// Carol is outside the group entirely.
@@ -626,7 +626,7 @@ func TestSharingPolicyIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, bob, sharingPostingA, carol); access.Allowed {
+	if access := checkPolicyAccess(t, d, bob, sharingTransactionA, carol); access.Allowed {
 		t.Fatal("outsider reads through automatic policy")
 	}
 }
@@ -649,31 +649,31 @@ func TestSharingPolicyExclusionBeatsAutomatic(t *testing.T) {
 		t.Fatal(err)
 	}
 	group := sharingGroup(t, d, "alice", "Club", "bob", "carol")
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 
 	enablePolicy(t, d, alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if _, err := d.ExcludeSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.ExcludeSharedTransaction(alice, transaction.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("user exclusion does not beat automatic")
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, carol); !access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, carol); !access.Allowed {
 		t.Fatal("exclusion leaked to another member")
 	}
-	if err := d.RemoveSharedExclusion(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if err := d.RemoveSharedExclusion(alice, transaction.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, posting.ID, store.SharingAudienceAll, "", sharingKey(t)); err != nil {
+	if _, err := d.ExcludeSharedTransaction(alice, transaction.ID, store.SharingAudienceAll, "", sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("wildcard exclusion does not beat automatic")
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, carol); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, carol); access.Allowed {
 		t.Fatal("wildcard exclusion leaked")
 	}
 }
@@ -699,18 +699,18 @@ func TestSharingPolicyLeaveAndRejoin(t *testing.T) {
 	if _, err := d.AcceptInvite(code, bob, "bob"); err != nil {
 		t.Fatal(err)
 	}
-	posting := policyRow(t, storeA, sharingPostingA, "checking", nil, "2026-06-15")
+	transaction := policyRow(t, storeA, sharingTransactionA, "checking", nil, "2026-06-15")
 	enablePolicy(t, d, alice, group.ID, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); !access.Allowed {
 		t.Fatal("member denied before leave")
 	}
 	if err := d.LeaveGroup(group.ID, bob); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); access.Allowed {
 		t.Fatal("leaver keeps automatic access")
 	}
 	if _, err := d.GetSharingPolicy(alice, group.ID); err != nil {
@@ -724,7 +724,7 @@ func TestSharingPolicyLeaveAndRejoin(t *testing.T) {
 	if _, err := d.AcceptInvite(code2, bob, "bob"); err != nil {
 		t.Fatal(err)
 	}
-	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed {
+	if access := checkPolicyAccess(t, d, alice, transaction.ID, bob); !access.Allowed {
 		t.Fatal("rejoined member not shared again")
 	}
 }

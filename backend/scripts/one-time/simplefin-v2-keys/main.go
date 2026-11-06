@@ -3,7 +3,7 @@
 // private account-to-connection map from a live Bridge read.
 //
 // The map step is the only provider read. The upgrade step is offline and
-// transactional: it rewrites account_links, posting_sync_keys, and
+// transactional: it rewrites account_links, transaction_sync_keys, and
 // suppressed_sync_keys, verifies row counts, and records the migration
 // marker. Neither the server nor setupdb calls this tool.
 package main
@@ -48,12 +48,12 @@ type mappingConnection struct {
 }
 
 type counts struct {
-	Users          int
-	Links          int
-	PostingKeys    int
-	SuppressedKeys int
-	Converted      int
-	AlreadyCurrent int
+	Users           int
+	Links           int
+	TransactionKeys int
+	SuppressedKeys  int
+	Converted       int
+	AlreadyCurrent  int
 }
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
@@ -97,12 +97,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if *dryRun {
-		fmt.Fprintf(stdout, "simplefin v2 keys dry run (%d users, %d links, %d posting keys, %d suppressed keys, %d converted)\n",
-			result.Users, result.Links, result.PostingKeys, result.SuppressedKeys, result.Converted)
+		fmt.Fprintf(stdout, "simplefin v2 keys dry run (%d users, %d links, %d transaction keys, %d suppressed keys, %d converted)\n",
+			result.Users, result.Links, result.TransactionKeys, result.SuppressedKeys, result.Converted)
 		return 0
 	}
-	fmt.Fprintf(stdout, "simplefin v2 keys complete (%d users, %d links, %d posting keys, %d suppressed keys, %d converted)\n",
-		result.Users, result.Links, result.PostingKeys, result.SuppressedKeys, result.Converted)
+	fmt.Fprintf(stdout, "simplefin v2 keys complete (%d users, %d links, %d transaction keys, %d suppressed keys, %d converted)\n",
+		result.Users, result.Links, result.TransactionKeys, result.SuppressedKeys, result.Converted)
 	return 0
 }
 
@@ -259,7 +259,7 @@ func upgrade(dbPath, mappingPath string, dryRun bool) (counts, error) {
 			return result, err
 		}
 		result.Links += before.Links
-		result.PostingKeys += before.PostingKeys
+		result.TransactionKeys += before.TransactionKeys
 		result.SuppressedKeys += before.SuppressedKeys
 		for _, key := range legacy {
 			newKey, err := mappedKey(userID, key, userMapping)
@@ -275,7 +275,7 @@ func upgrade(dbPath, mappingPath string, dryRun bool) (counts, error) {
 		if err != nil {
 			return result, err
 		}
-		if before.Links != after.Links || before.PostingKeys != after.PostingKeys || before.SuppressedKeys != after.SuppressedKeys {
+		if before.Links != after.Links || before.TransactionKeys != after.TransactionKeys || before.SuppressedKeys != after.SuppressedKeys {
 			return result, fmt.Errorf("user %s row counts changed during conversion", userID)
 		}
 	}
@@ -294,9 +294,9 @@ func upgrade(dbPath, mappingPath string, dryRun bool) (counts, error) {
 }
 
 type tableCount struct {
-	Links          int
-	PostingKeys    int
-	SuppressedKeys int
+	Links           int
+	TransactionKeys int
+	SuppressedKeys  int
 }
 
 func tableCounts(db *sql.DB, userID string) (tableCount, error) {
@@ -304,7 +304,7 @@ func tableCounts(db *sql.DB, userID string) (tableCount, error) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM account_links WHERE user_id = ?`, userID).Scan(&out.Links); err != nil {
 		return out, err
 	}
-	if err := db.QueryRow(`SELECT COUNT(*) FROM posting_sync_keys WHERE user_id = ? AND provider = ?`, userID, "simplefin").Scan(&out.PostingKeys); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM transaction_sync_keys WHERE user_id = ? AND provider = ?`, userID, "simplefin").Scan(&out.TransactionKeys); err != nil {
 		return out, err
 	}
 	exists, err := tableExists(db, "suppressed_sync_keys")
@@ -333,8 +333,8 @@ func rewriteKey(db *sql.DB, userID, oldKey, newKey string) error {
 	if _, err := db.Exec(`UPDATE account_links SET bridge_account_id = ? WHERE user_id = ? AND bridge_account_id = ?`, newKey, userID, oldKey); err != nil {
 		return fmt.Errorf("rewrite account link: %w", err)
 	}
-	if _, err := db.Exec(`UPDATE posting_sync_keys SET bridge_account_id = ? WHERE user_id = ? AND provider = ? AND bridge_account_id = ?`, newKey, userID, "simplefin", oldKey); err != nil {
-		return fmt.Errorf("rewrite posting key: %w", err)
+	if _, err := db.Exec(`UPDATE transaction_sync_keys SET bridge_account_id = ? WHERE user_id = ? AND provider = ? AND bridge_account_id = ?`, newKey, userID, "simplefin", oldKey); err != nil {
+		return fmt.Errorf("rewrite transaction key: %w", err)
 	}
 	exists, err := tableExists(db, "suppressed_sync_keys")
 	if err != nil {
@@ -369,7 +369,7 @@ func legacyKeys(db *sql.DB, userID string) ([]string, error) {
 	if err := appendKeys(db.Query(`SELECT bridge_account_id FROM account_links WHERE user_id = ?`, userID)); err != nil {
 		return nil, err
 	}
-	if err := appendKeys(db.Query(`SELECT bridge_account_id FROM posting_sync_keys WHERE user_id = ? AND provider = ?`, userID, "simplefin")); err != nil {
+	if err := appendKeys(db.Query(`SELECT bridge_account_id FROM transaction_sync_keys WHERE user_id = ? AND provider = ?`, userID, "simplefin")); err != nil {
 		return nil, err
 	}
 	exists, err := tableExists(db, "suppressed_sync_keys")
@@ -392,7 +392,7 @@ func legacyKeys(db *sql.DB, userID string) ([]string, error) {
 func simplefinUsers(db *sql.DB) ([]string, error) {
 	queries := []string{
 		`SELECT user_id FROM account_links`,
-		`SELECT user_id FROM posting_sync_keys WHERE provider = 'simplefin'`,
+		`SELECT user_id FROM transaction_sync_keys WHERE provider = 'simplefin'`,
 	}
 	exists, err := tableExists(db, "suppressed_sync_keys")
 	if err != nil {

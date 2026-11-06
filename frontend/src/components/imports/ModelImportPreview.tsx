@@ -30,14 +30,14 @@ export function ModelImportPreview({
 						"Waypoint model"}
 				</h3>
 				<p className="mt-2 text-xs">
-					{model.accounts.length} accounts · {model.postings.length} postings ·{" "}
-					{model.checkpoints.length} checkpoints
+					{model.accounts.length} accounts · {model.transactions.length}{" "}
+					transactions · {model.checkpoints.length} checkpoints
 				</p>
 				<p className="mt-2 text-xs">
 					{model.evaluations.financialIndependence.length +
 						model.evaluations.netWorthThreshold.length +
 						model.evaluations.accountBalance.length +
-						model.evaluations.postingFulfillment.length +
+						model.evaluations.transactionFulfillment.length +
 						(model.evaluations.cycleFulfillment ?? []).length}{" "}
 					evaluations
 				</p>

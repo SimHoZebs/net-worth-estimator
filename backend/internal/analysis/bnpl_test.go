@@ -9,7 +9,7 @@ import (
 )
 
 func transaction(id, description, amount string, day int) types.AnalysisTransaction {
-	return types.AnalysisTransaction{PostingID: id, AccountID: "bank", Facts: types.TransactionFacts{Description: description, Amount: amount, Currency: "USD", PostedTime: time.Date(2026, 1, day, 12, 0, 0, 0, time.UTC).Unix(), Metadata: map[string]string{}}}
+	return types.AnalysisTransaction{TransactionID: id, AccountID: "bank", Facts: types.TransactionFacts{Description: description, Amount: amount, Currency: "USD", PostedTime: time.Date(2026, 1, day, 12, 0, 0, 0, time.UTC).Unix(), Metadata: map[string]string{}}}
 }
 
 func TestBNPLDescriptorEvidence(t *testing.T) {
@@ -52,7 +52,7 @@ func TestBNPLPatternAndLifecycle(t *testing.T) {
 			t.Fatalf("got %d want %d err=%v", len(result), want, err)
 		}
 		for _, item := range result {
-			if item.Strength != "moderate" || len(item.Evidence[0].PostingIDs) != 3 {
+			if item.Strength != "moderate" || len(item.Evidence[0].TransactionIDs) != 3 {
 				t.Fatalf("pattern=%+v", item)
 			}
 		}

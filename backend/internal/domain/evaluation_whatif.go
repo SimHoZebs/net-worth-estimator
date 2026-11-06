@@ -11,8 +11,8 @@ import (
 // additions, disables, and modified copies. Canonical path stays untouched.
 
 var whatIfAllowedKeys = map[string]bool{
-	"addedAccounts": true, "addedPostings": true, "addedSchedules": true,
-	"disabledAccountIds": true, "disabledPostingIds": true, "disabledScheduleIds": true,
+	"addedAccounts": true, "addedTransactions": true, "addedSchedules": true,
+	"disabledAccountIds": true, "disabledTransactionIds": true, "disabledScheduleIds": true,
 }
 
 func validateWhatIfConfig(config any) error {
@@ -32,14 +32,14 @@ func validateWhatIfConfig(config any) error {
 			return fmt.Errorf("What-if field %q must be an array.", key)
 		}
 		switch key {
-		case "disabledAccountIds", "disabledPostingIds", "disabledScheduleIds":
+		case "disabledAccountIds", "disabledTransactionIds", "disabledScheduleIds":
 			for _, item := range list {
 				s, ok := item.(string)
 				if !ok || s == "" {
 					return fmt.Errorf("What-if field %q must be an array of non-empty IDs.", key)
 				}
 			}
-		case "addedAccounts", "addedPostings", "addedSchedules":
+		case "addedAccounts", "addedTransactions", "addedSchedules":
 			for _, item := range list {
 				object, ok := item.(map[string]any)
 				if !ok {
@@ -95,10 +95,10 @@ func whatIfOverridesFromParsed(config any) types.ModelOverrides {
 		return overrides
 	}
 	overrides.AddedAccounts = append(overrides.AddedAccounts, parsed.AddedAccounts...)
-	overrides.AddedPostings = append(overrides.AddedPostings, parsed.AddedPostings...)
+	overrides.AddedTransactions = append(overrides.AddedTransactions, parsed.AddedTransactions...)
 	overrides.AddedRules = append(overrides.AddedRules, parsed.AddedRules...)
 	overrides.DisabledAccountIDs = append(overrides.DisabledAccountIDs, parsed.DisabledAccountIDs...)
-	overrides.DisabledPostingIDs = append(overrides.DisabledPostingIDs, parsed.DisabledPostingIDs...)
+	overrides.DisabledTransactionIDs = append(overrides.DisabledTransactionIDs, parsed.DisabledTransactionIDs...)
 	overrides.DisabledScheduleIDs = append(overrides.DisabledScheduleIDs, parsed.DisabledScheduleIDs...)
 	return overrides
 }

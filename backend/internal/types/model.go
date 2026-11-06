@@ -11,13 +11,13 @@ import (
 type IsoDate = string
 
 const (
-	EvaluationTypeFinancialIndependence = "financialIndependence"
-	EvaluationTypeNetWorthThreshold     = "netWorthThreshold"
-	EvaluationTypeAccountBalance        = "accountBalance"
-	EvaluationTypePostingFulfillment    = "postingFulfillment"
-	EvaluationTypeCycleFulfillment      = "cycleFulfillment"
-	EvaluationTypePlannedPurchases      = "plannedPurchases"
-	EvaluationTypeWhatIf                = "whatIf"
+	EvaluationTypeFinancialIndependence  = "financialIndependence"
+	EvaluationTypeNetWorthThreshold      = "netWorthThreshold"
+	EvaluationTypeAccountBalance         = "accountBalance"
+	EvaluationTypeTransactionFulfillment = "transactionFulfillment"
+	EvaluationTypeCycleFulfillment       = "cycleFulfillment"
+	EvaluationTypePlannedPurchases       = "plannedPurchases"
+	EvaluationTypeWhatIf                 = "whatIf"
 )
 
 // EvaluationTypeOrder controls evaluation type ordering; table arrays
@@ -26,7 +26,7 @@ var EvaluationTypeOrder = []string{
 	EvaluationTypeFinancialIndependence,
 	EvaluationTypeNetWorthThreshold,
 	EvaluationTypeAccountBalance,
-	EvaluationTypePostingFulfillment,
+	EvaluationTypeTransactionFulfillment,
 	EvaluationTypeCycleFulfillment,
 	EvaluationTypePlannedPurchases,
 	EvaluationTypeWhatIf,
@@ -183,39 +183,39 @@ func (b AmountInputBinding) MarshalJSON() ([]byte, error) {
 	}{b.Source, b.Value})
 }
 
-type PostingAmountResolution struct {
+type TransactionAmountResolution struct {
 	Resolver string                        `json:"resolver"`
 	Config   map[string]any                `json:"config"`
 	Inputs   map[string]AmountInputBinding `json:"inputs"`
 }
 
-type PostingClaim struct {
+type TransactionClaim struct {
 	// ScheduleID names the schedule whose occurrence this
-	// posting records. Always paired with OccurrenceDate; both are set
+	// transaction records. Always paired with OccurrenceDate; both are set
 	// manually, never inferred.
 	ScheduleID string `json:"scheduleId"`
-	// OccurrenceDate is the scheduled occurrence this posting replaces.
+	// OccurrenceDate is the scheduled occurrence this transaction replaces.
 	// It is independent of posted and transaction times, so an early or
 	// late actual can still claim its occurrence.
 	OccurrenceDate IsoDate `json:"occurrenceDate"`
 }
 
-// Posting is a single transaction with two times: posted time is when the
+// Transaction is a single transaction with two times: posted time is when the
 // bank posts it, transaction time is when the money moves. Both are Unix
-// seconds. The UTC day of transaction time groups the transaction. Postings
+// seconds. The UTC day of transaction time groups the transaction. Transactions
 // never repeat; repetition is owned by Schedule, which expands into
-// occurrences at projection time. A posting with a Claim is an actual
+// occurrences at projection time. A transaction with a Claim is an actual
 // recorded against one scheduled occurrence of its rule.
-type Posting struct {
-	ID              string                  `json:"id"`
-	Name            string                  `json:"name"`
-	SourceAccountID *string                 `json:"sourceAccountId"`
-	Destinations    []string                `json:"destinations"`
-	Amount          PostingAmountResolution `json:"amount"`
-	PostedTime      int64                   `json:"postedTime"`
-	TransactionTime int64                   `json:"transactionTime"`
-	Claim           *PostingClaim           `json:"claim,omitempty"`
-	Enabled         bool                    `json:"enabled"`
+type Transaction struct {
+	ID              string                      `json:"id"`
+	Name            string                      `json:"name"`
+	SourceAccountID *string                     `json:"sourceAccountId"`
+	Destinations    []string                    `json:"destinations"`
+	Amount          TransactionAmountResolution `json:"amount"`
+	PostedTime      int64                       `json:"postedTime"`
+	TransactionTime int64                       `json:"transactionTime"`
+	Claim           *TransactionClaim           `json:"claim,omitempty"`
+	Enabled         bool                        `json:"enabled"`
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
 	// Owner writes cannot set it.
 	Pending bool `json:"pending,omitempty"`
@@ -237,22 +237,22 @@ type Posting struct {
 // Schedule owns repetition. Its transaction fields are the template
 // expanded into one occurrence per scheduled date; its schedule fields say
 // when. Rules never move money themselves; expansion at projection time
-// produces occurrences that execute exactly like postings. Rate behavior
+// produces occurrences that execute exactly like transactions. Rate behavior
 // (occurrence-rate, growth-factor, volatility) lives in the amount inputs,
-// the same descriptors one-time postings use; the rule contributes only
+// the same descriptors one-time transactions use; the rule contributes only
 // schedule context (frequency divisor, start date).
 type Schedule struct {
-	ID              string                  `json:"id"`
-	Name            string                  `json:"name"`
-	SourceAccountID *string                 `json:"sourceAccountId"`
-	Destinations    []string                `json:"destinations"`
-	Amount          PostingAmountResolution `json:"amount"`
-	Frequency       Frequency               `json:"frequency"`
-	StartDate       IsoDate                 `json:"startDate"`
-	EndDate         *IsoDate                `json:"endDate"`
-	AnnualCap       *float64                `json:"annualCap"`
-	Priority        int                     `json:"priority"`
-	Enabled         bool                    `json:"enabled"`
+	ID              string                      `json:"id"`
+	Name            string                      `json:"name"`
+	SourceAccountID *string                     `json:"sourceAccountId"`
+	Destinations    []string                    `json:"destinations"`
+	Amount          TransactionAmountResolution `json:"amount"`
+	Frequency       Frequency                   `json:"frequency"`
+	StartDate       IsoDate                     `json:"startDate"`
+	EndDate         *IsoDate                    `json:"endDate"`
+	AnnualCap       *float64                    `json:"annualCap"`
+	Priority        int                         `json:"priority"`
+	Enabled         bool                        `json:"enabled"`
 }
 
 // FinancialModel is the complete collection of financial rows.
@@ -261,7 +261,7 @@ type FinancialModel struct {
 	Accounts         []Account         `json:"accounts"`
 	Checkpoints      []Checkpoint      `json:"checkpoints"`
 	Evaluations      EvaluationTables  `json:"evaluations"`
-	Postings         []Posting         `json:"postings"`
+	Transactions     []Transaction     `json:"transactions"`
 	Schedules        []Schedule        `json:"schedules"`
 	PaymentTerms     []PaymentTerms    `json:"paymentTerms"`
 	PlannedPurchases []PlannedPurchase `json:"plannedPurchases,omitempty"`
@@ -270,7 +270,7 @@ type FinancialModel struct {
 // PaymentTerms is mechanism config linked to one debt account. Accounts
 // stay values only (balances, bounds, kind); terms carry the payment
 // schedule: minimums, monthly due anchor, and the revolving statement anchor
-// for cards. Terms never move money themselves; postings remain the only
+// for cards. Terms never move money themselves; transactions remain the only
 // transaction mechanism. The effective minimum combines MinimumFixed with
 // MinimumPercent of the balance magnitude when set; the balance basis is
 // resolved where terms are applied.
@@ -283,22 +283,22 @@ type PaymentTerms struct {
 }
 
 type ModelOverrides struct {
-	AddedAccounts       []Account  `json:"addedAccounts"`
-	AddedPostings       []Posting  `json:"addedPostings"`
-	AddedRules          []Schedule `json:"addedSchedules"`
-	DisabledAccountIDs  []string   `json:"disabledAccountIds"`
-	DisabledPostingIDs  []string   `json:"disabledPostingIds"`
-	DisabledScheduleIDs []string   `json:"disabledScheduleIds"`
+	AddedAccounts          []Account     `json:"addedAccounts"`
+	AddedTransactions      []Transaction `json:"addedTransactions"`
+	AddedRules             []Schedule    `json:"addedSchedules"`
+	DisabledAccountIDs     []string      `json:"disabledAccountIds"`
+	DisabledTransactionIDs []string      `json:"disabledTransactionIds"`
+	DisabledScheduleIDs    []string      `json:"disabledScheduleIds"`
 }
 
 func EmptyModelOverrides() ModelOverrides {
 	return ModelOverrides{
-		AddedAccounts:       []Account{},
-		AddedPostings:       []Posting{},
-		AddedRules:          []Schedule{},
-		DisabledAccountIDs:  []string{},
-		DisabledPostingIDs:  []string{},
-		DisabledScheduleIDs: []string{},
+		AddedAccounts:          []Account{},
+		AddedTransactions:      []Transaction{},
+		AddedRules:             []Schedule{},
+		DisabledAccountIDs:     []string{},
+		DisabledTransactionIDs: []string{},
+		DisabledScheduleIDs:    []string{},
 	}
 }
 
@@ -309,9 +309,9 @@ func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) Financi
 	for _, id := range overrides.DisabledAccountIDs {
 		disabledAccounts[id] = true
 	}
-	disabledPostings := make(map[string]bool, len(overrides.DisabledPostingIDs))
-	for _, id := range overrides.DisabledPostingIDs {
-		disabledPostings[id] = true
+	disabledTransactions := make(map[string]bool, len(overrides.DisabledTransactionIDs))
+	for _, id := range overrides.DisabledTransactionIDs {
+		disabledTransactions[id] = true
 	}
 	disabledRules := make(map[string]bool, len(overrides.DisabledScheduleIDs))
 	for _, id := range overrides.DisabledScheduleIDs {
@@ -334,13 +334,13 @@ func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) Financi
 			checkpoints = append(checkpoints, checkpoint)
 		}
 	}
-	postings := make([]Posting, 0, len(model.Postings)+len(overrides.AddedPostings))
-	for _, posting := range model.Postings {
-		if !disabledPostings[posting.ID] {
-			postings = append(postings, posting)
+	transactions := make([]Transaction, 0, len(model.Transactions)+len(overrides.AddedTransactions))
+	for _, transaction := range model.Transactions {
+		if !disabledTransactions[transaction.ID] {
+			transactions = append(transactions, transaction)
 		}
 	}
-	postings = append(postings, overrides.AddedPostings...)
+	transactions = append(transactions, overrides.AddedTransactions...)
 	rules := make([]Schedule, 0, len(model.Schedules)+len(overrides.AddedRules))
 	for _, rule := range model.Schedules {
 		if !disabledRules[rule.ID] {
@@ -353,7 +353,7 @@ func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) Financi
 		Accounts:         accounts,
 		Checkpoints:      checkpoints,
 		Evaluations:      model.Evaluations,
-		Postings:         postings,
+		Transactions:     transactions,
 		Schedules:        rules,
 		PaymentTerms:     model.PaymentTerms,
 		PlannedPurchases: model.PlannedPurchases,

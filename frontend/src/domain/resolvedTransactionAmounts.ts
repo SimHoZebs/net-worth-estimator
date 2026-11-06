@@ -11,7 +11,7 @@ export interface ResolvedTransactionAmount {
 /**
  * Summarize projected occurrences per transaction definition.
  *
- * Formula-driven postings (interest = balance * rate, 401(k) = pay * %,
+ * Formula-driven transactions (interest = balance * rate, 401(k) = pay * %,
  * payoffs = abs(balance), ...) have no single static amount. The transaction
  * list shows the earliest projected occurrence as the representative figure so
  * the row never dead-ends at "Unavailable".

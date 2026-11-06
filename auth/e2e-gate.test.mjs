@@ -51,7 +51,7 @@ test("journey steps cover every required boundary", () => {
 });
 
 test("seed is deterministic and frozen: fixed dates and names", () => {
-  assert.equal(E2E_SEED.postingDay, "2026-06-15");
+  assert.equal(E2E_SEED.transactionDay, "2026-06-15");
   assert.ok(Number.isFinite(E2E_SEED.postedTime));
   assert.ok(E2E_SEED.ownerName && E2E_SEED.secondName && E2E_SEED.groupName);
   assert.ok(Object.isFrozen(E2E_SEED), "the journey seed must stay immutable");

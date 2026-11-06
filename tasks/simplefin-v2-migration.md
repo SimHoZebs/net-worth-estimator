@@ -55,7 +55,7 @@ The client sends no `version` parameter, so the Bridge serves v1. The
 The bridge account identity is the bare `account.id` everywhere:
 
 - `account_links.bridge_account_id`
-- `posting_sync_keys.bridge_account_id`
+- `transaction_sync_keys.bridge_account_id`
 - `suppressed_sync_keys.bridge_account_id`
 - `ProviderAccountID` and `Checkpoint.BridgeID`
 - the account link API path and the Analysis transaction account identity
@@ -171,7 +171,7 @@ Scope:
 Exit gate:
 
 - A live owner sync on the demo access URL returns v2 data and applies the same
-  balances and postings as the v1 run.
+  balances and transactions as the v1 run.
 - `gen.auth`, `con.auth`, `act.failed`, unknown-code, and rate-limit cases are
   covered by tests.
 - A partial run does not void pending holds for the excluded account.
@@ -193,7 +193,7 @@ Scope:
 - Delete bare-key tests and fixtures.
 
 The conversion is all-or-nothing and happens with the API and scheduler
-stopped. The tool does not touch model rows, balances, postings, facts,
+stopped. The tool does not touch model rows, balances, transactions, facts,
 categories, claims, or sharing rows. It only rewrites external identity
 strings.
 
@@ -229,7 +229,7 @@ It:
   journal.
 - No-ops when no `simplefin` rows exist.
 - Maps every distinct key in `account_links`, and every
-  `provider='simplefin'` key in `posting_sync_keys` and
+  `provider='simplefin'` key in `transaction_sync_keys` and
   `suppressed_sync_keys`.
 - Assigns a stale account that is absent from the live map to the user's only
   connection when that user has exactly one connection. Aborts when the user
@@ -325,7 +325,7 @@ Migration tool:
 
 - Fresh database with no SimpleFIN rows is a no-op.
 - Two users remain isolated.
-- Link, posting, and suppressed keys all convert; counts are preserved.
+- Link, transaction, and suppressed keys all convert; counts are preserved.
 - Re-run is read-only.
 - Collision, ambiguous stale link, missing credential, missing mapping, and
   v1-only server all abort without mutation.

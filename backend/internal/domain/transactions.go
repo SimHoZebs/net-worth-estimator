@@ -6,7 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Posting occurrence transaction resolution. Scheduling lives in
+// Transaction occurrence transaction resolution. Scheduling lives in
 // recurrence.go; this file resolves and applies single transactions.
 
 // AccountTransactionAction is a generic transaction request against accounts.
@@ -23,33 +23,33 @@ type AccountTransactionResult struct {
 	RealizedAmount  float64
 }
 
-// ComputeRequestedAmount resolves the raw posting amount for one occurrence.
+// ComputeRequestedAmount resolves the raw transaction amount for one occurrence.
 // One-time and rule-generated transactions resolve through the same amount
 // descriptor path: rate, growth, and volatility live in the amount inputs
 // (occurrence-rate and growth-factor providers), never in side columns.
 // Rule schedule context (frequency divisor, start date, pre-sampled rate)
-// arrives through AmountProviderContext; manual postings use divisor 1,
+// arrives through AmountProviderContext; manual transactions use divisor 1,
 // no start date, and no sample.
-func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate string, latestRealized map[string]float64, realizedDates map[string]string, realizedByYear map[string]map[string]float64, balances map[string]float64, paymentTerms map[string]types.PaymentTerms, stochasticRate *float64) (float64, error) {
-	posting := occurrence.Posting
+func ComputeRequestedAmount(occurrence DatedTransactionOccurrence, currentDate string, latestRealized map[string]float64, realizedDates map[string]string, realizedByYear map[string]map[string]float64, balances map[string]float64, paymentTerms map[string]types.PaymentTerms, stochasticRate *float64) (float64, error) {
+	transaction := occurrence.Transaction
 	divisor := 1
 	startDate := ""
 	if occurrence.Rule != nil {
 		divisor = FrequencyDivisor(occurrence.Rule.Frequency)
 		startDate = occurrence.Rule.StartDate
 	}
-	// Manual postings carry no schedule: stochastic sampling only produces
+	// Manual transactions carry no schedule: stochastic sampling only produces
 	// rates for volatile amounts, so a nil sample always resolves literally.
-	rawAmount, err := ResolvePostingAmountDescriptor(posting.Amount, &AmountProviderContext{
-		Balances:                     balances,
-		LatestRealizedPostingAmounts: latestRealized,
-		LatestRealizedPostingDates:   realizedDates,
-		RealizedPostingAmountsByYear: realizedByYear,
-		PaymentTerms:                 paymentTerms,
-		Date:                         currentDate,
-		FrequencyDivisor:             divisor,
-		RuleStartDate:                startDate,
-		SampledAnnualRate:            stochasticRate,
+	rawAmount, err := ResolveTransactionAmountDescriptor(transaction.Amount, &AmountProviderContext{
+		Balances:                         balances,
+		LatestRealizedTransactionAmounts: latestRealized,
+		LatestRealizedTransactionDates:   realizedDates,
+		RealizedTransactionAmountsByYear: realizedByYear,
+		PaymentTerms:                     paymentTerms,
+		Date:                             currentDate,
+		FrequencyDivisor:                 divisor,
+		RuleStartDate:                    startDate,
+		SampledAnnualRate:                stochasticRate,
 	})
 	if err != nil {
 		return 0, err
@@ -82,26 +82,26 @@ func ResolveAccountTransaction(action AccountTransactionAction, balances map[str
 	return AccountTransactionResult{RequestedAmount: requestedAmount, RealizedAmount: realizedAmount}
 }
 
-// ResolvePostingTransaction wraps ResolveAccountTransaction for postings.
-func ResolvePostingTransaction(posting *types.Posting, requestedAmount, annualCapRemaining float64, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
+// ResolveTransactionTransaction wraps ResolveAccountTransaction for transactions.
+func ResolveTransactionTransaction(transaction *types.Transaction, requestedAmount, annualCapRemaining float64, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
 	capRemaining := annualCapRemaining
 	return ResolveAccountTransaction(AccountTransactionAction{
-		SourceAccountID: posting.SourceAccountID,
-		Destinations:    posting.Destinations,
+		SourceAccountID: transaction.SourceAccountID,
+		Destinations:    transaction.Destinations,
 		RequestedAmount: requestedAmount,
 		LimitRemaining:  &capRemaining,
 	}, balances, accountByID)
 }
 
 // ResolveNegativeInflowTransaction resolves a negative amount on a sourceless
-// inflow posting (an investment loss) against destination floors, in
+// inflow transaction (an investment loss) against destination floors, in
 // destination order. Requested and realized amounts stay negative; realized
 // is bounded by the withdrawable amount above each destination floor.
 // Losses never consume annual caps: caps limit money moved in, not losses.
-func ResolveNegativeInflowTransaction(posting *types.Posting, requestedLoss float64, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
+func ResolveNegativeInflowTransaction(transaction *types.Transaction, requestedLoss float64, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
 	remaining := -requestedLoss
 	withdrawn := 0.0
-	for _, destID := range posting.Destinations {
+	for _, destID := range transaction.Destinations {
 		if remaining <= 0 {
 			break
 		}
@@ -142,11 +142,11 @@ func ApplyAccountTransaction(action AccountTransactionAction, realizedAmount flo
 	}
 }
 
-// ApplyPosting applies a posting's realized transaction.
-func ApplyPosting(posting *types.Posting, realizedAmount float64, balances map[string]float64, accountByID map[string]types.Account) {
+// ApplyTransaction applies a transaction's realized transaction.
+func ApplyTransaction(transaction *types.Transaction, realizedAmount float64, balances map[string]float64, accountByID map[string]types.Account) {
 	ApplyAccountTransaction(AccountTransactionAction{
-		SourceAccountID: posting.SourceAccountID,
-		Destinations:    posting.Destinations,
+		SourceAccountID: transaction.SourceAccountID,
+		Destinations:    transaction.Destinations,
 		RequestedAmount: realizedAmount,
 	}, realizedAmount, balances, accountByID)
 }
@@ -154,12 +154,12 @@ func ApplyPosting(posting *types.Posting, realizedAmount float64, balances map[s
 // ApplyNegativeInflow deducts a realized loss from destinations in order,
 // bounded by each destination floor. It mirrors the resolve step above, so
 // resolve-then-apply transfers the full realized loss.
-func ApplyNegativeInflow(posting *types.Posting, realizedLoss float64, balances map[string]float64, accountByID map[string]types.Account) {
+func ApplyNegativeInflow(transaction *types.Transaction, realizedLoss float64, balances map[string]float64, accountByID map[string]types.Account) {
 	if realizedLoss >= 0 {
 		return
 	}
 	remaining := -realizedLoss
-	for _, destID := range posting.Destinations {
+	for _, destID := range transaction.Destinations {
 		if remaining <= 0 {
 			break
 		}

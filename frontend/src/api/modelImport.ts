@@ -14,7 +14,7 @@ function isEvaluationTables(value: unknown): boolean {
 		isRecord(value) &&
 		Array.isArray(value.financialIndependence) &&
 		Array.isArray(value.netWorthThreshold) &&
-		Array.isArray(value.postingFulfillment) &&
+		Array.isArray(value.transactionFulfillment) &&
 		(value.accountBalance === undefined ||
 			Array.isArray(value.accountBalance)) &&
 		(value.cycleFulfillment === undefined ||
@@ -34,7 +34,7 @@ export function isFinancialModel(value: unknown): value is FinancialModel {
 	if (
 		!Array.isArray(value.accounts) ||
 		!Array.isArray(value.checkpoints) ||
-		!Array.isArray(value.postings) ||
+		!Array.isArray(value.transactions) ||
 		(value.schedules !== undefined && !Array.isArray(value.schedules))
 	)
 		return false;
@@ -52,7 +52,7 @@ export function isFinancialModel(value: unknown): value is FinancialModel {
 			typeof item.Balance === "number" &&
 			typeof item.observedAt === "number",
 	);
-	const postingsValid = value.postings.every(
+	const transactionsValid = value.transactions.every(
 		(item) =>
 			isRecord(item) &&
 			typeof item.id === "string" &&
@@ -68,7 +68,7 @@ export function isFinancialModel(value: unknown): value is FinancialModel {
 				typeof item.name === "string" &&
 				typeof item.enabled === "boolean",
 		);
-	return accountsValid && checkpointsValid && postingsValid && rulesValid;
+	return accountsValid && checkpointsValid && transactionsValid && rulesValid;
 }
 
 export function parseFinancialModel({
@@ -84,7 +84,7 @@ export function parseFinancialModel({
 			if (!isFinancialModel(value))
 				return new ModelImportError({
 					detail:
-						"Choose a Waypoint server model JSON file with accounts, checkpoints, postings, and evaluations.",
+						"Choose a Waypoint server model JSON file with accounts, checkpoints, transactions, and evaluations.",
 				});
 			return value;
 		},

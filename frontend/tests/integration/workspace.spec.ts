@@ -4,7 +4,7 @@ import type { FinancialModel } from "../../src/api/contracts.ts";
 import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
-	await resetFixture({ pinnedEvaluationIds: ["posting-fulfillment"] });
+	await resetFixture({ pinnedEvaluationIds: ["transaction-fulfillment"] });
 });
 
 /** Open the transaction detail for the fixture's investing transfer. */
@@ -173,8 +173,8 @@ test("a schedule ends by recording one transaction and a transaction can start a
 	// The ending flow closes both dialogs once the recording lands.
 	await expect(confirm).not.toBeVisible();
 	const once = await readSavedServerModel();
-	const recorded = once.postings.find(
-		(posting) => posting.name === "Monthly investing",
+	const recorded = once.transactions.find(
+		(transaction) => transaction.name === "Monthly investing",
 	);
 	expect(recorded).toBeDefined();
 	expect(once.schedules.some((rule) => rule.id === "invest")).toBe(false);
@@ -204,8 +204,8 @@ test("a schedule ends by recording one transaction and a transaction can start a
 	const started = recurring.schedules.find(
 		(schedule) => schedule.name === "Monthly investing",
 	);
-	const kept = recurring.postings.find(
-		(posting) => posting.id === recorded!.id,
+	const kept = recurring.transactions.find(
+		(transaction) => transaction.id === recorded!.id,
 	);
 	expect(kept?.claim?.scheduleId).toBe(started?.id);
 	expect(kept?.claim?.occurrenceDate).toBe("2026-02-10");
@@ -434,7 +434,7 @@ test("capture the completed desktop outlook", async ({ page }) => {
 test("skips the scenario calculation without pinned threshold evaluations", async ({
 	page,
 }) => {
-	// The default pins hold only posting fulfillment, which shows no
+	// The default pins hold only transaction fulfillment, which shows no
 	// probability, so Outlook must not stream the range at all.
 	let rangeRequested = false;
 	await page.route("**/v1/projections/stochastic", async (route) => {
@@ -445,7 +445,7 @@ test("skips the scenario calculation without pinned threshold evaluations", asyn
 	await page
 		.getByRole("img", { name: /Net worth over the trailing/ })
 		.waitFor();
-	// The default posting-fulfillment pin renders its card, proving pins
+	// The default transaction-fulfillment pin renders its card, proving pins
 	// resolved: a null pins response alone would also skip the fetch.
 	await page.getByRole("button", { name: "Inspect cash flow" }).waitFor();
 	expect(rangeRequested).toBe(false);

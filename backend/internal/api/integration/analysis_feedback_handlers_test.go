@@ -34,7 +34,7 @@ func seedAPIFinding(t *testing.T, scoped store.Store) types.AnalysisFinding {
 	if err != nil || !claimed || len(input.Transactions) != 1 {
 		t.Fatalf("claim=%v %v %+v", claimed, err, input)
 	}
-	if err := scoped.CompleteAnalysis(run, []types.AnalysisDetection{{PostingID: input.Transactions[0].PostingID, Kind: "bnpl", Provider: "klarna", Strength: "strong"}}, ""); err != nil {
+	if err := scoped.CompleteAnalysis(run, []types.AnalysisDetection{{TransactionID: input.Transactions[0].TransactionID, Kind: "bnpl", Provider: "klarna", Strength: "strong"}}, ""); err != nil {
 		t.Fatal(err)
 	}
 	items, err := scoped.ListAnalysisFindings(types.AnalysisFindingFilter{})

@@ -1,8 +1,8 @@
-// Group shared transaction feed (GRP-03). The feed lists each posting the
+// Group shared transaction feed (GRP-03). The feed lists each transaction the
 // requester is currently authorized to read that belongs in one group,
 // exactly once however many group grants, policies, accounts, or direct
 // shares match. Candidates come from the indexed references plus the
-// explicit manual grants; every candidate passes CheckSharedPostingAccess
+// explicit manual grants; every candidate passes CheckSharedTransactionAccess
 // before it is read, so a stale or missing reference under-shares a list
 // but never over-shares a read. Filters stay navigation-only: they narrow
 // the authorized set for display and never widen eligibility.
@@ -17,13 +17,13 @@ import (
 )
 
 // ListGroupSharedFeed returns the per-group shared transaction feed: every
-// posting the requester is currently authorized to read that belongs in
-// the named group. A posting belongs in the group feed when the viewer
+// transaction the requester is currently authorized to read that belongs in
+// the named group. A transaction belongs in the group feed when the viewer
 // reaches it through the group (a manual group grant or an automatic
 // policy naming that group) or through a direct share from one of the
 // group's current members. Non-members and unknown groups report
 // ErrNotFound so group visibility is not enumerable. Results order by
-// owner then posting; keyset feed pagination over the result belongs to
+// owner then transaction; keyset feed pagination over the result belongs to
 // the HTTP consumer.
 func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.GroupFeedItem, error) {
 	if !validSharingUserID(requesterID) || !validSharingGroupID(groupID) {
@@ -36,11 +36,11 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 	if role == "" {
 		return nil, store.ErrNotFound
 	}
-	type candidate struct{ owner, posting string }
+	type candidate struct{ owner, transaction string }
 	seen := map[candidate]bool{}
 	var candidates []candidate
-	add := func(owner, posting string) {
-		key := candidate{owner, posting}
+	add := func(owner, transaction string) {
+		key := candidate{owner, transaction}
 		if !seen[key] {
 			seen[key] = true
 			candidates = append(candidates, key)
@@ -49,20 +49,20 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 	// Manual group grants naming this group. The join requires the owner
 	// row to still exist; the read gate below re-validates membership,
 	// exclusions, and revocation on every call.
-	grantRows, err := d.db.Query(`SELECT DISTINCT g.owner_user_id, g.posting_id FROM sharing_grants g
-		JOIN postings p ON p.user_id = g.owner_user_id AND p.id = g.posting_id
+	grantRows, err := d.db.Query(`SELECT DISTINCT g.owner_user_id, g.transaction_id FROM sharing_grants g
+		JOIN transactions p ON p.user_id = g.owner_user_id AND p.id = g.transaction_id
 		WHERE g.audience_type = 'group' AND g.audience_id = ? AND g.intent = 'shared'
-		ORDER BY g.owner_user_id, g.posting_id`, groupID)
+		ORDER BY g.owner_user_id, g.transaction_id`, groupID)
 	if err != nil {
 		return nil, err
 	}
 	for grantRows.Next() {
-		var owner, posting string
-		if err := grantRows.Scan(&owner, &posting); err != nil {
+		var owner, transaction string
+		if err := grantRows.Scan(&owner, &transaction); err != nil {
 			grantRows.Close()
 			return nil, err
 		}
-		add(owner, posting)
+		add(owner, transaction)
 	}
 	if err := grantRows.Err(); err != nil {
 		grantRows.Close()
@@ -73,23 +73,23 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 	// group at the current policy version. The joins pre-fence stale rows
 	// (version match, current membership both sides, non-void existence);
 	// the gate below still decides every read.
-	indexRows, err := d.db.Query(`SELECT DISTINCT v.owner_user_id, v.posting_id FROM sharing_visibility v
+	indexRows, err := d.db.Query(`SELECT DISTINCT v.owner_user_id, v.transaction_id FROM sharing_visibility v
 		JOIN group_members requester ON requester.group_id = v.group_id AND requester.user_id = ?
 		JOIN group_members owner ON owner.group_id = v.group_id AND owner.user_id = v.owner_user_id
 		JOIN sharing_policies policy ON policy.owner_user_id = v.owner_user_id AND policy.group_id = v.group_id
 			AND policy.version = v.policy_version AND policy.enabled = 1
-		JOIN postings posting ON posting.user_id = v.owner_user_id AND posting.id = v.posting_id AND posting.void = 0
-		WHERE v.group_id = ? ORDER BY v.owner_user_id, v.posting_id`, requesterID, groupID)
+		JOIN transactions tx ON tx.user_id = v.owner_user_id AND tx.id = v.transaction_id AND tx.void = 0
+		WHERE v.group_id = ? ORDER BY v.owner_user_id, v.transaction_id`, requesterID, groupID)
 	if err != nil {
 		return nil, err
 	}
 	for indexRows.Next() {
-		var owner, posting string
-		if err := indexRows.Scan(&owner, &posting); err != nil {
+		var owner, transaction string
+		if err := indexRows.Scan(&owner, &transaction); err != nil {
 			indexRows.Close()
 			return nil, err
 		}
-		add(owner, posting)
+		add(owner, transaction)
 	}
 	if err := indexRows.Err(); err != nil {
 		indexRows.Close()
@@ -99,21 +99,21 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 	// Direct shares from the group's current members surface in the group
 	// they share with the viewer; a direct share from outside the group
 	// belongs to no group feed.
-	directRows, err := d.db.Query(`SELECT DISTINCT g.owner_user_id, g.posting_id FROM sharing_grants g
-		JOIN postings p ON p.user_id = g.owner_user_id AND p.id = g.posting_id
+	directRows, err := d.db.Query(`SELECT DISTINCT g.owner_user_id, g.transaction_id FROM sharing_grants g
+		JOIN transactions p ON p.user_id = g.owner_user_id AND p.id = g.transaction_id
 		JOIN group_members m ON m.group_id = ? AND m.user_id = g.owner_user_id
 		WHERE g.audience_type = 'user' AND g.audience_id = ? AND g.intent = 'shared'
-		ORDER BY g.owner_user_id, g.posting_id`, groupID, requesterID)
+		ORDER BY g.owner_user_id, g.transaction_id`, groupID, requesterID)
 	if err != nil {
 		return nil, err
 	}
 	for directRows.Next() {
-		var owner, posting string
-		if err := directRows.Scan(&owner, &posting); err != nil {
+		var owner, transaction string
+		if err := directRows.Scan(&owner, &transaction); err != nil {
 			directRows.Close()
 			return nil, err
 		}
-		add(owner, posting)
+		add(owner, transaction)
 	}
 	if err := directRows.Err(); err != nil {
 		directRows.Close()
@@ -122,7 +122,7 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 	directRows.Close()
 	items := []store.GroupFeedItem{}
 	for _, key := range candidates {
-		access, err := d.CheckSharedPostingAccess(key.owner, key.posting, requesterID)
+		access, err := d.CheckSharedTransactionAccess(key.owner, key.transaction, requesterID)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 		// exclusion keeps the row out of that group's feed. Exclusions
 		// naming other viewers do not hide a row from its owner.
 		if key.owner == requesterID {
-			excluded, err := d.selfPostingExcludedFromGroup(key.owner, key.posting, groupID)
+			excluded, err := d.selfTransactionExcludedFromGroup(key.owner, key.transaction, groupID)
 			if err != nil {
 				return nil, err
 			}
@@ -142,14 +142,14 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 				continue
 			}
 		}
-		posting, err := d.ReadSharedPosting(key.owner, key.posting, requesterID)
+		transaction, err := d.ReadSharedTransaction(key.owner, key.transaction, requesterID)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				continue
 			}
 			return nil, err
 		}
-		audiences, inGroup, err := d.feedAudiences(groupID, key.owner, key.posting, posting, requesterID)
+		audiences, inGroup, err := d.feedAudiences(groupID, key.owner, key.transaction, transaction, requesterID)
 		if err != nil {
 			return nil, err
 		}
@@ -162,35 +162,35 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 		}
 		items = append(items, store.GroupFeedItem{
 			OwnerUserID: key.owner, SourceDisplayName: display,
-			Audiences: audiences, Posting: posting,
+			Audiences: audiences, Transaction: transaction,
 		})
 	}
 	return items, nil
 }
 
-// selfPostingExcludedFromGroup reports whether the owner's own posting is
+// selfTransactionExcludedFromGroup reports whether the owner's own transaction is
 // hidden from one group's feed by a group exclusion naming that group or
 // by a wildcard exclusion. It applies only to own rows: anyone else's
 // exclusions are evaluated per viewer by the read gate instead.
-func (d *Database) selfPostingExcludedFromGroup(ownerID, postingID, groupID string) (bool, error) {
+func (d *Database) selfTransactionExcludedFromGroup(ownerID, transactionID, groupID string) (bool, error) {
 	var excluded int
 	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_grants
-		WHERE owner_user_id = ? AND posting_id = ? AND intent = 'excluded'
+		WHERE owner_user_id = ? AND transaction_id = ? AND intent = 'excluded'
 		AND (audience_type = 'all' OR (audience_type = 'group' AND audience_id = ?))`,
-		ownerID, postingID, groupID).Scan(&excluded); err != nil {
+		ownerID, transactionID, groupID).Scan(&excluded); err != nil {
 		return false, err
 	}
 	return excluded > 0, nil
 }
 
 // feedAudiences attributes the viewer's authorizing paths for one gated
-// posting: every group the viewer reaches it through (manual grant or
+// transaction: every group the viewer reaches it through (manual grant or
 // automatic policy, named by current group name) plus a direct-share entry
-// when a manual grant names the viewer. It reports whether the posting
+// when a manual grant names the viewer. It reports whether the transaction
 // belongs in the named group feed: through that group, or directly from
 // one of its current members. Every path mirrors the live-row conditions
-// of CheckSharedPostingAccess, which already allowed this read.
-func (d *Database) feedAudiences(feedGroupID, ownerID, postingID string, posting types.Posting, requesterID string) ([]store.GroupFeedAudience, bool, error) {
+// of CheckSharedTransactionAccess, which already allowed this read.
+func (d *Database) feedAudiences(feedGroupID, ownerID, transactionID string, transaction types.Transaction, requesterID string) ([]store.GroupFeedAudience, bool, error) {
 	audiences := []store.GroupFeedAudience{}
 	seenGroups := map[string]bool{}
 	addGroup := func(groupID string) error {
@@ -209,7 +209,7 @@ func (d *Database) feedAudiences(feedGroupID, ownerID, postingID string, posting
 	// Manual group grants authorizing this viewer: current membership on
 	// both sides, matching the gate's group-grant arm.
 	grantRows, err := d.db.Query(`SELECT DISTINCT audience_id FROM sharing_grants
-		WHERE owner_user_id = ? AND posting_id = ? AND audience_type = 'group' AND intent = 'shared'`, ownerID, postingID)
+		WHERE owner_user_id = ? AND transaction_id = ? AND audience_type = 'group' AND intent = 'shared'`, ownerID, transactionID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -250,7 +250,7 @@ func (d *Database) feedAudiences(feedGroupID, ownerID, postingID string, posting
 		}
 	}
 	// Automatic policy paths: the owner's enabled policy for each group
-	// where both parties hold current membership and the posting's current
+	// where both parties hold current membership and the transaction's current
 	// accounts and transaction date qualify, matching the gate's policy arm.
 	policyRows, err := d.db.Query(`SELECT sp.owner_user_id, sp.group_id, sp.enabled, sp.account_ids_json, sp.start_date, sp.end_date, sp.version, sp.updated_at
 		FROM sharing_policies sp
@@ -275,7 +275,7 @@ func (d *Database) feedAudiences(feedGroupID, ownerID, postingID string, posting
 	}
 	policyRows.Close()
 	for _, policy := range policies {
-		if !store.PolicyCoversPosting(policy, posting) {
+		if !store.PolicyCoversTransaction(policy, transaction) {
 			continue
 		}
 		if err := addGroup(policy.GroupID); err != nil {
@@ -290,8 +290,8 @@ func (d *Database) feedAudiences(feedGroupID, ownerID, postingID string, posting
 	// authorize (FND-02); the membership scopes which group feed shows it.
 	var direct int
 	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_grants
-		WHERE owner_user_id = ? AND posting_id = ? AND audience_type = 'user' AND audience_id = ? AND intent = 'shared'`,
-		ownerID, postingID, requesterID).Scan(&direct); err != nil {
+		WHERE owner_user_id = ? AND transaction_id = ? AND audience_type = 'user' AND audience_id = ? AND intent = 'shared'`,
+		ownerID, transactionID, requesterID).Scan(&direct); err != nil {
 		return nil, false, err
 	}
 	if direct > 0 {

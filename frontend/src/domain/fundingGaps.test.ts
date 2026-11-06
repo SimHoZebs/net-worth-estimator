@@ -17,7 +17,7 @@ describe("derive funding gaps", () => {
 				transactions: financialModelFixture.transactions,
 				startDate: financialModelFixture.startDate,
 				projection,
-				postingIds: [],
+				transactionIds: [],
 			}),
 		).toEqual([]);
 		const gaps = deriveFundingGaps({
@@ -25,7 +25,7 @@ describe("derive funding gaps", () => {
 			transactions: financialModelFixture.transactions,
 			startDate: financialModelFixture.startDate,
 			projection,
-			postingIds: ["other"],
+			transactionIds: ["other"],
 		});
 		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06-0"]);
 		expect(
@@ -34,7 +34,7 @@ describe("derive funding gaps", () => {
 				transactions: financialModelFixture.transactions,
 				startDate: financialModelFixture.startDate,
 				projection,
-				postingIds: null,
+				transactionIds: null,
 			}),
 		).toHaveLength(2);
 	});

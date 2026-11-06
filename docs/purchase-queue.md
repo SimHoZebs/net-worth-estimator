@@ -1,7 +1,7 @@
 # Planned purchase queue
 
 Planned purchases are standalone canonical rows in `plannedPurchases`, separate
-from postings and recurrence rules. They use their own CRUD API, the shared ID
+from transactions and recurrence rules. They use their own CRUD API, the shared ID
 namespace, and the direct row-save workflow. Priority is nonnegative. Lower
 numbers come first. Model order breaks ties.
 
@@ -14,7 +14,7 @@ Failed saves retain form fields for retry. A multi-row priority change can persi
 partially, so the queue reloads authoritative state after each attempt.
 
 A purchase has a funding account, fixed positive cost, and earliest date. It has
-no posting timestamps, amount resolver, recurrence, or occurrence claim.
+no transaction timestamps, amount resolver, recurrence, or occurrence claim.
 Amounts cannot reference purchase IDs. This prevents
 established payments from depending on optional purchases.
 
@@ -62,7 +62,7 @@ row or rerunning FI. The query key includes both the queue and evaluation scope.
 
 The backend tries whole purchases in priority order. It tries the projection
 start, each established event date, and each eligible earliest-purchase date.
-Established one-time postings and recurring occurrences keep their existing
+Established one-time transactions and recurring occurrences keep their existing
 order. Accepted purchases execute after both. If a checkpoint records the
 projection start's end-of-day balance, purchases start on the following day.
 

@@ -15,7 +15,7 @@ export interface ProjectionSource {
 	revision: string;
 	startDate: string;
 	accounts: { id: string; name: string }[];
-	postings: {
+	transactions: {
 		id: string;
 		name: string;
 		sourceAccountId: string | null;
@@ -42,7 +42,7 @@ export function normalizedEvaluations(
 		financialIndependence: evaluations?.financialIndependence ?? [],
 		netWorthThreshold: evaluations?.netWorthThreshold ?? [],
 		accountBalance: evaluations?.accountBalance ?? [],
-		postingFulfillment: evaluations?.postingFulfillment ?? [],
+		transactionFulfillment: evaluations?.transactionFulfillment ?? [],
 		cycleFulfillment: evaluations?.cycleFulfillment ?? [],
 		plannedPurchases: evaluations?.plannedPurchases ?? [],
 	};
@@ -61,11 +61,11 @@ export function projectionSourceFromModel(
 			id: account.id,
 			name: account.name,
 		})),
-		postings: model.postings.map((posting) => ({
-			id: posting.id,
-			name: posting.name,
-			sourceAccountId: posting.sourceAccountId,
-			destinations: posting.destinations,
+		transactions: model.transactions.map((transaction) => ({
+			id: transaction.id,
+			name: transaction.name,
+			sourceAccountId: transaction.sourceAccountId,
+			destinations: transaction.destinations,
 		})),
 		schedules: model.schedules.map((schedule) => ({
 			id: schedule.id,

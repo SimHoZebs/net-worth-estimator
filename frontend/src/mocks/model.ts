@@ -1,6 +1,6 @@
 import type {
 	FinancialModel,
-	PostingAmountResolution,
+	TransactionAmountResolution,
 } from "../api/contracts.ts";
 import type { Transaction } from "../domain/model.ts";
 import {
@@ -11,7 +11,7 @@ import {
 const stamp = (date: string) =>
 	Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000);
 
-export function fixtureAmount(row: Transaction): PostingAmountResolution {
+export function fixtureAmount(row: Transaction): TransactionAmountResolution {
 	return row.annualIncrease === 0
 		? {
 				resolver: "expression",
@@ -57,8 +57,8 @@ export function fixtureModel(
 			Balance: account.balance,
 			source: account.readOnly ? "banksync" : "user",
 		})),
-		postings: data.transactions
-			.filter((row) => row.kind === "posting")
+		transactions: data.transactions
+			.filter((row) => row.kind === "transaction")
 			.map((row) => ({
 				id: row.id,
 				name: row.name,
@@ -106,7 +106,7 @@ export function fixtureModel(
 		})),
 		evaluations: {
 			financialIndependence: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 			cycleFulfillment: [],
 			netWorthThreshold: data.evaluations
 				.filter((row) => row.kind === "net-worth")

@@ -36,10 +36,10 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	}
 	accountID := accountPayload.Result.ID
 
-	posting := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+	transaction := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Pay","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
-	if posting.Code != http.StatusOK {
-		t.Fatalf("create posting status = %d, body %s", posting.Code, posting.Body.String())
+	if transaction.Code != http.StatusOK {
+		t.Fatalf("create transaction status = %d, body %s", transaction.Code, transaction.Body.String())
 	}
 	rule := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
 		`{"name":"Salary","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true,"priority":1}`)
@@ -94,7 +94,7 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 
 	transactions := get("/v1/transactions?accountId=" + accountID)
 	if len(decodeQueryBody(t, transactions, "transactions")) != 1 {
-		t.Fatalf("transactions for account = %s, want only the posting", transactions["transactions"])
+		t.Fatalf("transactions for account = %s, want only the transaction", transactions["transactions"])
 	}
 	rules := get("/v1/schedules?accountId=" + accountID)
 	ruleRows := decodeQueryBody(t, rules, "schedules")
@@ -180,46 +180,46 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	owner := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Settled","destinations":["card"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
 	if owner.Code != http.StatusOK {
-		t.Fatalf("create posting status = %d, body %s", owner.Code, owner.Body.String())
+		t.Fatalf("create transaction status = %d, body %s", owner.Code, owner.Body.String())
 	}
-	bank := types.Posting{
+	bank := types.Transaction{
 		Name: "Vanished auth", Source: store.SourceBankSync, SourceAccountID: ptr("card"),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785628800,
 		TransactionTime: 1785628800,
 		Enabled:         false,
 		Pending:         true,
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
-		Upsert: &store.BankUpsert{Posting: bank, Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}}},
+		Upsert: &store.BankUpsert{Transaction: bank, Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}}},
 	}}); err != nil {
 		t.Fatalf("bank upsert: %v", err)
 	}
 	model, err := database.LoadModel()
-	if err != nil || len(model.Postings) != 2 {
-		t.Fatalf("postings = %+v, err %v", model.Postings, err)
+	if err != nil || len(model.Transactions) != 2 {
+		t.Fatalf("transactions = %+v, err %v", model.Transactions, err)
 	}
 	var bankID string
-	for _, posting := range model.Postings {
-		if posting.Source == store.SourceBankSync {
-			bankID = posting.ID
+	for _, transaction := range model.Transactions {
+		if transaction.Source == store.SourceBankSync {
+			bankID = transaction.ID
 		}
 	}
 	if bankID == "" {
-		t.Fatalf("bank posting missing in %+v", model.Postings)
+		t.Fatalf("bank transaction missing in %+v", model.Transactions)
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{Void: bankID}}); err != nil {
 		t.Fatalf("bank void: %v", err)
 	}
-	settled := types.Posting{
+	settled := types.Transaction{
 		Name: "Settled bank charge", Source: store.SourceBankSync, SourceAccountID: ptr("card"),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "18.50"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "18.50"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785715200,
 		TransactionTime: 1785715200,
 		Enabled:         true,
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
-		Upsert: &store.BankUpsert{Posting: settled, Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}}},
+		Upsert: &store.BankUpsert{Transaction: settled, Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}}},
 	}}); err != nil {
 		t.Fatalf("bank settled upsert: %v", err)
 	}
@@ -252,9 +252,9 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	if !seen[bankID].void {
 		t.Fatalf("bank row void = false, want the sync void flag reported")
 	}
-	for _, posting := range model.Postings {
-		if posting.Source != store.SourceBankSync && seen[posting.ID].void {
-			t.Fatalf("owner row %s void = true, want false", posting.ID)
+	for _, transaction := range model.Transactions {
+		if transaction.Source != store.SourceBankSync && seen[transaction.ID].void {
+			t.Fatalf("owner row %s void = true, want false", transaction.ID)
 		}
 	}
 	// Only lifecycle bank rows stay read-only: pending holds and vanished
@@ -282,7 +282,7 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 	normal := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"id":"01900000-0000-7000-8000-000000000031","name":"Groceries","sourceAccountId":"cash","destinations":[],"amount":{"resolver":"expression","config":{"expression":"42.5"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
 	if normal.Code != http.StatusOK {
-		t.Fatalf("create posting status = %d, body %s", normal.Code, normal.Body.String())
+		t.Fatalf("create transaction status = %d, body %s", normal.Code, normal.Body.String())
 	}
 	marker := doRowRequest(t, handler, http.MethodPost, "/v1/planned-purchases",
 		`{"id":"01900000-0000-7000-8000-000000000032","name":"Laptop","fundingAccountId":"cash","cost":500,"earliestDate":"2026-02-01","enabled":true,"priority":0}`)
@@ -304,7 +304,7 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 		t.Fatalf("decode /v1/transactions: %v", err)
 	}
 	if len(payload.Transactions) != 1 || payload.Transactions[0].ID != "01900000-0000-7000-8000-000000000031" {
-		t.Fatalf("GET /v1/transactions rows = %+v, want only the non-purchase posting", payload.Transactions)
+		t.Fatalf("GET /v1/transactions rows = %+v, want only the non-purchase transaction", payload.Transactions)
 	}
 	rulesResponse := doRowRequest(t, handler, http.MethodGet, "/v1/schedules", "")
 	if rulesResponse.Code != http.StatusOK {
@@ -335,8 +335,8 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 	if err := json.Unmarshal(model.Body.Bytes(), &read); err != nil {
 		t.Fatalf("decode model: %v", err)
 	}
-	if len(read.Model.Postings) != 1 {
-		t.Fatalf("postings = %d, want 1", len(read.Model.Postings))
+	if len(read.Model.Transactions) != 1 {
+		t.Fatalf("transactions = %d, want 1", len(read.Model.Transactions))
 	}
 	kept := false
 	for _, purchase := range read.Model.PlannedPurchases {
@@ -363,7 +363,7 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 		t.Fatalf("decode read-only list: %v", err)
 	}
 	if len(listed.Transactions) != 1 {
-		t.Fatalf("read-only rows = %+v, want only the non-purchase posting", listed.Transactions)
+		t.Fatalf("read-only rows = %+v, want only the non-purchase transaction", listed.Transactions)
 	}
 }
 
@@ -396,7 +396,7 @@ func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
 	spent := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","time":"11:00","enabled":true}`)
 	if spent.Code != http.StatusOK {
-		t.Fatalf("create posting status = %d, body %s", spent.Code, spent.Body.String())
+		t.Fatalf("create transaction status = %d, body %s", spent.Code, spent.Body.String())
 	}
 
 	response := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
@@ -477,7 +477,7 @@ func TestExactCutPositionAndAccountListAgree(t *testing.T) {
 	spent := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","time":"11:00","enabled":true}`)
 	if spent.Code != http.StatusOK {
-		t.Fatalf("create posting status = %d, body %s", spent.Code, spent.Body.String())
+		t.Fatalf("create transaction status = %d, body %s", spent.Code, spent.Body.String())
 	}
 
 	cut := "2026-03-10T10:00:00Z"

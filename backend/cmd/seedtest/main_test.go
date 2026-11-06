@@ -50,14 +50,14 @@ func TestSeedtestInjectClearRoundTrip(t *testing.T) {
 	if code := run([]string{"--db", path, "--user", user, "--bulk", "2x3:7"}, &out, &errOut); code != 0 {
 		t.Fatalf("inject code=%d stderr=%s", code, errOut.String())
 	}
-	if !strings.Contains(out.String(), "2 accounts, 6 postings") {
+	if !strings.Contains(out.String(), "2 accounts, 6 transactions") {
 		t.Fatalf("inject output = %q", out.String())
 	}
 	out.Reset()
 	if code := run([]string{"--db", path, "--user", user, "--clear"}, &out, &errOut); code != 0 {
 		t.Fatalf("clear code=%d stderr=%s", code, errOut.String())
 	}
-	if !strings.Contains(out.String(), "2 accounts, 6 postings") {
+	if !strings.Contains(out.String(), "2 accounts, 6 transactions") {
 		t.Fatalf("clear output = %q", out.String())
 	}
 }

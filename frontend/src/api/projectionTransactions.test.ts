@@ -27,7 +27,7 @@ function serverProjection(events: TransactionEvent[]): ProjectionResult {
 			financialIndependence: [],
 			netWorthThreshold: [],
 			accountBalance: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 		},
 		transactionEvents: events,
 	};
@@ -37,7 +37,7 @@ function event(overrides: Partial<TransactionEvent> = {}): TransactionEvent {
 	return {
 		date: "2026-02-05",
 		sequence: 1,
-		origin: { type: "posting", postingId: "bill" },
+		origin: { type: "transaction", transactionId: "bill" },
 		requestedAmount: 200,
 		realizedAmount: 100,
 		accountDeltas: [{ accountId: "checking", delta: -100 }],
@@ -100,11 +100,11 @@ describe("projection transaction evidence", () => {
 				event({ date: "2026-01-30", sequence: 0 }),
 				event({
 					sequence: 1,
-					origin: { type: "posting", postingId: "z-first" },
+					origin: { type: "transaction", transactionId: "z-first" },
 				}),
 				event({
 					sequence: 2,
-					origin: { type: "posting", postingId: "a-second" },
+					origin: { type: "transaction", transactionId: "a-second" },
 				}),
 			]),
 			null,
@@ -114,10 +114,10 @@ describe("projection transaction evidence", () => {
 		).toEqual(["z-first", "a-second"]);
 	});
 
-	it("resolves names from the model index with postings winning ties", () => {
+	it("resolves names from the model index with transactions winning ties", () => {
 		const model = {
 			checkpoints: [],
-			postings: [
+			transactions: [
 				{
 					id: "bill",
 					name: "Electric bill",

@@ -95,7 +95,7 @@ func cycleOutflow(event *types.TransactionEvent, accountIDs map[string]bool) flo
 // EvaluateCycleFulfillment measures realized cycle spend against budget.
 //
 // Spend has two parts. Recorded spend covers enabled one-time outflows dated
-// in [cycleStart, projectionStart]: for a one-time posting the yearly
+// in [cycleStart, projectionStart]: for a one-time transaction the yearly
 // realized bucket holds exactly its single replayed occurrence, so the
 // bucket is precisely attributable. A start-date occurrence already covered
 // by a transaction event (no checkpoint suppression) is skipped to avoid double
@@ -119,30 +119,30 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 	for index := range path.TransactionEvents {
 		event := &path.TransactionEvents[index]
 		if event.Date == projectionStart {
-			startDateEvents[event.Origin.PostingID] = true
+			startDateEvents[event.Origin.TransactionID] = true
 		}
 	}
 	recorded := 0.0
-	for index := range path.EffectiveModel.Postings {
-		posting := &path.EffectiveModel.Postings[index]
-		if !posting.Enabled {
+	for index := range path.EffectiveModel.Transactions {
+		transaction := &path.EffectiveModel.Transactions[index]
+		if !transaction.Enabled {
 			continue
 		}
-		sourceAccount, ok := PostingSourceAccount(posting)
+		sourceAccount, ok := TransactionSourceAccount(transaction)
 		if !ok || !accountSet[sourceAccount] {
 			continue
 		}
-		day := postingDay(posting)
+		day := transactionDay(transaction)
 		if day == "" {
 			continue
 		}
 		if CompareIsoDates(day, cycleStart) < 0 || CompareIsoDates(day, projectionStart) > 0 {
 			continue
 		}
-		if day == projectionStart && startDateEvents[posting.ID] {
+		if day == projectionStart && startDateEvents[transaction.ID] {
 			continue
 		}
-		if byYear, ok := path.ProjectionStartPostingState.RealizedPostingAmountsByYear[posting.ID]; ok {
+		if byYear, ok := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear[transaction.ID]; ok {
 			recorded += maxFloat(0, byYear[day[:4]])
 		}
 	}

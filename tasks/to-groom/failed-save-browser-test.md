@@ -1,6 +1,6 @@
 # Monthly investing: fail the request the test actually saves
 
-The browser test changes `Monthly investing` from `600` to `900`, but injects failure into posting requests. Saving this scheduled transaction sends `PATCH /v1/recurrence-rules/invest`, so it bypasses the intended failure.
+The browser test changes `Monthly investing` from `600` to `900`, but injects failure into transaction requests. Saving this scheduled transaction sends `PATCH /v1/recurrence-rules/invest`, so it bypasses the intended failure.
 
 Intercept that exact PATCH request. Assert that the interception fired, the error appears, unsaved changes remain, and the saved expression is still `600`. Reuse the existing saved-plan helper and real fixture API.
 

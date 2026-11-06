@@ -63,7 +63,7 @@ func (o nullableOptional[T]) Schema(r huma.Registry) *huma.Schema {
 type amountInput struct {
 	Value          *float64
 	AnnualIncrease *float64
-	Resolution     *types.PostingAmountResolution
+	Resolution     *types.TransactionAmountResolution
 }
 
 func (a *amountInput) UnmarshalJSON(data []byte) error {
@@ -77,7 +77,7 @@ func (a *amountInput) UnmarshalJSON(data []byte) error {
 	}
 	switch {
 	case probe.Resolver != nil:
-		var resolution types.PostingAmountResolution
+		var resolution types.TransactionAmountResolution
 		if err := json.Unmarshal(data, &resolution); err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (a amountInput) Schema(r huma.Registry) *huma.Schema {
 					},
 				},
 			},
-			huma.SchemaFromType(r, reflect.TypeFor[types.PostingAmountResolution]()),
+			huma.SchemaFromType(r, reflect.TypeFor[types.TransactionAmountResolution]()),
 		},
 	}
 }
@@ -125,26 +125,26 @@ func (a amountInput) Schema(r huma.Registry) *huma.Schema {
 // resolution renders the authored amount as the stored descriptor. A literal
 // with growth compiles to the same expression and growth provider the editor
 // used to build by hand.
-func (a amountInput) resolution() (types.PostingAmountResolution, error) {
+func (a amountInput) resolution() (types.TransactionAmountResolution, error) {
 	return a.resolutionAllowingGrowth(true)
 }
 
-// literalResolution renders an amount for a one-time posting: growth is not
+// literalResolution renders an amount for a one-time transaction: growth is not
 // meaningful there, so a nonzero increase is rejected instead of stored.
-func (a amountInput) literalResolution() (types.PostingAmountResolution, error) {
+func (a amountInput) literalResolution() (types.TransactionAmountResolution, error) {
 	return a.resolutionAllowingGrowth(false)
 }
 
-func (a amountInput) resolutionAllowingGrowth(allowGrowth bool) (types.PostingAmountResolution, error) {
+func (a amountInput) resolutionAllowingGrowth(allowGrowth bool) (types.TransactionAmountResolution, error) {
 	if a.Resolution != nil {
 		return *a.Resolution, nil
 	}
 	if a.Value == nil {
-		return types.PostingAmountResolution{}, fmt.Errorf("amount must state a value or a resolver")
+		return types.TransactionAmountResolution{}, fmt.Errorf("amount must state a value or a resolver")
 	}
 	value := *a.Value
 	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1e10 {
-		return types.PostingAmountResolution{}, fmt.Errorf("amount must be between 0 and 10000000000")
+		return types.TransactionAmountResolution{}, fmt.Errorf("amount must be between 0 and 10000000000")
 	}
 	expression := strconv.FormatFloat(value, 'f', -1, 64)
 	rate := 0.0
@@ -152,19 +152,19 @@ func (a amountInput) resolutionAllowingGrowth(allowGrowth bool) (types.PostingAm
 		rate = *a.AnnualIncrease
 	}
 	if math.IsNaN(rate) || math.IsInf(rate, 0) || rate < -50 || rate > 50 {
-		return types.PostingAmountResolution{}, fmt.Errorf("annual increase must be between -50 and 50 percent")
+		return types.TransactionAmountResolution{}, fmt.Errorf("annual increase must be between -50 and 50 percent")
 	}
 	if !allowGrowth && rate != 0 {
-		return types.PostingAmountResolution{}, fmt.Errorf("one-time postings carry no yearly increase")
+		return types.TransactionAmountResolution{}, fmt.Errorf("one-time transactions carry no yearly increase")
 	}
 	if rate == 0 {
-		return types.PostingAmountResolution{
+		return types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": expression},
 			Inputs:   map[string]types.AmountInputBinding{},
 		}, nil
 	}
-	return types.PostingAmountResolution{
+	return types.TransactionAmountResolution{
 		Resolver: "expression",
 		Config:   map[string]any{"expression": "(" + expression + ") * growth"},
 		Inputs: map[string]types.AmountInputBinding{

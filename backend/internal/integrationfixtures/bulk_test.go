@@ -22,7 +22,7 @@ func TestParseBulkSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.Accounts != 20 || spec.PostingsPerAccount != 200 || spec.Seed != BulkDefaultSeed {
+	if spec.Accounts != 20 || spec.TransactionsPerAccount != 200 || spec.Seed != BulkDefaultSeed {
 		t.Fatalf("spec = %+v", spec)
 	}
 	seeded, err := ParseBulkSpec("3x5:42")
@@ -48,8 +48,8 @@ func TestBulkModelDeterministic(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("same spec built different models")
 	}
-	if len(first.Accounts) != 8 || len(first.Postings) != 16 || len(first.Schedules) != 2 {
-		t.Fatalf("model counts = %d/%d/%d", len(first.Accounts), len(first.Postings), len(first.Schedules))
+	if len(first.Accounts) != 8 || len(first.Transactions) != 16 || len(first.Schedules) != 2 {
+		t.Fatalf("model counts = %d/%d/%d", len(first.Accounts), len(first.Transactions), len(first.Schedules))
 	}
 	long := false
 	for _, account := range first.Accounts {
@@ -88,9 +88,9 @@ func TestBulkInjectClearKeepsRealRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := "checking"
-	real, err := scoped.CreatePosting(types.Posting{
+	real, err := scoped.CreateTransaction(types.Transaction{
 		Name: "Real groceries", SourceAccountID: &source,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "19.99"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "19.99"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1781524800,
 		TransactionTime: 1781524800,
 		Enabled:         true,
@@ -106,7 +106,7 @@ func TestBulkInjectClearKeepsRealRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if injected.Accounts != 3 || injected.Postings != 15 || injected.Rules != 1 {
+	if injected.Accounts != 3 || injected.Transactions != 15 || injected.Rules != 1 {
 		t.Fatalf("injected = %+v", injected)
 	}
 	model, err := scoped.LoadModel()
@@ -128,7 +128,7 @@ func TestBulkInjectClearKeepsRealRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cleared.Accounts != 3 || cleared.Postings != 15 || cleared.Rules != 1 {
+	if cleared.Accounts != 3 || cleared.Transactions != 15 || cleared.Rules != 1 {
 		t.Fatalf("cleared = %+v", cleared)
 	}
 	after, err := scoped.LoadModel()
@@ -138,14 +138,14 @@ func TestBulkInjectClearKeepsRealRows(t *testing.T) {
 	if len(after.Accounts) != 1 || after.Accounts[0].ID != "checking" {
 		t.Fatalf("accounts after clear = %+v", after.Accounts)
 	}
-	if len(after.Postings) != 1 || after.Postings[0].ID != real.ID {
-		t.Fatalf("postings after clear = %d", len(after.Postings))
+	if len(after.Transactions) != 1 || after.Transactions[0].ID != real.ID {
+		t.Fatalf("transactions after clear = %d", len(after.Transactions))
 	}
 	again, err := ClearSeed(scoped)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.Accounts != 0 || again.Postings != 0 {
+	if again.Accounts != 0 || again.Transactions != 0 {
 		t.Fatalf("second clear = %+v, want empty", again)
 	}
 }

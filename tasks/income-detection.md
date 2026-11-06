@@ -10,7 +10,7 @@ integration can reuse that lifecycle without coupling detection to bank sync.
 
 ## Next slice: detect candidate paycheck deposits
 
-Goal: flag which bank postings look like income, without touching payroll
+Goal: flag which bank transactions look like income, without touching payroll
 modeling.
 
 Agreed scope: gross deposits only. The 401k/match/tax split events are out

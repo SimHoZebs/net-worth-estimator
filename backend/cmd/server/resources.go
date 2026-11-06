@@ -83,7 +83,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	groupRoutes := groupHandler.Routes()
 	// Sharing routes carry the same own-user permission checks and resource
 	// header as every other user route (enforced in identity.Wrap) plus
-	// per-posting source-owner consent in the sharing handler.
+	// per-transaction source-owner consent in the sharing handler.
 	sharingHandler := sharing.New(database, loginConfig.Issuer, sharing.Config{
 		AllowedOrigins: apiConfig.AllowedOrigins,
 		ReadOnly:       apiConfig.ReadOnly,

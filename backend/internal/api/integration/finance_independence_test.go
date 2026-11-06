@@ -62,7 +62,7 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		`{"AccountId":"`+checkingID+`","Balance":1000,"observedAt":1773133200}`); response.Code != http.StatusOK {
 		t.Fatalf("save checkpoint status = %d, body %s", response.Code, response.Body.String())
 	}
-	postingID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+	transactionID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+checkingID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","enabled":true}`).Body.Bytes())
 	ruleID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
 		`{"name":"Salary","sourceAccountId":null,"destinations":["`+checkingID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true,"priority":1}`).Body.Bytes())
@@ -122,7 +122,7 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		t.Fatalf("decode transactions: %v", err)
 	}
 	if len(transactionPayload.Transactions) != 1 {
-		t.Fatalf("transactions = %+v, want only the posting", transactionPayload.Transactions)
+		t.Fatalf("transactions = %+v, want only the transaction", transactionPayload.Transactions)
 	}
 	rules := doRowRequest(t, handler, http.MethodGet, "/v1/schedules", "")
 	if rules.Code != http.StatusOK {
@@ -158,7 +158,7 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	patches := []struct{ method, path, body string }{
 		{http.MethodPatch, "/v1/accounts/" + checkingID,
 			`{"name":"Checking renamed","kind":"cash","enabled":true}`},
-		{http.MethodPost, "/v1/transactions/" + postingID + "/amend",
+		{http.MethodPost, "/v1/transactions/" + transactionID + "/amend",
 			`{"name":"Spend edited","sourceAccountId":"` + checkingID + `","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","enabled":true}`},
 		{http.MethodPost, "/v1/schedules/" + ruleID + "/amend",
 			`{"name":"Salary edited","enabled":true}`},

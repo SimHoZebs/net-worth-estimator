@@ -6,17 +6,17 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Terms-deferred amounts. Payment postings carry schedule and destinations;
+// Terms-deferred amounts. Payment transactions carry schedule and destinations;
 // the numbers come from payment-terms rows through providers, so minimums
 // live in exactly one place.
 
 func termsTestContext() *AmountProviderContext {
 	percent := 0.02
 	return &AmountProviderContext{
-		Balances:                     map[string]float64{"prime_card": -2000, "checking": 5000},
-		LatestRealizedPostingAmounts: map[string]float64{},
-		LatestRealizedPostingDates:   map[string]string{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         map[string]float64{"prime_card": -2000, "checking": 5000},
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		LatestRealizedTransactionDates:   map[string]string{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 		PaymentTerms: map[string]types.PaymentTerms{
 			"prime_card": {AccountID: "prime_card", MinimumFixed: 100, MinimumPercent: &percent, DueDay: 10},
 		},
@@ -65,8 +65,8 @@ func lateFeeArgs() map[string]types.JsonValue {
 
 func TestLateFeeFiresOnSameMonthShortfall(t *testing.T) {
 	ctx := termsTestContext()
-	ctx.LatestRealizedPostingAmounts["pay-prime"] = 60 // minimum is 100.
-	ctx.LatestRealizedPostingDates["pay-prime"] = "2026-09-10"
+	ctx.LatestRealizedTransactionAmounts["pay-prime"] = 60 // minimum is 100.
+	ctx.LatestRealizedTransactionDates["pay-prime"] = "2026-09-10"
 	value, err := amountProviders["late-fee"].resolve(lateFeeArgs(), ctx)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
@@ -78,8 +78,8 @@ func TestLateFeeFiresOnSameMonthShortfall(t *testing.T) {
 
 func TestLateFeeSilentWhenPaidInFull(t *testing.T) {
 	ctx := termsTestContext()
-	ctx.LatestRealizedPostingAmounts["pay-prime"] = 100
-	ctx.LatestRealizedPostingDates["pay-prime"] = "2026-09-10"
+	ctx.LatestRealizedTransactionAmounts["pay-prime"] = 100
+	ctx.LatestRealizedTransactionDates["pay-prime"] = "2026-09-10"
 	value, err := amountProviders["late-fee"].resolve(lateFeeArgs(), ctx)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
@@ -100,8 +100,8 @@ func TestLateFeeSilentWithoutSameMonthPayment(t *testing.T) {
 		t.Fatalf("fee = %v, want 0", value)
 	}
 	// Stale: last execution was last month (for example a disabled shell).
-	ctx.LatestRealizedPostingAmounts["pay-prime"] = 10
-	ctx.LatestRealizedPostingDates["pay-prime"] = "2026-08-10"
+	ctx.LatestRealizedTransactionAmounts["pay-prime"] = 10
+	ctx.LatestRealizedTransactionDates["pay-prime"] = "2026-08-10"
 	value, err = amountProviders["late-fee"].resolve(lateFeeArgs(), ctx)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
@@ -113,8 +113,8 @@ func TestLateFeeSilentWithoutSameMonthPayment(t *testing.T) {
 
 func TestLateFeeValidatesReferences(t *testing.T) {
 	refs := &AmountReferenceContext{
-		AccountIDs: map[string]bool{"prime_card": true},
-		PostingIDs: map[string]bool{"pay-prime": true},
+		AccountIDs:     map[string]bool{"prime_card": true},
+		TransactionIDs: map[string]bool{"pay-prime": true},
 	}
 	validate := amountProviders["late-fee"].validateReferences
 	if err := validate(lateFeeArgs(), refs); err != nil {
@@ -123,7 +123,7 @@ func TestLateFeeValidatesReferences(t *testing.T) {
 	bad := lateFeeArgs()
 	bad["payment"] = "ghost"
 	if err := validate(bad, refs); err == nil {
-		t.Fatalf("expected an error for an unknown payment posting")
+		t.Fatalf("expected an error for an unknown payment transaction")
 	}
 	bad = lateFeeArgs()
 	bad["fee"] = -5.0
@@ -145,13 +145,13 @@ func termsPaymentModel() types.SimulationInputs {
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 			{ID: card, Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
 		},
-		Postings: []types.Posting{},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{
 			{
 				ID: "pay-prime", Name: "Prime payment",
 				SourceAccountID: &checking,
 				Destinations:    []string{card},
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "minimum"},
 					Inputs: map[string]types.AmountInputBinding{
@@ -170,32 +170,32 @@ func termsPaymentModel() types.SimulationInputs {
 	}
 }
 
-func executeTermsOccurrence(t *testing.T, model types.SimulationInputs, balances map[string]float64, date string) PostingExecutionTransition {
+func executeTermsOccurrence(t *testing.T, model types.SimulationInputs, balances map[string]float64, date string) TransactionExecutionTransition {
 	t.Helper()
 	runtime := CreateTransitionRuntime(model, SimulationState{
-		Balances:                     balances,
-		LatestRealizedPostingAmounts: map[string]float64{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         balances,
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 	}, "2026-09-01", nil)
-	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, "pay-prime", date), date, false)
+	transition, err := runtime.ExecuteTransaction(resolveTestRuleOccurrence(t, model.Schedules, "pay-prime", date), date, false)
 	if err != nil {
-		t.Fatalf("execute posting: %v", err)
+		t.Fatalf("execute transaction: %v", err)
 	}
 	return transition
 }
 
 // resolveTestRuleOccurrence expands one rule occurrence for direct
 // execution tests. The resolved value keeps the instance slice alive.
-func resolveTestRuleOccurrence(t *testing.T, rules []types.Schedule, ruleID, date string) DatedPostingOccurrence {
+func resolveTestRuleOccurrence(t *testing.T, rules []types.Schedule, ruleID, date string) DatedTransactionOccurrence {
 	t.Helper()
 	resolved := ResolveOccurrences(rules, nil, date, date, true)
 	for _, occurrence := range resolved.ByDate[date] {
-		if occurrence.Posting.ID == ruleID {
+		if occurrence.Transaction.ID == ruleID {
 			return occurrence
 		}
 	}
 	t.Fatalf("no occurrence of rule %q on %s", ruleID, date)
-	return DatedPostingOccurrence{}
+	return DatedTransactionOccurrence{}
 }
 
 func TestPaymentAmountDefersToTerms(t *testing.T) {
@@ -204,7 +204,7 @@ func TestPaymentAmountDefersToTerms(t *testing.T) {
 	if transition.Result.RequestedAmount != 100 || transition.Result.RealizedAmount != 100 {
 		t.Fatalf("result = %+v, want 100/100 from terms", transition.Result)
 	}
-	// One edit to the terms row moves the payment: the posting is a shell.
+	// One edit to the terms row moves the payment: the transaction is a shell.
 	model.PaymentTerms[0].MinimumFixed = 250
 	transition = executeTermsOccurrence(t, model, map[string]float64{"checking": 5000, "prime_card": -2000}, "2026-09-10")
 	if transition.Result.RequestedAmount != 250 {
@@ -212,7 +212,7 @@ func TestPaymentAmountDefersToTerms(t *testing.T) {
 	}
 }
 
-func TestLateFeePostingAssessesShortfall(t *testing.T) {
+func TestLateFeeTransactionAssessesShortfall(t *testing.T) {
 	model := termsPaymentModel()
 	floor := 0.0
 	model.Accounts[0].MinBalance = &floor
@@ -220,7 +220,7 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 	model.Schedules = append(model.Schedules, types.Schedule{
 		ID: "fee-prime", Name: "Prime late fee",
 		Destinations: []string{"prime_card"},
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "fee"},
 			Inputs: map[string]types.AmountInputBinding{
@@ -233,20 +233,20 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 		Enabled:   true,
 	})
 	runtime := CreateTransitionRuntime(model, SimulationState{
-		Balances:                     map[string]float64{"checking": 50, "prime_card": -2000},
-		LatestRealizedPostingAmounts: map[string]float64{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         map[string]float64{"checking": 50, "prime_card": -2000},
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 	}, "2026-09-01", nil)
 	// Checking holds 50 above a zero floor against a 100 minimum: the payment
 	// realizes 50.
-	payment, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, "pay-prime", "2026-09-10"), "2026-09-10", false)
+	payment, err := runtime.ExecuteTransaction(resolveTestRuleOccurrence(t, model.Schedules, "pay-prime", "2026-09-10"), "2026-09-10", false)
 	if err != nil {
 		t.Fatalf("execute payment: %v", err)
 	}
 	if payment.Result.RealizedAmount != 50 {
 		t.Fatalf("realized = %v, want 50", payment.Result.RealizedAmount)
 	}
-	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, "fee-prime", "2026-09-11"), "2026-09-11", false)
+	assessed, err := runtime.ExecuteTransaction(resolveTestRuleOccurrence(t, model.Schedules, "fee-prime", "2026-09-11"), "2026-09-11", false)
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
 	}
@@ -308,18 +308,18 @@ func TestBalanceFeeValidatesReferences(t *testing.T) {
 	}
 }
 
-func TestBalanceFeePostingDebitsChecking(t *testing.T) {
+func TestBalanceFeeTransactionDebitsChecking(t *testing.T) {
 	checking := "checking"
 	model := types.SimulationInputs{
 		Accounts: []types.Account{
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{
 			{
 				ID: "checking-fee", Name: "Checking maintenance fee",
 				SourceAccountID: &checking,
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "fee"},
 					Inputs: map[string]types.AmountInputBinding{
@@ -334,11 +334,11 @@ func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 		},
 	}
 	runtime := CreateTransitionRuntime(model, SimulationState{
-		Balances:                     map[string]float64{checking: 1400},
-		LatestRealizedPostingAmounts: map[string]float64{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         map[string]float64{checking: 1400},
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 	}, "2026-09-01", nil)
-	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, "checking-fee", "2026-09-01"), "2026-09-01", false)
+	assessed, err := runtime.ExecuteTransaction(resolveTestRuleOccurrence(t, model.Schedules, "checking-fee", "2026-09-01"), "2026-09-01", false)
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
 	}

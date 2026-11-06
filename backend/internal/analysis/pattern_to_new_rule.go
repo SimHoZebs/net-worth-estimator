@@ -68,7 +68,7 @@ func formatCents(value float64) string {
 // generated rule for the pattern when one already exists.
 type PatternToNewScheduleInput struct {
 	Anchor             types.AnalysisFinding
-	Postings           []types.Posting
+	Transactions       []types.Transaction
 	Facts              map[string]types.TransactionFacts
 	AccountIDs         []string
 	ExistingScheduleID string
@@ -91,7 +91,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	confirmed := anchor.Review != nil && anchor.Review.Decision == "confirmed"
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
-		occurrenceIDs = append(occurrenceIDs, evidence.PostingIDs...)
+		occurrenceIDs = append(occurrenceIDs, evidence.TransactionIDs...)
 	}
 	seen := map[string]bool{}
 	ordered := occurrenceIDs[:0]
@@ -106,14 +106,14 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	if len(occurrenceIDs) == 0 {
 		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
 	}
-	byID := make(map[string]types.Posting, len(input.Postings))
-	for _, posting := range input.Postings {
-		byID[posting.ID] = posting
+	byID := make(map[string]types.Transaction, len(input.Transactions))
+	for _, transaction := range input.Transactions {
+		byID[transaction.ID] = transaction
 	}
 	occurrences := make([]recurringOccurrence, 0, len(occurrenceIDs))
 	for _, id := range occurrenceIDs {
-		posting, ok := byID[id]
-		if !ok || posting.Pending || posting.Void {
+		transaction, ok := byID[id]
+		if !ok || transaction.Pending || transaction.Void {
 			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		facts, ok := input.Facts[id]
@@ -124,9 +124,9 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 {
 			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
-		stamp := posting.TransactionTime
+		stamp := transaction.TransactionTime
 		if stamp <= 0 {
-			stamp = posting.PostedTime
+			stamp = transaction.PostedTime
 		}
 		if stamp <= 0 {
 			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
@@ -135,8 +135,8 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	}
 	first := byID[occurrenceIDs[0]]
 	for _, item := range occurrences {
-		posting := byID[item.id]
-		if !equalRouting(posting, first) {
+		transaction := byID[item.id]
+		if !equalRouting(transaction, first) {
 			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
 		}
 	}
@@ -175,7 +175,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		preview.Direction = "outflow"
 	}
 	for _, item := range occurrences {
-		preview.Occurrences = append(preview.Occurrences, types.PatternOccurrence{PostingID: item.id, Date: item.day, Amount: formatCents(math.Abs(item.amount))})
+		preview.Occurrences = append(preview.Occurrences, types.PatternOccurrence{TransactionID: item.id, Date: item.day, Amount: formatCents(math.Abs(item.amount))})
 	}
 	frequency, ok := recurringCadenceFrequency(cadence)
 	if !ok {
@@ -187,7 +187,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		Name:            ruleName(occurrences, byID, anchor.Provider),
 		SourceAccountID: first.SourceAccountID,
 		Destinations:    append([]string(nil), first.Destinations...),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": formatCents(typical)}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": formatCents(typical)}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency:       frequency,
 		StartDate:       domain.AdvanceRuleDate(lastDay, frequency, 1),
 		Enabled:         true,
@@ -211,7 +211,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	return preview, nil
 }
 
-func equalRouting(a, b types.Posting) bool {
+func equalRouting(a, b types.Transaction) bool {
 	if (a.SourceAccountID == nil) != (b.SourceAccountID == nil) {
 		return false
 	}
@@ -229,12 +229,12 @@ func equalRouting(a, b types.Posting) bool {
 	return true
 }
 
-func accountOf(posting types.Posting) string {
-	if posting.SourceAccountID != nil {
-		return *posting.SourceAccountID
+func accountOf(transaction types.Transaction) string {
+	if transaction.SourceAccountID != nil {
+		return *transaction.SourceAccountID
 	}
-	if len(posting.Destinations) > 0 {
-		return posting.Destinations[0]
+	if len(transaction.Destinations) > 0 {
+		return transaction.Destinations[0]
 	}
 	return ""
 }
@@ -243,7 +243,7 @@ func accountOf(posting types.Posting) string {
 // common saved transaction name, with the earliest movement breaking ties.
 // The rule stays an ordinary editable row afterwards, so approval never has
 // to get the wording perfect.
-func ruleName(occurrences []recurringOccurrence, byID map[string]types.Posting, fallback string) string {
+func ruleName(occurrences []recurringOccurrence, byID map[string]types.Transaction, fallback string) string {
 	counts := map[string]int{}
 	best, bestCount := "", 0
 	for _, item := range occurrences {

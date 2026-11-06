@@ -18,13 +18,13 @@ type settleFixture struct {
 }
 
 type settleFixtureCase struct {
-	Name   string                 `json:"name"`
-	Hold   settleFixturePosting   `json:"hold"`
-	Posted []settleFixturePosting `json:"posted"`
-	Want   []string               `json:"want"`
+	Name   string                     `json:"name"`
+	Hold   settleFixtureTransaction   `json:"hold"`
+	Posted []settleFixtureTransaction `json:"posted"`
+	Want   []string                   `json:"want"`
 }
 
-type settleFixturePosting struct {
+type settleFixtureTransaction struct {
 	Name        string `json:"name"`
 	AmountCents int64  `json:"amountCents"`
 	Day         string `json:"day"`
@@ -32,7 +32,7 @@ type settleFixturePosting struct {
 	Account     string `json:"account"`
 }
 
-func fixtureBankRow(id string, item settleFixturePosting, void bool) store.BankRow {
+func fixtureBankRow(id string, item settleFixtureTransaction, void bool) store.BankRow {
 	account := item.Account
 	if account == "" {
 		account = "prime_card"
@@ -42,11 +42,11 @@ func fixtureBankRow(id string, item settleFixturePosting, void bool) store.BankR
 		panic(err)
 	}
 	amount := strconv.FormatFloat(float64(item.AmountCents)/100, 'f', 2, 64)
-	posting := types.Posting{
+	transaction := types.Transaction{
 		ID:     id,
 		Name:   item.Name,
 		Source: store.SourceBankSync,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": amount},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -57,12 +57,12 @@ func fixtureBankRow(id string, item settleFixturePosting, void bool) store.BankR
 		Void:            void,
 	}
 	if item.Direction == "in" {
-		posting.Destinations = []string{account}
+		transaction.Destinations = []string{account}
 	} else {
-		posting.SourceAccountID = &account
+		transaction.SourceAccountID = &account
 	}
 	return store.BankRow{
-		Posting: posting,
+		Transaction: transaction,
 		Keys: []store.BankKey{{
 			Provider:      store.ProviderSimpleFIN,
 			AccountID:     "bridge-" + account,
@@ -93,7 +93,7 @@ func TestSettleCandidatesConformance(t *testing.T) {
 			candidates := SettleCandidates(hold, bank)
 			names := make([]string, 0, len(candidates))
 			for _, candidate := range candidates {
-				names = append(names, candidate.Posting.Name)
+				names = append(names, candidate.Transaction.Name)
 			}
 			if len(names) != len(test.Want) {
 				t.Fatalf("candidates = %v, want %v", names, test.Want)
@@ -123,7 +123,7 @@ func TestSettleProfiles(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			profile := profileForPosting(types.Posting{Name: test.name})
+			profile := profileForTransaction(types.Transaction{Name: test.name})
 			if profile.WindowDays != test.windowDays ||
 				profile.AmountMode != test.amountMode ||
 				profile.Capture != test.capture ||
@@ -138,7 +138,7 @@ func TestSettleProfiles(t *testing.T) {
 func TestFloorProfileAcceptsAuthAsFloor(t *testing.T) {
 	profile := settleProfiles.Profiles["floor"]
 	if !profile.allowsAmount(100, 4500) {
-		t.Fatal("floor profile rejected a $1 auth posting $45")
+		t.Fatal("floor profile rejected a $1 auth transaction $45")
 	}
 	if profile.allowsAmount(5000, 4000) {
 		t.Fatal("floor profile accepted a posted amount below the auth tolerance")

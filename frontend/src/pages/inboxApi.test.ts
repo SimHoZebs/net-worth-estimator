@@ -40,31 +40,33 @@ it("passes the status filter and the show-dismissed flag", async () => {
 
 it("accepts with the user-resource owner form", async () => {
 	const fetcher = vi.fn(async () =>
-		ok({ item: { status: "accepted", copyPostingId: "copy-1" } }),
+		ok({ item: { status: "accepted", copyTransactionId: "copy-1" } }),
 	);
 	vi.stubGlobal("fetch", fetcher);
-	expect(await acceptInboxShare("user:abc123", "posting-1")).toEqual({
+	expect(await acceptInboxShare("user:abc123", "transaction-1")).toEqual({
 		status: "accepted",
-		copyPostingId: "copy-1",
+		copyTransactionId: "copy-1",
 	});
 	const options = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(options[0]).toBe("/v1/inbox/shares/accept");
 	expect(JSON.parse(options[1].body as string)).toEqual({
 		owner: "users/abc123",
-		postingId: "posting-1",
+		transactionId: "transaction-1",
 	});
 });
 
 it("marks read with an explicit flag", async () => {
 	const fetcher = vi.fn(async () => ok({ item: { unread: false } }));
 	vi.stubGlobal("fetch", fetcher);
-	expect(await markInboxShareRead("user:abc123", "posting-1", false)).toEqual({
+	expect(
+		await markInboxShareRead("user:abc123", "transaction-1", false),
+	).toEqual({
 		unread: false,
 	});
 	const options = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(JSON.parse(options[1].body as string)).toEqual({
 		owner: "users/abc123",
-		postingId: "posting-1",
+		transactionId: "transaction-1",
 		read: false,
 	});
 });
@@ -87,8 +89,8 @@ it("leaves inbox mutation grants to the server", async () => {
 			),
 	);
 	vi.stubGlobal("fetch", fetcher);
-	await expect(acceptInboxShare("user:abc123", "posting-1")).rejects.toThrow(
-		"This action is not permitted.",
-	);
+	await expect(
+		acceptInboxShare("user:abc123", "transaction-1"),
+	).rejects.toThrow("This action is not permitted.");
 	expect(fetcher).toHaveBeenCalledOnce();
 });

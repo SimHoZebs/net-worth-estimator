@@ -21,7 +21,7 @@ function feedItem(overrides: Partial<FeedItem> = {}): FeedItem {
 		ownerUserId: "user:aaa",
 		sourceDisplayName: "Dana",
 		audiences: [{ type: "group", id: "g1", name: "Cabin" }],
-		posting: {
+		transaction: {
 			id: "p1",
 			name: "Groceries",
 			sourceAccountId: "checking",
@@ -65,7 +65,7 @@ function stubFeed(pages: Array<{ items: FeedItem[]; nextCursor?: string }>) {
 				});
 			}
 			if (path === "/v1/shared/copies" && init?.method === "POST") {
-				return ok({ posting: { id: "copy1" } }, 201);
+				return ok({ transaction: { id: "copy1" } }, 201);
 			}
 			throw new Error(`unexpected request ${init?.method} ${path}`);
 		}),
@@ -88,7 +88,7 @@ it("lists shared transactions with source, totals, and pending marker", async ()
 					ownerUserId: "user:bbb",
 					sourceDisplayName: "Alex",
 					audiences: [{ type: "direct", name: "Alex" }],
-					posting: {
+					transaction: {
 						id: "p2",
 						name: "Dinner",
 						sourceAccountId: "checking",
@@ -126,7 +126,7 @@ it("pages through the feed without repeating items", async () => {
 		{
 			items: [
 				feedItem({
-					posting: {
+					transaction: {
 						id: "p3",
 						name: "Fuel",
 						sourceAccountId: "checking",

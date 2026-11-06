@@ -16,7 +16,7 @@ import {
 import type { AccountBalanceRow } from "./generated/model/accountBalanceRow.ts";
 import {
 	type BackendPlannedPurchase,
-	type BackendPosting,
+	type BackendTransaction,
 	type FinancialModel,
 	NO_CEILING_SENTINEL,
 	NO_FLOOR_SENTINEL,
@@ -167,7 +167,7 @@ describe("planned purchase rows to display purchases", () => {
 });
 
 function purchaseModel(
-	postings: BackendPosting[] = [],
+	transactions: BackendTransaction[] = [],
 	plannedPurchases: BackendPlannedPurchase[] = [],
 ): FinancialModel {
 	return {
@@ -178,10 +178,10 @@ function purchaseModel(
 			financialIndependence: [],
 			netWorthThreshold: [],
 			accountBalance: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 			cycleFulfillment: [],
 		},
-		postings,
+		transactions,
 		schedules: [],
 		plannedPurchases,
 	};
@@ -222,7 +222,7 @@ describe("saved standalone purchases", () => {
 		]);
 	});
 
-	it("does not treat postings as purchases", () => {
+	it("does not treat transactions as purchases", () => {
 		const rows = savedPurchasesToDisplay(
 			purchaseModel(
 				[
@@ -367,7 +367,7 @@ describe("display visibility helpers over saved rows", () => {
 			isHistoricalTransaction(
 				{
 					...transactions[0]!,
-					kind: "posting",
+					kind: "transaction",
 					startDate: "2026-02-01",
 				},
 				startDate,
@@ -376,7 +376,7 @@ describe("display visibility helpers over saved rows", () => {
 		expect(isHistoricalTransaction(transactions[0]!, startDate)).toBe(false);
 		expect(
 			isHistoricalTransaction(
-				{ ...transactions[0]!, kind: "posting", startDate: "2026-03-01" },
+				{ ...transactions[0]!, kind: "transaction", startDate: "2026-03-01" },
 				startDate,
 			),
 		).toBe(false);

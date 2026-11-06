@@ -126,7 +126,7 @@ export function Transactions({
 			{filtered.length ? (
 				<>
 					<TransactionAnalysisProvider
-						postingIds={pageRows.map(
+						transactionIds={pageRows.map(
 							(transaction) => transaction.transactionId,
 						)}
 					>

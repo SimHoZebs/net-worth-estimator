@@ -23,40 +23,40 @@ func qa03ResourceOwnerID(t *testing.T, social *qa03Social) string {
 	return social.owner
 }
 
-func qa03Grant(t *testing.T, social *qa03Social, subject, postingID, audienceType, audienceID string) {
+func qa03Grant(t *testing.T, social *qa03Social, subject, transactionID, audienceType, audienceID string) {
 	t.Helper()
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/grants", subject,
-		`{"postingId":`+qa03Quote(postingID)+`,"audienceType":`+qa03Quote(audienceType)+`,"audienceId":`+qa03Quote(audienceID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+		`{"transactionId":`+qa03Quote(transactionID)+`,"audienceType":`+qa03Quote(audienceType)+`,"audienceId":`+qa03Quote(audienceID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
 }
 
-func qa03OwnerPosting(t *testing.T, social *qa03Social, id string) types.Posting {
+func qa03OwnerTransaction(t *testing.T, social *qa03Social, id string) types.Transaction {
 	t.Helper()
 	model, err := social.ownerSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		if posting.ID == id {
-			return posting
+	for _, transaction := range model.Transactions {
+		if transaction.ID == id {
+			return transaction
 		}
 	}
-	t.Fatalf("owner posting %s not found", id)
-	return types.Posting{}
+	t.Fatalf("owner transaction %s not found", id)
+	return types.Transaction{}
 }
 
-func qa03MemberPosting(t *testing.T, social *qa03Social, id string) types.Posting {
+func qa03MemberTransaction(t *testing.T, social *qa03Social, id string) types.Transaction {
 	t.Helper()
 	model, err := social.memberSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		if posting.ID == id {
-			return posting
+	for _, transaction := range model.Transactions {
+		if transaction.ID == id {
+			return transaction
 		}
 	}
-	t.Fatalf("member posting %s not found", id)
-	return types.Posting{}
+	t.Fatalf("member transaction %s not found", id)
+	return types.Transaction{}
 }
 
 func qa03Stranger(t *testing.T, social *qa03Social) string {

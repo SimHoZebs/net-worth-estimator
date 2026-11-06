@@ -1,4 +1,4 @@
-import type { Posting } from "@/api/contracts.ts";
+import type { Transaction } from "@/api/contracts.ts";
 import { waypointFetch } from "@/api/waypoint-fetch.ts";
 
 export type InboxStatus = "pending" | "accepted" | "declined" | "canceled";
@@ -7,15 +7,15 @@ export type InboxFilter = InboxStatus | "all";
 export interface InboxShareItem {
 	kind: "share" | "split-request";
 	ownerUserId: string;
-	postingId: string;
+	transactionId: string;
 	senderDisplayName?: string;
 	status: InboxStatus;
 	unread: boolean;
 	dismissed: boolean;
 	receivedAt: number;
 	decidedAt?: number;
-	copyPostingId?: string;
-	posting?: Posting;
+	copyTransactionId?: string;
+	transaction?: Transaction;
 }
 
 interface InboxListResponse {
@@ -63,7 +63,7 @@ export async function readInboxUnreadCount(
 async function mutateShare(
 	action: "accept" | "decline" | "dismiss" | "read",
 	ownerUserId: string,
-	postingId: string,
+	transactionId: string,
 	extra?: Record<string, boolean>,
 ): Promise<InboxShareItem> {
 	const response = await waypointFetch<InboxItemResponse>(
@@ -73,7 +73,7 @@ async function mutateShare(
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				owner: ownerResource(ownerUserId),
-				postingId,
+				transactionId,
 				...extra,
 			}),
 		},
@@ -83,30 +83,30 @@ async function mutateShare(
 
 export function acceptInboxShare(
 	ownerUserId: string,
-	postingId: string,
+	transactionId: string,
 ): Promise<InboxShareItem> {
-	return mutateShare("accept", ownerUserId, postingId);
+	return mutateShare("accept", ownerUserId, transactionId);
 }
 
 export function declineInboxShare(
 	ownerUserId: string,
-	postingId: string,
+	transactionId: string,
 ): Promise<InboxShareItem> {
-	return mutateShare("decline", ownerUserId, postingId);
+	return mutateShare("decline", ownerUserId, transactionId);
 }
 
 export function dismissInboxShare(
 	ownerUserId: string,
-	postingId: string,
+	transactionId: string,
 	dismissed = true,
 ): Promise<InboxShareItem> {
-	return mutateShare("dismiss", ownerUserId, postingId, { dismissed });
+	return mutateShare("dismiss", ownerUserId, transactionId, { dismissed });
 }
 
 export function markInboxShareRead(
 	ownerUserId: string,
-	postingId: string,
+	transactionId: string,
 	read = true,
 ): Promise<InboxShareItem> {
-	return mutateShare("read", ownerUserId, postingId, { read });
+	return mutateShare("read", ownerUserId, transactionId, { read });
 }

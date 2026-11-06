@@ -1,6 +1,6 @@
 // Package categorization derives a transaction category when the bank does
 // not supply one the server supports. It is deliberately separate from
-// evidence analysis: categories are editable sidecar metadata on postings,
+// evidence analysis: categories are editable sidecar metadata on transactions,
 // while analysis findings never change the saved financial model.
 package categorization
 
@@ -11,16 +11,16 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Input is one uncategorized bank posting offered to a classifier.
+// Input is one uncategorized bank transaction offered to a classifier.
 type Input struct {
-	PostingID string
-	Name      string
-	Direction string
-	Facts     *types.TransactionFacts
+	TransactionID string
+	Name          string
+	Direction     string
+	Facts         *types.TransactionFacts
 }
 
-// Classifier maps uncategorized postings onto the supported category keys.
-// Missing posting IDs stay uncategorized. Implementations must be safe for
+// Classifier maps uncategorized transactions onto the supported category keys.
+// Missing transaction IDs stay uncategorized. Implementations must be safe for
 // concurrent calls and must honor context cancellation.
 type Classifier interface {
 	Version() string
@@ -35,7 +35,7 @@ type KeywordClassifier struct{}
 // Version identifies the classifier composition in stored assignments.
 func (KeywordClassifier) Version() string { return "keyword-v1" }
 
-// Classify returns one category per recognized posting.
+// Classify returns one category per recognized transaction.
 func (c KeywordClassifier) Classify(ctx context.Context, inputs []Input) (map[string]string, error) {
 	results := map[string]string{}
 	for _, input := range inputs {
@@ -43,7 +43,7 @@ func (c KeywordClassifier) Classify(ctx context.Context, inputs []Input) (map[st
 			return nil, err
 		}
 		if category, ok := classifyKeyword(input); ok {
-			results[input.PostingID] = category
+			results[input.TransactionID] = category
 		}
 	}
 	return results, nil

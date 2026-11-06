@@ -15,7 +15,7 @@ type TransactionFacts struct {
 }
 
 type AnalysisTransaction struct {
-	PostingID      string           `json:"postingId"`
+	TransactionID  string           `json:"transactionId"`
 	AccountID      string           `json:"accountId"`
 	SourceProvider string           `json:"sourceProvider"`
 	Pending        bool             `json:"pending"`
@@ -29,19 +29,19 @@ type AnalysisSnapshot struct {
 }
 
 type AnalysisEvidence struct {
-	Code       string   `json:"code"`
-	Reason     string   `json:"reason"`
-	PostingIDs []string `json:"postingIds"`
+	Code           string   `json:"code"`
+	Reason         string   `json:"reason"`
+	TransactionIDs []string `json:"transactionIds"`
 }
 
 type AnalysisDetection struct {
-	PostingID string             `json:"postingId"`
-	Kind      string             `json:"kind"`
-	Provider  string             `json:"provider"`
-	Product   string             `json:"product"`
-	Role      string             `json:"role"`
-	Strength  string             `json:"strength"`
-	Evidence  []AnalysisEvidence `json:"evidence"`
+	TransactionID string             `json:"transactionId"`
+	Kind          string             `json:"kind"`
+	Provider      string             `json:"provider"`
+	Product       string             `json:"product"`
+	Role          string             `json:"role"`
+	Strength      string             `json:"strength"`
+	Evidence      []AnalysisEvidence `json:"evidence"`
 }
 
 type AnalysisRun struct {
@@ -72,7 +72,7 @@ type AnalysisFinding struct {
 }
 
 type AnalysisFindingFilter struct {
-	PostingIDs []string
-	Cursor     string
-	Limit      int
+	TransactionIDs []string
+	Cursor         string
+	Limit          int
 }

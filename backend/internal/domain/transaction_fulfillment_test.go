@@ -32,11 +32,11 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			source := "checking"
-			posting := types.Posting{ID: "bill", Name: "Bill", SourceAccountID: &source, Enabled: true}
+			transaction := types.Transaction{ID: "bill", Name: "Bill", SourceAccountID: &source, Enabled: true}
 			account := types.Account{ID: source, Name: "Checking", Kind: types.AccountKindCash, MinBalance: &tc.floor, Enabled: true}
 			event := types.TransactionEvent{
 				Date: "2026-02-05", Sequence: 1,
-				Origin:          types.TransactionOrigin{Type: "posting", PostingID: posting.ID},
+				Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: transaction.ID},
 				RequestedAmount: tc.requested, RealizedAmount: tc.realized,
 				AccountDeltas: []transactionAccountDelta{{AccountID: source, Delta: -tc.realized}},
 			}
@@ -51,7 +51,7 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 			}
 			if tc.destinationLimit {
 				ceiling := tc.realized
-				posting.Destinations = []string{"loan"}
+				transaction.Destinations = []string{"loan"}
 				model.Accounts = append(model.Accounts, types.Account{ID: "loan", Name: "Loan", MaxBalance: &ceiling, Enabled: true})
 				row.AccountSnapshots = append(row.AccountSnapshots, types.AccountSnapshot{AccountID: "loan", Balance: ceiling})
 				event.AccountDeltas = append(event.AccountDeltas, transactionAccountDelta{AccountID: "loan", Delta: tc.realized})
@@ -59,18 +59,18 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 			if tc.capped {
 				cap := tc.realized
 				model.Schedules = []types.Schedule{{
-					ID: posting.ID, Name: posting.Name, SourceAccountID: posting.SourceAccountID,
+					ID: transaction.ID, Name: transaction.Name, SourceAccountID: transaction.SourceAccountID,
 					AnnualCap: &cap, Enabled: true,
 				}}
 			} else {
-				model.Postings = []types.Posting{posting}
+				model.Transactions = []types.Transaction{transaction}
 			}
 			path := &types.ProjectionPath{
 				EffectiveModel: model, Rows: []types.ProjectionRow{row},
 				TransactionEvents: []types.TransactionEvent{event},
 			}
 			public := publicTransactionEvents(path)[0]
-			evaluation := EvaluatePostingFulfillment(path, types.PostingFulfillmentConfig{}, true)
+			evaluation := EvaluateTransactionFulfillment(path, types.TransactionFulfillmentConfig{}, true)
 			if public.Fulfillment == nil {
 				t.Fatal("public event has no fulfillment assessment")
 			}
@@ -110,15 +110,15 @@ func TestPublicTransactionFulfillmentDoesNotDependOnConfiguredEvaluations(t *tes
 		}
 	}
 	var baseline []types.TransactionEvent
-	for _, mode := range []string{"absent", "disabled", "selected subset", "all postings"} {
+	for _, mode := range []string{"absent", "disabled", "selected subset", "all transactions"} {
 		t.Run(mode, func(t *testing.T) {
 			settings.Evaluations = types.EmptyEvaluationTables()
 			if mode != "absent" {
-				config := map[string]any{"postingIds": nil}
+				config := map[string]any{"transactionIds": nil}
 				if mode == "selected subset" {
-					config["postingIds"] = []any{"salary"}
+					config["transactionIds"] = []any{"salary"}
 				}
-				settings.Evaluations.PostingFulfillment = []types.FulfillmentEvaluation{{
+				settings.Evaluations.TransactionFulfillment = []types.FulfillmentEvaluation{{
 					InstanceID: "fulfillment", Name: "Fulfillment", Enabled: mode != "disabled", Config: config,
 				}}
 			}
@@ -145,7 +145,7 @@ func TestPublicTransactionFulfillmentDoesNotDependOnConfiguredEvaluations(t *tes
 				t.Fatal("configured evaluation changed public fulfillment evidence")
 			}
 			if mode == "selected subset" {
-				envelope := result.Evaluations.PostingFulfillment[0]
+				envelope := result.Evaluations.TransactionFulfillment[0]
 				deterministic := envelope.Deterministic.(map[string]any)
 				if deterministic["unfulfilledAmount"] != float64(0) {
 					t.Fatalf("salary-only evaluation = %+v", deterministic)

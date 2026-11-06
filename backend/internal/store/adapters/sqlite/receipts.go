@@ -11,46 +11,46 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func receiptPosting(q queryer, id string) (types.Posting, error) {
-	rows, err := q.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.id = ? AND p.user_id = :user_id`, id)
+func receiptTransaction(q queryer, id string) (types.Transaction, error) {
+	rows, err := q.Query(`SELECT `+transactionSelect+` `+transactionJoins+` WHERE p.id = ? AND p.user_id = :user_id`, id)
 	if err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
 	defer rows.Close()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
-			return types.Posting{}, err
+			return types.Transaction{}, err
 		}
-		return types.Posting{}, ErrReceiptNotFound
+		return types.Transaction{}, ErrReceiptNotFound
 	}
-	p, err := scanPostingRow(rows)
+	p, err := scanTransactionRow(rows)
 	return p, err
 }
 
-// GetPosting reads one posting for receipt fingerprinting without loading
+// GetTransaction reads one transaction for receipt fingerprinting without loading
 // the full model. Missing rows report ErrReceiptNotFound.
-func (s *sqliteStore) GetPosting(id string) (types.Posting, error) {
-	return receiptPosting(s.db, id)
+func (s *sqliteStore) GetTransaction(id string) (types.Transaction, error) {
+	return receiptTransaction(s.db, id)
 }
 
-func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (out types.Receipt, err error) {
+func (s *sqliteStore) CreateReceipt(ctx context.Context, transactionID, filename string, image types.ReceiptImage) (out types.Receipt, err error) {
 	image, err = validatedReceiptImage(image)
 	if err != nil {
 		return out, err
 	}
 	check := func(tx *userTx) error {
-		posting, err := receiptPosting(tx, postingID)
+		transaction, err := receiptTransaction(tx, transactionID)
 		if err != nil {
 			return err
 		}
-		if posting.SourceAccountID == nil && len(posting.Destinations) == 0 {
+		if transaction.SourceAccountID == nil && len(transaction.Destinations) == 0 {
 			return ErrReceiptIneligible
 		}
-		if posting.Pending || posting.Void {
+		if transaction.Pending || transaction.Void {
 			return ErrReceiptIneligible
 		}
 		var existing string
-		if err := tx.QueryRow(`SELECT payload FROM receipts WHERE posting_id = ? AND digest = ? AND user_id = :user_id`, postingID, image.Digest).Scan(&existing); err == nil {
+		if err := tx.QueryRow(`SELECT payload FROM receipts WHERE transaction_id = ? AND digest = ? AND user_id = :user_id`, transactionID, image.Digest).Scan(&existing); err == nil {
 			return json.Unmarshal([]byte(existing), &out)
 		} else if err != sql.ErrNoRows {
 			return err
@@ -62,7 +62,7 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		if used+int64(len(image.Bytes)) > ReceiptStorageLimit || count >= 500 {
 			return ErrReceiptQuota
 		}
-		out = types.Receipt{PostingID: postingID, Filename: filename, MediaType: image.MediaType, Digest: image.Digest, Size: int64(len(image.Bytes)), Revision: 1, Status: "attached", PostingFingerprint: PostingReceiptFingerprint(posting)}
+		out = types.Receipt{TransactionID: transactionID, Filename: filename, MediaType: image.MediaType, Digest: image.Digest, Size: int64(len(image.Bytes)), Revision: 1, Status: "attached", TransactionFingerprint: TransactionReceiptFingerprint(transaction)}
 		return nil
 	}
 	// Reject ineligible parents, duplicates, and quota failures before provider I/O.
@@ -93,21 +93,21 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		if err := publishBlob(tx.Tx, key); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, user_id) VALUES (?,?,?,?,?,?,?, :user_id)`, out.ID, postingID, image.Digest, out.Size, key, out.Revision, string(payload)); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts (id, transaction_id, digest, size, blob_key, revision, payload, user_id) VALUES (?,?,?,?,?,?,?, :user_id)`, out.ID, transactionID, image.Digest, out.Size, key, out.Revision, string(payload)); err != nil {
 			return err
 		}
-		// The receipts row itself is the link; no posting back-reference
+		// The receipts row itself is the link; no transaction back-reference
 		// exists anymore.
 		return nil
 	})
 	return out, err
 }
 
-func (s *sqliteStore) ListReceipts(postingID string) ([]types.Receipt, error) {
-	if _, err := receiptPosting(s.db, postingID); err != nil {
+func (s *sqliteStore) ListReceipts(transactionID string) ([]types.Receipt, error) {
+	if _, err := receiptTransaction(s.db, transactionID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(`SELECT payload FROM receipts WHERE posting_id = ? AND user_id = :user_id ORDER BY id`, postingID)
+	rows, err := s.db.Query(`SELECT payload FROM receipts WHERE transaction_id = ? AND user_id = :user_id ORDER BY id`, transactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,22 +127,22 @@ func (s *sqliteStore) ListReceipts(postingID string) ([]types.Receipt, error) {
 	return out, rows.Err()
 }
 
-// ListPostingReceiptIDs derives links from the receipts table: each receipt
-// row points at its parent posting, so no posting-side back-reference is
-// stored or read. Only postings with at least one receipt appear in the map.
-func (s *sqliteStore) ListPostingReceiptIDs() (map[string][]string, error) {
-	rows, err := s.db.Query(`SELECT posting_id, id FROM receipts WHERE user_id = :user_id ORDER BY posting_id, id`)
+// ListTransactionReceiptIDs derives links from the receipts table: each receipt
+// row points at its parent transaction, so no transaction-side back-reference is
+// stored or read. Only transactions with at least one receipt appear in the map.
+func (s *sqliteStore) ListTransactionReceiptIDs() (map[string][]string, error) {
+	rows, err := s.db.Query(`SELECT transaction_id, id FROM receipts WHERE user_id = :user_id ORDER BY transaction_id, id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := map[string][]string{}
 	for rows.Next() {
-		var postingID, id string
-		if err := rows.Scan(&postingID, &id); err != nil {
+		var transactionID, id string
+		if err := rows.Scan(&transactionID, &id); err != nil {
 			return nil, err
 		}
-		out[postingID] = append(out[postingID], id)
+		out[transactionID] = append(out[transactionID], id)
 	}
 	return out, rows.Err()
 }
@@ -183,8 +183,8 @@ func (s *sqliteStore) SaveReceipt(receipt types.Receipt, expectedRevision int64)
 			return ErrReceiptConflict
 		}
 		// Immutable image/parent attributes cannot change through metadata writes.
-		if receipt.PostingID != previous.PostingID || receipt.Digest != previous.Digest || receipt.Filename != previous.Filename || receipt.MediaType != previous.MediaType || receipt.Size != previous.Size || receipt.CreatedAt != previous.CreatedAt {
-			return fmt.Errorf("receipt image and posting are immutable")
+		if receipt.TransactionID != previous.TransactionID || receipt.Digest != previous.Digest || receipt.Filename != previous.Filename || receipt.MediaType != previous.MediaType || receipt.Size != previous.Size || receipt.CreatedAt != previous.CreatedAt {
+			return fmt.Errorf("receipt image and transaction are immutable")
 		}
 		receipt.Revision = expectedRevision + 1
 		receipt.Stale = false
@@ -211,7 +211,7 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 	}
 	err := withRowTx(s.db, func(tx *userTx) error {
 		var exists string
-		if err := tx.QueryRow(`SELECT posting_id FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&exists); err == sql.ErrNoRows {
+		if err := tx.QueryRow(`SELECT transaction_id FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&exists); err == sql.ErrNoRows {
 			return ErrReceiptNotFound
 		} else if err != nil {
 			return err
@@ -228,47 +228,47 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 	return err
 }
 
-func bankPostingIDs(postings []types.Posting) []string {
-	ids := make([]string, 0, len(postings))
-	for _, posting := range postings {
-		ids = append(ids, posting.ID)
+func bankTransactionIDs(transactions []types.Transaction) []string {
+	ids := make([]string, 0, len(transactions))
+	for _, transaction := range transactions {
+		ids = append(ids, transaction.ID)
 	}
 	return ids
 }
 
 type preservedReceipt struct {
-	id, postingID, digest, blobKey, payload string
-	size                                    int64
-	revision                                int64
+	id, transactionID, digest, blobKey, payload string
+	size                                        int64
+	revision                                    int64
 }
 
-// loadReceiptsForPostings snapshots receipt rows so CSV replacement can
-// restore evidence for preserved postings after row deletion cascades.
-func loadReceiptsForPostings(tx *userTx, postingIDs []string) ([]preservedReceipt, error) {
-	if len(postingIDs) == 0 {
+// loadReceiptsForTransactions snapshots receipt rows so CSV replacement can
+// restore evidence for preserved transactions after row deletion cascades.
+func loadReceiptsForTransactions(tx *userTx, transactionIDs []string) ([]preservedReceipt, error) {
+	if len(transactionIDs) == 0 {
 		return nil, nil
 	}
 	var out []preservedReceipt
 	const chunkSize = 500
-	for start := 0; start < len(postingIDs); start += chunkSize {
+	for start := 0; start < len(transactionIDs); start += chunkSize {
 		end := start + chunkSize
-		if end > len(postingIDs) {
-			end = len(postingIDs)
+		if end > len(transactionIDs) {
+			end = len(transactionIDs)
 		}
-		chunk := postingIDs[start:end]
+		chunk := transactionIDs[start:end]
 		placeholders := make([]string, len(chunk))
 		args := make([]any, len(chunk))
 		for i, id := range chunk {
 			placeholders[i] = "?"
 			args[i] = id
 		}
-		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY id`, args...)
+		rows, err := tx.Query(`SELECT id, transaction_id, digest, size, blob_key, revision, payload FROM receipts WHERE transaction_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY id`, args...)
 		if err != nil {
 			return nil, err
 		}
 		for rows.Next() {
 			var receipt preservedReceipt
-			if err := rows.Scan(&receipt.id, &receipt.postingID, &receipt.digest, &receipt.size, &receipt.blobKey, &receipt.revision, &receipt.payload); err != nil {
+			if err := rows.Scan(&receipt.id, &receipt.transactionID, &receipt.digest, &receipt.size, &receipt.blobKey, &receipt.revision, &receipt.payload); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -290,8 +290,8 @@ func restoreReceipts(tx *userTx, receipts []preservedReceipt) error {
 		if _, err := tx.Exec(`UPDATE blob_objects SET state = 'live', expires_at = 0 WHERE key = ?`, receipt.blobKey); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, :user_id)`,
-			receipt.id, receipt.postingID, receipt.digest, receipt.size, receipt.blobKey, receipt.revision, receipt.payload); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts (id, transaction_id, digest, size, blob_key, revision, payload, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, :user_id)`,
+			receipt.id, receipt.transactionID, receipt.digest, receipt.size, receipt.blobKey, receipt.revision, receipt.payload); err != nil {
 			return err
 		}
 	}

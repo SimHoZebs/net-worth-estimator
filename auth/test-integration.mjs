@@ -310,7 +310,7 @@ try {
         financialIndependence: [],
         netWorthThreshold: [],
         accountBalance: [],
-        postingFulfillment: [],
+        transactionFulfillment: [],
         cycleFulfillment: [],
       },
     },
@@ -392,7 +392,7 @@ try {
     .model;
   assert.ok(blank, "Signup activates a usable blank model without an import");
   assert.deepEqual(blank.accounts, []);
-  assert.deepEqual(blank.postings, []);
+  assert.deepEqual(blank.transactions, []);
   assert.deepEqual(blank.schedules, []);
   await expect(secondPage.getByRole("heading", { name: "Your workspace is ready" })).toBeVisible();
   await secondPage.goto(`${origin.origin}/#sources`);

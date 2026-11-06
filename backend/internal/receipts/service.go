@@ -30,8 +30,8 @@ const extractionTimeout = 45 * time.Second
 const extractionLease = time.Minute
 
 // receiptView derives recovery state without a write or a provider request.
-func receiptView(receipt types.Receipt, posting types.Posting) types.Receipt {
-	receipt.Stale = receipt.PostingFingerprint != store.PostingReceiptFingerprint(posting)
+func receiptView(receipt types.Receipt, transaction types.Transaction) types.Receipt {
+	receipt.Stale = receipt.TransactionFingerprint != store.TransactionReceiptFingerprint(transaction)
 	if receipt.Status == "extracting" && time.Since(time.UnixMilli(receipt.ExtractionStartedAt)) >= extractionLease {
 		receipt.Status = "interrupted"
 	}
@@ -44,8 +44,8 @@ func NewService(repository Repository, source *Source, scope string) *Service {
 
 func (s *Service) Available() bool { return s.source != nil }
 
-func (s *Service) Attach(ctx context.Context, postingID, filename string, image types.ReceiptImage) (types.Receipt, error) {
-	return s.repository.CreateReceipt(ctx, postingID, receiptFilename(filename), image)
+func (s *Service) Attach(ctx context.Context, transactionID, filename string, image types.ReceiptImage) (types.Receipt, error) {
+	return s.repository.CreateReceipt(ctx, transactionID, receiptFilename(filename), image)
 }
 
 func (s *Service) ReplaceImage(ctx context.Context, id string, revision int64, filename string, image types.ReceiptImage) (types.Receipt, error) {
@@ -65,53 +65,53 @@ func (s *Service) Get(id string) (types.Receipt, error) {
 	if err != nil {
 		return receipt, err
 	}
-	posting, err := s.posting(receipt.PostingID)
+	transaction, err := s.transaction(receipt.TransactionID)
 	if err != nil {
 		return receipt, err
 	}
-	return receiptView(receipt, posting), nil
+	return receiptView(receipt, transaction), nil
 }
 
-func (s *Service) List(postingID string) ([]types.Receipt, error) {
-	items, err := s.repository.ListReceipts(postingID)
+func (s *Service) List(transactionID string) ([]types.Receipt, error) {
+	items, err := s.repository.ListReceipts(transactionID)
 	if err != nil {
 		return nil, err
 	}
-	posting, err := s.posting(postingID)
+	transaction, err := s.transaction(transactionID)
 	if err != nil {
 		return nil, err
 	}
 	for i := range items {
-		items[i] = receiptView(items[i], posting)
+		items[i] = receiptView(items[i], transaction)
 	}
 	return items, nil
 }
 
-// ListLinks is the stored reverse lookup: posting ID to its receipt IDs,
-// read from the posting row. Receipt writes maintain the field in the same
+// ListLinks is the stored reverse lookup: transaction ID to its receipt IDs,
+// read from the transaction row. Receipt writes maintain the field in the same
 // transaction as the receipt row.
 func (s *Service) ListLinks() (map[string][]string, error) {
-	return s.repository.ListPostingReceiptIDs()
+	return s.repository.ListTransactionReceiptIDs()
 }
 
-func (s *Service) posting(id string) (types.Posting, error) {
+func (s *Service) transaction(id string) (types.Transaction, error) {
 	if reader, ok := s.repository.(interface {
-		GetPosting(string) (types.Posting, error)
+		GetTransaction(string) (types.Transaction, error)
 	}); ok {
-		return reader.GetPosting(id)
+		return reader.GetTransaction(id)
 	}
 	model, err := s.repository.LoadModel()
 	if err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
 	if model != nil {
-		for _, posting := range model.Postings {
-			if posting.ID == id {
-				return posting, nil
+		for _, transaction := range model.Transactions {
+			if transaction.ID == id {
+				return transaction, nil
 			}
 		}
 	}
-	return types.Posting{}, store.ErrReceiptNotFound
+	return types.Transaction{}, store.ErrReceiptNotFound
 }
 
 func (s *Service) Review(id string, revision int64, details types.ReceiptDetails, confirm bool) (types.Receipt, error) {
@@ -138,13 +138,13 @@ func (s *Service) Review(id string, revision int64, details types.ReceiptDetails
 	}
 	receipt.Draft = &details
 	if confirm {
-		posting, err := s.posting(receipt.PostingID)
+		transaction, err := s.transaction(receipt.TransactionID)
 		if err != nil {
 			return receipt, err
 		}
 		receipt.Confirmed = &details
 		receipt.ConfirmedProvenance = receipt.DraftProvenance
-		receipt.PostingFingerprint = store.PostingReceiptFingerprint(posting)
+		receipt.TransactionFingerprint = store.TransactionReceiptFingerprint(transaction)
 	}
 	return s.repository.SaveReceipt(receipt, revision)
 }
@@ -255,10 +255,10 @@ func (s *Service) Diagnostics(receipt types.Receipt) []string {
 		out = append(out, "Receipt total is unknown.")
 		return out
 	}
-	posting, err := s.posting(receipt.PostingID)
-	if err == nil && posting.Amount.Resolver == "expression" && len(posting.Amount.Inputs) == 0 {
+	transaction, err := s.transaction(receipt.TransactionID)
+	if err == nil && transaction.Amount.Resolver == "expression" && len(transaction.Amount.Inputs) == 0 {
 		// Only a finite literal is comparable. Calculated amounts remain unknown.
-		if expression, ok := posting.Amount.Config["expression"].(string); ok {
+		if expression, ok := transaction.Amount.Config["expression"].(string); ok {
 			if amount, err := strconv.ParseFloat(strings.TrimSpace(expression), 64); err == nil && !math.IsNaN(amount) && !math.IsInf(amount, 0) && math.Abs(amount*100-float64(*details.TotalCents)) >= 1 {
 				out = append(out, "The receipt total differs from the saved transaction amount.")
 			}

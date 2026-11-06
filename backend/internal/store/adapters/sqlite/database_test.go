@@ -105,7 +105,7 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
-	const postingID = "01900000-0000-7000-8000-000000000077"
+	const transactionID = "01900000-0000-7000-8000-000000000077"
 	const pendingID = "01900000-0000-7000-8000-000000000078"
 	preset := testPresetFixture("same-recipe")
 	preset.ID = "same-preset"
@@ -113,7 +113,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 	for _, s := range []*sqliteStore{a, b} {
 		seedAccount(t, s, "checking")
 		seedAccount(t, s, "second")
-		if _, err := s.CreatePosting(testPostingFixture(postingID)); err != nil {
+		if _, err := s.CreateTransaction(testTransactionFixture(transactionID)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.CreateSchedule(testRuleFixture("same-rule")); err != nil {
@@ -156,13 +156,13 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pending := syncPendingPosting("same-transaction", "checking", "2026-08-02")
+		pending := syncPendingTransaction("same-transaction", "checking", "2026-08-02")
 		pending.ID = pendingID
-		if err := insertPosting(tx, 1, &pending.Posting, SourceBankSync); err != nil {
+		if err := insertTransaction(tx, 1, &pending.Transaction, SourceBankSync); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}
-		if err := insertPostingSyncKey(tx, postingSyncKey{ProviderSimpleFIN, pending.ProviderAccountID, pending.TransactionID, pendingID}); err != nil {
+		if err := insertTransactionSyncKey(tx, transactionSyncKey{ProviderSimpleFIN, pending.ProviderAccountID, pending.TransactionID, pendingID}); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}
@@ -181,12 +181,12 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { _, err := a.UpdateAccount(types.Account{ID: "checking", Name: "A only"}); return err },
 		func() error { return a.MoveAccount("second", "checking") },
 		func() error {
-			p := testPostingFixture(postingID)
+			p := testTransactionFixture(transactionID)
 			p.Name = "A only"
-			_, err := a.UpdatePosting(p)
+			_, err := a.UpdateTransaction(p)
 			return err
 		},
-		func() error { return a.MovePosting(postingID, pendingID) },
+		func() error { return a.MoveTransaction(transactionID, pendingID) },
 		func() error {
 			r := testRuleFixture("same-rule")
 			r.Name = "A only"
@@ -217,13 +217,13 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 			return err
 		},
 		func() error {
-			item := syncPendingPosting("same-transaction", "checking", "2026-08-03")
+			item := syncPendingTransaction("same-transaction", "checking", "2026-08-03")
 			_, err := a.ApplySync([]SyncCheckpoint{{AccountID: "checking", Balance: 50, Source: SourceBankSync, Provider: ProviderSimpleFIN, ObservedAt: 1769990399}}, []BankDirective{syncPendingDirective(item)})
 			return err
 		},
 		func() error { return a.SetLastSyncTime("after") },
 		func() error { _, err := a.ApplySync(nil, nil); return err },
-		func() error { return a.DeletePosting(postingID) },
+		func() error { return a.DeleteTransaction(transactionID) },
 		func() error { return a.DeleteSchedule("same-rule") },
 		func() error { return a.DeleteEvaluation(eval.InstanceID) },
 		func() error { return a.DeleteCheckpointAt("checking", 1767311999) },
@@ -313,8 +313,8 @@ func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
 	seedAccount(t, b, "checking")
-	if _, err := a.CreatePosting(testPostingFixture("01900000-0000-7000-8000-000000000099")); err == nil {
-		t.Fatal("posting referenced another plan's account")
+	if _, err := a.CreateTransaction(testTransactionFixture("01900000-0000-7000-8000-000000000099")); err == nil {
+		t.Fatal("transaction referenced another plan's account")
 	}
 	if _, err := a.SaveCheckpoint(types.Checkpoint{AccountID: "checking", ObservedAt: 1767311999}); err == nil {
 		t.Fatal("checkpoint referenced another plan's account")
@@ -347,17 +347,17 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 	if _, err := b.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 250, ObservedAt: 1785974399}); err != nil {
 		t.Fatal(err)
 	}
-	settledDirective := func(item SyncPosting) BankDirective {
+	settledDirective := func(item SyncTransaction) BankDirective {
 		item.Source = SourceBankSync
 		return BankDirective{Upsert: &BankUpsert{
-			Posting: item.Posting,
-			Keys:    []BankKey{{Provider: ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+			Transaction: item.Transaction,
+			Keys:        []BankKey{{Provider: ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
 		}}
 	}
 	for user, s := range map[string]*sqliteStore{"a": a, "b": b} {
 		if _, err := s.ApplySync(
 			[]SyncCheckpoint{{AccountID: "checking", Balance: 10, Source: SourceBankSync, Provider: ProviderSimpleFIN, ObservedAt: instant + 86400}},
-			[]BankDirective{settledDirective(syncSettledPosting("tx-"+user, "checking", "Settled "+user, "2026-08-06"))},
+			[]BankDirective{settledDirective(syncSettledTransaction("tx-"+user, "checking", "Settled "+user, "2026-08-06"))},
 		); err != nil {
 			t.Fatal(err)
 		}
@@ -367,9 +367,9 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, posting := range loaded.Postings {
-			if posting.Source == SourceBankSync && !posting.Pending {
-				return posting.ID
+		for _, transaction := range loaded.Transactions {
+			if transaction.Source == SourceBankSync && !transaction.Pending {
+				return transaction.ID
 			}
 		}
 		t.Fatalf("no settled bank row for user")
@@ -380,10 +380,10 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 		t.Fatalf("bank row IDs collided across users: %s", bankA)
 	}
 	checking := "checking"
-	if _, err := a.CreatePosting(types.Posting{
+	if _, err := a.CreateTransaction(types.Transaction{
 		ID: "01900000-0000-7000-8000-000000000091", Name: "Manual",
 		SourceAccountID: &checking,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785817200, TransactionTime: 1785817200, Enabled: true,
 	}); err != nil {
 		t.Fatal(err)
@@ -413,21 +413,21 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 	if countA != 1 || countB != 2 {
 		t.Fatalf("same-day rows leaked: a=%d b=%d", countA, countB)
 	}
-	for _, posting := range loadedB.Postings {
-		if posting.ID == "01900000-0000-7000-8000-000000000091" {
-			t.Fatalf("user A manual posting visible to user B")
+	for _, transaction := range loadedB.Transactions {
+		if transaction.ID == "01900000-0000-7000-8000-000000000091" {
+			t.Fatalf("user A manual transaction visible to user B")
 		}
-		if posting.ID == bankA {
+		if transaction.ID == bankA {
 			t.Fatalf("user A bank row visible to user B")
 		}
 	}
 	found := false
-	for _, posting := range loadedA.Postings {
-		if posting.ID == "01900000-0000-7000-8000-000000000091" {
+	for _, transaction := range loadedA.Transactions {
+		if transaction.ID == "01900000-0000-7000-8000-000000000091" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("user A manual posting missing")
+		t.Fatalf("user A manual transaction missing")
 	}
 }

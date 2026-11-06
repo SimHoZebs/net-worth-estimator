@@ -295,18 +295,18 @@ func (s *sqliteStore) SaveProviderConnection(conn types.ProviderConnection) (typ
 	return conn, nil
 }
 
-// SaveGeneratedPostings stores engine-output transactions for slices.
+// SaveGeneratedTransactions stores engine-output transactions for slices.
 // Generated rows skip the ID registry, simulation satellites, and claims:
 // they are output, never model input. The write replaces each touched
 // slice's stored output atomically, so a retried or concurrent rebuild can
 // never accumulate duplicate events for one slice.
-func (s *sqliteStore) SaveGeneratedPostings(rows []GeneratedPosting) error {
+func (s *sqliteStore) SaveGeneratedTransactions(rows []GeneratedTransaction) error {
 	if len(rows) == 0 {
 		return nil
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("save generated postings: %w", err)
+		return fmt.Errorf("save generated transactions: %w", err)
 	}
 	defer tx.Rollback()
 	sliceIDs := make([]string, 0, len(rows))
@@ -324,38 +324,38 @@ func (s *sqliteStore) SaveGeneratedPostings(rows []GeneratedPosting) error {
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	if _, err := tx.Exec(`DELETE FROM postings WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
-		return fmt.Errorf("replace generated postings: %w", err)
+	if _, err := tx.Exec(`DELETE FROM transactions WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+		return fmt.Errorf("replace generated transactions: %w", err)
 	}
 	for _, row := range rows {
 		id, err := uuid.NewV7()
 		if err != nil {
-			return fmt.Errorf("generated posting id: %w", err)
+			return fmt.Errorf("generated transaction id: %w", err)
 		}
 		destinations := []byte("null")
 		if row.DestinationIDs != nil {
 			encoded, err := json.Marshal(row.DestinationIDs)
 			if err != nil {
-				return fmt.Errorf("generated posting destinations: %w", err)
+				return fmt.Errorf("generated transaction destinations: %w", err)
 			}
 			destinations = encoded
 		}
-		if _, err := tx.Exec(`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome, user_id)
+		if _, err := tx.Exec(`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome, user_id)
 			VALUES (?, ?, ?, ?, '{}', ?, ?, 'projected', 0, 0, ?, ?, ?, ?, :user_id)`,
 			id.String(), row.Name, nullable(row.SourceAccountID), string(destinations), row.PostedTime, row.TransactionTime, row.SliceID, row.EventJSON, row.AppliedAmount, row.Outcome); err != nil {
 			source := "<none>"
 			if row.SourceAccountID != nil {
 				source = *row.SourceAccountID
 			}
-			return fmt.Errorf("save generated posting %q (source %s): %w", row.Name, source, err)
+			return fmt.Errorf("save generated transaction %q (source %s): %w", row.Name, source, err)
 		}
 	}
 	return tx.Commit()
 }
 
-// ListGeneratedPostings returns engine-output transactions for slices in time order.
-func (s *sqliteStore) ListGeneratedPostings(sliceIDs []string) ([]GeneratedPosting, error) {
-	out := []GeneratedPosting{}
+// ListGeneratedTransactions returns engine-output transactions for slices in time order.
+func (s *sqliteStore) ListGeneratedTransactions(sliceIDs []string) ([]GeneratedTransaction, error) {
+	out := []GeneratedTransaction{}
 	if len(sliceIDs) == 0 {
 		return out, nil
 	}
@@ -365,19 +365,19 @@ func (s *sqliteStore) ListGeneratedPostings(sliceIDs []string) ([]GeneratedPosti
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	rows, err := s.db.Query(`SELECT projection_slice_id, name, source_account_id, destination_account_ids, posted_time, transaction_time, event_json, applied_amount, outcome FROM postings WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY posted_time, transaction_time, id`, args...)
+	rows, err := s.db.Query(`SELECT projection_slice_id, name, source_account_id, destination_account_ids, posted_time, transaction_time, event_json, applied_amount, outcome FROM transactions WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY posted_time, transaction_time, id`, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list generated postings: %w", err)
+		return nil, fmt.Errorf("list generated transactions: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var row GeneratedPosting
+		var row GeneratedTransaction
 		var source sql.NullString
 		var destinations sql.NullString
 		var eventJSON, outcome sql.NullString
 		var applied sql.NullFloat64
 		if err := rows.Scan(&row.SliceID, &row.Name, &source, &destinations, &row.PostedTime, &row.TransactionTime, &eventJSON, &applied, &outcome); err != nil {
-			return nil, fmt.Errorf("scan generated posting: %w", err)
+			return nil, fmt.Errorf("scan generated transaction: %w", err)
 		}
 		if source.Valid {
 			row.SourceAccountID = &source.String
@@ -399,13 +399,13 @@ func (s *sqliteStore) ListGeneratedPostings(sliceIDs []string) ([]GeneratedPosti
 		out = append(out, row)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate generated postings: %w", err)
+		return nil, fmt.Errorf("iterate generated transactions: %w", err)
 	}
 	return out, nil
 }
 
-// DeleteGeneratedPostings removes engine-output transactions for slices.
-func (s *sqliteStore) DeleteGeneratedPostings(sliceIDs []string) error {
+// DeleteGeneratedTransactions removes engine-output transactions for slices.
+func (s *sqliteStore) DeleteGeneratedTransactions(sliceIDs []string) error {
 	if len(sliceIDs) == 0 {
 		return nil
 	}
@@ -415,8 +415,8 @@ func (s *sqliteStore) DeleteGeneratedPostings(sliceIDs []string) error {
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	if _, err := s.db.Exec(`DELETE FROM postings WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
-		return fmt.Errorf("delete generated postings: %w", err)
+	if _, err := s.db.Exec(`DELETE FROM transactions WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+		return fmt.Errorf("delete generated transactions: %w", err)
 	}
 	return nil
 }

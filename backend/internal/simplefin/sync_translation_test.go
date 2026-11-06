@@ -78,7 +78,7 @@ func TestTranslateProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.ID != "" || pending.ProviderAccountID != testAccountKey("bridge-prime") || pending.TransactionID != "pend1" || !pending.Pending {
 		t.Fatalf("pending identity/state = %+v", pending)
 	}
-	var refund *store.SyncPosting
+	var refund *store.SyncTransaction
 	for i := range translation.Pending {
 		if translation.Pending[i].TransactionID == "pendpos" {
 			refund = &translation.Pending[i]
@@ -243,8 +243,8 @@ func TestPartialSyncDoesNotVoidExcludedPendingHold(t *testing.T) {
 	if _, err := runner.Sync(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	bank, err := database.LoadBankPostings()
-	if err != nil || len(bank) != 1 || !bank[0].Posting.Pending {
+	bank, err := database.LoadBankTransactions()
+	if err != nil || len(bank) != 1 || !bank[0].Transaction.Pending {
 		t.Fatalf("first sync hold = %+v, err %v", bank, err)
 	}
 
@@ -263,8 +263,8 @@ func TestPartialSyncDoesNotVoidExcludedPendingHold(t *testing.T) {
 	if !summary.Partial || len(summary.Errors) != 1 || summary.PendingDeleted != 0 {
 		t.Fatalf("partial summary = %+v", summary)
 	}
-	bank, err = database.LoadBankPostings()
-	if err != nil || len(bank) != 1 || !bank[0].Posting.Pending {
+	bank, err = database.LoadBankTransactions()
+	if err != nil || len(bank) != 1 || !bank[0].Transaction.Pending {
 		t.Fatalf("excluded hold = %+v, err %v, want it preserved", bank, err)
 	}
 }
@@ -294,7 +294,7 @@ func TestTranslateSeparatesSameAccountIDAcrossConnections(t *testing.T) {
 }
 
 func TestTranslateNormalizesSettledEventTimeToPosted(t *testing.T) { // A purchase authorized at 08:00 but posted at 11:00 affects the
-	// reported balance at posting: the settled event time is the post
+	// reported balance at transaction: the settled event time is the post
 	// instant. Pending seeds keep the purchase timestamp for matching.
 	set := &AccountSet{Accounts: []Account{{
 		ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
@@ -313,16 +313,16 @@ func TestTranslateNormalizesSettledEventTimeToPosted(t *testing.T) { // A purcha
 	}
 	settled := translation.Settled[0]
 	if !settled.Enabled {
-		t.Fatalf("settled bank actual must participate: %+v", settled.Posting)
+		t.Fatalf("settled bank actual must participate: %+v", settled.Transaction)
 	}
-	if settled.Posting.TransactionTime != 1773140400 || settled.Posting.PostedTime != 1773140400 {
-		t.Fatalf("settled event time = %d/%d, want posted instant 1773140400", settled.Posting.TransactionTime, settled.Posting.PostedTime)
+	if settled.Transaction.TransactionTime != 1773140400 || settled.Transaction.PostedTime != 1773140400 {
+		t.Fatalf("settled event time = %d/%d, want posted instant 1773140400", settled.Transaction.TransactionTime, settled.Transaction.PostedTime)
 	}
 	pending := translation.Pending[0]
-	if pending.Enabled || pending.Posting.TransactionTime != 1773129600 {
-		t.Fatalf("pending seed must stay disabled on its purchase timestamp: %+v", pending.Posting)
+	if pending.Enabled || pending.Transaction.TransactionTime != 1773129600 {
+		t.Fatalf("pending seed must stay disabled on its purchase timestamp: %+v", pending.Transaction)
 	}
-	if pending.Posting.PostedTime != 0 {
-		t.Fatalf("pending seed must leave the missing posted date missing instead of fabricating the sync instant: %+v", pending.Posting)
+	if pending.Transaction.PostedTime != 0 {
+		t.Fatalf("pending seed must leave the missing posted date missing instead of fabricating the sync instant: %+v", pending.Transaction)
 	}
 }

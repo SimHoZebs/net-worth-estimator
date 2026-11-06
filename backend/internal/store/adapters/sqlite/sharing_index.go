@@ -1,20 +1,20 @@
 // Materialized group-share visibility index (GRP-05). One row references
-// one owner posting for one group audience at one policy version: no
+// one owner transaction for one group audience at one policy version: no
 // financial payload is copied, and at most one reference exists per
-// posting plus group however many selected accounts match.
+// transaction plus group however many selected accounts match.
 //
 // The index is discovery only, never authorization. Every shared read
-// re-validates through CheckSharedPostingAccess over live rows, so a
+// re-validates through CheckSharedTransactionAccess over live rows, so a
 // stale or missing reference can under-share but never over-share:
 // extra rows deny at the live gate, missing rows only hide list entries
 // while detail reads still evaluate the live rule.
 //
 // Maintenance is same-write: every statement below runs inside the
-// transaction that mutates postings, policies, accounts, memberships, or
+// transaction that mutates transactions, policies, accounts, memberships, or
 // consent, or the mutation fails. Policy changes bump the policy version
 // first, then old-version rows are deleted and current rows rewritten in
 // the same transaction, so revocation fences on commit. Bulk rebuilds
-// delete before re-deriving and insert only live-covered postings, so an
+// delete before re-deriving and insert only live-covered transactions, so an
 // interrupted rebuild under-shares until it completes.
 //
 // Placeholder order is load-bearing (see scoped.go): in scoped (*userTx)
@@ -40,13 +40,13 @@ func sharingVisibilitySchemaStatements() []string {
 	return []string{
 		`CREATE TABLE IF NOT EXISTS sharing_visibility (
 			owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			posting_id TEXT NOT NULL,
+			transaction_id TEXT NOT NULL,
 			group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
 			policy_version INTEGER NOT NULL CHECK (policy_version >= 1),
 			updated_at INTEGER NOT NULL,
-			PRIMARY KEY (owner_user_id, posting_id, group_id)
+			PRIMARY KEY (owner_user_id, transaction_id, group_id)
 		)`,
-		`CREATE INDEX IF NOT EXISTS sharing_visibility_group ON sharing_visibility(group_id, owner_user_id, posting_id)`,
+		`CREATE INDEX IF NOT EXISTS sharing_visibility_group ON sharing_visibility(group_id, owner_user_id, transaction_id)`,
 	}
 }
 
@@ -66,7 +66,7 @@ func sharingAuditSchemaStatements() []string {
 			owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			actor_user_id TEXT NOT NULL,
 			kind TEXT NOT NULL CHECK (kind IN ('policy-set', 'policy-strip', 'policies-cleared', 'grant', 'revoke', 'exclude', 'unexclude', 'index-rebuild', 'copy-accepted', 'link-refreshed', 'split-created', 'split-updated', 'split-accepted')),
-			posting_id TEXT NOT NULL DEFAULT '',
+			transaction_id TEXT NOT NULL DEFAULT '',
 			audience_type TEXT NOT NULL DEFAULT '',
 			audience_id TEXT NOT NULL DEFAULT '',
 			group_id TEXT NOT NULL DEFAULT '',
@@ -81,10 +81,10 @@ func sharingAuditSchemaStatements() []string {
 // transaction. All placeholders are positional. It accepts the shared
 // storage surface so social-operation audit rows commit alongside the
 // mutation whether the caller holds a transaction or the pool handle.
-func auditSharingRaw(db sharingStorage, ownerID, actor, kind, postingID, audienceType, audienceID, groupID, detail string) error {
-	if _, err := db.Exec(`INSERT INTO sharing_audit(owner_user_id, actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at)
+func auditSharingRaw(db sharingStorage, ownerID, actor, kind, transactionID, audienceType, audienceID, groupID, detail string) error {
+	if _, err := db.Exec(`INSERT INTO sharing_audit(owner_user_id, actor_user_id, kind, transaction_id, audience_type, audience_id, group_id, detail_json, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		ownerID, actor, kind, postingID, audienceType, audienceID, groupID, detail, time.Now().Unix()); err != nil {
+		ownerID, actor, kind, transactionID, audienceType, audienceID, groupID, detail, time.Now().Unix()); err != nil {
 		return fmt.Errorf("audit sharing %s: %w", kind, err)
 	}
 	return nil
@@ -105,21 +105,21 @@ type shareAuditDetail struct {
 // landed consent shape: actor, kind, owner-scoped target, and audience
 // columns for consent rows, with link, status, and request key inside the
 // detail payload decoded by ListSharingAudit.
-func auditShareEvent(db sharingStorage, ownerID, actor, kind, postingID, audienceType, audienceID, linkID, status, requestID string) error {
+func auditShareEvent(db sharingStorage, ownerID, actor, kind, transactionID, audienceType, audienceID, linkID, status, requestID string) error {
 	detail, err := json.Marshal(shareAuditDetail{Link: linkID, Status: status, RequestID: requestID})
 	if err != nil {
 		return err
 	}
-	return auditSharingRaw(db, ownerID, actor, kind, postingID, audienceType, audienceID, "", string(detail))
+	return auditSharingRaw(db, ownerID, actor, kind, transactionID, audienceType, audienceID, "", string(detail))
 }
 
 // auditSharingScoped appends one consent audit row inside a scoped
 // (owner) transaction. The owner scope binds last per convention; the
 // actor travels as an explicit positional argument.
-func auditSharingScoped(tx *userTx, actor, kind, postingID, audienceType, audienceID, groupID, detail string) error {
-	if _, err := tx.Exec(`INSERT INTO sharing_audit(actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at, owner_user_id)
+func auditSharingScoped(tx *userTx, actor, kind, transactionID, audienceType, audienceID, groupID, detail string) error {
+	if _, err := tx.Exec(`INSERT INTO sharing_audit(actor_user_id, kind, transaction_id, audience_type, audience_id, group_id, detail_json, created_at, owner_user_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
-		actor, kind, postingID, audienceType, audienceID, groupID, detail, time.Now().Unix()); err != nil {
+		actor, kind, transactionID, audienceType, audienceID, groupID, detail, time.Now().Unix()); err != nil {
 		return fmt.Errorf("audit sharing %s: %w", kind, err)
 	}
 	return nil
@@ -148,13 +148,13 @@ func policyAuditDetail(before, after store.SharingPolicy, hasBefore bool) string
 }
 
 // coveringVisibility returns one candidate per enabled policy covering the
-// posting under the single store.PolicyCoversPosting rule. Deduplication
-// by (posting, group) is structural: one policy exists per owner plus
+// transaction under the single store.PolicyCoversTransaction rule. Deduplication
+// by (transaction, group) is structural: one policy exists per owner plus
 // group, so at most one candidate names a group.
-func coveringVisibility(policies []store.SharingPolicy, posting policyPosting) []store.SharingPolicy {
+func coveringVisibility(policies []store.SharingPolicy, transaction policyTransaction) []store.SharingPolicy {
 	var covering []store.SharingPolicy
 	for _, policy := range policies {
-		if policyPostingEligible(policy, posting) {
+		if policyTransactionEligible(policy, transaction) {
 			covering = append(covering, policy)
 		}
 	}
@@ -180,73 +180,73 @@ func loadOwnerEnabledPoliciesTx(tx *userTx) ([]store.SharingPolicy, error) {
 	return policies, rows.Err()
 }
 
-// loadVisibilityPostingTx reads the eligibility columns of one scoped
-// posting. The positional placeholder precedes the scope, per convention.
-func loadVisibilityPostingTx(tx *userTx, postingID string) (policyPosting, error) {
-	var posting policyPosting
+// loadVisibilityTransactionTx reads the eligibility columns of one scoped
+// transaction. The positional placeholder precedes the scope, per convention.
+func loadVisibilityTransactionTx(tx *userTx, transactionID string) (policyTransaction, error) {
+	var transaction policyTransaction
 	var source sql.NullString
 	var destinationsJSON string
 	var voided int
-	posting.id = postingID
-	err := tx.QueryRow(`SELECT source_account_id, destination_account_ids, transaction_time, void FROM postings WHERE id = ? AND user_id = :user_id`,
-		postingID).Scan(&source, &destinationsJSON, &posting.txnTime, &voided)
+	transaction.id = transactionID
+	err := tx.QueryRow(`SELECT source_account_id, destination_account_ids, transaction_time, void FROM transactions WHERE id = ? AND user_id = :user_id`,
+		transactionID).Scan(&source, &destinationsJSON, &transaction.txnTime, &voided)
 	if err != nil {
-		return policyPosting{}, err
+		return policyTransaction{}, err
 	}
 	if source.Valid {
 		value := source.String
-		posting.source = &value
+		transaction.source = &value
 	}
 	if destinationsJSON != "" && destinationsJSON != "null" {
-		if err := json.Unmarshal([]byte(destinationsJSON), &posting.destinations); err != nil {
-			return policyPosting{}, fmt.Errorf("parse posting destinations: %w", err)
+		if err := json.Unmarshal([]byte(destinationsJSON), &transaction.destinations); err != nil {
+			return policyTransaction{}, fmt.Errorf("parse transaction destinations: %w", err)
 		}
 	}
-	posting.void = voided != 0
-	return posting, nil
+	transaction.void = voided != 0
+	return transaction, nil
 }
 
-// refreshVisibilityForPostingTx re-derives one scoped posting's index rows
+// refreshVisibilityForTransactionTx re-derives one scoped transaction's index rows
 // in the caller's write transaction: stale rows go, then one row per
 // currently covering enabled policy lands with its current version. A
-// voided posting keeps its retained rows untouched (spec section 4): the
+// voided transaction keeps its retained rows untouched (spec section 4): the
 // live read gate denies void rows, and lazy cleanup removes the
-// reference. A missing posting (delete paths that refresh after the
+// reference. A missing transaction (delete paths that refresh after the
 // delete) indexes nothing.
-func refreshVisibilityForPostingTx(tx *userTx, postingID string) error {
-	posting, err := loadVisibilityPostingTx(tx, postingID)
+func refreshVisibilityForTransactionTx(tx *userTx, transactionID string) error {
+	transaction, err := loadVisibilityTransactionTx(tx, transactionID)
 	if err == sql.ErrNoRows {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if posting.void {
+	if transaction.void {
 		return nil
 	}
-	if _, err := tx.Exec(`DELETE FROM sharing_visibility WHERE posting_id = ? AND owner_user_id = :user_id`, postingID); err != nil {
-		return fmt.Errorf("fence sharing visibility %s: %w", postingID, err)
+	if _, err := tx.Exec(`DELETE FROM sharing_visibility WHERE transaction_id = ? AND owner_user_id = :user_id`, transactionID); err != nil {
+		return fmt.Errorf("fence sharing visibility %s: %w", transactionID, err)
 	}
 	policies, err := loadOwnerEnabledPoliciesTx(tx)
 	if err != nil {
 		return err
 	}
 	now := time.Now().Unix()
-	for _, policy := range coveringVisibility(policies, posting) {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO sharing_visibility(posting_id, group_id, policy_version, updated_at, owner_user_id)
+	for _, policy := range coveringVisibility(policies, transaction) {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO sharing_visibility(transaction_id, group_id, policy_version, updated_at, owner_user_id)
 			VALUES (?, ?, ?, ?, :user_id)`,
-			postingID, policy.GroupID, policy.Version, now); err != nil {
-			return fmt.Errorf("index sharing visibility %s: %w", postingID, err)
+			transactionID, policy.GroupID, policy.Version, now); err != nil {
+			return fmt.Errorf("index sharing visibility %s: %w", transactionID, err)
 		}
 	}
 	return nil
 }
 
-// deleteVisibilityForPostingTx drops one scoped posting's index rows. The
+// deleteVisibilityForTransactionTx drops one scoped transaction's index rows. The
 // positional placeholder precedes the scope, per convention.
-func deleteVisibilityForPostingTx(tx *userTx, postingID string) error {
-	if _, err := tx.Exec(`DELETE FROM sharing_visibility WHERE posting_id = ? AND owner_user_id = :user_id`, postingID); err != nil {
-		return fmt.Errorf("clear sharing visibility %s: %w", postingID, err)
+func deleteVisibilityForTransactionTx(tx *userTx, transactionID string) error {
+	if _, err := tx.Exec(`DELETE FROM sharing_visibility WHERE transaction_id = ? AND owner_user_id = :user_id`, transactionID); err != nil {
+		return fmt.Errorf("clear sharing visibility %s: %w", transactionID, err)
 	}
 	return nil
 }
@@ -260,86 +260,86 @@ func deleteVisibilityForOwnerTx(tx *userTx) error {
 	return nil
 }
 
-// loadPolicyPostingsRaw scans one owner's eligibility columns in a raw
+// loadPolicyTransactionsRaw scans one owner's eligibility columns in a raw
 // transaction. Positional placeholders only.
-func loadPolicyPostingsRaw(tx *sql.Tx, ownerID string) ([]policyPosting, error) {
-	rows, err := tx.Query(`SELECT id, source_account_id, destination_account_ids, transaction_time, void FROM postings WHERE user_id = ? ORDER BY id`, ownerID)
+func loadPolicyTransactionsRaw(tx *sql.Tx, ownerID string) ([]policyTransaction, error) {
+	rows, err := tx.Query(`SELECT id, source_account_id, destination_account_ids, transaction_time, void FROM transactions WHERE user_id = ? ORDER BY id`, ownerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []policyPosting
+	var out []policyTransaction
 	for rows.Next() {
-		var posting policyPosting
+		var transaction policyTransaction
 		var source sql.NullString
 		var destinationsJSON string
 		var voided int
-		if err := rows.Scan(&posting.id, &source, &destinationsJSON, &posting.txnTime, &voided); err != nil {
+		if err := rows.Scan(&transaction.id, &source, &destinationsJSON, &transaction.txnTime, &voided); err != nil {
 			return nil, err
 		}
 		if source.Valid {
 			value := source.String
-			posting.source = &value
+			transaction.source = &value
 		}
 		if destinationsJSON != "" && destinationsJSON != "null" {
-			if err := json.Unmarshal([]byte(destinationsJSON), &posting.destinations); err != nil {
-				return nil, fmt.Errorf("parse posting destinations: %w", err)
+			if err := json.Unmarshal([]byte(destinationsJSON), &transaction.destinations); err != nil {
+				return nil, fmt.Errorf("parse transaction destinations: %w", err)
 			}
 		}
-		posting.void = voided != 0
-		out = append(out, posting)
+		transaction.void = voided != 0
+		out = append(out, transaction)
 	}
 	return out, rows.Err()
 }
 
-// loadPolicyPostingsScoped scans one scoped owner's eligibility columns.
+// loadPolicyTransactionsScoped scans one scoped owner's eligibility columns.
 // The scope placeholder stands alone, so no mixing applies.
-func loadPolicyPostingsScoped(tx *userTx) ([]policyPosting, error) {
-	rows, err := tx.Query(`SELECT id, source_account_id, destination_account_ids, transaction_time, void FROM postings WHERE user_id = :user_id ORDER BY id`)
+func loadPolicyTransactionsScoped(tx *userTx) ([]policyTransaction, error) {
+	rows, err := tx.Query(`SELECT id, source_account_id, destination_account_ids, transaction_time, void FROM transactions WHERE user_id = :user_id ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []policyPosting
+	var out []policyTransaction
 	for rows.Next() {
-		var posting policyPosting
+		var transaction policyTransaction
 		var source sql.NullString
 		var destinationsJSON string
 		var voided int
-		if err := rows.Scan(&posting.id, &source, &destinationsJSON, &posting.txnTime, &voided); err != nil {
+		if err := rows.Scan(&transaction.id, &source, &destinationsJSON, &transaction.txnTime, &voided); err != nil {
 			return nil, err
 		}
 		if source.Valid {
 			value := source.String
-			posting.source = &value
+			transaction.source = &value
 		}
 		if destinationsJSON != "" && destinationsJSON != "null" {
-			if err := json.Unmarshal([]byte(destinationsJSON), &posting.destinations); err != nil {
-				return nil, fmt.Errorf("parse posting destinations: %w", err)
+			if err := json.Unmarshal([]byte(destinationsJSON), &transaction.destinations); err != nil {
+				return nil, fmt.Errorf("parse transaction destinations: %w", err)
 			}
 		}
-		posting.void = voided != 0
-		out = append(out, posting)
+		transaction.void = voided != 0
+		out = append(out, transaction)
 	}
 	return out, rows.Err()
 }
 
 // insertVisibilityRaw writes one reference row in a raw transaction.
 // Positional placeholders only.
-func insertVisibilityRaw(tx *sql.Tx, ownerID, postingID, groupID string, version, now int64) error {
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO sharing_visibility(owner_user_id, posting_id, group_id, policy_version, updated_at)
-		VALUES (?, ?, ?, ?, ?)`, ownerID, postingID, groupID, version, now); err != nil {
-		return fmt.Errorf("index sharing visibility %s: %w", postingID, err)
+func insertVisibilityRaw(tx *sql.Tx, ownerID, transactionID, groupID string, version, now int64) error {
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO sharing_visibility(owner_user_id, transaction_id, group_id, policy_version, updated_at)
+		VALUES (?, ?, ?, ?, ?)`, ownerID, transactionID, groupID, version, now); err != nil {
+		return fmt.Errorf("index sharing visibility %s: %w", transactionID, err)
 	}
 	return nil
 }
 
 // insertVisibilityScoped writes one reference row in a scoped transaction.
 // The owner scope binds last per convention.
-func insertVisibilityScoped(tx *userTx, postingID, groupID string, version, now int64) error {
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO sharing_visibility(posting_id, group_id, policy_version, updated_at, owner_user_id)
-		VALUES (?, ?, ?, ?, :user_id)`, postingID, groupID, version, now); err != nil {
-		return fmt.Errorf("index sharing visibility %s: %w", postingID, err)
+func insertVisibilityScoped(tx *userTx, transactionID, groupID string, version, now int64) error {
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO sharing_visibility(transaction_id, group_id, policy_version, updated_at, owner_user_id)
+		VALUES (?, ?, ?, ?, :user_id)`, transactionID, groupID, version, now); err != nil {
+		return fmt.Errorf("index sharing visibility %s: %w", transactionID, err)
 	}
 	return nil
 }
@@ -368,10 +368,10 @@ func ownerMemberGroupsRaw(tx *sql.Tx, ownerID string) (map[string]bool, error) {
 // rebuildVisibilityForOwnerGroupRaw re-derives one owner's index slice for
 // one group in a raw transaction: old-version rows go first so the
 // committed slice never mixes generations, then one row per currently
-// covered non-void posting lands with the policy's current version. An
+// covered non-void transaction lands with the policy's current version. An
 // absent or disabled policy, or an ended membership, leaves the slice
 // empty. A rolled-back caller keeps its old slice; only live-covered
-// postings for current memberships ever land.
+// transactions for current memberships ever land.
 func rebuildVisibilityForOwnerGroupRaw(tx *sql.Tx, ownerID, groupID string) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_visibility WHERE owner_user_id = ? AND group_id = ?`, ownerID, groupID); err != nil {
 		return fmt.Errorf("fence sharing visibility: %w", err)
@@ -392,17 +392,17 @@ func rebuildVisibilityForOwnerGroupRaw(tx *sql.Tx, ownerID, groupID string) erro
 	if err != nil {
 		return err
 	}
-	postings, err := loadPolicyPostingsRaw(tx, ownerID)
+	transactions, err := loadPolicyTransactionsRaw(tx, ownerID)
 	if err != nil {
 		return err
 	}
 	now := time.Now().Unix()
-	for _, posting := range postings {
-		if posting.void {
+	for _, transaction := range transactions {
+		if transaction.void {
 			continue
 		}
-		for _, covering := range coveringVisibility([]store.SharingPolicy{policy}, posting) {
-			if err := insertVisibilityRaw(tx, ownerID, posting.id, covering.GroupID, covering.Version, now); err != nil {
+		for _, covering := range coveringVisibility([]store.SharingPolicy{policy}, transaction) {
+			if err := insertVisibilityRaw(tx, ownerID, transaction.id, covering.GroupID, covering.Version, now); err != nil {
 				return err
 			}
 		}
@@ -435,17 +435,17 @@ func rebuildVisibilityForOwnerGroupScoped(tx *userTx, groupID string) error {
 	if err != nil {
 		return err
 	}
-	postings, err := loadPolicyPostingsScoped(tx)
+	transactions, err := loadPolicyTransactionsScoped(tx)
 	if err != nil {
 		return err
 	}
 	now := time.Now().Unix()
-	for _, posting := range postings {
-		if posting.void {
+	for _, transaction := range transactions {
+		if transaction.void {
 			continue
 		}
-		for _, covering := range coveringVisibility([]store.SharingPolicy{policy}, posting) {
-			if err := insertVisibilityScoped(tx, posting.id, covering.GroupID, covering.Version, now); err != nil {
+		for _, covering := range coveringVisibility([]store.SharingPolicy{policy}, transaction) {
+			if err := insertVisibilityScoped(tx, transaction.id, covering.GroupID, covering.Version, now); err != nil {
 				return err
 			}
 		}
@@ -482,9 +482,9 @@ func deleteVisibilityForOwnerRaw(tx *sql.Tx, ownerID string) error {
 }
 
 // RebuildSharingIndex re-derives one owner's whole visibility index from
-// live policies and postings in one transaction: concurrent readers keep
+// live policies and transactions in one transaction: concurrent readers keep
 // seeing the pre-rebuild slice until commit, and a crash rolls back to
-// it. Only live-covered postings for current memberships land, so a
+// it. Only live-covered transactions for current memberships land, so a
 // rebuild never over-shares. Operator recovery and tests use this; normal
 // writes maintain the index incrementally instead.
 func (d *Database) RebuildSharingIndex(ownerID string) error {
@@ -531,25 +531,25 @@ func (d *Database) RebuildSharingIndex(ownerID string) error {
 	if err != nil {
 		return err
 	}
-	postings, err := loadPolicyPostingsRaw(tx, ownerID)
+	transactions, err := loadPolicyTransactionsRaw(tx, ownerID)
 	if err != nil {
 		return err
 	}
 	now := time.Now().Unix()
-	for _, posting := range postings {
-		if posting.void {
+	for _, transaction := range transactions {
+		if transaction.void {
 			continue
 		}
-		for _, policy := range coveringVisibility(policies, posting) {
+		for _, policy := range coveringVisibility(policies, transaction) {
 			if !member[policy.GroupID] {
 				continue
 			}
-			if err := insertVisibilityRaw(tx, ownerID, posting.id, policy.GroupID, policy.Version, now); err != nil {
+			if err := insertVisibilityRaw(tx, ownerID, transaction.id, policy.GroupID, policy.Version, now); err != nil {
 				return err
 			}
 		}
 	}
-	if err := auditSharingRaw(tx, ownerID, ownerID, "index-rebuild", "", "", "", "", fmt.Sprintf(`{"policies":%d,"postings":%d}`, len(policies), len(postings))); err != nil {
+	if err := auditSharingRaw(tx, ownerID, ownerID, "index-rebuild", "", "", "", "", fmt.Sprintf(`{"policies":%d,"transactions":%d}`, len(policies), len(transactions))); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -315,13 +315,13 @@ func (s *handler) adoptSlices(prefix []types.ProjectionSlice, revision int64) er
 	return nil
 }
 
-// deleteSliceRows removes generated postings, checkpoints, timeline rows,
+// deleteSliceRows removes generated transactions, checkpoints, timeline rows,
 // and statistics for slices.
 func (s *handler) deleteSliceRows(sliceIDs []string) error {
 	if len(sliceIDs) == 0 {
 		return nil
 	}
-	if err := s.store.DeleteGeneratedPostings(sliceIDs); err != nil {
+	if err := s.store.DeleteGeneratedTransactions(sliceIDs); err != nil {
 		return err
 	}
 	if err := s.store.DeleteProjectionRows(sliceIDs); err != nil {
@@ -353,23 +353,23 @@ func (s *handler) ensureSuffixManifest(state types.ProjectionState, fromUnix int
 	return out, nil
 }
 
-// writeDeterministicRows persists projected rows, events, generated postings,
+// writeDeterministicRows persists projected rows, events, generated transactions,
 // and generated checkpoints for dates at or after suffixFrom.
 func (s *handler) writeDeterministicRows(path *types.ProjectionPath, result types.ProjectionResult, byID map[string]types.ProjectionSlice, suffixFrom int64) error {
 	slices := make([]types.ProjectionSlice, 0, len(byID))
 	for _, slice := range byID {
 		slices = append(slices, slice)
 	}
-	modelByID := map[string]types.Posting{}
-	for _, posting := range path.EffectiveModel.Postings {
-		modelByID[posting.ID] = posting
+	modelByID := map[string]types.Transaction{}
+	for _, transaction := range path.EffectiveModel.Transactions {
+		modelByID[transaction.ID] = transaction
 	}
 	modelRuleByID := map[string]types.Schedule{}
 	for _, rule := range path.EffectiveModel.Schedules {
 		modelRuleByID[rule.ID] = rule
 	}
 	var rows []store.ProjectionRowPayload
-	var postings []store.GeneratedPosting
+	var transactions []store.GeneratedTransaction
 	for _, row := range path.Rows {
 		if row.IsHistorical || midnightUnix(string(row.Date)) < suffixFrom {
 			continue
@@ -396,7 +396,7 @@ func (s *handler) writeDeterministicRows(path *types.ProjectionPath, result type
 		if err != nil {
 			return err
 		}
-		posting := store.GeneratedPosting{
+		transaction := store.GeneratedTransaction{
 			SliceID:         sliceID,
 			PostedTime:      midnightUnix(string(event.Date)),
 			TransactionTime: midnightUnix(string(event.Date)),
@@ -404,21 +404,21 @@ func (s *handler) writeDeterministicRows(path *types.ProjectionPath, result type
 			AppliedAmount:   event.RealizedAmount,
 			Outcome:         fulfillmentOutcome(event.Fulfillment),
 		}
-		if source, ok := modelByID[event.Origin.PostingID]; ok {
-			posting.Name = source.Name
-			posting.SourceAccountID = source.SourceAccountID
-			posting.DestinationIDs = source.Destinations
-		} else if rule, ok := modelRuleByID[event.Origin.PostingID]; ok {
-			posting.Name = rule.Name
-			posting.SourceAccountID = rule.SourceAccountID
-			posting.DestinationIDs = rule.Destinations
+		if source, ok := modelByID[event.Origin.TransactionID]; ok {
+			transaction.Name = source.Name
+			transaction.SourceAccountID = source.SourceAccountID
+			transaction.DestinationIDs = source.Destinations
+		} else if rule, ok := modelRuleByID[event.Origin.TransactionID]; ok {
+			transaction.Name = rule.Name
+			transaction.SourceAccountID = rule.SourceAccountID
+			transaction.DestinationIDs = rule.Destinations
 		}
-		postings = append(postings, posting)
+		transactions = append(transactions, transaction)
 	}
 	if err := s.store.SaveProjectionRows(rows); err != nil {
 		return err
 	}
-	if err := s.store.SaveGeneratedPostings(postings); err != nil {
+	if err := s.store.SaveGeneratedTransactions(transactions); err != nil {
 		return err
 	}
 	return nil
@@ -471,7 +471,7 @@ func (s *handler) writeEvaluationOutputs(stateID, kind string, tables types.Eval
 			if err := s.writeBalanceOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
 				return err
 			}
-		case types.EvaluationTypePostingFulfillment:
+		case types.EvaluationTypeTransactionFulfillment:
 			if err := s.writeFulfillmentOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
 				return err
 			}
@@ -596,15 +596,15 @@ type cycleProbabilistic struct {
 }
 
 func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
-	outputs := make([]types.PostingFulfillmentOutput, 0, len(rows))
+	outputs := make([]types.TransactionFulfillmentOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
 			return err
 		}
-		output := types.PostingFulfillmentOutput{EvaluationOutputBase: base}
+		output := types.TransactionFulfillmentOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
-			det, err := decodeResult[domain.PostingFulfillmentPathResult](envelope.Deterministic)
+			det, err := decodeResult[domain.TransactionFulfillmentPathResult](envelope.Deterministic)
 			if err != nil {
 				return err
 			}
@@ -616,7 +616,7 @@ func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.Eva
 			if err != nil {
 				return err
 			}
-			postings, err := json.Marshal(det.Postings)
+			transactions, err := json.Marshal(det.Transactions)
 			if err != nil {
 				return err
 			}
@@ -631,7 +631,7 @@ func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.Eva
 			}
 			output.EventsJSON = string(events)
 			output.DatesJSON = string(dates)
-			output.PostingsJSON = string(postings)
+			output.TransactionsJSON = string(transactions)
 		}
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[fulfillmentProbabilistic](envelope.Probabilistic)
@@ -649,7 +649,7 @@ func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.Eva
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SavePostingFulfillmentOutputs(stateID, kind, outputs, builtRevision)
+	return s.store.SaveTransactionFulfillmentOutputs(stateID, kind, outputs, builtRevision)
 }
 
 func (s *handler) writeCycleOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
@@ -844,11 +844,11 @@ func (s *handler) writeWhatIfOutputs(stateID, kind string, rows []types.Evaluati
 // byte-identical.
 func (s *handler) assembleEvaluations(stateID, kind string, tables *types.EvaluationTables, revision int64) (types.EvaluationResultTables, bool, error) {
 	empty := types.EvaluationResultTables{
-		FinancialIndependence: []types.EvaluationResultEnvelope{},
-		NetWorthThreshold:     []types.EvaluationResultEnvelope{},
-		AccountBalance:        []types.EvaluationResultEnvelope{},
-		PostingFulfillment:    []types.EvaluationResultEnvelope{},
-		CycleFulfillment:      []types.EvaluationResultEnvelope{},
+		FinancialIndependence:  []types.EvaluationResultEnvelope{},
+		NetWorthThreshold:      []types.EvaluationResultEnvelope{},
+		AccountBalance:         []types.EvaluationResultEnvelope{},
+		TransactionFulfillment: []types.EvaluationResultEnvelope{},
+		CycleFulfillment:       []types.EvaluationResultEnvelope{},
 	}
 	want := 0
 	for _, table := range tables.Tables() {
@@ -918,7 +918,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.AccountBalance = append(out.AccountBalance, envelope)
 		count++
 	}
-	fulfillments, err := s.store.ListPostingFulfillmentOutputs(stateID, kind)
+	fulfillments, err := s.store.ListTransactionFulfillmentOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -935,7 +935,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 				"requestedAmount": optFloat(row.RequestedAmount), "realizedAmount": optFloat(row.RealizedAmount),
 				"destinationLimitedAmount": optFloat(row.DestinationLimitedAmount), "unfulfilledAmount": optFloat(row.UnfulfilledAmount),
 				"completionRate": optFloat(row.CompletionRate), "firstUnderfulfilledDate": optString(row.FirstUnderfulfilledDate),
-				"events": json.RawMessage(row.EventsJSON), "dates": json.RawMessage(row.DatesJSON), "postings": json.RawMessage(row.PostingsJSON),
+				"events": json.RawMessage(row.EventsJSON), "dates": json.RawMessage(row.DatesJSON), "transactions": json.RawMessage(row.TransactionsJSON),
 			}
 		}
 		if row.HasProbabilistic {
@@ -948,7 +948,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 				},
 			}
 		}
-		out.PostingFulfillment = append(out.PostingFulfillment, envelope)
+		out.TransactionFulfillment = append(out.TransactionFulfillment, envelope)
 		count++
 	}
 	cycles, err := s.store.ListCycleFulfillmentOutputs(stateID, kind)
@@ -1131,7 +1131,7 @@ func (s *handler) readDeterministic(model *types.FinancialModel, settings *types
 	if err != nil {
 		return nil, false, err
 	}
-	storedPostings, err := s.store.ListGeneratedPostings(ids)
+	storedTransactions, err := s.store.ListGeneratedTransactions(ids)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1155,8 +1155,8 @@ func (s *handler) readDeterministic(model *types.FinancialModel, settings *types
 		}
 		rows = append(rows, row)
 	}
-	events := make([]types.TransactionEvent, 0, len(storedPostings))
-	for _, stored := range storedPostings {
+	events := make([]types.TransactionEvent, 0, len(storedTransactions))
+	for _, stored := range storedTransactions {
 		var event types.TransactionEvent
 		if err := json.Unmarshal([]byte(stored.EventJSON), &event); err != nil {
 			return nil, false, err

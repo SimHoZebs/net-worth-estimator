@@ -8,7 +8,7 @@
 // the short-lived access token, Window/SWindowFor supply the initial or
 // incremental scan range, and SetGmailScanCursor advances the history
 // cursor after a completed scan. Scanning writes only email-receipt
-// triage rows and the scan cursor: it holds no reference to postings,
+// triage rows and the scan cursor: it holds no reference to transactions,
 // checkpoints, or balances, so a parser error can never mutate financial
 // state. Message bodies and snippets are never persisted; only the
 // message identity, display headers for receipt-like mail, extracted

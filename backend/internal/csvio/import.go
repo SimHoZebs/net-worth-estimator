@@ -19,12 +19,12 @@ import (
 const (
 	AccountsFile       = "accounts.csv"
 	CheckpointsFile    = "checkpoints.csv"
-	PostingsFile       = "postings.csv"
+	TransactionsFile   = "transactions.csv"
 	RulesFile          = "recurrence-rules.csv"
 	FIFile             = "behavior/financial-independence.csv"
 	ThresholdFile      = "behavior/net-worth-threshold.csv"
 	AccountBalanceFile = "behavior/account-balance.csv"
-	FulfillmentFile    = "behavior/posting-fulfillment.csv"
+	FulfillmentFile    = "behavior/transaction-fulfillment.csv"
 )
 
 func readCSV(path string) ([][]string, error) {
@@ -193,9 +193,9 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 		})
 	}
 
-	records, err = readCSV(filepath.Join(csvPath, PostingsFile))
+	records, err = readCSV(filepath.Join(csvPath, TransactionsFile))
 	if err != nil {
-		return nil, fmt.Errorf("read postings: %w", err)
+		return nil, fmt.Errorf("read transactions: %w", err)
 	}
 	index = headerIndex(records[0])
 	for _, record := range records[1:] {
@@ -204,23 +204,23 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 		}
 		rawID := field(record, index, "id")
 		if !isUUID(rawID) {
-			return nil, fmt.Errorf("posting id %q must be a canonical UUID", rawID)
+			return nil, fmt.Errorf("transaction id %q must be a canonical UUID", rawID)
 		}
 		postedTime, err := parseUnixTime(field(record, index, "postedTime"))
 		if err != nil {
-			return nil, fmt.Errorf("posting %s: %w", rawID, err)
+			return nil, fmt.Errorf("transaction %s: %w", rawID, err)
 		}
 		transactionRaw := field(record, index, "transactionTime")
 		var transactionTime int64
 		if transactionRaw != "" {
 			transactionTime, err = parseUnixTime(transactionRaw)
 			if err != nil {
-				return nil, fmt.Errorf("posting %s: %w", rawID, err)
+				return nil, fmt.Errorf("transaction %s: %w", rawID, err)
 			}
 		} else {
 			transactionTime = postedTime
 		}
-		posting := types.Posting{
+		transaction := types.Transaction{
 			ID:              rawID,
 			Name:            field(record, index, "name"),
 			SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
@@ -229,17 +229,17 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 			TransactionTime: transactionTime,
 			Enabled:         parseBool(field(record, index, "enabled")),
 		}
-		var amount types.PostingAmountResolution
+		var amount types.TransactionAmountResolution
 		amountRaw := field(record, index, "amount")
 		if err := strictUnmarshal([]byte(amountRaw), &amount); err != nil {
-			return nil, fmt.Errorf("posting %s amount: %w", rawID, err)
+			return nil, fmt.Errorf("transaction %s amount: %w", rawID, err)
 		}
-		posting.Amount = amount
+		transaction.Amount = amount
 		if ruleID := field(record, index, "scheduleId"); ruleID != "" {
 			occurrenceDate := field(record, index, "occurrenceDate")
-			posting.Claim = &types.PostingClaim{ScheduleID: ruleID, OccurrenceDate: occurrenceDate}
+			transaction.Claim = &types.TransactionClaim{ScheduleID: ruleID, OccurrenceDate: occurrenceDate}
 		}
-		model.Postings = append(model.Postings, posting)
+		model.Transactions = append(model.Transactions, transaction)
 	}
 
 	records, err = readCSV(filepath.Join(csvPath, RulesFile))
@@ -267,7 +267,7 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 				Priority:        int(parseNumberOr(field(record, index, "priority"), 1)),
 				Enabled:         parseBool(field(record, index, "enabled")),
 			}
-			var amount types.PostingAmountResolution
+			var amount types.TransactionAmountResolution
 			amountRaw := field(record, index, "amount")
 			if err := strictUnmarshal([]byte(amountRaw), &amount); err != nil {
 				return nil, fmt.Errorf("rule %s amount: %w", rule.ID, err)
@@ -304,7 +304,7 @@ func importFIEvaluations(csvPath string, model *types.FinancialModel) error {
 			continue
 		}
 		sourcesJSON := field(record, index, "sources")
-		continuingJSON := field(record, index, "continuingPostingIds")
+		continuingJSON := field(record, index, "continuingTransactionIds")
 		evaluationYears := int(parseNumberOr(field(record, index, "evaluationYears"), 1))
 		config := map[string]any{
 			"minimumNetWorth":         parseNumberOr(field(record, index, "minimumNetWorth"), 0),
@@ -325,9 +325,9 @@ func importFIEvaluations(csvPath string, model *types.FinancialModel) error {
 		config["sources"] = sources
 		var continuing any
 		if err := strictUnmarshal([]byte(continuingJSON), &continuing); err != nil {
-			return fmt.Errorf("FI continuingPostingIds: %w", err)
+			return fmt.Errorf("FI continuingTransactionIds: %w", err)
 		}
-		config["continuingPostingIds"] = continuing
+		config["continuingTransactionIds"] = continuing
 		model.Evaluations.FinancialIndependence = append(model.Evaluations.FinancialIndependence, types.FIEvaluation{
 			InstanceID: field(record, index, "instanceId"),
 			Name:       field(record, index, "name"),
@@ -393,19 +393,19 @@ func importFulfillmentEvaluations(csvPath string, model *types.FinancialModel) e
 		if len(strings.Join(record, "")) == 0 {
 			continue
 		}
-		var postingIDs any
-		raw := field(record, index, "postingIds")
+		var transactionIDs any
+		raw := field(record, index, "transactionIds")
 		if raw == "" || raw == "null" {
-			postingIDs = nil
-		} else if err := strictUnmarshal([]byte(raw), &postingIDs); err != nil {
-			return fmt.Errorf("fulfillment postingIds: %w", err)
+			transactionIDs = nil
+		} else if err := strictUnmarshal([]byte(raw), &transactionIDs); err != nil {
+			return fmt.Errorf("fulfillment transactionIds: %w", err)
 		}
-		model.Evaluations.PostingFulfillment = append(model.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
+		model.Evaluations.TransactionFulfillment = append(model.Evaluations.TransactionFulfillment, types.FulfillmentEvaluation{
 			InstanceID: field(record, index, "instanceId"),
 			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
 			Config: map[string]any{
-				"postingIds": postingIDs,
+				"transactionIds": transactionIDs,
 			},
 		})
 	}

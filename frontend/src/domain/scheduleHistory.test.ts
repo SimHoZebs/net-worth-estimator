@@ -7,7 +7,7 @@ const schedule = financialModelFixture.transactions.find(
 	(transaction) => transaction.id === "living",
 )!;
 const base = financialModelFixture.transactions.find(
-	(transaction) => transaction.kind === "posting",
+	(transaction) => transaction.kind === "transaction",
 )!;
 
 function claimed(
@@ -20,14 +20,14 @@ function claimed(
 		...base,
 		id,
 		name: `Claim ${id}`,
-		kind: "posting",
+		kind: "transaction",
 		startDate,
 		claimScheduleId,
 		claimOccurrenceDate,
 	};
 }
 
-it("returns matching postings newest first, by the day the transaction happened", () => {
+it("returns matching transactions newest first, by the day the transaction happened", () => {
 	// Claim dates and own days disagree on purpose: the claim names the
 	// guess being fulfilled, so ordering must follow the own day.
 	const older = claimed("older", "2026-11-01", schedule.id, "2026-10-02");
@@ -44,8 +44,8 @@ it("returns matching postings newest first, by the day the transaction happened"
 	]);
 });
 
-it("reads rows with a missing claim day by their own day", () => {
-	const posting = {
+it("falls back to the transaction date when a claim has no occurrence day", () => {
+	const transaction = {
 		...claimed("no-occurrence", "2026-10-01"),
 		claimOccurrenceDate: null,
 		startDate: "2026-10-04",
@@ -53,7 +53,7 @@ it("reads rows with a missing claim day by their own day", () => {
 	expect(
 		scheduleHistoryTransactions({
 			scheduleId: schedule.id,
-			transactions: [posting],
+			transactions: [transaction],
 		}),
-	).toEqual([posting]);
+	).toEqual([transaction]);
 });

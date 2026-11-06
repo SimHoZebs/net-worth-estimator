@@ -21,27 +21,27 @@ function editCachedModel(
 	serverQueryClient().setQueryData(key, { ...cached, model });
 }
 
-it("leaves projections alone when no consumer names the posting", () => {
+it("leaves projections alone when no consumer names the transaction", () => {
 	setServerModelOnly();
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(false);
 });
 
-it("refreshes projections when a fulfillment evaluation names the posting", () => {
+it("refreshes projections when a fulfillment evaluation names the transaction", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
-		model.evaluations.postingFulfillment = [
+		model.evaluations.transactionFulfillment = [
 			{
 				instanceId: "fulfillment",
 				name: "Fulfillment",
 				enabled: true,
-				config: { postingIds: ["vanished-hold"] },
+				config: { transactionIds: ["vanished-hold"] },
 			},
 		];
 	});
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });
 
-it("refreshes projections when a financial independence source names the posting", () => {
+it("refreshes projections when a financial independence source names the transaction", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
 		model.evaluations.financialIndependence = [
@@ -51,9 +51,13 @@ it("refreshes projections when a financial independence source names the posting
 				enabled: true,
 				config: {
 					sources: [
-						{ type: "cashflow", postingId: "vanished-hold", included: true },
+						{
+							type: "cashflow",
+							transactionId: "vanished-hold",
+							included: true,
+						},
 					],
-					continuingPostingIds: [],
+					continuingTransactionIds: [],
 				},
 			},
 		];
@@ -61,7 +65,7 @@ it("refreshes projections when a financial independence source names the posting
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });
 
-it("refreshes projections when a what-if scenario names the posting", () => {
+it("refreshes projections when a what-if scenario names the transaction", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
 		model.evaluations.whatIf = [
@@ -69,14 +73,14 @@ it("refreshes projections when a what-if scenario names the posting", () => {
 				instanceId: "scenario",
 				name: "Scenario",
 				enabled: true,
-				config: { disabledPostingIds: ["vanished-hold"] },
+				config: { disabledTransactionIds: ["vanished-hold"] },
 			},
 		];
 	});
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });
 
-it("refreshes projections when continuing postings name the posting", () => {
+it("refreshes projections when continuing transactions name the transaction", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
 		model.evaluations.financialIndependence = [
@@ -86,7 +90,7 @@ it("refreshes projections when continuing postings name the posting", () => {
 				enabled: true,
 				config: {
 					sources: [],
-					continuingPostingIds: ["vanished-hold"],
+					continuingTransactionIds: ["vanished-hold"],
 				},
 			},
 		];
@@ -94,7 +98,7 @@ it("refreshes projections when continuing postings name the posting", () => {
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });
 
-it("refreshes projections when a what-if addition names the posting", () => {
+it("refreshes projections when a what-if addition names the transaction", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
 		model.evaluations.whatIf = [
@@ -103,8 +107,8 @@ it("refreshes projections when a what-if addition names the posting", () => {
 				name: "Scenario",
 				enabled: true,
 				config: {
-					disabledPostingIds: [],
-					addedPostings: [{ id: "vanished-hold" }],
+					disabledTransactionIds: [],
+					addedTransactions: [{ id: "vanished-hold" }],
 				},
 			},
 		];
@@ -112,12 +116,12 @@ it("refreshes projections when a what-if addition names the posting", () => {
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });
 
-it("refreshes projections when the posting supplies the start date", () => {
+it("refreshes projections when the transaction supplies the start date", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
 		model.checkpoints = [];
 		model.schedules = [];
-		model.postings = [{ ...model.postings[0]!, id: "vanished-hold" }];
+		model.transactions = [{ ...model.transactions[0]!, id: "vanished-hold" }];
 	});
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });

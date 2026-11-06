@@ -102,11 +102,11 @@ func (BNPL) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]types.
 			} else if refundMarker.MatchString(text) {
 				role = "refund"
 			}
-			evidence := types.AnalysisEvidence{Code: "bnpl.product-descriptor", Reason: "A recognized provider and an explicit deferred-payment or installment descriptor occur in the source evidence.", PostingIDs: []string{transaction.PostingID}}
+			evidence := types.AnalysisEvidence{Code: "bnpl.product-descriptor", Reason: "A recognized provider and an explicit deferred-payment or installment descriptor occur in the source evidence.", TransactionIDs: []string{transaction.TransactionID}}
 			if sourceCategory {
 				evidence.Code, evidence.Reason = "bnpl.source-category", "The source supplies the explicit LOAN_PAYMENTS_BNPL category."
 			}
-			findings = append(findings, types.AnalysisDetection{PostingID: transaction.PostingID, Kind: "bnpl", Provider: provider.id, Product: product, Role: role, Strength: "strong", Evidence: []types.AnalysisEvidence{evidence}})
+			findings = append(findings, types.AnalysisDetection{TransactionID: transaction.TransactionID, Kind: "bnpl", Provider: provider.id, Product: product, Role: role, Strength: "strong", Evidence: []types.AnalysisEvidence{evidence}})
 			continue
 		}
 		// Generic PayPal and Shop Pay recurrence is not evidence of financing.
@@ -136,7 +136,7 @@ func (BNPL) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]types.
 		sort.Slice(group, func(i, j int) bool { return group[i].day < group[j].day })
 		ids, regular := []string{}, true
 		for i, item := range group {
-			ids = append(ids, item.transaction.PostingID)
+			ids = append(ids, item.transaction.TransactionID)
 			if i > 0 {
 				gap := item.day - group[i-1].day
 				regular = regular && gap >= 12 && gap <= 16
@@ -146,9 +146,9 @@ func (BNPL) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]types.
 			continue
 		}
 		for _, item := range group {
-			findings = append(findings, types.AnalysisDetection{PostingID: item.transaction.PostingID, Kind: "bnpl", Provider: item.provider.id, Product: "unknown", Role: "repayment", Strength: "moderate", Evidence: []types.AnalysisEvidence{{Code: "bnpl.fortnightly-candidate", Reason: "A recognized financing provider has three or four equal withdrawals approximately two weeks apart. This pattern suggests BNPL but does not establish a payment plan.", PostingIDs: ids}}})
+			findings = append(findings, types.AnalysisDetection{TransactionID: item.transaction.TransactionID, Kind: "bnpl", Provider: item.provider.id, Product: "unknown", Role: "repayment", Strength: "moderate", Evidence: []types.AnalysisEvidence{{Code: "bnpl.fortnightly-candidate", Reason: "A recognized financing provider has three or four equal withdrawals approximately two weeks apart. This pattern suggests BNPL but does not establish a payment plan.", TransactionIDs: ids}}})
 		}
 	}
-	sort.Slice(findings, func(i, j int) bool { return findings[i].PostingID < findings[j].PostingID })
+	sort.Slice(findings, func(i, j int) bool { return findings[i].TransactionID < findings[j].TransactionID })
 	return findings, nil
 }

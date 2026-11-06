@@ -150,35 +150,35 @@ func advQuote(value string) string {
 	return string(raw)
 }
 
-func advMustPosting(t *testing.T, scoped store.Store, name, amount string, day int64) string {
+func advMustTransaction(t *testing.T, scoped store.Store, name, amount string, day int64) string {
 	t.Helper()
 	source := "checking"
-	created, err := scoped.CreatePosting(types.Posting{
+	created, err := scoped.CreateTransaction(types.Transaction{
 		Name: name, SourceAccountID: &source,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      day,
 		TransactionTime: day,
 		Enabled:         true,
 	})
 	if err != nil {
-		t.Fatalf("create posting %q: %v", name, err)
+		t.Fatalf("create transaction %q: %v", name, err)
 	}
 	return created.ID
 }
 
-// advMustPostingID creates one posting under a caller-chosen valid ID
+// advMustTransactionID creates one transaction under a caller-chosen valid ID
 // (fixture packs carry deterministic UUIDs) and fails the test otherwise.
-func advMustPostingID(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
+func advMustTransactionID(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
 	t.Helper()
 	source := "checking"
-	if _, err := scoped.CreatePosting(types.Posting{
+	if _, err := scoped.CreateTransaction(types.Transaction{
 		ID: id, Name: name, SourceAccountID: &source,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      day,
 		TransactionTime: day,
 		Enabled:         true,
 	}); err != nil {
-		t.Fatalf("create posting %s: %v", id, err)
+		t.Fatalf("create transaction %s: %v", id, err)
 	}
 }
 
@@ -301,14 +301,14 @@ func advFeedList(t *testing.T, world *advWorld, subject string) map[string]any {
 	return advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, "/v1/shared/groups/"+world.groupID+"/feed", subject, ""), http.StatusOK)
 }
 
-// advFeedIDs returns the posting IDs in the full feed.
+// advFeedIDs returns the transaction IDs in the full feed.
 func advFeedIDs(t *testing.T, world *advWorld, subject string) map[string]bool {
 	t.Helper()
 	ids := map[string]bool{}
 	for _, raw := range advFeedList(t, world, subject)["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		ids[id] = true
 	}
 	return ids
@@ -325,20 +325,20 @@ func advFeedTotalsAgreement(t *testing.T, decoded map[string]any) {
 	}
 }
 
-// advEnsurePostingID creates one row under a caller-chosen valid ID unless
+// advEnsureTransactionID creates one row under a caller-chosen valid ID unless
 // the fixture pack already seeded it, and fails the test otherwise.
-func advEnsurePostingID(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
+func advEnsureTransactionID(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
 	t.Helper()
 	model, err := scoped.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		if posting.ID == id {
+	for _, transaction := range model.Transactions {
+		if transaction.ID == id {
 			return
 		}
 	}
-	advMustPostingID(t, scoped, id, name, amount, day)
+	advMustTransactionID(t, scoped, id, name, amount, day)
 }
 
 // advStorm runs workers concurrently and collects each result.

@@ -1,11 +1,11 @@
 // Package sharing serves cross-user transaction authorization over HTTP
-// (FND-02). Grants name one owner-scoped posting and one audience and are
-// issued only by the source owner for their own postings: the owner is
+// (FND-02). Grants name one owner-scoped transaction and one audience and are
+// issued only by the source owner for their own transactions: the owner is
 // always the authenticated caller, so a group administrator cannot grant
 // for another member. Reads re-evaluate current membership, exclusion,
 // and revocation state in the store on every call.
 //
-// Status contract mirrors groups: unknown postings, owners, or memberships
+// Status contract mirrors groups: unknown transactions, owners, or memberships
 // report 404 (store.ErrNotFound), including reads by unauthorized callers
 // so shared data is not enumerable. Denied member actions report 403
 // (store.ErrGroupForbidden). Rejected input reports 400
@@ -81,8 +81,8 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/copies", h.serveCopies)
 	mux.HandleFunc("/v1/shared/copies/", h.serveCopyLink)
 	mux.HandleFunc("/v1/shared/audit", h.serveAudit)
-	mux.HandleFunc("/v1/shared/postings", h.serveSharedList)
-	mux.HandleFunc("/v1/shared/postings/", h.serveSharedRead)
+	mux.HandleFunc("/v1/shared/transactions", h.serveSharedList)
+	mux.HandleFunc("/v1/shared/transactions/", h.serveSharedRead)
 	mux.HandleFunc("/v1/shared/policies/", h.servePolicies)
 	mux.HandleFunc("/v1/shared/groups/", h.serveGroupFeed)
 	return middleware.Recoverer(api.CORSMiddleware(h.origins)(mux))
@@ -155,10 +155,10 @@ func (h *Handler) locked(w http.ResponseWriter, r *http.Request) bool {
 }
 
 type grantInput struct {
-	PostingID    string `json:"postingId"`
-	AudienceType string `json:"audienceType"`
-	AudienceID   string `json:"audienceId"`
-	RequestID    string `json:"requestId"`
+	TransactionID string `json:"transactionId"`
+	AudienceType  string `json:"audienceType"`
+	AudienceID    string `json:"audienceId"`
+	RequestID     string `json:"requestId"`
 }
 
 func decodeGrantInput(body []byte) (grantInput, error) {
@@ -166,7 +166,7 @@ func decodeGrantInput(body []byte) (grantInput, error) {
 	if err := json.Unmarshal(body, &input); err != nil {
 		return grantInput{}, err
 	}
-	input.PostingID = strings.TrimSpace(input.PostingID)
+	input.TransactionID = strings.TrimSpace(input.TransactionID)
 	input.AudienceType = strings.TrimSpace(input.AudienceType)
 	input.AudienceID = strings.TrimSpace(input.AudienceID)
 	input.RequestID = strings.TrimSpace(input.RequestID)
@@ -201,7 +201,7 @@ func (h *Handler) serveGrants(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		grant, err := h.db.GrantSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID)
+		grant, err := h.db.GrantSharedTransaction(owner, input.TransactionID, input.AudienceType, input.AudienceID, input.RequestID)
 		if err != nil {
 			writeStoreError(w, err, "Transaction not found.")
 			return
@@ -221,11 +221,11 @@ func (h *Handler) serveGrants(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		if err := h.db.RevokeSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID); err != nil {
+		if err := h.db.RevokeSharedTransaction(owner, input.TransactionID, input.AudienceType, input.AudienceID, input.RequestID); err != nil {
 			writeStoreError(w, err, "Grant not found.")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"revoked": input.PostingID})
+		writeJSON(w, http.StatusOK, map[string]any{"revoked": input.TransactionID})
 	default:
 		w.Header().Set("Allow", "GET, POST, DELETE")
 		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
@@ -253,7 +253,7 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		exclusion, err := h.db.ExcludeSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID)
+		exclusion, err := h.db.ExcludeSharedTransaction(owner, input.TransactionID, input.AudienceType, input.AudienceID, input.RequestID)
 		if err != nil {
 			writeStoreError(w, err, "Transaction not found.")
 			return
@@ -273,11 +273,11 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		if err := h.db.RemoveSharedExclusion(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID); err != nil {
+		if err := h.db.RemoveSharedExclusion(owner, input.TransactionID, input.AudienceType, input.AudienceID, input.RequestID); err != nil {
 			writeStoreError(w, err, "Exclusion not found.")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"removed": input.PostingID})
+		writeJSON(w, http.StatusOK, map[string]any{"removed": input.TransactionID})
 	default:
 		w.Header().Set("Allow", "POST, DELETE")
 		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
@@ -285,7 +285,7 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveAudit returns the committed cross-user changes for one of the
-// caller's own postings in sequence order. The caller is always the
+// caller's own transactions in sequence order. The caller is always the
 // source owner: a cross-owner query returns an empty trace, never another
 // owner's history. Events carry actor, action, target identities, link,
 // outcome status, request key, and time only, never transaction evidence.
@@ -300,12 +300,12 @@ func (h *Handler) serveAudit(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
 		return
 	}
-	postingID := strings.TrimSpace(r.URL.Query().Get("postingId"))
-	if postingID == "" {
-		writeProblem(w, http.StatusBadRequest, "A posting ID is required to view sharing history.")
+	transactionID := strings.TrimSpace(r.URL.Query().Get("transactionId"))
+	if transactionID == "" {
+		writeProblem(w, http.StatusBadRequest, "A transaction ID is required to view sharing history.")
 		return
 	}
-	events, err := h.db.ListSharingAudit(owner, postingID)
+	events, err := h.db.ListSharingAudit(owner, transactionID)
 	if err != nil {
 		writeStoreError(w, err, "Sharing history not found.")
 		return
@@ -324,7 +324,7 @@ func (h *Handler) serveSharedList(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
 		return
 	}
-	refs, err := h.db.ListSharedPostings(requester)
+	refs, err := h.db.ListSharedTransactions(requester)
 	if err != nil {
 		writeStoreError(w, err, "Shared transactions not found.")
 		return
@@ -332,7 +332,7 @@ func (h *Handler) serveSharedList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"shared": refs})
 }
 
-// serveSharedRead returns one authorized posting in the existing
+// serveSharedRead returns one authorized transaction in the existing
 // transaction shape. The owner segment uses the user-resource form
 // (users/<64hex>) matching Waypoint-Resource values; anything else,
 // including forged owner IDs, reports 404.
@@ -347,7 +347,7 @@ func (h *Handler) serveSharedRead(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusMethodNotAllowed, "Editing another member's original transaction is deferred; shared originals are read-only.")
 		return
 	}
-	rest := strings.TrimPrefix(r.URL.Path, "/v1/shared/postings/")
+	rest := strings.TrimPrefix(r.URL.Path, "/v1/shared/transactions/")
 	parts := strings.SplitN(rest, "/", 3)
 	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" || strings.Contains(parts[2], "/") {
 		writeProblem(w, http.StatusNotFound, "Shared transaction not found.")
@@ -358,12 +358,12 @@ func (h *Handler) serveSharedRead(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusNotFound, "Shared transaction not found.")
 		return
 	}
-	posting, err := h.db.ReadSharedPosting(owner, parts[2], requester)
+	transaction, err := h.db.ReadSharedTransaction(owner, parts[2], requester)
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ownerUserId": owner, "posting": posting})
+	writeJSON(w, http.StatusOK, map[string]any{"ownerUserId": owner, "transaction": transaction})
 }
 
 // servePolicies serves one member's automatic-sharing preference for one
@@ -487,16 +487,16 @@ func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Owner     string `json:"owner"`
-		PostingID string `json:"postingId"`
-		RequestID string `json:"requestId"`
+		Owner         string `json:"owner"`
+		TransactionID string `json:"transactionId"`
+		RequestID     string `json:"requestId"`
 	}
 	if err := json.Unmarshal(body, &input); err != nil {
 		writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 		return
 	}
 	owner, err := resourceOwner(strings.TrimSpace(input.Owner))
-	if err != nil || strings.TrimSpace(input.PostingID) == "" {
+	if err != nil || strings.TrimSpace(input.TransactionID) == "" {
 		writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 		return
 	}
@@ -507,12 +507,12 @@ func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusServiceUnavailable, "Shared transaction storage is temporarily unavailable.")
 		return
 	}
-	copied, err := h.db.CopySharedPosting(owner, strings.TrimSpace(input.PostingID), requester, strings.TrimSpace(input.RequestID))
+	copied, err := h.db.CopySharedTransaction(owner, strings.TrimSpace(input.TransactionID), requester, strings.TrimSpace(input.RequestID))
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"posting": copied})
+	writeJSON(w, http.StatusCreated, map[string]any{"transaction": copied})
 }
 
 // serveCopyLink serves one recipient-owned copy's link provenance. The
@@ -591,11 +591,11 @@ func (h *Handler) serveCopyLink(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveGroupFeed serves one group's shared transaction feed (GRP-03): the
-// requester's authorized postings in that group, each listed once with its
+// requester's authorized transactions in that group, each listed once with its
 // source member and audiences, plus viewer-specific totals over the
 // filtered set. Date, member, and direction filters narrow the authorized
 // set for navigation only and never widen eligibility. Pagination is a
-// keyset over the owner-then-posting order: cursor names the last item of
+// keyset over the owner-then-transaction order: cursor names the last item of
 // the previous page. Filters, totals, and pages all derive from the same
 // gated read, so counts and sums always describe exactly the listed set.
 func (h *Handler) serveGroupFeed(w http.ResponseWriter, r *http.Request) {
@@ -641,16 +641,16 @@ func (h *Handler) serveGroupFeed(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// feedDirection classifies a posting by money movement: external inflow,
+// feedDirection classifies a transaction by money movement: external inflow,
 // external outflow, or an account-to-account transfer. Rows with neither
 // side classify nowhere and appear only when no direction filter applies.
-func feedDirection(posting types.Posting) string {
+func feedDirection(transaction types.Transaction) string {
 	switch {
-	case posting.SourceAccountID == nil && len(posting.Destinations) > 0:
+	case transaction.SourceAccountID == nil && len(transaction.Destinations) > 0:
 		return "in"
-	case posting.SourceAccountID != nil && len(posting.Destinations) == 0:
+	case transaction.SourceAccountID != nil && len(transaction.Destinations) == 0:
 		return "out"
-	case posting.SourceAccountID != nil && len(posting.Destinations) > 0:
+	case transaction.SourceAccountID != nil && len(transaction.Destinations) > 0:
 		return "transfer"
 	default:
 		return ""
@@ -667,9 +667,9 @@ type feedFilters struct {
 }
 
 type feedCursor struct {
-	set     bool
-	owner   string
-	posting string
+	set         bool
+	owner       string
+	transaction string
 }
 
 // parseFeedFilters reads the navigation filters. Every rejection is a 400
@@ -738,11 +738,11 @@ func applyFeedFilters(items []store.GroupFeedItem, filters feedFilters) []store.
 		if len(filters.members) > 0 && !filters.members[item.OwnerUserID] {
 			continue
 		}
-		if len(filters.direction) > 0 && !filters.direction[feedDirection(item.Posting)] {
+		if len(filters.direction) > 0 && !filters.direction[feedDirection(item.Transaction)] {
 			continue
 		}
 		if filters.start != "" || filters.end != "" {
-			day := time.Unix(item.Posting.TransactionTime, 0).UTC().Format("2006-01-02")
+			day := time.Unix(item.Transaction.TransactionTime, 0).UTC().Format("2006-01-02")
 			if filters.start != "" && day < filters.start {
 				continue
 			}
@@ -756,17 +756,17 @@ func applyFeedFilters(items []store.GroupFeedItem, filters feedFilters) []store.
 }
 
 // sumFeedTotals computes viewer-specific totals over the filtered feed:
-// one count per authorized posting, the rounded sum of fixed amounts, and
+// one count per authorized transaction, the rounded sum of fixed amounts, and
 // the pending and calculated-amount rows inside the count but outside the
 // sum. Totals and pages derive from the same filtered set, so they always
 // agree.
 func sumFeedTotals(items []store.GroupFeedItem) store.GroupFeedTotals {
 	totals := store.GroupFeedTotals{Count: len(items)}
 	for _, item := range items {
-		if item.Posting.Pending {
+		if item.Transaction.Pending {
 			totals.PendingCount++
 		}
-		amount, fixed := store.FeedLiteralAmount(item.Posting.Amount)
+		amount, fixed := store.FeedLiteralAmount(item.Transaction.Amount)
 		if !fixed {
 			totals.VaryingCount++
 			continue
@@ -777,7 +777,7 @@ func sumFeedTotals(items []store.GroupFeedItem) store.GroupFeedTotals {
 	return totals
 }
 
-// pageFeedItems slices one keyset page over the owner-then-posting order.
+// pageFeedItems slices one keyset page over the owner-then-transaction order.
 // The cursor names the last item of the previous page; items at or before
 // it stay behind. The next cursor names the page's last item when more
 // items remain.
@@ -785,12 +785,12 @@ func pageFeedItems(items []store.GroupFeedItem, cursor feedCursor, limit int) ([
 	start := 0
 	if cursor.set {
 		for i, item := range items {
-			if item.OwnerUserID == cursor.owner && item.Posting.ID == cursor.posting {
+			if item.OwnerUserID == cursor.owner && item.Transaction.ID == cursor.transaction {
 				start = i + 1
 				break
 			}
 			if item.OwnerUserID > cursor.owner ||
-				(item.OwnerUserID == cursor.owner && item.Posting.ID > cursor.posting) {
+				(item.OwnerUserID == cursor.owner && item.Transaction.ID > cursor.transaction) {
 				start = i
 				break
 			}
@@ -811,13 +811,13 @@ func pageFeedItems(items []store.GroupFeedItem, cursor feedCursor, limit int) ([
 	}
 	next := ""
 	if hasMore {
-		next = encodeFeedCursor(page[len(page)-1].OwnerUserID, page[len(page)-1].Posting.ID)
+		next = encodeFeedCursor(page[len(page)-1].OwnerUserID, page[len(page)-1].Transaction.ID)
 	}
 	return page, next, hasMore
 }
 
-func encodeFeedCursor(owner, posting string) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(owner + "\x00" + posting))
+func encodeFeedCursor(owner, transaction string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(owner + "\x00" + transaction))
 }
 
 func decodeFeedCursor(raw string) (feedCursor, error) {
@@ -825,11 +825,11 @@ func decodeFeedCursor(raw string) (feedCursor, error) {
 	if err != nil {
 		return feedCursor{}, err
 	}
-	owner, posting, found := strings.Cut(string(decoded), "\x00")
-	if !found || owner == "" || posting == "" {
+	owner, transaction, found := strings.Cut(string(decoded), "\x00")
+	if !found || owner == "" || transaction == "" {
 		return feedCursor{}, errors.New("invalid feed cursor")
 	}
-	return feedCursor{set: true, owner: owner, posting: posting}, nil
+	return feedCursor{set: true, owner: owner, transaction: transaction}, nil
 }
 
 // resourceOwner converts the user-resource form (users/<64hex>) used by

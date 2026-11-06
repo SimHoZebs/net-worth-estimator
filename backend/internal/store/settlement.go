@@ -1,12 +1,12 @@
 // Split settlement ledger (SOC-05). Settlements record real-world payoff
 // against versioned split obligations (SOC-04B) without moving money:
-// recording a settlement writes only settlement rows, never postings,
+// recording a settlement writes only settlement rows, never transactions,
 // checkpoints, accounts, or balances, so share acceptance and settlement
 // alike synthesize no cash movement.
 //
 // A settlement names one split plus the participant whose obligation it
 // reduces, a positive integer-minor-unit amount, and an optional link to
-// one real payment (an owner-scoped posting). Linked payments are never
+// one real payment (an owner-scoped transaction). Linked payments are never
 // double-counted: one real payment backs at most one settlement record.
 // Rows are append-only; ListSettlements exposes the full history in
 // record order.
@@ -40,37 +40,37 @@ const (
 // Settlement is one recorded payoff against one participant's share of
 // one split. AmountMinor is a positive integer-minor-unit payment the
 // recorder observed in the real world. LinkedOwnerID plus
-// LinkedPostingID optionally names the real payment backing this record;
+// LinkedTransactionID optionally names the real payment backing this record;
 // both are empty when the settlement was recorded without a link.
 type Settlement struct {
-	ID              string `json:"id"`
-	SplitID         string `json:"splitId"`
-	ParticipantID   string `json:"participantId"`
-	AmountMinor     int64  `json:"amountMinor"`
-	LinkedOwnerID   string `json:"linkedOwnerId,omitempty"`
-	LinkedPostingID string `json:"linkedPostingId,omitempty"`
-	ActorID         string `json:"actorId"`
-	RequestID       string `json:"requestId"`
-	CreatedAt       int64  `json:"createdAt"`
+	ID                  string `json:"id"`
+	SplitID             string `json:"splitId"`
+	ParticipantID       string `json:"participantId"`
+	AmountMinor         int64  `json:"amountMinor"`
+	LinkedOwnerID       string `json:"linkedOwnerId,omitempty"`
+	LinkedTransactionID string `json:"linkedTransactionId,omitempty"`
+	ActorID             string `json:"actorId"`
+	RequestID           string `json:"requestId"`
+	CreatedAt           int64  `json:"createdAt"`
 }
 
 // Linked reports whether the settlement names a backing real payment.
 func (s Settlement) Linked() bool {
-	return s.LinkedOwnerID != "" && s.LinkedPostingID != ""
+	return s.LinkedOwnerID != "" && s.LinkedTransactionID != ""
 }
 
 // SettlementInput describes one settlement to record. SplitID names the
 // split obligation (SOC-04B owns split identity and membership);
 // ParticipantID names whose obligation the payment reduces; AmountMinor
 // is the positive integer-minor-unit payment observed. LinkedOwnerID
-// plus LinkedPostingID optionally link the record to one real payment;
+// plus LinkedTransactionID optionally link the record to one real payment;
 // the pair must be set together or not at all.
 type SettlementInput struct {
-	SplitID         string
-	ParticipantID   string
-	AmountMinor     int64
-	LinkedOwnerID   string
-	LinkedPostingID string
+	SplitID             string
+	ParticipantID       string
+	AmountMinor         int64
+	LinkedOwnerID       string
+	LinkedTransactionID string
 }
 
 // ParticipantSettlement is one participant's derived settlement position:

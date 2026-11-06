@@ -13,9 +13,9 @@ func termsModel() *types.FinancialModel {
 			{ID: "prime_card", Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Checkpoints: []types.Checkpoint{},
-		Postings:    []types.Posting{},
-		Evaluations: types.EmptyEvaluationTables(),
+		Checkpoints:  []types.Checkpoint{},
+		Transactions: []types.Transaction{},
+		Evaluations:  types.EmptyEvaluationTables(),
 	}
 }
 
@@ -36,12 +36,12 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 		DueDay: 10, StatementDay: &statementDay,
 	}}
 	checking := "checking"
-	model.Postings = []types.Posting{}
+	model.Transactions = []types.Transaction{}
 	model.Schedules = []types.Schedule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "25"},
 		},
@@ -117,12 +117,12 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 		t.Fatalf("expected a terms.payment.missing warning")
 	}
 	checking := "checking"
-	model.Postings = []types.Posting{}
+	model.Transactions = []types.Transaction{}
 	model.Schedules = []types.Schedule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "25"},
 		},

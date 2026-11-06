@@ -137,9 +137,9 @@ A release notes each outcome; a skip names its reason.
 ## 4. Uncovered by automation (never faked green)
 
 - Receipt matcher ranking with approve, reject, and hand-linking mail
-  receipts to postings: no such product surface exists yet. Mail
+  receipts to transactions: no such product surface exists yet. Mail
   review (confirm/correct with the original extraction preserved) and
-  image-receipt posting links are journey-tested; the matcher step is
+  image-receipt transaction links are journey-tested; the matcher step is
   not, and must not be reported as covered.
 - Split-builder and manual-send flows: blocked on the undecided
   friend-request lifecycle and the unbuilt send flow.
@@ -151,7 +151,7 @@ A release notes each outcome; a skip names its reason.
 - Image extraction adapter: the local mock stands in for OCR; journeys
   say so in their names and cover the real upload, storage, review,
   and link paths around it.
-- Posting-level currency: amounts are bare expressions with no currency
+- Transaction-level currency: amounts are bare expressions with no currency
   field. Zero-decimal coverage lives in the split probes (JPY 1000 over
-  3 allocates exactly 334/333/333); a yen-denominated posting row is not
+  3 allocates exactly 334/333/333); a yen-denominated transaction row is not
   expressible and stays uncovered.

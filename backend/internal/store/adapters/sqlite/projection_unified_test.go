@@ -168,22 +168,22 @@ func TestRowWritesMarkDirty(t *testing.T) {
 	}
 	mustClean()
 
-	posting, err := s.CreatePosting(types.Posting{
+	transaction, err := s.CreateTransaction(types.Transaction{
 		Name: "Groceries", SourceAccountID: &account.ID,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785811200,
 		TransactionTime: 1785811200,
 		Enabled:         true,
 	})
 	if err != nil {
-		t.Fatalf("create posting: %v", err)
+		t.Fatalf("create transaction: %v", err)
 	}
 	if got := dirty(); got != 1785811200 {
-		t.Fatalf("posting must dirty its day, got %d", got)
+		t.Fatalf("transaction must dirty its day, got %d", got)
 	}
 	mustClean()
-	if err := s.DeletePosting(posting.ID); err != nil {
-		t.Fatalf("delete posting: %v", err)
+	if err := s.DeleteTransaction(transaction.ID); err != nil {
+		t.Fatalf("delete transaction: %v", err)
 	}
 	if got := dirty(); got != dirtyDay("2026-01-01") {
 		t.Fatalf("delete must dirty from projection start, got %d", got)
@@ -192,7 +192,7 @@ func TestRowWritesMarkDirty(t *testing.T) {
 
 	rule, err := s.CreateSchedule(types.Schedule{
 		Name: "Pay", SourceAccountID: &account.ID,
-		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency: "monthly", StartDate: "2026-09-01", Priority: 1, Enabled: true,
 	})
 	if err != nil {
@@ -211,8 +211,8 @@ func TestRowWritesMarkDirty(t *testing.T) {
 	mustClean()
 }
 
-func generatedPostingFor(sliceID, payload string, source *string) GeneratedPosting {
-	return GeneratedPosting{
+func generatedTransactionFor(sliceID, payload string, source *string) GeneratedTransaction {
+	return GeneratedTransaction{
 		SliceID:         sliceID,
 		Name:            "Generated",
 		SourceAccountID: source,
@@ -224,7 +224,7 @@ func generatedPostingFor(sliceID, payload string, source *string) GeneratedPosti
 	}
 }
 
-func TestSaveGeneratedPostingsReplacesSliceOutput(t *testing.T) {
+func TestSaveGeneratedTransactionsReplacesSliceOutput(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "generated-replace")
 	slice, err := s.SaveProjectionSlice(newProjectionSlice("2026-01-01", "2027-01-01", 1))
@@ -233,20 +233,20 @@ func TestSaveGeneratedPostingsReplacesSliceOutput(t *testing.T) {
 	}
 	payload := `{"date":"2026-03-06","sequence":1}`
 	for attempt := 0; attempt < 2; attempt++ {
-		if err := s.SaveGeneratedPostings([]GeneratedPosting{generatedPostingFor(slice.ID, payload, nil)}); err != nil {
-			t.Fatalf("save generated postings attempt %d: %v", attempt, err)
+		if err := s.SaveGeneratedTransactions([]GeneratedTransaction{generatedTransactionFor(slice.ID, payload, nil)}); err != nil {
+			t.Fatalf("save generated transactions attempt %d: %v", attempt, err)
 		}
 	}
-	stored, err := s.ListGeneratedPostings([]string{slice.ID})
+	stored, err := s.ListGeneratedTransactions([]string{slice.ID})
 	if err != nil {
-		t.Fatalf("list generated postings: %v", err)
+		t.Fatalf("list generated transactions: %v", err)
 	}
 	if len(stored) != 1 {
 		t.Fatalf("rebuild must replace slice output, got %d rows", len(stored))
 	}
 }
 
-func TestSaveGeneratedPostingsRollsBackOnFailure(t *testing.T) {
+func TestSaveGeneratedTransactionsRollsBackOnFailure(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "generated-rollback")
 	slice, err := s.SaveProjectionSlice(newProjectionSlice("2026-01-01", "2027-01-01", 1))
@@ -254,20 +254,20 @@ func TestSaveGeneratedPostingsRollsBackOnFailure(t *testing.T) {
 		t.Fatalf("save slice: %v", err)
 	}
 	original := `{"date":"2026-03-06","sequence":1}`
-	if err := s.SaveGeneratedPostings([]GeneratedPosting{generatedPostingFor(slice.ID, original, nil)}); err != nil {
-		t.Fatalf("seed generated postings: %v", err)
+	if err := s.SaveGeneratedTransactions([]GeneratedTransaction{generatedTransactionFor(slice.ID, original, nil)}); err != nil {
+		t.Fatalf("seed generated transactions: %v", err)
 	}
 	missingSource := "missing-account"
-	replacement := []GeneratedPosting{
-		generatedPostingFor(slice.ID, `{"date":"2026-03-06","sequence":2}`, nil),
-		generatedPostingFor(slice.ID, `{"date":"2026-03-07","sequence":3}`, &missingSource),
+	replacement := []GeneratedTransaction{
+		generatedTransactionFor(slice.ID, `{"date":"2026-03-06","sequence":2}`, nil),
+		generatedTransactionFor(slice.ID, `{"date":"2026-03-07","sequence":3}`, &missingSource),
 	}
-	if err := s.SaveGeneratedPostings(replacement); err == nil {
+	if err := s.SaveGeneratedTransactions(replacement); err == nil {
 		t.Fatal("expected the missing source account to reject the batch")
 	}
-	stored, err := s.ListGeneratedPostings([]string{slice.ID})
+	stored, err := s.ListGeneratedTransactions([]string{slice.ID})
 	if err != nil {
-		t.Fatalf("list generated postings: %v", err)
+		t.Fatalf("list generated transactions: %v", err)
 	}
 	if len(stored) != 1 || stored[0].EventJSON != original {
 		t.Fatalf("failed batch must roll back to the previous output, got %+v", stored)

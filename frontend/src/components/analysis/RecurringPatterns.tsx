@@ -250,8 +250,8 @@ export function ExistingScheduleDialog({
 								<h3 className="text-sm font-semibold">Matched occurrences</h3>
 								<ul className="mb-0 mt-1 space-y-1 pl-4 text-sm text-muted">
 									{plan.assignments.map((item) => (
-										<li key={item.postingId}>
-											{names.get(item.postingId) ?? item.postingId} ·{" "}
+										<li key={item.transactionId}>
+											{names.get(item.transactionId) ?? item.transactionId} ·{" "}
 											{item.date}
 											{item.amount ? ` · ${item.amount}` : ""}
 										</li>

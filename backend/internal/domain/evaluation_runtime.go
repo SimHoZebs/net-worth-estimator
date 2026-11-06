@@ -585,11 +585,11 @@ func (s *EvaluationRuntimeSet) PartitionByKind() (readers, simulators *Evaluatio
 func MergeEvaluationResultCollections(set *EvaluationRuntimeSet, reader, simulator *types.EvaluationResultCollection) *types.EvaluationResultCollection {
 	merged := &types.EvaluationResultCollection{
 		Evaluations: types.EvaluationResultTables{
-			FinancialIndependence: []types.EvaluationResultEnvelope{},
-			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
-			AccountBalance:        []types.EvaluationResultEnvelope{},
-			PostingFulfillment:    []types.EvaluationResultEnvelope{},
-			CycleFulfillment:      []types.EvaluationResultEnvelope{},
+			FinancialIndependence:  []types.EvaluationResultEnvelope{},
+			NetWorthThreshold:      []types.EvaluationResultEnvelope{},
+			AccountBalance:         []types.EvaluationResultEnvelope{},
+			TransactionFulfillment: []types.EvaluationResultEnvelope{},
+			CycleFulfillment:       []types.EvaluationResultEnvelope{},
 			// PlannedPurchases stays nil when empty: Result() appends per
 			// registered instance, and nil-vs-empty matters to DeepEqual
 			// callers that strip the table before comparing baselines.
@@ -670,11 +670,11 @@ func (s *EvaluationRuntimeSet) WorkloadProgress(completedRuns, totalRuns int) []
 func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 	collection := types.EvaluationResultCollection{
 		Evaluations: types.EvaluationResultTables{
-			FinancialIndependence: []types.EvaluationResultEnvelope{},
-			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
-			AccountBalance:        []types.EvaluationResultEnvelope{},
-			PostingFulfillment:    []types.EvaluationResultEnvelope{},
-			CycleFulfillment:      []types.EvaluationResultEnvelope{},
+			FinancialIndependence:  []types.EvaluationResultEnvelope{},
+			NetWorthThreshold:      []types.EvaluationResultEnvelope{},
+			AccountBalance:         []types.EvaluationResultEnvelope{},
+			TransactionFulfillment: []types.EvaluationResultEnvelope{},
+			CycleFulfillment:       []types.EvaluationResultEnvelope{},
 			// PlannedPurchases stays nil when empty: Result() appends per
 			// registered instance, and nil-vs-empty matters to DeepEqual
 			// callers that strip the table before comparing baselines.

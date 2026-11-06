@@ -92,7 +92,7 @@ func applyAnalysisFeedback(tx *userTx, id string, input types.AnalysisFeedbackIn
 	err = tx.QueryRow(`SELECT f.detection_json, f.run_id, f.review_json, f.feedback_revision, f.dismissed, f.status,
 		r.type, r.version, r.input_revision, p.pending, p.void FROM analysis_findings f
 		JOIN analysis_runs r ON r.user_id = f.user_id AND r.id = f.run_id
-		JOIN postings p ON p.user_id = f.user_id AND p.id = f.posting_id
+		JOIN transactions p ON p.user_id = f.user_id AND p.id = f.transaction_id
 		WHERE f.id = ? AND f.user_id = :user_id`, id).Scan(&predictionJSON, &feedback.RunID, &reviewJSON, &previousRevision, &dismissed, &status,
 		&feedback.AnalysisType, &feedback.AnalyzerVersion, &feedback.InputRevision, &pending, &void)
 	if err == sql.ErrNoRows {
@@ -169,7 +169,7 @@ func applyAnalysisFeedback(tx *userTx, id string, input types.AnalysisFeedbackIn
 	if err != nil {
 		return feedback, err
 	}
-	feedback.FindingID, feedback.PostingID = id, feedback.Prediction.PostingID
+	feedback.FindingID, feedback.TransactionID = id, feedback.Prediction.TransactionID
 	feedback.Actor, feedback.Request, feedback.CreatedAt = actor, input, now
 	feedback.Revision, feedback.Dismissed = previousRevision+1, dismissed
 	currentReviewJSON, err := json.Marshal(feedback.Review)

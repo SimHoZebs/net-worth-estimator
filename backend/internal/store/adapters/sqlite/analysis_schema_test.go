@@ -64,7 +64,7 @@ func TestAnalysisLifecycleTriggersFireOnBothSatellites(t *testing.T) {
 	s := privateTestPlan(t, d, "owner")
 	seedAccount(t, s, "checking")
 	account := "checking"
-	posting, err := s.CreatePosting(types.Posting{Name: "Trigger expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
+	transaction, err := s.CreateTransaction(types.Transaction{Name: "Trigger expense", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,25 +76,25 @@ func TestAnalysisLifecycleTriggersFireOnBothSatellites(t *testing.T) {
 		}
 		return out
 	}
-	if _, err := s.db.Exec(`INSERT INTO transaction_source_facts(posting_id, facts_json, user_id) VALUES (?, '{}', :user_id)`, posting.ID); err != nil {
+	if _, err := s.db.Exec(`INSERT INTO transaction_source_facts(transaction_id, facts_json, user_id) VALUES (?, '{}', :user_id)`, transaction.ID); err != nil {
 		t.Fatal(err)
 	}
 	before := revision()
-	if _, err := s.db.Exec(`UPDATE posting_sim SET enabled = 0 WHERE posting_id = ? AND user_id = :user_id`, posting.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transaction_sim SET enabled = 0 WHERE transaction_id = ? AND user_id = :user_id`, transaction.ID); err != nil {
 		t.Fatal(err)
 	}
 	if got := revision(); got != before+1 {
 		t.Fatalf("sim enabled flip revision = %d, want %d", got, before+1)
 	}
 	before = revision()
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 1 WHERE id = ? AND user_id = :user_id`, posting.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET pending = 1 WHERE id = ? AND user_id = :user_id`, transaction.ID); err != nil {
 		t.Fatal(err)
 	}
 	if got := revision(); got != before+1 {
 		t.Fatalf("pending flip revision = %d, want %d", got, before+1)
 	}
 	before = revision()
-	if _, err := s.db.Exec(`UPDATE postings SET name = 'Renamed' WHERE id = ? AND user_id = :user_id`, posting.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET name = 'Renamed' WHERE id = ? AND user_id = :user_id`, transaction.ID); err != nil {
 		t.Fatal(err)
 	}
 	if got := revision(); got != before {

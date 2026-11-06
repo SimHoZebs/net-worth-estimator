@@ -104,10 +104,10 @@ type AccountBalanceOutput struct {
 	ProbP90Date      *string  `json:"probP90Date"`
 }
 
-// PostingFulfillmentOutput is one stored posting-fulfillment result.
+// TransactionFulfillmentOutput is one stored transaction-fulfillment result.
 // Scalar evidence is typed; variable-length event evidence stays verbatim
 // JSON so served bytes match the computed envelopes exactly.
-type PostingFulfillmentOutput struct {
+type TransactionFulfillmentOutput struct {
 	EvaluationOutputBase
 	RequestedAmount          *float64 `json:"requestedAmount"`
 	RealizedAmount           *float64 `json:"realizedAmount"`
@@ -117,7 +117,7 @@ type PostingFulfillmentOutput struct {
 	FirstUnderfulfilledDate  *string  `json:"firstUnderfulfilledDate"`
 	EventsJSON               string   `json:"eventsJson"`
 	DatesJSON                string   `json:"datesJson"`
-	PostingsJSON             string   `json:"postingsJson"`
+	TransactionsJSON         string   `json:"transactionsJson"`
 	ProbRunCount             *int     `json:"probRunCount"`
 	ProbFulfilledCount       *int     `json:"probFulfilledCount"`
 	ProbFullProbability      *float64 `json:"probFullProbability"`

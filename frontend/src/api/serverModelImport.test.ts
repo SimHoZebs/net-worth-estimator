@@ -18,13 +18,13 @@ const emptyModel: FinancialModel = {
 	sourcePath: "models/current",
 	accounts: [],
 	checkpoints: [],
-	postings: [],
+	transactions: [],
 	schedules: [],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
 		accountBalance: [],
-		postingFulfillment: [],
+		transactionFulfillment: [],
 	},
 };
 

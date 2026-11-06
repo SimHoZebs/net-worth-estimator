@@ -79,9 +79,9 @@ import {
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
 	claimUpdate,
-	detailPostingValues,
+	detailTransactionValues,
 	detailScheduleValues,
-	postingUpdate,
+	transactionUpdate,
 	scheduleUpdate,
 	timeOfDay,
 } from "../editors/transactionBodies.ts";
@@ -206,7 +206,7 @@ function MoreOptions({
 			<div className="flex flex-col">
 				{!schedule && !savedTransaction.void && (
 					<TransactionCategory
-						postingId={savedTransaction.id}
+						transactionId={savedTransaction.id}
 						category={savedTransaction.category}
 						source={savedTransaction.categorySource}
 						readOnly={categoryReadOnly}
@@ -367,7 +367,7 @@ function ScheduleCapsule({
 }) {
 	const id = useId();
 	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
-	if (savedTransaction.kind === "posting") {
+	if (savedTransaction.kind === "transaction") {
 		if (!draft.claimScheduleId) return null;
 		return (
 			<p className="mt-4 flex items-center gap-2 text-xs leading-[1.6] text-muted">
@@ -508,7 +508,7 @@ function ReadOnlyNotice({
 	return (
 		<Notice className="my-4">
 			<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
-			This hold vanished without posting, so there is nothing to edit.
+			This hold vanished without a posted charge, so there is nothing to edit.
 			{!appReadOnly &&
 				" If it posted after all, pick the posted charge below and remove this record."}
 		</Notice>
@@ -579,7 +579,7 @@ function draftFromTransaction(
  */
 function canClaimOccurrence(transaction: Transaction): boolean {
 	return (
-		transaction.kind === "posting" &&
+		transaction.kind === "transaction" &&
 		transaction.pending === true &&
 		transaction.syncOwned === true
 	);
@@ -736,7 +736,7 @@ function useTransactionEdit({
 			finish(ok, "The schedule could not be saved.");
 			return;
 		}
-		const values = detailPostingValues({ draft, item: savedTransaction });
+		const values = detailTransactionValues({ draft, item: savedTransaction });
 		if (values instanceof Error) {
 			setSaving(false);
 			setError(values.message);
@@ -748,7 +748,7 @@ function useTransactionEdit({
 				savedTransaction.claimOccurrenceDate;
 		const ok = await performSave({
 			call: async () => {
-				const patch = postingUpdate({ baseline: savedTransaction, values });
+				const patch = transactionUpdate({ baseline: savedTransaction, values });
 				if (Object.keys(patch).length) {
 					const amended = await amendTransaction(savedTransaction.id, patch);
 					if (amended.data.saved === false) return amended;
@@ -853,7 +853,7 @@ function useMarkAsSubscription({
 	const attemptRef = useRef<{ scheduleId: string } | null>(null);
 	const canClaimPending = canClaimOccurrence(savedTransaction);
 	const available =
-		savedTransaction.kind === "posting" &&
+		savedTransaction.kind === "transaction" &&
 		!savedTransaction.claimScheduleId &&
 		(!locked || canClaimPending);
 	const mark = async () => {
@@ -993,7 +993,7 @@ export function TransactionDetail({
 	const [endScheduleError, setEndScheduleError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
-	const once = savedTransaction.kind === "posting";
+	const once = savedTransaction.kind === "transaction";
 	const canEdit = !edit.readOnlyReason;
 	// Settled bank rows are editable and removable through the UI: removing
 	// one suppresses its bank ids, so the feed will not re-import it.
@@ -1110,7 +1110,7 @@ export function TransactionDetail({
 		setDeleteError(null);
 		const ok = await performSave({
 			call: () =>
-				savedTransaction.kind === "posting"
+				savedTransaction.kind === "transaction"
 					? deleteTransaction(savedTransaction.id)
 					: deleteSchedule(savedTransaction.id),
 			refresh,
@@ -1157,7 +1157,7 @@ export function TransactionDetail({
 	const mergeVoidHold = async (candidateId: string): Promise<boolean> => {
 		if (deleting || readOnly) return false;
 		const candidate = voidCandidates.find(
-			(row) => row.postingId === candidateId,
+			(row) => row.transactionId === candidateId,
 		);
 		if (!candidate) return false;
 		const claimScheduleId = savedTransaction.claimScheduleId;
@@ -1211,7 +1211,7 @@ export function TransactionDetail({
 			once
 				? buildInsightSuggestions({
 						findings: findingsQuery.data?.findings ?? [],
-						postingId: savedTransaction.id,
+						transactionId: savedTransaction.id,
 						voidRow: savedTransaction,
 						candidates: voidCandidates,
 					})
@@ -1226,7 +1226,7 @@ export function TransactionDetail({
 	const sharedIntents = useMemo(
 		() =>
 			(grantsQuery.data ?? []).filter(
-				(grant) => grant.postingId === savedTransaction.id,
+				(grant) => grant.transactionId === savedTransaction.id,
 			),
 		[grantsQuery.data, savedTransaction.id],
 	);
@@ -1644,15 +1644,15 @@ export function TransactionDetail({
 				</form>
 				{once && (
 					<TransactionAnalysisPanel
-						postingId={savedTransaction.id}
+						transactionId={savedTransaction.id}
 						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 					/>
 				)}
 				{once && (
 					<div id={`${edit.formId}-receipts`} className="scroll-mt-4">
 						<ReceiptPanel
-							postingId={savedTransaction.id}
-							posting={savedTransaction}
+							transactionId={savedTransaction.id}
+							transaction={savedTransaction}
 							readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 						/>
 					</div>
@@ -1740,7 +1740,7 @@ export function TransactionDetail({
 					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
 				>
 					<TransactionSharing
-						postingId={savedTransaction.id}
+						transactionId={savedTransaction.id}
 						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 					/>
 				</Modal>
@@ -1749,7 +1749,7 @@ export function TransactionDetail({
 				<TransactionDetail
 					key={historySelection.id}
 					// The schedule start is only the adapter's display horizon;
-					// the posting detail reads the posting's own fields.
+					// the transaction detail reads the transaction's own fields.
 					transaction={scheduleTransaction({
 						transaction: historySelection,
 						accounts: fullAccounts,

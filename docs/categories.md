@@ -1,7 +1,7 @@
 # Transaction Categories
 
 A transaction holds one user-facing category. This is separate from Evidence
-Analysis claims: a posting may be BNPL, recurring, and a transfer at the same
+Analysis claims: a transaction may be BNPL, recurring, and a transfer at the same
 time, but it has at most one category assignment.
 
 ## Supported set
@@ -36,7 +36,7 @@ values are dropped. Only the primary key is stored and returned.
 1. A user assignment always wins.
 2. A supported bank value replaces an inferred value.
 3. An inferred value fills only when no assignment exists.
-4. Otherwise the posting stays uncategorized.
+4. Otherwise the transaction stays uncategorized.
 
 Clearing a user assignment restores the last supported bank value. Without a
 supported bank value, the assignment is removed and the classifier may run
@@ -44,9 +44,9 @@ again.
 
 ## Storage
 
-`posting_categories` is a sidecar table keyed by user and posting. It stores
+`transaction_categories` is a sidecar table keyed by user and transaction. It stores
 `category`, `source` (`bank`, `inferred`, or `user`), `producer`, and
-`updated_at`. Posting deletion cascades. Category writes never change the
+`updated_at`. Transaction deletion cascades. Category writes never change the
 financial model, the model revision, or a projection.
 
 The table is additive. Fresh databases create it during setup. Existing
@@ -69,24 +69,24 @@ uses protocol version 2 and keeps `extra.category` as provider evidence.
 `backend/internal/categorization` owns the classifier seam. The current
 implementation is a deterministic keyword mock, versioned as `keyword-v1`.
 
-A periodic worker scans uncategorized bank postings, newest first, and writes
+A periodic worker scans uncategorized bank transactions, newest first, and writes
 inferred assignments. It never blocks sync and keeps no queue table: an
-interrupted run resumes from the rows on the next tick. Pending postings stay
-eligible because settlement preserves the posting identity.
+interrupted run resumes from the rows on the next tick. Pending transactions stay
+eligible because settlement preserves the transaction identity.
 
-The worker does not classify recurrence rules. Owner-authored postings are
-also skipped; the user can still assign a category to those postings through
+The worker does not classify recurrence rules. Owner-authored transactions are
+also skipped; the user can still assign a category to those transactions through
 the API.
 
 ## API and interface
 
-`GET /v1/transactions` adds `category` and `categorySource` to each posting row.
+`GET /v1/transactions` adds `category` and `categorySource` to each transaction row.
 Missing values mean uncategorized.
 
 `POST /v1/transactions/{id}/categorize` accepts `{"category": "<key>"}` or
 `{"category": null}` to clear a user override. It validates the key, requires
 an authenticated session on a writable server, and works on pending bank rows.
-It does not replace the posting row and does not touch the financial model.
+It does not replace the transaction row and does not touch the financial model.
 
 The transaction detail shows the category as one row beside the other
 transaction fields. The picker lists each category with a Lucide icon. The
@@ -98,8 +98,8 @@ separate from the transaction form.
 
 - Recurrence rules have no category. Occurrences inherit nothing in this
   version.
-- Owner-authored postings are not auto-classified.
-- A CSV model import deletes and reinserts postings. The cascade drops every
+- Owner-authored transactions are not auto-classified.
+- A CSV model import deletes and reinserts transactions. The cascade drops every
   sidecar assignment, including user overrides on bank rows that the import
   preserves. Bank values return on the next sync; inferred values return when
   the worker scans again.

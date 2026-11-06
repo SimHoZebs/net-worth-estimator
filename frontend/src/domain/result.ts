@@ -46,7 +46,7 @@ export interface EvaluationResult {
 }
 export type OtherEvaluationType =
 	| "financialIndependence"
-	| "postingFulfillment"
+	| "transactionFulfillment"
 	| "cycleFulfillment";
 export interface OtherEvaluationProgress {
 	fraction: number;
@@ -83,8 +83,8 @@ export interface OtherEvaluation {
 	value?: OtherEvaluationValue | null;
 	/** Percentile bands rendered alongside the status badge. Null when absent. */
 	bands?: OtherEvaluationBands | null;
-	/** Configured transaction scope for posting-fulfillment evidence. Null means all. */
-	postingIds?: string[] | null;
+	/** Configured transaction scope for transaction-fulfillment evidence. Null means all. */
+	transactionIds?: string[] | null;
 	financialIndependence?: FinancialIndependenceAnalysis | null;
 }
 export interface Projection {

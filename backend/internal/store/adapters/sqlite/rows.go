@@ -17,11 +17,11 @@ import (
 type RowKind string
 
 const (
-	RowAccount    RowKind = "account"
-	RowPosting    RowKind = "posting"
-	RowRule       RowKind = "rule"
-	RowEvaluation RowKind = "evaluation"
-	RowPreset     RowKind = "preset"
+	RowAccount     RowKind = "account"
+	RowTransaction RowKind = "transaction"
+	RowRule        RowKind = "rule"
+	RowEvaluation  RowKind = "evaluation"
+	RowPreset      RowKind = "preset"
 )
 
 // newRowID generates a time-ordered unique row ID.
@@ -84,8 +84,8 @@ func orderedIDs(tx *userTx, kind RowKind, evaluationType string) ([]string, erro
 	switch kind {
 	case RowAccount:
 		query = `SELECT id FROM accounts WHERE user_id = :user_id ORDER BY position`
-	case RowPosting:
-		query = `SELECT p.id FROM postings p LEFT JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id WHERE p.user_id = :user_id AND p.projection_slice_id IS NULL ORDER BY s.position`
+	case RowTransaction:
+		query = `SELECT p.id FROM transactions p LEFT JOIN transaction_sim s ON s.user_id = p.user_id AND s.transaction_id = p.id WHERE p.user_id = :user_id AND p.projection_slice_id IS NULL ORDER BY s.position`
 	case RowRule:
 		query = `SELECT id FROM recurrence_rules WHERE user_id = :user_id ORDER BY position`
 	case RowEvaluation:
@@ -124,8 +124,8 @@ func rewritePositions(tx *userTx, kind RowKind, evaluationType string, ids []str
 	switch kind {
 	case RowAccount:
 		table, idColumn = "accounts", "id"
-	case RowPosting:
-		table, idColumn = "posting_sim", "posting_id"
+	case RowTransaction:
+		table, idColumn = "transaction_sim", "transaction_id"
 	case RowRule:
 		table, idColumn = "recurrence_rules", "id"
 	case RowEvaluation:
@@ -460,7 +460,7 @@ func (s *sqliteStore) UpdateSchedule(rule types.Schedule) (types.Schedule, error
 // DeleteSchedule removes one recurrence rule.
 func (s *sqliteStore) DeleteSchedule(id string) error {
 	err := withRowTx(s.db, func(tx *userTx) error {
-		if _, err := tx.Exec(`DELETE FROM posting_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, id); err != nil {
+		if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, id); err != nil {
 			return fmt.Errorf("release claims for rule %s: %w", id, err)
 		}
 		result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, id)

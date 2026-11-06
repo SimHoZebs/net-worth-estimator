@@ -18,9 +18,9 @@ import {
 import { parseDisplayNumber } from "./formValues.ts";
 import {
 	combineDayTime,
-	postingBody,
-	validatePostingValues,
-	type PostingFormValues,
+	transactionBody,
+	validateTransactionValues,
+	type TransactionFormValues,
 } from "./transactionBodies.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
@@ -56,7 +56,7 @@ export function AddTransactionDialog({
 		[catalog.data],
 	);
 	// The create form picks from the same scheduled occurrence list as the
-	// detail editor: closest to the new posting's own day first.
+	// detail editor: closest to the new transaction's own day first.
 	const savedTransactions = useSavedTransactions();
 	const [name, setName] = useState("");
 	const [amount, setAmount] = useState("500");
@@ -119,7 +119,7 @@ export function AddTransactionDialog({
 			setError("Enter an amount of zero or more.");
 			return;
 		}
-		const values: PostingFormValues = {
+		const values: TransactionFormValues = {
 			name: name.trim(),
 			amount: parsedAmount,
 			fromId: fromId || null,
@@ -132,7 +132,7 @@ export function AddTransactionDialog({
 			claimOccurrenceDate:
 				claimScheduleId && claimOccurrenceDate ? claimOccurrenceDate : null,
 		};
-		const invalid = validatePostingValues(values);
+		const invalid = validateTransactionValues(values);
 		if (invalid) {
 			setError(invalid);
 			return;
@@ -141,7 +141,7 @@ export function AddTransactionDialog({
 		setError(null);
 		const id = crypto.randomUUID();
 		const ok = await performSave({
-			call: () => recordTransaction({ ...postingBody(values), id }),
+			call: () => recordTransaction({ ...transactionBody(values), id }),
 			refresh: refreshTransactions,
 			failureMessage: "The transaction could not be saved.",
 		});

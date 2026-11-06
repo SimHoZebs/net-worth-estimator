@@ -74,7 +74,7 @@ export function serverModelFingerprint(model: FinancialModel): string {
 					config,
 				}),
 			),
-			postingFulfillment: model.evaluations.postingFulfillment.map(
+			transactionFulfillment: model.evaluations.transactionFulfillment.map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,
@@ -91,7 +91,7 @@ export function serverModelFingerprint(model: FinancialModel): string {
 				}),
 			),
 		},
-		postings: model.postings.map(
+		transactions: model.transactions.map(
 			({
 				id,
 				name,

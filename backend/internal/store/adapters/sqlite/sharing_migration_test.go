@@ -28,19 +28,19 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	posting := sharingPosting(t, storeA, sharingPostingA)
+	transaction := sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, transaction.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatalf("grant: %v", err)
 	}
-	if access := checkAccess(t, d, alice, posting.ID, bob); !access.Allowed || access.Reason != "manual-user" {
+	if access := checkAccess(t, d, alice, transaction.ID, bob); !access.Allowed || access.Reason != "manual-user" {
 		t.Fatalf("access = %+v, want manual-user allow", access)
 	}
-	if _, err := d.ReadSharedPosting(alice, posting.ID, bob); err != nil {
+	if _, err := d.ReadSharedTransaction(alice, transaction.ID, bob); err != nil {
 		t.Fatalf("read: %v", err)
 	}
 
-	copied, err := d.CopySharedPosting(alice, posting.ID, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, transaction.ID, bob, sharingKey(t))
 	if err != nil {
 		t.Fatalf("copy: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("link: %v", err)
 	}
-	if link.LinkID != store.SharingLinkID(alice, posting.ID, bob) {
+	if link.LinkID != store.SharingLinkID(alice, transaction.ID, bob) {
 		t.Fatalf("link = %q, want deterministic link identity", link.LinkID)
 	}
 	refreshed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
@@ -65,14 +65,14 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 	}
 	found := false
 	for _, item := range items {
-		if item.OwnerUserID == alice && item.PostingID == posting.ID {
+		if item.OwnerUserID == alice && item.TransactionID == transaction.ID {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("inbox list misses the shared posting")
+		t.Fatal("inbox list misses the shared transaction")
 	}
-	decided, err := d.AcceptInboxShare(bob, alice, posting.ID)
+	decided, err := d.AcceptInboxShare(bob, alice, transaction.ID)
 	if err != nil {
 		t.Fatalf("inbox accept: %v", err)
 	}
@@ -88,10 +88,10 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("policy preview: %v", err)
 	}
-	if preview.EligiblePostings < 1 {
-		t.Fatalf("eligible postings = %d, want at least the shared row", preview.EligiblePostings)
+	if preview.EligibleTransactions < 1 {
+		t.Fatalf("eligible transactions = %d, want at least the shared row", preview.EligibleTransactions)
 	}
-	shared, err := d.ListSharedPostings(bob)
+	shared, err := d.ListSharedTransactions(bob)
 	if err != nil {
 		t.Fatalf("shared list: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 		t.Fatal("shared list is empty")
 	}
 
-	events, err := d.ListSharingAudit(alice, posting.ID)
+	events, err := d.ListSharingAudit(alice, transaction.ID)
 	if err != nil {
 		t.Fatalf("audit: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 		t.Fatalf("audit actions = %v, want grant and copy-accepted", seen)
 	}
 
-	split := createSplit(t, d, splitInput(alice, posting.ID, alice, alice, bob))
+	split := createSplit(t, d, splitInput(alice, transaction.ID, alice, alice, bob))
 	if split.Version != 1 || split.Status != store.SplitStatusProposed {
 		t.Fatalf("split = v%d %q, want v1 proposed", split.Version, split.Status)
 	}

@@ -47,7 +47,7 @@ API and create a verified backup before an upgrade. Setup and runtime validate
 the required objects of the current schema.
 This tree supplies the [planned-purchase upgrade](purchase-queue.md#persistence)
 and the separate [deployment operation](../deploy/MIGRATIONS.md), which also
-removes completed posting-ID audit bookkeeping before model refresh or publication.
+removes completed transaction-ID audit bookkeeping before model refresh or publication.
 For other unsupported shapes, restore a verified current-schema backup or prepare
 an operator upgrade specific to the source. No replacement converter is supplied.
 

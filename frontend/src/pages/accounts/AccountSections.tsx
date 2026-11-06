@@ -256,7 +256,7 @@ function TransactionsView({
 		(transaction) => transaction.kind === "schedule",
 	).length;
 	const transactionsCount = visible.filter(
-		(transaction) => transaction.kind === "posting",
+		(transaction) => transaction.kind === "transaction",
 	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
@@ -273,7 +273,7 @@ function TransactionsView({
 					(transaction) =>
 						transaction.name.toLowerCase().includes(query.toLowerCase()) &&
 						(schedule === "all"
-							? transaction.kind === "posting"
+							? transaction.kind === "transaction"
 							: transaction.kind === "schedule"),
 				),
 				getDate: (transaction) => transaction.startDate,

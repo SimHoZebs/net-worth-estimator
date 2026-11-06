@@ -24,7 +24,7 @@ func TestCustomResolverAndProviderPlugin(t *testing.T) {
 		},
 	})
 
-	amount := types.PostingAmountResolution{
+	amount := types.TransactionAmountResolution{
 		Resolver: "test-double",
 		Config:   map[string]types.JsonValue{},
 		Inputs: map[string]types.AmountInputBinding{
@@ -34,7 +34,7 @@ func TestCustomResolverAndProviderPlugin(t *testing.T) {
 	if _, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{}); err != nil {
 		t.Fatalf("validate plugin amount: %v", err)
 	}
-	value, err := ResolvePostingAmountDescriptor(amount, &AmountProviderContext{})
+	value, err := ResolveTransactionAmountDescriptor(amount, &AmountProviderContext{})
 	if err != nil {
 		t.Fatalf("resolve plugin amount: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestVolatileHookIsGeneric(t *testing.T) {
 			return 0.1, 0.2, true
 		},
 	})
-	amount := types.PostingAmountResolution{
+	amount := types.TransactionAmountResolution{
 		Resolver: "expression",
 		Config:   map[string]types.JsonValue{"expression": "v"},
 		Inputs: map[string]types.AmountInputBinding{

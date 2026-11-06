@@ -19,10 +19,10 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// SeedPrefix tags every bulk account. Real accounts never carry it. Postings
+// SeedPrefix tags every bulk account. Real accounts never carry it. Transactions
 // and rules need store UUIDs, so they carry deterministic UUIDs and link to
 // a tagged account instead. Clear matches tagged accounts first, then drops
-// every posting and rule tied to those accounts, so no bulk row survives and
+// every transaction and rule tied to those accounts, so no bulk row survives and
 // no real row is touched.
 const SeedPrefix = "seed-"
 
@@ -30,24 +30,24 @@ const SeedPrefix = "seed-"
 // Larger walks compose through repeated injects with distinct seeds, since
 // every bulk ID scopes by seed, or through matrix repetition.
 const (
-	BulkMaxAccounts              = 100
-	BulkMaxPostingsPerAcct       = 1000
-	BulkMaxTotalPostings         = 20000
-	BulkDefaultSeed        int64 = 7
+	BulkMaxAccounts                  = 100
+	BulkMaxTransactionsPerAcct       = 1000
+	BulkMaxTotalTransactions         = 20000
+	BulkDefaultSeed            int64 = 7
 )
 
-// BulkSpec selects the bulk shape: accounts with postings each.
+// BulkSpec selects the bulk shape: accounts with transactions each.
 type BulkSpec struct {
-	Accounts           int
-	PostingsPerAccount int
-	Seed               int64
+	Accounts               int
+	TransactionsPerAccount int
+	Seed                   int64
 }
 
 // BulkResult counts rows an inject or clear touched.
 type BulkResult struct {
-	Accounts int
-	Postings int
-	Rules    int
+	Accounts     int
+	Transactions int
+	Rules        int
 }
 
 // ParseBulkSpec decodes "20x200" or "20x200:7". Empty means no bulk.
@@ -77,14 +77,14 @@ func ParseBulkSpec(raw string) (BulkSpec, error) {
 		return spec, fmt.Errorf("integrationfixtures: bulk accounts %q wants 1-%d", parts[0], BulkMaxAccounts)
 	}
 	perAccount, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if err != nil || perAccount < 0 || perAccount > BulkMaxPostingsPerAcct {
-		return spec, fmt.Errorf("integrationfixtures: bulk postings %q wants 0-%d", parts[1], BulkMaxPostingsPerAcct)
+	if err != nil || perAccount < 0 || perAccount > BulkMaxTransactionsPerAcct {
+		return spec, fmt.Errorf("integrationfixtures: bulk transactions %q wants 0-%d", parts[1], BulkMaxTransactionsPerAcct)
 	}
-	if accounts*perAccount > BulkMaxTotalPostings {
-		return spec, fmt.Errorf("integrationfixtures: bulk %dx%d exceeds %d postings", accounts, perAccount, BulkMaxTotalPostings)
+	if accounts*perAccount > BulkMaxTotalTransactions {
+		return spec, fmt.Errorf("integrationfixtures: bulk %dx%d exceeds %d transactions", accounts, perAccount, BulkMaxTotalTransactions)
 	}
 	spec.Accounts = accounts
-	spec.PostingsPerAccount = perAccount
+	spec.TransactionsPerAccount = perAccount
 	spec.Seed = seed
 	return spec, nil
 }
@@ -132,10 +132,10 @@ func bulkScheduleID(seed int64, index int) string {
 	return fmt.Sprintf("%srule-%d-%04d", SeedPrefix, seed, index)
 }
 
-// bulkPostingID renders the deterministic UUID for one bulk posting. The
-// store requires posting IDs to parse as UUIDs, so the seed tag travels on
-// the linked account instead of the posting ID.
-func bulkPostingID(seed int64, account, index int) string {
+// bulkTransactionID renders the deterministic UUID for one bulk transaction. The
+// store requires transaction IDs to parse as UUIDs, so the seed tag travels on
+// the linked account instead of the transaction ID.
+func bulkTransactionID(seed int64, account, index int) string {
 	return uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("seed-bulk-%d-%d-%d", seed, account, index))).String()
 }
 
@@ -145,7 +145,7 @@ func ptr(s string) *string {
 }
 
 // BuildBulkModel renders the deterministic bulk model for one spec. Account
-// IDs carry the seed prefix so Clear can match them exactly. Postings carry
+// IDs carry the seed prefix so Clear can match them exactly. Transactions carry
 // deterministic UUIDs and link to their tagged account.
 func BuildBulkModel(spec BulkSpec) *types.FinancialModel {
 	rng := rand.New(rand.NewSource(spec.Seed))
@@ -168,17 +168,17 @@ func BuildBulkModel(spec BulkSpec) *types.FinancialModel {
 			Source:     "user",
 			ObservedAt: time.Date(2026, time.January, 1, 12, 0, 0, 0, time.UTC).Unix() + int64(i*86400),
 		})
-		for j := 0; j < spec.PostingsPerAccount; j++ {
+		for j := 0; j < spec.TransactionsPerAccount; j++ {
 			stamp := bulkDay(rng, i+j)
 			amount := bulkAmounts[(i+j)%len(bulkAmounts)]
 			// Duplicate names across days exercise name-plus-amount
 			// grouping without collapsing distinct days.
-			postingName := fmt.Sprintf("%s acct-%02d", bulkNameTraits[(i+j)%len(bulkNameTraits)], i)
-			model.Postings = append(model.Postings, types.Posting{
-				ID:              bulkPostingID(spec.Seed, i, j),
-				Name:            postingName,
+			transactionName := fmt.Sprintf("%s acct-%02d", bulkNameTraits[(i+j)%len(bulkNameTraits)], i)
+			model.Transactions = append(model.Transactions, types.Transaction{
+				ID:              bulkTransactionID(spec.Seed, i, j),
+				Name:            transactionName,
 				SourceAccountID: ptr(accountID),
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": amount},
 					Inputs:   map[string]types.AmountInputBinding{},
@@ -194,7 +194,7 @@ func BuildBulkModel(spec BulkSpec) *types.FinancialModel {
 				Name:            fmt.Sprintf("Seed rule %02d", i),
 				SourceAccountID: ptr(accountID),
 				Frequency:       types.FrequencyMonthly,
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "250.00"},
 					Inputs:   map[string]types.AmountInputBinding{},
@@ -231,19 +231,19 @@ func InjectBulk(scoped store.Store, spec BulkSpec) (BulkResult, error) {
 		}
 		result.Rules++
 	}
-	for _, posting := range model.Postings {
-		if _, err := scoped.CreatePosting(posting); err != nil {
-			return result, fmt.Errorf("integrationfixtures: bulk create posting %q: %w", posting.ID, err)
+	for _, transaction := range model.Transactions {
+		if _, err := scoped.CreateTransaction(transaction); err != nil {
+			return result, fmt.Errorf("integrationfixtures: bulk create transaction %q: %w", transaction.ID, err)
 		}
-		result.Postings++
+		result.Transactions++
 	}
 	return result, nil
 }
 
 // ClearSeed removes only bulk rows. It matches tagged accounts by prefix,
-// then drops every posting and rule tied to those accounts, then the
+// then drops every transaction and rule tied to those accounts, then the
 // checkpoints and the accounts themselves. Real rows stay untouched.
-// Postings and rules go before accounts so row references never dangle.
+// Transactions and rules go before accounts so row references never dangle.
 func ClearSeed(scoped store.Store) (BulkResult, error) {
 	var result BulkResult
 	model, err := scoped.LoadModel()
@@ -259,14 +259,14 @@ func ClearSeed(scoped store.Store) (BulkResult, error) {
 	if len(seedAccounts) == 0 {
 		return result, nil
 	}
-	for _, posting := range model.Postings {
-		if posting.SourceAccountID == nil || !seedAccounts[*posting.SourceAccountID] {
+	for _, transaction := range model.Transactions {
+		if transaction.SourceAccountID == nil || !seedAccounts[*transaction.SourceAccountID] {
 			continue
 		}
-		if err := scoped.DeletePosting(posting.ID); err != nil {
-			return result, fmt.Errorf("integrationfixtures: clear seed posting %q: %w", posting.ID, err)
+		if err := scoped.DeleteTransaction(transaction.ID); err != nil {
+			return result, fmt.Errorf("integrationfixtures: clear seed transaction %q: %w", transaction.ID, err)
 		}
-		result.Postings++
+		result.Transactions++
 	}
 	for _, rule := range model.Schedules {
 		if rule.SourceAccountID == nil || !seedAccounts[*rule.SourceAccountID] {

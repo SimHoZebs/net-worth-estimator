@@ -24,7 +24,7 @@ type StatusFilter = "all" | "pending" | "posted";
 /** Rows per transaction page. */
 const PAGE_SIZE = 20;
 
-const postingFilter = cva(
+const transactionFilter = cva(
 	"rounded-control border-0 px-2 py-1 text-xs whitespace-nowrap capitalize",
 	{
 		variants: {
@@ -199,7 +199,7 @@ export function AccountDetailsModal({
 						<button
 							key={key}
 							type="button"
-							className={postingFilter({ selected: filter === key })}
+							className={transactionFilter({ selected: filter === key })}
 							aria-pressed={filter === key}
 							onClick={() => {
 								setFilter(key);

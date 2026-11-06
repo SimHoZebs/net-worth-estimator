@@ -21,7 +21,7 @@ Store interface backed by SQLite
 ```
 
 - `internal/api` parses HTTP configuration, resolves stored or request-scoped inputs, applies access policy, and serializes results.
-- `internal/domain` validates the model, prepares history, executes posting transitions, and runs evaluations.
+- `internal/domain` validates the model, prepares history, executes transaction transitions, and runs evaluations.
 - `internal/store` owns transactions, ordering, schema migration, row ownership, and projection caches.
 - `internal/types` defines the JSON and domain values shared across those layers.
 
@@ -126,8 +126,8 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
   Preexisting unrelated forecast errors remain diagnostics on the model read.
 - Warning-only writes are saved.
 - A rejected request changes nothing.
-- The `source` field on checkpoint and posting inputs is not trusted. The store recomputes ownership.
-- Omitted row IDs are server-generated UUIDv7, unique across accounts, postings, rules, and evaluations via the `entity_ids` registry (duplicate IDs return 409).
+- The `source` field on checkpoint and transaction inputs is not trusted. The store recomputes ownership.
+- Omitted row IDs are server-generated UUIDv7, unique across accounts, transactions, rules, and evaluations via the `entity_ids` registry (duplicate IDs return 409).
 - Positions are server-managed: creates append, `POST .../reorder` moves one row before another (or to the end).
 
 ### Status
@@ -145,10 +145,10 @@ The frontend displays these provider-neutral sync signals. Provider setup and ra
   "model": "optional FinancialModel",
   "overrides": {
     "addedAccounts": [],
-    "addedPostings": [],
+    "addedTransactions": [],
     "addedRules": [],
     "disabledAccountIds": [],
-    "disabledPostingIds": [],
+    "disabledTransactionIds": [],
     "disabledRuleIds": []
   },
   "settings": {
@@ -289,7 +289,7 @@ API writers stopped and the actual data mount attached. The image's SQLite
 CLI converts each legacy date to 23:59:59 UTC and drops the date column.
 The body validates the source state and creates a private SQLite-safe backup.
 It converts a disposable candidate, applies the frozen Analysis SQL, invokes
-the standalone purchase conversion tool, and removes completed posting-ID audit
+the standalone purchase conversion tool, and removes completed transaction-ID audit
 bookkeeping there. The audit remains in the verified backup. `setupdb` only validates the
 finished schema. The body verifies preserved rows,
 integrity, and foreign keys before publication. Complete target databases
@@ -308,15 +308,15 @@ The current schema stores:
 | `model_metadata`         | source path and model-present flag                                                                         |
 | `accounts`               | ordered account definitions                                                                                   |
 | `checkpoints`            | ordered balance observations, unique by account/instant, with required exact time (`observed_at`, no date column) |
-| `postings`               | ordered UUID posting definitions with owner, execution order, and explicit bank lifecycle |
+| `transactions`               | ordered UUID transaction definitions with owner, execution order, and explicit bank lifecycle |
 | `planned_purchases`      | user-scoped purchase intentions with fixed cost, funding account, earliest date, priority, and enabled state |
-| `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
+| `receipts`               | private transaction attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
 | `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
 | `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
 | `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
 | `evaluations`            | type, user-scoped instance ID, order, label, enablement, and JSON config                                      |
-| `entity_ids`             | shared ID registry across accounts, postings, planned purchases, rules, and evaluations |
+| `entity_ids`             | shared ID registry across accounts, transactions, planned purchases, rules, and evaluations |
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
 | `split_settlements`      | append-only payoff records against one split participant, with optional real-payment link                      |
 | `split_settlement_requests` | one recorded settlement per (actor, request ID); retries replay it                                         |
@@ -330,7 +330,7 @@ The current schema stores:
 | `projection_slices`        | contiguous yearly build ranges with built revision and status           |
 | `projection_rows`          | one persisted timeline row payload per slice date                      |
 | `monte_carlo_statistics`   | portfolio net worth bands plus moments per slice date                  |
-| `net_worth_threshold_outputs`, `account_balance_outputs`, `posting_fulfillment_outputs`, `cycle_fulfillment_outputs`, `planned_purchases_outputs`, `financial_independence_outputs`, `whatif_outputs` | one typed result row per state, kind, and instance |
+| `net_worth_threshold_outputs`, `account_balance_outputs`, `transaction_fulfillment_outputs`, `cycle_fulfillment_outputs`, `planned_purchases_outputs`, `financial_independence_outputs`, `whatif_outputs` | one typed result row per state, kind, and instance |
 | `sync_credentials`         | per-user bank bridge address and selected cards for safe-spending math                                        |
 | `user_groups`              | named member groups                                                                                           |
 | `group_members`            | group membership with owner, admin, or member role                                                             |
@@ -341,8 +341,8 @@ The current schema stores:
 | `analysis_findings`        | one current finding per analysis, transaction, and finding kind                                                |
 | `analysis_feedback`        | append-only answer history with actor, prediction, detector version, and review                                |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
-| `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
-| `posting_categories`     | one sidecar category assignment per posting with source and producer                                          |
+| `transaction_sync_keys`      | exact provider/account/transaction identity mapped to a local transaction UUID                                    |
+| `transaction_categories`     | one sidecar category assignment per transaction with source and producer                                          |
 | `schema_migrations`      | compatibility markers and historical upgrade records |
 
 ### First boot and import
@@ -360,7 +360,7 @@ Each row write validates the resulting state at its finance or evaluation bounda
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
-3. Posting IDs are canonical UUIDs. Incoming `source`, `pending`, and `void` values are ignored and recomputed. Stored lifecycle protects live pending and void bank rows from owner updates and deletes; settled bank rows accept them. ID prefixes carry no policy or lifecycle meaning.
+3. Transaction IDs are canonical UUIDs. Incoming `source`, `pending`, and `void` values are ignored and recomputed. Stored lifecycle protects live pending and void bank rows from owner updates and deletes; settled bank rows accept them. ID prefixes carry no policy or lifecycle meaning.
 4. Owner checkpoints win same-instant key collisions (several observations per account/day survive); a later synchronization skips the owner-owned instant until owner data is removed, retains backdated instants as their own rows, and replaces a same-instant sync row idempotently. Databases that predate the required instant fail schema validation; the server never migrates them.
 5. Deleting an account keeps its bridge links; the link is the memory of the mapping, so recreating the account resumes sync flow. A link whose model account is gone resolves to nothing and is counted as `linked-account-missing` until relinked.
 
@@ -368,12 +368,12 @@ Each row write validates the resulting state at its finance or evaluation bounda
 
 Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical model: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `saved: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
 
-### Posting identity
+### Transaction identity
 
-Persisted postings use canonical UUIDs; the store generates UUIDv7 IDs when the
-caller supplies none. Sources with non-UUID posting IDs are unsupported. Exact upstream `(provider, account_id, transaction_id)` identity
-lives in `posting_sync_keys`, separate from local posting IDs (see
-`postingSyncKey` in `backend/internal/store/sync_pending.go`).
+Persisted transactions use canonical UUIDs; the store generates UUIDv7 IDs when the
+caller supplies none. Sources with non-UUID transaction IDs are unsupported. Exact upstream `(provider, account_id, transaction_id)` identity
+lives in `transaction_sync_keys`, separate from local transaction IDs (see
+`transactionSyncKey` in `backend/internal/store/sync_pending.go`).
 
 ### Result durability
 
@@ -387,7 +387,7 @@ Payoff against shared-expense obligations (SOC-05,
 only) is an append-only ledger kept separate from balances:
 `RecordSettlement` writes one `split_settlements` row plus one
 `split_settlement_requests` idempotency row and never touches
-postings, checkpoints, accounts, or balances, so recording a
+transactions, checkpoints, accounts, or balances, so recording a
 settlement moves no money. Each record names one split, the
 participant whose obligation it reduces, a positive integer-minor-unit
 amount, and an optional link to one real payment; one real payment
@@ -431,10 +431,10 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
   replaying an unapplied outcome.
 - Committed mutations append one `sharing_audit` row carrying actor,
   action, target identities, link, outcome status, request ID, and time.
-  Replays and heals append none. Owners read their posting's trace at
+  Replays and heals append none. Owners read their transaction's trace at
   `GET /v1/shared/audit`; there is no audience-side read. Audit payloads
   never carry transaction evidence (no amounts, names, accounts, memos,
-  or posting content). Replays return the recorded result to its own
+  or transaction content). Replays return the recorded result to its own
   actor only; the accept replay is the recipient's own copy, never a
   cross-user read.
 
@@ -453,7 +453,7 @@ Consequences:
 - disabled settings evaluation configs still skip their evaluations, but every call re-evaluates what is enabled;
 - seeded stochastic runs with equal run count and seed draw the same sequence;
 - unseeded stochastic runs draw fresh samples per call;
-- projection payloads keep dates as strings, `projectionStartPostingState` as a plain JSON object, and evaluation `deterministic`/`probabilistic` values as arbitrary JSON.
+- projection payloads keep dates as strings, `projectionStartTransactionState` as a plain JSON object, and evaluation `deterministic`/`probabilistic` values as arbitrary JSON.
 
 ## 5. Model Semantics
 
@@ -468,17 +468,17 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 - A destination can receive only `max(0, maxBalance - balance)`.
 - Bounds are structural constraints, not labels or categories.
 
-### Posting and recurrence-rule structure
+### Transaction and recurrence-rule structure
 
-Postings are single timed transactions: one record of money moved, carrying
+Transactions are single timed transactions: one record of money moved, carrying
 posted time (when the bank posts it) and transaction time (when the money
 moves), both Unix seconds. Repetition is owned by recurrence rules, which
-expand into occurrences at projection time. A posting with a `claim`
+expand into occurrences at projection time. A transaction with a `claim`
 (`scheduleId` plus `occurrenceDate`, both set manually) records the actual for
 one scheduled occurrence; history replays the actual and skips the generated
 occurrence.
 
-Posting and rule behavior is selected only by source and destination presence:
+Transaction and rule behavior is selected only by source and destination presence:
 
 | Source  | Destinations | Behavior                    |
 | ------- | ------------ | --------------------------- |
@@ -486,18 +486,18 @@ Posting and rule behavior is selected only by source and destination presence:
 | present | absent       | external outflow            |
 | present | present      | account-to-account transfer |
 
-`enabled` controls participation. One-time postings carry posted and
+`enabled` controls participation. One-time transactions carry posted and
 transaction Unix times and always execute before scheduled rule
 occurrences on the same day, ordered by transaction time, then posted
 time, then ID. Rules carry `priority`, which orders rule occurrences
-after all one-time postings on the same day; declaration sequence breaks
+after all one-time transactions on the same day; declaration sequence breaks
 priority ties.
 
 A rule occurrence executes exactly on its scheduled date. Schedules use 365-day years, 52-week years, and clamped calendar-month/year addition.
 
 ### Amount resolution
 
-`PostingAmountResolution` contains a resolver name, resolver config, and exact required inputs. Each input is either a finite literal or a named provider binding.
+`TransactionAmountResolution` contains a resolver name, resolver config, and exact required inputs. Each input is either a finite literal or a named provider binding.
 
 Current providers:
 
@@ -514,9 +514,9 @@ Current general resolvers:
 - `expression`;
 - `progressive-bracket` (progressive tax liability on gross minus pre-tax contributions minus deduction).
 
-`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring transactions resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary transactions.
+`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring transactions resolve through the same path. Transaction references (`model-value`) may name transaction or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary transactions.
 
-Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets. The wire shape is unchanged; presets only author it.
+Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a transaction or rule, so simulation never reads presets. The wire shape is unchanged; presets only author it.
 
 ### Constraints and transaction records
 
@@ -528,7 +528,7 @@ Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers`
 
 `TransitionRuntime` applies the realized amount and records ordered account deltas. Every transaction exposes requested and realized amounts, which is the causal evidence used by fulfillment and financial-independence diagnostics.
 
-Annual-cap usage is observed from realized amounts by transaction ID (posting or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own posting ID.
+Annual-cap usage is observed from realized amounts by transaction ID (transaction or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own transaction ID.
 
 ## 6. Validation and Preparation
 
@@ -539,14 +539,14 @@ also reject newly introduced evaluation reference errors.
 
 Complete validation checks:
 
-- duplicate account, posting, rule, and cross-type evaluation IDs;
-- account/posting/rule ID collisions (one shared namespace);
+- duplicate account, transaction, rule, and cross-type evaluation IDs;
+- account/transaction/rule ID collisions (one shared namespace);
 - checkpoint account and required instant (every observation carries only
   its exact Unix time; there is no Date field and no zero sentinel), and
   the timestamp-only key (several observations per day survive; only the
   exact same account/instant collides);
-- amount resolver config, exact required inputs, provider references, and transaction dependency cycles spanning postings and rules;
-- posting and rule source/destination references, duplicate destinations, same-account routing, rule schedules, and claim validity (named rule exists, date is a real scheduled occurrence, no double claims);
+- amount resolver config, exact required inputs, provider references, and transaction dependency cycles spanning transactions and rules;
+- transaction and rule source/destination references, duplicate destinations, same-account routing, rule schedules, and claim validity (named rule exists, date is a real scheduled occurrence, no double claims);
 - account bounds;
 - evaluation instance IDs and config.
 
@@ -572,7 +572,7 @@ replay; everything after it is future. Observations after the projection
 start are invalid.
 
 - History is one sorted event list, one forward pass: each transaction at its
-  effective instant (postings at their stored Unix time including 00:00;
+  effective instant (transactions at their stored Unix time including 00:00;
   rules at the day-close of their date) and each observation at its exact
   instant. No date-wide gates, no per-day phases, no identity-suppression
   maps. Claimed rule occurrences never replay.
@@ -580,7 +580,7 @@ start are invalid.
   before an observation at the same instant; owner observations execute
   last at the same instant. Daily snapshots sample the resulting state;
   they are not alternative execution phases.
-- Observations SET their account balance; postings CHANGE balances; a
+- Observations SET their account balance; transactions CHANGE balances; a
   later observation SETS again and records the observed-vs-modeled
   discrepancy as a checkpoint correction. Each anchor is per-account and
   absolute. Observations sort by instant, so arrival order never matters
@@ -591,7 +591,7 @@ start are invalid.
 - The simulation continues after the same cut instant, skipping
   already-replayed occurrences so nothing executes twice.
 
-Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers. `GET /v1/accounts/balances` and `POST /v1/position` report the same replay: adjusted modeled balances with the latest observation (balance plus timestamp) carried separately per account, never a folded latest checkpoint.
+Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Replay still updates balances, latest realized transaction amounts, and annual-cap state for later projection and amount providers. `GET /v1/accounts/balances` and `POST /v1/position` report the same replay: adjusted modeled balances with the latest observation (balance plus timestamp) carried separately per account, never a folded latest checkpoint.
 
 `BuildProjectionPath` prefixes these historical observations with projected snapshots. `ProjectionRow.isHistorical` marks the boundary.
 
@@ -604,7 +604,7 @@ The kernel:
 1. creates a `TransitionRuntime` from the prepared model, state, date, and optional sampled rates;
 2. expands enabled occurrences through the projection window via the preprocessor (`ExpandProjectionSchedule`; history, candidates, and branch windows keep their own local expansion);
 3. sorts dates and same-date occurrences, skipping occurrences named in `SuppressedIdentities` (exact-cut history already replayed them);
-4. prepares each occurrence amount from snapshots without touching runtime state (`PreparePostingExecution`: scheduled, sampled, and model-value inputs resolve here);
+4. prepares each occurrence amount from snapshots without touching runtime state (`PrepareTransactionExecution`: scheduled, sampled, and model-value inputs resolve here);
 5. applies each prepared request through the shared transition path (`ApplyPreparedExecution`: constraint clamping, balance mutation, and ledger recording live here — the only place impossible states are handled);
 6. records every requested/realized transaction and ordered account deltas;
 7. snapshots balances after each event date;
@@ -629,7 +629,7 @@ The kernel:
 | `financialIndependenceDefinition` | `financialIndependence` |
 | `netWorthThresholdDefinition`     | `netWorthThreshold`     |
 | `accountBalanceDefinition`        | `accountBalance`        |
-| `postingFulfillmentDefinition`    | `postingFulfillment`    |
+| `transactionFulfillmentDefinition`    | `transactionFulfillment`    |
 | `cycleFulfillmentDefinition`      | `cycleFulfillment`      |
 | `plannedPurchasesDefinition`      | `plannedPurchases`      |
 | `whatIfDefinition`                | `whatIf`                |
@@ -649,7 +649,7 @@ The kernel:
 
 An evaluator failure is isolated to that instance as an error diagnostic. Other configured instances continue.
 
-Posting fulfillment and public transaction evidence share the per-event assessment in `evaluateTransactionEvents`. Public `transactionEvents[].fulfillment` reports unfulfilled and destination-limited amounts, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
+Transaction fulfillment and public transaction evidence share the per-event assessment in `evaluateTransactionEvents`. Public `transactionEvents[].fulfillment` reports unfulfilled and destination-limited amounts, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
 
 Outlook renders only saved evaluation pins, using the same compact evaluation card components as the Evaluations page. Net-worth and account-balance targets have no automatic preview or fallback selection. Funding gaps has no separate always-visible panel. Pins control Outlook visibility; unpinning does not disable an evaluation. Threshold cards show the first-crossing date, current amount, target, and scenario result directly, without an evidence dialog. The shared Funding gaps card's cash-flow inspector follows the evaluation's configured transaction selection.
 
@@ -660,7 +660,7 @@ Outlook renders only saved evaluation pins, using the same compact evaluation ca
 The full principal-preservation cycle uses the generic monthly behavior loop and `TransitionRuntime`:
 
 - selected cashflow sources are observed from the base path;
-- only explicitly selected continuing transactions (postings or rules) execute in the branch;
+- only explicitly selected continuing transactions (transactions or rules) execute in the branch;
 - monthly expenses are covered by reactive withdrawals;
 - withdrawals obey account floors, nonnegative balance, and annual withdrawal limits;
 - a cycle fails at the first unresolved expense shortfall;
@@ -675,15 +675,15 @@ Continuing transactions are never inferred from IDs, labels, categories, or nonz
 
 `EvaluateNetWorthThreshold` scans projected rows only and returns the first date at which net worth reaches the configured target. Stochastic aggregation reports success probability and P10, median, and P90 reached dates across successful sampled outcomes.
 
-### Posting fulfillment
+### Transaction fulfillment
 
-`EvaluatePostingFulfillment` selects all postings when `postingIds` is null, or the configured subset otherwise. It reconstructs pre-event balances, classifies binding constraints, and reports requested, realized, destination-limited, and unfulfilled amounts.
+`EvaluateTransactionFulfillment` selects all transactions when `transactionIds` is null, or the configured subset otherwise. It reconstructs pre-event balances, classifies binding constraints, and reports requested, realized, destination-limited, and unfulfilled amounts.
 
-A residual below 0.5 is not reportable. Deterministic output includes first underfulfilled date plus event, date, and posting summaries. Stochastic output reports full-fulfillment probability and unfulfilled-amount percentiles.
+A residual below 0.5 is not reportable. Deterministic output includes first underfulfilled date plus event, date, and transaction summaries. Stochastic output reports full-fulfillment probability and unfulfilled-amount percentiles.
 
 ## 10. Stochastic Kernel
 
-`StochasticProjection` creates one `stochasticSession` and one prepared baseline request. When no enabled rule or posting carries a volatile amount, Monte Carlo stays fully opt-in: the session simulates once and folds that path into every trial, which is bit-identical to N identical trials at ~1/N the cost. Otherwise the session then:
+`StochasticProjection` creates one `stochasticSession` and one prepared baseline request. When no enabled rule or transaction carries a volatile amount, Monte Carlo stays fully opt-in: the session simulates once and folds that path into every trial, which is bit-identical to N identical trials at ~1/N the cost. Otherwise the session then:
 
 1. prepares and runs the deterministic baseline;
 2. evaluates deterministic baseline evaluations in summary mode;
@@ -763,7 +763,7 @@ carry extracted evidence with `gmail-receipt-email/v1` provenance while
 ordinary and shipping-only rows keep identity and verdict only. Message
 bodies and snippets are never persisted. Per-message fetch/parse
 failures are isolated as failed rows with diagnostics; the scanner holds
-no reference to postings or balances, so parser errors never mutate
+no reference to transactions or balances, so parser errors never mutate
 financial state. `GET /v1/integrations/gmail/receipts` lists evidence
 with verdict/status filters and `PATCH .../receipts/{id}` confirms or
 corrects one extraction, overlaying the original values without
@@ -779,17 +779,17 @@ the user correction overlay.
 - The client sends SimpleFIN protocol version 2 and rejects a response without both `errlist` and `connections`. General and authentication errors fail the run. Connection and account errors exclude only the affected rows, so an incomplete snapshot never voids healthy pending holds. The last condition is stored on the provider connection row and exposed as `syncError` on `/v1/status`; a clean success clears it.
 - Card selection is stored per user in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
-- The synced-account list offers one account-mapping action: `POST /v1/sync/simplefin/accounts/{bridgeAccountId}/supersede` retires one manual account in favor of the synced account already linked to that bridge account. The synced account keeps its link and bank facts. The manual account's list slot, name, color, kind, balance limits, payment terms, recurrence routes, planned-purchase funding, safe-spending selections, card selections, evaluation references, and sharing-policy account selections move to it. The manual account, its owner postings, and its checkpoints are deleted. A manual account that already carries bank checkpoints or bank postings is rejected, as is a stale bridge link. The candidate is validated before commit; a rejected candidate returns issues with `saved: false` and changes nothing.
+- The synced-account list offers one account-mapping action: `POST /v1/sync/simplefin/accounts/{bridgeAccountId}/supersede` retires one manual account in favor of the synced account already linked to that bridge account. The synced account keeps its link and bank facts. The manual account's list slot, name, color, kind, balance limits, payment terms, recurrence routes, planned-purchase funding, safe-spending selections, card selections, evaluation references, and sharing-policy account selections move to it. The manual account, its owner transactions, and its checkpoints are deleted. A manual account that already carries bank checkpoints or bank transactions is rejected, as is a stale bridge link. The candidate is validated before commit; a rejected candidate returns issues with `saved: false` and changes nothing.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
 `Runner.Sync` delegates to the ingest orchestrator with the SimpleFIN adapter. The orchestrator requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. The checkpoint also carries the Bridge's `available-balance` when present in the additive `checkpoint_available_balances` sidecar. The posted balance remains the sole net-worth authority; available balance is nullable evidence for safe-spending and card headroom. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at posting time: the translation emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual postings. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at transaction time: the translation emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual transactions. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
 
 One-off legacy interpretation, stated plainly: in databases written
 before this change, a disabled settled bank row does not distinguish the
 old importer default from an explicit pre-upgrade API owner disable
-(`UpdatePosting` persists `enabled` on settled bank rows, and bank rows
+(`UpdateTransaction` persists `enabled` on settled bank rows, and bank rows
 are readable in the UI but only the API could have written the flag).
 The one-time offline script therefore enables ALL legacy settled bank
 rows, including any pre-upgrade API disables; that is the documented
@@ -839,7 +839,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                        |
 | `backend/internal/domain/evaluation_fi.go`          | financial-independence branch evaluation                |
 | `backend/internal/domain/evaluation_threshold.go`   | net-worth threshold evaluation                          |
-| `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation                          |
+| `backend/internal/domain/evaluation_fulfillment.go` | transaction fulfillment evaluation                          |
 | `backend/internal/domain/project.go`                 | direct prepare, simulate, and evaluate orchestration    |
 | `backend/internal/domain/projection_pipeline.go`    | baseline engine and Monte Carlo runner wrappers         |
 | `backend/internal/domain/projection_reader.go`      | slice invalidation helpers                             |

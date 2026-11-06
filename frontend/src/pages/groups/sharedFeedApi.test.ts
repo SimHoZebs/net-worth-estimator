@@ -56,10 +56,12 @@ it("omits empty filters from the feed request", async () => {
 });
 
 it("saves a copy through the recipient copy flow", async () => {
-	const posting = { id: "p1", name: "Groceries" };
-	const fetcher = vi.fn(async () => ok({ posting }));
+	const transaction = { id: "p1", name: "Groceries" };
+	const fetcher = vi.fn(async () => ok({ transaction }));
 	vi.stubGlobal("fetch", fetcher);
-	await expect(saveSharedCopy("user:abc123", "p1")).resolves.toEqual(posting);
+	await expect(saveSharedCopy("user:abc123", "p1")).resolves.toEqual(
+		transaction,
+	);
 	const [url, options] = fetcher.mock.calls[0] as unknown as [
 		string,
 		RequestInit,
@@ -68,18 +70,18 @@ it("saves a copy through the recipient copy flow", async () => {
 	expect(options.method).toBe("POST");
 	const body = JSON.parse(String(options.body)) as Record<string, string>;
 	expect(body.owner).toBe("users/abc123");
-	expect(body.postingId).toBe("p1");
+	expect(body.transactionId).toBe("p1");
 	expect(body.requestId).toMatch(
 		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
 	);
 });
 
 it("mints a fresh idempotency key per saved copy", async () => {
-	const posting = { id: "p1", name: "Groceries" };
+	const transaction = { id: "p1", name: "Groceries" };
 	const bodies: string[] = [];
 	const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {
 		bodies.push(String(options?.body));
-		return ok({ posting });
+		return ok({ transaction });
 	});
 	vi.stubGlobal("fetch", fetcher);
 	await saveSharedCopy("user:abc123", "p1");
@@ -92,8 +94,8 @@ it("mints a fresh idempotency key per saved copy", async () => {
 });
 
 it("reuses the caller's key for one share action", async () => {
-	const posting = { id: "p1", name: "Groceries" };
-	const fetcher = vi.fn(async () => ok({ posting }));
+	const transaction = { id: "p1", name: "Groceries" };
+	const fetcher = vi.fn(async () => ok({ transaction }));
 	vi.stubGlobal("fetch", fetcher);
 	await saveSharedCopy(
 		"user:abc123",
@@ -103,7 +105,7 @@ it("reuses the caller's key for one share action", async () => {
 	const [, options] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(JSON.parse(String(options.body))).toEqual({
 		owner: "users/abc123",
-		postingId: "p1",
+		transactionId: "p1",
 		requestId: "11111111-2222-4333-8444-555555555555",
 	});
 });

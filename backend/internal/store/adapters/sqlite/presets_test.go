@@ -9,7 +9,7 @@ import (
 func testPresetFixture(name string) types.AmountPreset {
 	return types.AmountPreset{
 		Name: name, Label: "Label " + name, Enabled: true,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "10"},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -54,7 +54,7 @@ func TestAmountPresetCRUD(t *testing.T) {
 	}
 	generated, err := store.CreateAmountPreset(types.AmountPreset{
 		Label: "Generated", Enabled: true,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "5"},
 			Inputs:   map[string]types.AmountInputBinding{},

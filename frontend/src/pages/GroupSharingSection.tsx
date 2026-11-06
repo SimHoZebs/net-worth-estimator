@@ -15,7 +15,7 @@ import {
 } from "../state/sharing.ts";
 import {
 	mintShareRequestId,
-	revokeSharedPosting,
+	revokeSharedTransaction,
 } from "../pages/sharingApi.ts";
 import type { SharingPolicyInput } from "../pages/sharingApi.ts";
 
@@ -211,8 +211,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			});
 			for (const grant of sharedGrants) {
 				try {
-					await revokeSharedPosting(
-						grant.postingId,
+					await revokeSharedTransaction(
+						grant.transactionId,
 						grant.audienceType,
 						grant.audienceId,
 						mintShareRequestId(),
@@ -366,8 +366,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					) : (
 						preview && (
 							<p className="m-0 text-muted">
-								{preview.eligiblePostings}{" "}
-								{preview.eligiblePostings === 1
+								{preview.eligibleTransactions}{" "}
+								{preview.eligibleTransactions === 1
 									? "transaction"
 									: "transactions"}{" "}
 								across {preview.accountIds.length}{" "}

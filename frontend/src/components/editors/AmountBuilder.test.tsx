@@ -27,7 +27,7 @@ it("starts from the saved built-in recipe and applies only explicit edits", () =
 	render(
 		<AmountBuilder
 			accounts={[]}
-			postings={[]}
+			transactions={[]}
 			templates={[template]}
 			onChange={onChange}
 		/>,

@@ -113,13 +113,13 @@ func (s *sqliteStore) CompleteAnalysis(run types.AnalysisRun, findings []types.A
 		}
 		seen := map[string]bool{}
 		for _, item := range findings {
-			key := item.PostingID + "\x00" + item.Kind
-			if item.PostingID == "" || item.Kind == "" || seen[key] {
+			key := item.TransactionID + "\x00" + item.Kind
+			if item.TransactionID == "" || item.Kind == "" || seen[key] {
 				return fmt.Errorf("invalid or duplicate analysis finding")
 			}
 			seen[key] = true
 			var exists int
-			if err := tx.QueryRow(`SELECT COUNT(*) FROM transaction_source_facts WHERE posting_id = ? AND user_id = :user_id`, item.PostingID).Scan(&exists); err != nil {
+			if err := tx.QueryRow(`SELECT COUNT(*) FROM transaction_source_facts WHERE transaction_id = ? AND user_id = :user_id`, item.TransactionID).Scan(&exists); err != nil {
 				return err
 			}
 			if exists != 1 {
@@ -133,10 +133,10 @@ func (s *sqliteStore) CompleteAnalysis(run types.AnalysisRun, findings []types.A
 			if err != nil {
 				return err
 			}
-			if _, err := tx.Exec(`INSERT INTO analysis_findings(id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, user_id)
+			if _, err := tx.Exec(`INSERT INTO analysis_findings(id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, user_id)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', :user_id)
-				ON CONFLICT(user_id, analysis_type, posting_id, kind) DO UPDATE SET detection_json = excluded.detection_json, run_id = excluded.run_id, last_checked_at = excluded.last_checked_at, status = 'active'`,
-				id, run.Type, item.PostingID, item.Kind, string(data), run.ID, now, now); err != nil {
+				ON CONFLICT(user_id, analysis_type, transaction_id, kind) DO UPDATE SET detection_json = excluded.detection_json, run_id = excluded.run_id, last_checked_at = excluded.last_checked_at, status = 'active'`,
+				id, run.Type, item.TransactionID, item.Kind, string(data), run.ID, now, now); err != nil {
 				return err
 			}
 		}

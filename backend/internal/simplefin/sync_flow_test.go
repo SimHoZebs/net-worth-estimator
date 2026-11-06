@@ -10,21 +10,21 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// flowPosting builds adapter-shaped sync postings: settled rows participate
+// flowTransaction builds adapter-shaped sync transactions: settled rows participate
 // (enabled), pending seeds stay disabled, exactly as the translation emits them.
-func flowPosting(id, name, account, amount string, pending bool, day string) store.SyncPosting {
+func flowTransaction(id, name, account, amount string, pending bool, day string) store.SyncTransaction {
 	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
 	if err != nil {
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
-	return store.SyncPosting{
+	return store.SyncTransaction{
 		ProviderAccountID: testAccountKey("bridge-" + account),
 		TransactionID:     id,
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            name,
 			Source:          store.SourceBankSync,
 			SourceAccountID: &account,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
 			Enabled:         !pending,
@@ -33,9 +33,9 @@ func flowPosting(id, name, account, amount string, pending bool, day string) sto
 	}
 }
 
-func applyFlow(t *testing.T, database store.Store, pending, settled []store.SyncPosting) store.SyncApplySummary {
+func applyFlow(t *testing.T, database store.Store, pending, settled []store.SyncTransaction) store.SyncApplySummary {
 	t.Helper()
-	bank, err := database.LoadBankPostings()
+	bank, err := database.LoadBankTransactions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,15 +47,15 @@ func applyFlow(t *testing.T, database store.Store, pending, settled []store.Sync
 	return summary
 }
 
-func bankRowIDs(t *testing.T, database store.Store) map[string]types.Posting {
+func bankRowIDs(t *testing.T, database store.Store) map[string]types.Transaction {
 	t.Helper()
-	rows, err := database.LoadBankPostings()
+	rows, err := database.LoadBankTransactions()
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := map[string]types.Posting{}
+	out := map[string]types.Transaction{}
 	for _, row := range rows {
-		out[row.Posting.ID] = row.Posting
+		out[row.Transaction.ID] = row.Transaction
 	}
 	return out
 }
@@ -64,7 +64,7 @@ func TestSyncFlowPendingConvertsToSettled(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
 	first := applyFlow(t, database,
-		[]store.SyncPosting{flowPosting("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
+		[]store.SyncTransaction{flowTransaction("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
 	if first.PendingInserted != 1 {
 		t.Fatalf("seed = %+v", first)
 	}
@@ -75,7 +75,7 @@ func TestSyncFlowPendingConvertsToSettled(t *testing.T) {
 	// The posted charge arrives under a new id: the hold itself becomes
 	// the posted charge, keeping its UUID.
 	second := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
 	if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingDeleted != 0 {
 		t.Fatalf("settle = %+v, want one convert of the hold", second)
 	}
@@ -90,7 +90,7 @@ func TestSyncFlowPendingConvertsToSettled(t *testing.T) {
 	}
 	// The settled charge stays in later feeds without duplicating.
 	third := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
 	if third.SettledConverted != 0 || third.SettledInserted != 0 || third.PendingDeleted != 0 {
 		t.Fatalf("repeat = %+v", third)
 	}
@@ -103,7 +103,7 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
 	first := applyFlow(t, database,
-		[]store.SyncPosting{flowPosting("auth-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
+		[]store.SyncTransaction{flowTransaction("auth-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
 	if first.PendingInserted != 1 {
 		t.Fatalf("seed = %+v", first)
 	}
@@ -118,20 +118,20 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	if _, err := database.CreateSchedule(types.Schedule{
 		ID: "corner", Name: "Corner Store", Frequency: types.FrequencyMonthly,
 		StartDate: "2026-08-01", Enabled: true,
-		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
 	}); err != nil {
 		t.Fatalf("rule = %v", err)
 	}
-	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
-		PostingID: id,
-		Claim:     types.PostingClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"},
+	if _, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: id,
+		Claim:         types.TransactionClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"},
 	}}); err != nil {
 		t.Fatalf("claim = %v", err)
 	}
 	// The posted charge arrives under a new id: it joins the claimed hold
 	// instead of inserting beside it, and the claim survives.
 	second := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
 	if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingDeleted != 0 {
 		t.Fatalf("settle = %+v, want one convert of the claimed hold", second)
 	}
@@ -157,12 +157,12 @@ func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
 	// Dinner authorizes $50, then posts at $58 with the tip: the hold
 	// itself becomes the posted charge, keeping its UUID.
 	first := applyFlow(t, database,
-		[]store.SyncPosting{flowPosting("auth-a", "Bistro", "prime_card", "50.00", true, "2026-08-02")}, nil)
+		[]store.SyncTransaction{flowTransaction("auth-a", "Bistro", "prime_card", "50.00", true, "2026-08-02")}, nil)
 	if first.PendingInserted != 1 {
 		t.Fatalf("seed = %+v", first)
 	}
 	second := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
 	if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingDeleted != 0 {
 		t.Fatalf("tip settle = %+v, want one convert of the hold", second)
 	}
@@ -177,7 +177,7 @@ func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
 	}
 	// A repeat of the identical feed is a stable no-op.
 	third := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
 	if third.SettledConverted != 0 || third.SettledInserted != 0 || third.PendingDeleted != 0 {
 		t.Fatalf("repeat = %+v", third)
 	}
@@ -187,7 +187,7 @@ func TestSyncFlowVanishedPendingVoidsAndHeals(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
 	applyFlow(t, database,
-		[]store.SyncPosting{flowPosting("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
+		[]store.SyncTransaction{flowTransaction("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
 	voided := applyFlow(t, database, nil, nil)
 	if voided.PendingDeleted != 1 {
 		t.Fatalf("void = %+v", voided)
@@ -202,7 +202,7 @@ func TestSyncFlowVanishedPendingVoidsAndHeals(t *testing.T) {
 		}
 	}
 	healed := applyFlow(t, database,
-		[]store.SyncPosting{flowPosting("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-04")}, nil)
+		[]store.SyncTransaction{flowTransaction("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-04")}, nil)
 	if healed.PendingUpdated != 1 || healed.PendingInserted != 0 {
 		t.Fatalf("heal = %+v", healed)
 	}
@@ -215,10 +215,10 @@ func TestSyncFlowAmbiguousSettleVoidsAndInsertsBoth(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
 	applyFlow(t, database,
-		[]store.SyncPosting{flowPosting("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
-	summary := applyFlow(t, database, nil, []store.SyncPosting{
-		flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03"),
-		flowPosting("post-b", "Corner Store late", "prime_card", "42.10", false, "2026-08-04"),
+		[]store.SyncTransaction{flowTransaction("pend-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
+	summary := applyFlow(t, database, nil, []store.SyncTransaction{
+		flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03"),
+		flowTransaction("post-b", "Corner Store late", "prime_card", "42.10", false, "2026-08-04"),
 	})
 	if summary.SettledConverted != 0 || summary.SettledInserted != 2 || summary.PendingDeleted != 1 {
 		t.Fatalf("ambiguous = %+v", summary)
@@ -233,7 +233,7 @@ func TestSyncFlowPreservesOwnerDisabledSettledBankRow(t *testing.T) {
 	seedRunnerAccounts(t, database)
 	// Settle one posted charge through the normal path.
 	first := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
 	if first.SettledInserted != 1 {
 		t.Fatalf("seed = %+v", first)
 	}
@@ -242,11 +242,11 @@ func TestSyncFlowPreservesOwnerDisabledSettledBankRow(t *testing.T) {
 	for rowID := range rows {
 		id = rowID
 	}
-	// The owner explicitly excludes the settled row. UpdatePosting persists
+	// The owner explicitly excludes the settled row. UpdateTransaction persists
 	// Enabled for settled bank rows while keeping their provenance.
 	disabled := rows[id]
 	disabled.Enabled = false
-	updated, err := database.UpdatePosting(disabled)
+	updated, err := database.UpdateTransaction(disabled)
 	if err != nil || updated.Enabled {
 		t.Fatalf("owner disable = %+v, err %v", updated, err)
 	}
@@ -254,7 +254,7 @@ func TestSyncFlowPreservesOwnerDisabledSettledBankRow(t *testing.T) {
 	// is never reprocessed, so the explicit exclusion is not reactivated
 	// and no duplicate appears.
 	second := applyFlow(t, database, nil,
-		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
 	if second.SettledInserted != 0 || second.SettledConverted != 0 || second.PendingUpdated != 0 {
 		t.Fatalf("repeat = %+v, want no directives", second)
 	}
@@ -300,7 +300,7 @@ func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now 
 	for _, checkpoint := range translation.Checkpoints {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{AccountID: checkpoint.AccountID, Balance: checkpoint.Balance, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: checkpoint.ObservedAt})
 	}
-	bank, err := database.LoadBankPostings()
+	bank, err := database.LoadBankTransactions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,8 +338,8 @@ func TestFirstSyncImportsCheckpointAndSettledTogether(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(model.Postings) != 1 {
-			t.Fatalf("%s: postings = %d, want 1 translated settled row", sync, len(model.Postings))
+		if len(model.Transactions) != 1 {
+			t.Fatalf("%s: transactions = %d, want 1 translated settled row", sync, len(model.Transactions))
 		}
 		position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 		if err != nil {
@@ -382,11 +382,11 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if len(translation.Settled) != 1 {
 		t.Fatalf("settled = %+v, want 1", translation.Settled)
 	}
-	if !translation.Settled[0].Posting.Enabled {
-		t.Fatalf("settled bank actual must participate: %+v", translation.Settled[0].Posting)
+	if !translation.Settled[0].Transaction.Enabled {
+		t.Fatalf("settled bank actual must participate: %+v", translation.Settled[0].Transaction)
 	}
-	if translation.Settled[0].Posting.TransactionTime != 1773140400 {
-		t.Fatalf("settled event time = %d, want posted instant 1773140400", translation.Settled[0].Posting.TransactionTime)
+	if translation.Settled[0].Transaction.TransactionTime != 1773140400 {
+		t.Fatalf("settled event time = %d, want posted instant 1773140400", translation.Settled[0].Transaction.TransactionTime)
 	}
 	_, model := applyProviderFeed(t, database, &set, now)
 	position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
@@ -405,9 +405,9 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if result.Summary.CurrentNetWorth != position.NetWorth {
 		t.Fatalf("projection net worth %v != position net worth %v", result.Summary.CurrentNetWorth, position.NetWorth)
 	}
-	// A repeat of the identical feed is a stable no-op: one posting held,
+	// A repeat of the identical feed is a stable no-op: one transaction held,
 	// balances unchanged.
-	bank, err := database.LoadBankPostings()
+	bank, err := database.LoadBankTransactions()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,8 +422,8 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(again.Postings) != 1 {
-		t.Fatalf("repeat feed duplicated the bank row: %+v", again.Postings)
+	if len(again.Transactions) != 1 {
+		t.Fatalf("repeat feed duplicated the bank row: %+v", again.Transactions)
 	}
 	position, err = domain.ResolveCurrentPosition(again, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
@@ -466,11 +466,11 @@ func TestPendingSeedConvertsToSettledEndToEnd(t *testing.T) {
 	if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingDeleted != 0 {
 		t.Fatalf("settlement = %+v, want one convert of the hold", second)
 	}
-	if len(converted.Postings) != 1 {
-		t.Fatalf("settlement rows = %d, want the hold updated to posted", len(converted.Postings))
+	if len(converted.Transactions) != 1 {
+		t.Fatalf("settlement rows = %d, want the hold updated to posted", len(converted.Transactions))
 	}
-	if converted.Postings[0].Pending {
-		t.Fatalf("settled row is still pending: %+v", converted.Postings[0])
+	if converted.Transactions[0].Pending {
+		t.Fatalf("settled row is still pending: %+v", converted.Transactions[0])
 	}
 	position, err = domain.ResolveCurrentPosition(converted, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {

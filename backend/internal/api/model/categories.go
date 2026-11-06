@@ -23,7 +23,7 @@ type transactionCategoryOutput struct {
 	} `json:"body"`
 }
 
-func (s *handler) setPostingCategory(_ context.Context, input *struct {
+func (s *handler) setTransactionCategory(_ context.Context, input *struct {
 	ID   string                  `path:"id"`
 	Body transactionCategoryBody `json:"body"`
 }) (*transactionCategoryOutput, error) {
@@ -34,7 +34,7 @@ func (s *handler) setPostingCategory(_ context.Context, input *struct {
 		}
 		input.Body.Category = &value
 	}
-	result, err := s.store.SetUserPostingCategory(input.ID, input.Body.Category)
+	result, err := s.store.SetUserTransactionCategory(input.ID, input.Body.Category)
 	if err != nil {
 		if store.IsNotFound(err) {
 			return nil, huma.Error404NotFound("transaction not found")
@@ -42,7 +42,7 @@ func (s *handler) setPostingCategory(_ context.Context, input *struct {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	output := &transactionCategoryOutput{}
-	output.Body.TransactionID = result.PostingID
+	output.Body.TransactionID = result.TransactionID
 	output.Body.Category = result.Category
 	output.Body.CategorySource = result.Source
 	return output, nil

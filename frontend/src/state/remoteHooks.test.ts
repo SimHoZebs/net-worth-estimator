@@ -372,13 +372,13 @@ function projectionFixture(): ProjectionResult {
 				},
 			],
 			accountBalance: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 		},
 		transactionEvents: [
 			{
 				date: "2026-02-01",
 				sequence: 0,
-				origin: { type: "posting", postingId: "salary" },
+				origin: { type: "transaction", transactionId: "salary" },
 				requestedAmount: 100,
 				realizedAmount: 100,
 				accountDeltas: [{ accountId: "cash", delta: 100 }],
@@ -413,12 +413,12 @@ function stochasticFixture(): StochasticProjectionResult {
 				},
 			],
 			accountBalance: [],
-			postingFulfillment: [
+			transactionFulfillment: [
 				{
 					instanceId: "all",
-					name: "All postings",
+					name: "All transactions",
 					status: "satisfied",
-					deterministic: { postingIds: null },
+					deterministic: { transactionIds: null },
 					probabilistic: { fullFulfillmentProbability: 0.6 },
 					diagnostics: [],
 				},
@@ -1004,7 +1004,7 @@ describe("remote projection mapping and SSE", () => {
 							evaluationYears: 10,
 							requiredConfidence: 0.9,
 							sources: [],
-							continuingPostingIds: [],
+							continuingTransactionIds: [],
 							principalPolicy: "preserve-real-principal",
 							annualExpenseTargetBasis: "fi-date-dollars",
 						},
@@ -1248,17 +1248,17 @@ describe("remote projection mapping and SSE", () => {
 		).not.toBeNull();
 	});
 
-	it("maps a posting shortfall to a date and fulfillment bar", () => {
+	it("maps a transaction shortfall to a date and fulfillment bar", () => {
 		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
-				postingFulfillment: [
+				transactionFulfillment: [
 					{
 						instanceId: "fulfillment",
 						name: "Planned transactions",
 						enabled: true,
-						config: { postingIds: null },
+						config: { transactionIds: null },
 					},
 				],
 			},
@@ -1267,7 +1267,7 @@ describe("remote projection mapping and SSE", () => {
 			...projectionFixture(),
 			evaluations: {
 				...projectionFixture().evaluations,
-				postingFulfillment: [
+				transactionFulfillment: [
 					{
 						instanceId: "fulfillment",
 						name: "Planned transactions",
@@ -1286,24 +1286,24 @@ describe("remote projection mapping and SSE", () => {
 		expect(
 			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
 		).toMatchObject({
-			name: model.evaluations.postingFulfillment[0]!.name,
+			name: model.evaluations.transactionFulfillment[0]!.name,
 			outcomeDate: "2026-05-01",
 			qualifier: null,
 			progress: { fraction: 0.87 },
 		});
 	});
 
-	it("maps full posting fulfillment to words without a bar", () => {
+	it("maps full transaction fulfillment to words without a bar", () => {
 		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
-				postingFulfillment: [
+				transactionFulfillment: [
 					{
 						instanceId: "fulfillment",
-						name: "Posting fulfillment",
+						name: "Transaction fulfillment",
 						enabled: true,
-						config: { postingIds: null },
+						config: { transactionIds: null },
 					},
 				],
 			},
@@ -1312,7 +1312,7 @@ describe("remote projection mapping and SSE", () => {
 			...projectionFixture(),
 			evaluations: {
 				...projectionFixture().evaluations,
-				postingFulfillment: [
+				transactionFulfillment: [
 					{
 						instanceId: "fulfillment",
 						name: "Planned transactions",
@@ -1329,7 +1329,7 @@ describe("remote projection mapping and SSE", () => {
 			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
 		).toMatchObject({
 			status: "satisfied",
-			postingIds: null,
+			transactionIds: null,
 			outcomeDate: null,
 			progress: null,
 		});
@@ -2005,7 +2005,7 @@ describe("saved-state resource scope", () => {
 	it("uses a stable semantic server fingerprint", () => {
 		const model = modelFixture();
 		const reordered = {
-			postings: model.postings,
+			transactions: model.transactions,
 			schedules: model.schedules,
 			evaluations: model.evaluations,
 			checkpoints: model.checkpoints,

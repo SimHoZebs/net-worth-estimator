@@ -24,8 +24,8 @@ export function FlowEdgePanel({
 }) {
 	const { edge } = item;
 	const nameOf = (id: string) => flowNodeName(graph, id);
-	const postingIds = Array.from(
-		new Set(edge.sources.map((source) => source.postingId)),
+	const transactionIds = Array.from(
+		new Set(edge.sources.map((source) => source.transactionId)),
 	);
 	return (
 		<section
@@ -59,7 +59,7 @@ export function FlowEdgePanel({
 			{expanded &&
 				item.members.map((member) => (
 					<p
-						key={`${member.from} ${member.to} ${member.sources.map((source) => source.postingId).join(",")}`}
+						key={`${member.from} ${member.to} ${member.sources.map((source) => source.transactionId).join(",")}`}
 						className="mt-1 text-xs text-muted"
 					>
 						{describeFlowEdge(member, nameOf, money)} — {member.sources.length}{" "}
@@ -77,7 +77,7 @@ export function FlowEdgePanel({
 			>
 				{edge.sources.map((source) => (
 					<TableRow
-						key={`${source.postingId} ${source.date} ${source.sequence}`}
+						key={`${source.transactionId} ${source.date} ${source.sequence}`}
 					>
 						<TableCell>{dateLabel(source.date)}</TableCell>
 						<TableCell>{money(source.requestedAmount)}</TableCell>
@@ -87,7 +87,7 @@ export function FlowEdgePanel({
 			</DataTable>
 			{edge.kind === "transfer" && (
 				<TransferMatchNote
-					postingIds={postingIds}
+					transactionIds={transactionIds}
 					transferCount={edge.sources.length}
 				/>
 			)}

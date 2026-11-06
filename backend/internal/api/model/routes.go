@@ -36,7 +36,7 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "claim-occurrence", Method: "POST", Path: "/transactions/{id}/claim", Summary: "Record which schedule occurrence a transaction fulfils"}, s.claimOccurrence)
 	huma.Register(api, huma.Operation{OperationID: "release-occurrence", Method: "POST", Path: "/transactions/{id}/release", Summary: "Release a transaction from its schedule occurrence"}, s.releaseOccurrence)
 	huma.Register(api, huma.Operation{OperationID: "schedule-from-transaction", Method: "POST", Path: "/transactions/{id}/schedule", Summary: "Start a schedule from a recorded transaction"}, s.startScheduleFromTransaction)
-	huma.Register(api, huma.Operation{OperationID: "categorize-transaction", Method: "POST", Path: "/transactions/{id}/categorize", Summary: "Set or clear one transaction category"}, s.setPostingCategory)
+	huma.Register(api, huma.Operation{OperationID: "categorize-transaction", Method: "POST", Path: "/transactions/{id}/categorize", Summary: "Set or clear one transaction category"}, s.setTransactionCategory)
 	huma.Register(api, huma.Operation{OperationID: "delete-transaction", Method: "DELETE", Path: "/transactions/{id}", Summary: "Delete one recorded transaction"}, s.deleteTransaction)
 	huma.Register(api, huma.Operation{OperationID: "move-transaction", Method: "POST", Path: "/transactions/{id}/move", Summary: "Move one transaction in same-day execution order"}, s.moveTransaction)
 	huma.Register(api, huma.Operation{OperationID: "import-model", Method: "POST", Path: "/model/import", Summary: "Replace the reviewed model"}, s.importModel)

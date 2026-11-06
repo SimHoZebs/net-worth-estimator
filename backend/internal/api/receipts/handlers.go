@@ -29,8 +29,8 @@ func (s *handler) receiptResponse(receipt types.Receipt, err error) (*receiptOut
 	if err != nil {
 		return nil, receiptAPIError(err)
 	}
-	// Decorate every response against the current saved posting, including a
-	// review saved after that posting changed. View state is never persisted.
+	// Decorate every response against the current saved transaction, including a
+	// review saved after that transaction changed. View state is never persisted.
 	receipt, err = s.service.Get(receipt.ID)
 	if err != nil {
 		return nil, receiptAPIError(err)
@@ -45,7 +45,7 @@ func receiptAPIError(err error) error {
 	var failure *receipts.Error
 	switch {
 	case errors.Is(err, store.ErrReceiptNotFound):
-		return huma.Error404NotFound("Receipt or posting not found")
+		return huma.Error404NotFound("Receipt or transaction not found")
 	case errors.Is(err, store.ErrReceiptConflict):
 		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, store.ErrReceiptDuplicate):
@@ -92,8 +92,8 @@ func (s *handler) listReceipts(_ context.Context, input *receiptIDInput) (*struc
 
 func (s *handler) attachReceipt(ctx context.Context, input *struct {
 	RawBody huma.MultipartFormFiles[struct {
-		PostingID string        `form:"postingId" required:"true" maxLength:"100"`
-		Image     huma.FormFile `form:"image" contentType:"image/jpeg,image/png" required:"true"`
+		TransactionID string        `form:"transactionId" required:"true" maxLength:"100"`
+		Image         huma.FormFile `form:"image" contentType:"image/jpeg,image/png" required:"true"`
 	}]
 }) (*receiptOutput, error) {
 	form := input.RawBody.Data()
@@ -102,7 +102,7 @@ func (s *handler) attachReceipt(ctx context.Context, input *struct {
 	if err != nil {
 		return nil, receiptAPIError(err)
 	}
-	return s.receiptResponse(s.service.Attach(ctx, form.PostingID, form.Image.Filename, image))
+	return s.receiptResponse(s.service.Attach(ctx, form.TransactionID, form.Image.Filename, image))
 }
 
 func (s *handler) getReceipt(_ context.Context, input *receiptIDInput) (*receiptOutput, error) {

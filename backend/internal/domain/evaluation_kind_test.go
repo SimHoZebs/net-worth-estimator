@@ -172,9 +172,9 @@ func kindTestModel() (*types.FinancialModel, *types.ProjectionRuntimeSettings) {
 	model := &types.FinancialModel{
 		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
 		Evaluations: types.EmptyEvaluationTables(),
-		Postings: []types.Posting{{
+		Transactions: []types.Transaction{{
 			ID: "pay", Name: "Pay", Destinations: []string{"cash"}, Enabled: true,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
 			PostedTime:      midnightUnix("2026-02-05"),
 			TransactionTime: midnightUnix("2026-02-05"),
 		}},

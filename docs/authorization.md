@@ -6,7 +6,7 @@ not embed a second Casbin engine or evaluate a custom policy language.
 
 ## Resources, actions, and roles
 
-A user is the permission boundary. Its model accounts, postings, recurrence rules,
+A user is the permission boundary. Its model accounts, transactions, recurrence rules,
 checkpoints, evaluations, presets, pinned results, sync links, and projection
 projection caches stay inside that boundary.
 
@@ -145,22 +145,22 @@ permissions. The owner assignment is a one-time data migration, not signup role 
 ## Scope limits
 
 The first resource boundary is the whole user. Transaction-level sharing
-(FND-02) grants explicitly named postings to explicit audiences without
-widening that boundary: a shared read returns one owner-scoped posting in
+(FND-02) grants explicitly named transactions to explicit audiences without
+widening that boundary: a shared read returns one owner-scoped transaction in
 the existing transaction shape only, never accounts, balances, models,
 secrets, or receipts. A user picker, an IAM management screen, and
-cross-user collaboration beyond explicit posting grants remain out of
+cross-user collaboration beyond explicit transaction grants remain out of
 scope. New action/resource policies belong in Casdoor. New resource
 visibility must also pass the API's resource-resolution and
 storage-isolation boundary.
 
 Explicit sharing rules:
 
-- Only the source owner may grant, exclude, or revoke their own postings;
+- Only the source owner may grant, exclude, or revoke their own transactions;
   a group administrator cannot grant for another member.
 - Group-audience grants authorize only while both requester and source
   owner hold current membership; removal denies immediately.
-- Explicit share and exclusion cannot coexist for one posting plus one
+- Explicit share and exclusion cannot coexist for one transaction plus one
   audience; a user exclusion denies that person even through group
   grants, a group exclusion denies its current members, and a wildcard
   exclusion denies all current and future audiences.
@@ -169,65 +169,65 @@ Explicit sharing rules:
 - Accepted copies are recipient-owned rows: independently editable, never
   rewritten or erased by revocation. Delegated writes to another
   member's original stay deferred.
-- Forged owner, posting, account, and audience IDs fail closed as
+- Forged owner, transaction, account, and audience IDs fail closed as
   not-found so shared data is not enumerable.
 
 ## Group shared transaction feed (GRP-03)
 
 The per-group feed (`GET /v1/shared/groups/{groupId}/feed`) shows one
-member's authorized postings in one group, each listed once with the
+member's authorized transactions in one group, each listed once with the
 source member's group display name and every path authorizing the viewer
-(group names plus direct share). A posting belongs in the group feed when
+(group names plus direct share). A transaction belongs in the group feed when
 the viewer reaches it through the group (manual group grant or automatic
 policy) or through a direct share from one of the group's current
 members. Discovery reads the indexed references plus the explicit manual
-grants; `CheckSharedPostingAccess` re-validates membership and policy
+grants; `CheckSharedTransactionAccess` re-validates membership and policy
 version on every candidate with no index shortcut, so leaving or removal
 revokes source-original access immediately. Friend-specific (user),
 group, and wildcard exclusions deny the feed, the detail read, and the
-counts alike; pending postings qualify exactly like posted ones. Date,
+counts alike; pending transactions qualify exactly like posted ones. Date,
 member, and movement-direction filters narrow the authorized set for
 navigation only and never widen eligibility. Viewer-specific totals (one
-count per posting, the rounded sum of fixed amounts, plus the pending and
+count per transaction, the rounded sum of fixed amounts, plus the pending and
 calculated-amount rows inside the count but outside the sum) derive from
 the same filtered set as the listing, so they always agree. Keyset pages
-walk the owner-then-posting order with an opaque cursor. Saving a copy
+walk the owner-then-transaction order with an opaque cursor. Saving a copy
 reuses the SOC-02 accept flow, yielding an independently editable
 recipient row; source edits by recipients stay deferred, and
 read-only-permission is not a separate representation.
 ## Linked transactions (FND-04)
 
-A link binds one source-owner posting to one recipient-owned private copy
+A link binds one source-owner transaction to one recipient-owned private copy
 through immutable identities stored in `sharing_copies`. The copy stays
-an ordinary recipient-owned posting; the link is its provenance, not a
+an ordinary recipient-owned transaction; the link is its provenance, not a
 shared-transaction response DTO (reads still return the existing
 transaction shape only).
 
 Identities on one link (`store.SharingLink`):
 
-- Source transaction ID: `sourceOwnerId` plus `sourcePostingId`.
+- Source transaction ID: `sourceOwnerId` plus `sourceTransactionId`.
 - Link ID: `link_` plus 64 lowercase hex characters, derived as
-  `SHA-256("nwe-sharing-link/v1" || sourceOwnerId || sourcePostingId ||
+  `SHA-256("nwe-sharing-link/v1" || sourceOwnerId || sourceTransactionId ||
   recipientUserId)` with `0x00` separators (`store.SharingLinkID`). One
   link per source-plus-recipient triple: repeat accepts return the
   existing recipient row instead of minting duplicates, so the link ID is
   stable across refresh, revocation, re-grant, and retry replays. The
   `link_` prefix keeps links out of the row-ID registry shared by
-  accounts, postings, rules, and evaluations. A future scheme change must
+  accounts, transactions, rules, and evaluations. A future scheme change must
   use a new namespace.
-- Source revision: opaque hex content hash of the source posting snapshot
+- Source revision: opaque hex content hash of the source transaction snapshot
   observed at the last authorized copy or refresh
   (`store.SharingSourceRevision`). Compare revisions for staleness; never
   parse them.
-- Recipient owner: `recipientUserId` plus `copyPostingId`.
+- Recipient owner: `recipientUserId` plus `copyTransactionId`.
 - Sharing-grant identifiers: `grantAudienceType`, `grantAudienceId`, and
   `grantReason` naming the concrete surviving grant (direct user grant,
   or the first group grant in group-ID order where both parties hold
   current membership).
 
-`CopySharedPosting` records the link at accept time and is idempotent per
+`CopySharedTransaction` records the link at accept time and is idempotent per
 triple. Copies are always owner-authored with no bank sync key, so
-accepting a share never manufactures a duplicate bank posting.
+accepting a share never manufactures a duplicate bank transaction.
 
 `RefreshSharingLink` re-checks live authorization and source state and
 records the outcome on the link row. It never writes the recipient's
@@ -236,7 +236,7 @@ copy, so recipient edits survive every outcome. Statuses: `current`
 records the new revision while the copy keeps its edits),
 `unauthorized` (revoked, excluded, or membership ended; exposes no
 source content, not even the revision), `source-gone` (defensive: the
-source row is missing while the link survives, which `DeletePosting`
+source row is missing while the link survives, which `DeleteTransaction`
 never produces itself since it drops links with consent; the copy stays
 intact as an ordinary row). Source-row deletion through the API drops the
 link with the source consent; recipient-side copy deletion
@@ -249,7 +249,7 @@ caching link state.
 ## Received-share inbox (FND-03)
 
 The inbox is the one place for transaction shares the viewer received.
-Entries derive from the ListSharedPostings primitive on every list; inbox
+Entries derive from the ListSharedTransactions primitive on every list; inbox
 rows only record the viewer's own decision, read, and dismissed state and
 never authorize. Every preview re-checks current membership, exclusion,
 and revocation state, and revoked shares surface as canceled without
@@ -278,7 +278,7 @@ Recipient rules:
 - Unread state changes only through explicit mark-read/mark-unread.
   Listing, viewing, and deciding never clear it.
 - Clearing the viewer's model resets their inbox state; currently shared
-  postings re-sight as new on the next list.
+  transactions re-sight as new on the next list.
 
 Split-request producer contract (SOC-03 assigned shares, SOC-04C split
 requests): producers persist their own request rows — split persistence
@@ -291,8 +291,8 @@ duplicate requests.
 
 SOC-02 HTTP contract (recipient scope, existing shapes only):
 
-- `POST /v1/shared/copies` accepts `{owner, postingId, requestId}` and
-  returns the recipient-owned copy as `{"posting": <transaction>}`. The copy is an
+- `POST /v1/shared/copies` accepts `{owner, transactionId, requestId}` and
+  returns the recipient-owned copy as `{"transaction": <transaction>}`. The copy is an
   ordinary owner-authored row (`source: "user"`, never pending or void,
   no bank sync key); repeat accepts return the existing row with its
   edits intact. Recipient edits to the copy never reach the source, and
@@ -328,7 +328,7 @@ the request key in the detail payload, `copy-accepted` with the link
 and key, `link-refreshed` with the link, status, and key — carrying
 actor, action, target identities, and time only, never transaction
 evidence. Replays and heals append none. The source owner reads one
-posting's trace at `GET /v1/shared/audit?postingId=<uuid>` as
+transaction's trace at `GET /v1/shared/audit?transactionId=<uuid>` as
 `{"audit": [...]}` in sequence order; there is no audience-side read.
 Model replacement and scope clears drop the keys and user-touching
 audit rows the cleared user executed or owns, so a cleared scope
@@ -336,14 +336,14 @@ restarts with an empty trace.
 ## Automatic sharing policies
 
 Per-group automatic preferences (GRP-02) let each member opt their own
-postings into group visibility without per-posting grants. Absence of a
+transactions into group visibility without per-transaction grants. Absence of a
 preference row means off; administrators cannot set another member's
 preference. Enabling requires one or more owner-held accounts; an empty
 selection matches nothing. One transaction-date interval governs, with the
 start fixed at the setup day by default and an open end; both stay
-editable. Pending postings qualify exactly like posted ones; void and
+editable. Pending transactions qualify exactly like posted ones; void and
 deleted rows never authorize. Eligibility always derives from the
-posting's current accounts and current transaction date, so owner edits,
+transaction's current accounts and current transaction date, so owner edits,
 bank sync, and late imports reshape visibility without touching the
 preference. Every committed preference change bumps its version, and
 disabling or narrowing revokes automatic access on commit with no cache.
@@ -353,18 +353,18 @@ exclusions composition keep their FND-02 behavior alongside the
 preview stay owner-scoped; other members never read the preference rows.
 
 Policy contract for the server authorization path (GRP-05): `store.SharingPolicy`
-rows plus `store.PolicyCoversPosting` stay the single eligibility rule.
-`CheckSharedPostingAccess` alone decides every shared list and detail
+rows plus `store.PolicyCoversTransaction` stay the single eligibility rule.
+`CheckSharedTransactionAccess` alone decides every shared list and detail
 read from live rows on each call — current membership both sides,
 owner consent (manual grant union automatic policy), exclusions, void
 and deleted state, and revocation — with no positive auth cache.
-`ListSharedPostings` discovers automatic candidates from the
+`ListSharedTransactions` discovers automatic candidates from the
 write-maintained `sharing_visibility` reference index (one row per
-posting plus group at the current policy version, no payload copied, one
-listing per posting however many accounts, groups, or reasons match) and
-re-authorizes each through `CheckSharedPostingAccess`, so a stale or
+transaction plus group at the current policy version, no payload copied, one
+listing per transaction however many accounts, groups, or reasons match) and
+re-authorizes each through `CheckSharedTransactionAccess`, so a stale or
 missing reference under-shares a list but never over-shares a read.
-Every write that changes postings, policies, accounts, memberships, or
+Every write that changes transactions, policies, accounts, memberships, or
 consent maintains or fences the index in the same transaction: inserts,
 owner edits, bank-sync conversions and late inserts, policy sets and
 account-strip narrowing (with version bumps), membership leave and
@@ -377,7 +377,7 @@ transaction; keyed consent retries and heals audit nothing (policy
 writes carry no request key and audit every PUT). Operator recovery uses
 `RebuildSharingIndex`, which re-derives one owner's slice from live rows
 in one transaction for current memberships only and never over-shares. Consumers (feed,
-consent UI): list results order by owner then posting with the existing
+consent UI): list results order by owner then transaction with the existing
 transaction shape; keyset pagination over the index and any audit read
 path belong to the consumer, not this path. Statement caution: the SQLite
 driver binds arguments to placeholders sequentially by index and ignores
@@ -396,7 +396,7 @@ revision appends a version row with status `proposed` and reset
 acceptances: accepted shares only change through an explicit new
 version, never by silent edit. Acceptance is per participant; the version
 turns `accepted` when every participant has accepted. Split writes never
-touch postings, checkpoints, accounts, or balances, so acceptance moves
+touch transactions, checkpoints, accounts, or balances, so acceptance moves
 no money.
 
 Split authorization rules:
@@ -404,7 +404,7 @@ Split authorization rules:
 - Only the initiator may create or revise their split; anyone else fails
   closed (`ErrGroupForbidden`).
 - Every participant (initiator included) must hold current
-  shared-posting access to the source at creation and at each revision;
+  shared-transaction access to the source at creation and at each revision;
   a participant without access fails the whole write as not-found, so
   authorization never leaks who can see the source.
 - Reads are participant-scoped: the initiator or a participant of the

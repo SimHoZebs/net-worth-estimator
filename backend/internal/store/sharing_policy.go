@@ -1,7 +1,7 @@
 // Automatic sharing-policy semantics (GRP-02). These pure helpers own the
 // eligibility contract every consumer shares: the policy store, the
 // read-time authorization check, the exposure preview, and the later
-// reference index (GRP-05). Eligibility derives from the posting's current
+// reference index (GRP-05). Eligibility derives from the transaction's current
 // account associations and current transaction date; edits that move or
 // re-date a row reshape visibility without touching the policy.
 package store
@@ -16,7 +16,7 @@ import (
 )
 
 // SharingPolicyReasonAutomatic names the policy-derived automatic reason
-// in SharedPostingAccess. Manual reasons stay "manual-user"/"manual-group".
+// in SharedTransactionAccess. Manual reasons stay "manual-user"/"manual-group".
 const SharingPolicyReasonAutomatic = "automatic-group"
 
 // calendarDay is the shared YYYY-MM-DD calendar used for policy intervals.
@@ -86,24 +86,24 @@ func NormalizeSharingPolicyInput(input SharingPolicyInput) (SharingPolicyInput, 
 	return out, nil
 }
 
-// sharingTransactionDay reports the UTC day of a posting's transaction
+// sharingTransactionDay reports the UTC day of a transaction's transaction
 // time. The transaction date is the single canonical sharing date; both
 // times are always present on stored rows, so no fallback applies here.
-func sharingTransactionDay(posting types.Posting) string {
-	return time.Unix(posting.TransactionTime, 0).UTC().Format(calendarDay)
+func sharingTransactionDay(transaction types.Transaction) string {
+	return time.Unix(transaction.TransactionTime, 0).UTC().Format(calendarDay)
 }
 
-// PolicyCoversPosting reports whether one posting is automatically eligible
+// PolicyCoversTransaction reports whether one transaction is automatically eligible
 // under one policy: the policy is enabled with selected accounts, the
-// posting is not void, any currently involved account (source or any
+// transaction is not void, any currently involved account (source or any
 // destination, transfers included) matches, and the current transaction
-// day falls inside the interval on both ends. Pending postings qualify
+// day falls inside the interval on both ends. Pending transactions qualify
 // exactly like posted ones; there are no category or transfer exceptions.
-func PolicyCoversPosting(policy SharingPolicy, posting types.Posting) bool {
+func PolicyCoversTransaction(policy SharingPolicy, transaction types.Transaction) bool {
 	if !policy.Enabled || len(policy.AccountIDs) == 0 {
 		return false
 	}
-	if posting.Void {
+	if transaction.Void {
 		return false
 	}
 	selected := map[string]bool{}
@@ -111,10 +111,10 @@ func PolicyCoversPosting(policy SharingPolicy, posting types.Posting) bool {
 		selected[id] = true
 	}
 	matched := false
-	if posting.SourceAccountID != nil && selected[*posting.SourceAccountID] {
+	if transaction.SourceAccountID != nil && selected[*transaction.SourceAccountID] {
 		matched = true
 	}
-	for _, destination := range posting.Destinations {
+	for _, destination := range transaction.Destinations {
 		if selected[destination] {
 			matched = true
 			break
@@ -123,7 +123,7 @@ func PolicyCoversPosting(policy SharingPolicy, posting types.Posting) bool {
 	if !matched {
 		return false
 	}
-	day := sharingTransactionDay(posting)
+	day := sharingTransactionDay(transaction)
 	if day < policy.StartDate {
 		return false
 	}

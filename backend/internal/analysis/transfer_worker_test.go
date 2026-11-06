@@ -65,7 +65,7 @@ func TestWorkerPairsCreditCardPaymentLegs(t *testing.T) {
 		t.Fatalf("transfer findings=%+v", findings)
 	}
 	for _, item := range transfers {
-		if item.Strength != "strong" || len(item.Evidence) != 1 || len(item.Evidence[0].PostingIDs) != 2 {
+		if item.Strength != "strong" || len(item.Evidence) != 1 || len(item.Evidence[0].TransactionIDs) != 2 {
 			t.Fatalf("pair=%+v", item)
 		}
 	}
@@ -79,7 +79,7 @@ func TestWorkerPairsCreditCardPaymentLegs(t *testing.T) {
 		t.Fatalf("rerun findings=%+v err=%v", again, err)
 	}
 	for _, item := range again {
-		if item.AnalysisType == "transfer" && item.PostingID == transfers[0].PostingID && item.ID != before {
+		if item.AnalysisType == "transfer" && item.TransactionID == transfers[0].TransactionID && item.ID != before {
 			t.Fatalf("rerun rewrote finding identity: %+v", item)
 		}
 	}

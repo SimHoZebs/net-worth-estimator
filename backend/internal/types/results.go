@@ -12,12 +12,12 @@ const (
 )
 
 type EvaluationDiagnostic struct {
-	Code              string   `json:"code"`
-	Severity          string   `json:"severity"` // info | warning | error
-	Message           string   `json:"message"`
-	Date              *IsoDate `json:"date,omitempty"`
-	RelatedAccountIDs []string `json:"relatedAccountIds,omitempty"`
-	RelatedPostingIDs []string `json:"relatedPostingIds,omitempty"`
+	Code                  string   `json:"code"`
+	Severity              string   `json:"severity"` // info | warning | error
+	Message               string   `json:"message"`
+	Date                  *IsoDate `json:"date,omitempty"`
+	RelatedAccountIDs     []string `json:"relatedAccountIds,omitempty"`
+	RelatedTransactionIDs []string `json:"relatedTransactionIds,omitempty"`
 }
 
 type EvaluationResultEnvelope struct {
@@ -30,13 +30,13 @@ type EvaluationResultEnvelope struct {
 }
 
 type EvaluationResultTables struct {
-	FinancialIndependence []EvaluationResultEnvelope `json:"financialIndependence"`
-	NetWorthThreshold     []EvaluationResultEnvelope `json:"netWorthThreshold"`
-	AccountBalance        []EvaluationResultEnvelope `json:"accountBalance"`
-	PostingFulfillment    []EvaluationResultEnvelope `json:"postingFulfillment"`
-	CycleFulfillment      []EvaluationResultEnvelope `json:"cycleFulfillment"`
-	PlannedPurchases      []EvaluationResultEnvelope `json:"plannedPurchases,omitempty"`
-	WhatIf                []EvaluationResultEnvelope `json:"whatIf,omitempty"`
+	FinancialIndependence  []EvaluationResultEnvelope `json:"financialIndependence"`
+	NetWorthThreshold      []EvaluationResultEnvelope `json:"netWorthThreshold"`
+	AccountBalance         []EvaluationResultEnvelope `json:"accountBalance"`
+	TransactionFulfillment []EvaluationResultEnvelope `json:"transactionFulfillment"`
+	CycleFulfillment       []EvaluationResultEnvelope `json:"cycleFulfillment"`
+	PlannedPurchases       []EvaluationResultEnvelope `json:"plannedPurchases,omitempty"`
+	WhatIf                 []EvaluationResultEnvelope `json:"whatIf,omitempty"`
 }
 
 type EvaluationResultCollection struct {

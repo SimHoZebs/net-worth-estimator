@@ -6,9 +6,9 @@ package types
 // it: new-schedule creation lists it as evidence, adding to an existing schedule
 // maps each one onto a scheduled occurrence.
 type PatternOccurrence struct {
-	PostingID string `json:"postingId"`
-	Date      string `json:"date"`
-	Amount    string `json:"amount"`
+	TransactionID string `json:"transactionId"`
+	Date          string `json:"date"`
+	Amount        string `json:"amount"`
 }
 
 // ProposedNewSchedule is the forecast schedule a confirmed pattern would create. It

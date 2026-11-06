@@ -11,12 +11,12 @@ import (
 
 func completeRecurringAnalysis(t *testing.T, s *sqliteStore, version string) types.AnalysisFinding {
 	t.Helper()
-	postingID := seedAnalysisEvidence(t, s)
+	transactionID := seedAnalysisEvidence(t, s)
 	run, input, claimed, err := s.ClaimAnalysis("recurring", version)
 	if err != nil || !claimed || len(input.Transactions) != 1 {
 		t.Fatalf("claim=%v input=%+v claimed=%v err=%v", claimed, input, claimed, err)
 	}
-	detection := types.AnalysisDetection{PostingID: postingID, Kind: "recurring", Provider: "klarna", Product: "monthly", Strength: "moderate", Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test pattern", PostingIDs: []string{postingID}}}}
+	detection := types.AnalysisDetection{TransactionID: transactionID, Kind: "recurring", Provider: "klarna", Product: "monthly", Strength: "moderate", Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test pattern", TransactionIDs: []string{transactionID}}}}
 	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{detection}, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -27,10 +27,10 @@ func completeRecurringAnalysis(t *testing.T, s *sqliteStore, version string) typ
 	return findings[0]
 }
 
-func recurringSourceFacts(t *testing.T, s *sqliteStore, postingID string) string {
+func recurringSourceFacts(t *testing.T, s *sqliteStore, transactionID string) string {
 	t.Helper()
 	var raw string
-	if err := s.db.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE posting_id = ?`, postingID).Scan(&raw); err != nil {
+	if err := s.db.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE transaction_id = ?`, transactionID).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
 	return raw
@@ -40,7 +40,7 @@ func TestRecurringFindingsAcceptOwnerCorrections(t *testing.T) {
 	s := openSQLiteStore(t)
 	finding := completeRecurringAnalysis(t, s, "v1")
 	beforeModel, _ := s.LoadModel()
-	beforeFacts := recurringSourceFacts(t, s, finding.PostingID)
+	beforeFacts := recurringSourceFacts(t, s, finding.TransactionID)
 	confirmed, err := s.ReviewAnalysisFinding(finding.ID, feedbackInput(t, finding, "confirm"))
 	if err != nil || confirmed.Review == nil || confirmed.Review.Decision != "confirmed" || confirmed.Review.Provider != "klarna" {
 		t.Fatalf("confirm=%+v err=%v", confirmed, err)
@@ -61,7 +61,7 @@ func TestRecurringFindingsAcceptOwnerCorrections(t *testing.T) {
 	if !reflect.DeepEqual(beforeModel, afterModel) {
 		t.Fatal("owner correction changed the financial model")
 	}
-	if afterFacts := recurringSourceFacts(t, s, finding.PostingID); afterFacts != beforeFacts {
+	if afterFacts := recurringSourceFacts(t, s, finding.TransactionID); afterFacts != beforeFacts {
 		t.Fatal("owner correction overwrote immutable source facts")
 	}
 }
@@ -69,7 +69,7 @@ func TestRecurringFindingsAcceptOwnerCorrections(t *testing.T) {
 func TestRecurringCorrectionsRejectPendingEvidence(t *testing.T) {
 	s := openSQLiteStore(t)
 	finding := completeRecurringAnalysis(t, s, "v1")
-	if _, err := s.db.Exec(`UPDATE postings SET pending=1 WHERE id=? AND user_id=:user_id`, finding.PostingID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET pending=1 WHERE id=? AND user_id=:user_id`, finding.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.ReviewAnalysisFinding(finding.ID, feedbackInput(t, finding, "confirm")); !errors.Is(err, store.ErrAnalysisFeedbackInvalid) {

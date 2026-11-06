@@ -19,9 +19,9 @@ func (s *sqliteStore) ListAnalysisFindings(filter types.AnalysisFindingFilter) (
 		FROM analysis_findings f JOIN analysis_runs r ON r.user_id = f.user_id AND r.id = f.run_id
 		LEFT JOIN analysis_inputs i ON i.user_id = f.user_id WHERE f.id > ?`
 	args := []any{filter.Cursor}
-	if len(filter.PostingIDs) > 0 {
-		query += ` AND f.posting_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(filter.PostingIDs)), ",") + `)`
-		for _, id := range filter.PostingIDs {
+	if len(filter.TransactionIDs) > 0 {
+		query += ` AND f.transaction_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(filter.TransactionIDs)), ",") + `)`
+		for _, id := range filter.TransactionIDs {
 			args = append(args, id)
 		}
 	}

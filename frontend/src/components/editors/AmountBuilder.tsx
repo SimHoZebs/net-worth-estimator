@@ -6,7 +6,7 @@ import {
 import type {
 	AmountTemplate,
 	JsonValue,
-	PostingAmountResolution,
+	TransactionAmountResolution,
 } from "../../api/contracts.ts";
 import {
 	FALLBACK_TEMPLATES,
@@ -58,7 +58,7 @@ export function buildTemplateAmount(
 	templateId: string,
 	fields: Record<string, string>,
 	accounts: { id: string }[],
-): PostingAmountResolution {
+): TransactionAmountResolution {
 	const firstAccount = accounts[0]?.id ?? "checking";
 	const get = (key: string, fallback: string) => fields[key] || fallback;
 	switch (templateId) {
@@ -187,13 +187,13 @@ export function buildTemplateAmount(
 function TemplateFields({
 	templateId,
 	accounts,
-	postings,
+	transactions,
 	fields,
 	onField,
 }: {
 	templateId: string;
 	accounts: Option[];
-	postings: Option[];
+	transactions: Option[];
 	fields: Record<string, string>;
 	onField: (key: string, value: string) => void;
 }) {
@@ -296,7 +296,7 @@ function TemplateFields({
 						name="paymentId"
 						{...set("paymentId")}
 					>
-						{optionsFor(postings, "Pick a transaction")}
+						{optionsFor(transactions, "Pick a transaction")}
 					</SelectField>
 					<SelectField
 						label="Card account"
@@ -347,14 +347,14 @@ function TemplateFields({
 						name="grossId"
 						{...set("grossId")}
 					>
-						{optionsFor(postings, "Pick gross pay")}
+						{optionsFor(transactions, "Pick gross pay")}
 					</SelectField>
 					<SelectField
 						label="Pre-tax slice transaction"
 						name="pretaxId"
 						{...set("pretaxId")}
 					>
-						{optionsFor(postings, "Pick pre-tax slice")}
+						{optionsFor(transactions, "Pick pre-tax slice")}
 					</SelectField>
 					<InputField
 						label="Deduction per paycheck"
@@ -381,7 +381,7 @@ function TemplateFields({
 
 export function AmountBuilder({
 	accounts,
-	postings,
+	transactions,
 	templates,
 	initialTemplateId,
 	hidePicker,
@@ -390,13 +390,13 @@ export function AmountBuilder({
 	onChange,
 }: {
 	accounts: Option[];
-	postings: Option[];
+	transactions: Option[];
 	templates?: AmountTemplate[];
 	initialTemplateId?: string;
 	hidePicker?: boolean;
-	fixedAmount?: PostingAmountResolution;
-	initialAmount?: PostingAmountResolution;
-	onChange?: (amount: PostingAmountResolution) => void;
+	fixedAmount?: TransactionAmountResolution;
+	initialAmount?: TransactionAmountResolution;
+	onChange?: (amount: TransactionAmountResolution) => void;
 }) {
 	const list = templates?.length ? templates : FALLBACK_TEMPLATES;
 	const [templateId, setTemplateId] = useState(initialTemplateId ?? "fixed");
@@ -452,7 +452,7 @@ export function AmountBuilder({
 					<TemplateFields
 						templateId={template.id}
 						accounts={accounts}
-						postings={postings}
+						transactions={transactions}
 						fields={currentFields}
 						onField={(key, value) =>
 							setFields((previous) => ({ ...previous, [key]: value }))

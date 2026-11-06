@@ -603,7 +603,9 @@ export function evalSummaryOptions(scope = getUserScope()) {
 						| null;
 					netWorthThreshold?: EvaluationTables["netWorthThreshold"] | null;
 					accountBalance?: EvaluationTables["accountBalance"] | null;
-					postingFulfillment?: EvaluationTables["postingFulfillment"] | null;
+					transactionFulfillment?:
+						| EvaluationTables["transactionFulfillment"]
+						| null;
 					cycleFulfillment?: EvaluationTables["cycleFulfillment"] | null;
 				} | null;
 				revision?: string;
@@ -615,7 +617,7 @@ export function evalSummaryOptions(scope = getUserScope()) {
 					financialIndependence: tables.financialIndependence ?? [],
 					netWorthThreshold: tables.netWorthThreshold ?? [],
 					accountBalance: tables.accountBalance ?? [],
-					postingFulfillment: tables.postingFulfillment ?? [],
+					transactionFulfillment: tables.transactionFulfillment ?? [],
 				},
 				revision: result.revision ?? null,
 			};

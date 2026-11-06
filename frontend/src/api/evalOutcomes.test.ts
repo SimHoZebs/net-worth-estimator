@@ -5,7 +5,7 @@ import {
 	bandsOf,
 	cycleOutcome,
 	numericValueOf,
-	postingOutcome,
+	transactionOutcome,
 	thresholdEvaluation,
 } from "./evalOutcomes.ts";
 import type { EvaluationResultEnvelope } from "./contracts.ts";
@@ -54,10 +54,12 @@ describe("eval outcome renderers", () => {
 		});
 	});
 
-	it("keeps posting and cycle outcomes identical", () => {
-		expect(postingOutcome(null).outcomeText).toBe("No projected funding gaps");
+	it("keeps transaction and cycle outcomes identical", () => {
+		expect(transactionOutcome(null).outcomeText).toBe(
+			"No projected funding gaps",
+		);
 		expect(
-			postingOutcome({ firstUnderfulfilledDate: "2026-03-01" }).outcomeText,
+			transactionOutcome({ firstUnderfulfilledDate: "2026-03-01" }).outcomeText,
 		).toBe("Shortfall");
 		expect(cycleOutcome({ withinBudget: true }).outcomeText).toBe(
 			"Within budget",
@@ -81,12 +83,12 @@ describe("eval outcome renderers", () => {
 	});
 
 	it("routes every other-eval type through the registry with reader support", () => {
-		const posting = OTHER_EVAL_OUTCOME_RENDERERS.postingFulfillment(
+		const transaction = OTHER_EVAL_OUTCOME_RENDERERS.transactionFulfillment(
 			{ instanceId: "p", name: "Bills", enabled: true, config: {} },
-			{ envelope: undefined, postingIds: null, enabled: true },
+			{ envelope: undefined, transactionIds: null, enabled: true },
 		);
-		expect(posting).toMatchObject({
-			type: "postingFulfillment",
+		expect(transaction).toMatchObject({
+			type: "transactionFulfillment",
 			status: "indeterminate",
 			outcomeText: "No projected funding gaps",
 		});
@@ -94,7 +96,7 @@ describe("eval outcome renderers", () => {
 			{ instanceId: "c", name: "", enabled: true, config: {} },
 			{
 				envelope: envelope({ status: "not-satisfied" }),
-				postingIds: null,
+				transactionIds: null,
 				enabled: true,
 			},
 		);

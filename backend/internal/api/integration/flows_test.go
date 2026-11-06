@@ -130,7 +130,7 @@ func TestFlowsRequiresRange(t *testing.T) {
 
 // Settled history must surface as recorded money through the endpoint:
 // rows dated before the projection start emit no transaction events, so
-// only the settled replay can draw their edges. Each posting appears
+// only the settled replay can draw their edges. Each transaction appears
 // exactly once and the transfer counts once with its full amount.
 func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 	database := openAPIStore(t)
@@ -139,8 +139,8 @@ func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 	stamp := func(month time.Month, day int) int64 {
 		return time.Date(2025, month, day, 12, 0, 0, 0, time.UTC).Unix()
 	}
-	expression := func(value string) types.PostingAmountResolution {
-		return types.PostingAmountResolution{
+	expression := func(value string) types.TransactionAmountResolution {
+		return types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": value},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -152,7 +152,7 @@ func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{
 				ID: "salary", Name: "Salary", Destinations: []string{"checking"},
 				Amount: expression("3000"), PostedTime: salaryAt, TransactionTime: salaryAt,
@@ -189,12 +189,12 @@ func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 	seen := map[string]int{}
 	for _, edge := range graph.Edges {
 		for _, source := range edge.Sources {
-			seen[source.PostingID]++
+			seen[source.TransactionID]++
 		}
 	}
 	for _, id := range []string{"salary", "groceries", "save"} {
 		if seen[id] != 1 {
-			t.Errorf("posting %s appears in %d edge sources, want exactly once", id, seen[id])
+			t.Errorf("transaction %s appears in %d edge sources, want exactly once", id, seen[id])
 		}
 	}
 	if !graph.Reconciliation.Reconciled {

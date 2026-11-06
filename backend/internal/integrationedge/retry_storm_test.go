@@ -10,13 +10,13 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-// grantTriple names one grant row by its natural key: owner, posting,
+// grantTriple names one grant row by its natural key: owner, transaction,
 // audience. Grants carry no synthetic ID.
 func grantTriple(grant map[string]any) string {
 	owner, _ := grant["ownerUserId"].(string)
-	posting, _ := grant["postingId"].(string)
+	transaction, _ := grant["transactionId"].(string)
 	audience, _ := grant["audienceId"].(string)
-	return owner + "/" + posting + "/" + audience
+	return owner + "/" + transaction + "/" + audience
 }
 
 // Double-spend via retry storms on every mutating share, split, and
@@ -31,14 +31,14 @@ func TestIntegrationEdgeGrantRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 			t.Skip("needs the group identity set")
 		}
 		day := int64(1781524800)
-		shareRow := advMustPosting(t, world.ownerSC, "Storm row", "50.00", day)
+		shareRow := advMustTransaction(t, world.ownerSC, "Storm row", "50.00", day)
 		key := advRequestID(t)
-		grantBody := `{"postingId":` + advQuote(shareRow) + `,"audienceType":"group","audienceId":` + advQuote(world.groupID) + `,"requestId":` + advQuote(key) + `}`
+		grantBody := `{"transactionId":` + advQuote(shareRow) + `,"audienceType":"group","audienceId":` + advQuote(world.groupID) + `,"requestId":` + advQuote(key) + `}`
 		first := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/grants", world.ownerSubject, grantBody), http.StatusCreated)
 		firstGrant, _ := first["grant"].(map[string]any)
 		firstKey := grantTriple(firstGrant)
 		if firstKey == "//" {
-			t.Fatalf("round %d grant = %+v, want owner/posting/audience identity", round, first)
+			t.Fatalf("round %d grant = %+v, want owner/transaction/audience identity", round, first)
 		}
 		results := advStorm(16, func(i int) any {
 			response := advServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/grants", world.ownerSubject, grantBody)
@@ -64,10 +64,10 @@ func TestIntegrationEdgeGrantRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 				t.Fatalf("round %d unexpected replay outcome %T (%v)", round, result, result)
 			}
 		}
-		// One key reused for a different posting must fail, never grant.
-		otherRow := advMustPosting(t, world.ownerSC, "Other row", "5.00", day)
+		// One key reused for a different transaction must fail, never grant.
+		otherRow := advMustTransaction(t, world.ownerSC, "Other row", "5.00", day)
 		reuse := advServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/grants", world.ownerSubject,
-			`{"postingId":`+advQuote(otherRow)+`,"audienceType":"group","audienceId":`+advQuote(world.groupID)+`,"requestId":`+advQuote(key)+`}`)
+			`{"transactionId":`+advQuote(otherRow)+`,"audienceType":"group","audienceId":`+advQuote(world.groupID)+`,"requestId":`+advQuote(key)+`}`)
 		if reuse.Code != http.StatusConflict {
 			t.Fatalf("round %d key reuse status = %d, want 409 with no grant written", round, reuse.Code)
 		}
@@ -90,12 +90,12 @@ func TestIntegrationEdgeCopyRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 			t.Skip("needs the group identity set")
 		}
 		day := int64(1781524800)
-		copyRow := advMustPosting(t, world.ownerSC, "Copy storm row", "20.00", day)
-		if _, err := world.db.GrantSharedPosting(world.owner, copyRow, "group", world.groupID, advRequestID(t)); err != nil {
+		copyRow := advMustTransaction(t, world.ownerSC, "Copy storm row", "20.00", day)
+		if _, err := world.db.GrantSharedTransaction(world.owner, copyRow, "group", world.groupID, advRequestID(t)); err != nil {
 			t.Fatal(err)
 		}
 		key := advRequestID(t)
-		copyBody := `{"owner":` + advQuote(advResource(world.owner)) + `,"postingId":` + advQuote(copyRow) + `,"requestId":` + advQuote(key) + `}`
+		copyBody := `{"owner":` + advQuote(advResource(world.owner)) + `,"transactionId":` + advQuote(copyRow) + `,"requestId":` + advQuote(key) + `}`
 		results := advStorm(16, func(i int) any {
 			return advServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/copies", world.secondSubject, copyBody)
 		})
@@ -109,8 +109,8 @@ func TestIntegrationEdgeCopyRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 			if err := json.Unmarshal(response.Body.Bytes(), &decoded); err != nil {
 				t.Fatalf("round %d copy decode: %v", round, err)
 			}
-			posting, _ := decoded["posting"].(map[string]any)
-			id, _ := posting["id"].(string)
+			transaction, _ := decoded["transaction"].(map[string]any)
+			id, _ := transaction["id"].(string)
 			if copyID == "" {
 				copyID = id
 			} else if id != copyID {
@@ -122,8 +122,8 @@ func TestIntegrationEdgeCopyRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 			t.Fatal(err)
 		}
 		copies := 0
-		for _, posting := range model.Postings {
-			if posting.Name == "Copy storm row" {
+		for _, transaction := range model.Transactions {
+			if transaction.Name == "Copy storm row" {
 				copies++
 			}
 		}
@@ -143,17 +143,17 @@ func TestIntegrationEdgeSplitSettlementRetryStorm_RealSQLite_RealHTTP(t *testing
 			t.Skip("needs a second participant")
 		}
 		participants := []string{world.owner, world.second}
-		sourceRow := advMustPosting(t, world.ownerSC, "Storm split source", "100.00", 1781524800)
+		sourceRow := advMustTransaction(t, world.ownerSC, "Storm split source", "100.00", 1781524800)
 		if world.groupID != "" {
-			if _, err := world.db.GrantSharedPosting(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
+			if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
 				t.Fatal(err)
 			}
-		} else if _, err := world.db.GrantSharedPosting(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
+		} else if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
 			t.Fatal(err)
 		}
 		newInput := func() store.SplitInput {
 			return store.SplitInput{
-				SourceOwnerID: world.owner, SourcePostingID: sourceRow,
+				SourceOwnerID: world.owner, SourceTransactionID: sourceRow,
 				InitiatorID: world.owner, Currency: "USD",
 				TotalMinor: 100, ParticipantIDs: participants,
 			}
@@ -190,18 +190,18 @@ func TestIntegrationEdgeSplitSettlementRetryStorm_RealSQLite_RealHTTP(t *testing
 		// The linked-payment double-spend: one real payment backs one
 		// settlement. The second record against the same payment fails.
 		day := int64(1781524800)
-		payRow := advMustPosting(t, world.ownerSC, "Real payment", "60.00", day)
+		payRow := advMustTransaction(t, world.ownerSC, "Real payment", "60.00", day)
 		payKey := advRequestID(t)
 		settlement, err := world.db.RecordSettlement(world.owner, store.SettlementInput{
 			SplitID: first.ID, ParticipantID: world.second, AmountMinor: 60,
-			LinkedOwnerID: world.owner, LinkedPostingID: payRow,
+			LinkedOwnerID: world.owner, LinkedTransactionID: payRow,
 		}, payKey)
 		if err != nil {
 			t.Fatal(err)
 		}
 		replay, err := world.db.RecordSettlement(world.owner, store.SettlementInput{
 			SplitID: first.ID, ParticipantID: world.second, AmountMinor: 60,
-			LinkedOwnerID: world.owner, LinkedPostingID: payRow,
+			LinkedOwnerID: world.owner, LinkedTransactionID: payRow,
 		}, payKey)
 		if err != nil {
 			t.Fatalf("round %d settlement replay failed: %v", round, err)
@@ -211,7 +211,7 @@ func TestIntegrationEdgeSplitSettlementRetryStorm_RealSQLite_RealHTTP(t *testing
 		}
 		_, err = world.db.RecordSettlement(world.owner, store.SettlementInput{
 			SplitID: first.ID, ParticipantID: world.second, AmountMinor: 60,
-			LinkedOwnerID: world.owner, LinkedPostingID: payRow,
+			LinkedOwnerID: world.owner, LinkedTransactionID: payRow,
 		}, advRequestID(t))
 		if err == nil {
 			t.Fatalf("round %d same payment settled twice: double-spend recorded", round)

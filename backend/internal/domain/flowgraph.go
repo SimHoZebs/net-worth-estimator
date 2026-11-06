@@ -12,7 +12,7 @@ import (
 // transaction events plus balance-check corrections: no simulation, no
 // transfer matching, no thresholds. Transfer matching stays with VIS-03;
 // this builder counts structurally-declared transfers once from their
-// posting routes.
+// transaction routes.
 
 // flowEdgeKey groups one directed movement class.
 type flowEdgeKey struct {
@@ -22,30 +22,30 @@ type flowEdgeKey struct {
 	movement string
 }
 
-// settledHistoryEvents replays in-window settled postings as actual
+// settledHistoryEvents replays in-window settled transactions as actual
 // movements. The projection emits transaction events only for occurrences
 // after its start date, so settled history would otherwise never reach
 // the graph: the replay moves balances but records no events. Each
-// settled posting becomes one synthetic event carrying its resolved
+// settled transaction becomes one synthetic event carrying its resolved
 // amount with no account deltas, so the classification below routes it
 // through the same structural paths as event-driven actuals (external to
 // first destination for inflows, source to external for outflows, source
-// to first destination for transfers: one listing per posting however
+// to first destination for transfers: one listing per transaction however
 // many accounts it names).
 //
 // Membership mirrors execution: enabled rows only. An enabled pending row
 // counts like a posted one; the Pending flag itself is never a filter.
 // Void rows are excluded, deleted rows are absent from the model, and
-// zero or unresolvable amounts are skipped. Postings that already
+// zero or unresolvable amounts are skipped. Transactions that already
 // produced an in-window event (dated after the projection start) are
-// skipped by (posting, date) so they count exactly once. Rule templates
-// in the resolved listing stay event-driven: only manual postings
+// skipped by (transaction, date) so they count exactly once. Rule templates
+// in the resolved listing stay event-driven: only manual transactions
 // synthesize.
-func settledHistoryEvents(model *types.FinancialModel, transactions []types.Posting, ruleIDs map[string]bool, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) []types.TransactionEvent {
+func settledHistoryEvents(model *types.FinancialModel, transactions []types.Transaction, ruleIDs map[string]bool, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) []types.TransactionEvent {
 	covered := make(map[string]bool, len(events))
 	nextSequence := 0
 	for _, event := range events {
-		covered[event.Origin.PostingID+"\x00"+string(event.Date)] = true
+		covered[event.Origin.TransactionID+"\x00"+string(event.Date)] = true
 		if event.Sequence >= nextSequence {
 			nextSequence = event.Sequence + 1
 		}
@@ -68,22 +68,22 @@ func settledHistoryEvents(model *types.FinancialModel, transactions []types.Post
 	terms := PaymentTermsByAccount(model)
 	synthesized := []types.TransactionEvent{}
 	for index := range transactions {
-		posting := &transactions[index]
-		if ruleIDs[posting.ID] {
+		transaction := &transactions[index]
+		if ruleIDs[transaction.ID] {
 			continue
 		}
-		if !posting.Enabled || posting.Void {
+		if !transaction.Enabled || transaction.Void {
 			continue
 		}
-		day := postingDay(posting)
+		day := transactionDay(transaction)
 		if day == "" || CompareIsoDates(day, startDate) < 0 || CompareIsoDates(day, endDate) > 0 {
 			continue
 		}
-		if covered[posting.ID+"\x00"+day] {
+		if covered[transaction.ID+"\x00"+day] {
 			continue
 		}
 		amount, err := ComputeRequestedAmount(
-			DatedPostingOccurrence{Posting: posting, Index: index},
+			DatedTransactionOccurrence{Transaction: transaction, Index: index},
 			day, map[string]float64{}, map[string]string{}, map[string]map[string]float64{},
 			balancesByDate[day], terms, nil,
 		)
@@ -97,7 +97,7 @@ func settledHistoryEvents(model *types.FinancialModel, transactions []types.Post
 		synthesized = append(synthesized, types.TransactionEvent{
 			Date:            types.IsoDate(day),
 			Sequence:        nextSequence,
-			Origin:          types.TransactionOrigin{Type: "posting", PostingID: posting.ID},
+			Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: transaction.ID},
 			RequestedAmount: realized,
 			RealizedAmount:  realized,
 		})
@@ -107,7 +107,7 @@ func settledHistoryEvents(model *types.FinancialModel, transactions []types.Post
 }
 
 // BuildFlowGraph aggregates in-window transaction events plus settled
-// postings replayed as actual movements (see settledHistoryEvents) into
+// transactions replayed as actual movements (see settledHistoryEvents) into
 // directed account/counterparty edges. events and rows must already be
 // clipped to [startDate, endDate]; the builder trusts that clip and
 // reports the window it was given. model is the effective model the
@@ -127,10 +127,10 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 		return nil, fmt.Errorf("flow window startDate must not be after endDate")
 	}
 
-	transactions := ResolvedTransactionPostings(model)
-	postingByID := make(map[string]*types.Posting, len(transactions))
+	transactions := ResolvedTransactionTransactions(model)
+	transactionByID := make(map[string]*types.Transaction, len(transactions))
 	for index := range transactions {
-		postingByID[transactions[index].ID] = &transactions[index]
+		transactionByID[transactions[index].ID] = &transactions[index]
 	}
 	ruleIDs := make(map[string]bool, len(model.Schedules))
 	for index := range model.Schedules {
@@ -201,13 +201,13 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 			continue
 		}
 		reconciliation.WindowEvents++
-		posting, ok := postingByID[event.Origin.PostingID]
+		transaction, ok := transactionByID[event.Origin.TransactionID]
 		if !ok {
 			reconciliation.UnmatchedEvents++
 			realized := roundCurrency(event.RealizedAmount)
 			totals.Unmatched = roundCurrency(totals.Unmatched + realized)
 			graph.Unmatched = append(graph.Unmatched, types.FlowUnmatchedEvent{
-				PostingID:      event.Origin.PostingID,
+				TransactionID:  event.Origin.TransactionID,
 				Date:           event.Date,
 				Sequence:       event.Sequence,
 				RealizedAmount: realized,
@@ -216,13 +216,13 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 		}
 		reconciliation.ClassifiedEvents++
 		movement := types.FlowMovementActual
-		if ruleIDs[event.Origin.PostingID] {
+		if ruleIDs[event.Origin.TransactionID] {
 			movement = types.FlowMovementProjected
 		}
 		realized := roundCurrency(event.RealizedAmount)
 		requested := roundCurrency(event.RequestedAmount)
 		record := types.FlowSourceRecord{
-			PostingID:       event.Origin.PostingID,
+			TransactionID:   event.Origin.TransactionID,
 			Date:            event.Date,
 			Sequence:        event.Sequence,
 			RequestedAmount: requested,
@@ -233,25 +233,25 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 			classTotals = &totals.Projected
 		}
 		switch {
-		case IsExternalInflow(posting):
+		case IsExternalInflow(transaction):
 			reconciliation.EventsInflow = roundCurrency(reconciliation.EventsInflow + realized)
 			classTotals.Inflow = roundCurrency(classTotals.Inflow + realized)
 			for _, delta := range event.AccountDeltas {
 				share := roundCurrency(delta.Delta)
 				addFlow(types.FlowNodeIDExternal, delta.AccountID, share, types.FlowKindInflow, movement, record)
 			}
-			if len(event.AccountDeltas) == 0 && realized != 0 && len(posting.Destinations) > 0 {
-				addFlow(types.FlowNodeIDExternal, posting.Destinations[0], realized, types.FlowKindInflow, movement, record)
+			if len(event.AccountDeltas) == 0 && realized != 0 && len(transaction.Destinations) > 0 {
+				addFlow(types.FlowNodeIDExternal, transaction.Destinations[0], realized, types.FlowKindInflow, movement, record)
 			}
-		case IsExternalOutflow(posting):
+		case IsExternalOutflow(transaction):
 			reconciliation.EventsOutflow = roundCurrency(reconciliation.EventsOutflow + realized)
 			classTotals.Outflow = roundCurrency(classTotals.Outflow + realized)
-			source, _ := PostingSourceAccount(posting)
+			source, _ := TransactionSourceAccount(transaction)
 			addFlow(source, types.FlowNodeIDExternal, realized, types.FlowKindOutflow, movement, record)
-		case IsInternalTransfer(posting):
+		case IsInternalTransfer(transaction):
 			reconciliation.EventsTransfer = roundCurrency(reconciliation.EventsTransfer + realized)
 			classTotals.Transfer = roundCurrency(classTotals.Transfer + realized)
-			source, _ := PostingSourceAccount(posting)
+			source, _ := TransactionSourceAccount(transaction)
 			for _, delta := range event.AccountDeltas {
 				if delta.Delta <= 0 {
 					continue
@@ -260,19 +260,19 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 				addFlow(source, delta.AccountID, share, types.FlowKindTransfer, movement, record)
 			}
 			if len(event.AccountDeltas) == 0 && realized != 0 {
-				for _, destID := range posting.Destinations {
+				for _, destID := range transaction.Destinations {
 					addFlow(source, destID, realized, types.FlowKindTransfer, movement, record)
 					break
 				}
 			}
 		default:
-			// A posting with neither source nor destinations moves no
+			// A transaction with neither source nor destinations moves no
 			// money. Validation rejects it, so reaching here means the
 			// model changed under the events: report, never absorb.
 			reconciliation.UnmatchedEvents++
 			totals.Unmatched = roundCurrency(totals.Unmatched + realized)
 			graph.Unmatched = append(graph.Unmatched, types.FlowUnmatchedEvent{
-				PostingID:      event.Origin.PostingID,
+				TransactionID:  event.Origin.TransactionID,
 				Date:           event.Date,
 				Sequence:       event.Sequence,
 				RealizedAmount: realized,

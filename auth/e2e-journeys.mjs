@@ -203,13 +203,13 @@ export async function guestReads(ctx, ownerBundle) {
 
   const projection = {
     settings: {
-      fallbackProjectionStartDate: E2E_SEED.postingDay,
+      fallbackProjectionStartDate: E2E_SEED.transactionDay,
       horizonYears: 1,
       evaluations: {
         financialIndependence: [],
         netWorthThreshold: [],
         accountBalance: [],
-        postingFulfillment: [],
+        transactionFulfillment: [],
         cycleFulfillment: [],
       },
     },
@@ -298,7 +298,7 @@ export async function secondUserSignup(ctx, hooks) {
 
   const blank = (await (await api(second, origin, other, "GET", "/v1/financial-model")).json()).model;
   assert.deepEqual(blank.accounts, []);
-  assert.deepEqual(blank.postings, []);
+  assert.deepEqual(blank.transactions, []);
   await expect(page.getByRole("heading", { name: "Your workspace is ready" })).toBeVisible();
   for (const route of ["accounts", "transactions", "purchases", "evaluations", "sources", "outlook"]) {
     await page.goto(`${origin}/#${route}`);
@@ -345,7 +345,7 @@ function transactionPayload(row) {
   };
 }
 
-function postingPayload(name, sourceAccountId) {
+function transactionPayload(name, sourceAccountId) {
   return transactionPayload({
     name,
     sourceAccountId,
@@ -357,11 +357,11 @@ function postingPayload(name, sourceAccountId) {
   });
 }
 
-async function createPosting(ctx, ownerBundle, name, accountId = E2E_SEED.accountId) {
+async function createTransaction(ctx, ownerBundle, name, accountId = E2E_SEED.accountId) {
   const { origin } = ctx;
   const { owner, own } = ownerBundle;
-  const response = await api(owner, origin, own, "POST", "/v1/transactions", postingPayload(name, accountId));
-  assert.equal(response.status(), 200, `create posting ${name}: ${await response.text()}`);
+  const response = await api(owner, origin, own, "POST", "/v1/transactions", transactionPayload(name, accountId));
+  assert.equal(response.status(), 200, `create transaction ${name}: ${await response.text()}`);
   const body = await response.json();
   assert.equal(body.saved, true);
   return body.value.id;
@@ -377,18 +377,18 @@ export async function directShareCycle(ctx, ownerBundle, secondBundle) {
   const ownerResource = own.resource.id;
   const memberUserId = userRowId(other.resource.id);
 
-  const gift = await createPosting(ctx, ownerBundle, "E2E gift");
-  const declinedGift = await createPosting(ctx, ownerBundle, "E2E declined gift");
-  for (const postingId of [gift, declinedGift]) {
+  const gift = await createTransaction(ctx, ownerBundle, "E2E gift");
+  const declinedGift = await createTransaction(ctx, ownerBundle, "E2E declined gift");
+  for (const transactionId of [gift, declinedGift]) {
     const granted = await api(owner, origin, own, "POST", "/v1/shared/grants", {
-      postingId,
+      transactionId,
       audienceType: "user",
       audienceId: memberUserId,
       requestId: requestId(),
     });
-    assert.equal(granted.status(), 201, `grant ${postingId}: ${await granted.text()}`);
+    assert.equal(granted.status(), 201, `grant ${transactionId}: ${await granted.text()}`);
   }
-  const shareRef = (postingId) => ({ owner: ownerResource, postingId });
+  const shareRef = (transactionId) => ({ owner: ownerResource, transactionId });
 
   const pending = await (await api(second, origin, other, "GET", "/v1/inbox")).json();
   assert.equal(pending.items.length, 2, `inbox items = ${JSON.stringify(pending)}`);
@@ -406,28 +406,28 @@ export async function directShareCycle(ctx, ownerBundle, secondBundle) {
 
   const accepted = await api(second, origin, other, "POST", "/v1/inbox/shares/accept", shareRef(gift));
   assert.equal(accepted.status(), 200);
-  const firstCopy = (await accepted.json()).item.copyPostingId;
+  const firstCopy = (await accepted.json()).item.copyTransactionId;
   assert.ok(firstCopy, "accept must save a copy");
   const retried = await api(second, origin, other, "POST", "/v1/inbox/shares/accept", shareRef(gift));
   assert.equal(retried.status(), 200);
-  assert.equal((await retried.json()).item.copyPostingId, firstCopy, "accept retry must return the same copy");
+  assert.equal((await retried.json()).item.copyTransactionId, firstCopy, "accept retry must return the same copy");
 
   const declined = await api(second, origin, other, "POST", "/v1/inbox/shares/decline", shareRef(declinedGift));
   assert.equal(declined.status(), 200);
   assert.equal((await declined.json()).item.status, "declined");
 
   const revoked = await api(owner, origin, own, "DELETE", "/v1/shared/grants", {
-    postingId: gift,
+    transactionId: gift,
     audienceType: "user",
     audienceId: memberUserId,
     requestId: requestId(),
   });
   assert.equal(revoked.status(), 200);
-  const denied = await api(second, origin, other, "GET", `/v1/shared/postings/${ownerResource}/${gift}`);
+  const denied = await api(second, origin, other, "GET", `/v1/shared/transactions/${ownerResource}/${gift}`);
   assert.equal(denied.status(), 404, "revoked read must deny without existence leakage");
 
   const memberModel = (await (await api(second, origin, other, "GET", "/v1/financial-model")).json()).model;
-  const copyRow = memberModel.postings.find((row) => row.id === firstCopy);
+  const copyRow = memberModel.transactions.find((row) => row.id === firstCopy);
   assert.ok(copyRow, "the accepted copy must survive revocation");
   console.log("e2e: share → inbox accept → copy → revoke PASS");
 }
@@ -443,7 +443,7 @@ export async function groupFeedCycle(ctx, ownerBundle, secondBundle) {
   const ownerResource = own.resource.id;
 
   // A dedicated account scopes the feed to this journey's rows: the
-  // direct-share journey already wrote postings to the default account, and
+  // direct-share journey already wrote transactions to the default account, and
   // the policy feeds every row in its listed accounts.
   const groupAccount = "e2e-group-checking";
   const groupChecking = await api(owner, origin, own, "POST", "/v1/accounts", {
@@ -465,8 +465,8 @@ export async function groupFeedCycle(ctx, ownerBundle, secondBundle) {
   const joined = await api(second, origin, other, "POST", "/v1/invites/accept", { code });
   assert.equal(joined.status(), 200, `accept invite: ${await joined.text()}`);
 
-  const groceries = await createPosting(ctx, ownerBundle, "E2E groceries", groupAccount);
-  const fuel = await createPosting(ctx, ownerBundle, "E2E fuel", groupAccount);
+  const groceries = await createTransaction(ctx, ownerBundle, "E2E groceries", groupAccount);
+  const fuel = await createTransaction(ctx, ownerBundle, "E2E fuel", groupAccount);
   const policy = await api(owner, origin, own, "PUT", `/v1/shared/policies/${groupId}`, {
     enabled: true,
     accountIds: [groupAccount],
@@ -481,7 +481,7 @@ export async function groupFeedCycle(ctx, ownerBundle, secondBundle) {
   assert.equal(feed.totals.count, 2);
 
   const granted = await api(owner, origin, own, "POST", "/v1/shared/grants", {
-    postingId: groceries,
+    transactionId: groceries,
     audienceType: "group",
     audienceId: groupId,
     requestId: requestId(),
@@ -489,15 +489,15 @@ export async function groupFeedCycle(ctx, ownerBundle, secondBundle) {
   assert.equal(granted.status(), 201);
   const copied = await api(second, origin, other, "POST", "/v1/shared/copies", {
     owner: ownerResource,
-    postingId: groceries,
+    transactionId: groceries,
     requestId: requestId(),
   });
   assert.equal(copied.status(), 201, `save copy: ${await copied.text()}`);
-  const copyRow = (await copied.json()).posting;
+  const copyRow = (await copied.json()).transaction;
   assert.ok(copyRow.id && copyRow.id !== groceries, "copy must be a new recipient-owned row");
 
   const excluded = await api(owner, origin, own, "POST", "/v1/shared/exclusions", {
-    postingId: fuel,
+    transactionId: fuel,
     audienceType: "group",
     audienceId: groupId,
     requestId: requestId(),
@@ -507,7 +507,7 @@ export async function groupFeedCycle(ctx, ownerBundle, secondBundle) {
   assert.equal(narrowed.totals.count, 1, `narrowed totals = ${JSON.stringify(narrowed.totals)}`);
 
   const ungranted = await api(owner, origin, own, "DELETE", "/v1/shared/grants", {
-    postingId: groceries,
+    transactionId: groceries,
     audienceType: "group",
     audienceId: groupId,
     requestId: requestId(),
@@ -520,12 +520,12 @@ export async function groupFeedCycle(ctx, ownerBundle, secondBundle) {
     endDate: E2E_SEED.rangeEnd,
   });
   assert.equal(disabled.status(), 200);
-  const denied = await api(second, origin, other, "GET", `/v1/shared/postings/${ownerResource}/${groceries}`);
+  const denied = await api(second, origin, other, "GET", `/v1/shared/transactions/${ownerResource}/${groceries}`);
   assert.equal(denied.status(), 404, "revoked read must deny without existence leakage");
 
   const memberModel = (await (await api(second, origin, other, "GET", "/v1/financial-model")).json()).model;
   assert.ok(
-    memberModel.postings.some((row) => row.id === copyRow.id),
+    memberModel.transactions.some((row) => row.id === copyRow.id),
     "the granted copy must survive revocation as a private row",
   );
   console.log("e2e: group policy → feed → exclusion → revoke PASS");
@@ -541,11 +541,11 @@ export async function receiptUpload(ctx, ownerBundle, secondBundle, pngPath) {
   const { readFile } = await import("node:fs/promises");
   const image = await readFile(pngPath);
 
-  const postingId = await createPosting(ctx, ownerBundle, "E2E receipt purchase");
+  const transactionId = await createTransaction(ctx, ownerBundle, "E2E receipt purchase");
   const attached = await owner.request.post(`${origin}/v1/receipts`, {
     headers: { "Waypoint-Resource": own.resource.id },
     multipart: {
-      postingId,
+      transactionId,
       image: { name: "market.png", mimeType: "image/png", buffer: image },
     },
   });
@@ -553,8 +553,8 @@ export async function receiptUpload(ctx, ownerBundle, secondBundle, pngPath) {
   const receipt = (await attached.json()).receipt;
   assert.ok(receipt?.id, "attached receipt must carry an id");
 
-  const listed = await (await api(owner, origin, own, "GET", `/v1/transactions/${postingId}/receipts`)).json();
-  assert.ok(listed.receipts?.some((row) => row.id === receipt.id), "receipt must list under its posting");
+  const listed = await (await api(owner, origin, own, "GET", `/v1/transactions/${transactionId}/receipts`)).json();
+  assert.ok(listed.receipts?.some((row) => row.id === receipt.id), "receipt must list under its transaction");
 
   const pixels = await api(owner, origin, own, "GET", `/v1/receipts/${receipt.id}/image`);
   assert.equal(pixels.status(), 200);
@@ -635,7 +635,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
   const before = (await (await api(owner, origin, own, "GET", "/v1/financial-model")).json()).model;
   const haveAccounts = new Set(before.accounts.map((item) => item.id));
   let addedAccounts = 0;
-  let addedPostings = 0;
+  let addedTransactions = 0;
   let addedRules = 0;
 
   async function createAccount(row) {
@@ -664,7 +664,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
 
   // Deterministic version-5 UUID over one bulk coordinate, mirroring the
   // Go bulk builder's namespace-and-name scheme.
-  function bulkPostingId(seed, account, index) {
+  function bulkTransactionId(seed, account, index) {
     const namespace = Buffer.from("6ba7b8119dad11d180b400c04fd430c8", "hex");
     const digest = createHash("sha1")
       .update(namespace)
@@ -704,11 +704,11 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
     };
   }
 
-  async function createPosting(row) {
+  async function createTransaction(row) {
     const response = await api(owner, origin, own, "POST", "/v1/transactions", transactionPayload(row));
-    assert.equal(response.status(), 200, `seed posting ${row.id}: ${await response.text()}`);
+    assert.equal(response.status(), 200, `seed transaction ${row.id}: ${await response.text()}`);
     assert.equal((await response.json()).saved, true);
-    addedPostings += 1;
+    addedTransactions += 1;
   }
 
   async function createRule(row) {
@@ -731,7 +731,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       throw new Error(`unknown seed pack ${pack}`);
     });
     const model = JSON.parse(raw).model ?? {};
-    // The API path covers accounts, checkpoints, postings, and rules. A
+    // The API path covers accounts, checkpoints, transactions, and rules. A
     // pack carrying evaluations, payment terms, or planned purchases needs
     // the Go import path instead, so fail loudly instead of half-seeding.
     const evaluations = model.evaluations ?? {};
@@ -748,7 +748,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       });
       assert.equal(response.status(), 200, `seed checkpoint: ${await response.text()}`);
     }
-    for (const posting of model.postings ?? []) await createPosting(posting);
+    for (const transaction of model.transactions ?? []) await createTransaction(transaction);
     for (const rule of model.schedules ?? []) await createRule(rule);
   }
 
@@ -759,8 +759,8 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
     const perAccount = Number(match[2]);
     const seed = Number(match[3] ?? 7);
     assert.ok(accounts >= 1 && accounts <= 100, "seed bulk accounts wants 1-100");
-    assert.ok(perAccount >= 0 && perAccount <= 1000, "seed bulk postings wants 0-1000");
-    assert.ok(accounts * perAccount <= 20000, "seed bulk exceeds 20000 postings");
+    assert.ok(perAccount >= 0 && perAccount <= 1000, "seed bulk transactions wants 0-1000");
+    assert.ok(accounts * perAccount <= 20000, "seed bulk exceeds 20000 transactions");
     // Bulk tables mirror the Go bulk builder: the same amount and name
     // traits (including unicode, right-to-left, combining, and overlong
     // rows), the same day shapes, and the same account and rule ID scheme.
@@ -792,8 +792,8 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       });
       for (let j = 0; j < perAccount; j++) {
         const stamp = bulkDay(next, i + j);
-        await createPosting({
-          id: bulkPostingId(seed, i, j),
+        await createTransaction({
+          id: bulkTransactionId(seed, i, j),
           name: `${names[(i + j) % names.length]} ${String(i).padStart(2, "0")}`,
           sourceAccountId: accountId,
           destinations: [],
@@ -820,9 +820,9 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
 
   const after = (await (await api(owner, origin, own, "GET", "/v1/financial-model")).json()).model;
   assert.equal(after.accounts.length - before.accounts.length, addedAccounts);
-  assert.equal(after.postings.length - before.postings.length, addedPostings);
+  assert.equal(after.transactions.length - before.transactions.length, addedTransactions);
   console.log(
     `e2e: extra data seed pack=${pack ?? "none"} bulk=${bulk ?? "none"} ` +
-      `(+${addedAccounts} accounts, +${addedPostings} postings, +${addedRules} rules) PASS`,
+      `(+${addedAccounts} accounts, +${addedTransactions} transactions, +${addedRules} rules) PASS`,
   );
 }

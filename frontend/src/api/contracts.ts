@@ -67,21 +67,21 @@ export interface ExpressionAmountConfig extends JsonObject {
 	expression: string;
 }
 
-export interface ExpressionPostingAmountResolution extends HumaMetadata {
+export interface ExpressionTransactionAmountResolution extends HumaMetadata {
 	resolver: "expression";
 	config: ExpressionAmountConfig;
 	inputs?: Record<string, AmountInputBinding> | null;
 }
 
-export interface OtherPostingAmountResolution extends HumaMetadata {
+export interface OtherTransactionAmountResolution extends HumaMetadata {
 	resolver: string;
 	config: JsonValue;
 	inputs?: Record<string, AmountInputBinding> | null;
 }
 
-export type PostingAmountResolution =
-	| ExpressionPostingAmountResolution
-	| OtherPostingAmountResolution;
+export type TransactionAmountResolution =
+	| ExpressionTransactionAmountResolution
+	| OtherTransactionAmountResolution;
 
 export interface AmountFieldSpec extends HumaMetadata {
 	key: string;
@@ -108,7 +108,7 @@ export interface AmountTemplate extends HumaMetadata {
 	summary?: string;
 	resolver?: string;
 	whenToUse?: string;
-	amount?: PostingAmountResolution;
+	amount?: TransactionAmountResolution;
 }
 
 export interface AmountPreset extends HumaMetadata {
@@ -117,7 +117,7 @@ export interface AmountPreset extends HumaMetadata {
 	label: string;
 	summary?: string | null;
 	whenUse?: string | null;
-	amount: PostingAmountResolution;
+	amount: TransactionAmountResolution;
 	enabled: boolean;
 }
 
@@ -156,34 +156,34 @@ export interface BackendPlannedPurchase extends HumaMetadata {
 	priority: number;
 }
 
-export interface PostingClaim extends HumaMetadata {
+export interface TransactionClaim extends HumaMetadata {
 	scheduleId: string;
 	occurrenceDate: IsoDate;
 }
 
-export interface BackendPosting extends HumaMetadata {
+export interface BackendTransaction extends HumaMetadata {
 	id: string;
 	name: string;
 	sourceAccountId: string | null;
 	destinations: string[] | null;
-	amount: PostingAmountResolution;
+	amount: TransactionAmountResolution;
 	postedTime: number;
 	transactionTime: number;
-	claim?: PostingClaim | null;
+	claim?: TransactionClaim | null;
 	executionOrder?: number;
 	enabled: boolean;
 	source?: string;
 	pending?: boolean;
 	void?: boolean;
 }
-export type Posting = BackendPosting;
+export type Transaction = BackendTransaction;
 
 export interface BackendSchedule extends HumaMetadata {
 	id: string;
 	name: string;
 	sourceAccountId: string | null;
 	destinations: string[] | null;
-	amount: PostingAmountResolution;
+	amount: TransactionAmountResolution;
 	frequency: Frequency;
 	startDate: IsoDate;
 	endDate: IsoDate | null;
@@ -199,7 +199,7 @@ export type EvaluationResultPayload = JsonValue;
 export type FinancialIndependenceConfig = EvaluationConfig;
 export type NetWorthThresholdConfig = EvaluationConfig;
 export type AccountBalanceConfig = EvaluationConfig;
-export type PostingFulfillmentConfig = EvaluationConfig;
+export type TransactionFulfillmentConfig = EvaluationConfig;
 export type CycleFulfillmentConfig = EvaluationConfig;
 export type AccountBalanceEvaluation = EvaluationInstance<AccountBalanceConfig>;
 
@@ -216,8 +216,8 @@ export type FinancialIndependenceEvaluation =
 	EvaluationInstance<FinancialIndependenceConfig>;
 export type NetWorthThresholdEvaluation =
 	EvaluationInstance<NetWorthThresholdConfig>;
-export type PostingFulfillmentEvaluation =
-	EvaluationInstance<PostingFulfillmentConfig>;
+export type TransactionFulfillmentEvaluation =
+	EvaluationInstance<TransactionFulfillmentConfig>;
 export type CycleFulfillmentEvaluation =
 	EvaluationInstance<CycleFulfillmentConfig>;
 
@@ -225,7 +225,7 @@ export interface EvaluationTables extends HumaMetadata {
 	financialIndependence: FinancialIndependenceEvaluation[];
 	netWorthThreshold: NetWorthThresholdEvaluation[];
 	accountBalance: AccountBalanceEvaluation[];
-	postingFulfillment: PostingFulfillmentEvaluation[];
+	transactionFulfillment: TransactionFulfillmentEvaluation[];
 	cycleFulfillment?: CycleFulfillmentEvaluation[];
 	plannedPurchases?: EvaluationInstance[];
 	whatIf?: EvaluationInstance[];
@@ -244,7 +244,7 @@ export interface FinancialModel extends HumaMetadata {
 	accounts: BackendAccount[];
 	checkpoints: BackendCheckpoint[];
 	evaluations: EvaluationTables;
-	postings: BackendPosting[];
+	transactions: BackendTransaction[];
 	schedules: BackendSchedule[];
 	paymentTerms?: BackendPaymentTerms[];
 	plannedPurchases?: BackendPlannedPurchase[];
@@ -252,10 +252,10 @@ export interface FinancialModel extends HumaMetadata {
 
 export interface ModelOverrides extends HumaMetadata {
 	addedAccounts: BackendAccount[];
-	addedPostings: BackendPosting[];
+	addedTransactions: BackendTransaction[];
 	addedSchedules: BackendSchedule[];
 	disabledAccountIds: string[];
-	disabledPostingIds: string[];
+	disabledTransactionIds: string[];
 	disabledScheduleIds: string[];
 }
 
@@ -273,7 +273,7 @@ export interface ModelValidationIssue extends HumaMetadata {
 }
 
 export interface AccountDelta {
-	postingId: string;
+	transactionId: string;
 	delta: number;
 }
 
@@ -313,7 +313,7 @@ export interface ProjectionAccountSummary {
 
 export interface TransactionOrigin {
 	type: string;
-	postingId: string;
+	transactionId: string;
 }
 
 export interface TransactionAccountDelta {
@@ -371,7 +371,7 @@ export interface EvaluationDiagnostic {
 	message: string;
 	date?: IsoDate;
 	relatedAccountIds?: string[];
-	relatedPostingIds?: string[];
+	relatedTransactionIds?: string[];
 }
 
 export interface EvaluationResultEnvelope extends HumaMetadata {
@@ -387,7 +387,7 @@ export interface EvaluationResultTables extends HumaMetadata {
 	financialIndependence: EvaluationResultEnvelope[];
 	netWorthThreshold: EvaluationResultEnvelope[];
 	accountBalance: EvaluationResultEnvelope[];
-	postingFulfillment: EvaluationResultEnvelope[];
+	transactionFulfillment: EvaluationResultEnvelope[];
 	cycleFulfillment?: EvaluationResultEnvelope[];
 	plannedPurchases?: EvaluationResultEnvelope[];
 	whatIf?: EvaluationResultEnvelope[];
@@ -545,7 +545,7 @@ export interface FinancialModelResponse extends HumaMetadata {
 	model: FinancialModel | null;
 	issues: ModelValidationIssue[];
 	revision?: string;
-	/** Stored reverse lookup: posting ID to its receipt IDs. */
+	/** Stored reverse lookup: transaction ID to its receipt IDs. */
 	receiptLinks?: Record<string, string[]>;
 }
 

@@ -50,19 +50,19 @@ func TestDeterministicFulfillmentOmitsDetailArrays(t *testing.T) {
 	if payload.Result == nil || len(payload.Result.TransactionEvents) == 0 {
 		t.Fatal("transactionEvents copy is missing; the kept evidence must stay")
 	}
-	if len(payload.Result.Evaluations.PostingFulfillment) == 0 {
-		t.Fatal("postingFulfillment envelope is missing")
+	if len(payload.Result.Evaluations.TransactionFulfillment) == 0 {
+		t.Fatal("transactionFulfillment envelope is missing")
 	}
-	detail, ok := payload.Result.Evaluations.PostingFulfillment[0].Deterministic.(map[string]any)
+	detail, ok := payload.Result.Evaluations.TransactionFulfillment[0].Deterministic.(map[string]any)
 	if !ok {
-		t.Fatalf("fulfillment deterministic has unexpected shape %T", payload.Result.Evaluations.PostingFulfillment[0].Deterministic)
+		t.Fatalf("fulfillment deterministic has unexpected shape %T", payload.Result.Evaluations.TransactionFulfillment[0].Deterministic)
 	}
 	for _, key := range []string{"completionRate", "requestedAmount", "realizedAmount", "firstUnderfulfilledDate"} {
 		if _, ok := detail[key]; !ok {
 			t.Errorf("fulfillment scalar %q is missing", key)
 		}
 	}
-	for _, key := range []string{"events", "dates", "postings"} {
+	for _, key := range []string{"events", "dates", "transactions"} {
 		if items, ok := detail[key].([]any); !ok || len(items) != 0 {
 			t.Errorf("fulfillment %q has %d entries, want empty", key, len(items))
 		}

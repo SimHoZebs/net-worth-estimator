@@ -3,7 +3,7 @@ import { isIsoDate } from "./format.ts";
 /**
  * Scheduled occurrence dates of a schedule from its start date
  * through `through` (inclusive), never past the schedule's own end date.
- * The window to today is the claimable range: a posting exists in the
+ * The window to today is the claimable range: a transaction exists in the
  * past or today, so only occurrences scheduled by then are offered.
  * An open-ended schedule stops at `through`.
  */
@@ -31,7 +31,7 @@ export function scheduleOccurrenceDates({
 
 /**
  * Claim candidates for one schedule, ordered by absolute distance to the day
- * the posting actually happened; ties keep chronological order. Dates
+ * the transaction actually happened; ties keep chronological order. Dates
  * another row already claimed for this schedule are excluded.
  */
 export function claimOccurrenceCandidates({

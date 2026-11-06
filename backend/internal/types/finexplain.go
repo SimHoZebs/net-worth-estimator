@@ -67,12 +67,12 @@ type FinancialHealthFreshness struct {
 // UnknownLiabilityAccountIDs names enabled debt accounts with a carried
 // balance (or an unconfirmed balance) and no payment terms, so their
 // required minimums cannot be computed. Paid-off debt needs no terms.
-// window flow postings by raw author name, with owner rows (including the
+// window flow transactions by raw author name, with owner rows (including the
 // empty author used before authorship is assigned) grouped as "manual".
 type FinancialHealthCoverage struct {
-	WindowPostings             int            `json:"windowPostings"`
-	ResolvedPostings           int            `json:"resolvedPostings"`
-	ExcludedPostings           int            `json:"excludedPostings"`
+	WindowTransactions         int            `json:"windowTransactions"`
+	ResolvedTransactions       int            `json:"resolvedTransactions"`
+	ExcludedTransactions       int            `json:"excludedTransactions"`
 	ExcludedIDs                []string       `json:"excludedIds"`
 	MissingIncome              bool           `json:"missingIncome"`
 	MissingOutflow             bool           `json:"missingOutflow"`

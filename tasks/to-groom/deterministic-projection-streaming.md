@@ -8,7 +8,7 @@ Deliver deterministic projections progressively over SSE: history rows first for
 
 ## Why deferred
 
-The range API plus gzip already covers slow links. Measured 2026-10-24 on production-shaped data (21 accounts, 230 postings, 20-year horizon): a past-to-today slice is 98 of 1883 rows, ~189KB raw and ~11KB gzipped at level 5, against ~6MB raw / ~329KB gzipped full. The full run itself is on the order of 100ms. Chunking therefore saves perceived latency only, never compute. Revisit when first paint still lags (very large horizons, very bad links) or when the modal flow in Outlook needs progressive fill.
+The range API plus gzip already covers slow links. Measured 2026-10-24 on production-shaped data (21 accounts, 230 transactions, 20-year horizon): a past-to-today slice is 98 of 1883 rows, ~189KB raw and ~11KB gzipped at level 5, against ~6MB raw / ~329KB gzipped full. The full run itself is on the order of 100ms. Chunking therefore saves perceived latency only, never compute. Revisit when first paint still lags (very large horizons, very bad links) or when the modal flow in Outlook needs progressive fill.
 
 ## Scope
 

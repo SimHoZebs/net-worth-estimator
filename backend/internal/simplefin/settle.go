@@ -12,7 +12,7 @@ import (
 // SettleCandidate is one settled bank row that could be the posted version
 // of a void hold, with the evidence used to rank it.
 type SettleCandidate struct {
-	Posting           types.Posting
+	Transaction       types.Transaction
 	Cents             int64
 	DayGapDays        int
 	AmountDeltaCents  int64
@@ -29,8 +29,8 @@ func absInt64(value int64) int64 {
 // settleCandidate scores one candidate against a void hold. It uses the
 // same widened merchant key and merchant profile as the pending-to-posted
 // convert.
-func settleCandidate(voidRow types.Posting, candidate types.Posting) (SettleCandidate, bool) {
-	profile := profileForPosting(voidRow)
+func settleCandidate(voidRow types.Transaction, candidate types.Transaction) (SettleCandidate, bool) {
+	profile := profileForTransaction(voidRow)
 	staleCents, candidateCents, ok := settleJoinKeysWith(
 		voidRow, candidate, profile.windowSeconds(), merchantNamesMatch,
 	)
@@ -42,7 +42,7 @@ func settleCandidate(voidRow types.Posting, candidate types.Posting) (SettleCand
 	}
 	gap := candidate.TransactionTime - voidRow.TransactionTime
 	return SettleCandidate{
-		Posting:           candidate,
+		Transaction:       candidate,
 		Cents:             candidateCents,
 		DayGapDays:        int(math.Round(math.Abs(float64(gap)) / 86400)),
 		AmountDeltaCents:  candidateCents - staleCents,
@@ -55,16 +55,16 @@ func settleCandidate(voidRow types.Posting, candidate types.Posting) (SettleCand
 // amount closeness, so the first row is the suggested posted charge. The
 // caller still decides whether the pair is unique enough to convert.
 func SettleCandidates(hold store.BankRow, bank []store.BankRow) []SettleCandidate {
-	voidRow := hold.Posting
+	voidRow := hold.Transaction
 	if voidRow.Source != store.SourceBankSync || !voidRow.Void || voidRow.Pending || !hasSimpleFINKey(hold) {
 		return nil
 	}
-	if cents, ok := postingAmountCents(voidRow); !ok || cents <= 0 {
+	if cents, ok := transactionAmountCents(voidRow); !ok || cents <= 0 {
 		return nil
 	}
 	candidates := make([]SettleCandidate, 0)
 	for _, row := range bank {
-		candidate := row.Posting
+		candidate := row.Transaction
 		if candidate.ID == voidRow.ID {
 			continue
 		}
@@ -86,7 +86,7 @@ func SettleCandidates(hold store.BankRow, bank []store.BankRow) []SettleCandidat
 		if leftDelta != rightDelta {
 			return leftDelta < rightDelta
 		}
-		return candidates[i].Posting.ID < candidates[j].Posting.ID
+		return candidates[i].Transaction.ID < candidates[j].Transaction.ID
 	})
 	return candidates
 }
@@ -95,9 +95,9 @@ func SettleCandidates(hold store.BankRow, bank []store.BankRow) []SettleCandidat
 // rows normalize their transaction time to the posted instant, so the first
 // nonzero stamp is the day the owner sees in the activity list.
 func SettleCandidateDate(candidate SettleCandidate) string {
-	stamp := candidate.Posting.TransactionTime
+	stamp := candidate.Transaction.TransactionTime
 	if stamp <= 0 {
-		stamp = candidate.Posting.PostedTime
+		stamp = candidate.Transaction.PostedTime
 	}
 	if stamp <= 0 {
 		return ""

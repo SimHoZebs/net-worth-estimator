@@ -34,7 +34,7 @@ it("keeps the picker closed until the row is pressed", async () => {
 	stubTestServer();
 	render(
 		<TransactionCategory
-			postingId="charge"
+			transactionId="charge"
 			category="FOOD_AND_DRINK"
 			source="bank"
 		/>,
@@ -49,7 +49,7 @@ it("renders one row and saves a category chosen from the icon list", async () =>
 	const server = stubTestServer();
 	render(
 		<TransactionCategory
-			postingId="charge"
+			transactionId="charge"
 			category="FOOD_AND_DRINK"
 			source="bank"
 		/>,
@@ -72,7 +72,11 @@ it("resets a user override to automatic", async () => {
 	const user = userEvent.setup();
 	const server = stubTestServer();
 	render(
-		<TransactionCategory postingId="charge" category="MEDICAL" source="user" />,
+		<TransactionCategory
+			transactionId="charge"
+			category="MEDICAL"
+			source="user"
+		/>,
 	);
 	expect(screen.getByText("Set by you")).toBeTruthy();
 	await user.click(trigger());
@@ -86,7 +90,7 @@ it("shows an unknown server key in the row instead of a blank value", async () =
 	stubTestServer();
 	render(
 		<TransactionCategory
-			postingId="charge"
+			transactionId="charge"
 			category="FUTURE_CATEGORY"
 			source="bank"
 		/>,
@@ -98,13 +102,17 @@ it("shows an unknown server key in the row instead of a blank value", async () =
 
 it("stays enabled until app read-only is set", () => {
 	const { rerender } = render(
-		<TransactionCategory postingId="charge" category={null} source={null} />,
+		<TransactionCategory
+			transactionId="charge"
+			category={null}
+			source={null}
+		/>,
 	);
 	expect((trigger() as HTMLButtonElement).disabled).toBe(false);
 	expect(trigger().textContent).toContain("Not categorized");
 	rerender(
 		<TransactionCategory
-			postingId="charge"
+			transactionId="charge"
 			category={null}
 			source={null}
 			readOnly

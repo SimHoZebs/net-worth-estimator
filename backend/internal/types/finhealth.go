@@ -115,12 +115,12 @@ func DefaultFinancialHealthStandards() FinancialHealthStandards {
 // FinancialHealthEvidenceItem is one inspectable fact behind a check:
 // a balance, a dated flow, a threshold application, or a limitation.
 type FinancialHealthEvidenceItem struct {
-	Label      string   `json:"label"`
-	Detail     string   `json:"detail"`
-	Amount     *float64 `json:"amount,omitempty"`
-	AccountIDs []string `json:"accountIds,omitempty"`
-	PostingIDs []string `json:"postingIds,omitempty"`
-	Date       *IsoDate `json:"date,omitempty"`
+	Label          string   `json:"label"`
+	Detail         string   `json:"detail"`
+	Amount         *float64 `json:"amount,omitempty"`
+	AccountIDs     []string `json:"accountIds,omitempty"`
+	TransactionIDs []string `json:"transactionIds,omitempty"`
+	Date           *IsoDate `json:"date,omitempty"`
 }
 
 // FinancialHealthCheckResult carries one check's input, calculation,
@@ -141,12 +141,12 @@ type FinancialHealthCheckResult struct {
 // descriptors that need simulation context) and non-flow rows (transfers,
 // pending, void, disabled) are counted, never silently dropped.
 type FinancialHealthFlowCoverage struct {
-	WindowPostings   int      `json:"windowPostings"`
-	ResolvedPostings int      `json:"resolvedPostings"`
-	ExcludedPostings int      `json:"excludedPostings"`
-	ExcludedIDs      []string `json:"excludedIds"`
-	InflowTotal      float64  `json:"inflowTotal"`
-	OutflowTotal     float64  `json:"outflowTotal"`
+	WindowTransactions   int      `json:"windowTransactions"`
+	ResolvedTransactions int      `json:"resolvedTransactions"`
+	ExcludedTransactions int      `json:"excludedTransactions"`
+	ExcludedIDs          []string `json:"excludedIds"`
+	InflowTotal          float64  `json:"inflowTotal"`
+	OutflowTotal         float64  `json:"outflowTotal"`
 }
 
 // FinancialHealthReport is the complete FIN-03 output: one result per

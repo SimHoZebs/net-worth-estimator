@@ -24,21 +24,21 @@ func sharingKey(t *testing.T) string {
 	return id.String()
 }
 
-func grantSplitAccess(t *testing.T, d *Database, owner, posting, audience string) {
+func grantSplitAccess(t *testing.T, d *Database, owner, transaction, audience string) {
 	t.Helper()
-	if _, err := d.GrantSharedPosting(owner, posting, store.SharingAudienceUser, audience, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(owner, transaction, store.SharingAudienceUser, audience, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func splitInput(owner, posting, initiator string, participants ...string) store.SplitInput {
+func splitInput(owner, transaction, initiator string, participants ...string) store.SplitInput {
 	return store.SplitInput{
-		SourceOwnerID:   owner,
-		SourcePostingID: posting,
-		InitiatorID:     initiator,
-		Currency:        "USD",
-		TotalMinor:      1000,
-		ParticipantIDs:  participants,
+		SourceOwnerID:       owner,
+		SourceTransactionID: transaction,
+		InitiatorID:         initiator,
+		Currency:            "USD",
+		TotalMinor:          1000,
+		ParticipantIDs:      participants,
 	}
 }
 
@@ -65,12 +65,12 @@ func snapshotFinancials(t *testing.T, d *Database) string {
 	t.Helper()
 	tables := map[string]string{
 		"accounts":         "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
-		"postings":         "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
+		"transactions":     "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
 		"checkpoints":      "user_id, id, position, model_account_id, balance, source, observed_at",
 		"recurrence_rules": "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
 	}
 	var out strings.Builder
-	for _, table := range []string{"accounts", "postings", "checkpoints", "recurrence_rules"} {
+	for _, table := range []string{"accounts", "transactions", "checkpoints", "recurrence_rules"} {
 		columns := tables[table]
 		rows, err := d.db.Query(`SELECT ` + columns + ` FROM ` + table + ` ORDER BY user_id, id`)
 		if err != nil {
@@ -105,17 +105,17 @@ func TestSplitCreateStoresShares(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	carol, _ := sharingUser(t, d, "carol")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
-	grantSplitAccess(t, d, alice, sharingPostingA, carol)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
+	grantSplitAccess(t, d, alice, sharingTransactionA, carol)
 
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob, carol))
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob, carol))
 	if split.Version != 1 || split.Status != store.SplitStatusProposed {
 		t.Fatalf("split = v%d %q, want v1 proposed", split.Version, split.Status)
 	}
-	if split.SourceOwnerID != alice || split.SourcePostingID != sharingPostingA || split.SourceRevision == "" {
-		t.Fatalf("split source = %+v, want owner/posting/revision", split)
+	if split.SourceOwnerID != alice || split.SourceTransactionID != sharingTransactionA || split.SourceRevision == "" {
+		t.Fatalf("split source = %+v, want owner/transaction/revision", split)
 	}
 	if split.InitiatorID != alice || split.Currency != "USD" || split.TotalMinor != 1000 {
 		t.Fatalf("split header = %+v, want initiator/currency/total", split)
@@ -139,7 +139,7 @@ func TestSplitCreateStoresShares(t *testing.T) {
 	// Caller-supplied overrides replace the equal default when they name
 	// every participant and sum exactly to the total.
 	overridden := createSplit(t, d, store.SplitInput{
-		SourceOwnerID: alice, SourcePostingID: sharingPostingA, InitiatorID: alice,
+		SourceOwnerID: alice, SourceTransactionID: sharingTransactionA, InitiatorID: alice,
 		Currency: "USD", TotalMinor: 1000, ParticipantIDs: []string{alice, bob},
 		Overrides: map[string]int64{alice: 700, bob: 300},
 	})
@@ -160,21 +160,21 @@ func TestSplitCreateAuthorizesEachParticipant(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	carol, _ := sharingUser(t, d, "carol")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
 	// Carol holds no access: creation fails without naming who.
-	if _, err := d.CreateSplit(alice, splitInput(alice, sharingPostingA, alice, alice, bob, carol), sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.CreateSplit(alice, splitInput(alice, sharingTransactionA, alice, alice, bob, carol), sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("create with unauthorized participant = %v, want not-found", err)
 	}
 	// Bob cannot create Alice's split.
-	if _, err := d.CreateSplit(bob, splitInput(alice, sharingPostingA, alice, alice, bob), sharingKey(t)); !errors.Is(err, store.ErrGroupForbidden) {
+	if _, err := d.CreateSplit(bob, splitInput(alice, sharingTransactionA, alice, alice, bob), sharingKey(t)); !errors.Is(err, store.ErrGroupForbidden) {
 		t.Fatalf("non-initiator create = %v, want forbidden", err)
 	}
 	// Bob cannot accept a split he cannot see created... and a stranger
 	// cannot read a split they hold no share of.
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob))
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob))
 	if _, err := d.GetSplit(carol, split.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("stranger read = %v, want not-found", err)
 	}
@@ -184,13 +184,13 @@ func TestSplitCreateAuthorizesEachParticipant(t *testing.T) {
 	if _, err := d.ListSplitVersions(carol, split.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("stranger history read = %v, want not-found", err)
 	}
-	// Two users share one file with identical posting IDs: splits stay
-	// owner-scoped. Bob's own posting (same ID, his scope) backs an
+	// Two users share one file with identical transaction IDs: splits stay
+	// owner-scoped. Bob's own transaction (same ID, his scope) backs an
 	// independent split Alice cannot see.
 	bobScoped := mustStore(t, d, bob)
-	sharingPosting(t, bobScoped, sharingPostingA)
-	grantSplitAccess(t, d, bob, sharingPostingA, bob)
-	bobSplit, err := d.CreateSplit(bob, splitInput(bob, sharingPostingA, bob, bob), sharingKey(t))
+	sharingTransaction(t, bobScoped, sharingTransactionA)
+	grantSplitAccess(t, d, bob, sharingTransactionA, bob)
+	bobSplit, err := d.CreateSplit(bob, splitInput(bob, sharingTransactionA, bob, bob), sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,17 +209,17 @@ func TestSplitCreateRejectsInvalidInput(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
-	bad := splitInput(alice, sharingPostingA, alice, alice, bob)
+	bad := splitInput(alice, sharingTransactionA, alice, alice, bob)
 	cases := map[string]store.SplitInput{
-		"bad currency":      {SourceOwnerID: alice, SourcePostingID: sharingPostingA, InitiatorID: alice, Currency: "XX", TotalMinor: 100, ParticipantIDs: []string{alice, bob}},
-		"negative total":    {SourceOwnerID: alice, SourcePostingID: sharingPostingA, InitiatorID: alice, Currency: "USD", TotalMinor: -1, ParticipantIDs: []string{alice, bob}},
-		"partial overrides": {SourceOwnerID: alice, SourcePostingID: sharingPostingA, InitiatorID: alice, Currency: "USD", TotalMinor: 100, ParticipantIDs: []string{alice, bob}, Overrides: map[string]int64{alice: 100}},
-		"overriding total":  {SourceOwnerID: alice, SourcePostingID: sharingPostingA, InitiatorID: alice, Currency: "USD", TotalMinor: 100, ParticipantIDs: []string{alice, bob}, Overrides: map[string]int64{alice: 60, bob: 60}},
-		"initiator absent":  {SourceOwnerID: alice, SourcePostingID: sharingPostingA, InitiatorID: alice, Currency: "USD", TotalMinor: 100, ParticipantIDs: []string{bob}},
+		"bad currency":      {SourceOwnerID: alice, SourceTransactionID: sharingTransactionA, InitiatorID: alice, Currency: "XX", TotalMinor: 100, ParticipantIDs: []string{alice, bob}},
+		"negative total":    {SourceOwnerID: alice, SourceTransactionID: sharingTransactionA, InitiatorID: alice, Currency: "USD", TotalMinor: -1, ParticipantIDs: []string{alice, bob}},
+		"partial overrides": {SourceOwnerID: alice, SourceTransactionID: sharingTransactionA, InitiatorID: alice, Currency: "USD", TotalMinor: 100, ParticipantIDs: []string{alice, bob}, Overrides: map[string]int64{alice: 100}},
+		"overriding total":  {SourceOwnerID: alice, SourceTransactionID: sharingTransactionA, InitiatorID: alice, Currency: "USD", TotalMinor: 100, ParticipantIDs: []string{alice, bob}, Overrides: map[string]int64{alice: 60, bob: 60}},
+		"initiator absent":  {SourceOwnerID: alice, SourceTransactionID: sharingTransactionA, InitiatorID: alice, Currency: "USD", TotalMinor: 100, ParticipantIDs: []string{bob}},
 	}
 	_ = bad
 	for name, input := range cases {
@@ -238,12 +238,12 @@ func TestSplitAcceptanceMovesNoMoney(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
 	before := snapshotFinancials(t, d)
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob))
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob))
 
 	afterBob, err := d.AcceptSplit(bob, split.ID, 1, sharingKey(t))
 	if err != nil {
@@ -276,7 +276,7 @@ func TestSplitAcceptanceMovesNoMoney(t *testing.T) {
 	if again.Status != store.SplitStatusAccepted {
 		t.Fatalf("re-accept status = %q, want accepted", again.Status)
 	}
-	events, err := d.ListSharingAudit(alice, sharingPostingA)
+	events, err := d.ListSharingAudit(alice, sharingTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,11 +301,11 @@ func TestSplitUpdateVersionsImmutableHistory(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob))
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob))
 	if _, err := d.AcceptSplit(alice, split.ID, 1, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestSplitUpdateVersionsImmutableHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Only the initiator may revise.
-	updated := splitInput(alice, sharingPostingA, alice, alice, bob)
+	updated := splitInput(alice, sharingTransactionA, alice, alice, bob)
 	updated.TotalMinor = 2000
 	if _, err := d.UpdateSplit(bob, split.ID, 1, updated, sharingKey(t)); !errors.Is(err, store.ErrGroupForbidden) {
 		t.Fatalf("non-initiator update = %v, want forbidden", err)
@@ -378,12 +378,12 @@ func TestSplitStrangerProbesStayNotFound(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	stranger, _ := sharingUser(t, d, "stranger")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob))
-	updated := splitInput(alice, sharingPostingA, alice, alice, bob)
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob))
+	updated := splitInput(alice, sharingTransactionA, alice, alice, bob)
 	if _, err := d.UpdateSplit(alice, split.ID, 1, updated, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
@@ -403,23 +403,23 @@ func TestSplitCreateRetryReplays(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
 	key := sharingKey(t)
-	first, err := d.CreateSplit(alice, splitInput(alice, sharingPostingA, alice, alice, bob), key)
+	first, err := d.CreateSplit(alice, splitInput(alice, sharingTransactionA, alice, alice, bob), key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := d.CreateSplit(alice, splitInput(alice, sharingPostingA, alice, alice, bob), key)
+	second, err := d.CreateSplit(alice, splitInput(alice, sharingTransactionA, alice, alice, bob), key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if second.ID != first.ID || second.Version != 1 {
 		t.Fatalf("replayed split = %+v, want %+v", second, first)
 	}
-	events, err := d.ListSharingAudit(alice, sharingPostingA)
+	events, err := d.ListSharingAudit(alice, sharingTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +427,7 @@ func TestSplitCreateRetryReplays(t *testing.T) {
 	for _, event := range events {
 		if event.Action == store.SharingAuditSplitCreated {
 			creates++
-			if event.ActorUserID != alice || event.OwnerUserID != alice || event.PostingID != sharingPostingA ||
+			if event.ActorUserID != alice || event.OwnerUserID != alice || event.TransactionID != sharingTransactionA ||
 				event.LinkID != first.ID || event.Status != store.SplitStatusProposed || event.RequestID != key {
 				t.Fatalf("create audit = %+v, want actor/action/target/link/status/key", event)
 			}
@@ -440,7 +440,7 @@ func TestSplitCreateRetryReplays(t *testing.T) {
 	// (Grant/exclusion mutations carry no request IDs in this tree, so
 	// cross-operation key aliasing is untestable here; split keys still
 	// never alias each other.)
-	updated := splitInput(alice, sharingPostingA, alice, alice, bob)
+	updated := splitInput(alice, sharingTransactionA, alice, alice, bob)
 	if _, err := d.UpdateSplit(alice, first.ID, 1, updated, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("update with create key = %v, want conflict", err)
 	}
@@ -455,11 +455,11 @@ func TestSplitConcurrentUpdatesConverge(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob))
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob))
 	const racers = 16
 	errs := make([]error, racers)
 	var wg sync.WaitGroup
@@ -467,7 +467,7 @@ func TestSplitConcurrentUpdatesConverge(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			updated := splitInput(alice, sharingPostingA, alice, alice, bob)
+			updated := splitInput(alice, sharingTransactionA, alice, alice, bob)
 			updated.TotalMinor = int64(1000 + i + 1)
 			_, errs[i] = d.UpdateSplit(alice, split.ID, 1, updated, sharingKey(t))
 		}(i)
@@ -512,9 +512,9 @@ func TestSplitConcurrentCreatesConverge(t *testing.T) {
 		d := openSharingTestDB(t)
 		alice, storeA := sharingUser(t, d, "alice")
 		bob, _ := sharingUser(t, d, "bob")
-		sharingPosting(t, storeA, sharingPostingA)
-		grantSplitAccess(t, d, alice, sharingPostingA, alice)
-		grantSplitAccess(t, d, alice, sharingPostingA, bob)
+		sharingTransaction(t, storeA, sharingTransactionA)
+		grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+		grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
 		const racers = 16
 		key := sharingKey(t)
@@ -529,7 +529,7 @@ func TestSplitConcurrentCreatesConverge(t *testing.T) {
 				if shared {
 					k = key
 				}
-				split, err := d.CreateSplit(alice, splitInput(alice, sharingPostingA, alice, alice, bob), k)
+				split, err := d.CreateSplit(alice, splitInput(alice, sharingTransactionA, alice, alice, bob), k)
 				if err == nil {
 					ids[i] = split.ID
 				} else {
@@ -566,11 +566,11 @@ func TestSplitRequestIDsAreUUIDs(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
-	input := splitInput(alice, sharingPostingA, alice, alice, bob)
+	input := splitInput(alice, sharingTransactionA, alice, alice, bob)
 	if _, err := d.CreateSplit(alice, input, "not-a-uuid"); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("create with bad key = %v, want invalid", err)
 	}
@@ -589,11 +589,11 @@ func TestSplitClearDropsUserSplits(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	grantSplitAccess(t, d, alice, sharingPostingA, alice)
-	grantSplitAccess(t, d, alice, sharingPostingA, bob)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	grantSplitAccess(t, d, alice, sharingTransactionA, alice)
+	grantSplitAccess(t, d, alice, sharingTransactionA, bob)
 
-	split := createSplit(t, d, splitInput(alice, sharingPostingA, alice, alice, bob))
+	split := createSplit(t, d, splitInput(alice, sharingTransactionA, alice, alice, bob))
 	if err := storeB.Clear(); err != nil {
 		t.Fatal(err)
 	}

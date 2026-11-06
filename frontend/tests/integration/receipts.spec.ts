@@ -45,7 +45,7 @@ async function openExpense(page: Page) {
 test("private receipt upload, extraction, corrections, and reload preserve the saved model", async ({
 	page,
 }) => {
-	const postingId = await seedExpense(page);
+	const transactionId = await seedExpense(page);
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	let assertedImage = false;
 	page.on("request", (request) => {
@@ -101,7 +101,7 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	const after = await (await page.request.get("/v1/financial-model")).json();
 	expect(after.revision).toBe(before.revision);
 	const list = await (
-		await page.request.get(`/v1/transactions/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
 	).json();
 	expect(list.receipts).toHaveLength(1);
 	expect(list.receipts[0].confirmed.merchant).toBe("Reviewed market");
@@ -130,7 +130,7 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 test("reopened extraction polls only reads and exposes interrupted recovery", async ({
 	page,
 }) => {
-	const postingId = await seedExpense(page);
+	const transactionId = await seedExpense(page);
 	const detail = await openExpense(page);
 	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
 	const receipt = page.getByRole("dialog", {
@@ -142,7 +142,7 @@ test("reopened extraction polls only reads and exposes interrupted recovery", as
 		.getByRole("button", { name: "Close dialog", exact: true })
 		.click();
 	const collection = await (
-		await page.request.get(`/v1/transactions/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
 	).json();
 	const id = collection.receipts[0].id as string;
 	let phase = "extracting";
@@ -385,7 +385,7 @@ test("read-only mode keeps receipt mutations unavailable", async ({ page }) => {
 test("image controls replace all receipt content and delete it without changing the transaction", async ({
 	page,
 }) => {
-	const postingId = await seedExpense(page);
+	const transactionId = await seedExpense(page);
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	const detail = await openExpense(page);
 	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
@@ -407,7 +407,7 @@ test("image controls replace all receipt content and delete it without changing 
 		.click();
 	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
 	const original = await (
-		await page.request.get(`/v1/transactions/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
 	).json();
 	const id = original.receipts[0].id as string;
 	const oldPixels = await receipt.getByRole("img").getAttribute("src");
@@ -469,7 +469,7 @@ test("image controls replace all receipt content and delete it without changing 
 		receipt.getByText("Original extracted values", { exact: true }),
 	).toHaveCount(0);
 	const updated = await (
-		await page.request.get(`/v1/transactions/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
 	).json();
 	expect(updated.receipts).toHaveLength(1);
 	expect(updated.receipts[0].id).toBe(id);
@@ -508,7 +508,7 @@ test("image controls replace all receipt content and delete it without changing 
 		404,
 	);
 	const list = await (
-		await page.request.get(`/v1/transactions/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
 	).json();
 	expect(list.receipts).toHaveLength(0);
 	const after = await (await page.request.get("/v1/financial-model")).json();

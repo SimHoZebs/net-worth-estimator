@@ -6,15 +6,15 @@ export function projectionStartDate(model: FinancialModel): string {
 		new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
 	);
 	const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
-	const posting = model.postings[0];
+	const transaction = model.transactions[0];
 	return (
 		latest ??
 		(model.schedules ?? [])[0]?.startDate ??
-		(posting
+		(transaction
 			? new Date(
-					(posting.transactionTime > 0
-						? posting.transactionTime
-						: posting.postedTime) * 1000,
+					(transaction.transactionTime > 0
+						? transaction.transactionTime
+						: transaction.postedTime) * 1000,
 				)
 					.toISOString()
 					.slice(0, 10)

@@ -54,7 +54,7 @@ func feedNumber(raw any) (float64, bool) {
 // descriptor, mirroring the record lists: a numeric expression recipe or a
 // numeric configured value counts; calculated recipes report varying and
 // stay out of summed totals.
-func FeedLiteralAmount(amount types.PostingAmountResolution) (float64, bool) {
+func FeedLiteralAmount(amount types.TransactionAmountResolution) (float64, bool) {
 	if amount.Config == nil {
 		return 0, false
 	}

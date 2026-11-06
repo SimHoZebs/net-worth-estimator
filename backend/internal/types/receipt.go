@@ -49,24 +49,24 @@ type ReceiptProblem struct {
 }
 
 type Receipt struct {
-	ID                  string             `json:"id"`
-	PostingID           string             `json:"postingId"`
-	Filename            string             `json:"filename"`
-	MediaType           string             `json:"mediaType"`
-	Size                int64              `json:"size"`
-	Digest              string             `json:"digest"`
-	CreatedAt           string             `json:"createdAt"`
-	Revision            int64              `json:"revision"`
-	Status              string             `json:"status"`
-	ExtractionStartedAt int64              `json:"extractionStartedAt,omitempty"`
-	Extraction          *ReceiptExtraction `json:"extraction,omitempty"`
-	Draft               *ReceiptDetails    `json:"draft,omitempty"`
-	Confirmed           *ReceiptDetails    `json:"confirmed,omitempty"`
-	DraftProvenance     *ReceiptProvenance `json:"draftProvenance,omitempty"`
-	ConfirmedProvenance *ReceiptProvenance `json:"confirmedProvenance,omitempty"`
-	Problem             *ReceiptProblem    `json:"problem,omitempty"`
-	PostingFingerprint  string             `json:"postingFingerprint"`
-	Stale               bool               `json:"stale"`
+	ID                     string             `json:"id"`
+	TransactionID          string             `json:"transactionId"`
+	Filename               string             `json:"filename"`
+	MediaType              string             `json:"mediaType"`
+	Size                   int64              `json:"size"`
+	Digest                 string             `json:"digest"`
+	CreatedAt              string             `json:"createdAt"`
+	Revision               int64              `json:"revision"`
+	Status                 string             `json:"status"`
+	ExtractionStartedAt    int64              `json:"extractionStartedAt,omitempty"`
+	Extraction             *ReceiptExtraction `json:"extraction,omitempty"`
+	Draft                  *ReceiptDetails    `json:"draft,omitempty"`
+	Confirmed              *ReceiptDetails    `json:"confirmed,omitempty"`
+	DraftProvenance        *ReceiptProvenance `json:"draftProvenance,omitempty"`
+	ConfirmedProvenance    *ReceiptProvenance `json:"confirmedProvenance,omitempty"`
+	Problem                *ReceiptProblem    `json:"problem,omitempty"`
+	TransactionFingerprint string             `json:"transactionFingerprint"`
+	Stale                  bool               `json:"stale"`
 }
 
 // ReceiptImage never participates in model serialization or receipt list reads.

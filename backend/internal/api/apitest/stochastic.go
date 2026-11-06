@@ -14,11 +14,11 @@ import (
 func StochasticModel() *types.FinancialModel {
 	end := "2027-01-01"
 	return &types.FinancialModel{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
-		Postings: []types.Posting{},
+		Accounts:     []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{{
 			ID: "salary", Name: "Salary", Destinations: []string{"checking"},
-			Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
+			Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
 			Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", EndDate: &end, Priority: 1, Enabled: true,
 		}},
 		Evaluations: types.EmptyEvaluationTables(),

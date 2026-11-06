@@ -33,7 +33,7 @@ func TestExtensionTokenTransportAndOriginBoundary(t *testing.T) {
 		{"purchase", testExtensionOrigin, "/v1/planned-purchases", "access-device", "none", 204},
 		{"without token", testExtensionOrigin, "/v1/planned-purchases", "", "none", 401},
 		{"invalid token", testExtensionOrigin, "/v1/planned-purchases", "retired-token", "none", 401},
-		{"posting", testExtensionOrigin, "/v1/transactions", "access-device", "none", 403},
+		{"transaction", testExtensionOrigin, "/v1/transactions", "access-device", "none", 403},
 		{"unrelated route", testExtensionOrigin, "/v1/accounts", "access-device", "none", 403},
 		{"website", "https://attacker.test", "/v1/planned-purchases", "access-device", "cross-site", 403},
 		{"lookalike", testExtensionOrigin + ".evil.test", "/v1/planned-purchases", "access-device", "none", 403},
@@ -131,7 +131,7 @@ func TestExtensionUsesPlannedPurchaseAPI(t *testing.T) {
 		}
 	}
 	model, err := plan.LoadModel()
-	if err != nil || len(model.Postings) != 0 || len(model.PlannedPurchases) != 1 {
+	if err != nil || len(model.Transactions) != 0 || len(model.PlannedPurchases) != 1 {
 		t.Fatalf("purchase persistence: %+v %v", model, err)
 	}
 	readOnly := s.Wrap(api.New(plan, api.Config{ReadOnly: true}))

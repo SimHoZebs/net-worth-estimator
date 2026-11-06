@@ -1,6 +1,6 @@
 import type {
 	AmountTemplate,
-	PostingAmountResolution,
+	TransactionAmountResolution,
 } from "../api/contracts.ts";
 
 // Frontend-owned copy: all human words live here, not in the backend.
@@ -73,7 +73,7 @@ export const FALLBACK_PROVIDERS: CopyEntry[] = [
 	},
 ];
 
-function fixed(expression: string): PostingAmountResolution {
+function fixed(expression: string): TransactionAmountResolution {
 	return {
 		resolver: "expression",
 		config: { expression },
@@ -244,7 +244,7 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 ];
 
 export function plainLanguageForAmount(
-	amount: PostingAmountResolution | null | undefined,
+	amount: TransactionAmountResolution | null | undefined,
 ): string {
 	if (!amount) return "No amount set.";
 	if (amount.resolver === "progressive-bracket") {
@@ -277,7 +277,7 @@ export function presetToTemplate(preset: {
 	label: string;
 	summary?: string | null;
 	whenUse?: string | null;
-	amount: PostingAmountResolution;
+	amount: TransactionAmountResolution;
 }): AmountTemplate {
 	return {
 		id: preset.name,

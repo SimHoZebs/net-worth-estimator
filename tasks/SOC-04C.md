@@ -9,7 +9,7 @@
 
 ### Acceptance criteria
 
-- [ ] Select source posting and participants.
+- [ ] Select source transaction and participants.
 - [ ] Equal allocation default with manual overrides.
 - [ ] Immediate total validation.
 - [ ] Preview before sending.

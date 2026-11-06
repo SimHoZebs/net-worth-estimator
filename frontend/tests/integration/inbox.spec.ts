@@ -79,7 +79,9 @@ test("inbox accept saves an independent copy to the viewer model", async ({
 
 	const model = await readSavedServerModel();
 	expect(
-		model.postings.some((posting) => posting.name === "Lake cabin groceries"),
+		model.transactions.some(
+			(transaction) => transaction.name === "Lake cabin groceries",
+		),
 	).toBe(true);
 });
 

@@ -11,31 +11,31 @@ import { useAnalysisFindings } from "../../state/analyses.ts";
  * ambiguous-match review UX is VIS-03's open decision. */
 export function transferFindingsForEdge(
 	findings: AnalysisFinding[],
-	postingIds: string[],
+	transactionIds: string[],
 ): AnalysisFinding[] {
-	if (!postingIds.length) return [];
-	const ids = new Set(postingIds);
+	if (!transactionIds.length) return [];
+	const ids = new Set(transactionIds);
 	return findings.filter(
 		(finding) =>
 			finding.kind === "transfer" &&
 			!finding.dismissed &&
 			finding.review?.decision !== "rejected" &&
-			ids.has(finding.postingId),
+			ids.has(finding.transactionId),
 	);
 }
 
 export function TransferMatchNote({
-	postingIds,
+	transactionIds,
 	transferCount,
 }: {
-	postingIds: string[];
+	transactionIds: string[];
 	/** Number of source transactions behind the edge. */
 	transferCount: number;
 }) {
-	const query = useAnalysisFindings(postingIds);
+	const query = useAnalysisFindings(transactionIds);
 	const findings = transferFindingsForEdge(
 		query.data?.findings ?? [],
-		postingIds,
+		transactionIds,
 	);
 	const matched = findings.filter((finding) => finding.strength === "strong");
 	const ambiguous = findings.filter((finding) => finding.strength !== "strong");

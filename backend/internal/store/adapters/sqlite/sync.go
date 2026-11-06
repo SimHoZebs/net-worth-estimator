@@ -17,11 +17,11 @@ func syncCheckpointKey(accountID string, observedAt int64) string {
 
 // nextTablePosition returns MAX(position)+1 for a position-ordered table, or
 // 0 when empty. One position-management helper shared by the sync apply and
-// model re-merge paths. Posting display order lives in posting_sim, so a
-// "postings" request resolves to that satellite.
+// model re-merge paths. Transaction display order lives in transaction_sim, so a
+// "transactions" request resolves to that satellite.
 func nextTablePosition(tx *userTx, table string) (int, error) {
-	if table == "postings" {
-		table = "posting_sim"
+	if table == "transactions" {
+		table = "transaction_sim"
 	}
 	var maxPosition sql.NullInt64
 	if err := tx.QueryRow(`SELECT MAX(position) FROM ` + table + ` WHERE user_id = :user_id`).Scan(&maxPosition); err != nil {
@@ -105,22 +105,22 @@ func equalFloatPtr(left, right *float64) bool {
 	return *left == *right
 }
 
-// remergePostings writes owner postings, then restores authoritative sync rows.
+// remergeTransactions writes owner transactions, then restores authoritative sync rows.
 // Execution orders allocate once per batch instead of one MAX query per row.
-func remergePostings(tx *userTx, incoming []types.Posting, synced []types.Posting, startPosition int) (int, error) {
+func remergeTransactions(tx *userTx, incoming []types.Transaction, synced []types.Transaction, startPosition int) (int, error) {
 	position := startPosition
 	syncedIDs := make(map[string]bool, len(synced))
-	for _, posting := range synced {
-		syncedIDs[posting.ID] = true
+	for _, transaction := range synced {
+		syncedIDs[transaction.ID] = true
 	}
 	var nextOrder int64
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) FROM posting_sim WHERE user_id = :user_id`).Scan(&nextOrder); err != nil {
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) FROM transaction_sim WHERE user_id = :user_id`).Scan(&nextOrder); err != nil {
 		return 0, fmt.Errorf("read max execution order: %w", err)
 	}
 	nextOrder++
-	allocate := func(posting *types.Posting) {
-		if posting.ExecutionOrder == 0 {
-			posting.ExecutionOrder = nextOrder
+	allocate := func(transaction *types.Transaction) {
+		if transaction.ExecutionOrder == 0 {
+			transaction.ExecutionOrder = nextOrder
 			nextOrder++
 		}
 	}
@@ -129,15 +129,15 @@ func remergePostings(tx *userTx, incoming []types.Posting, synced []types.Postin
 			continue
 		}
 		allocate(&incoming[i])
-		if err := insertPosting(tx, position, &incoming[i], SourceUser); err != nil {
+		if err := insertTransaction(tx, position, &incoming[i], SourceUser); err != nil {
 			return 0, err
 		}
 		position++
 	}
 	for i := range synced {
 		allocate(&synced[i])
-		if err := insertPosting(tx, position, &synced[i], synced[i].Source); err != nil {
-			return 0, fmt.Errorf("re-merge synced posting: %w", err)
+		if err := insertTransaction(tx, position, &synced[i], synced[i].Source); err != nil {
+			return 0, fmt.Errorf("re-merge synced transaction: %w", err)
 		}
 		position++
 	}
@@ -182,24 +182,24 @@ func loadSyncedCheckpoints(tx *userTx) ([]syncedCheckpoint, error) {
 	return checkpoints, rows.Close()
 }
 
-func loadSyncedPostings(tx *userTx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.projection_slice_id IS NULL AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
+func loadSyncedTransactions(tx *userTx) ([]types.Transaction, error) {
+	rows, err := tx.Query(`SELECT `+transactionSelect+` `+transactionJoins+` WHERE p.source != ? AND p.projection_slice_id IS NULL AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var postings []types.Posting
+	var transactions []types.Transaction
 	for rows.Next() {
-		posting, err := scanPostingRow(rows)
+		transaction, err := scanTransactionRow(rows)
 		if err != nil {
 			return nil, err
 		}
-		postings = append(postings, posting)
+		transactions = append(transactions, transaction)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return postings, rows.Close()
+	return transactions, rows.Close()
 }
 
 // validateSyncCheckpointSource rejects checkpoints without explicit

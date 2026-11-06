@@ -253,8 +253,8 @@ test("a shortfall can be inspected and edited while preserving account context a
 	// Find the saved renovation by name.
 	await expect(dialog).toContainText("Account activity · Saved");
 	const saved = await readSavedServerModel();
-	const savedExpression = saved.postings.find(
-		(posting) => posting.name === "Home renovation",
+	const savedExpression = saved.transactions.find(
+		(transaction) => transaction.name === "Home renovation",
 	)?.amount.config.expression;
 	expect(savedExpression).toBe("3000");
 });

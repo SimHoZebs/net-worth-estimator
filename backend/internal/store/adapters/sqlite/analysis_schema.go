@@ -5,9 +5,9 @@ import "fmt"
 var analysisSchema = []string{
 	`CREATE TABLE IF NOT EXISTS transaction_source_facts (
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		posting_id TEXT NOT NULL, facts_json TEXT NOT NULL,
-		PRIMARY KEY(user_id, posting_id),
-		FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
+		transaction_id TEXT NOT NULL, facts_json TEXT NOT NULL,
+		PRIMARY KEY(user_id, transaction_id),
+		FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 	)`,
 	`CREATE TABLE IF NOT EXISTS analysis_inputs (
 		user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -24,18 +24,18 @@ var analysisSchema = []string{
 	`CREATE INDEX IF NOT EXISTS analysis_runs_latest ON analysis_runs(user_id, type, started_at DESC, id DESC)`,
 	`CREATE TABLE IF NOT EXISTS analysis_findings (
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		id TEXT NOT NULL, analysis_type TEXT NOT NULL, posting_id TEXT NOT NULL,
+		id TEXT NOT NULL, analysis_type TEXT NOT NULL, transaction_id TEXT NOT NULL,
 		kind TEXT NOT NULL, detection_json TEXT NOT NULL, run_id TEXT NOT NULL,
 		first_detected_at INTEGER NOT NULL, last_checked_at INTEGER NOT NULL,
 		status TEXT NOT NULL CHECK(status IN ('active', 'withdrawn')),
 		dismissed INTEGER NOT NULL DEFAULT 0 CHECK(dismissed IN (0, 1)),
 		review_json TEXT NOT NULL DEFAULT 'null',
 		feedback_revision INTEGER NOT NULL DEFAULT 0,
-		PRIMARY KEY(user_id, id), UNIQUE(user_id, analysis_type, posting_id, kind),
-		FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
+		PRIMARY KEY(user_id, id), UNIQUE(user_id, analysis_type, transaction_id, kind),
+		FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
 		FOREIGN KEY(user_id, run_id) REFERENCES analysis_runs(user_id, id)
 	)`,
-	`CREATE INDEX IF NOT EXISTS analysis_findings_posting ON analysis_findings(user_id, posting_id, id)`,
+	`CREATE INDEX IF NOT EXISTS analysis_findings_transaction ON analysis_findings(user_id, transaction_id, id)`,
 	`CREATE TABLE IF NOT EXISTS analysis_promotions (
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
@@ -43,7 +43,7 @@ var analysisSchema = []string{
 	)`,
 }
 
-var analysisTriggerNames = []string{"analysis_facts_insert", "analysis_facts_update", "analysis_facts_delete", "analysis_posting_lifecycle", "analysis_posting_sim_lifecycle"}
+var analysisTriggerNames = []string{"analysis_facts_insert", "analysis_facts_update", "analysis_facts_delete", "analysis_transaction_lifecycle", "analysis_transaction_sim_lifecycle"}
 
 func analysisSchemaStatements() []string {
 	statements := append([]string(nil), analysisSchema...)
@@ -60,14 +60,14 @@ func analysisSchemaStatements() []string {
 			ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
 		END`, name, action, row))
 	}
-	return append(statements, `CREATE TRIGGER IF NOT EXISTS analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
+	return append(statements, `CREATE TRIGGER IF NOT EXISTS analysis_transaction_lifecycle AFTER UPDATE OF pending, void ON transactions
 		WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
-		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.id)
+		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`,
-		`CREATE TRIGGER IF NOT EXISTS analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
+		`CREATE TRIGGER IF NOT EXISTS analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON transaction_sim
 		WHEN (OLD.enabled != NEW.enabled)
-		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.posting_id)
+		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`,
 		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('transaction-analysis-v1')`)

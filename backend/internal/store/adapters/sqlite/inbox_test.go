@@ -10,8 +10,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const inboxPostingA = "01900000-0000-7000-8000-0000000000c1"
-const inboxPostingB = "01900000-0000-7000-8000-0000000000c2"
+const inboxTransactionA = "01900000-0000-7000-8000-0000000000c1"
+const inboxTransactionB = "01900000-0000-7000-8000-0000000000c2"
 
 func openInboxTestDB(t *testing.T) *Database {
 	t.Helper()
@@ -36,27 +36,27 @@ func reopenInboxTestDB(t *testing.T, d *Database, path string) *Database {
 	return reopened
 }
 
-func grantToUser(t *testing.T, d *Database, owner, posting, recipient string) {
+func grantToUser(t *testing.T, d *Database, owner, transaction, recipient string) {
 	t.Helper()
-	if _, err := d.GrantSharedPosting(owner, posting, store.SharingAudienceUser, recipient, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(owner, transaction, store.SharingAudienceUser, recipient, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func recipientPostings(t *testing.T, d *Database, recipient string) []types.Posting {
+func recipientTransactions(t *testing.T, d *Database, recipient string) []types.Transaction {
 	t.Helper()
-	rows, err := d.db.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.user_id = ?`, recipient)
+	rows, err := d.db.Query(`SELECT `+transactionSelect+` `+transactionJoins+` WHERE p.user_id = ?`, recipient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer rows.Close()
-	var out []types.Posting
+	var out []types.Transaction
 	for rows.Next() {
-		posting, err := scanPostingRow(rows)
+		transaction, err := scanTransactionRow(rows)
 		if err != nil {
 			t.Fatal(err)
 		}
-		out = append(out, posting)
+		out = append(out, transaction)
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
@@ -70,8 +70,8 @@ func TestInboxShareArrivesPendingUnread(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 
 	items, err := d.ListInboxItems(bob)
 	if err != nil {
@@ -87,8 +87,8 @@ func TestInboxShareArrivesPendingUnread(t *testing.T) {
 	if !item.Unread || item.Dismissed || item.ReceivedAt == 0 {
 		t.Fatalf("item = %+v, want unread visible sighting", item)
 	}
-	if item.Posting == nil || item.Posting.ID != inboxPostingA {
-		t.Fatalf("item preview = %+v, want authorized posting", item.Posting)
+	if item.Transaction == nil || item.Transaction.ID != inboxTransactionA {
+		t.Fatalf("item preview = %+v, want authorized transaction", item.Transaction)
 	}
 	again, err := d.ListInboxItems(bob)
 	if err != nil {
@@ -106,31 +106,31 @@ func TestInboxAcceptIdempotentSingleCopy(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 
-	before := len(recipientPostings(t, d, bob))
-	accepted, err := d.AcceptInboxShare(bob, alice, inboxPostingA)
+	before := len(recipientTransactions(t, d, bob))
+	accepted, err := d.AcceptInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accepted.Status != store.InboxStatusAccepted || accepted.CopyPostingID == "" {
+	if accepted.Status != store.InboxStatusAccepted || accepted.CopyTransactionID == "" {
 		t.Fatalf("accepted = %+v, want accepted with copy", accepted)
 	}
-	if after := len(recipientPostings(t, d, bob)); after != before+1 {
-		t.Fatalf("recipient postings grew by %d, want 1", after-before)
+	if after := len(recipientTransactions(t, d, bob)); after != before+1 {
+		t.Fatalf("recipient transactions grew by %d, want 1", after-before)
 	}
-	retry, err := d.AcceptInboxShare(bob, alice, inboxPostingA)
+	retry, err := d.AcceptInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if retry.CopyPostingID != accepted.CopyPostingID {
-		t.Fatalf("retry copy = %q, want %q", retry.CopyPostingID, accepted.CopyPostingID)
+	if retry.CopyTransactionID != accepted.CopyTransactionID {
+		t.Fatalf("retry copy = %q, want %q", retry.CopyTransactionID, accepted.CopyTransactionID)
 	}
-	if after := len(recipientPostings(t, d, bob)); after != before+1 {
-		t.Fatalf("retry grew recipient postings to %d, want no duplicate", after)
+	if after := len(recipientTransactions(t, d, bob)); after != before+1 {
+		t.Fatalf("retry grew recipient transactions to %d, want no duplicate", after)
 	}
-	decline, err := d.DeclineInboxShare(bob, alice, inboxPostingA)
+	decline, err := d.DeclineInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,22 +152,22 @@ func TestInboxAcceptAdoptsExistingCopy(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 
-	before := len(recipientPostings(t, d, bob))
-	copied, err := d.CopySharedPosting(alice, inboxPostingA, bob, sharingKey(t))
+	before := len(recipientTransactions(t, d, bob))
+	copied, err := d.CopySharedTransaction(alice, inboxTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	accepted, err := d.AcceptInboxShare(bob, alice, inboxPostingA)
+	accepted, err := d.AcceptInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accepted.CopyPostingID != copied.ID {
-		t.Fatalf("adopted copy = %q, want %q", accepted.CopyPostingID, copied.ID)
+	if accepted.CopyTransactionID != copied.ID {
+		t.Fatalf("adopted copy = %q, want %q", accepted.CopyTransactionID, copied.ID)
 	}
-	if after := len(recipientPostings(t, d, bob)); after != before+1 {
+	if after := len(recipientTransactions(t, d, bob)); after != before+1 {
 		t.Fatalf("accept minted a second copy: grew by %d", after-before)
 	}
 }
@@ -178,17 +178,17 @@ func TestInboxDeclineWithdrawsDirectGrant(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 
-	declined, err := d.DeclineInboxShare(bob, alice, inboxPostingA)
+	declined, err := d.DeclineInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if declined.Status != store.InboxStatusDeclined {
 		t.Fatalf("declined = %+v, want declined", declined)
 	}
-	if declined.Posting != nil {
+	if declined.Transaction != nil {
 		t.Fatal("declined direct share still carries a preview")
 	}
 	grants, err := d.ListSharingGrants(alice)
@@ -198,14 +198,14 @@ func TestInboxDeclineWithdrawsDirectGrant(t *testing.T) {
 	if len(grants) != 0 {
 		t.Fatalf("sender grants = %+v, want declined recipient gone", grants)
 	}
-	retry, err := d.DeclineInboxShare(bob, alice, inboxPostingA)
+	retry, err := d.DeclineInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if retry.Status != store.InboxStatusDeclined {
 		t.Fatalf("retry = %q, want declined", retry.Status)
 	}
-	if _, err := d.AcceptInboxShare(bob, alice, inboxPostingA); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.AcceptInboxShare(bob, alice, inboxTransactionA); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("accept-after-decline = %v, want not-found until reshared", err)
 	}
 }
@@ -216,17 +216,17 @@ func TestInboxDeclineGroupShareKeepsGrant(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
+	sharingTransaction(t, storeA, inboxTransactionA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, inboxTransactionA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 
-	declined, err := d.DeclineInboxShare(bob, alice, inboxPostingA)
+	declined, err := d.DeclineInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if declined.Status != store.InboxStatusDeclined || declined.Posting == nil {
+	if declined.Status != store.InboxStatusDeclined || declined.Transaction == nil {
 		t.Fatalf("declined = %+v, want declined with authorized preview", declined)
 	}
 	grants, err := d.ListSharingGrants(alice)
@@ -238,16 +238,16 @@ func TestInboxDeclineGroupShareKeepsGrant(t *testing.T) {
 	}
 	// A declined group share stays authorized, so the recipient may still
 	// accept afterwards; the acceptance saves the personal copy as usual.
-	before := len(recipientPostings(t, d, bob))
-	accepted, err := d.AcceptInboxShare(bob, alice, inboxPostingA)
+	before := len(recipientTransactions(t, d, bob))
+	accepted, err := d.AcceptInboxShare(bob, alice, inboxTransactionA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accepted.Status != store.InboxStatusAccepted || accepted.CopyPostingID == "" {
+	if accepted.Status != store.InboxStatusAccepted || accepted.CopyTransactionID == "" {
 		t.Fatalf("accept-after-decline = %+v, want accepted with copy", accepted)
 	}
-	if after := len(recipientPostings(t, d, bob)); after != before+1 {
-		t.Fatalf("accept-after-decline grew postings by %d, want 1", after-before)
+	if after := len(recipientTransactions(t, d, bob)); after != before+1 {
+		t.Fatalf("accept-after-decline grew transactions by %d, want 1", after-before)
 	}
 }
 
@@ -257,19 +257,19 @@ func TestInboxStandingGroupDeclineStaysDeclined(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
+	sharingTransaction(t, storeA, inboxTransactionA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, inboxTransactionA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.DeclineInboxShare(bob, alice, inboxPostingA); err != nil {
+	if _, err := d.DeclineInboxShare(bob, alice, inboxTransactionA); err != nil {
 		t.Fatal(err)
 	}
 	items, err := d.ListInboxItems(bob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].Status != store.InboxStatusDeclined || items[0].Posting == nil {
+	if len(items) != 1 || items[0].Status != store.InboxStatusDeclined || items[0].Transaction == nil {
 		t.Fatalf("relisted = %+v, want declined with authorized preview", items)
 	}
 }
@@ -281,24 +281,24 @@ func TestInboxFreshGroupGrantReopensDeclined(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
+	sharingTransaction(t, storeA, inboxTransactionA)
 	first := sharingGroup(t, d, "alice", "First", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, first, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, inboxTransactionA, store.SharingAudienceGroup, first, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.DeclineInboxShare(bob, alice, inboxPostingA); err != nil {
+	if _, err := d.DeclineInboxShare(bob, alice, inboxTransactionA); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1100 * time.Millisecond)
 	second := sharingGroup(t, d, "alice", "Second", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, second, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, inboxTransactionA, store.SharingAudienceGroup, second, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	items, err := d.ListInboxItems(bob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].Status != store.InboxStatusPending || !items[0].Unread || items[0].Posting == nil {
+	if len(items) != 1 || items[0].Status != store.InboxStatusPending || !items[0].Unread || items[0].Transaction == nil {
 		t.Fatalf("reopened = %+v, want pending unread with preview", items)
 	}
 }
@@ -309,12 +309,12 @@ func TestInboxReshareAfterDeclineReturnsPending(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
-	if _, err := d.DeclineInboxShare(bob, alice, inboxPostingA); err != nil {
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
+	if _, err := d.DeclineInboxShare(bob, alice, inboxTransactionA); err != nil {
 		t.Fatal(err)
 	}
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 	items, err := d.ListInboxItems(bob)
 	if err != nil {
 		t.Fatal(err)
@@ -323,7 +323,7 @@ func TestInboxReshareAfterDeclineReturnsPending(t *testing.T) {
 		t.Fatalf("items = %d, want 1", len(items))
 	}
 	reshared := items[0]
-	if reshared.Status != store.InboxStatusPending || !reshared.Unread || reshared.Posting == nil {
+	if reshared.Status != store.InboxStatusPending || !reshared.Unread || reshared.Transaction == nil {
 		t.Fatalf("reshared = %+v, want pending unread with preview", reshared)
 	}
 	if reshared.DecidedAt != 0 {
@@ -338,20 +338,20 @@ func TestInboxCanceledOnRevoke(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	carol, storeC := sharingUser(t, d, "carol")
-	sharingPosting(t, storeA, inboxPostingA)
-	sharingPosting(t, storeC, inboxPostingB)
-	grantToUser(t, d, alice, inboxPostingA, bob)
-	grantToUser(t, d, carol, inboxPostingB, bob)
-	if _, err := d.AcceptInboxShare(bob, carol, inboxPostingB); err != nil {
+	sharingTransaction(t, storeA, inboxTransactionA)
+	sharingTransaction(t, storeC, inboxTransactionB)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
+	grantToUser(t, d, carol, inboxTransactionB, bob)
+	if _, err := d.AcceptInboxShare(bob, carol, inboxTransactionB); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.ListInboxItems(bob); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(alice, inboxPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if err := d.RevokeSharedTransaction(alice, inboxTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(carol, inboxPostingB, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if err := d.RevokeSharedTransaction(carol, inboxTransactionB, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -359,41 +359,41 @@ func TestInboxCanceledOnRevoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	byPosting := map[string]store.InboxShareItem{}
+	byTransaction := map[string]store.InboxShareItem{}
 	for _, item := range items {
-		byPosting[item.PostingID] = item
+		byTransaction[item.TransactionID] = item
 	}
-	pending, ok := byPosting[inboxPostingA]
-	if !ok || pending.Status != store.InboxStatusCanceled || pending.Posting != nil {
+	pending, ok := byTransaction[inboxTransactionA]
+	if !ok || pending.Status != store.InboxStatusCanceled || pending.Transaction != nil {
 		t.Fatalf("revoked pending = %+v, want canceled without preview", pending)
 	}
-	decided, ok := byPosting[inboxPostingB]
+	decided, ok := byTransaction[inboxTransactionB]
 	if !ok || decided.Status != store.InboxStatusAccepted {
 		t.Fatalf("revoked accepted = %+v, want recorded acceptance", decided)
 	}
-	if _, err := d.AcceptInboxShare(bob, alice, inboxPostingA); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.AcceptInboxShare(bob, alice, inboxTransactionA); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("accept-after-revoke = %v, want not-found", err)
 	}
 }
 
-// Deleting the source posting cancels its pending inbox items.
+// Deleting the source transaction cancels its pending inbox items.
 func TestInboxCanceledOnSourceDelete(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 	if _, err := d.ListInboxItems(bob); err != nil {
 		t.Fatal(err)
 	}
-	if err := storeA.DeletePosting(inboxPostingA); err != nil {
+	if err := storeA.DeleteTransaction(inboxTransactionA); err != nil {
 		t.Fatal(err)
 	}
 	items, err := d.ListInboxItems(bob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].Status != store.InboxStatusCanceled || items[0].Posting != nil {
+	if len(items) != 1 || items[0].Status != store.InboxStatusCanceled || items[0].Transaction != nil {
 		t.Fatalf("items = %+v, want one canceled without preview", items)
 	}
 }
@@ -404,24 +404,24 @@ func TestInboxDismissRecoverable(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 
-	dismissed, err := d.SetInboxShareDismissed(bob, alice, inboxPostingA, true)
+	dismissed, err := d.SetInboxShareDismissed(bob, alice, inboxTransactionA, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !dismissed.Dismissed || dismissed.Status != store.InboxStatusPending {
 		t.Fatalf("dismissed = %+v, want hidden pending", dismissed)
 	}
-	shown, err := d.SetInboxShareDismissed(bob, alice, inboxPostingA, false)
+	shown, err := d.SetInboxShareDismissed(bob, alice, inboxTransactionA, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if shown.Dismissed {
 		t.Fatalf("unhidden = %+v, want visible", shown)
 	}
-	if _, err := d.SetInboxShareDismissed(bob, alice, inboxPostingB, true); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.SetInboxShareDismissed(bob, alice, inboxTransactionB, true); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("dismiss unseen = %v, want not-found", err)
 	}
 }
@@ -436,15 +436,15 @@ func TestInboxUnreadPersists(t *testing.T) {
 	}
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 	if _, err := d.ListInboxItems(bob); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.AcceptInboxShare(bob, alice, inboxPostingA); err != nil {
+	if _, err := d.AcceptInboxShare(bob, alice, inboxTransactionA); err != nil {
 		t.Fatal(err)
 	}
-	read, err := d.SetInboxShareRead(bob, alice, inboxPostingA, true)
+	read, err := d.SetInboxShareRead(bob, alice, inboxTransactionA, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,7 +460,7 @@ func TestInboxUnreadPersists(t *testing.T) {
 	if len(items) != 1 || items[0].Unread || items[0].Status != store.InboxStatusAccepted {
 		t.Fatalf("reopened = %+v, want persisted read accepted", items)
 	}
-	unread, err := d.SetInboxShareRead(bob, alice, inboxPostingA, false)
+	unread, err := d.SetInboxShareRead(bob, alice, inboxTransactionA, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,34 +470,34 @@ func TestInboxUnreadPersists(t *testing.T) {
 }
 
 // Shares stay invisible to anyone outside the audience, even with forged
-// owner and posting IDs, in the same physical file.
+// owner and transaction IDs, in the same physical file.
 func TestInboxIsolation(t *testing.T) {
 	d := openInboxTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
 	carol, _ := sharingUser(t, d, "carol")
-	sharingPosting(t, storeA, inboxPostingA)
-	sharingPosting(t, storeB, inboxPostingA)
-	grantToUser(t, d, alice, inboxPostingA, bob)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	sharingTransaction(t, storeB, inboxTransactionA)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
 
 	if items, err := d.ListInboxItems(carol); err != nil || len(items) != 0 {
 		t.Fatalf("outsider inbox = %+v, %v; want empty", items, err)
 	}
 	unknownOwner := "user:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	if _, err := d.AcceptInboxShare(carol, unknownOwner, inboxPostingA); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.AcceptInboxShare(carol, unknownOwner, inboxTransactionA); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("forged-owner accept = %v, want not-found", err)
 	}
-	if _, err := d.DeclineInboxShare(bob, alice, inboxPostingB); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("wrong-posting decline = %v, want not-found", err)
+	if _, err := d.DeclineInboxShare(bob, alice, inboxTransactionB); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("wrong-transaction decline = %v, want not-found", err)
 	}
-	if _, err := d.SetInboxShareRead(bob, alice, inboxPostingB, true); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("wrong-posting read = %v, want not-found", err)
+	if _, err := d.SetInboxShareRead(bob, alice, inboxTransactionB, true); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("wrong-transaction read = %v, want not-found", err)
 	}
-	if _, err := d.AcceptInboxShare(bob, "not-a-user", inboxPostingA); !errors.Is(err, store.ErrGroupInvalid) {
+	if _, err := d.AcceptInboxShare(bob, "not-a-user", inboxTransactionA); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("malformed-owner accept = %v, want invalid", err)
 	}
-	if _, err := d.AcceptInboxShare(bob, alice, "not-a-posting"); !errors.Is(err, store.ErrGroupInvalid) {
-		t.Fatalf("malformed-posting accept = %v, want invalid", err)
+	if _, err := d.AcceptInboxShare(bob, alice, "not-a-transaction"); !errors.Is(err, store.ErrGroupInvalid) {
+		t.Fatalf("malformed-transaction accept = %v, want invalid", err)
 	}
 	if _, err := d.ListInboxItems("not-a-user"); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("malformed-recipient list = %v, want invalid", err)
@@ -511,25 +511,25 @@ func TestInboxSenderDisplayName(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	carol, storeC := sharingUser(t, d, "carol")
-	sharingPosting(t, storeA, inboxPostingA)
-	sharingPosting(t, storeC, inboxPostingB)
+	sharingTransaction(t, storeA, inboxTransactionA)
+	sharingTransaction(t, storeC, inboxTransactionB)
 	sharingGroup(t, d, "alice", "Club", "bob")
-	grantToUser(t, d, alice, inboxPostingA, bob)
-	grantToUser(t, d, carol, inboxPostingB, bob)
+	grantToUser(t, d, alice, inboxTransactionA, bob)
+	grantToUser(t, d, carol, inboxTransactionB, bob)
 
 	items, err := d.ListInboxItems(bob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	byPosting := map[string]store.InboxShareItem{}
+	byTransaction := map[string]store.InboxShareItem{}
 	for _, item := range items {
-		byPosting[item.PostingID] = item
+		byTransaction[item.TransactionID] = item
 	}
-	if byPosting[inboxPostingA].SenderDisplayName != "alice" {
-		t.Fatalf("group sender name = %q, want alice", byPosting[inboxPostingA].SenderDisplayName)
+	if byTransaction[inboxTransactionA].SenderDisplayName != "alice" {
+		t.Fatalf("group sender name = %q, want alice", byTransaction[inboxTransactionA].SenderDisplayName)
 	}
-	if byPosting[inboxPostingB].SenderDisplayName != "" {
-		t.Fatalf("stranger sender name = %q, want empty", byPosting[inboxPostingB].SenderDisplayName)
+	if byTransaction[inboxTransactionB].SenderDisplayName != "" {
+		t.Fatalf("stranger sender name = %q, want empty", byTransaction[inboxTransactionB].SenderDisplayName)
 	}
 }
 
@@ -539,17 +539,17 @@ func TestWithdrawUserGrant(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	carol, _ := sharingUser(t, d, "carol")
-	sharingPosting(t, storeA, inboxPostingA)
+	sharingTransaction(t, storeA, inboxTransactionA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	grantToUser(t, d, alice, inboxPostingA, bob)
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
+	grantToUser(t, d, alice, inboxTransactionA, bob)
+	if _, err := d.GrantSharedTransaction(alice, inboxTransactionA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := d.WithdrawUserGrant(carol, alice, inboxPostingA); !errors.Is(err, store.ErrNotFound) {
+	if err := d.WithdrawUserGrant(carol, alice, inboxTransactionA); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("stranger withdraw = %v, want not-found", err)
 	}
-	if err := d.WithdrawUserGrant(bob, alice, inboxPostingA); err != nil {
+	if err := d.WithdrawUserGrant(bob, alice, inboxTransactionA); err != nil {
 		t.Fatal(err)
 	}
 	grants, err := d.ListSharingGrants(alice)
@@ -559,7 +559,7 @@ func TestWithdrawUserGrant(t *testing.T) {
 	if len(grants) != 1 || grants[0].Audience != store.SharingAudienceGroup {
 		t.Fatalf("grants = %+v, want only the group grant left", grants)
 	}
-	if err := d.WithdrawUserGrant(bob, alice, inboxPostingA); !errors.Is(err, store.ErrNotFound) {
+	if err := d.WithdrawUserGrant(bob, alice, inboxTransactionA); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("second withdraw = %v, want not-found", err)
 	}
 	if err := d.WithdrawUserGrant(bob, alice, "nope"); !errors.Is(err, store.ErrGroupInvalid) {

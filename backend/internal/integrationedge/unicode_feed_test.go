@@ -24,27 +24,27 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 	if !ok {
 		t.Fatal("unicode pack has no model seed")
 	}
-	for _, posting := range packModel.Postings {
-		advEnsurePostingID(t, world.ownerSC, posting.ID, posting.Name, "12.00", 1781524800)
-		if _, err := world.db.GrantSharedPosting(world.owner, posting.ID, "group", world.groupID, advRequestID(t)); err != nil {
+	for _, transaction := range packModel.Transactions {
+		advEnsureTransactionID(t, world.ownerSC, transaction.ID, transaction.Name, "12.00", 1781524800)
+		if _, err := world.db.GrantSharedTransaction(world.owner, transaction.ID, "group", world.groupID, advRequestID(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	feed := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, "/v1/shared/groups/"+world.groupID+"/feed", world.secondSubject, ""), http.StatusOK)
 	items, _ := feed["items"].([]any)
-	if len(items) < len(packModel.Postings) {
-		t.Fatalf("feed items = %d, want at least the %d unicode rows", len(items), len(packModel.Postings))
+	if len(items) < len(packModel.Transactions) {
+		t.Fatalf("feed items = %d, want at least the %d unicode rows", len(items), len(packModel.Transactions))
 	}
 	advFeedTotalsAgreement(t, feed)
 	byID := map[string]string{}
 	for _, raw := range items {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
-		name, _ := posting["name"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
+		name, _ := transaction["name"].(string)
 		byID[id] = name
 	}
-	for _, want := range packModel.Postings {
+	for _, want := range packModel.Transactions {
 		got, ok := byID[want.ID]
 		if !ok {
 			t.Fatalf("unicode row %q missing from the feed", want.ID)
@@ -56,20 +56,20 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 
 	// A saved copy keeps the exact name, and the owner's own list does too.
 	copied := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/copies", world.secondSubject,
-		`{"owner":`+advQuote(advResource(world.owner))+`,"postingId":"`+packModel.Postings[0].ID+`","requestId":`+advQuote(advRequestID(t))+`}`), http.StatusCreated)
-	saved, _ := copied["posting"].(map[string]any)
-	if saved["name"] != packModel.Postings[0].Name {
-		t.Fatalf("copy name = %q, want byte-identical %q", saved["name"], packModel.Postings[0].Name)
+		`{"owner":`+advQuote(advResource(world.owner))+`,"transactionId":"`+packModel.Transactions[0].ID+`","requestId":`+advQuote(advRequestID(t))+`}`), http.StatusCreated)
+	saved, _ := copied["transaction"].(map[string]any)
+	if saved["name"] != packModel.Transactions[0].Name {
+		t.Fatalf("copy name = %q, want byte-identical %q", saved["name"], packModel.Transactions[0].Name)
 	}
 	model, err := world.ownerSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	stored := map[string]string{}
-	for _, posting := range model.Postings {
-		stored[posting.ID] = posting.Name
+	for _, transaction := range model.Transactions {
+		stored[transaction.ID] = transaction.Name
 	}
-	for _, want := range packModel.Postings {
+	for _, want := range packModel.Transactions {
 		if stored[want.ID] != want.Name {
 			t.Fatalf("stored name for %q = %q, want byte-identical %q", want.ID, stored[want.ID], want.Name)
 		}

@@ -36,7 +36,7 @@ func settlementUser(t *testing.T, d *Database, subject string) string {
 	return id
 }
 
-func settlementPaymentPosting(t *testing.T, d *Database, subject, id string) string {
+func settlementPaymentTransaction(t *testing.T, d *Database, subject, id string) string {
 	t.Helper()
 	owner := settlementUser(t, d, subject)
 	scoped, err := d.EnsureUser(owner, settlementIssuer, subject)
@@ -47,9 +47,9 @@ func settlementPaymentPosting(t *testing.T, d *Database, subject, id string) str
 	if _, err := scoped.CreateAccount(types.Account{ID: account, Name: "Checking", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := scoped.CreatePosting(types.Posting{
+	if _, err := scoped.CreateTransaction(types.Transaction{
 		ID: id, Name: "Real payment", SourceAccountID: &account,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785817200,
 		TransactionTime: 1785817200,
 		Enabled:         true,
@@ -167,17 +167,17 @@ func TestSettlementLinkedPaymentCountedOnce(t *testing.T) {
 	d := openSettlementTestDB(t)
 	alice := settlementUser(t, d, "alice")
 	bob := settlementUser(t, d, "bob")
-	payer := settlementPaymentPosting(t, d, "payer", settlementPayment)
+	payer := settlementPaymentTransaction(t, d, "payer", settlementPayment)
 
 	linked := store.SettlementInput{
 		SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 500,
-		LinkedOwnerID: payer, LinkedPostingID: settlementPayment,
+		LinkedOwnerID: payer, LinkedTransactionID: settlementPayment,
 	}
 	recorded, err := d.RecordSettlement(alice, linked, "01900000-0000-7000-8000-00000000c005")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !recorded.Linked() || recorded.LinkedOwnerID != payer || recorded.LinkedPostingID != settlementPayment {
+	if !recorded.Linked() || recorded.LinkedOwnerID != payer || recorded.LinkedTransactionID != settlementPayment {
 		t.Fatalf("recorded = %+v, want the payment link", recorded)
 	}
 
@@ -188,11 +188,11 @@ func TestSettlementLinkedPaymentCountedOnce(t *testing.T) {
 		{"same share", linked},
 		{"other participant", store.SettlementInput{
 			SplitID: settlementSplitA, ParticipantID: alice, AmountMinor: 500,
-			LinkedOwnerID: payer, LinkedPostingID: settlementPayment,
+			LinkedOwnerID: payer, LinkedTransactionID: settlementPayment,
 		}},
 		{"other split", store.SettlementInput{
 			SplitID: settlementSplitB, ParticipantID: bob, AmountMinor: 500,
-			LinkedOwnerID: payer, LinkedPostingID: settlementPayment,
+			LinkedOwnerID: payer, LinkedTransactionID: settlementPayment,
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -204,13 +204,13 @@ func TestSettlementLinkedPaymentCountedOnce(t *testing.T) {
 }
 
 // Recording a settlement writes only settlement rows: the linked real
-// payment, the payer's other postings, accounts, and checkpoints are
+// payment, the payer's other transactions, accounts, and checkpoints are
 // byte-identical before and after.
 func TestSettlementMovesNoMoney(t *testing.T) {
 	d := openSettlementTestDB(t)
 	alice := settlementUser(t, d, "alice")
 	bob := settlementUser(t, d, "bob")
-	payer := settlementPaymentPosting(t, d, "payer", settlementPayment)
+	payer := settlementPaymentTransaction(t, d, "payer", settlementPayment)
 
 	scoped, err := d.User(payer)
 	if err != nil {
@@ -223,7 +223,7 @@ func TestSettlementMovesNoMoney(t *testing.T) {
 
 	if _, err := d.RecordSettlement(alice, store.SettlementInput{
 		SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 500,
-		LinkedOwnerID: payer, LinkedPostingID: settlementPayment,
+		LinkedOwnerID: payer, LinkedTransactionID: settlementPayment,
 	}, "01900000-0000-7000-8000-00000000c007"); err != nil {
 		t.Fatal(err)
 	}
@@ -238,13 +238,13 @@ func TestSettlementMovesNoMoney(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(after.Accounts) != len(before.Accounts) ||
-		len(after.Postings) != len(before.Postings) ||
+		len(after.Transactions) != len(before.Transactions) ||
 		len(after.Checkpoints) != len(before.Checkpoints) {
 		t.Fatalf("model changed: before %+v after %+v", before, after)
 	}
-	for i, posting := range after.Postings {
-		if !reflect.DeepEqual(posting, before.Postings[i]) {
-			t.Fatalf("posting %d changed: %+v", i, posting)
+	for i, transaction := range after.Transactions {
+		if !reflect.DeepEqual(transaction, before.Transactions[i]) {
+			t.Fatalf("transaction %d changed: %+v", i, transaction)
 		}
 	}
 }
@@ -311,8 +311,8 @@ func TestSettlementRejectsBadInput(t *testing.T) {
 		{"zero amount", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 0}, key},
 		{"negative amount", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: -5}, key},
 		{"half link", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 1, LinkedOwnerID: alice}, key},
-		{"bad link posting", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 1, LinkedOwnerID: alice, LinkedPostingID: "pay-1"}, key},
-		{"ghost link posting", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 1, LinkedOwnerID: alice, LinkedPostingID: settlementPayment}, key},
+		{"bad link transaction", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 1, LinkedOwnerID: alice, LinkedTransactionID: "pay-1"}, key},
+		{"ghost link transaction", alice, store.SettlementInput{SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 1, LinkedOwnerID: alice, LinkedTransactionID: settlementPayment}, key},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := d.RecordSettlement(tc.actor, tc.input, tc.key); err == nil {
@@ -340,11 +340,11 @@ func TestSettlementHistorySurvivesLinkedPaymentDelete(t *testing.T) {
 	d := openSettlementTestDB(t)
 	alice := settlementUser(t, d, "alice")
 	bob := settlementUser(t, d, "bob")
-	payer := settlementPaymentPosting(t, d, "payer", settlementPayment)
+	payer := settlementPaymentTransaction(t, d, "payer", settlementPayment)
 
 	recorded, err := d.RecordSettlement(alice, store.SettlementInput{
 		SplitID: settlementSplitA, ParticipantID: bob, AmountMinor: 500,
-		LinkedOwnerID: payer, LinkedPostingID: settlementPayment,
+		LinkedOwnerID: payer, LinkedTransactionID: settlementPayment,
 	}, "01900000-0000-7000-8000-00000000c013")
 	if err != nil {
 		t.Fatal(err)
@@ -353,7 +353,7 @@ func TestSettlementHistorySurvivesLinkedPaymentDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := scoped.DeletePosting(settlementPayment); err != nil {
+	if err := scoped.DeleteTransaction(settlementPayment); err != nil {
 		t.Fatal(err)
 	}
 	history, err := d.ListSettlements(alice, settlementSplitA)

@@ -179,7 +179,7 @@ func TestLedgerMailReceiptShowsChargeEvidence(t *testing.T) {
 		t.Fatalf("receipt = %+v, want amount, merchant, and provenance", receipt)
 	}
 	// The ledger's bookshop charge lists beside it with the same amount.
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	if len(byName["Bookshop order"]) != 1 {
 		t.Fatalf("bookshop charge rows = %d, want 1", len(byName["Bookshop order"]))
 	}
@@ -219,11 +219,11 @@ func TestLedgerMailReceiptShowsChargeEvidence(t *testing.T) {
 	}
 }
 
-func ledgerUploadImage(t *testing.T, handler http.Handler, postingID string) *httptest.ResponseRecorder {
+func ledgerUploadImage(t *testing.T, handler http.Handler, transactionID string) *httptest.ResponseRecorder {
 	t.Helper()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	if err := form.WriteField("postingId", postingID); err != nil {
+	if err := form.WriteField("transactionId", transactionID); err != nil {
 		t.Fatal(err)
 	}
 	part, err := form.CreatePart(textproto.MIMEHeader{
@@ -252,7 +252,7 @@ func ledgerUploadImage(t *testing.T, handler http.Handler, postingID string) *ht
 func TestLedgerImageReceiptLinksChargeAcrossResync(t *testing.T) {
 	world := ledgerSetup(t, nil)
 	ledgerDeletePhantom(t, world)
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	charge := byName["Bookshop order"][0]
 
 	upload := ledgerUploadImage(t, world.plan, charge)
@@ -315,8 +315,8 @@ func TestLedgerImageReceiptLinksChargeAcrossResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(before.Postings) != len(after.Postings) {
-		t.Fatalf("postings = %d after re-sync, want %d", len(after.Postings), len(before.Postings))
+	if len(before.Transactions) != len(after.Transactions) {
+		t.Fatalf("transactions = %d after re-sync, want %d", len(after.Transactions), len(before.Transactions))
 	}
 	stillReq := httptest.NewRequest(http.MethodGet, "/v1/transactions/"+charge+"/receipts", nil)
 	stillResp := httptest.NewRecorder()

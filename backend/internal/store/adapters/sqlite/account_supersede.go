@@ -1,6 +1,6 @@
 // Account supersede merges one manual account into a bank-linked synced
 // account. The synced account keeps its bridge link, bank checkpoints, and
-// bank postings: those are the authoritative facts. The manual account's
+// bank transactions: those are the authoritative facts. The manual account's
 // profile and account-scoped configuration move to the synced account, then
 // the manual account and its history are deleted in one transaction.
 package sqlite
@@ -48,8 +48,8 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		if err := supersedeCheckPreconditions(tx, baseline, manual, synced, bridgeID); err != nil {
 			return err
 		}
-		deletedPostingIDs := supersedePostingsTouching(baseline, manualID)
-		deletedPostingSet := stringSet(deletedPostingIDs)
+		deletedTransactionIDs := supersedeTransactionsTouching(baseline, manualID)
+		deletedTransactionSet := stringSet(deletedTransactionIDs)
 		deletedScheduleIDs, err := supersedeRules(tx, baseline, manualID, syncedID)
 		if err != nil {
 			return err
@@ -58,10 +58,10 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		if err := supersedeAccountProfile(tx, manual, syncedID); err != nil {
 			return err
 		}
-		if err := supersedeDeletePostings(tx, deletedPostingIDs); err != nil {
+		if err := supersedeDeleteTransactions(tx, deletedTransactionIDs); err != nil {
 			return err
 		}
-		if err := supersedePostingAmounts(tx, baseline, deletedPostingSet, manualID, syncedID); err != nil {
+		if err := supersedeTransactionAmounts(tx, baseline, deletedTransactionSet, manualID, syncedID); err != nil {
 			return err
 		}
 		if err := supersedeRuleAmounts(tx, baseline, deletedRuleSet, manualID, syncedID); err != nil {
@@ -76,10 +76,10 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		if err := supersedePaymentTerms(tx, baseline, manualID, syncedID); err != nil {
 			return err
 		}
-		if err := supersedeEvaluations(tx, manualID, syncedID, deletedPostingSet, deletedRuleSet); err != nil {
+		if err := supersedeEvaluations(tx, manualID, syncedID, deletedTransactionSet, deletedRuleSet); err != nil {
 			return err
 		}
-		if err := supersedeSafeSpending(tx, manualID, syncedID, deletedPostingSet, deletedRuleSet); err != nil {
+		if err := supersedeSafeSpending(tx, manualID, syncedID, deletedTransactionSet, deletedRuleSet); err != nil {
 			return err
 		}
 		if err := supersedeSyncCards(tx, manualID, syncedID); err != nil {
@@ -145,8 +145,8 @@ func supersedeCheckPreconditions(tx *userTx, model *types.FinancialModel, manual
 			return fmt.Errorf("%w: %s already has bank history", store.ErrAccountSupersedeInvalid, manual.Name)
 		}
 	}
-	for _, posting := range model.Postings {
-		if supersedePostingTouches(posting, manual.ID) && posting.Source != store.SourceUser {
+	for _, transaction := range model.Transactions {
+		if supersedeTransactionTouches(transaction, manual.ID) && transaction.Source != store.SourceUser {
 			return fmt.Errorf("%w: %s still has bank transactions", store.ErrAccountSupersedeInvalid, manual.Name)
 		}
 	}
@@ -193,41 +193,41 @@ func supersedeAccountProfile(tx *userTx, manual types.Account, syncedID string) 
 	return nil
 }
 
-func supersedePostingsTouching(model *types.FinancialModel, accountID string) []string {
+func supersedeTransactionsTouching(model *types.FinancialModel, accountID string) []string {
 	var ids []string
-	for _, posting := range model.Postings {
-		if supersedePostingTouches(posting, accountID) {
-			ids = append(ids, posting.ID)
+	for _, transaction := range model.Transactions {
+		if supersedeTransactionTouches(transaction, accountID) {
+			ids = append(ids, transaction.ID)
 		}
 	}
 	return ids
 }
 
-func supersedePostingTouches(posting types.Posting, accountID string) bool {
-	if posting.SourceAccountID != nil && *posting.SourceAccountID == accountID {
+func supersedeTransactionTouches(transaction types.Transaction, accountID string) bool {
+	if transaction.SourceAccountID != nil && *transaction.SourceAccountID == accountID {
 		return true
 	}
-	return supersedeContains(posting.Destinations, accountID)
+	return supersedeContains(transaction.Destinations, accountID)
 }
 
-func supersedeDeletePostings(tx *userTx, postingIDs []string) error {
-	if len(postingIDs) == 0 {
+func supersedeDeleteTransactions(tx *userTx, transactionIDs []string) error {
+	if len(transactionIDs) == 0 {
 		return nil
 	}
 	now := time.Now().Unix()
 	if err := ensureSuppressionSchema(tx); err != nil {
 		return err
 	}
-	for _, id := range postingIDs {
-		if err := deleteSharingForPosting(tx, id); err != nil {
+	for _, id := range transactionIDs {
+		if err := deleteSharingForTransaction(tx, id); err != nil {
 			return err
 		}
-		if err := suppressPostingKeys(tx, id, now); err != nil {
-			return fmt.Errorf("suppress posting keys %s: %w", id, err)
+		if err := suppressTransactionKeys(tx, id, now); err != nil {
+			return fmt.Errorf("suppress transaction keys %s: %w", id, err)
 		}
-		result, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND user_id = :user_id`, id)
+		result, err := tx.Exec(`DELETE FROM transactions WHERE id = ? AND user_id = :user_id`, id)
 		if err != nil {
-			return fmt.Errorf("delete posting %s: %w", id, err)
+			return fmt.Errorf("delete transaction %s: %w", id, err)
 		}
 		affected, err := result.RowsAffected()
 		if err != nil {
@@ -252,8 +252,8 @@ func supersedeDeleteCheckpoints(tx *userTx, accountID string) error {
 	return nil
 }
 
-// supersedePostingAmounts rewrites provider argument references on owner and
-// bank postings that survive the merge. The expression's input names stay
+// supersedeTransactionAmounts rewrites provider argument references on owner and
+// bank transactions that survive the merge. The expression's input names stay
 // untouched because they are local variables, not account IDs.
 func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID string) ([]string, error) {
 	var deleted []string
@@ -291,7 +291,7 @@ func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID 
 }
 
 func supersedeDeleteSchedule(tx *userTx, ruleID string) error {
-	if _, err := tx.Exec(`DELETE FROM posting_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
+	if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
 		return fmt.Errorf("delete claims for rule %s: %w", ruleID, err)
 	}
 	if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, ruleID); err != nil {

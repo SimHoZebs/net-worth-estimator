@@ -3,13 +3,13 @@ import { useSyncExternalStore } from "react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import {
-	excludeSharedPosting,
+	excludeSharedTransaction,
 	getSharingPolicy,
-	grantSharedPosting,
+	grantSharedTransaction,
 	listSharingGrants,
 	previewSharingPolicy,
 	removeSharedExclusion,
-	revokeSharedPosting,
+	revokeSharedTransaction,
 	setSharingPolicy,
 	type SharingPolicyInput,
 } from "@/pages/sharingApi.ts";
@@ -195,7 +195,7 @@ export function useSetSharingPolicy() {
 	);
 }
 
-export function useGrantSharedPosting() {
+export function useGrantSharedTransaction() {
 	const scope = useSharingScope();
 	const cache = serverQueryClient();
 	return useMutation(
@@ -203,17 +203,17 @@ export function useGrantSharedPosting() {
 			mutationKey: ["sharing-write", scope.key, "grant"],
 			retry: false,
 			mutationFn: async ({
-				postingId,
+				transactionId,
 				audienceId,
 				requestId,
 			}: {
-				postingId: string;
+				transactionId: string;
 				audienceId: string;
 				requestId?: string;
 			}) => {
 				currentScope(scope);
-				const result = await grantSharedPosting(
-					postingId,
+				const result = await grantSharedTransaction(
+					transactionId,
 					"group",
 					audienceId,
 					requestId,
@@ -229,7 +229,7 @@ export function useGrantSharedPosting() {
 	);
 }
 
-export function useRevokeSharedPosting() {
+export function useRevokeSharedTransaction() {
 	const scope = useSharingScope();
 	const cache = serverQueryClient();
 	return useMutation(
@@ -237,19 +237,19 @@ export function useRevokeSharedPosting() {
 			mutationKey: ["sharing-write", scope.key, "grant-revoke"],
 			retry: false,
 			mutationFn: async ({
-				postingId,
+				transactionId,
 				audienceType,
 				audienceId,
 				requestId,
 			}: {
-				postingId: string;
+				transactionId: string;
 				audienceType: string;
 				audienceId: string;
 				requestId?: string;
 			}) => {
 				currentScope(scope);
-				await revokeSharedPosting(
-					postingId,
+				await revokeSharedTransaction(
+					transactionId,
 					audienceType,
 					audienceId,
 					requestId,
@@ -264,7 +264,7 @@ export function useRevokeSharedPosting() {
 	);
 }
 
-export function useExcludeSharedPosting() {
+export function useExcludeSharedTransaction() {
 	const scope = useSharingScope();
 	const cache = serverQueryClient();
 	return useMutation(
@@ -272,19 +272,19 @@ export function useExcludeSharedPosting() {
 			mutationKey: ["sharing-write", scope.key, "exclude"],
 			retry: false,
 			mutationFn: async ({
-				postingId,
+				transactionId,
 				audienceType,
 				audienceId,
 				requestId,
 			}: {
-				postingId: string;
+				transactionId: string;
 				audienceType: "group" | "all";
 				audienceId: string;
 				requestId?: string;
 			}) => {
 				currentScope(scope);
-				const result = await excludeSharedPosting(
-					postingId,
+				const result = await excludeSharedTransaction(
+					transactionId,
 					audienceType,
 					audienceId,
 					requestId,
@@ -308,19 +308,19 @@ export function useRemoveSharedExclusion() {
 			mutationKey: ["sharing-write", scope.key, "exclude-remove"],
 			retry: false,
 			mutationFn: async ({
-				postingId,
+				transactionId,
 				audienceType,
 				audienceId,
 				requestId,
 			}: {
-				postingId: string;
+				transactionId: string;
 				audienceType: string;
 				audienceId: string;
 				requestId?: string;
 			}) => {
 				currentScope(scope);
 				await removeSharedExclusion(
-					postingId,
+					transactionId,
 					audienceType,
 					audienceId,
 					requestId,

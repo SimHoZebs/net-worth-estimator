@@ -19,7 +19,7 @@ func TestSetupAndRuntimeRejectInlineReceiptBlobsWithoutChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := privateTestPlan(t, d, "owner")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	image := types.ReceiptImage{Bytes: []byte("old normalized image"), MediaType: "image/png"}
 	r, err := s.CreateReceipt(t.Context(), p.ID, "old.png", image)
 	if err != nil {
@@ -33,17 +33,17 @@ func TestSetupAndRuntimeRejectInlineReceiptBlobsWithoutChanges(t *testing.T) {
 		`DROP TABLE receipts`, `DELETE FROM blob_data`, `DELETE FROM blob_objects`,
 		`CREATE TABLE receipts (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			id TEXT NOT NULL, posting_id TEXT NOT NULL, digest TEXT NOT NULL,
+			id TEXT NOT NULL, transaction_id TEXT NOT NULL, digest TEXT NOT NULL,
 			size INTEGER NOT NULL CHECK(size>0), image BLOB NOT NULL,
 			revision INTEGER NOT NULL, payload TEXT NOT NULL,
-			PRIMARY KEY(user_id,id), UNIQUE(user_id,posting_id,digest),
-			FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE)`,
+			PRIMARY KEY(user_id,id), UNIQUE(user_id,transaction_id,digest),
+			FOREIGN KEY(user_id,transaction_id) REFERENCES transactions(user_id,id) ON DELETE CASCADE)`,
 	} {
 		if _, err := d.db.Exec(statement); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := d.db.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,image,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, s.db.userID, r.ID, r.PostingID, r.Digest, r.Size, image.Bytes, r.Revision, payload); err != nil {
+	if _, err := d.db.Exec(`INSERT INTO receipts(user_id,id,transaction_id,digest,size,image,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, s.db.userID, r.ID, r.TransactionID, r.Digest, r.Size, image.Bytes, r.Revision, payload); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.Close(); err != nil {

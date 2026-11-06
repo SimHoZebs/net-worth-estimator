@@ -18,7 +18,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const receiptAPIPostingID = "01900000-0000-7000-8000-000000000087"
+const receiptAPITransactionID = "01900000-0000-7000-8000-000000000087"
 
 func receiptAPIStore(t *testing.T) store.Store {
 	t.Helper()
@@ -27,7 +27,7 @@ func receiptAPIStore(t *testing.T) store.Store {
 		t.Fatal(err)
 	}
 	account := "checking"
-	if _, err := db.CreatePosting(types.Posting{ID: receiptAPIPostingID, Name: "Expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "12.34"}, Inputs: map[string]types.AmountInputBinding{}}, TransactionTime: 1, PostedTime: 1, Enabled: true}); err != nil {
+	if _, err := db.CreateTransaction(types.Transaction{ID: receiptAPITransactionID, Name: "Expense", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "12.34"}, Inputs: map[string]types.AmountInputBinding{}}, TransactionTime: 1, PostedTime: 1, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -35,7 +35,7 @@ func receiptAPIStore(t *testing.T) store.Store {
 
 func receiptUpload(t *testing.T, h http.Handler, image []byte) *httptest.ResponseRecorder {
 	t.Helper()
-	return receiptMultipartRequest(t, h, "POST", "/v1/receipts", map[string]string{"postingId": receiptAPIPostingID}, image)
+	return receiptMultipartRequest(t, h, "POST", "/v1/receipts", map[string]string{"transactionId": receiptAPITransactionID}, image)
 }
 
 func receiptMultipartRequest(t *testing.T, h http.Handler, method, path string, fields map[string]string, image []byte) *httptest.ResponseRecorder {
@@ -152,7 +152,7 @@ func TestReceiptHTTPContractSurvivesAdapterSwap(t *testing.T) {
 			if stale.Code != 409 {
 				t.Fatalf("stale=%d %s", stale.Code, stale.Body.String())
 			}
-			if got := receiptRequest(h, "GET", "/v1/transactions/"+receiptAPIPostingID+"/receipts", nil); got.Code != 200 {
+			if got := receiptRequest(h, "GET", "/v1/transactions/"+receiptAPITransactionID+"/receipts", nil); got.Code != 200 {
 				t.Fatal(got.Body.String())
 			}
 			if got := receiptRequest(h, "DELETE", "/v1/receipts/"+r.ID, nil); got.Code != 200 {
@@ -228,7 +228,7 @@ func TestReceiptAPIPlanIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 		account := "checking"
-		if _, err := db.CreatePosting(types.Posting{ID: receiptAPIPostingID, Name: "Expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true}); err != nil {
+		if _, err := db.CreateTransaction(types.Transaction{ID: receiptAPITransactionID, Name: "Expense", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true}); err != nil {
 			t.Fatal(err)
 		}
 	}

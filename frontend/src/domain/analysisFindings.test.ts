@@ -8,7 +8,7 @@ import {
 
 const finding = {
 	id: "one",
-	postingId: "transaction",
+	transactionId: "transaction",
 	kind: "bnpl",
 	strength: "strong",
 	status: "active",
@@ -24,7 +24,7 @@ describe("BNPL transaction flags", () => {
 			{ dismissed: true },
 			{ status: "withdrawn" },
 			{ kind: "provider" },
-			{ postingId: "other" },
+			{ transactionId: "other" },
 		]) {
 			expect(
 				activeBNPLFinding([{ ...finding, ...change }], "transaction"),

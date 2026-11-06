@@ -49,7 +49,7 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 					if (method === "POST") {
 						const grant = {
 							ownerUserId: "user:test",
-							postingId: input.postingId,
+							transactionId: input.transactionId,
 							audienceType: input.audienceType,
 							audienceId: input.audienceId,
 							intent: "shared",
@@ -60,12 +60,12 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 					}
 					const at = grants.findIndex(
 						(grant) =>
-							grant.postingId === input.postingId &&
+							grant.transactionId === input.transactionId &&
 							grant.audienceType === input.audienceType &&
 							grant.audienceId === input.audienceId,
 					);
 					if (at >= 0) grants.splice(at, 1);
-					return ok({ revoked: input.postingId });
+					return ok({ revoked: input.transactionId });
 				}
 				return ok({ grants });
 			}
@@ -76,7 +76,7 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 					// exclusion; the exclusion side mirrors the conflict.
 					const conflict = grants.some(
 						(grant) =>
-							grant.postingId === input.postingId &&
+							grant.transactionId === input.transactionId &&
 							grant.audienceType === input.audienceType &&
 							grant.audienceId === input.audienceId &&
 							grant.intent === "shared",
@@ -91,7 +91,7 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 						);
 					const exclusion = {
 						ownerUserId: "user:test",
-						postingId: input.postingId,
+						transactionId: input.transactionId,
 						audienceType: input.audienceType,
 						audienceId: input.audienceId,
 						intent: "excluded",
@@ -102,12 +102,12 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 				}
 				const at = grants.findIndex(
 					(grant) =>
-						grant.postingId === input.postingId &&
+						grant.transactionId === input.transactionId &&
 						grant.audienceType === input.audienceType &&
 						grant.audienceId === input.audienceId,
 				);
 				if (at >= 0) grants.splice(at, 1);
-				return ok({ removed: input.postingId });
+				return ok({ removed: input.transactionId });
 			}
 			throw new Error(`unexpected request ${method} ${path}`);
 		}),
@@ -115,10 +115,13 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 	return { requested };
 }
 
-function renderSharing(postingId = "p1", readOnly = false) {
-	render(<TransactionSharing postingId={postingId} readOnly={readOnly} />, {
-		wrapper,
-	});
+function renderSharing(transactionId = "p1", readOnly = false) {
+	render(
+		<TransactionSharing transactionId={transactionId} readOnly={readOnly} />,
+		{
+			wrapper,
+		},
+	);
 }
 
 beforeEach(() => setupQueryScope());
@@ -145,7 +148,7 @@ it("shares one transaction with one group", async () => {
 			(entry) => entry.path === "/v1/shared/grants" && entry.method === "POST",
 		)?.body,
 	).toMatchObject({
-		postingId: "p1",
+		transactionId: "p1",
 		audienceType: "group",
 		audienceId: "g1",
 	});
@@ -167,14 +170,14 @@ it("hides one transaction from everyone including future groups", async () => {
 			(entry) =>
 				entry.path === "/v1/shared/exclusions" && entry.method === "POST",
 		)?.body,
-	).toMatchObject({ postingId: "p1", audienceType: "all", audienceId: "" });
+	).toMatchObject({ transactionId: "p1", audienceType: "all", audienceId: "" });
 });
 
 it("surfaces the server conflict instead of double intents", async () => {
 	stubSharing([
 		{
 			ownerUserId: "user:test",
-			postingId: "p1",
+			transactionId: "p1",
 			audienceType: "group",
 			audienceId: "g1",
 			intent: "shared",

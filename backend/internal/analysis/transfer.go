@@ -100,7 +100,7 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 		return "inflow"
 	}
 	detection := func(leg transferLeg, negative bool, strength string, partnerIDs []string) types.AnalysisDetection {
-		ids := append([]string{leg.transaction.PostingID}, partnerIDs...)
+		ids := append([]string{leg.transaction.TransactionID}, partnerIDs...)
 		sort.Strings(ids[1:])
 		code := "transfer.exact-leg-match"
 		reason := "An opposite-direction transaction for the exact amount posts on another account within the transfer window. Both legs are observed; neither is fabricated."
@@ -109,13 +109,13 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 			reason = "Several opposite-direction transactions match this amount and date. Review selects the true opposite leg; unmatched candidates stay visible."
 		}
 		return types.AnalysisDetection{
-			PostingID: leg.transaction.PostingID,
-			Kind:      "transfer",
-			Provider:  leg.transaction.SourceProvider,
-			Product:   "internal-transfer",
-			Role:      role(negative),
-			Strength:  strength,
-			Evidence:  []types.AnalysisEvidence{{Code: code, Reason: reason, PostingIDs: ids}},
+			TransactionID: leg.transaction.TransactionID,
+			Kind:          "transfer",
+			Provider:      leg.transaction.SourceProvider,
+			Product:       "internal-transfer",
+			Role:          role(negative),
+			Strength:      strength,
+			Evidence:      []types.AnalysisEvidence{{Code: code, Reason: reason, TransactionIDs: ids}},
 		}
 	}
 	pairedOutflow := make([]bool, len(outflows))
@@ -130,8 +130,8 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 			continue
 		} // The partner also matches elsewhere: both legs need review below.
 		pairedOutflow[o], pairedInflow[i] = true, true
-		findings = append(findings, detection(outflow, true, "strong", []string{inflows[i].transaction.PostingID}))
-		findings = append(findings, detection(inflows[i], false, "strong", []string{outflow.transaction.PostingID}))
+		findings = append(findings, detection(outflow, true, "strong", []string{inflows[i].transaction.TransactionID}))
+		findings = append(findings, detection(inflows[i], false, "strong", []string{outflow.transaction.TransactionID}))
 	}
 	for o, outflow := range outflows {
 		if pairedOutflow[o] || len(outflowCandidates[o]) == 0 {
@@ -139,7 +139,7 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 		}
 		partners := make([]string, 0, len(outflowCandidates[o]))
 		for _, i := range outflowCandidates[o] {
-			partners = append(partners, inflows[i].transaction.PostingID)
+			partners = append(partners, inflows[i].transaction.TransactionID)
 		}
 		findings = append(findings, detection(outflow, true, "moderate", partners))
 	}
@@ -149,10 +149,10 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 		}
 		partners := make([]string, 0, len(inflowCandidates[i]))
 		for _, o := range inflowCandidates[i] {
-			partners = append(partners, outflows[o].transaction.PostingID)
+			partners = append(partners, outflows[o].transaction.TransactionID)
 		}
 		findings = append(findings, detection(inflow, false, "moderate", partners))
 	}
-	sort.Slice(findings, func(a, b int) bool { return findings[a].PostingID < findings[b].PostingID })
+	sort.Slice(findings, func(a, b int) bool { return findings[a].TransactionID < findings[b].TransactionID })
 	return findings, nil
 }

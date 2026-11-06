@@ -67,14 +67,15 @@ describe("safeSpendingIncome", () => {
 		).toEqual({ date: "2026-10-20", endDate: "2026-10-20", amount: 2000 });
 	});
 
-	it.each([{ ids: [] }, { ids: ["deleted"] }, { ids: ["unrelated-posting"] }])(
-		"does not infer income for selection $ids",
-		({ ids }) => {
-			expect(
-				safeSpendingIncome({ ...input, incomeScheduleIds: ids }).paycheck,
-			).toBeNull();
-		},
-	);
+	it.each([
+		{ ids: [] },
+		{ ids: ["deleted"] },
+		{ ids: ["unrelated-transaction"] },
+	])("does not infer income for selection $ids", ({ ids }) => {
+		expect(
+			safeSpendingIncome({ ...input, incomeScheduleIds: ids }).paycheck,
+		).toBeNull();
+	});
 
 	it("counts same-day sources once and ignores repeated selected IDs", () => {
 		expect(
@@ -109,7 +110,7 @@ describe("safeSpendingIncome", () => {
 			rule("disabled", { enabled: false }),
 			rule("expired", { endDate: "2026-10-07" }),
 			rule("future", { startDate: "2026-10-09" }),
-			rule("one-time", { kind: "posting" }),
+			rule("one-time", { kind: "transaction" }),
 			rule("expense", { fromId: "checking", toId: null }),
 			rule("other-account", { toId: "brokerage" }),
 			rule("starts-today", { startDate: "2026-10-08" }),

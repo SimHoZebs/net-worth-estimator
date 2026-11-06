@@ -57,26 +57,26 @@ func midnightOf(date types.IsoDate) (int64, error) {
 }
 
 type transactionRecordBody struct {
-	ID              *string             `json:"id,omitempty" format:"uuid"`
-	Name            string              `json:"name"`
-	SourceAccountID *string             `json:"sourceAccountId,omitempty"`
-	Destinations    []string            `json:"destinations,omitempty"`
-	Amount          amountInput         `json:"amount"`
-	Date            types.IsoDate       `json:"date"`
-	Time            *string             `json:"time,omitempty"`
-	PostedDate      *types.IsoDate      `json:"postedDate,omitempty"`
-	Enabled         bool                `json:"enabled"`
-	Claim           *types.PostingClaim `json:"claim,omitempty"`
+	ID              *string                 `json:"id,omitempty" format:"uuid"`
+	Name            string                  `json:"name"`
+	SourceAccountID *string                 `json:"sourceAccountId,omitempty"`
+	Destinations    []string                `json:"destinations,omitempty"`
+	Amount          amountInput             `json:"amount"`
+	Date            types.IsoDate           `json:"date"`
+	Time            *string                 `json:"time,omitempty"`
+	PostedDate      *types.IsoDate          `json:"postedDate,omitempty"`
+	Enabled         bool                    `json:"enabled"`
+	Claim           *types.TransactionClaim `json:"claim,omitempty"`
 }
 
-func (b transactionRecordBody) toPosting(id string) (types.Posting, error) {
+func (b transactionRecordBody) toTransaction(id string) (types.Transaction, error) {
 	amount, err := b.Amount.literalResolution()
 	if err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
 	transactionTime, err := instantOf(b.Date, derefString(b.Time))
 	if err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
 	postedDate := b.Date
 	if b.PostedDate != nil {
@@ -84,9 +84,9 @@ func (b transactionRecordBody) toPosting(id string) (types.Posting, error) {
 	}
 	postedTime, err := midnightOf(postedDate)
 	if err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
-	out := types.Posting{
+	out := types.Transaction{
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
 		Destinations: b.Destinations, Amount: amount,
 		PostedTime: postedTime, TransactionTime: transactionTime,
@@ -119,7 +119,7 @@ type transactionAmendBody struct {
 	Enabled         optional[bool]                  `json:"enabled,omitempty"`
 }
 
-func (b transactionAmendBody) apply(stored types.Posting) (types.Posting, error) {
+func (b transactionAmendBody) apply(stored types.Transaction) (types.Transaction, error) {
 	out := stored
 	if b.Name.Set {
 		out.Name = b.Name.Value
@@ -142,7 +142,7 @@ func (b transactionAmendBody) apply(stored types.Posting) (types.Posting, error)
 	if b.Amount.Set {
 		amount, err := b.Amount.Value.literalResolution()
 		if err != nil {
-			return types.Posting{}, err
+			return types.Transaction{}, err
 		}
 		out.Amount = amount
 	}
@@ -161,7 +161,7 @@ func (b transactionAmendBody) apply(stored types.Posting) (types.Posting, error)
 	if b.Date.Set || b.Time.Set {
 		transactionTime, err := instantOf(date, clock)
 		if err != nil {
-			return types.Posting{}, err
+			return types.Transaction{}, err
 		}
 		out.TransactionTime = transactionTime
 	}
@@ -172,7 +172,7 @@ func (b transactionAmendBody) apply(stored types.Posting) (types.Posting, error)
 		}
 		postedTime, err := midnightOf(postedDate)
 		if err != nil {
-			return types.Posting{}, err
+			return types.Transaction{}, err
 		}
 		out.PostedTime = postedTime
 	}
@@ -192,27 +192,27 @@ type transactionInput struct {
 }
 
 type transactionOutput struct {
-	Body writeResult[types.Posting] `json:"body"`
+	Body writeResult[types.Transaction] `json:"body"`
 }
 
-func transactionID(posting types.Posting) string { return posting.ID }
+func transactionID(transaction types.Transaction) string { return transaction.ID }
 
 func (s *handler) recordTransaction(_ context.Context, input *transactionInput) (*transactionOutput, error) {
-	posting, err := input.Body.toPosting("")
+	transaction, err := input.Body.toTransaction("")
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
-	if posting.ID == "" {
+	if transaction.ID == "" {
 		id, idErr := uuid.NewV7()
 		if idErr != nil {
 			return nil, huma.Error500InternalServerError(idErr.Error())
 		}
-		posting.ID = id.String()
+		transaction.ID = id.String()
 	}
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Postings = replaceByID(model.Postings, posting.ID, transactionID, posting)
-	}, func() (types.Posting, error) {
-		return s.store.CreatePosting(posting)
+		model.Transactions = replaceByID(model.Transactions, transaction.ID, transactionID, transaction)
+	}, func() (types.Transaction, error) {
+		return s.store.CreateTransaction(transaction)
 	})
 	if err != nil {
 		return nil, err
@@ -220,29 +220,29 @@ func (s *handler) recordTransaction(_ context.Context, input *transactionInput) 
 	if saved {
 		row.Source = store.SourceUser
 	}
-	return &transactionOutput{Body: writeResult[types.Posting]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
+	return &transactionOutput{Body: writeResult[types.Transaction]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
-func (s *handler) storedTransaction(id string) (types.Posting, error) {
+func (s *handler) storedTransaction(id string) (types.Transaction, error) {
 	stored, err := s.store.LoadModel()
 	if err != nil {
-		return types.Posting{}, huma.Error500InternalServerError(err.Error())
+		return types.Transaction{}, huma.Error500InternalServerError(err.Error())
 	}
 	if stored != nil {
-		for _, posting := range stored.Postings {
-			if posting.ID == id {
-				return posting, nil
+		for _, transaction := range stored.Transactions {
+			if transaction.ID == id {
+				return transaction, nil
 			}
 		}
 	}
-	return types.Posting{}, huma.Error404NotFound("transaction " + id + " does not exist")
+	return types.Transaction{}, huma.Error404NotFound("transaction " + id + " does not exist")
 }
 
-func (s *handler) saveTransaction(posting types.Posting) (*transactionOutput, error) {
+func (s *handler) saveTransaction(transaction types.Transaction) (*transactionOutput, error) {
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Postings = replaceByID(model.Postings, posting.ID, transactionID, posting)
-	}, func() (types.Posting, error) {
-		return s.store.UpdatePosting(posting)
+		model.Transactions = replaceByID(model.Transactions, transaction.ID, transactionID, transaction)
+	}, func() (types.Transaction, error) {
+		return s.store.UpdateTransaction(transaction)
 	})
 	if err != nil {
 		return nil, err
@@ -250,7 +250,7 @@ func (s *handler) saveTransaction(posting types.Posting) (*transactionOutput, er
 	if saved {
 		row.Source = store.SourceUser
 	}
-	return &transactionOutput{Body: writeResult[types.Posting]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
+	return &transactionOutput{Body: writeResult[types.Transaction]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) amendTransaction(_ context.Context, input *struct {
@@ -261,11 +261,11 @@ func (s *handler) amendTransaction(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	posting, err := input.Body.apply(existing)
+	transaction, err := input.Body.apply(existing)
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
-	return s.saveTransaction(posting)
+	return s.saveTransaction(transaction)
 }
 
 func (s *handler) claimOccurrence(_ context.Context, input *struct {
@@ -279,7 +279,7 @@ func (s *handler) claimOccurrence(_ context.Context, input *struct {
 	if input.Body.ScheduleID == "" || !domain.IsValidIsoDate(string(input.Body.OccurrenceDate)) {
 		return nil, huma.Error422UnprocessableEntity("scheduleId and occurrenceDate are required")
 	}
-	existing.Claim = &types.PostingClaim{
+	existing.Claim = &types.TransactionClaim{
 		ScheduleID:     input.Body.ScheduleID,
 		OccurrenceDate: string(input.Body.OccurrenceDate),
 	}
@@ -321,11 +321,11 @@ func (s *handler) startScheduleFromTransaction(_ context.Context, input *struct 
 	ID   string                      `path:"id"`
 	Body scheduleFromTransactionBody `json:"body"`
 }) (*scheduleFromTransactionOutput, error) {
-	posting, err := s.storedTransaction(input.ID)
+	transaction, err := s.storedTransaction(input.ID)
 	if err != nil {
 		return nil, err
 	}
-	if posting.Claim != nil {
+	if transaction.Claim != nil {
 		return nil, huma.Error422UnprocessableEntity(
 			"transaction already records a schedule occurrence; release it before starting a schedule",
 		)
@@ -334,14 +334,14 @@ func (s *handler) startScheduleFromTransaction(_ context.Context, input *struct 
 		return nil, huma.Error422UnprocessableEntity("startDate must be a YYYY-MM-DD calendar date")
 	}
 	schedule := types.Schedule{
-		Name:            posting.Name,
-		SourceAccountID: posting.SourceAccountID,
-		Destinations:    posting.Destinations,
-		Amount:          posting.Amount,
+		Name:            transaction.Name,
+		SourceAccountID: transaction.SourceAccountID,
+		Destinations:    transaction.Destinations,
+		Amount:          transaction.Amount,
 		Frequency:       input.Body.Frequency,
 		StartDate:       input.Body.StartDate,
 		EndDate:         input.Body.EndDate,
-		Enabled:         posting.Enabled,
+		Enabled:         transaction.Enabled,
 	}
 	if input.Body.ID != nil {
 		schedule.ID = *input.Body.ID
@@ -356,7 +356,7 @@ func (s *handler) startScheduleFromTransaction(_ context.Context, input *struct 
 		}
 		schedule.Amount = amount
 	} else if input.Body.AnnualIncrease != nil {
-		amount := amountInput{Value: literalValueOf(posting.Amount), AnnualIncrease: input.Body.AnnualIncrease}
+		amount := amountInput{Value: literalValueOf(transaction.Amount), AnnualIncrease: input.Body.AnnualIncrease}
 		resolved, amountErr := amount.resolution()
 		if amountErr != nil {
 			return nil, huma.Error422UnprocessableEntity(amountErr.Error())
@@ -390,17 +390,17 @@ func (s *handler) startScheduleFromTransaction(_ context.Context, input *struct 
 		}
 		schedule.Priority = maximum + 1
 		model.Schedules = replaceByID(model.Schedules, schedule.ID, scheduleID, schedule)
-		for index := range model.Postings {
-			if model.Postings[index].ID != posting.ID {
+		for index := range model.Transactions {
+			if model.Transactions[index].ID != transaction.ID {
 				continue
 			}
-			model.Postings[index].Claim = &types.PostingClaim{
+			model.Transactions[index].Claim = &types.TransactionClaim{
 				ScheduleID:     schedule.ID,
 				OccurrenceDate: string(input.Body.StartDate),
 			}
 		}
 	}, func() (types.Schedule, error) {
-		return s.store.CreateScheduleClaimingPosting(schedule, posting.ID, string(input.Body.StartDate))
+		return s.store.CreateScheduleClaimingTransaction(schedule, transaction.ID, string(input.Body.StartDate))
 	})
 	if err != nil {
 		return nil, err
@@ -410,7 +410,7 @@ func (s *handler) startScheduleFromTransaction(_ context.Context, input *struct 
 
 // literalValueOf returns the literal amount of a stored descriptor when it is
 // a plain numeric expression, or nil when the amount is calculated.
-func literalValueOf(amount types.PostingAmountResolution) *float64 {
+func literalValueOf(amount types.TransactionAmountResolution) *float64 {
 	expression, _ := amount.Config["expression"].(string)
 	if expression == "" {
 		return nil
@@ -427,9 +427,9 @@ func (s *handler) deleteTransaction(_ context.Context, input *struct {
 }) (*modelstate.ReorderOutput, error) {
 	id := input.ID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Postings = removeByID(model.Postings, id, transactionID)
+		model.Transactions = removeByID(model.Transactions, id, transactionID)
 	}, func() (struct{}, error) {
-		return struct{}{}, s.store.DeletePosting(id)
+		return struct{}{}, s.store.DeleteTransaction(id)
 	})
 	if err != nil {
 		return nil, err
@@ -447,9 +447,9 @@ func (s *handler) moveTransaction(_ context.Context, input *struct {
 }) (*modelstate.ReorderOutput, error) {
 	id, beforeID := input.ID, input.Body.BeforeID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Postings = moveBeforeID(model.Postings, id, beforeID, transactionID)
+		model.Transactions = moveBeforeID(model.Transactions, id, beforeID, transactionID)
 	}, func() (struct{}, error) {
-		return struct{}{}, s.store.MovePosting(id, beforeID)
+		return struct{}{}, s.store.MoveTransaction(id, beforeID)
 	})
 	if err != nil {
 		return nil, err

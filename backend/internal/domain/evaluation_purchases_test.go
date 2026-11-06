@@ -17,9 +17,9 @@ func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T)
 	request := purchaseRequest(1000,
 		plannedPurchase("laptop", "2025-01-01", "500", 0),
 		plannedPurchase("chair", "2026-02-01", "150", 1),
-		establishedPosting("rent", "2026-02-02", "900", false),
-		establishedPosting("pay", "2026-02-05", "1000", true))
-	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
+		establishedTransaction("rent", "2026-02-02", "900", false),
+		establishedTransaction("pay", "2026-02-05", "1000", true))
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Transactions: request.Model.Transactions, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	settings.Evaluations.PlannedPurchases = purchaseEvaluation()
@@ -60,7 +60,7 @@ func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 	model := decodeModel(t, fixture["model"])
 	settings := decodeSettings(t, fixture["settings"])
 	// Exercise actual sampled income as well as the existing FI branch.
-	model.Schedules[0].Amount = types.PostingAmountResolution{Resolver: "expression",
+	model.Schedules[0].Amount = types.TransactionAmountResolution{Resolver: "expression",
 		Config: map[string]any{"expression": "rate * 12"},
 		Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate",
 			Arguments: map[string]any{"annualRate": 100.0, "volatility": 10.0}}}}
@@ -112,13 +112,13 @@ func TestPlannedPurchasesSampleUsesTheBaselineSample(t *testing.T) {
 	end := "2026-03-01"
 	request.Model.Schedules = []types.Schedule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
 		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
-		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
+		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
 	}}
-	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, Schedules: request.Model.Schedules, PlannedPurchases: request.Model.PlannedPurchases}
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Transactions: request.Model.Transactions, Schedules: request.Model.Schedules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	for _, rate := range []float64{0, 100} {
-		sample := &types.MonteCarloSample{AnnualRatesByPostingID: map[string][]float64{"pay": {rate}}}
+		sample := &types.MonteCarloSample{AnnualRatesByTransactionID: map[string][]float64{"pay": {rate}}}
 		path, _, err := ProjectRawFinancialModel(&model, &settings, types.ModelOverrides{}, sample)
 		if err != nil {
 			t.Fatal(err)

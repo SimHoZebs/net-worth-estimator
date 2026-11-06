@@ -1,8 +1,8 @@
 # Bank source normalization
 
-One-time operator script. It rewrites legacy `postings.source` and
+One-time operator script. It rewrites legacy `transactions.source` and
 `checkpoints.source` values from `simplefin` to the current `banksync`
-spelling. The provider identity stays in `posting_sync_keys` and the
+spelling. The provider identity stays in `transaction_sync_keys` and the
 checkpoint `provider` column.
 
 ## Maintenance window
@@ -23,7 +23,7 @@ one transaction and fails if any `simplefin` source remains.
 
 ```sh
 sqlite3 -readonly /data/net-worth-estimator.db \
-  "SELECT COUNT(*) FROM postings WHERE source = 'simplefin';
+  "SELECT COUNT(*) FROM transactions WHERE source = 'simplefin';
    SELECT COUNT(*) FROM checkpoints WHERE source = 'simplefin';"
 ```
 

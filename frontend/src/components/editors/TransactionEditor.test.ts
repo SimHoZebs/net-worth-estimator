@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { combineDayTime, timeOfDay, postingBody } from "./transactionBodies.ts";
+import {
+	combineDayTime,
+	timeOfDay,
+	transactionBody,
+} from "./transactionBodies.ts";
 
 describe("timestamped actual authoring", () => {
 	it("formats and combines UTC instants without losing seconds", () => {
@@ -11,7 +15,7 @@ describe("timestamped actual authoring", () => {
 		expect(combineDayTime("2026-03-10", "")).toBe(1773100800);
 	});
 	it("writes an explicit intraday time through the row body", () => {
-		const body = postingBody({
+		const body = transactionBody({
 			name: "Expense",
 			amount: 100,
 			fromId: "checking",

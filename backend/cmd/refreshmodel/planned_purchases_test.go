@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestRefreshCopiesStandalonePurchasesWithoutPostings(t *testing.T) {
+func TestRefreshCopiesStandalonePurchasesWithoutTransactions(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
@@ -39,7 +39,7 @@ func TestRefreshCopiesStandalonePurchasesWithoutPostings(t *testing.T) {
 	if got := query(t, target, `SELECT COUNT(*) FROM planned_purchases WHERE user_id='owner' AND id=?`, p.ID); got != "1" {
 		t.Fatal("financial-only publication lost purchase", got)
 	}
-	if got := query(t, target, `SELECT COUNT(*) FROM postings WHERE id=?`, p.ID); got != "0" {
-		t.Fatal("purchase became a posting", got)
+	if got := query(t, target, `SELECT COUNT(*) FROM transactions WHERE id=?`, p.ID); got != "0" {
+		t.Fatal("purchase became a transaction", got)
 	}
 }

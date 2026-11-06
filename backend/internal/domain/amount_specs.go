@@ -6,7 +6,7 @@ import (
 
 // Minimal discovery wiring for resolvers and providers.
 //
-// The wire shape (PostingAmountResolution with resolver/config/inputs) is
+// The wire shape (TransactionAmountResolution with resolver/config/inputs) is
 // unchanged. This endpoint exposes only the machine facts a client needs
 // to build and validate that wire shape without hard-coding registry
 // logic: entry names, field keys, field kinds, and required flags.
@@ -15,8 +15,8 @@ import (
 // by ValidateAmountDescriptor.
 
 // Field kinds tell a client which control to render for a key:
-// expression, money, percent, rate, volatility, account, posting,
-// posting-or-account, brackets.
+// expression, money, percent, rate, volatility, account, transaction,
+// transaction-or-account, brackets.
 type AmountFieldSpec struct {
 	Key      string `json:"key"`
 	Kind     string `json:"kind"`
@@ -68,7 +68,7 @@ func ListAmountProviderSpecs() []AmountProviderInfo {
 		"model-value": {
 			Name: "model-value",
 			ArgFields: []AmountFieldSpec{
-				{Key: "id", Kind: "posting-or-account", Required: true},
+				{Key: "id", Kind: "transaction-or-account", Required: true},
 			},
 		},
 		"account-balance": {
@@ -100,7 +100,7 @@ func ListAmountProviderSpecs() []AmountProviderInfo {
 		"late-fee": {
 			Name: "late-fee",
 			ArgFields: []AmountFieldSpec{
-				{Key: "payment", Kind: "posting", Required: true},
+				{Key: "payment", Kind: "transaction", Required: true},
 				{Key: "account", Kind: "account", Required: true},
 				{Key: "fee", Kind: "money", Required: true},
 			},

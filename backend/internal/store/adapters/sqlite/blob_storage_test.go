@@ -65,7 +65,7 @@ func externalBlobFixture(t *testing.T) (*Database, *sqliteStore, *faultBlobs, st
 	}
 	t.Cleanup(func() { d.Close() })
 	s := privateTestPlan(t, d, "external")
-	seedReceiptPosting(t, s)
+	seedReceiptTransaction(t, s)
 	return d, s, blobs, path
 }
 
@@ -81,10 +81,10 @@ func receiptBlobKey(t *testing.T, s *sqliteStore, id string) string {
 func TestReceiptBlobAdapterSwapAndAuthorization(t *testing.T) {
 	d, a, blobs, _ := externalBlobFixture(t)
 	b := privateTestPlan(t, d, "other")
-	seedReceiptPosting(t, b)
+	seedReceiptTransaction(t, b)
 	ctx := t.Context()
 	image := types.ReceiptImage{Bytes: []byte("external pixels"), MediaType: "image/png"}
-	r, err := a.CreateReceipt(ctx, receiptPostingID, "receipt.png", image)
+	r, err := a.CreateReceipt(ctx, receiptTransactionID, "receipt.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestReceiptBlobAdapterSwapAndAuthorization(t *testing.T) {
 	if puts != blobs.puts || opens != blobs.opens || deletes != blobs.deletes {
 		t.Fatal("denied access reached blob provider")
 	}
-	if err := a.DeletePosting(receiptPostingID); err != nil {
+	if err := a.DeleteTransaction(receiptTransactionID); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.CollectBlobGarbage(ctx, 100); err != nil {
@@ -128,7 +128,7 @@ func TestReceiptBlobAdapterSwapAndAuthorization(t *testing.T) {
 func TestBlobUploadFailureKeepsReviewedImageAndRetriesAfterRestart(t *testing.T) {
 	d, s, blobs, path := externalBlobFixture(t)
 	ctx := t.Context()
-	r, err := s.CreateReceipt(ctx, receiptPostingID, "old.png", types.ReceiptImage{Bytes: []byte("old pixels"), MediaType: "image/png"})
+	r, err := s.CreateReceipt(ctx, receiptTransactionID, "old.png", types.ReceiptImage{Bytes: []byte("old pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestBlobReplacementConflictAndReadRace(t *testing.T) {
 	d, s, blobs, _ := externalBlobFixture(t)
 	ctx := t.Context()
 	image := types.ReceiptImage{Bytes: []byte("old pixels"), MediaType: "image/png"}
-	r, err := s.CreateReceipt(ctx, receiptPostingID, "old.png", image)
+	r, err := s.CreateReceipt(ctx, receiptTransactionID, "old.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestBlobReplacementConflictAndReadRace(t *testing.T) {
 
 func TestReceiptDeletionRetainsRetryWorkWhenProviderFails(t *testing.T) {
 	d, s, blobs, _ := externalBlobFixture(t)
-	r, err := s.CreateReceipt(t.Context(), receiptPostingID, "image.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
+	r, err := s.CreateReceipt(t.Context(), receiptTransactionID, "image.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,13 +257,13 @@ func TestReceiptBlobOperationsHonorCancellationAndIntegrity(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	image := types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"}
-	if _, err := s.CreateReceipt(ctx, receiptPostingID, "image.png", image); !errors.Is(err, context.Canceled) {
+	if _, err := s.CreateReceipt(ctx, receiptTransactionID, "image.png", image); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled upload = %v", err)
 	}
 	if blobs.puts != 0 {
 		t.Fatal("canceled upload reached provider")
 	}
-	r, err := s.CreateReceipt(t.Context(), receiptPostingID, "image.png", image)
+	r, err := s.CreateReceipt(t.Context(), receiptTransactionID, "image.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,7 +22,7 @@ Use **transaction** for a recorded movement. The saved model's "Transactions" ta
 A recorded account balance that corrects modeled history for that account.
 A check carries its exact observation time. Several checks per account per
 day survive; the replay orders them by instant, executes same-time
-postings first on a tie, and lets an owner check win only at its own
+transactions first on a tie, and lets an owner check win only at its own
 instant.
 
 Use **balance check**. Its date column is **balance**; its tab is "Balance checks".
@@ -32,7 +32,7 @@ Use **balance check**. Its date column is **balance**; its tab is "Balance check
   participate like manual actuals once imported. Enabled alone decides
   execution: sync translation stores pending and void rows disabled, so
   they never move balances until settlement converts them enabled.
-- A bank hold that vanished without posting shows **Did not post**; a live
+- A bank hold that vanished without a posted charge shows **Did not post**; a live
   hold shows **Pending**.
 
 ## C. Projection and range
@@ -60,9 +60,9 @@ Use **evaluation**. The three roles below are distinct and stay distinct:
 - **constraint** — the binding limit that stopped a transaction
 - **shortfall** — the gap between what a transaction requested and what funded it
 
-Use **Funding gaps** for the default transaction-funding evaluation and its outlook summary. Use **Funding gap** for one inspector item and **No projected funding gaps** for a clear result. Keep custom evaluation names. `postingFulfillment` remains the engine's storage and API identifier; the stored default name "Posting fulfillment" displays as "Funding gaps" without a data rewrite.
+Use **Funding gaps** for the default transaction-funding evaluation and its outlook summary. Use **Funding gap** for one inspector item and **No projected funding gaps** for a clear result. Keep custom evaluation names. `transactionFulfillment` remains the engine's storage and API identifier; the stored default name "Transaction fulfillment" displays as "Funding gaps" without a data rewrite.
 
-`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the evaluation tables: financial independence, net-worth threshold, account balance, posting fulfillment, cycle fulfillment, planned purchases, what-if. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
+`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the evaluation tables: financial independence, net-worth threshold, account balance, transaction fulfillment, cycle fulfillment, planned purchases, what-if. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
 
 ## F. Income evidence
 

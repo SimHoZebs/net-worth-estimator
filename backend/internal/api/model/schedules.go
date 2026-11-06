@@ -237,10 +237,10 @@ func (s *handler) deleteSchedule(_ context.Context, input *struct {
 	id := input.ID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Schedules = removeByID(model.Schedules, id, scheduleID)
-		for index := range model.Postings {
-			if model.Postings[index].Claim != nil &&
-				model.Postings[index].Claim.ScheduleID == id {
-				model.Postings[index].Claim = nil
+		for index := range model.Transactions {
+			if model.Transactions[index].Claim != nil &&
+				model.Transactions[index].Claim.ScheduleID == id {
+				model.Transactions[index].Claim = nil
 			}
 		}
 	}, func() (struct{}, error) {
@@ -287,7 +287,7 @@ type scheduleEndBody struct {
 
 type scheduleEndOutput struct {
 	Body struct {
-		Result          types.Posting                `json:"value"`
+		Result          types.Transaction            `json:"value"`
 		EndedScheduleID string                       `json:"endedScheduleId"`
 		Issues          []types.ModelValidationIssue `json:"issues"`
 		Saved           bool                         `json:"saved"`
@@ -306,7 +306,7 @@ func (s *handler) endScheduleWithTransaction(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	posting := types.Posting{
+	transaction := types.Transaction{
 		Name:            schedule.Name,
 		SourceAccountID: schedule.SourceAccountID,
 		Destinations:    schedule.Destinations,
@@ -314,14 +314,14 @@ func (s *handler) endScheduleWithTransaction(_ context.Context, input *struct {
 		Enabled:         schedule.Enabled,
 	}
 	if input.Body.ID != nil {
-		posting.ID = *input.Body.ID
+		transaction.ID = *input.Body.ID
 	}
-	if posting.ID == "" {
+	if transaction.ID == "" {
 		id, idErr := uuid.NewV7()
 		if idErr != nil {
 			return nil, huma.Error500InternalServerError(idErr.Error())
 		}
-		posting.ID = id.String()
+		transaction.ID = id.String()
 	}
 	transactionTime, timeErr := instantOf(input.Body.Date, derefString(input.Body.Time))
 	if timeErr != nil {
@@ -335,44 +335,44 @@ func (s *handler) endScheduleWithTransaction(_ context.Context, input *struct {
 	if postedErr != nil {
 		return nil, huma.Error422UnprocessableEntity(postedErr.Error())
 	}
-	posting.TransactionTime = transactionTime
-	posting.PostedTime = postedTime
+	transaction.TransactionTime = transactionTime
+	transaction.PostedTime = postedTime
 	if input.Body.Amount != nil {
 		amount, amountErr := input.Body.Amount.literalResolution()
 		if amountErr != nil {
 			return nil, huma.Error422UnprocessableEntity(amountErr.Error())
 		}
-		posting.Amount = amount
+		transaction.Amount = amount
 	}
 	if input.Body.SourceAccountID.Set {
 		if input.Body.SourceAccountID.Null {
-			posting.SourceAccountID = nil
+			transaction.SourceAccountID = nil
 		} else {
 			value := input.Body.SourceAccountID.Value
-			posting.SourceAccountID = &value
+			transaction.SourceAccountID = &value
 		}
 	}
 	if input.Body.Destinations.Set {
 		if input.Body.Destinations.Null {
-			posting.Destinations = nil
+			transaction.Destinations = nil
 		} else {
-			posting.Destinations = input.Body.Destinations.Value
+			transaction.Destinations = input.Body.Destinations.Value
 		}
 	}
 	if input.Body.Enabled != nil {
-		posting.Enabled = *input.Body.Enabled
+		transaction.Enabled = *input.Body.Enabled
 	}
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Schedules = removeByID(model.Schedules, input.ID, scheduleID)
-		for index := range model.Postings {
-			if model.Postings[index].Claim != nil &&
-				model.Postings[index].Claim.ScheduleID == input.ID {
-				model.Postings[index].Claim = nil
+		for index := range model.Transactions {
+			if model.Transactions[index].Claim != nil &&
+				model.Transactions[index].Claim.ScheduleID == input.ID {
+				model.Transactions[index].Claim = nil
 			}
 		}
-		model.Postings = replaceByID(model.Postings, posting.ID, transactionID, posting)
-	}, func() (types.Posting, error) {
-		return s.store.DeleteScheduleCreatingPosting(input.ID, posting)
+		model.Transactions = replaceByID(model.Transactions, transaction.ID, transactionID, transaction)
+	}, func() (types.Transaction, error) {
+		return s.store.DeleteScheduleCreatingTransaction(input.ID, transaction)
 	})
 	if err != nil {
 		return nil, err

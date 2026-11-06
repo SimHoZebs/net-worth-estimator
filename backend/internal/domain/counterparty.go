@@ -10,38 +10,38 @@ import (
 // through these helpers instead of re-deriving nil semantics, while
 // execution clamps and presence checks keep their direct pointer tests.
 
-// PostingSourceAccount returns the funding account when the posting is
+// TransactionSourceAccount returns the funding account when the transaction is
 // account-sourced. False means the external counterparty funds it.
-func PostingSourceAccount(posting *types.Posting) (string, bool) {
-	if posting.SourceAccountID == nil {
+func TransactionSourceAccount(transaction *types.Transaction) (string, bool) {
+	if transaction.SourceAccountID == nil {
 		return "", false
 	}
-	return *posting.SourceAccountID, true
+	return *transaction.SourceAccountID, true
 }
 
 // HasExternalSource reports whether the external counterparty funds the
-// posting.
-func HasExternalSource(posting *types.Posting) bool {
-	return posting.SourceAccountID == nil
+// transaction.
+func HasExternalSource(transaction *types.Transaction) bool {
+	return transaction.SourceAccountID == nil
 }
 
 // HasExternalDestination reports whether the external counterparty receives
-// the posting.
-func HasExternalDestination(posting *types.Posting) bool {
-	return posting.Destinations == nil
+// the transaction.
+func HasExternalDestination(transaction *types.Transaction) bool {
+	return transaction.Destinations == nil
 }
 
 // IsExternalInflow reports money arriving from outside.
-func IsExternalInflow(posting *types.Posting) bool {
-	return HasExternalSource(posting) && !HasExternalDestination(posting)
+func IsExternalInflow(transaction *types.Transaction) bool {
+	return HasExternalSource(transaction) && !HasExternalDestination(transaction)
 }
 
 // IsExternalOutflow reports money leaving to outside.
-func IsExternalOutflow(posting *types.Posting) bool {
-	return !HasExternalSource(posting) && HasExternalDestination(posting)
+func IsExternalOutflow(transaction *types.Transaction) bool {
+	return !HasExternalSource(transaction) && HasExternalDestination(transaction)
 }
 
 // IsInternalTransfer reports money moving between accounts.
-func IsInternalTransfer(posting *types.Posting) bool {
-	return !HasExternalSource(posting) && !HasExternalDestination(posting)
+func IsInternalTransfer(transaction *types.Transaction) bool {
+	return !HasExternalSource(transaction) && !HasExternalDestination(transaction)
 }

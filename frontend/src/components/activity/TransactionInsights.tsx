@@ -77,19 +77,19 @@ function isActionablePattern(pattern: RecurringPattern): boolean {
  */
 export function buildInsightSuggestions({
 	findings,
-	postingId,
+	transactionId,
 	voidRow,
 	candidates,
 }: {
 	findings: AnalysisFinding[];
-	postingId: string;
+	transactionId: string;
 	/** Settling a void hold is an action too, not just a badge. */
 	voidRow?: Transaction;
 	/** Server-ranked posted charges for this hold. */
 	candidates?: SettleCandidateRow[];
 }): InsightSuggestion[] {
 	const suggestions: InsightSuggestion[] = [];
-	if (voidRow?.id === postingId && voidRow.void && candidates?.length) {
+	if (voidRow?.id === transactionId && voidRow.void && candidates?.length) {
 		suggestions.push({
 			kind: "void",
 			voidRow,
@@ -99,7 +99,7 @@ export function buildInsightSuggestions({
 	}
 	const bnpl = findings.find(
 		(finding) =>
-			finding.postingId === postingId &&
+			finding.transactionId === transactionId &&
 			(isPendingBnpl(finding) || needsDuration(finding)),
 	);
 	if (bnpl) {
@@ -107,8 +107,9 @@ export function buildInsightSuggestions({
 	}
 	for (const pattern of groupRecurringPatterns(findings)) {
 		const touchesCurrent =
-			pattern.findings.some((finding) => finding.postingId === postingId) ||
-			pattern.anchor.postingId === postingId;
+			pattern.findings.some(
+				(finding) => finding.transactionId === transactionId,
+			) || pattern.anchor.transactionId === transactionId;
 		if (!touchesCurrent) continue;
 		if (!isActionablePattern(pattern)) continue;
 		suggestions.push({ kind: "recurring", pattern, priority: 2 });
@@ -221,7 +222,9 @@ export function TransactionInsightsPanel({
 		setDurationUnit("months");
 		setRuleDialog(null);
 		setVoidCandidateId(
-			active?.kind === "void" ? (active.candidates[0]?.postingId ?? "") : "",
+			active?.kind === "void"
+				? (active.candidates[0]?.transactionId ?? "")
+				: "",
 		);
 		setVoidError(null);
 	}
@@ -320,7 +323,7 @@ export function TransactionInsightsPanel({
 	const selectedVoid =
 		shown.kind === "void"
 			? (shown.candidates.find(
-					(candidate) => candidate.postingId === voidCandidateId,
+					(candidate) => candidate.transactionId === voidCandidateId,
 				) ??
 				shown.candidates[0] ??
 				null)
@@ -454,7 +457,10 @@ export function TransactionInsightsPanel({
 							onChange={(event) => setVoidCandidateId(event.target.value)}
 						>
 							{shown.candidates.map((candidate) => (
-								<option key={candidate.postingId} value={candidate.postingId}>
+								<option
+									key={candidate.transactionId}
+									value={candidate.transactionId}
+								>
 									{candidate.name} — {money(candidate.amount)} on{" "}
 									{dateLabel(candidate.date, true)}
 								</option>

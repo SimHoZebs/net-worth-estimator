@@ -78,9 +78,7 @@ vi.mock("../workspace/useWorkspaceNavigation.ts", () => ({
 // The layout stays mounted across every body state, so state selection is tested
 // through the mocked body and the real layout identity.
 vi.mock("../workspace/WorkspaceLayout.tsx", () => ({
-	WorkspaceLayout: ({ children }: { children: ReactNode }) => (
-		<>{children}</>
-	),
+	WorkspaceLayout: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock("../workspace/WorkspaceHeader.tsx", () => ({
 	WorkspaceHeading: () => null,

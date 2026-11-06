@@ -103,11 +103,11 @@ for `go test -count=N -race` repetition: green means hostile, not lucky.
 | Split + settlement storm: one split row, linked payment settles once | Real SQLite | Identity seam only |
 | Revocation mid-pagination / mid-copy-save / mid-inbox-decide | Real SQLite, real router over real HTTP | Identity seam only |
 | Void-marking mid-share and mid-split | Real SQLite, real router over real HTTP | Identity seam only |
-| Forged owner/posting/account/group IDs on every cross-user route | Real SQLite, real router over real HTTP | Identity seam only |
+| Forged owner/transaction/account/group IDs on every cross-user route | Real SQLite, real router over real HTTP | Identity seam only |
 | Membership removed mid-feed; policy narrowed to off; account deleted mid-policy; group deleted; model cleared | Real SQLite, real router over real HTTP | Identity seam only |
 | Single-use invite accept storm (exactly one wins) + spent-code retries | Real SQLite, real router over real HTTP | Identity seam only |
 | Expired and revoked invites (expiry forced through the real row) | Real SQLite, real router over real HTTP | Identity seam only |
-| Future-dated and timezone-edge postings vs sharing intervals + leap day | Real SQLite, real router over real HTTP | Identity seam only |
+| Future-dated and timezone-edge transactions vs sharing intervals + leap day | Real SQLite, real router over real HTTP | Identity seam only |
 | Unicode names through feed, totals, copies, stored rows | Real SQLite, real router over real HTTP | Identity seam only |
 | 10k-row feed: set-wide totals agreement + head-page chaining | Real SQLite, real router over real HTTP | Identity seam only |
 | 1k-row exhaustive page walk: 10 pages, 1000 unique rows, per-page totals | Real SQLite, real router over real HTTP | Identity seam only |

@@ -166,7 +166,7 @@ Do not require one composite financial-health score.
 
 #### Acceptance criteria
 
-- [ ] Pick source posting and recipient.
+- [ ] Pick source transaction and recipient.
 - [ ] Preview original total and assigned portion.
 - [ ] Recipient sees permitted source context and allocation.
 - [ ] Support accept, decline, view, and save as linked copy.
@@ -192,7 +192,7 @@ Sending a share does not move money.
 
 #### Acceptance criteria
 
-- [ ] Select source posting and participants.
+- [ ] Select source transaction and participants.
 - [ ] Equal allocation default with manual overrides.
 - [ ] Immediate total validation.
 - [ ] Preview before sending.
@@ -246,7 +246,7 @@ Extend existing group/invite implementation rather than create another subsystem
 - [ ] Cover blocked contacts, group exits, revoked receipts and stale identity assertions.
 - [ ] Verify backend-only authorization; read-only mode.
 - [ ] Verify manual grant/exclusion invariant, future wildcard and friend-in-group overlap.
-- [ ] Cover forged source owner/account/posting IDs, no selected account, policy disable, date/account reassignments, pending rows, late sync and model replacement.
+- [ ] Cover forged source owner/account/transaction IDs, no selected account, policy disable, date/account reassignments, pending rows, late sync and model replacement.
 - [ ] Confirm source access revocation after commit under concurrent read/edit/revoke; no stale index authorization.
 - [ ] Test idempotency and concurrent split revisions; no-store shared responses and no cross-group leaks.
 
@@ -270,7 +270,7 @@ Do not assume any broad Casdoor cross-user model permission.
 #### Acceptance criteria
 
 - [ ] Benchmark existing full JSON+SHA-256 lookup, a persisted revision-key lookup, event-backed invalidation, and a revision-fast-path/content-hash hybrid using equivalent semantics.
-- [ ] Use representative model sizes (100, 1,000, 10,000 postings), varied accounts/rules/amount resolvers/evaluations, and repeatable workloads.
+- [ ] Use representative model sizes (100, 1,000, 10,000 transactions), varied accounts/rules/amount resolvers/evaluations, and repeatable workloads.
 - [ ] Test warm stable reads, frequent small writes, bank-sync bursts, evaluation-only changes, concurrent requests, cold starts and restarts.
 - [ ] Separately measure serialization/hash generation, revision reads/writes, event publication/fanout, cache lookup, full projection/reader/simulator computations.
 - [ ] Record p50/p95/p99 latency, CPU, allocations, SQLite lock time, cache hit/miss and total operations; estimate break-even read/write ratios.

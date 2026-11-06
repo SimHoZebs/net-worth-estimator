@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedPostings, deletedRules map[string]bool) error {
+func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedTransactions, deletedRules map[string]bool) error {
 	var raw string
 	if err := tx.QueryRow(`SELECT settings_json FROM safe_spending_settings WHERE id = 1 AND user_id = :user_id`).Scan(&raw); err != nil {
 		if err == sql.ErrNoRows {
@@ -23,7 +23,7 @@ func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedPosting
 	settings.AccountIDs = supersedeReplaceIDs(settings.AccountIDs, manualID, syncedID)
 	settings.SpendingAccountIDs = supersedeReplaceIDs(settings.SpendingAccountIDs, manualID, syncedID)
 	settings.IncomeAccountIDs = supersedeReplaceIDs(settings.IncomeAccountIDs, manualID, syncedID)
-	settings.TransactionIDs = supersedeRemoveIDs(settings.TransactionIDs, deletedPostings)
+	settings.TransactionIDs = supersedeRemoveIDs(settings.TransactionIDs, deletedTransactions)
 	settings.IncomeScheduleIDs = supersedeRemoveIDs(settings.IncomeScheduleIDs, deletedRules)
 	encoded, err := json.Marshal(settings)
 	if err != nil {

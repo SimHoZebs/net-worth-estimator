@@ -140,7 +140,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 			t.Fatalf("projected row %s is historical", row.Date)
 		}
 	}
-	if len(futureOnly.Evaluations.PostingFulfillment) == 0 {
+	if len(futureOnly.Evaluations.TransactionFulfillment) == 0 {
 		t.Fatal("projected slice lost evaluations")
 	}
 }

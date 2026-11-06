@@ -48,8 +48,8 @@ type Checkpoint struct {
 // void rows never suppress an insert.
 type Translation struct {
 	Checkpoints []Checkpoint
-	Pending     []store.SyncPosting
-	Settled     []store.SyncPosting
+	Pending     []store.SyncTransaction
+	Settled     []store.SyncTransaction
 	Skipped     map[SkipReason]int
 }
 
@@ -204,18 +204,18 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 				}
 				// Settled movements affect the reported balance when posted,
 				// not at the earlier purchase timestamp: normalize the settled
-				// event time to the post instant. Manual postings are
+				// event time to the post instant. Manual transactions are
 				// untouched: their TransactionTime-first ordering is unchanged.
 				transactionTime = postedTime
 			}
-			posting := store.SyncPosting{
+			transaction := store.SyncTransaction{
 				ProviderAccountID: bridgeID,
 				TransactionID:     transaction.ID,
 				Facts:             transactionFacts(transaction, account.Currency),
-				Posting: types.Posting{
+				Transaction: types.Transaction{
 					Name:   truncateLabel(transaction.Description),
 					Source: store.SourceBankSync,
-					Amount: types.PostingAmountResolution{
+					Amount: types.TransactionAmountResolution{
 						Resolver: "expression",
 						Config:   map[string]any{"expression": abs},
 						Inputs:   map[string]types.AmountInputBinding{},
@@ -227,14 +227,14 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 				},
 			}
 			if amount >= 0 {
-				posting.Destinations = []string{modelAccountID}
+				transaction.Destinations = []string{modelAccountID}
 			} else {
-				posting.SourceAccountID = &source
+				transaction.SourceAccountID = &source
 			}
 			if seed {
-				translation.Pending = append(translation.Pending, posting)
+				translation.Pending = append(translation.Pending, transaction)
 			} else {
-				translation.Settled = append(translation.Settled, posting)
+				translation.Settled = append(translation.Settled, transaction)
 			}
 		}
 	}

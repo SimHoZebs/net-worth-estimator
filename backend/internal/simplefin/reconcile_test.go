@@ -7,15 +7,15 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func reconcilePosting(name, account, amount string, pending bool, txTime int64) store.SyncPosting {
+func reconcileTransaction(name, account, amount string, pending bool, txTime int64) store.SyncTransaction {
 	source := account
-	return store.SyncPosting{
+	return store.SyncTransaction{
 		ProviderAccountID: "bridge-" + account,
 		TransactionID:     name,
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            name,
 			SourceAccountID: &source,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      txTime,
 			TransactionTime: txTime,
 			Enabled:         !pending,
@@ -27,12 +27,12 @@ func reconcilePosting(name, account, amount string, pending bool, txTime int64) 
 func reconcileBankRow(id, name, account, amount string, pending, void bool, keys ...store.BankKey) store.BankRow {
 	source := account
 	return store.BankRow{
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			ID:              id,
 			Name:            name,
 			Source:          store.SourceBankSync,
 			SourceAccountID: &source,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785628800,
 			TransactionTime: 1785628800,
 			Enabled:         !pending && !void,
@@ -62,7 +62,7 @@ func directivesByAction(directives []store.BankDirective) (upserts, converts int
 }
 
 func TestReconcileUpsertsPendingByKey(t *testing.T) {
-	pending := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", true, 1785628800)}
+	pending := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", true, 1785628800)}
 	directives := Reconcile(pending, nil, nil, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 0 {
@@ -77,7 +77,7 @@ func TestReconcileUpsertsPendingByKey(t *testing.T) {
 func TestReconcileConvertsVanishedPendingToSettled(t *testing.T) {
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 0 || converts != 1 || len(voids) != 0 {
@@ -102,9 +102,9 @@ func TestReconcileVoidsWithoutMatchAndHoldsAmbiguous(t *testing.T) {
 		t.Fatalf("no-match = %+v", directives)
 	}
 	// Two matching candidates: void the pending row, insert both as new.
-	candidates := []store.SyncPosting{
-		reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200),
-		reconcilePosting("Corner Store (2)", "prime_card", "42.10", false, 1785801600),
+	candidates := []store.SyncTransaction{
+		reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200),
+		reconcileTransaction("Corner Store (2)", "prime_card", "42.10", false, 1785801600),
 	}
 	directives = Reconcile(nil, candidates, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
@@ -119,10 +119,10 @@ func TestReconcileSkipsRecordedCandidatesAndInsertsBesideLivePending(t *testing.
 	// Same charge still pending and now posted under a new bank key: the
 	// pending seed refreshes and the posted charge inserts beside it. The
 	// hold voids once it vanishes from the feed.
-	stillPending := reconcilePosting("Corner Store", "prime_card", "42.10", true, 1785628800)
+	stillPending := reconcileTransaction("Corner Store", "prime_card", "42.10", true, 1785628800)
 	stillPending.TransactionID = "old-auth"
-	pending := []store.SyncPosting{stillPending}
-	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
+	pending := []store.SyncTransaction{stillPending}
+	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(pending, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 2 || converts != 0 || len(voids) != 0 {
@@ -143,10 +143,10 @@ func TestReconcileSkipsRecordedCandidatesAndInsertsBesideLivePending(t *testing.
 func TestReconcileConvertsSameKeyPendingToSettled(t *testing.T) {
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	sameKey := reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)
+	sameKey := reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)
 	sameKey.TransactionID = "old-auth"
 	sameKey.ProviderAccountID = "bridge-prime_card"
-	directives := Reconcile(nil, []store.SyncPosting{sameKey}, bank, map[string]bool{"prime_card": true})
+	directives := Reconcile(nil, []store.SyncTransaction{sameKey}, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 0 {
 		t.Fatalf("same-key settle = %+v, want one upsert and no void", directives)
@@ -159,10 +159,10 @@ func TestReconcileConvertsVanishedClaimedOccurrence(t *testing.T) {
 	// instead of inserting beside it.
 	row := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false,
 		pendingKey("prime_card", "old-auth"))
-	row.Posting.Enabled = true
-	row.Posting.Claim = &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
+	row.Transaction.Enabled = true
+	row.Transaction.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
 	bank := []store.BankRow{row}
-	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 0 || converts != 1 || len(voids) != 0 {
@@ -182,7 +182,7 @@ func TestReconcileHoldsOneCandidateMatchingTwoHolds(t *testing.T) {
 		reconcileBankRow("uuid-second", "Corner Store", "prime_card", "42.10", true, false,
 			pendingKey("prime_card", "old-second")),
 	}
-	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 2 {
@@ -195,12 +195,12 @@ func TestReconcileIgnoresLiveClaimedRowAsConvertTarget(t *testing.T) {
 	// charge under a new key inserts beside it instead of converting it.
 	row := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false,
 		pendingKey("prime_card", "old-auth"))
-	row.Posting.Enabled = true
-	row.Posting.Claim = &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
-	stillPending := reconcilePosting("Corner Store", "prime_card", "42.10", true, 1785628800)
+	row.Transaction.Enabled = true
+	row.Transaction.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
+	stillPending := reconcileTransaction("Corner Store", "prime_card", "42.10", true, 1785628800)
 	stillPending.TransactionID = "old-auth"
-	pending := []store.SyncPosting{stillPending}
-	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
+	pending := []store.SyncTransaction{stillPending}
+	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(pending, settled, []store.BankRow{row}, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 2 || converts != 0 || len(voids) != 0 {
@@ -211,7 +211,7 @@ func TestReconcileIgnoresLiveClaimedRowAsConvertTarget(t *testing.T) {
 func TestReconcileIgnoresUncoveredAccounts(t *testing.T) {
 	bank := []store.BankRow{reconcileBankRow("uuid-other", "Corner Store", "other_card", "42.10", true, false,
 		pendingKey("other_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("Corner Store", "other_card", "42.10", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "other_card", "42.10", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	if len(directives) != 0 {
 		t.Fatalf("uncovered account produced directives: %+v", directives)
@@ -223,7 +223,7 @@ func TestReconcileConvertsTipAdjustedAuth(t *testing.T) {
 	// posted values under its own id.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "58.00", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Bistro", "prime_card", "58.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 0 || converts != 1 || len(voids) != 0 {
@@ -236,7 +236,7 @@ func TestReconcileConvertsAuthBelowFinal(t *testing.T) {
 	// the final values under its own id.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Instacart", "prime_card", "100.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("Instacart", "prime_card", "92.00", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Instacart", "prime_card", "92.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 0 || converts != 1 || len(voids) != 0 {
@@ -250,7 +250,7 @@ func TestReconcileConvertsRenamedAuthDescriptor(t *testing.T) {
 	// settles the hold in place.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "LYFT *TEMP AUTH HOLD", "prime_card", "74.94", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("LYFT *STANDARD 10-30", "prime_card", "81.22", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("LYFT *STANDARD 10-30", "prime_card", "81.22", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 0 || converts != 1 || len(voids) != 0 {
@@ -262,7 +262,7 @@ func TestReconcileRejectsDifferentMerchantBranches(t *testing.T) {
 	// The same first token is not enough when the branch token differs.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "BISTRO UPTOWN", "prime_card", "50.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("BISTRO DOWNTOWN", "prime_card", "58.00", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("BISTRO DOWNTOWN", "prime_card", "58.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 1 {
@@ -275,7 +275,7 @@ func TestReconcileRejectsBeyondTolerance(t *testing.T) {
 	// as its own row, exactly like an unmatched charge.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "80.00", false, 1785715200)}
+	settled := []store.SyncTransaction{reconcileTransaction("Bistro", "prime_card", "80.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 1 {
@@ -289,7 +289,7 @@ func TestReconcileSettledDedupKeepsDifferentStoreNumbers(t *testing.T) {
 	// stores are distinct.
 	bank := []store.BankRow{reconcileBankRow("uuid-settled", "CORNER STORE 1234", "prime_card", "10.00", false, false,
 		pendingKey("prime_card", "old-post"))}
-	second := []store.SyncPosting{reconcilePosting("CORNER STORE 5678", "prime_card", "10.00", false, 1785715200)}
+	second := []store.SyncTransaction{reconcileTransaction("CORNER STORE 5678", "prime_card", "10.00", false, 1785715200)}
 	directives := Reconcile(nil, second, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 0 {
@@ -301,9 +301,9 @@ func TestReconcileHoldsAmbiguousTipMatches(t *testing.T) {
 	// Two near-amount candidates: no conversion, both insert, auth voids.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	candidates := []store.SyncPosting{
-		reconcilePosting("Bistro", "prime_card", "55.00", false, 1785715200),
-		reconcilePosting("Bistro", "prime_card", "56.00", false, 1785801600),
+	candidates := []store.SyncTransaction{
+		reconcileTransaction("Bistro", "prime_card", "55.00", false, 1785715200),
+		reconcileTransaction("Bistro", "prime_card", "56.00", false, 1785801600),
 	}
 	directives := Reconcile(nil, candidates, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
@@ -318,7 +318,7 @@ func TestReconcileNeverConvertsZeroAmountAuth(t *testing.T) {
 	for _, amount := range []string{"0.00", "2.00"} {
 		bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "0.00", true, false,
 			pendingKey("prime_card", "old-auth"))}
-		settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", amount, false, 1785715200)}
+		settled := []store.SyncTransaction{reconcileTransaction("Bistro", "prime_card", amount, false, 1785715200)}
 		directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 		upserts, converts, voids := directivesByAction(directives)
 		if upserts != 1 || converts != 0 || len(voids) != 1 {
@@ -327,14 +327,14 @@ func TestReconcileNeverConvertsZeroAmountAuth(t *testing.T) {
 	}
 }
 
-func reconcileInflowPosting(name, account, amount string, txTime int64) store.SyncPosting {
-	return store.SyncPosting{
+func reconcileInflowTransaction(name, account, amount string, txTime int64) store.SyncTransaction {
+	return store.SyncTransaction{
 		ProviderAccountID: "bridge-" + account,
 		TransactionID:     name,
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            name,
 			Destinations:    []string{account},
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      txTime,
 			TransactionTime: txTime,
 			Enabled:         true,
@@ -343,11 +343,11 @@ func reconcileInflowPosting(name, account, amount string, txTime int64) store.Sy
 }
 
 func TestReconcileRejectsDirectionMismatch(t *testing.T) {
-	// An outflow auth never joins an inflow posting, even at the exact
+	// An outflow auth never joins an inflow transaction, even at the exact
 	// amount and merchant.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Refund Desk", "prime_card", "42.10", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	settled := []store.SyncPosting{reconcileInflowPosting("Refund Desk", "prime_card", "42.10", 1785715200)}
+	settled := []store.SyncTransaction{reconcileInflowTransaction("Refund Desk", "prime_card", "42.10", 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 1 {
@@ -360,13 +360,13 @@ func TestReconcileSettledDedupStaysExact(t *testing.T) {
 	// charge and must insert; only an exact repeat is already imported.
 	bank := []store.BankRow{reconcileBankRow("uuid-settled", "Bistro", "prime_card", "50.00", false, false,
 		pendingKey("prime_card", "old-post"))}
-	near := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "52.00", false, 1785715200)}
+	near := []store.SyncTransaction{reconcileTransaction("Bistro", "prime_card", "52.00", false, 1785715200)}
 	directives := Reconcile(nil, near, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 0 {
 		t.Fatalf("near repeat = %+v, want one insert", directives)
 	}
-	exact := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "50.00", false, 1785715200)}
+	exact := []store.SyncTransaction{reconcileTransaction("Bistro", "prime_card", "50.00", false, 1785715200)}
 	directives = Reconcile(nil, exact, bank, map[string]bool{"prime_card": true})
 	if len(directives) != 0 {
 		t.Fatalf("exact repeat = %+v, want suppression", directives)
@@ -378,8 +378,8 @@ func TestReconcileSuggestsButDoesNotConvertLodging(t *testing.T) {
 	// and the posted charge inserts for the owner to resolve.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "MARRIOTT HOTEL", "prime_card", "300.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	bank[0].Posting.TransactionTime -= 9 * 86400
-	settled := []store.SyncPosting{reconcilePosting("MARRIOTT HOTEL", "prime_card", "320.00", false, 1785715200)}
+	bank[0].Transaction.TransactionTime -= 9 * 86400
+	settled := []store.SyncTransaction{reconcileTransaction("MARRIOTT HOTEL", "prime_card", "320.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 1 {

@@ -302,12 +302,12 @@
           src: "types.Checkpoint",
         },
         {
-          id: "posting",
+          id: "transaction",
           lane: 0,
-          label: "Posting",
+          label: "Transaction",
           sub: "One dated transaction of money",
           data: true,
-          src: "types.Posting",
+          src: "types.Transaction",
         },
         {
           id: "rule",
@@ -339,7 +339,7 @@
           id: "occurrence",
           lane: 1,
           label: "Occurrence",
-          sub: "Rule instance, executes as posting",
+          sub: "Rule instance, executes as transaction",
           src: "domain.ResolveOccurrences",
         },
         {
@@ -437,7 +437,7 @@
         // Phases follow one run: references validated, history replayed, request
         // assembled, the per-occurrence execution loop, evaluation, readout.
         // Flows sharing a phase run together, not in sequence.
-        { f: "posting", t: "rule", l: "names rule", phase: 1, src: "types.PostingClaim" },
+        { f: "transaction", t: "rule", l: "names rule", phase: 1, src: "types.TransactionClaim" },
         {
           f: "terms",
           t: "providers",
@@ -461,7 +461,7 @@
           src: "types.CheckpointCorrection",
         },
         {
-          f: "posting",
+          f: "transaction",
           t: "replay",
           l: "history actuals",
           phase: 2,
@@ -475,11 +475,11 @@
           src: "domain.ResolveOccurrences",
         },
         {
-          f: "posting",
+          f: "transaction",
           t: "occurrence",
           l: "claims occurrence",
           phase: 2,
-          src: "types.PostingClaim",
+          src: "types.TransactionClaim",
         },
         {
           f: "occurrence",
@@ -496,7 +496,7 @@
           src: "domain.PrepareSimulationRequest",
         },
         {
-          f: "posting",
+          f: "transaction",
           t: "request",
           l: "future actuals",
           phase: 3,
@@ -519,7 +519,7 @@
           src: "domain.ComputeRequestedAmount",
         },
         {
-          f: "posting",
+          f: "transaction",
           t: "resolvers",
           l: "every amount",
           phase: 4,
@@ -529,7 +529,7 @@
         {
           f: "occurrence",
           t: "runtime",
-          l: "executes as posting",
+          l: "executes as transaction",
           phase: 4,
           src: "domain.TransitionRuntime",
         },
@@ -551,7 +551,7 @@
           src: "domain/evaluation_fi.go",
         },
         { f: "events", t: "timing", l: "group", phase: 6, src: "TimingPreview" },
-        { f: "posting", t: "analysis", l: "recorded inflows", phase: 6, src: "domain.analyzePay" },
+        { f: "transaction", t: "analysis", l: "recorded inflows", phase: 6, src: "domain.analyzePay" },
       ];
       const W = 1280,
         H = 760,
@@ -921,7 +921,7 @@
         const roots = new Set([...linked].map(rootOf));
         // Keep only flows directly touching the hovered node, plus edges fully
         // inside one linked group (e.g. runtime -> memory under the engine).
-        // A neighbor's other flows stay dim: hovering Posting shows its own
+        // A neighbor's other flows stay dim: hovering Transaction shows its own
         // outflows, not its neighbors'.
         const keepEdge = (f, t) =>
           f === id ||

@@ -91,7 +91,7 @@ func TestFinancialModelExposesReceiptLinksWithoutChangingRevision(t *testing.T) 
 	if got.Revision != empty.Revision {
 		t.Fatalf("receipt changed financial revision %q -> %q", empty.Revision, got.Revision)
 	}
-	links, ok := got.ReceiptLinks[receiptAPIPostingID]
+	links, ok := got.ReceiptLinks[receiptAPITransactionID]
 	if !ok || len(links) != 1 || links[0] != r.ID {
 		t.Fatalf("receipt links = %+v", got.ReceiptLinks)
 	}

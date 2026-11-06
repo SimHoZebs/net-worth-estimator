@@ -14,7 +14,7 @@ function syncRow(overrides: Partial<Transaction>): Transaction {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting",
+		kind: "transaction",
 		startDate: "2026-09-25",
 		endDate: null,
 		annualIncrease: 0,

@@ -36,7 +36,7 @@ func NormalizeFIPlan(plan types.FIPlan) types.FIPlan {
 	spendableIncomeIDs := map[string]bool{}
 	for _, source := range sources {
 		if source.Type == "cashflow" && source.Included {
-			spendableIncomeIDs[source.PostingID] = true
+			spendableIncomeIDs[source.TransactionID] = true
 		}
 	}
 	basis := types.ExpenseBasisFIDateDollars
@@ -50,7 +50,7 @@ func NormalizeFIPlan(plan types.FIPlan) types.FIPlan {
 	requiredConfidence := math.Min(1, math.Max(0.01, finiteNonNegative(plan.RequiredConfidence, 1)))
 	continuing := []string{}
 	seenContinuing := map[string]bool{}
-	for _, id := range plan.ContinuingPostingIDs {
+	for _, id := range plan.ContinuingTransactionIDs {
 		if seenContinuing[id] || spendableIncomeIDs[id] {
 			continue
 		}
@@ -66,7 +66,7 @@ func NormalizeFIPlan(plan types.FIPlan) types.FIPlan {
 		EvaluationYears:          evaluationYears,
 		RequiredConfidence:       requiredConfidence,
 		Sources:                  sources,
-		ContinuingPostingIDs:     continuing,
+		ContinuingTransactionIDs: continuing,
 		PrincipalPolicy:          normalizePrincipalPolicy(plan.PrincipalPolicy),
 	}
 }
@@ -147,7 +147,7 @@ func ValidateFIPlanConfig(config any) error {
 		}
 		switch source["type"] {
 		case "cashflow":
-			if _, ok := source["postingId"].(string); !ok || len(source) > 3 {
+			if _, ok := source["transactionId"].(string); !ok || len(source) > 3 {
 				return fmt.Errorf("Financial independence configuration is invalid.")
 			}
 		case "asset":
@@ -167,7 +167,7 @@ func ValidateFIPlanConfig(config any) error {
 			return fmt.Errorf("Financial independence configuration is invalid.")
 		}
 	}
-	if _, ok := stringArrayField(obj, "continuingPostingIds"); !ok {
+	if _, ok := stringArrayField(obj, "continuingTransactionIds"); !ok {
 		return fmt.Errorf("Financial independence configuration is invalid.")
 	}
 	policyValue, present := obj["principalPolicy"]
@@ -249,7 +249,7 @@ func ParseFIPlan(config any) (types.FIPlan, error) {
 			fiSource := types.FISource{Included: source["included"].(bool)}
 			if source["type"] == "cashflow" {
 				fiSource.Type = "cashflow"
-				fiSource.PostingID = source["postingId"].(string)
+				fiSource.TransactionID = source["transactionId"].(string)
 			} else {
 				fiSource.Type = "asset"
 				fiSource.AccountID = source["accountId"].(string)
@@ -261,8 +261,8 @@ func ParseFIPlan(config any) (types.FIPlan, error) {
 			plan.Sources = append(plan.Sources, fiSource)
 		}
 	}
-	ids, _ := stringArrayField(obj, "continuingPostingIds")
-	plan.ContinuingPostingIDs = ids
+	ids, _ := stringArrayField(obj, "continuingTransactionIds")
+	plan.ContinuingTransactionIDs = ids
 	return NormalizeFIPlan(plan), nil
 }
 
@@ -324,24 +324,24 @@ func ParseAccountBalanceConfig(config any) (types.AccountBalanceConfig, error) {
 	return parsed, nil
 }
 
-// ValidateFulfillmentConfig validates posting fulfillment config JSON.
+// ValidateFulfillmentConfig validates transaction fulfillment config JSON.
 func ValidateFulfillmentConfig(config any) error {
 	obj, ok := asObject(config)
 	if !ok {
-		return fmt.Errorf("Posting fulfillment configuration must be an object.")
+		return fmt.Errorf("Transaction fulfillment configuration must be an object.")
 	}
-	raw, present := obj["postingIds"]
+	raw, present := obj["transactionIds"]
 	if !present || raw == nil {
 		return nil
 	}
 	list, ok := raw.([]any)
 	if !ok {
-		return fmt.Errorf("Posting fulfillment postingIds must be null or an array of IDs.")
+		return fmt.Errorf("Transaction fulfillment transactionIds must be null or an array of IDs.")
 	}
 	for _, item := range list {
 		id, ok := item.(string)
 		if !ok || strings.TrimSpace(id) == "" {
-			return fmt.Errorf("Posting fulfillment postingIds must be null or an array of IDs.")
+			return fmt.Errorf("Transaction fulfillment transactionIds must be null or an array of IDs.")
 		}
 	}
 	return nil
@@ -349,13 +349,13 @@ func ValidateFulfillmentConfig(config any) error {
 
 // ParseFulfillmentConfig converts validated JSON into a typed config,
 // de-duplicating IDs while preserving order.
-func ParseFulfillmentConfig(config any) (types.PostingFulfillmentConfig, error) {
-	var parsed types.PostingFulfillmentConfig
+func ParseFulfillmentConfig(config any) (types.TransactionFulfillmentConfig, error) {
+	var parsed types.TransactionFulfillmentConfig
 	if err := ValidateFulfillmentConfig(config); err != nil {
 		return parsed, err
 	}
 	obj := config.(map[string]any)
-	raw, present := obj["postingIds"]
+	raw, present := obj["transactionIds"]
 	if !present || raw == nil {
 		return parsed, nil
 	}
@@ -366,7 +366,7 @@ func ParseFulfillmentConfig(config any) (types.PostingFulfillmentConfig, error) 
 			continue
 		}
 		seen[id] = true
-		parsed.PostingIDs = append(parsed.PostingIDs, id)
+		parsed.TransactionIDs = append(parsed.TransactionIDs, id)
 	}
 	return parsed, nil
 }

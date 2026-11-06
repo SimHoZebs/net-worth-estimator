@@ -9,7 +9,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Amount resolution for posting and rule configurations.
+// Amount resolution for transaction and rule configurations.
 
 // AmountResolutionError reports amount-resolution failures.
 type AmountResolutionError struct{ Message string }
@@ -22,17 +22,17 @@ func amtErrf(format string, args ...any) *AmountResolutionError {
 
 // AmountProviderContext supplies concrete values to providers.
 type AmountProviderContext struct {
-	Balances                     map[string]float64
-	LatestRealizedPostingAmounts map[string]float64
-	LatestRealizedPostingDates   map[string]string
-	RealizedPostingAmountsByYear map[string]map[string]float64
-	PaymentTerms                 map[string]types.PaymentTerms
-	Date                         string
+	Balances                         map[string]float64
+	LatestRealizedTransactionAmounts map[string]float64
+	LatestRealizedTransactionDates   map[string]string
+	RealizedTransactionAmountsByYear map[string]map[string]float64
+	PaymentTerms                     map[string]types.PaymentTerms
+	Date                             string
 	// FrequencyDivisor converts an annual rate to a per-occurrence rate.
-	// Rules carry their frequency divisor; manual postings use 1.
+	// Rules carry their frequency divisor; manual transactions use 1.
 	FrequencyDivisor int
 	// RuleStartDate is the owning rule's start date, or "" for manual
-	// postings. It anchors the growth-factor provider.
+	// transactions. It anchors the growth-factor provider.
 	RuleStartDate string
 	// SampledAnnualRate is the pre-sampled annual rate for this transaction
 	// in this projection year, or nil when the transaction is not sampled
@@ -43,8 +43,8 @@ type AmountProviderContext struct {
 
 // AmountReferenceContext validates ID references during validation.
 type AmountReferenceContext struct {
-	AccountIDs map[string]bool
-	PostingIDs map[string]bool
+	AccountIDs     map[string]bool
+	TransactionIDs map[string]bool
 }
 
 type providerDefinition struct {
@@ -52,10 +52,10 @@ type providerDefinition struct {
 	// Registered once via RegisterAmountProvider; duplicates panic.
 	name string
 	// Description is human-readable help surfaced by the discovery endpoint.
-	description         string
-	resolve             func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error)
-	validateReferences  func(args map[string]types.JsonValue, refs *AmountReferenceContext) error
-	postingDependencies func(args map[string]types.JsonValue) []string
+	description             string
+	resolve                 func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error)
+	validateReferences      func(args map[string]types.JsonValue, refs *AmountReferenceContext) error
+	transactionDependencies func(args map[string]types.JsonValue) []string
 	// volatileParams reports stochastic sampling parameters when the
 	// provider carries rate behavior. Nil means never volatile.
 	// occurrence-rate is the only built-in volatile provider; custom
@@ -162,7 +162,7 @@ type AmountProviderInfo struct {
 
 // Design: accounts stay dumb, transactions carry behavior. Accounts expose
 // only floor/ceiling/withdrawable/headroom (see accounts.go). Fees and
-// minimums live in PaymentTerms plus the providers below, and a posting or
+// minimums live in PaymentTerms plus the providers below, and a transaction or
 // rule reads them to move money. Terms declare what is owed; an enabled
 // transaction behind them moves it.
 //
@@ -175,7 +175,7 @@ var amountProviders = map[string]providerDefinition{
 	"model-value": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			id := args["id"].(string)
-			if v, ok := ctx.LatestRealizedPostingAmounts[id]; ok {
+			if v, ok := ctx.LatestRealizedTransactionAmounts[id]; ok {
 				return v, nil
 			}
 			if v, ok := ctx.Balances[id]; ok {
@@ -188,12 +188,12 @@ var amountProviders = map[string]providerDefinition{
 			if err != nil {
 				return err
 			}
-			if !refs.PostingIDs[id] && !refs.AccountIDs[id] {
-				return amtErrf("Model value '%s' is not a posting or account ID.", id)
+			if !refs.TransactionIDs[id] && !refs.AccountIDs[id] {
+				return amtErrf("Model value '%s' is not a transaction or account ID.", id)
 			}
 			return nil
 		},
-		postingDependencies: func(args map[string]types.JsonValue) []string {
+		transactionDependencies: func(args map[string]types.JsonValue) []string {
 			if id, ok := args["id"].(string); ok {
 				return []string{id}
 			}
@@ -252,7 +252,7 @@ var amountProviders = map[string]providerDefinition{
 	// annual growth rate over the days from the rule start date to the
 	// occurrence date. Expressions multiply it explicitly, so one-time
 	// and recurring transactions resolve through the same path. Manual
-	// postings have no start date and resolve 1.
+	// transactions have no start date and resolve 1.
 	"growth-factor": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			annualGrowthRate, err := argFloat(args, "annualGrowthRate", true, 0)
@@ -276,7 +276,7 @@ var amountProviders = map[string]providerDefinition{
 	// terms-minimum resolves a payment-terms minimum for one account: the
 	// fixed minimum, or the percent share of the balance magnitude when set,
 	// whichever is larger. Terms stay the single source for minimums; the
-	// payment posting carries schedule and destinations only.
+	// payment transaction carries schedule and destinations only.
 	"terms-minimum": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			id, err := validateIDArgument(args)
@@ -300,7 +300,7 @@ var amountProviders = map[string]providerDefinition{
 			return nil
 		},
 	},
-	// late-fee resolves a flat fee when the referenced payment posting fell
+	// late-fee resolves a flat fee when the referenced payment transaction fell
 	// short of its terms minimum in the fee's calendar month, and zero
 	// otherwise. The same-month guard keeps pre-history occurrences and
 	// disabled shells from charging stale shortfalls: no payment execution
@@ -309,7 +309,7 @@ var amountProviders = map[string]providerDefinition{
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			paymentID, ok := args["payment"].(string)
 			if !ok || strings.TrimSpace(paymentID) == "" {
-				return 0, amtErrf("Late fee 'payment' must be a non-empty posting ID.")
+				return 0, amtErrf("Late fee 'payment' must be a non-empty transaction ID.")
 			}
 			accountID, ok := args["account"].(string)
 			if !ok || strings.TrimSpace(accountID) == "" {
@@ -323,11 +323,11 @@ var amountProviders = map[string]providerDefinition{
 			if !ok {
 				return 0, amtErrf("Account '%s' has no payment terms.", accountID)
 			}
-			lastDate, ok := ctx.LatestRealizedPostingDates[paymentID]
+			lastDate, ok := ctx.LatestRealizedTransactionDates[paymentID]
 			if !ok || len(lastDate) < 7 || len(ctx.Date) < 7 || lastDate[:7] != ctx.Date[:7] {
 				return 0, nil
 			}
-			paid := ctx.LatestRealizedPostingAmounts[paymentID]
+			paid := ctx.LatestRealizedTransactionAmounts[paymentID]
 			if math.Max(0, termsMinimum(terms, ctx.Balances[accountID])-paid) > 0 {
 				return fee, nil
 			}
@@ -336,10 +336,10 @@ var amountProviders = map[string]providerDefinition{
 		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
 			paymentID, ok := args["payment"].(string)
 			if !ok || strings.TrimSpace(paymentID) == "" {
-				return amtErrf("Late fee 'payment' must be a non-empty posting ID.")
+				return amtErrf("Late fee 'payment' must be a non-empty transaction ID.")
 			}
-			if !refs.PostingIDs[paymentID] {
-				return amtErrf("Posting '%s' does not exist.", paymentID)
+			if !refs.TransactionIDs[paymentID] {
+				return amtErrf("Transaction '%s' does not exist.", paymentID)
 			}
 			accountID, ok := args["account"].(string)
 			if !ok || strings.TrimSpace(accountID) == "" {
@@ -354,7 +354,7 @@ var amountProviders = map[string]providerDefinition{
 			}
 			return nil
 		},
-		postingDependencies: func(args map[string]types.JsonValue) []string {
+		transactionDependencies: func(args map[string]types.JsonValue) []string {
 			if id, ok := args["payment"].(string); ok {
 				return []string{id}
 			}
@@ -433,7 +433,7 @@ type VolatileRateParams struct {
 // inputs in sorted input-name order and returns the sampling parameters.
 // Providers opt in via volatileParams; malformed arguments report
 // found=false here while ValidateAmountDescriptor reports them.
-func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileRateParams, found bool) {
+func VolatileRateInputOf(amount types.TransactionAmountResolution) (params VolatileRateParams, found bool) {
 	names := make([]string, 0, len(amount.Inputs))
 	for name := range amount.Inputs {
 		names = append(names, name)
@@ -466,7 +466,7 @@ func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileR
 // CountVolatileRateInputs reports how many provider inputs in an amount
 // descriptor carry volatility. Validation rejects more than one: one
 // transaction shares one pre-sampled annual rate.
-func CountVolatileRateInputs(amount types.PostingAmountResolution) int {
+func CountVolatileRateInputs(amount types.TransactionAmountResolution) int {
 	count := 0
 	for _, binding := range amount.Inputs {
 		if binding.Source != "provider" {
@@ -559,12 +559,12 @@ func init() {
 			amountProviders[name] = def
 		}
 	}
-	describe("model-value", "Latest realized posting amount, falling back to account balance.")
+	describe("model-value", "Latest realized transaction amount, falling back to account balance.")
 	describe("account-balance", "Live balance of one account.")
 	describe("occurrence-rate", "Per-occurrence rate from annualRate/frequency with optional stochastic volatility.")
 	describe("growth-factor", "Compounding factor for annualGrowthRate over rule start to occurrence date.")
 	describe("terms-minimum", "Payment-terms minimum for one account.")
-	describe("late-fee", "Flat fee when a payment posting fell short of its terms minimum this month.")
+	describe("late-fee", "Flat fee when a payment transaction fell short of its terms minimum this month.")
 	describe("balance-fee", "Flat fee when an account balance sits below a threshold.")
 }
 
@@ -603,11 +603,11 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 	return nil
 }
 
-// ValidateAmountDescriptor validates an amount descriptor and returns posting
+// ValidateAmountDescriptor validates an amount descriptor and returns transaction
 // dependencies for cycle detection. Resolvers and providers come from the
 // registry; RegisterAmountResolver/RegisterAmountProvider extend it without
 // touching this function.
-func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *AmountReferenceContext) ([]string, error) {
+func ValidateAmountDescriptor(amount types.TransactionAmountResolution, references *AmountReferenceContext) ([]string, error) {
 	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {
 		return nil, amtErrf("Unknown amount resolver '%s'.", amount.Resolver)
@@ -643,9 +643,9 @@ func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *
 				return nil, err
 			}
 		}
-		if references != nil && provider.postingDependencies != nil {
-			for _, id := range provider.postingDependencies(binding.Arguments) {
-				if references.PostingIDs[id] {
+		if references != nil && provider.transactionDependencies != nil {
+			for _, id := range provider.transactionDependencies(binding.Arguments) {
+				if references.TransactionIDs[id] {
 					dependencies = append(dependencies, id)
 				}
 			}
@@ -654,9 +654,9 @@ func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *
 	return dependencies, nil
 }
 
-// ResolvePostingAmountDescriptor resolves a posting amount.
+// ResolveTransactionAmountDescriptor resolves a transaction amount.
 // Resolver and provider implementations come from the registry.
-func ResolvePostingAmountDescriptor(amount types.PostingAmountResolution, ctx *AmountProviderContext) (float64, error) {
+func ResolveTransactionAmountDescriptor(amount types.TransactionAmountResolution, ctx *AmountProviderContext) (float64, error) {
 	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {
 		return 0, amtErrf("Unknown amount resolver '%s'.", amount.Resolver)

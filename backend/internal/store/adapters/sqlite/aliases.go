@@ -12,7 +12,7 @@ type (
 	SyncCheckpoint       = store.SyncCheckpoint
 	SyncApplySummary     = store.SyncApplySummary
 	SyncProvision        = store.SyncProvision
-	SyncPosting          = store.SyncPosting
+	SyncTransaction      = store.SyncTransaction
 	BankKey              = store.BankKey
 	BankRow              = store.BankRow
 	BankDirective        = store.BankDirective
@@ -25,7 +25,7 @@ type (
 	Friend               = store.Friend
 	AccountLink          = store.AccountLink
 	EvaluationUpdate     = store.EvaluationUpdate
-	GeneratedPosting     = store.GeneratedPosting
+	GeneratedTransaction = store.GeneratedTransaction
 	ProjectionRowPayload = store.ProjectionRowPayload
 )
 
@@ -57,12 +57,12 @@ var (
 	IsSyncOwned      = store.IsSyncOwned
 	IsAccountMissing = store.IsAccountMissing
 
-	ValidateAmountPresetName  = store.ValidateAmountPresetName
-	ModelETag                 = store.ModelETag
-	PostingReceiptFingerprint = store.PostingReceiptFingerprint
-	NotFound                  = store.NotFound
-	IDConflict                = store.IDConflict
-	InvalidID                 = store.InvalidID
-	SyncOwned                 = store.SyncOwned
-	AccountMissing            = store.AccountMissing
+	ValidateAmountPresetName      = store.ValidateAmountPresetName
+	ModelETag                     = store.ModelETag
+	TransactionReceiptFingerprint = store.TransactionReceiptFingerprint
+	NotFound                      = store.NotFound
+	IDConflict                    = store.IDConflict
+	InvalidID                     = store.InvalidID
+	SyncOwned                     = store.SyncOwned
+	AccountMissing                = store.AccountMissing
 )

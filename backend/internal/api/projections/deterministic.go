@@ -87,8 +87,8 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 		}
 	}
 
-	log.Printf("deterministic compute accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
-		len(model.Accounts), len(model.Postings), len(model.Checkpoints),
+	log.Printf("deterministic compute accounts=%d transactions=%d checkpoints=%d horizon=%d range=%s",
+		len(model.Accounts), len(model.Transactions), len(model.Checkpoints),
 		input.Body.Settings.HorizonYears, formatProjectionRange(input.Body.Range))
 
 	result, err := domain.ProjectFinancialModel(model, &input.Body.Settings, input.Body.Overrides, nil)
@@ -110,7 +110,7 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 }
 
 func isEmptyOverrides(overrides types.ModelOverrides) bool {
-	return len(overrides.AddedAccounts) == 0 && len(overrides.AddedPostings) == 0 &&
+	return len(overrides.AddedAccounts) == 0 && len(overrides.AddedTransactions) == 0 &&
 		len(overrides.AddedRules) == 0 && len(overrides.DisabledAccountIDs) == 0 &&
-		len(overrides.DisabledPostingIDs) == 0 && len(overrides.DisabledScheduleIDs) == 0
+		len(overrides.DisabledTransactionIDs) == 0 && len(overrides.DisabledScheduleIDs) == 0
 }

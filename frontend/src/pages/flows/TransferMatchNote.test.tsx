@@ -28,7 +28,7 @@ function finding(overrides: Partial<AnalysisFinding>): AnalysisFinding {
 		stale: false,
 		dismissed: false,
 		feedbackRevision: 0,
-		postingId: "leg-1",
+		transactionId: "leg-1",
 		kind: "transfer",
 		provider: "",
 		product: "internal-transfer",
@@ -53,15 +53,15 @@ afterEach(() => {
 
 describe("transferFindingsForEdge", () => {
 	it("keeps only live transfer findings for the edge legs", () => {
-		const kept = finding({ id: "kept", postingId: "leg-1" });
+		const kept = finding({ id: "kept", transactionId: "leg-1" });
 		const candidates = [
 			kept,
-			finding({ id: "other-kind", kind: "bnpl", postingId: "leg-1" }),
-			finding({ id: "other-leg", postingId: "leg-9" }),
-			finding({ id: "dismissed", dismissed: true, postingId: "leg-1" }),
+			finding({ id: "other-kind", kind: "bnpl", transactionId: "leg-1" }),
+			finding({ id: "other-leg", transactionId: "leg-9" }),
+			finding({ id: "dismissed", dismissed: true, transactionId: "leg-1" }),
 			finding({
 				id: "rejected",
-				postingId: "leg-1",
+				transactionId: "leg-1",
 				review: { decision: "rejected" },
 			} as Partial<AnalysisFinding>),
 		];
@@ -75,7 +75,7 @@ describe("transferFindingsForEdge", () => {
 describe("TransferMatchNote", () => {
 	it("states the once-counted transfer and a confirmed pair", () => {
 		mockFindings([finding({ strength: "strong" })]);
-		render(<TransferMatchNote postingIds={["leg-1"]} transferCount={2} />);
+		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={2} />);
 		expect(
 			screen.getByText(/Counted once as a transfer across 2 transactions/),
 		).toBeTruthy();
@@ -86,14 +86,14 @@ describe("TransferMatchNote", () => {
 	it("marks ambiguous pairs as unsettled without review actions", () => {
 		mockFindings([finding({ strength: "moderate" })]);
 		const { container } = render(
-			<TransferMatchNote postingIds={["leg-1"]} transferCount={1} />,
+			<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />,
 		);
 		expect(screen.getByText(/not settled yet/)).toBeTruthy();
 		expect(container.querySelector("button")).toBeNull();
 	});
 	it("says when no opposite leg is confirmed", () => {
 		mockFindings([]);
-		render(<TransferMatchNote postingIds={["leg-1"]} transferCount={1} />);
+		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />);
 		expect(screen.getByText(/No matching opposite transfer/)).toBeTruthy();
 	});
 });

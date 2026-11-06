@@ -174,11 +174,11 @@ func TestFinanceWriteChangeBlocksNewOrphanButToleratesPreexisting(t *testing.T) 
 	// Real finance errors still block, even with preexisting forecast breakage.
 	invalid := financeFixture(t, "dangling")
 	ghost := "does-not-exist"
-	invalid.Postings[0].SourceAccountID = &ghost
-	if issues := ValidateFinanceWriteChange(danglingBaseline, invalid); !hasErrorCode(issues, "posting.source.missing") {
+	invalid.Transactions[0].SourceAccountID = &ghost
+	if issues := ValidateFinanceWriteChange(danglingBaseline, invalid); !hasErrorCode(issues, "transaction.source.missing") {
 		t.Fatalf("write must keep finance route checks, got %+v", issues)
 	}
-	if issues := ValidateFinanceModel(invalid); !hasErrorCode(issues, "posting.source.missing") {
+	if issues := ValidateFinanceModel(invalid); !hasErrorCode(issues, "transaction.source.missing") {
 		t.Fatalf("finance validation must keep finance route checks, got %+v", issues)
 	}
 

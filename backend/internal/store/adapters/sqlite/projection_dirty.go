@@ -45,8 +45,8 @@ func dirtyDay(day string) int64 {
 	return moment.UTC().Unix()
 }
 
-// dirtyPosting returns the earlier of a posting's two stored times.
-func dirtyPosting(postedTime, transactionTime int64) int64 {
+// dirtyTransaction returns the earlier of a transaction's two stored times.
+func dirtyTransaction(postedTime, transactionTime int64) int64 {
 	if postedTime <= 0 {
 		return transactionTime
 	}
@@ -74,11 +74,11 @@ func dirtyFromSync(checkpoints []SyncCheckpoint, directives []BankDirective) (in
 	for _, directive := range directives {
 		switch {
 		case directive.Upsert != nil:
-			note(directive.Upsert.Posting.PostedTime)
-			note(directive.Upsert.Posting.TransactionTime)
+			note(directive.Upsert.Transaction.PostedTime)
+			note(directive.Upsert.Transaction.TransactionTime)
 		case directive.Convert != nil:
-			note(directive.Convert.Posting.PostedTime)
-			note(directive.Convert.Posting.TransactionTime)
+			note(directive.Convert.Transaction.PostedTime)
+			note(directive.Convert.Transaction.TransactionTime)
 		}
 	}
 	if earliest == 0 {

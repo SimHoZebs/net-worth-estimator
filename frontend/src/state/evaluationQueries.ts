@@ -57,7 +57,7 @@ export function summaryInstanceIds(
 	for (const row of summary.evaluations.netWorthThreshold)
 		ids.add(row.instanceId);
 	for (const row of summary.evaluations.accountBalance) ids.add(row.instanceId);
-	for (const row of summary.evaluations.postingFulfillment)
+	for (const row of summary.evaluations.transactionFulfillment)
 		ids.add(row.instanceId);
 	for (const row of summary.evaluations.cycleFulfillment ?? [])
 		ids.add(row.instanceId);

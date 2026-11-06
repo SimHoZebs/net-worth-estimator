@@ -107,7 +107,7 @@ func merchantNamesContain(a, b string) bool {
 
 // merchantNamesMatch reports whether two bank descriptors name the same
 // merchant. Exact containment covers unchanged descriptors. The merchant key
-// covers descriptors that change between authorization and posting, such as
+// covers descriptors that change between authorization and transaction, such as
 // "LYFT *TEMP AUTH HOLD" and "LYFT *STANDARD": both reduce to LYFT after the
 // hold noise is removed. A longer key must agree on every token the shorter
 // key carries, so "BISTRO UPTOWN" never joins "BISTRO DOWNTOWN".

@@ -48,9 +48,9 @@ export function modelFixture(): FinancialModel {
 				},
 			],
 			accountBalance: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 		},
-		postings: [],
+		transactions: [],
 		schedules: [
 			{
 				id: "salary",
@@ -217,10 +217,10 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			/^\/v1\/transactions\/([^/]+)\/settle-candidates$/,
 		);
 		if (settleRoute && method === "GET") {
-			const postingId = settleRoute[1]!;
+			const transactionId = settleRoute[1]!;
 			return ok({
-				postingId,
-				candidates: settleCandidates.get(postingId) ?? [],
+				transactionId,
+				candidates: settleCandidates.get(transactionId) ?? [],
 				revision: revisionValue,
 			});
 		}
@@ -297,23 +297,25 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				return Array.isArray(destinations) && destinations.includes(accountId);
 			};
 			const transactions: unknown[] = [];
-			for (const posting of current.postings as unknown as Record<
+			for (const transaction of current.transactions as unknown as Record<
 				string,
 				unknown
 			>[]) {
-				if (!touches(posting.sourceAccountId, posting.destinations)) continue;
+				if (!touches(transaction.sourceAccountId, transaction.destinations))
+					continue;
 				const syncOwned =
-					typeof posting.source === "string" &&
-					posting.source !== "" &&
-					posting.source !== "user";
+					typeof transaction.source === "string" &&
+					transaction.source !== "" &&
+					transaction.source !== "user";
 				transactions.push({
-					...posting,
+					...transaction,
 					syncOwned,
 					// Only lifecycle bank rows stay sync-owned: pending
 					// seeds refresh in place and voids convert. Settled
 					// bank rows are write-stable after import.
 					readOnly:
-						syncOwned && (posting.pending === true || posting.void === true),
+						syncOwned &&
+						(transaction.pending === true || transaction.void === true),
 				});
 			}
 			return ok({ transactions, revision: narrowRevision });
@@ -335,11 +337,11 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				...(current.schedules as unknown as Record<string, unknown>[]).map(
 					(rule) => ({ id: rule.id, kind: "schedule", name: rule.name }),
 				),
-				...(current.postings as unknown as Record<string, unknown>[]).map(
-					(posting) => ({
-						id: posting.id,
-						kind: "posting",
-						name: posting.name,
+				...(current.transactions as unknown as Record<string, unknown>[]).map(
+					(transaction) => ({
+						id: transaction.id,
+						kind: "transaction",
+						name: transaction.name,
 					}),
 				),
 			];
@@ -467,7 +469,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						`${String(row.postedDate ?? row.date)}T00:00:00Z`,
 					).getTime() / 1000,
 				);
-				(current.postings as unknown[]).push(row);
+				(current.transactions as unknown[]).push(row);
 			}, body);
 		if (path === "/v1/model/import" && method === "POST") {
 			const document = structuredClone(
@@ -484,12 +486,12 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (categoryMatch && method === "POST") {
 			const [, id] = categoryMatch;
 			const category = (body as { category?: string | null }).category ?? null;
-			current.postings = (current.postings as unknown[]).map((item) => {
+			current.transactions = (current.transactions as unknown[]).map((item) => {
 				const row = item as Record<string, unknown>;
 				if (row.id !== id) return item;
 				const { category: _category, categorySource: _source, ...rest } = row;
 				return category ? { ...rest, category, categorySource: "user" } : rest;
-			}) as typeof current.postings;
+			}) as typeof current.transactions;
 			return ok({
 				transactionId: id,
 				...(category ? { category, categorySource: "user" } : {}),
@@ -499,9 +501,9 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (match && method === "DELETE") {
 			const [, id] = match;
 			return write(() => {
-				current.postings = (current.postings as unknown[]).filter(
+				current.transactions = (current.transactions as unknown[]).filter(
 					(item) => (item as { id: string }).id !== id,
-				) as typeof current.postings;
+				) as typeof current.transactions;
 			}, undefined);
 		}
 		const claimMatch = path.match(
@@ -510,22 +512,24 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (claimMatch && method === "POST") {
 			const [, id, action] = claimMatch;
 			return write(() => {
-				current.postings = (current.postings as unknown[]).map((item) => {
-					const row = item as Record<string, unknown>;
-					if (row.id !== id) return item;
-					if (action === "release") {
-						const { claim: _claim, ...rest } = row;
-						return rest;
-					}
-					return {
-						...row,
-						claim: {
-							scheduleId: (body as { scheduleId: string }).scheduleId,
-							occurrenceDate: (body as { occurrenceDate: string })
-								.occurrenceDate,
-						},
-					};
-				}) as typeof current.postings;
+				current.transactions = (current.transactions as unknown[]).map(
+					(item) => {
+						const row = item as Record<string, unknown>;
+						if (row.id !== id) return item;
+						if (action === "release") {
+							const { claim: _claim, ...rest } = row;
+							return rest;
+						}
+						return {
+							...row,
+							claim: {
+								scheduleId: (body as { scheduleId: string }).scheduleId,
+								occurrenceDate: (body as { occurrenceDate: string })
+									.occurrenceDate,
+							},
+						};
+					},
+				) as typeof current.transactions;
 			}, body);
 		}
 		const amendTransactionMatch = path.match(
@@ -534,14 +538,16 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (amendTransactionMatch && method === "POST") {
 			const [, id] = amendTransactionMatch;
 			return write(() => {
-				current.postings = (current.postings as unknown[]).map((item) => {
-					const row = item as Record<string, unknown>;
-					if (row.id !== id) return item;
-					return {
-						...row,
-						...(structuredClone(body) as Record<string, unknown>),
-					};
-				}) as typeof current.postings;
+				current.transactions = (current.transactions as unknown[]).map(
+					(item) => {
+						const row = item as Record<string, unknown>;
+						if (row.id !== id) return item;
+						return {
+							...row,
+							...(structuredClone(body) as Record<string, unknown>),
+						};
+					},
+				) as typeof current.transactions;
 			}, body);
 		}
 		const moveTransactionMatch = path.match(
@@ -550,7 +556,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (moveTransactionMatch && method === "POST") {
 			const [, id] = moveTransactionMatch;
 			return write(() => {
-				moveIn(current.postings as { id?: string; instanceId?: string }[])(
+				moveIn(current.transactions as { id?: string; instanceId?: string }[])(
 					id!,
 					(body as { beforeId: string | null }).beforeId ?? null,
 				);
@@ -559,7 +565,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		const startMatch = path.match(/^\/v1\/transactions\/([^/]+)\/schedule$/);
 		if (startMatch && method === "POST") {
 			const [, id] = startMatch;
-			const source = (current.postings as unknown[]).find(
+			const source = (current.transactions as unknown[]).find(
 				(item) => (item as { id: string }).id === id,
 			) as Record<string, unknown> | undefined;
 			const payload = structuredClone(body) as Record<string, unknown>;
@@ -579,17 +585,19 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					enabled: payload.enabled ?? source?.enabled ?? true,
 				};
 				(current.schedules as unknown[]).push(schedule);
-				current.postings = (current.postings as unknown[]).map((item) => {
-					const row = item as Record<string, unknown>;
-					if (row.id !== id) return item;
-					return {
-						...row,
-						claim: {
-							scheduleId: schedule.id,
-							occurrenceDate: schedule.startDate,
-						},
-					};
-				}) as typeof current.postings;
+				current.transactions = (current.transactions as unknown[]).map(
+					(item) => {
+						const row = item as Record<string, unknown>;
+						if (row.id !== id) return item;
+						return {
+							...row,
+							claim: {
+								scheduleId: schedule.id,
+								occurrenceDate: schedule.startDate,
+							},
+						};
+					},
+				) as typeof current.transactions;
 			}, body);
 		}
 		if (path === "/v1/planned-purchases" && method === "GET")
@@ -715,7 +723,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				const stamp = Math.floor(
 					new Date(`${String(payload.date)}T${clock}Z`).getTime() / 1000,
 				);
-				const posting = {
+				const transaction = {
 					id: (payload.id as string) || `transaction-${id}`,
 					name: schedule?.name,
 					sourceAccountId:
@@ -730,7 +738,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					transactionTime: stamp,
 					enabled: payload.enabled ?? schedule?.enabled ?? true,
 				};
-				(current.postings as unknown[]).push(posting);
+				(current.transactions as unknown[]).push(transaction);
 			}, undefined);
 		}
 		if (path === "/v1/checkpoints" && method === "POST") {
@@ -847,8 +855,8 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		setRevision: (revision: string) => {
 			revisionValue = revision;
 		},
-		setSettleCandidates: (postingId: string, candidates: unknown[]) => {
-			settleCandidates.set(postingId, candidates);
+		setSettleCandidates: (transactionId: string, candidates: unknown[]) => {
+			settleCandidates.set(transactionId, candidates);
 		},
 		setModel: (model: FinancialModel | null) => {
 			(current as { model?: unknown }).model = model;

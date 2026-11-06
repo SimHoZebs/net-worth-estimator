@@ -20,19 +20,19 @@ func seedRecurringEvidence(t *testing.T, s *sqliteStore) []string {
 	}
 	amounts := []string{"-29.50", "-30.00", "-30.50"}
 	for i, stamp := range stamps {
-		posting := bankSeedPosting("Grocer weekly shop", "checking", "30", false)
-		posting.PostedTime = stamp.Unix()
-		posting.TransactionTime = stamp.Unix()
+		transaction := bankSeedTransaction("Grocer weekly shop", "checking", "30", false)
+		transaction.PostedTime = stamp.Unix()
+		transaction.TransactionTime = stamp.Unix()
 		keys := bankKeys(ProviderSimpleFIN, "bank", "grocery-"+string(rune('a'+i)))
 		applyDirectives(t, s, []BankDirective{
-			bankUpsertDirective(posting, ProviderSimpleFIN, "bank", "grocery-"+string(rune('a'+i))),
+			bankUpsertDirective(transaction, ProviderSimpleFIN, "bank", "grocery-"+string(rune('a'+i))),
 			{Observe: &BankObservation{Keys: keys, Facts: types.TransactionFacts{Description: "GROCER 123", Amount: amounts[i], Currency: "USD", PostedTime: stamp.Unix(), OccurredAt: stamp.Unix()}}},
 		})
-		rows, err := s.LoadBankPostings()
+		rows, err := s.LoadBankTransactions()
 		if err != nil {
 			t.Fatal(err)
 		}
-		ids = append(ids, rows[len(rows)-1].Posting.ID)
+		ids = append(ids, rows[len(rows)-1].Transaction.ID)
 	}
 	return ids
 }
@@ -46,8 +46,8 @@ func completePatternAnalysis(t *testing.T, s *sqliteStore, ids []string, cadence
 	detections := make([]types.AnalysisDetection, 0, len(ids))
 	for _, id := range ids {
 		detections = append(detections, types.AnalysisDetection{
-			PostingID: id, Kind: "recurring", Provider: "grocer", Product: cadence, Role: "outflow", Strength: "moderate",
-			Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test pattern", PostingIDs: ids}},
+			TransactionID: id, Kind: "recurring", Provider: "grocer", Product: cadence, Role: "outflow", Strength: "moderate",
+			Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test pattern", TransactionIDs: ids}},
 		})
 	}
 	if err := s.CompleteAnalysis(run, detections, ""); err != nil {
@@ -126,10 +126,10 @@ func TestPatternToNewSchedulePreviewGuards(t *testing.T) {
 	if err != nil || !claimed {
 		t.Fatalf("claim=%v err=%v", claimed, err)
 	}
-	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{{PostingID: ids[0], Kind: "bnpl", Provider: "grocer", Strength: "strong"}}, ""); err != nil {
+	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{{TransactionID: ids[0], Kind: "bnpl", Provider: "grocer", Strength: "strong"}}, ""); err != nil {
 		t.Fatal(err)
 	}
-	bnpl, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{ids[0]}})
+	bnpl, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{ids[0]}})
 	if err != nil || len(bnpl) != 2 {
 		t.Fatalf("findings=%+v err=%v", bnpl, err)
 	}
@@ -148,7 +148,7 @@ func TestPatternToNewSchedulePreviewGuards(t *testing.T) {
 		t.Fatalf("unconfirmed=%+v", unconfirmed)
 	}
 	anchor := confirmFinding(t, s, findings[0])
-	if _, err := s.db.Exec(`UPDATE postings SET void=1 WHERE id=? AND user_id=:user_id`, ids[0]); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET void=1 WHERE id=? AND user_id=:user_id`, ids[0]); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.PreviewPatternToNewSchedule(anchor.ID); !errors.Is(err, store.ErrPatternToNewScheduleConflict) {
@@ -185,7 +185,7 @@ func TestPatternToNewScheduleTracksOneActiveRule(t *testing.T) {
 	if _, err := s.FindPatternToNewSchedule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("record=%v", err)
 	}
-	rule, err := s.CreateSchedule(types.Schedule{Name: "Grocer", SourceAccountID: &[]string{"checking"}[0], Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true})
+	rule, err := s.CreateSchedule(types.Schedule{Name: "Grocer", SourceAccountID: &[]string{"checking"}[0], Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}

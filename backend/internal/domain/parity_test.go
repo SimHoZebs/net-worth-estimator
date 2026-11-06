@@ -87,8 +87,8 @@ func TestIsValidIsoDate(t *testing.T) {
 
 func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 	model := &types.FinancialModel{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
-		Postings: []types.Posting{},
+		Accounts:     []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
+		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{{
 			ID:           "p1",
 			Name:         "Broken dates",
@@ -98,7 +98,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 			Priority:     1,
 			Enabled:      true,
 			Destinations: []string{"checking"},
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "100"},
 			},
@@ -126,7 +126,7 @@ func TestValidateFinancialModelAllowsMissingPostedDateOnBankLifecycleRows(t *tes
 	source := account
 	document := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "pending", Name: "Pending", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "banksync", Pending: true},
 			{ID: "voided", Name: "Voided", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "banksync", Void: true},
 			{ID: "settled", Name: "Settled", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
@@ -142,8 +142,8 @@ func TestValidateFinancialModelAllowsMissingPostedDateOnBankLifecycleRows(t *tes
 			counts[issue.Code]++
 		}
 	}
-	if counts["posting.postedTime.invalid"] != 1 {
-		t.Fatalf("expected exactly one posting.postedTime.invalid for the settled row, got %v", counts)
+	if counts["transaction.postedTime.invalid"] != 1 {
+		t.Fatalf("expected exactly one transaction.postedTime.invalid for the settled row, got %v", counts)
 	}
 }
 

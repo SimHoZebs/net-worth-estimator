@@ -47,7 +47,7 @@ func decodePresetOutput(t *testing.T, response *httptest.ResponseRecorder) prese
 func validPresetBody() types.AmountPreset {
 	return types.AmountPreset{
 		Name: "custom", Label: "Custom", Enabled: true,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "10"},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -124,7 +124,7 @@ func TestPresetCreateRoundTrip(t *testing.T) {
 func TestPresetCreateRejectsBadAmount(t *testing.T) {
 	handler := New(openAPIStore(t), Config{})
 	body := validPresetBody()
-	body.Amount = types.PostingAmountResolution{
+	body.Amount = types.TransactionAmountResolution{
 		Resolver: "nope",
 		Config:   map[string]any{},
 		Inputs:   map[string]types.AmountInputBinding{},

@@ -75,7 +75,7 @@ export function AccountDialog({
 		[accountRules],
 	);
 	// The activity tab maps projected occurrences back to their saved
-	// definition, and both postings and rules own occurrences.
+	// definition, and both transactions and rules own occurrences.
 	const savedState = useMemo(
 		() => [...transactions, ...recurring],
 		[transactions, recurring],

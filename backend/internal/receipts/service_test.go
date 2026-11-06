@@ -25,7 +25,7 @@ func (f extractorFunc) Extract(ctx context.Context, input receipts.ExtractionInp
 	return f(ctx, input)
 }
 
-const postingID = "01900000-0000-7000-8000-000000000088"
+const transactionID = "01900000-0000-7000-8000-000000000088"
 
 func serviceFixture(t *testing.T, source *receipts.Source) (store.Store, *receipts.Service, types.Receipt) {
 	t.Helper()
@@ -38,7 +38,7 @@ func serviceFixture(t *testing.T, source *receipts.Source) (store.Store, *receip
 		t.Fatal(err)
 	}
 	account := "checking"
-	if _, err := db.CreatePosting(types.Posting{ID: postingID, Name: "Expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "12.34"}, Inputs: map[string]types.AmountInputBinding{}}, PostedTime: 1, TransactionTime: 1, Enabled: true}); err != nil {
+	if _, err := db.CreateTransaction(types.Transaction{ID: transactionID, Name: "Expense", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "12.34"}, Inputs: map[string]types.AmountInputBinding{}}, PostedTime: 1, TransactionTime: 1, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	svc := receipts.NewService(db, source, "users/test")
@@ -46,7 +46,7 @@ func serviceFixture(t *testing.T, source *receipts.Source) (store.Store, *receip
 	if err != nil {
 		t.Fatal(err)
 	}
-	receipt, err := svc.Attach(context.Background(), postingID, "market.png", image)
+	receipt, err := svc.Attach(context.Background(), transactionID, "market.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,9 +197,9 @@ func TestManualModeStalenessAndDiagnostics(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc, _ := db.LoadModel()
-	p := doc.Postings[0]
+	p := doc.Transactions[0]
 	p.Name = "Changed"
-	if _, err := db.UpdatePosting(p); err != nil {
+	if _, err := db.UpdateTransaction(p); err != nil {
 		t.Fatal(err)
 	}
 	r, err = svc.Get(r.ID)
@@ -239,7 +239,7 @@ func TestExtractionRecoveryReadsDoNotStartOrPersistAnAttempt(t *testing.T) {
 	if err != nil || interrupted.Status != "interrupted" || interrupted.Revision != r.Revision {
 		t.Fatalf("interrupted view = %+v, %v", interrupted, err)
 	}
-	list, err := svc.List(r.PostingID)
+	list, err := svc.List(r.TransactionID)
 	if err != nil || len(list) != 1 || list[0].Status != "interrupted" {
 		t.Fatalf("list view = %+v, %v", list, err)
 	}
@@ -324,7 +324,7 @@ func TestListLinksExposesReverseLookupWithoutSecondQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, ok := links[postingID]
+	got, ok := links[transactionID]
 	if !ok || len(got) != 1 || got[0] != r.ID {
 		t.Fatalf("links = %+v", links)
 	}
@@ -335,7 +335,7 @@ func TestListLinksExposesReverseLookupWithoutSecondQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := links[postingID]; len(got) != 1 || got[0] != r.ID {
+	if got := links[transactionID]; len(got) != 1 || got[0] != r.ID {
 		t.Fatalf("links after review = %+v", links)
 	}
 }

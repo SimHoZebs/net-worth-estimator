@@ -1,4 +1,4 @@
-import type { PostingAmountResolution } from "../../api/contracts.ts";
+import type { TransactionAmountResolution } from "../../api/contracts.ts";
 
 const paths: Record<string, Record<string, string[]>> = {
 	fixed: { amount: ["config", "expression"] },
@@ -46,7 +46,7 @@ function readPath(value: unknown, path: string[]): unknown {
 
 export function templateFieldsFromAmount(
 	id: string,
-	amount: PostingAmountResolution | undefined,
+	amount: TransactionAmountResolution | undefined,
 ): Record<string, string> {
 	if (!amount) return {};
 	return Object.fromEntries(
@@ -67,10 +67,10 @@ export function templateFieldsFromAmount(
 /** Change only the paths the user edited. Preserve the saved resolver and all other inputs. */
 export function patchTemplateAmount(
 	id: string,
-	source: PostingAmountResolution,
-	built: PostingAmountResolution,
+	source: TransactionAmountResolution,
+	built: TransactionAmountResolution,
 	fields: Record<string, string>,
-): PostingAmountResolution {
+): TransactionAmountResolution {
 	const next = structuredClone(source);
 	for (const field of Object.keys(fields)) {
 		const path = paths[id]?.[field];

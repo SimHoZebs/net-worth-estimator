@@ -16,27 +16,27 @@ export interface FeedAmountInput {
 	arguments?: Record<string, unknown>;
 }
 
-export interface FeedPostingAmount {
+export interface FeedTransactionAmount {
 	resolver: string;
 	config: Record<string, unknown>;
 	inputs: Record<string, FeedAmountInput>;
 }
 
-export interface FeedPosting {
+export interface FeedTransaction {
 	id: string;
 	name: string;
 	sourceAccountId: string | null;
 	destinations: string[];
 	transactionTime: number;
 	pending?: boolean;
-	amount: FeedPostingAmount;
+	amount: FeedTransactionAmount;
 }
 
 export interface FeedItem {
 	ownerUserId: string;
 	sourceDisplayName: string;
 	audiences: FeedAudience[];
-	posting: FeedPosting;
+	transaction: FeedTransaction;
 }
 
 export interface FeedTotals {
@@ -90,10 +90,10 @@ export async function fetchGroupFeed(
 		groupId: body.groupId,
 		items: (body.items ?? []).map((item) => ({
 			...item,
-			posting: {
-				...item.posting,
-				sourceAccountId: item.posting.sourceAccountId ?? null,
-				destinations: item.posting.destinations ?? [],
+			transaction: {
+				...item.transaction,
+				sourceAccountId: item.transaction.sourceAccountId ?? null,
+				destinations: item.transaction.destinations ?? [],
 			},
 		})),
 		totals: body.totals ?? {
@@ -108,20 +108,19 @@ export async function fetchGroupFeed(
 
 export async function saveSharedCopy(
 	ownerUserId: string,
-	postingId: string,
+	transactionId: string,
 	requestId: string = mintShareRequestId(),
-): Promise<FeedPosting> {
-	const response = await waypointFetch<{ data: { posting: FeedPosting } }>(
-		"/v1/shared/copies",
-		{
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				owner: ownerResource(ownerUserId),
-				postingId,
-				requestId,
-			}),
-		},
-	);
-	return response.data.posting;
+): Promise<FeedTransaction> {
+	const response = await waypointFetch<{
+		data: { transaction: FeedTransaction };
+	}>("/v1/shared/copies", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			owner: ownerResource(ownerUserId),
+			transactionId,
+			requestId,
+		}),
+	});
+	return response.data.transaction;
 }

@@ -37,9 +37,9 @@
     "evaluations": {
       "financialIndependence": [],
       "netWorthThreshold": [],
-      "postingFulfillment": []
+      "transactionFulfillment": []
     },
-    "postings": [],
+    "transactions": [],
     "schedules": [
       {
         "amount": {
@@ -107,9 +107,9 @@
   },
   "overrides": {
     "addedAccounts": [],
-    "addedPostings": [],
+    "addedTransactions": [],
     "disabledAccountIds": [],
-    "disabledPostingIds": []
+    "disabledTransactionIds": []
   },
   "result": {
     "bands": [
@@ -2465,10 +2465,10 @@
         }
       ],
       "accountBalance": [],
-      "postingFulfillment": [
+      "transactionFulfillment": [
         {
           "instanceId": "pf-all",
-          "name": "Posting fulfillment",
+          "name": "Transaction fulfillment",
           "status": "satisfied",
           "deterministic": {
             "completionRate": 1,
@@ -2476,7 +2476,7 @@
             "destinationLimitedAmount": 0,
             "events": [],
             "firstUnderfulfilledDate": null,
-            "postings": [],
+            "transactions": [],
             "realizedAmount": 69600,
             "requestedAmount": 69600,
             "unfulfilledAmount": 0
@@ -2516,7 +2516,7 @@
             "annualExpenseGrowthRate": 0.02,
             "annualExpenseTarget": 12000,
             "annualExpenseTargetBasis": "fi-date-dollars",
-            "continuingPostingIds": [
+            "continuingTransactionIds": [
               "growth"
             ],
             "evaluationYears": 2,
@@ -2547,14 +2547,14 @@
           "name": "Net worth 500"
         }
       ],
-      "postingFulfillment": [
+      "transactionFulfillment": [
         {
           "config": {
-            "postingIds": null
+            "transactionIds": null
           },
           "enabled": true,
           "instanceId": "pf-all",
-          "name": "Posting fulfillment"
+          "name": "Transaction fulfillment"
         }
       ]
     },

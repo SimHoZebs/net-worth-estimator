@@ -71,7 +71,7 @@ docker compose --env-file .env.dev.shots -f docker-compose.dev.yml down
 scripts/dev ps-all
 ```
 
-Posting UUID migration and exact upstream identity checks:
+Transaction UUID migration and exact upstream identity checks:
 
 ```bash
 CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api/...
@@ -464,7 +464,7 @@ printf '\n'
 
 curl -fsS "$BASE_URL/v1/status" | jq .
 curl -fsS "$BASE_URL/v1/financial-model" \
-  | jq '{accounts: (.model.accounts | length), postings: (.model.postings | length), checkpoints: (.model.checkpoints | length), issues}'
+  | jq '{accounts: (.model.accounts | length), transactions: (.model.transactions | length), checkpoints: (.model.checkpoints | length), issues}'
 ```
 
 Expected baseline:
@@ -503,7 +503,7 @@ jq -n --arg start "$START_DATE" '{
     evaluations: {
       financialIndependence: [],
       netWorthThreshold: [],
-      postingFulfillment: []
+      transactionFulfillment: []
     }
   },
   range: { startDate: "2000-01-01", endDate: "2100-01-01" }

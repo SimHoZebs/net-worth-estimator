@@ -87,7 +87,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	}
 	missingDestination := false
 	for _, issue := range rejected.Issues {
-		missingDestination = missingDestination || issue.Code == "posting.destination.missing"
+		missingDestination = missingDestination || issue.Code == "transaction.destination.missing"
 	}
 	if response.Code != http.StatusOK || rejected.Saved || !missingDestination {
 		t.Fatalf("cross-plan JSON reference accepted: %d %s", response.Code, response.Body.String())

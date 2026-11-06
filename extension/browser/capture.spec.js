@@ -108,7 +108,7 @@ test("installed extension connects, captures, picks, persists drafts, and retrie
               { id: "cash", name: "Everyday cash", kind: "cash", enabled: true },
               { id: "card", name: "Credit card", kind: "debt", enabled: true },
             ],
-            postings: [],
+            transactions: [],
             schedules: [],
             plannedPurchases: saved ? [saved] : [],
           },

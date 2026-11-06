@@ -105,10 +105,10 @@ func validateProfiles(set settleProfileSet) error {
 	return nil
 }
 
-// profileForPosting picks the behavior class from the merchant key. An
+// profileForTransaction picks the behavior class from the merchant key. An
 // unknown merchant gets the conservative default, never a guessed class.
-func profileForPosting(posting types.Posting) settleProfile {
-	for _, token := range merchantKey(posting.Name) {
+func profileForTransaction(transaction types.Transaction) settleProfile {
+	for _, token := range merchantKey(transaction.Name) {
 		if name, ok := settleProfiles.Merchants[token]; ok {
 			if profile, ok := settleProfiles.Profiles[name]; ok {
 				return profile

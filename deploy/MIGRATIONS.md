@@ -12,6 +12,9 @@ registry, numbered chain, or historical-model converter to the backend.
 Use existing `setupdb`, `refreshmodel`, and `importcsv` tools where appropriate.
 The image also provides `sqlite3` for offline SQL and SQLite-safe backups.
 
+Databases that still carry pre-rename tables must first run
+the one-time `/app/upgrade-transaction-rename` tool (with the API stopped)
+to rename stored vocabulary to `transactions`, then run this body.
 The current body performs one combined offline upgrade. It converts the
 deployed user-scoped date-only checkpoints to exact UTC day-close instants
 and enables legacy settled bank rows with their posted event time, then
@@ -32,7 +35,7 @@ the SQLite backup API, and compares every preexisting application table,
 except the schema-marker table, against that backup. Only the checkpoint
 date-to-instant conversion, settled-bank repair, explicit purchase-row
 conversion, the SimpleFIN v2 key rewrite, and removal of the completed
-`posting_id_migrations` audit table may differ. The audit remains in the
+`transaction_id_migrations` audit table may differ. The audit remains in the
 verified backup. Purchase conversion preserves all other rows, identities,
 and Analysis evidence. Unsafe purchase inputs leave the original unchanged. A
 complete target without that audit table repeats read-only checks only and never reactivates
@@ -40,7 +43,7 @@ a post-upgrade owner disable.
 
 The SimpleFIN v2 key conversion is one additional offline step in the same
 candidate. `simplefin-v2-keys` rewrites `account_links`,
-`posting_sync_keys`, and `suppressed_sync_keys` from bare account IDs to
+`transaction_sync_keys`, and `suppressed_sync_keys` from bare account IDs to
 connection-scoped keys, verifies row counts, and records
 `simplefin-v2-keys`. It is a no-op when no SimpleFIN rows exist. When rows
 exist, the deployment supplies `SIMPLEFIN_V2_MAPPING` as a private runtime
@@ -231,10 +234,10 @@ The unified projection adds tables and columns with no data conversion:
 `stoch_evaluations_json`), `projection_slices`, `projection_rows`,
 `monte_carlo_statistics` (plus `p25`, `p50`, `p75`), one typed output table
 per evaluation (`net_worth_threshold_outputs`, `account_balance_outputs`,
-`posting_fulfillment_outputs`, `cycle_fulfillment_outputs`,
+`transaction_fulfillment_outputs`, `cycle_fulfillment_outputs`,
 `planned_purchases_outputs`, `financial_independence_outputs`,
 `whatif_outputs`),
-`checkpoints.provider`, and on `postings`
+`checkpoints.provider`, and on `transactions`
 `projection_slice_id`, `event_json`, `applied_amount`, plus `outcome`.
 
 The offline body treats this group as absent, complete, or invalid. Absent
@@ -251,7 +254,7 @@ complete schema.
 
 Run `backend/scripts/one-time/bank-source/run.sh` with every API writer
 stopped and the real database path. The script backs up the database with
-SQLite's backup API, rewrites `postings.source` and `checkpoints.source`
+SQLite's backup API, rewrites `transactions.source` and `checkpoints.source`
 from `simplefin` to `banksync`, and fails if any legacy value remains.
 Verify both counts are zero before starting the API. The strict settlement
 matcher requires `banksync`.

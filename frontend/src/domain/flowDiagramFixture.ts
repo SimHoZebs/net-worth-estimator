@@ -41,7 +41,7 @@ export function graphFixture(): FlowGraph {
 				amount: 5000,
 				sources: [
 					{
-						postingId: "pay-1",
+						transactionId: "pay-1",
 						date: "2026-02-14",
 						sequence: 0,
 						requestedAmount: 5000,
@@ -57,7 +57,7 @@ export function graphFixture(): FlowGraph {
 				amount: 300,
 				sources: [
 					{
-						postingId: "rent-1",
+						transactionId: "rent-1",
 						date: "2026-02-01",
 						sequence: 0,
 						requestedAmount: 300,
@@ -73,7 +73,7 @@ export function graphFixture(): FlowGraph {
 				amount: 1000,
 				sources: [
 					{
-						postingId: "sweep-1",
+						transactionId: "sweep-1",
 						date: "2026-03-01",
 						sequence: 0,
 						requestedAmount: 1000,
@@ -89,7 +89,7 @@ export function graphFixture(): FlowGraph {
 				amount: 200,
 				sources: [
 					{
-						postingId: "rule-pay",
+						transactionId: "rule-pay",
 						date: "2026-07-01",
 						sequence: 0,
 						requestedAmount: 200,
@@ -105,7 +105,7 @@ export function graphFixture(): FlowGraph {
 				amount: 1,
 				sources: [
 					{
-						postingId: "dust-1",
+						transactionId: "dust-1",
 						date: "2026-04-01",
 						sequence: 0,
 						requestedAmount: 1,
@@ -121,7 +121,7 @@ export function graphFixture(): FlowGraph {
 				amount: 2,
 				sources: [
 					{
-						postingId: "dust-2",
+						transactionId: "dust-2",
 						date: "2026-05-01",
 						sequence: 0,
 						requestedAmount: 2,

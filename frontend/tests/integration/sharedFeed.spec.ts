@@ -99,7 +99,9 @@ test("group feed saves an independent copy to the viewer model", async ({
 	// The copy is an ordinary row in the viewer's own model.
 	const model = await readSavedServerModel();
 	expect(
-		model.postings.some((posting) => posting.name === "Cabin groceries"),
+		model.transactions.some(
+			(transaction) => transaction.name === "Cabin groceries",
+		),
 	).toBe(true);
 	// The seeded owner resource stays out of the viewer's model scope.
 	const owners = await request.get(`${FIXTURE_API}/v1/financial-model`);

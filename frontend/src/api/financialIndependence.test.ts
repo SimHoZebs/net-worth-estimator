@@ -35,7 +35,7 @@ describe("financial independence evidence mapping", () => {
 				financialIndependence: [independenceEnvelope()],
 				netWorthThreshold: [],
 				accountBalance: [],
-				postingFulfillment: [],
+				transactionFulfillment: [],
 			},
 		};
 		const local = projectionResultToLocal(result, model, 20);

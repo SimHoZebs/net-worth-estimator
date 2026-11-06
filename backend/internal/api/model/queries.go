@@ -180,24 +180,24 @@ func latestObservationDay(adjusted types.PositionAccount, asOf types.IsoDate) ty
 }
 
 type transactionRow struct {
-	ID              string                        `json:"id"`
-	Name            string                        `json:"name"`
-	SourceAccountID *string                       `json:"sourceAccountId"`
-	Destinations    []string                      `json:"destinations"`
-	Amount          types.PostingAmountResolution `json:"amount"`
-	StartDate       types.IsoDate                 `json:"startDate"`
-	EndDate         *types.IsoDate                `json:"endDate"`
-	Priority        *int                          `json:"priority,omitempty"`
-	Enabled         bool                          `json:"enabled"`
-	SyncOwned       bool                          `json:"syncOwned"`
-	ReadOnly        bool                          `json:"readOnly"`
-	Claim           *types.PostingClaim           `json:"claim,omitempty"`
-	Pending         bool                          `json:"pending,omitempty"`
-	Void            bool                          `json:"void,omitempty"`
-	PostedTime      int64                         `json:"postedTime,omitempty"`
-	TransactionTime int64                         `json:"transactionTime,omitempty"`
-	Category        string                        `json:"category,omitempty"`
-	CategorySource  string                        `json:"categorySource,omitempty"`
+	ID              string                            `json:"id"`
+	Name            string                            `json:"name"`
+	SourceAccountID *string                           `json:"sourceAccountId"`
+	Destinations    []string                          `json:"destinations"`
+	Amount          types.TransactionAmountResolution `json:"amount"`
+	StartDate       types.IsoDate                     `json:"startDate"`
+	EndDate         *types.IsoDate                    `json:"endDate"`
+	Priority        *int                              `json:"priority,omitempty"`
+	Enabled         bool                              `json:"enabled"`
+	SyncOwned       bool                              `json:"syncOwned"`
+	ReadOnly        bool                              `json:"readOnly"`
+	Claim           *types.TransactionClaim           `json:"claim,omitempty"`
+	Pending         bool                              `json:"pending,omitempty"`
+	Void            bool                              `json:"void,omitempty"`
+	PostedTime      int64                             `json:"postedTime,omitempty"`
+	TransactionTime int64                             `json:"transactionTime,omitempty"`
+	Category        string                            `json:"category,omitempty"`
+	CategorySource  string                            `json:"categorySource,omitempty"`
 	// ReceiptIDs is the reverse lookup this row displays, read once for the
 	// whole list instead of loading the model document.
 	ReceiptIDs []string `json:"receiptIds,omitempty"`
@@ -247,40 +247,40 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			}
 			return false
 		}
-		postingIDs := make([]string, 0, len(model.Postings))
-		for _, posting := range model.Postings {
-			if !touches(posting.SourceAccountID, posting.Destinations) {
+		transactionIDs := make([]string, 0, len(model.Transactions))
+		for _, transaction := range model.Transactions {
+			if !touches(transaction.SourceAccountID, transaction.Destinations) {
 				continue
 			}
-			postingIDs = append(postingIDs, posting.ID)
-			syncOwned := isSyncOwned(posting.Source)
-			startDate := transactionDay(posting.TransactionTime)
+			transactionIDs = append(transactionIDs, transaction.ID)
+			syncOwned := isSyncOwned(transaction.Source)
+			startDate := transactionDay(transaction.TransactionTime)
 			if startDate == "" {
-				startDate = transactionDay(posting.PostedTime)
+				startDate = transactionDay(transaction.PostedTime)
 			}
 			transactions = append(transactions, transactionRow{
-				ID:              posting.ID,
-				Name:            posting.Name,
-				SourceAccountID: posting.SourceAccountID,
-				Destinations:    posting.Destinations,
-				Amount:          posting.Amount,
+				ID:              transaction.ID,
+				Name:            transaction.Name,
+				SourceAccountID: transaction.SourceAccountID,
+				Destinations:    transaction.Destinations,
+				Amount:          transaction.Amount,
 				StartDate:       startDate,
-				Enabled:         posting.Enabled,
+				Enabled:         transaction.Enabled,
 				SyncOwned:       syncOwned,
 				// Only lifecycle bank rows stay sync-owned: pending
 				// seeds refresh in place and voids convert, so owner
 				// edits would be clobbered. Settled bank rows are
 				// write-stable after import, so the owner can edit,
 				// exclude, and remove phantoms through them.
-				ReadOnly:        syncOwned && (posting.Pending || posting.Void),
-				Claim:           posting.Claim,
-				Pending:         posting.Pending,
-				Void:            posting.Void,
-				PostedTime:      posting.PostedTime,
-				TransactionTime: posting.TransactionTime,
+				ReadOnly:        syncOwned && (transaction.Pending || transaction.Void),
+				Claim:           transaction.Claim,
+				Pending:         transaction.Pending,
+				Void:            transaction.Void,
+				PostedTime:      transaction.PostedTime,
+				TransactionTime: transaction.TransactionTime,
 			})
 		}
-		categories, err := s.store.LoadPostingCategories(postingIDs)
+		categories, err := s.store.LoadTransactionCategories(transactionIDs)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
@@ -315,7 +315,7 @@ type scheduleListOutput struct {
 
 // listSchedules answers "which standing schedules touch this account"
 // (or all of them). A schedule owns repetition; it is not a transaction and never
-// appears in the postings list. Rows keep the model's storage order, which is
+// appears in the transactions list. Rows keep the model's storage order, which is
 // the owner's execution priority order.
 func (s *handler) listSchedules(_ context.Context, input *struct {
 	AccountID string `query:"accountId" doc:"Only schedules touching this account"`
@@ -394,12 +394,12 @@ func (s *handler) listTransactionCatalog(_ context.Context, _ *struct{}) (*trans
 				Name string `json:"name"`
 			}{ID: schedule.ID, Kind: "schedule", Name: schedule.Name})
 		}
-		for _, posting := range model.Postings {
+		for _, transaction := range model.Transactions {
 			output.Body.Items = append(output.Body.Items, struct {
 				ID   string `json:"id"`
 				Kind string `json:"kind"`
 				Name string `json:"name"`
-			}{ID: posting.ID, Kind: "transaction", Name: posting.Name})
+			}{ID: transaction.ID, Kind: "transaction", Name: transaction.Name})
 		}
 	}
 	output.Body.Revision = revision

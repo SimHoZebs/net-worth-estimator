@@ -106,7 +106,7 @@ func TestFinancialModelContract(t *testing.T) {
 	if model == nil {
 		t.Fatal("financial model schema is missing")
 	}
-	for _, name := range []string{"sourcePath", "accounts", "checkpoints", "postings", "schedules", "paymentTerms", "plannedPurchases", "evaluations"} {
+	for _, name := range []string{"sourcePath", "accounts", "checkpoints", "transactions", "schedules", "paymentTerms", "plannedPurchases", "evaluations"} {
 		if _, ok := model.Properties[name]; !ok {
 			t.Errorf("financial model field %q is missing", name)
 		}

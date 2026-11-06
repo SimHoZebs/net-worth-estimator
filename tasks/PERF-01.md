@@ -10,7 +10,7 @@
 ### Acceptance criteria
 
 - [ ] Benchmark existing full JSON+SHA-256 lookup, a persisted revision-key lookup, event-backed invalidation, and a revision-fast-path/content-hash hybrid using equivalent semantics.
-- [ ] Use representative model sizes (100, 1,000, 10,000 postings), varied accounts/rules/amount resolvers/evaluations, and repeatable workloads.
+- [ ] Use representative model sizes (100, 1,000, 10,000 transactions), varied accounts/rules/amount resolvers/evaluations, and repeatable workloads.
 - [ ] Test warm stable reads, frequent small writes, bank-sync bursts, evaluation-only changes, concurrent requests, cold starts and restarts.
 - [ ] Separately measure serialization/hash generation, revision reads/writes, event publication/fanout, cache lookup, full projection/reader/simulator computations.
 - [ ] Record p50/p95/p99 latency, CPU, allocations, SQLite lock time, cache hit/miss and total operations; estimate break-even read/write ratios.

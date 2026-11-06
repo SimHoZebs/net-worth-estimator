@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestPostingUUIDRequiresCanonicalForm(t *testing.T) {
+func TestTransactionUUIDRequiresCanonicalForm(t *testing.T) {
 	for _, test := range []struct {
 		id   string
 		want bool
@@ -22,8 +22,8 @@ func TestPostingUUIDRequiresCanonicalForm(t *testing.T) {
 	}
 }
 
-func TestImportModelPreservesCanonicalPostingIDs(t *testing.T) {
-	const postingID = "01900000-0000-7000-8000-000000000001"
+func TestImportModelPreservesCanonicalTransactionIDs(t *testing.T) {
+	const transactionID = "01900000-0000-7000-8000-000000000001"
 	const amount = `{"resolver":"expression","config":{"expression":"100"},"inputs":{}}`
 	files := map[string][][]string{
 		AccountsFile: {
@@ -31,9 +31,9 @@ func TestImportModelPreservesCanonicalPostingIDs(t *testing.T) {
 			{"checking", "Checking", "true"},
 		},
 		CheckpointsFile: {{"AccountId", "Balance", "ObservedAt"}},
-		PostingsFile: {
+		TransactionsFile: {
 			{"id", "name", "amount", "postedTime", "enabled"},
-			{postingID, "Pay", amount, "1785628800", "true"},
+			{transactionID, "Pay", amount, "1785628800", "true"},
 		},
 		RulesFile:          {{"id", "name", "amount", "frequency", "startDate", "enabled"}},
 		FIFile:             {{"instanceId"}},
@@ -45,8 +45,8 @@ func TestImportModelPreservesCanonicalPostingIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != postingID {
-		t.Fatalf("postings = %+v, want the canonical UUID preserved", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].ID != transactionID {
+		t.Fatalf("transactions = %+v, want the canonical UUID preserved", model.Transactions)
 	}
 }
 
@@ -79,7 +79,7 @@ func TestImportCheckpointsRequireInstants(t *testing.T) {
 			{"id", "name", "enabled"},
 			{"checking", "Checking", "true"},
 		},
-		PostingsFile: {
+		TransactionsFile: {
 			{"id", "name", "amount", "postedTime", "enabled"},
 		},
 		RulesFile:          {{"id", "name", "amount", "frequency", "startDate", "enabled"}},

@@ -100,7 +100,7 @@ export function transactionToDisplay(
 	const amount = literal ?? requested;
 	const claim = extra.claim;
 	return {
-		kind: "posting",
+		kind: "transaction",
 		id: row.id,
 		name: row.name || row.id,
 		amount: Math.max(0, amount ?? 0),
@@ -148,8 +148,8 @@ export function transactionToDisplay(
 
 /**
  * Narrow rule row to the display transaction the shared row views edit.
- * A rule is not a posting: kind marks the source table, cadence stays on
- * the rule row itself, and no posting lifecycle fields apply.
+ * A rule is not a transaction: kind marks the source table, cadence stays on
+ * the rule row itself, and no transaction lifecycle fields apply.
  */
 export function scheduleToDisplay(rule: Schedule): Transaction {
 	const literal = literalAmountOf(rule.amount);

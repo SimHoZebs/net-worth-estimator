@@ -1,5 +1,5 @@
 // Stable linked-transaction representation (FND-04). Links bind one
-// source-owner posting to one recipient-owned private copy through
+// source-owner transaction to one recipient-owned private copy through
 // immutable identities recorded in sharing_copies: the source transaction
 // ID, the deterministic link ID, the source revision observed at the last
 // authorized copy or refresh, the recipient owner, and the authorizing
@@ -22,7 +22,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const sharingLinkSelect = `c.link_id, c.source_owner_id, c.source_posting_id, c.source_revision, c.recipient_user_id, c.copy_posting_id, c.grant_audience_type, c.grant_audience_id, c.grant_reason, c.copied_at, c.refreshed_at`
+const sharingLinkSelect = `c.link_id, c.source_owner_id, c.source_transaction_id, c.source_revision, c.recipient_user_id, c.copy_transaction_id, c.grant_audience_type, c.grant_audience_id, c.grant_reason, c.copied_at, c.refreshed_at`
 
 func validSharingLinkID(id string) bool {
 	if !strings.HasPrefix(id, "link_") {
@@ -35,8 +35,8 @@ func validSharingLinkID(id string) bool {
 
 func scanSharingLinkRow(rows *sql.Rows) (store.SharingLink, error) {
 	var link store.SharingLink
-	if err := rows.Scan(&link.LinkID, &link.SourceOwnerID, &link.SourcePostingID, &link.SourceRevision,
-		&link.RecipientUserID, &link.CopyPostingID, &link.GrantAudience, &link.GrantAudienceID,
+	if err := rows.Scan(&link.LinkID, &link.SourceOwnerID, &link.SourceTransactionID, &link.SourceRevision,
+		&link.RecipientUserID, &link.CopyTransactionID, &link.GrantAudience, &link.GrantAudienceID,
 		&link.GrantReason, &link.CopiedAt, &link.RefreshedAt); err != nil {
 		return store.SharingLink{}, err
 	}
@@ -44,7 +44,7 @@ func scanSharingLinkRow(rows *sql.Rows) (store.SharingLink, error) {
 	// mismatch means the provenance row is corrupt, and dependents
 	// resolving links without a lookup would address a different link.
 	// The error carries no identities so a corrupt row is never enumerable.
-	if link.LinkID != store.SharingLinkID(link.SourceOwnerID, link.SourcePostingID, link.RecipientUserID) {
+	if link.LinkID != store.SharingLinkID(link.SourceOwnerID, link.SourceTransactionID, link.RecipientUserID) {
 		return store.SharingLink{}, fmt.Errorf("sharing link identity mismatch")
 	}
 	return link, nil
@@ -55,7 +55,7 @@ func scanSharingLinkRow(rows *sql.Rows) (store.SharingLink, error) {
 // Missing and foreign links both report ErrNotFound so link memory is not
 // enumerable across users.
 func (d *Database) querySharingLink(where string, args ...any) (store.SharingLink, error) {
-	rows, err := d.db.Query(`SELECT `+sharingLinkSelect+` FROM sharing_copies c JOIN postings p ON p.user_id = c.recipient_user_id AND p.id = c.copy_posting_id `+where,
+	rows, err := d.db.Query(`SELECT `+sharingLinkSelect+` FROM sharing_copies c JOIN transactions p ON p.user_id = c.recipient_user_id AND p.id = c.copy_transaction_id `+where,
 		args...)
 	if err != nil {
 		return store.SharingLink{}, err
@@ -74,11 +74,11 @@ func (d *Database) querySharingLink(where string, args ...any) (store.SharingLin
 // GetSharingLink resolves the stable link for one of the recipient's own
 // copies. It performs no source authorization check: the link is the
 // recipient's own provenance.
-func (d *Database) GetSharingLink(recipientID, copyPostingID string) (store.SharingLink, error) {
-	if !validSharingUserID(recipientID) || !validSharingPostingID(copyPostingID) {
+func (d *Database) GetSharingLink(recipientID, copyTransactionID string) (store.SharingLink, error) {
+	if !validSharingUserID(recipientID) || !validSharingTransactionID(copyTransactionID) {
 		return store.SharingLink{}, store.ErrNotFound
 	}
-	return d.querySharingLink(`WHERE c.recipient_user_id = ? AND c.copy_posting_id = ?`, recipientID, copyPostingID)
+	return d.querySharingLink(`WHERE c.recipient_user_id = ? AND c.copy_transaction_id = ?`, recipientID, copyTransactionID)
 }
 
 // GetSharingLinkByID resolves one of the recipient's links by its stable
@@ -94,39 +94,39 @@ func (d *Database) GetSharingLinkByID(linkID, recipientID string) (store.Sharing
 // findSharingCopy returns the recipient's existing copy for one
 // source-plus-recipient triple. Stale provenance whose copy row is gone
 // is dropped so a later accept mints a fresh copy under the same link.
-func (d *Database) findSharingCopy(ownerID, postingID, requesterID string) (types.Posting, bool, error) {
+func (d *Database) findSharingCopy(ownerID, transactionID, requesterID string) (types.Transaction, bool, error) {
 	var copyID string
-	err := d.db.QueryRow(`SELECT copy_posting_id FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_posting_id = ?`,
-		requesterID, ownerID, postingID).Scan(&copyID)
+	err := d.db.QueryRow(`SELECT copy_transaction_id FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_transaction_id = ?`,
+		requesterID, ownerID, transactionID).Scan(&copyID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return types.Posting{}, false, nil
+		return types.Transaction{}, false, nil
 	}
 	if err != nil {
-		return types.Posting{}, false, err
+		return types.Transaction{}, false, err
 	}
-	rows, err := d.db.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.user_id = ? AND p.id = ?`, requesterID, copyID)
+	rows, err := d.db.Query(`SELECT `+transactionSelect+` `+transactionJoins+` WHERE p.user_id = ? AND p.id = ?`, requesterID, copyID)
 	if err != nil {
-		return types.Posting{}, false, err
+		return types.Transaction{}, false, err
 	}
 	defer rows.Close()
 	if !rows.Next() {
 		// Stale provenance: close the exhausted rows before the nested
 		// cleanup write (single-connection store).
 		rows.Close()
-		if _, derr := d.db.Exec(`DELETE FROM sharing_copies WHERE recipient_user_id = ? AND copy_posting_id = ?`, requesterID, copyID); derr != nil {
-			return types.Posting{}, false, derr
+		if _, derr := d.db.Exec(`DELETE FROM sharing_copies WHERE recipient_user_id = ? AND copy_transaction_id = ?`, requesterID, copyID); derr != nil {
+			return types.Transaction{}, false, derr
 		}
-		return types.Posting{}, false, nil
+		return types.Transaction{}, false, nil
 	}
-	posting, err := scanPostingRow(rows)
+	transaction, err := scanTransactionRow(rows)
 	if err != nil {
-		return types.Posting{}, false, err
+		return types.Transaction{}, false, err
 	}
-	return posting, true, rows.Err()
+	return transaction, true, rows.Err()
 }
 
 // sharingLinkGrant names the concrete surviving grant for one authorized
-// source-plus-recipient triple, following the CheckSharedPostingAccess
+// source-plus-recipient triple, following the CheckSharedTransactionAccess
 // allow/deny order: the owner's own row, then a direct user grant, then a
 // group grant where both requester and source owner hold current
 // membership. When several group grants survive, the recorded one is the
@@ -134,20 +134,20 @@ func (d *Database) findSharingCopy(ownerID, postingID, requesterID string) (type
 // Callers invoke it only after an allow decision; a fallthrough means
 // consent changed mid-flight and fails closed with an error so no link
 // records an unauthorized grant.
-func (d *Database) sharingLinkGrant(ownerID, postingID, requesterID string) (string, string, string, error) {
+func (d *Database) sharingLinkGrant(ownerID, transactionID, requesterID string) (string, string, string, error) {
 	if requesterID == ownerID {
 		return store.SharingAudienceUser, ownerID, "owner", nil
 	}
 	var direct int
-	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = 'user' AND audience_id = ? AND intent = 'shared'`,
-		ownerID, postingID, requesterID).Scan(&direct); err != nil {
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_grants WHERE owner_user_id = ? AND transaction_id = ? AND audience_type = 'user' AND audience_id = ? AND intent = 'shared'`,
+		ownerID, transactionID, requesterID).Scan(&direct); err != nil {
 		return "", "", "", err
 	}
 	if direct > 0 {
 		return store.SharingAudienceUser, requesterID, "manual-user", nil
 	}
-	rows, err := d.db.Query(`SELECT audience_id FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = 'group' AND intent = 'shared' ORDER BY audience_id`,
-		ownerID, postingID)
+	rows, err := d.db.Query(`SELECT audience_id FROM sharing_grants WHERE owner_user_id = ? AND transaction_id = ? AND audience_type = 'group' AND intent = 'shared' ORDER BY audience_id`,
+		ownerID, transactionID)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -189,22 +189,22 @@ func (d *Database) sharingLinkGrant(ownerID, postingID, requesterID string) (str
 
 // RefreshSharingLink re-checks one of the recipient's links against live
 // authorization and source state and records the outcome on the link row.
-// It never writes the postings table: the recipient's copy and its edits
+// It never writes the transactions table: the recipient's copy and its edits
 // survive every outcome, and an unauthorized refresh exposes no source
 // content (not even the current revision). requestID is a client UUID: a
 // retry replays the recorded outcome. The link update commits before the
 // outcome key, so an interrupted refresh retries as a new execution
 // converging to current rather than replaying an unapplied outcome.
-func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID string) (store.SharingLinkRefresh, error) {
+func (d *Database) RefreshSharingLink(recipientID, copyTransactionID, requestID string) (store.SharingLinkRefresh, error) {
 	if err := checkSharingRequestID(requestID); err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
-	link, err := d.GetSharingLink(recipientID, copyPostingID)
+	link, err := d.GetSharingLink(recipientID, copyTransactionID)
 	if err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
 	if recorded, err := lookupSharingRequest(d.db, recipientID, requestID); err == nil {
-		if err := matchSharingRequest(recorded, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourcePostingID, "", "", link.LinkID); err != nil {
+		if err := matchSharingRequest(recorded, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourceTransactionID, "", "", link.LinkID); err != nil {
 			return store.SharingLinkRefresh{}, err
 		}
 		return decodeSharingResult[store.SharingLinkRefresh](recorded)
@@ -233,10 +233,10 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID stri
 		}
 		defer tx.Rollback()
 		if err := auditShareEvent(tx, link.SourceOwnerID, recipientID, store.SharingAuditLinkRefreshed,
-			link.SourcePostingID, "", "", link.LinkID, outcome.Status, requestID); err != nil {
+			link.SourceTransactionID, "", "", link.LinkID, outcome.Status, requestID); err != nil {
 			return store.SharingLinkRefresh{}, err
 		}
-		if err := recordSharingRequest(tx, recipientID, requestID, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourcePostingID, "", "", link.LinkID, outcome); err != nil {
+		if err := recordSharingRequest(tx, recipientID, requestID, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourceTransactionID, "", "", link.LinkID, outcome); err != nil {
 			_ = tx.Rollback()
 			if isUniqueViolation(err) {
 				return d.replaySharingRefresh(recipientID, requestID, link)
@@ -246,7 +246,7 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID stri
 		return outcome, tx.Commit()
 	}
 	var present int
-	if err := d.db.QueryRow(`SELECT COUNT(*) FROM postings WHERE user_id = ? AND id = ?`, link.SourceOwnerID, link.SourcePostingID).Scan(&present); err != nil {
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM transactions WHERE user_id = ? AND id = ?`, link.SourceOwnerID, link.SourceTransactionID).Scan(&present); err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
 	if present != 1 {
@@ -257,7 +257,7 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID stri
 		}
 		return finish(store.SharingLinkRefresh{Link: link, Status: store.SharingLinkSourceGone})
 	}
-	access, err := d.CheckSharedPostingAccess(link.SourceOwnerID, link.SourcePostingID, recipientID)
+	access, err := d.CheckSharedTransactionAccess(link.SourceOwnerID, link.SourceTransactionID, recipientID)
 	if err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
@@ -269,7 +269,7 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID stri
 		}
 		return finish(store.SharingLinkRefresh{Link: link, Status: store.SharingLinkUnauthorized})
 	}
-	source, err := d.ReadSharedPosting(link.SourceOwnerID, link.SourcePostingID, recipientID)
+	source, err := d.ReadSharedTransaction(link.SourceOwnerID, link.SourceTransactionID, recipientID)
 	if err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
@@ -277,7 +277,7 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID stri
 	if err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
-	audienceType, audienceID, reason, err := d.sharingLinkGrant(link.SourceOwnerID, link.SourcePostingID, recipientID)
+	audienceType, audienceID, reason, err := d.sharingLinkGrant(link.SourceOwnerID, link.SourceTransactionID, recipientID)
 	if err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
@@ -304,7 +304,7 @@ func (d *Database) replaySharingRefresh(recipientID, requestID string, link stor
 	if err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
-	if err := matchSharingRequest(recorded, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourcePostingID, "", "", link.LinkID); err != nil {
+	if err := matchSharingRequest(recorded, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourceTransactionID, "", "", link.LinkID); err != nil {
 		return store.SharingLinkRefresh{}, err
 	}
 	return decodeSharingResult[store.SharingLinkRefresh](recorded)

@@ -59,8 +59,8 @@ func qa03FeedItemIDs(feed map[string]any) []string {
 	for _, raw := range items {
 		item, _ := raw.(map[string]any)
 		owner, _ := item["ownerUserId"].(string)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		ids = append(ids, owner+"/"+id)
 	}
 	return ids
@@ -72,9 +72,9 @@ func qa03FeedCount(feed map[string]any) int {
 	return int(count)
 }
 
-func qa03FeedHas(feed map[string]any, owner, posting string) bool {
+func qa03FeedHas(feed map[string]any, owner, transaction string) bool {
 	for _, id := range qa03FeedItemIDs(feed) {
-		if id == owner+"/"+posting {
+		if id == owner+"/"+transaction {
 			return true
 		}
 	}
@@ -90,8 +90,8 @@ func qa03FeedAgrees(t *testing.T, feed map[string]any) {
 	}
 	for _, raw := range items {
 		item, _ := raw.(map[string]any)
-		if item["sourceDisplayName"] == "" || item["audiences"] == nil || item["posting"] == nil {
-			t.Fatalf("feed item = %+v, want named source with audiences and posting", item)
+		if item["sourceDisplayName"] == "" || item["audiences"] == nil || item["transaction"] == nil {
+			t.Fatalf("feed item = %+v, want named source with audiences and transaction", item)
 		}
 	}
 }
@@ -127,8 +127,8 @@ func qa03PolicyBody(enabled bool, accounts string, start, end string) string {
 // remains.
 func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 	social := qa03SocialSetup(t)
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
-	qa03MustPosting(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", qa03MatrixDay)
 	groupID := qa03MatrixGroup(t, social)
 
 	// No policy yet: both feeds are empty but well-formed.
@@ -169,7 +169,7 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 	if qa03FeedCount(deniedFeed) != 0 {
 		t.Fatalf("member feed = %d, want 0 after disabling", qa03FeedCount(deniedFeed))
 	}
-	denied := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/postings/"+qa03Resource(social.owner)+"/"+qa03SharedGroceries, "qa03-member", "")
+	denied := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/transactions/"+qa03Resource(social.owner)+"/"+qa03SharedGroceries, "qa03-member", "")
 	if denied.Code != http.StatusNotFound {
 		t.Fatalf("disabled-policy read = %d, want 404", denied.Code)
 	}
@@ -185,17 +185,17 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 
 	// Re-enable on checking, then delete a second account mid-policy: the
 	// feed follows to what remains without touching the survivor.
-	// Deleting an account its postings still reference is refused first
+	// Deleting an account its transactions still reference is refused first
 	// (fail-closed with the referencing row named); only the unused
 	// account deletes and strips the policy.
 	if _, err := social.ownerSC.CreateAccount(types.Account{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	savings := "savings"
-	savingsPosting := "01900000-0000-7000-8000-0000000000e5"
-	if _, err := social.ownerSC.CreatePosting(types.Posting{
-		ID: savingsPosting, Name: "Dues", SourceAccountID: &savings,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "5.00"}, Inputs: map[string]types.AmountInputBinding{}},
+	savingsTransaction := "01900000-0000-7000-8000-0000000000e5"
+	if _, err := social.ownerSC.CreateTransaction(types.Transaction{
+		ID: savingsTransaction, Name: "Dues", SourceAccountID: &savings,
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "5.00"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      qa03MatrixDay,
 		TransactionTime: qa03MatrixDay,
 		Enabled:         true,
@@ -205,9 +205,9 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 	qa03SetPolicy(t, social, "qa03-owner", groupID, qa03PolicyBody(true, `["checking","savings"]`, "2026-01-01", "2026-12-31"), http.StatusOK)
 	preview := qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/policies/"+groupID+"/preview", "qa03-owner",
 		qa03PolicyBody(true, `["checking","savings"]`, "2026-01-01", "2026-12-31")), http.StatusOK)
-	eligible, _ := preview["preview"].(map[string]any)["eligiblePostings"].(float64)
+	eligible, _ := preview["preview"].(map[string]any)["eligibleTransactions"].(float64)
 	if int(eligible) != 3 {
-		t.Fatalf("preview = %+v, want 3 eligible postings", preview["preview"])
+		t.Fatalf("preview = %+v, want 3 eligible transactions", preview["preview"])
 	}
 	if got := qa03FeedCount(qa03MatrixFeed(t, social, "qa03-member", groupID)); got != 3 {
 		t.Fatalf("member feed = %d, want 3 across both accounts", got)
@@ -219,15 +219,15 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 		t.Fatalf("member feed = %+v, want 3 unchanged after the refused deletion", qa03FeedItemIDs(refused))
 	}
 
-	// With its posting gone the account deletes, the policy strips to the
+	// With its transaction gone the account deletes, the policy strips to the
 	// survivor, and the feed follows.
-	if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+savingsPosting, ""); response.Code != http.StatusOK {
-		t.Fatalf("delete posting = %d %s", response.Code, response.Body.String())
+	if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+savingsTransaction, ""); response.Code != http.StatusOK {
+		t.Fatalf("delete transaction = %d %s", response.Code, response.Body.String())
 	}
 	qa03DeleteOwnerAccount(t, social, "savings", true)
 	after := qa03MatrixFeed(t, social, "qa03-member", groupID)
 	qa03FeedAgrees(t, after)
-	if qa03FeedCount(after) != 2 || qa03FeedHas(after, social.owner, savingsPosting) {
+	if qa03FeedCount(after) != 2 || qa03FeedHas(after, social.owner, savingsTransaction) {
 		t.Fatalf("member feed = %+v, want the 2 checking rows after the account deletion", qa03FeedItemIDs(after))
 	}
 	stored, err := social.db.GetSharingPolicy(social.owner, groupID)
@@ -244,7 +244,7 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 	// accounts, and it matches nothing.
 	for _, id := range []string{qa03SharedGroceries, qa03SharedFuel} {
 		if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+id, ""); response.Code != http.StatusOK {
-			t.Fatalf("delete posting %s = %d %s", id, response.Code, response.Body.String())
+			t.Fatalf("delete transaction %s = %d %s", id, response.Code, response.Body.String())
 		}
 	}
 	qa03DeleteOwnerAccount(t, social, "checking", true)
@@ -264,16 +264,16 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 // (own rows) and the excluded viewer alike.
 func TestQA03ExclusionsAgreeForExcluderAndViewer(t *testing.T) {
 	social := qa03SocialSetup(t)
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
-	qa03MustPosting(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", qa03MatrixDay)
 	groupID := qa03MatrixGroup(t, social)
 	qa03SetPolicy(t, social, "qa03-owner", groupID, qa03PolicyBody(true, `["checking"]`, "2026-01-01", "2026-12-31"), http.StatusOK)
 
-	detail := func(subject, posting string, want int) {
+	detail := func(subject, transaction string, want int) {
 		t.Helper()
-		got := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/postings/"+qa03Resource(social.owner)+"/"+posting, subject, "")
+		got := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/transactions/"+qa03Resource(social.owner)+"/"+transaction, subject, "")
 		if got.Code != want {
-			t.Fatalf("detail %s/%s = %d, want %d", subject, posting, got.Code, want)
+			t.Fatalf("detail %s/%s = %d, want %d", subject, transaction, got.Code, want)
 		}
 	}
 	check := func(step string, ownerCount, memberCount int) {
@@ -286,15 +286,15 @@ func TestQA03ExclusionsAgreeForExcluderAndViewer(t *testing.T) {
 			t.Fatalf("%s: feeds = %d/%d, want %d/%d", step, qa03FeedCount(ownerFeed), qa03FeedCount(memberFeed), ownerCount, memberCount)
 		}
 	}
-	exclude := func(posting, audienceType, audienceID string) {
+	exclude := func(transaction, audienceType, audienceID string) {
 		t.Helper()
 		qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/exclusions", "qa03-owner",
-			`{"postingId":`+qa03Quote(posting)+`,"audienceType":`+qa03Quote(audienceType)+`,"audienceId":`+qa03Quote(audienceID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+			`{"transactionId":`+qa03Quote(transaction)+`,"audienceType":`+qa03Quote(audienceType)+`,"audienceId":`+qa03Quote(audienceID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
 	}
-	unexclude := func(posting, audienceType, audienceID string) {
+	unexclude := func(transaction, audienceType, audienceID string) {
 		t.Helper()
 		qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodDelete, "/v1/shared/exclusions", "qa03-owner",
-			`{"postingId":`+qa03Quote(posting)+`,"audienceType":`+qa03Quote(audienceType)+`,"audienceId":`+qa03Quote(audienceID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
+			`{"transactionId":`+qa03Quote(transaction)+`,"audienceType":`+qa03Quote(audienceType)+`,"audienceId":`+qa03Quote(audienceID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
 	}
 
 	check("baseline", 2, 2)

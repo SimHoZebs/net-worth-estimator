@@ -10,7 +10,7 @@ import (
 
 func transferTransaction(id, account, provider, description, amount string, day int) types.AnalysisTransaction {
 	return types.AnalysisTransaction{
-		PostingID: id, AccountID: account, SourceProvider: provider,
+		TransactionID: id, AccountID: account, SourceProvider: provider,
 		Facts: types.TransactionFacts{
 			Description: description, Amount: amount, Currency: "USD",
 			PostedTime: time.Date(2026, time.January, day, 12, 0, 0, 0, time.UTC).Unix(),
@@ -39,7 +39,7 @@ func TestTransferCreditCardPaymentPair(t *testing.T) {
 	}
 	byID := map[string]types.AnalysisDetection{}
 	for _, item := range result {
-		byID[item.PostingID] = item
+		byID[item.TransactionID] = item
 	}
 	outflow, inflow := byID["checking-leg"], byID["card-leg"]
 	if outflow.Role != "outflow" || inflow.Role != "inflow" {
@@ -49,11 +49,11 @@ func TestTransferCreditCardPaymentPair(t *testing.T) {
 		if item.Kind != "transfer" || item.Strength != "strong" || item.Product != "internal-transfer" {
 			t.Fatalf("finding=%+v", item)
 		}
-		if len(item.Evidence) != 1 || item.Evidence[0].Code != "transfer.exact-leg-match" || len(item.Evidence[0].PostingIDs) != 2 {
+		if len(item.Evidence) != 1 || item.Evidence[0].Code != "transfer.exact-leg-match" || len(item.Evidence[0].TransactionIDs) != 2 {
 			t.Fatalf("evidence=%+v", item)
 		}
 	}
-	if outflow.Evidence[0].PostingIDs[1] != "card-leg" || inflow.Evidence[0].PostingIDs[1] != "checking-leg" {
+	if outflow.Evidence[0].TransactionIDs[1] != "card-leg" || inflow.Evidence[0].TransactionIDs[1] != "checking-leg" {
 		t.Fatalf("legs do not reference each other: %+v", result)
 	}
 }
@@ -120,9 +120,9 @@ func TestTransferAmbiguousLegsStayForReview(t *testing.T) {
 	}
 	byID := map[string]types.AnalysisDetection{}
 	for _, item := range result {
-		byID[item.PostingID] = item
+		byID[item.TransactionID] = item
 	}
-	if len(byID["out"].Evidence[0].PostingIDs) != 3 {
+	if len(byID["out"].Evidence[0].TransactionIDs) != 3 {
 		t.Fatalf("outflow evidence=%+v", byID["out"])
 	}
 }

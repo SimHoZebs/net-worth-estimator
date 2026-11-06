@@ -16,9 +16,9 @@ type PatternToExistingSchedulePreview struct {
 	Assignments  []PatternOccurrence `json:"assignments,omitempty"`
 }
 
-// PostingClaimUpdate sets one posting's occurrence claim. The schedule and date
+// TransactionClaimUpdate sets one transaction's occurrence claim. The schedule and date
 // must name a real scheduled occurrence; validation rejects anything else.
-type PostingClaimUpdate struct {
-	PostingID string       `json:"postingId"`
-	Claim     PostingClaim `json:"claim"`
+type TransactionClaimUpdate struct {
+	TransactionID string           `json:"transactionId"`
+	Claim         TransactionClaim `json:"claim"`
 }

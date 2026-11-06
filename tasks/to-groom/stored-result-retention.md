@@ -39,6 +39,6 @@ There is no alternate case, so nothing is "base". The single calculated path is 
 - Purchase-planner doc: `docs/purchase-queue.md:88` says projection schedule.
 - Tests pinning the strings move with the copy: `frontend/tests/financialIndependence.spec.ts:104,220,236,252,406`, `frontend/src/pages/evaluations/FinancialIndependenceCard.test.tsx:285,302,308`, `frontend/src/domain/chart.test.ts:36`.
 - Deferred prose moves too: `tasks/to-groom/range-stream-ownership.md:5`.
-- Two backend comments move with the vocabulary (`backend/internal/domain/transitions.go:194`, `backend/internal/domain/posting_loss_test.go:13`); identifiers stay.
+- Two backend comments move with the vocabulary (`backend/internal/domain/transitions.go:194`, `backend/internal/domain/transaction_loss_test.go:13`); identifiers stay.
 
 Acceptance: prose, interface, and test searches for the retired term return only storage and wire identifiers; the displayed-names coverage in `frontend/tests/workspace.spec.ts` and the evaluation unit tests pass on the new strings.

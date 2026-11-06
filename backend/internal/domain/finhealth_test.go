@@ -10,14 +10,14 @@ func finHealthStrPtr(value string) *string { return &value }
 
 func finHealthFloat(value float64) *float64 { return &value }
 
-func finHealthLiteralPosting(id, name string, source *string, destinations []string, amount, day string) types.Posting {
+func finHealthLiteralTransaction(id, name string, source *string, destinations []string, amount, day string) types.Transaction {
 	stamp := midnightUnix(day)
-	return types.Posting{
+	return types.Transaction{
 		ID:              id,
 		Name:            name,
 		SourceAccountID: source,
 		Destinations:    destinations,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}},
 		PostedTime:      stamp,
 		TransactionTime: stamp,
 		Enabled:         true,
@@ -35,13 +35,13 @@ func finHealthFixture() (*types.FinancialModel, *types.CurrentPosition) {
 		PaymentTerms: []types.PaymentTerms{
 			{AccountID: "card", MinimumFixed: 50, MinimumPercent: finHealthFloat(0.02), DueDay: 15},
 		},
-		Postings: []types.Posting{
-			finHealthLiteralPosting("pay-aug", "Pay", nil, []string{"checking"}, "3000", "2026-08-15"),
-			finHealthLiteralPosting("pay-sep", "Pay", nil, []string{"checking"}, "3000", "2026-09-15"),
-			finHealthLiteralPosting("pay-oct", "Pay", nil, []string{"checking"}, "3000", "2026-10-15"),
-			finHealthLiteralPosting("rent-aug", "Rent", &checking, nil, "1500", "2026-08-05"),
-			finHealthLiteralPosting("rent-sep", "Rent", &checking, nil, "1500", "2026-09-05"),
-			finHealthLiteralPosting("rent-oct", "Rent", &checking, nil, "1500", "2026-10-05"),
+		Transactions: []types.Transaction{
+			finHealthLiteralTransaction("pay-aug", "Pay", nil, []string{"checking"}, "3000", "2026-08-15"),
+			finHealthLiteralTransaction("pay-sep", "Pay", nil, []string{"checking"}, "3000", "2026-09-15"),
+			finHealthLiteralTransaction("pay-oct", "Pay", nil, []string{"checking"}, "3000", "2026-10-15"),
+			finHealthLiteralTransaction("rent-aug", "Rent", &checking, nil, "1500", "2026-08-05"),
+			finHealthLiteralTransaction("rent-sep", "Rent", &checking, nil, "1500", "2026-09-05"),
+			finHealthLiteralTransaction("rent-oct", "Rent", &checking, nil, "1500", "2026-10-05"),
 		},
 	}
 	position := &types.CurrentPosition{
@@ -110,7 +110,7 @@ func TestEvaluateFinancialHealthMeetingFixture(t *testing.T) {
 			t.Fatalf("%s = %q, want %q", checkID, got, status)
 		}
 	}
-	if report.FlowCoverage.WindowPostings != 6 || report.FlowCoverage.ResolvedPostings != 6 || report.FlowCoverage.ExcludedPostings != 0 {
+	if report.FlowCoverage.WindowTransactions != 6 || report.FlowCoverage.ResolvedTransactions != 6 || report.FlowCoverage.ExcludedTransactions != 0 {
 		t.Fatalf("coverage = %+v, want 6 considered and resolved", report.FlowCoverage)
 	}
 	if report.FlowCoverage.InflowTotal != 9000 || report.FlowCoverage.OutflowTotal != 4500 {
@@ -152,7 +152,7 @@ func TestEvaluateFinancialHealthAdjustableStandards(t *testing.T) {
 
 func TestEvaluateFinancialHealthInsufficientData(t *testing.T) {
 	model, position := finHealthFixture()
-	model.Postings = nil
+	model.Transactions = nil
 	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
 	for _, checkID := range []string{
 		types.FinancialHealthCheckEmergencyCoverage,
@@ -174,51 +174,51 @@ func TestEvaluateFinancialHealthExclusions(t *testing.T) {
 	model, position := finHealthFixture()
 	checking := "checking"
 	stamp := midnightUnix("2026-09-10")
-	model.Postings = append(model.Postings,
+	model.Transactions = append(model.Transactions,
 		// Unresolvable descriptor: counted, never silently dropped.
-		types.Posting{
+		types.Transaction{
 			ID: "mystery", Name: "Mystery", Destinations: []string{"checking"},
-			Amount:          types.PostingAmountResolution{Resolver: "does-not-exist"},
+			Amount:          types.TransactionAmountResolution{Resolver: "does-not-exist"},
 			PostedTime:      stamp,
 			TransactionTime: stamp,
 			Enabled:         true,
 		},
 		// Never moved balances: pending, void, disabled.
-		types.Posting{
+		types.Transaction{
 			ID: "pending", Name: "Pending", SourceAccountID: &checking,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
 			PostedTime:      stamp,
 			TransactionTime: stamp,
 			Enabled:         true,
 			Pending:         true,
 		},
-		types.Posting{
+		types.Transaction{
 			ID: "voided", Name: "Voided", SourceAccountID: &checking,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
 			PostedTime:      stamp,
 			TransactionTime: stamp,
 			Enabled:         true,
 			Void:            true,
 		},
-		types.Posting{
+		types.Transaction{
 			ID: "off", Name: "Off", SourceAccountID: &checking,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
 			PostedTime:      stamp,
 			TransactionTime: stamp,
 		},
 		// Internal transfer: not income or spending.
-		types.Posting{
+		types.Transaction{
 			ID: "move", Name: "Move", SourceAccountID: &checking, Destinations: []string{"checking"},
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}},
 			PostedTime:      stamp,
 			TransactionTime: stamp,
 			Enabled:         true,
 		},
 		// Outside the window.
-		finHealthLiteralPosting("old", "Old", &checking, nil, "999", "2026-01-05"),
+		finHealthLiteralTransaction("old", "Old", &checking, nil, "999", "2026-01-05"),
 	)
 	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
-	if report.FlowCoverage.WindowPostings != 7 || report.FlowCoverage.ResolvedPostings != 6 || report.FlowCoverage.ExcludedPostings != 1 {
+	if report.FlowCoverage.WindowTransactions != 7 || report.FlowCoverage.ResolvedTransactions != 6 || report.FlowCoverage.ExcludedTransactions != 1 {
 		t.Fatalf("coverage = %+v, want 7/6/1", report.FlowCoverage)
 	}
 	if len(report.FlowCoverage.ExcludedIDs) != 1 || report.FlowCoverage.ExcludedIDs[0] != "mystery" {
@@ -235,9 +235,9 @@ func TestEvaluateFinancialHealthExcludesStatefulAmounts(t *testing.T) {
 	stamp := midnightUnix("2026-09-10")
 	// Resolves cleanly against as-of balances (9000) but describes no
 	// recorded flow: live-balance providers must be excluded evidence.
-	model.Postings = append(model.Postings, types.Posting{
+	model.Transactions = append(model.Transactions, types.Transaction{
 		ID: "live-balance", Name: "Live", SourceAccountID: &checking,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "balance"},
 			Inputs: map[string]types.AmountInputBinding{
@@ -249,7 +249,7 @@ func TestEvaluateFinancialHealthExcludesStatefulAmounts(t *testing.T) {
 		Enabled:         true,
 	})
 	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
-	if report.FlowCoverage.ExcludedPostings != 1 || report.FlowCoverage.ExcludedIDs[0] != "live-balance" {
+	if report.FlowCoverage.ExcludedTransactions != 1 || report.FlowCoverage.ExcludedIDs[0] != "live-balance" {
 		t.Fatalf("coverage = %+v, want live-balance excluded", report.FlowCoverage)
 	}
 	if report.FlowCoverage.OutflowTotal != 4500 {
@@ -271,12 +271,12 @@ func TestEvaluateFinancialHealthSpendingBands(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			model, position := finHealthFixture()
 			checking := "checking"
-			postings := model.Postings[:3]
+			transactions := model.Transactions[:3]
 			days := []string{"2026-08-05", "2026-09-05", "2026-10-05"}
 			for index, amount := range testCase.amounts {
-				postings = append(postings, finHealthLiteralPosting("rent-"+days[index], "Rent", &checking, nil, amount, days[index]))
+				transactions = append(transactions, finHealthLiteralTransaction("rent-"+days[index], "Rent", &checking, nil, amount, days[index]))
 			}
-			model.Postings = postings
+			model.Transactions = transactions
 			report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
 			if got := finHealthCheckByID(report, types.FinancialHealthCheckSpendingConsistency).Status; got != testCase.want {
 				t.Fatalf("consistency = %q, want %q", got, testCase.want)

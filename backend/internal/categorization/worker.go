@@ -8,16 +8,16 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-// Database discovers users with bank postings. The worker never sees raw
+// Database discovers users with bank transactions. The worker never sees raw
 // credentials or another user's scope.
 type Database interface {
 	ListCategoryUsers() ([]string, error)
 	User(string) (store.Store, error)
 }
 
-// Worker fills uncategorized bank postings in the background. It scans durable
+// Worker fills uncategorized bank transactions in the background. It scans durable
 // rows instead of keeping a queue: an interrupted run resumes on the next tick,
-// and a deleted posting simply stops appearing as a candidate.
+// and a deleted transaction simply stops appearing as a candidate.
 type Worker struct {
 	database   Database
 	classifier Classifier
@@ -34,7 +34,7 @@ func NewWorker(database Database, classifier Classifier) (*Worker, error) {
 	return &Worker{database: database, classifier: classifier}, nil
 }
 
-// RunOnce is also the deterministic test seam. One failed user or posting does
+// RunOnce is also the deterministic test seam. One failed user or transaction does
 // not block the rest.
 func (w *Worker) RunOnce(ctx context.Context) error {
 	users, err := w.database.ListCategoryUsers()
@@ -61,17 +61,17 @@ func (w *Worker) RunOnce(ctx context.Context) error {
 }
 
 func (w *Worker) runUser(ctx context.Context, scoped store.Store) error {
-	candidates, err := scoped.ListPostingCategoryCandidates(100)
+	candidates, err := scoped.ListTransactionCategoryCandidates(100)
 	if err != nil || len(candidates) == 0 {
 		return err
 	}
 	inputs := make([]Input, len(candidates))
 	for index, candidate := range candidates {
 		inputs[index] = Input{
-			PostingID: candidate.PostingID,
-			Name:      candidate.Name,
-			Direction: candidate.Direction,
-			Facts:     candidate.Facts,
+			TransactionID: candidate.TransactionID,
+			Name:          candidate.Name,
+			Direction:     candidate.Direction,
+			Facts:         candidate.Facts,
 		}
 	}
 	work, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -80,8 +80,8 @@ func (w *Worker) runUser(ctx context.Context, scoped store.Store) error {
 	if err != nil {
 		return err
 	}
-	for postingID, category := range results {
-		if err := scoped.SetInferredPostingCategory(postingID, category, w.classifier.Version()); err != nil && !store.IsNotFound(err) {
+	for transactionID, category := range results {
+		if err := scoped.SetInferredTransactionCategory(transactionID, category, w.classifier.Version()); err != nil && !store.IsNotFound(err) {
 			return err
 		}
 	}

@@ -50,7 +50,7 @@ describe("isolated purchase evaluation", () => {
 		const model = fixtureModel();
 		model.checkpoints = [];
 		model.schedules = [];
-		model.postings = [
+		model.transactions = [
 			{
 				id: "real",
 				name: "Real",
@@ -104,7 +104,7 @@ describe("isolated purchase evaluation", () => {
 			financialIndependence: [],
 			netWorthThreshold: [],
 			accountBalance: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 		};
 		expect(() =>
 			purchaseEvaluationResult(tables, PURCHASE_EVALUATIONS),
@@ -161,7 +161,7 @@ describe("isolated purchase evaluation", () => {
 					financialIndependence: [],
 					netWorthThreshold: [],
 					accountBalance: [],
-					postingFulfillment: [],
+					transactionFulfillment: [],
 				};
 				if (request.settings.evaluations.plannedPurchases?.length) {
 					purchasesCalls += 1;

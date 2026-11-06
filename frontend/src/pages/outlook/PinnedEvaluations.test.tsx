@@ -57,7 +57,7 @@ beforeEach(() => {
 const funding: OtherEvaluation = {
 	id: "funding",
 	name: "Test evaluation",
-	type: "postingFulfillment",
+	type: "transactionFulfillment",
 	enabled: true,
 	status: "satisfied",
 	goal: null,
@@ -65,7 +65,7 @@ const funding: OtherEvaluation = {
 	outcomeText: "Test outcome",
 	qualifier: null,
 	progress: null,
-	postingIds: null,
+	transactionIds: null,
 };
 
 function mockState(input: {

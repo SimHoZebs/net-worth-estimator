@@ -62,13 +62,13 @@ export function FundingGapsCard({
 									transactions,
 									startDate,
 									projection,
-									postingIds: item.postingIds,
+									transactionIds: item.transactionIds,
 								})
 							: [],
 					),
 		[
 			item.enabled,
-			item.postingIds,
+			item.transactionIds,
 			accounts,
 			transactions,
 			startDate,

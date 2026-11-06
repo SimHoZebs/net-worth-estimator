@@ -21,7 +21,7 @@ function model(balance = 100): FinancialModel {
 	return {
 		sourcePath: "",
 		accounts: [],
-		postings: [],
+		transactions: [],
 		schedules: [],
 		checkpoints: [
 			{ AccountId: "cash", Balance: balance, observedAt: 1767311999 },
@@ -29,7 +29,7 @@ function model(balance = 100): FinancialModel {
 		evaluations: {
 			financialIndependence: [],
 			netWorthThreshold: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 			cycleFulfillment: [],
 			accountBalance: [],
 		},

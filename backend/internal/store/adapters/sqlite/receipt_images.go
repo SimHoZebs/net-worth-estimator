@@ -72,7 +72,7 @@ func (s *sqliteStore) GetReceiptImage(ctx context.Context, id string) (types.Rec
 }
 
 // ReplaceReceiptImage atomically replaces pixels and clears all derived content.
-// The receipt identity and posting link remain stable. Metadata writes cannot
+// The receipt identity and transaction link remain stable. Metadata writes cannot
 // change images through SaveReceipt.
 func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expectedRevision int64, filename string, image types.ReceiptImage) (out types.Receipt, err error) {
 	image, err = validatedReceiptImage(image)
@@ -95,7 +95,7 @@ func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expect
 			return ErrReceiptConflict
 		}
 		var duplicates int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM receipts WHERE posting_id = ? AND digest = ? AND id != ? AND user_id = :user_id`, previous.PostingID, image.Digest, id).Scan(&duplicates); err != nil {
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM receipts WHERE transaction_id = ? AND digest = ? AND id != ? AND user_id = :user_id`, previous.TransactionID, image.Digest, id).Scan(&duplicates); err != nil {
 			return err
 		}
 		if duplicates > 0 {
@@ -125,13 +125,13 @@ func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expect
 		if err := check(tx); err != nil {
 			return err
 		}
-		posting, err := receiptPosting(tx, previous.PostingID)
+		transaction, err := receiptTransaction(tx, previous.TransactionID)
 		if err != nil {
 			return err
 		}
-		out = types.Receipt{ID: previous.ID, PostingID: previous.PostingID, CreatedAt: previous.CreatedAt,
+		out = types.Receipt{ID: previous.ID, TransactionID: previous.TransactionID, CreatedAt: previous.CreatedAt,
 			Filename: filename, MediaType: image.MediaType, Size: int64(len(image.Bytes)), Digest: image.Digest,
-			Revision: expectedRevision + 1, Status: "attached", PostingFingerprint: PostingReceiptFingerprint(posting)}
+			Revision: expectedRevision + 1, Status: "attached", TransactionFingerprint: TransactionReceiptFingerprint(transaction)}
 		data, err := json.Marshal(out)
 		if err != nil {
 			return err

@@ -3,7 +3,7 @@
 // every revision appends a version, accepted shares are never edited in
 // place, and every mutation is retry-safe through the social-operation
 // request-ID contract (FND-05) with explicit revision conflicts. Split
-// writes never touch postings, checkpoints, accounts, or balances, so
+// writes never touch transactions, checkpoints, accounts, or balances, so
 // acceptance moves no money.
 package sqlite
 
@@ -30,7 +30,7 @@ func splitSchemaStatements() []string {
 			split_id TEXT NOT NULL,
 			version INTEGER NOT NULL CHECK (version >= 1),
 			source_owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			source_posting_id TEXT NOT NULL,
+			source_transaction_id TEXT NOT NULL,
 			source_revision TEXT NOT NULL DEFAULT '',
 			initiator_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			currency TEXT NOT NULL,
@@ -40,7 +40,7 @@ func splitSchemaStatements() []string {
 			updated_at INTEGER NOT NULL,
 			PRIMARY KEY (split_id, version)
 		)`,
-		`CREATE INDEX IF NOT EXISTS splits_source ON splits(source_owner_id, source_posting_id)`,
+		`CREATE INDEX IF NOT EXISTS splits_source ON splits(source_owner_id, source_transaction_id)`,
 		`CREATE TABLE IF NOT EXISTS split_allocations (
 			split_id TEXT NOT NULL,
 			version INTEGER NOT NULL,
@@ -75,8 +75,8 @@ func validSplitID(id string) bool {
 // authorization read. Share math stays with domain.AllocateSplit (SOC-04A);
 // the store only persists its result.
 func checkSplitInput(input store.SplitInput) ([]store.SplitAllocation, error) {
-	if !validSharingUserID(input.SourceOwnerID) || !validSharingPostingID(input.SourcePostingID) {
-		return nil, fmt.Errorf("%w: source owner and posting must identify one transaction", store.ErrGroupInvalid)
+	if !validSharingUserID(input.SourceOwnerID) || !validSharingTransactionID(input.SourceTransactionID) {
+		return nil, fmt.Errorf("%w: source owner and transaction must identify one transaction", store.ErrGroupInvalid)
 	}
 	if !validSharingUserID(input.InitiatorID) {
 		return nil, fmt.Errorf("%w: initiator must be a user ID", store.ErrGroupInvalid)
@@ -107,12 +107,12 @@ func checkSplitInput(input store.SplitInput) ([]store.SplitAllocation, error) {
 }
 
 // authorizeSplitParticipants requires every participant to hold current
-// shared-posting access to the source. Failures report ErrNotFound without
+// shared-transaction access to the source. Failures report ErrNotFound without
 // naming who lacks access, so participant authorization never leaks who
 // can see the source transaction.
-func (d *Database) authorizeSplitParticipants(ownerID, postingID string, participants []string) error {
+func (d *Database) authorizeSplitParticipants(ownerID, transactionID string, participants []string) error {
 	for _, participant := range participants {
-		access, err := d.CheckSharedPostingAccess(ownerID, postingID, participant)
+		access, err := d.CheckSharedTransactionAccess(ownerID, transactionID, participant)
 		if err != nil {
 			return err
 		}
@@ -127,9 +127,9 @@ func (d *Database) authorizeSplitParticipants(ownerID, postingID string, partici
 // stable participant order.
 func querySplitVersion(db splitQuerier, splitID string, version int64) (store.Split, error) {
 	var split store.Split
-	err := db.QueryRow(`SELECT split_id, source_owner_id, source_posting_id, source_revision, initiator_id, currency, total_minor, version, status, created_at, updated_at
+	err := db.QueryRow(`SELECT split_id, source_owner_id, source_transaction_id, source_revision, initiator_id, currency, total_minor, version, status, created_at, updated_at
 		FROM splits WHERE split_id = ? AND version = ?`, splitID, version).Scan(
-		&split.ID, &split.SourceOwnerID, &split.SourcePostingID, &split.SourceRevision, &split.InitiatorID,
+		&split.ID, &split.SourceOwnerID, &split.SourceTransactionID, &split.SourceRevision, &split.InitiatorID,
 		&split.Currency, &split.TotalMinor, &split.Version, &split.Status, &split.CreatedAt, &split.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -185,9 +185,9 @@ func checkSplitReader(split store.Split, requesterID string) error {
 
 // insertSplitVersion appends one immutable version row plus its allocations.
 func insertSplitVersion(db splitQuerier, split store.Split, allocations []store.SplitAllocation, now int64) error {
-	if _, err := db.Exec(`INSERT INTO splits(split_id, version, source_owner_id, source_posting_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at)
+	if _, err := db.Exec(`INSERT INTO splits(split_id, version, source_owner_id, source_transaction_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		split.ID, split.Version, split.SourceOwnerID, split.SourcePostingID, split.SourceRevision,
+		split.ID, split.Version, split.SourceOwnerID, split.SourceTransactionID, split.SourceRevision,
 		split.InitiatorID, split.Currency, split.TotalMinor, split.Status, split.CreatedAt, now); err != nil {
 		return err
 	}
@@ -206,15 +206,15 @@ func insertSplitVersion(db splitQuerier, split store.Split, allocations []store.
 }
 
 // replaySplitCreate returns the recorded split for a retried creation key.
-// One key creates one split per source posting, so the replay matches on
+// One key creates one split per source transaction, so the replay matches on
 // action plus source target: a key reused for a different action or target
 // fails as a conflict.
-func (d *Database) replaySplitCreate(actorID, requestID, ownerID, postingID string) (store.Split, error) {
+func (d *Database) replaySplitCreate(actorID, requestID, ownerID, transactionID string) (store.Split, error) {
 	recorded, err := lookupSharingRequest(d.db, actorID, requestID)
 	if err != nil {
 		return store.Split{}, err
 	}
-	if recorded.Action != store.SharingAuditSplitCreated || recorded.OwnerUserID != ownerID || recorded.PostingID != postingID {
+	if recorded.Action != store.SharingAuditSplitCreated || recorded.OwnerUserID != ownerID || recorded.TransactionID != transactionID {
 		return store.Split{}, fmt.Errorf("%w: sharing request ID already completed a different action", store.ErrSharingConflict)
 	}
 	return decodeSharingResult[store.Split](recorded)
@@ -239,7 +239,7 @@ func (d *Database) replaySplitMutation(actorID, requestID, action, splitID strin
 	if err != nil {
 		return store.Split{}, err
 	}
-	if err := matchSharingRequest(recorded, action, current.SourceOwnerID, current.SourcePostingID, "", "", splitID); err != nil {
+	if err := matchSharingRequest(recorded, action, current.SourceOwnerID, current.SourceTransactionID, "", "", splitID); err != nil {
 		return store.Split{}, err
 	}
 	split, err := decodeSharingResult[store.Split](recorded)
@@ -274,15 +274,15 @@ func (d *Database) CreateSplit(actorID string, input store.SplitInput, requestID
 		return store.Split{}, fmt.Errorf("%w: only the initiator may create their split", store.ErrGroupForbidden)
 	}
 	if _, err := lookupSharingRequest(d.db, actorID, requestID); err == nil {
-		return d.replaySplitCreate(actorID, requestID, input.SourceOwnerID, input.SourcePostingID)
+		return d.replaySplitCreate(actorID, requestID, input.SourceOwnerID, input.SourceTransactionID)
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return store.Split{}, err
 	}
-	source, err := d.ReadSharedPosting(input.SourceOwnerID, input.SourcePostingID, actorID)
+	source, err := d.ReadSharedTransaction(input.SourceOwnerID, input.SourceTransactionID, actorID)
 	if err != nil {
 		return store.Split{}, err
 	}
-	if err := d.authorizeSplitParticipants(input.SourceOwnerID, input.SourcePostingID, input.ParticipantIDs); err != nil {
+	if err := d.authorizeSplitParticipants(input.SourceOwnerID, input.SourceTransactionID, input.ParticipantIDs); err != nil {
 		return store.Split{}, err
 	}
 	revision, err := store.SharingSourceRevision(source)
@@ -295,7 +295,7 @@ func (d *Database) CreateSplit(actorID string, input store.SplitInput, requestID
 	}
 	now := time.Now().Unix()
 	split := store.Split{
-		ID: id.String(), SourceOwnerID: input.SourceOwnerID, SourcePostingID: input.SourcePostingID,
+		ID: id.String(), SourceOwnerID: input.SourceOwnerID, SourceTransactionID: input.SourceTransactionID,
 		SourceRevision: revision, InitiatorID: input.InitiatorID, Currency: strings.ToUpper(strings.TrimSpace(input.Currency)),
 		TotalMinor: input.TotalMinor, Version: 1, Status: store.SplitStatusProposed,
 		Allocations: allocations, CreatedAt: now, UpdatedAt: now,
@@ -308,18 +308,18 @@ func (d *Database) CreateSplit(actorID string, input store.SplitInput, requestID
 	if err := insertSplitVersion(tx, split, allocations, now); err != nil {
 		return store.Split{}, fmt.Errorf("record split: %w", err)
 	}
-	if err := auditSplitEvent(tx, actorID, split.SourceOwnerID, store.SharingAuditSplitCreated, split.SourcePostingID, split.ID, store.SplitStatusProposed, requestID); err != nil {
+	if err := auditSplitEvent(tx, actorID, split.SourceOwnerID, store.SharingAuditSplitCreated, split.SourceTransactionID, split.ID, store.SplitStatusProposed, requestID); err != nil {
 		return store.Split{}, err
 	}
 	if err := recordSharingRequest(tx, actorID, requestID, store.SharingAuditSplitCreated,
-		split.SourceOwnerID, split.SourcePostingID, "", "", split.ID, split); err != nil {
+		split.SourceOwnerID, split.SourceTransactionID, "", "", split.ID, split); err != nil {
 		if isUniqueViolation(err) {
 			// A concurrent creation with the same key committed first:
 			// drop our rows and replay the winner's recording.
 			if rerr := tx.Rollback(); rerr != nil {
 				return store.Split{}, fmt.Errorf("record split: %v: %w", rerr, err)
 			}
-			return d.replaySplitCreate(actorID, requestID, input.SourceOwnerID, input.SourcePostingID)
+			return d.replaySplitCreate(actorID, requestID, input.SourceOwnerID, input.SourceTransactionID)
 		}
 		return store.Split{}, err
 	}
@@ -371,13 +371,13 @@ func (d *Database) UpdateSplit(actorID, splitID string, expectedVersion int64, i
 	if input.InitiatorID != current.InitiatorID {
 		return store.Split{}, fmt.Errorf("%w: a revision cannot change the split initiator", store.ErrGroupInvalid)
 	}
-	if input.SourceOwnerID != current.SourceOwnerID || input.SourcePostingID != current.SourcePostingID {
+	if input.SourceOwnerID != current.SourceOwnerID || input.SourceTransactionID != current.SourceTransactionID {
 		return store.Split{}, fmt.Errorf("%w: a revision cannot move a split to another transaction", store.ErrGroupInvalid)
 	}
-	if err := d.authorizeSplitParticipants(input.SourceOwnerID, input.SourcePostingID, input.ParticipantIDs); err != nil {
+	if err := d.authorizeSplitParticipants(input.SourceOwnerID, input.SourceTransactionID, input.ParticipantIDs); err != nil {
 		return store.Split{}, err
 	}
-	source, err := d.ReadSharedPosting(input.SourceOwnerID, input.SourcePostingID, actorID)
+	source, err := d.ReadSharedTransaction(input.SourceOwnerID, input.SourceTransactionID, actorID)
 	if err != nil {
 		return store.Split{}, err
 	}
@@ -387,7 +387,7 @@ func (d *Database) UpdateSplit(actorID, splitID string, expectedVersion int64, i
 	}
 	now := time.Now().Unix()
 	next := store.Split{
-		ID: splitID, SourceOwnerID: current.SourceOwnerID, SourcePostingID: current.SourcePostingID,
+		ID: splitID, SourceOwnerID: current.SourceOwnerID, SourceTransactionID: current.SourceTransactionID,
 		SourceRevision: revision, InitiatorID: current.InitiatorID, Currency: strings.ToUpper(strings.TrimSpace(input.Currency)),
 		TotalMinor: input.TotalMinor, Version: version + 1, Status: store.SplitStatusProposed,
 		Allocations: allocations, CreatedAt: current.CreatedAt, UpdatedAt: now,
@@ -413,11 +413,11 @@ func (d *Database) UpdateSplit(actorID, splitID string, expectedVersion int64, i
 		}
 		return store.Split{}, fmt.Errorf("record split revision: %w", err)
 	}
-	if err := auditSplitEvent(tx, actorID, next.SourceOwnerID, store.SharingAuditSplitUpdated, next.SourcePostingID, splitID, store.SplitStatusProposed, requestID); err != nil {
+	if err := auditSplitEvent(tx, actorID, next.SourceOwnerID, store.SharingAuditSplitUpdated, next.SourceTransactionID, splitID, store.SplitStatusProposed, requestID); err != nil {
 		return store.Split{}, err
 	}
 	if err := recordSharingRequest(tx, actorID, requestID, store.SharingAuditSplitUpdated,
-		next.SourceOwnerID, next.SourcePostingID, "", "", splitID, next); err != nil {
+		next.SourceOwnerID, next.SourceTransactionID, "", "", splitID, next); err != nil {
 		if isUniqueViolation(err) {
 			if rerr := tx.Rollback(); rerr != nil {
 				return store.Split{}, fmt.Errorf("record split revision: %v: %w", rerr, err)
@@ -510,7 +510,7 @@ func (d *Database) AcceptSplit(actorID, splitID string, expectedVersion int64, r
 		// version, so no audit row. The outcome key alone records that
 		// this request completed with the current version.
 		if err := recordSharingRequest(tx, actorID, requestID, store.SharingAuditSplitAccepted,
-			split.SourceOwnerID, split.SourcePostingID, "", "", splitID, split); err != nil {
+			split.SourceOwnerID, split.SourceTransactionID, "", "", splitID, split); err != nil {
 			if isUniqueViolation(err) {
 				if rerr := tx.Rollback(); rerr != nil {
 					return store.Split{}, fmt.Errorf("record split acceptance: %v: %w", rerr, err)
@@ -521,11 +521,11 @@ func (d *Database) AcceptSplit(actorID, splitID string, expectedVersion int64, r
 		}
 		return split, tx.Commit()
 	}
-	if err := auditSplitEvent(tx, actorID, split.SourceOwnerID, store.SharingAuditSplitAccepted, split.SourcePostingID, splitID, status, requestID); err != nil {
+	if err := auditSplitEvent(tx, actorID, split.SourceOwnerID, store.SharingAuditSplitAccepted, split.SourceTransactionID, splitID, status, requestID); err != nil {
 		return store.Split{}, err
 	}
 	if err := recordSharingRequest(tx, actorID, requestID, store.SharingAuditSplitAccepted,
-		split.SourceOwnerID, split.SourcePostingID, "", "", splitID, split); err != nil {
+		split.SourceOwnerID, split.SourceTransactionID, "", "", splitID, split); err != nil {
 		if isUniqueViolation(err) {
 			if rerr := tx.Rollback(); rerr != nil {
 				return store.Split{}, fmt.Errorf("record split acceptance: %v: %w", rerr, err)
@@ -646,27 +646,27 @@ func clearSplitsForUser(tx *userTx) error {
 	return nil
 }
 
-func auditSplitEvent(tx *sql.Tx, actorID, ownerID, action, postingID, splitID, status, requestID string) error {
+func auditSplitEvent(tx *sql.Tx, actorID, ownerID, action, transactionID, splitID, status, requestID string) error {
 	detail, err := json.Marshal(shareAuditDetail{Link: splitID, Status: status, RequestID: requestID})
 	if err != nil {
 		return err
 	}
-	return auditSharingRaw(tx, ownerID, actorID, action, postingID, "", "", "", string(detail))
+	return auditSharingRaw(tx, ownerID, actorID, action, transactionID, "", "", "", string(detail))
 }
 
 // ListSharingAudit returns the committed cross-user changes for one
-// owner-scoped posting in sequence order: consent rows (grant, revoke,
+// owner-scoped transaction in sequence order: consent rows (grant, revoke,
 // exclude, unexclude), accepted-copy and link-refresh rows, and
 // split-created, split-updated, and split-accepted rows. Audit reads are
 // owner-scoped like grant lists. Audience columns populate the consent
 // target; link, status, and request-key fields decode from the audit
 // detail payload, which other actions leave empty.
-func (d *Database) ListSharingAudit(ownerID, postingID string) ([]store.SharingAuditEvent, error) {
-	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
-		return nil, fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
+func (d *Database) ListSharingAudit(ownerID, transactionID string) ([]store.SharingAuditEvent, error) {
+	if !validSharingUserID(ownerID) || !validSharingTransactionID(transactionID) {
+		return nil, fmt.Errorf("%w: owner and transaction must identify one transaction", store.ErrGroupInvalid)
 	}
-	rows, err := d.db.Query(`SELECT id, actor_user_id, kind, owner_user_id, posting_id, audience_type, audience_id, group_id, detail_json, created_at FROM sharing_audit WHERE owner_user_id = ? AND posting_id = ? ORDER BY id`,
-		ownerID, postingID)
+	rows, err := d.db.Query(`SELECT id, actor_user_id, kind, owner_user_id, transaction_id, audience_type, audience_id, group_id, detail_json, created_at FROM sharing_audit WHERE owner_user_id = ? AND transaction_id = ? ORDER BY id`,
+		ownerID, transactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -675,7 +675,7 @@ func (d *Database) ListSharingAudit(ownerID, postingID string) ([]store.SharingA
 	for rows.Next() {
 		var event store.SharingAuditEvent
 		var groupID, detail string
-		if err := rows.Scan(&event.Seq, &event.ActorUserID, &event.Action, &event.OwnerUserID, &event.PostingID,
+		if err := rows.Scan(&event.Seq, &event.ActorUserID, &event.Action, &event.OwnerUserID, &event.TransactionID,
 			&event.Audience, &event.AudienceID, &groupID, &detail, &event.CreatedAt); err != nil {
 			return nil, err
 		}

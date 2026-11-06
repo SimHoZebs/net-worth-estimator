@@ -42,22 +42,22 @@ func existingRuleIntervalDays(frequency types.Frequency) (float64, bool) {
 }
 
 // PatternToExistingScheduleInput carries everything adding needs: the confirmed anchor
-// finding, all saved postings (for routing, taken dates, and validation),
+// finding, all saved transactions (for routing, taken dates, and validation),
 // the immutable source facts for display amounts, and the target rule.
 type PatternToExistingScheduleInput struct {
 	Anchor        types.AnalysisFinding
-	Postings      []types.Posting
+	Transactions  []types.Transaction
 	Facts         map[string]types.TransactionFacts
 	Rule          types.Schedule
 	OccurrenceIDs []string
 }
 
-// existingRulePostingDay derives the UTC calendar day for one posting, using
+// existingRuleTransactionDay derives the UTC calendar day for one transaction, using
 // transaction time with posted time as fallback.
-func existingRulePostingDay(posting types.Posting) (string, int64, error) {
-	stamp := posting.TransactionTime
+func existingRuleTransactionDay(transaction types.Transaction) (string, int64, error) {
+	stamp := transaction.TransactionTime
 	if stamp <= 0 {
-		stamp = posting.PostedTime
+		stamp = transaction.PostedTime
 	}
 	if stamp <= 0 {
 		return "", 0, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
@@ -80,18 +80,18 @@ func parsePatternAmount(raw string) (string, error) {
 	return strconv.FormatFloat(math.Round(amount*100)/100, 'f', 2, 64), nil
 }
 
-func existingRuleMatchesPosting(rule types.Schedule, posting types.Posting) bool {
-	if (rule.SourceAccountID == nil) != (posting.SourceAccountID == nil) {
+func existingRuleMatchesTransaction(rule types.Schedule, transaction types.Transaction) bool {
+	if (rule.SourceAccountID == nil) != (transaction.SourceAccountID == nil) {
 		return false
 	}
-	if rule.SourceAccountID != nil && *rule.SourceAccountID != *posting.SourceAccountID {
+	if rule.SourceAccountID != nil && *rule.SourceAccountID != *transaction.SourceAccountID {
 		return false
 	}
-	if len(rule.Destinations) != len(posting.Destinations) {
+	if len(rule.Destinations) != len(transaction.Destinations) {
 		return false
 	}
 	for i := range rule.Destinations {
-		if rule.Destinations[i] != posting.Destinations[i] {
+		if rule.Destinations[i] != transaction.Destinations[i] {
 			return false
 		}
 	}
@@ -130,9 +130,9 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	if !domain.IsValidIsoDate(rule.StartDate) {
 		return nil, fmt.Errorf("%w: rule schedule is unknown", ErrNoScheduleMatch)
 	}
-	byID := make(map[string]types.Posting, len(input.Postings))
-	for _, posting := range input.Postings {
-		byID[posting.ID] = posting
+	byID := make(map[string]types.Transaction, len(input.Transactions))
+	for _, transaction := range input.Transactions {
+		byID[transaction.ID] = transaction
 	}
 	type occurrence struct {
 		id    string
@@ -141,14 +141,14 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	}
 	occurrences := make([]occurrence, 0, len(input.OccurrenceIDs))
 	for _, id := range input.OccurrenceIDs {
-		posting, ok := byID[id]
-		if !ok || posting.Pending || posting.Void {
+		transaction, ok := byID[id]
+		if !ok || transaction.Pending || transaction.Void {
 			return nil, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
-		if !posting.Enabled {
+		if !transaction.Enabled {
 			return nil, fmt.Errorf("%w: a recorded movement is disabled", ErrPatternStale)
 		}
-		day, stamp, err := existingRulePostingDay(posting)
+		day, stamp, err := existingRuleTransactionDay(transaction)
 		if err != nil {
 			return nil, err
 		}
@@ -156,29 +156,29 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	}
 	first := byID[input.OccurrenceIDs[0]]
 	for _, item := range occurrences {
-		posting := byID[item.id]
-		if !equalRouting(posting, first) {
+		transaction := byID[item.id]
+		if !equalRouting(transaction, first) {
 			return nil, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
 		}
 	}
 	for _, item := range occurrences {
-		if !existingRuleMatchesPosting(rule, byID[item.id]) {
+		if !existingRuleMatchesTransaction(rule, byID[item.id]) {
 			return nil, ErrRoutingMismatch
 		}
 	}
-	// Dates already claimed by other postings are taken and never reused.
-	// Disabled postings claim nothing in projections, so their dates stay free.
+	// Dates already claimed by other transactions are taken and never reused.
+	// Disabled transactions claim nothing in projections, so their dates stay free.
 	taken := map[string]bool{}
-	for _, posting := range input.Postings {
-		if posting.Claim == nil || posting.Claim.ScheduleID != rule.ID {
+	for _, transaction := range input.Transactions {
+		if transaction.Claim == nil || transaction.Claim.ScheduleID != rule.ID {
 			continue
 		}
-		if !posting.Enabled {
+		if !transaction.Enabled {
 			continue
 		}
 		inPattern := false
 		for _, id := range input.OccurrenceIDs {
-			if id == posting.ID {
+			if id == transaction.ID {
 				inPattern = true
 				break
 			}
@@ -186,7 +186,7 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 		if inPattern {
 			continue
 		}
-		taken[posting.Claim.OccurrenceDate] = true
+		taken[transaction.Claim.OccurrenceDate] = true
 	}
 	// Already-correct claims stay put and reserve their dates.
 	used := map[string]bool{}
@@ -206,14 +206,14 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 		tolerance = 1
 	}
 	assignments := make([]types.PatternOccurrence, 0, len(occurrences))
-	amountOf := func(postingID string) string {
-		if facts, ok := input.Facts[postingID]; ok {
+	amountOf := func(transactionID string) string {
+		if facts, ok := input.Facts[transactionID]; ok {
 			if parsed, err := parsePatternAmount(facts.Amount); err == nil {
 				return parsed
 			}
 		}
-		if posting, ok := byID[postingID]; ok {
-			if expr, ok := posting.Amount.Config["expression"]; ok {
+		if transaction, ok := byID[transactionID]; ok {
+			if expr, ok := transaction.Amount.Config["expression"]; ok {
 				if s, ok := expr.(string); ok {
 					if parsed, err := parsePatternAmount(s); err == nil {
 						return parsed
@@ -249,7 +249,7 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 			}
 			if kept {
 				used[current.Claim.OccurrenceDate] = true
-				assignments = append(assignments, types.PatternOccurrence{PostingID: item.id, Date: current.Claim.OccurrenceDate, Amount: amountOf(item.id)})
+				assignments = append(assignments, types.PatternOccurrence{TransactionID: item.id, Date: current.Claim.OccurrenceDate, Amount: amountOf(item.id)})
 				continue
 			}
 		}
@@ -274,8 +274,8 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 			return nil, fmt.Errorf("%w: %s is %d days from its nearest free occurrence", ErrNoScheduleMatch, item.day, bestDiff)
 		}
 		used[best] = true
-		assignments = append(assignments, types.PatternOccurrence{PostingID: item.id, Date: best, Amount: amountOf(item.id)})
+		assignments = append(assignments, types.PatternOccurrence{TransactionID: item.id, Date: best, Amount: amountOf(item.id)})
 	}
-	sort.Slice(assignments, func(i, j int) bool { return assignments[i].PostingID < assignments[j].PostingID })
+	sort.Slice(assignments, func(i, j int) bool { return assignments[i].TransactionID < assignments[j].TransactionID })
 	return assignments, nil
 }

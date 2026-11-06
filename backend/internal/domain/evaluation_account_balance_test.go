@@ -163,8 +163,8 @@ func TestValidateFinancialModelFlagsDanglingAccountBalanceEvaluation(t *testing.
 		Accounts: []types.Account{
 			{ID: "checking", Name: "Checking", Enabled: true},
 		},
-		Checkpoints: []types.Checkpoint{},
-		Postings:    []types.Posting{},
+		Checkpoints:  []types.Checkpoint{},
+		Transactions: []types.Transaction{},
 		Evaluations: types.EvaluationTables{
 			AccountBalance: []types.BalanceEvaluation{{
 				InstanceID: "ghost-evaluation",

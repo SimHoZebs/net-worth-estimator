@@ -14,11 +14,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 # Independent one-time operator tools. Neither server nor setupdb imports them.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
-    -o /out/upgrade-posting-sim-split ./scripts/one-time/posting-sim-split
+    -o /out/upgrade-transaction-sim-split ./scripts/one-time/transaction-sim-split
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/upgrade-planned-purchases ./scripts/one-time/planned-purchases
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/simplefin-v2-keys ./scripts/one-time/simplefin-v2-keys
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/upgrade-transaction-rename ./scripts/one-time/transaction-rename
 
 FROM alpine:3.22
 

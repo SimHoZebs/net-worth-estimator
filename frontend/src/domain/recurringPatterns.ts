@@ -13,7 +13,7 @@ function evidenceIds(finding: AnalysisFinding): string[] {
 	const seen = new Set<string>();
 	const ordered: string[] = [];
 	for (const evidence of finding.evidence ?? [])
-		for (const id of evidence.postingIds ?? []) {
+		for (const id of evidence.transactionIds ?? []) {
 			if (id && !seen.has(id)) {
 				seen.add(id);
 				ordered.push(id);
@@ -46,8 +46,8 @@ export function groupRecurringPatterns(
 		const order = new Map(evidenceIds(head).map((id, index) => [id, index]));
 		const findings = [...group].sort(
 			(a, b) =>
-				(order.get(a.postingId) ?? Number.MAX_SAFE_INTEGER) -
-				(order.get(b.postingId) ?? Number.MAX_SAFE_INTEGER),
+				(order.get(a.transactionId) ?? Number.MAX_SAFE_INTEGER) -
+				(order.get(b.transactionId) ?? Number.MAX_SAFE_INTEGER),
 		);
 		const anchor = findings[0];
 		if (!anchor) return [];
@@ -74,7 +74,7 @@ export function patternTitle(
 	let best = "";
 	let bestCount = 0;
 	for (const finding of pattern.findings) {
-		const name = names.get(finding.postingId) ?? "";
+		const name = names.get(finding.transactionId) ?? "";
 		if (!name) continue;
 		const count = (counts.get(name) ?? 0) + 1;
 		counts.set(name, count);

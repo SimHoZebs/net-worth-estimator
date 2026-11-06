@@ -45,7 +45,7 @@ func replayChronologicalHistory(model *types.FinancialModel, projectionStartDate
 	return replayChronologicalHistoryAt(model, projectionStartDate, dayCloseUnix(projectionStartDate))
 }
 
-// historyEvent is the single unified replay input: either one posting/rule
+// historyEvent is the single unified replay input: either one transaction/rule
 // occurrence at its effective instant or one absolute observation. There
 // are no date-wide gates, no per-day phases, and no identity-suppression
 // maps: one sorted list, one forward pass.
@@ -53,22 +53,22 @@ type historyEvent struct {
 	instant       int64
 	isObservation bool
 	checkpoint    types.Checkpoint
-	occurrence    DatedPostingOccurrence
+	occurrence    DatedTransactionOccurrence
 	execDate      string
 	seq           int
 }
 
 // replayChronologicalHistoryAt replays one sorted event stream through the
 // cut instant. Every event at or before cutInstant replays; everything
-// after is future. Observations SET their account balance; postings CHANGE
+// after is future. Observations SET their account balance; transactions CHANGE
 // balances; a later observation SETS again and records the
 // observed-vs-modeled discrepancy.
 //
 //   - Recurrence instances take effect at the day-close instant of their
 //     date, so a rule at 23:59:59 executes BEFORE an observation at the
 //     same instant (movement before anchor preserves day-close meaning).
-//   - Every one-time posting carries its stored Unix time, including 00:00.
-//   - Postings execute before an observation on a tie; owner observations
+//   - Every one-time transaction carries its stored Unix time, including 00:00.
+//   - Transactions execute before an observation on a tie; owner observations
 //     execute last at the same instant.
 //   - Each account anchors independently. Observations sort by instant, so
 //     arrival order never matters and a backdated observation cannot roll
@@ -97,18 +97,18 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		}
 	}
 	var history ResolvedOccurrences
-	history = ResolveOccurrences(model.Schedules, model.Postings, earliestDay, projectionStartDate, true)
+	history = ResolveOccurrences(model.Schedules, model.Transactions, earliestDay, projectionStartDate, true)
 
 	events := []historyEvent{}
 	seq := 0
-	addedPosting := map[string]bool{}
+	addedTransaction := map[string]bool{}
 	for date, occurrences := range history.ByDate {
 		for _, occurrence := range occurrences {
 			// Enabled alone decides execution. Pending and void are
 			// stored provider lifecycle metadata; translation assigns
 			// them Enabled false, and the engine never reinterprets
 			// them here.
-			if !occurrence.Posting.Enabled {
+			if !occurrence.Transaction.Enabled {
 				continue
 			}
 			instant := EffectiveOccurrenceInstant(occurrence, date)
@@ -124,32 +124,32 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 			})
 			seq++
 			if occurrence.Rule == nil {
-				addedPosting[occurrence.Posting.ID] = true
+				addedTransaction[occurrence.Transaction.ID] = true
 			}
 		}
 	}
-	// Manual postings before the rule-expansion lower bound still replay:
+	// Manual transactions before the rule-expansion lower bound still replay:
 	// history has no lower bound for confirmed actuals, only the cut.
-	for index := range model.Postings {
-		posting := &model.Postings[index]
-		if addedPosting[posting.ID] {
+	for index := range model.Transactions {
+		transaction := &model.Transactions[index]
+		if addedTransaction[transaction.ID] {
 			continue
 		}
-		if !posting.Enabled {
+		if !transaction.Enabled {
 			continue
 		}
-		day := postingDay(posting)
+		day := transactionDay(transaction)
 		if day == "" || CompareIsoDates(day, projectionStartDate) > 0 {
 			continue
 		}
-		instant := PostingInstant(posting)
+		instant := TransactionInstant(transaction)
 		if instant <= 0 || instant > cutInstant {
 			continue
 		}
 		events = append(events, historyEvent{
 			instant:       instant,
 			isObservation: false,
-			occurrence:    DatedPostingOccurrence{Posting: posting, Index: 1000000 + index, Rule: nil, DocPath: []any{"postings", index}},
+			occurrence:    DatedTransactionOccurrence{Transaction: transaction, Index: 1000000 + index, Rule: nil, DocPath: []any{"transactions", index}},
 			execDate:      day,
 			seq:           seq,
 		})
@@ -184,7 +184,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 			}
 			return events[i].seq < events[j].seq
 		}
-		if tied := compareDatedPostingOccurrences(events[i].occurrence, events[j].occurrence); tied != 0 {
+		if tied := compareDatedTransactionOccurrences(events[i].occurrence, events[j].occurrence); tied != 0 {
 			return tied < 0
 		}
 		return events[i].seq < events[j].seq
@@ -192,20 +192,20 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 
 	transitions := CreateTransitionRuntime(types.SimulationInputs{
 		Accounts:         model.Accounts,
-		Postings:         model.Postings,
+		Transactions:     model.Transactions,
 		Schedules:        model.Schedules,
 		PaymentTerms:     model.PaymentTerms,
 		PlannedPurchases: model.PlannedPurchases,
 	}, SimulationState{
-		Balances:                     InitAccountBalances(model.Accounts),
-		LatestRealizedPostingAmounts: map[string]float64{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         InitAccountBalances(model.Accounts),
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 	}, projectionStartDate, nil)
 
 	latestObserved := map[string]types.Checkpoint{}
 	historicalSnapshots := []types.HistoricalObservationSnapshot{}
-	executeOccurrence := func(occurrence DatedPostingOccurrence, date string, historicalActual bool) error {
-		_, execErr := transitions.ExecutePosting(occurrence, date, historicalActual)
+	executeOccurrence := func(occurrence DatedTransactionOccurrence, date string, historicalActual bool) error {
+		_, execErr := transitions.ExecuteTransaction(occurrence, date, historicalActual)
 		if execErr != nil {
 			message := execErr.Error()
 			switch typed := execErr.(type) {
@@ -218,9 +218,9 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 			}
 			return &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
 				Severity: types.SeverityError,
-				Code:     "posting.history.execution",
-				Message: fmt.Sprintf("Could not replay posting '%s' on %s: %s",
-					occurrence.Posting.ID, date, message),
+				Code:     "transaction.history.execution",
+				Message: fmt.Sprintf("Could not replay transaction '%s' on %s: %s",
+					occurrence.Transaction.ID, date, message),
 				Path: occurrence.DocPath,
 			}}}
 		}
@@ -374,7 +374,7 @@ func PrepareSimulationRequest(model *types.FinancialModel, settings *types.Proje
 		Request: types.SimulationRequest{
 			Model: types.SimulationInputs{
 				Accounts:         effectiveModel.Accounts,
-				Postings:         effectiveModel.Postings,
+				Transactions:     effectiveModel.Transactions,
 				Schedules:        effectiveModel.Schedules,
 				PaymentTerms:     effectiveModel.PaymentTerms,
 				PlannedPurchases: effectiveModel.PlannedPurchases,

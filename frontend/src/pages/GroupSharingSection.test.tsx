@@ -87,7 +87,7 @@ function stubSharing(options?: {
 							startDate: input.startDate,
 							endDate: input.endDate || "",
 							version: 0,
-							eligiblePostings: 4,
+							eligibleTransactions: 4,
 							memberCount: 3,
 						} satisfies Record<string, unknown>),
 				});
@@ -95,16 +95,16 @@ function stubSharing(options?: {
 			if (path === "/v1/shared/grants") {
 				if (method === "DELETE") {
 					const input = body as Record<string, unknown>;
-					if ((options?.failRevoke ?? []).includes(String(input.postingId)))
+					if ((options?.failRevoke ?? []).includes(String(input.transactionId)))
 						return new Response("gone", { status: 404 });
 					const at = grants.findIndex(
 						(grant) =>
-							grant.postingId === input.postingId &&
+							grant.transactionId === input.transactionId &&
 							grant.audienceType === input.audienceType &&
 							grant.audienceId === input.audienceId,
 					);
 					if (at >= 0) grants.splice(at, 1);
-					return ok({ revoked: input.postingId });
+					return ok({ revoked: input.transactionId });
 				}
 				return ok({ grants });
 			}
@@ -223,7 +223,7 @@ it("stops sharing with everyone through the normal revocations", async () => {
 		grants: [
 			{
 				ownerUserId: "user:test",
-				postingId: "p1",
+				transactionId: "p1",
 				audienceType: "group",
 				audienceId: "g2",
 				intent: "shared",
@@ -250,7 +250,7 @@ it("stops sharing with everyone through the normal revocations", async () => {
 	);
 	expect(revocations).toHaveLength(1);
 	expect(revocations[0]?.body).toMatchObject({
-		postingId: "p1",
+		transactionId: "p1",
 		audienceType: "group",
 		audienceId: "g2",
 	});
@@ -271,7 +271,7 @@ it("tolerates an already-revoked grant when stopping", async () => {
 		grants: [
 			{
 				ownerUserId: "user:test",
-				postingId: "p1",
+				transactionId: "p1",
 				audienceType: "group",
 				audienceId: "g2",
 				intent: "shared",
@@ -279,7 +279,7 @@ it("tolerates an already-revoked grant when stopping", async () => {
 			},
 			{
 				ownerUserId: "user:test",
-				postingId: "p2",
+				transactionId: "p2",
 				audienceType: "group",
 				audienceId: "g2",
 				intent: "shared",

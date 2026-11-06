@@ -26,8 +26,8 @@ Is repeated full-model JSON serialization + hashing cheaper overall than transac
 
 ## Benchmark matrix
 
-- Models: 100 / 1,000 / 10,000 postings; vary accounts, recurrence rules, amount resolvers and evaluation configurations.
-- Workloads: repeated warm-cache reads; many single posting edits; a bank-sync batch with hundreds of updated transactions and **one** post-sync forecast request; evaluation-only changes; concurrent identical calls; cold process restart.
+- Models: 100 / 1,000 / 10,000 transactions; vary accounts, recurrence rules, amount resolvers and evaluation configurations.
+- Workloads: repeated warm-cache reads; many single transaction edits; a bank-sync batch with hundreds of updated transactions and **one** post-sync forecast request; evaluation-only changes; concurrent identical calls; cold process restart.
 - Measure individually: JSON encoding, SHA-256, revision lookup/update, event send/delivery/handler, cache lookup, projection base compute, reader evaluations, simulator/branch evaluations, SQLite transaction and lock time.
 - Report allocations/op, CPU, memory, cache hit and miss counts, recomputation count, end-to-end p50/p95/p99 and write amplification.
 - Simulate realistic read/write ratios and derive a break-even region rather than relying only on microbenchmarks.

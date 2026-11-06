@@ -80,7 +80,7 @@ export function TransactionsPanel({
 							: ("outflow" as const)
 						: ("inflow" as const);
 					const dateText =
-						transaction.kind === "posting"
+						transaction.kind === "transaction"
 							? dateLabel(transaction.startDate, true)
 							: cadenceOf(transaction.id);
 					return (
@@ -88,7 +88,7 @@ export function TransactionsPanel({
 							key={transaction.id}
 							dimmed={!transaction.enabled && !pending}
 							date={
-								transaction.kind === "posting" ? (
+								transaction.kind === "transaction" ? (
 									<time dateTime={transaction.startDate}>{dateText}</time>
 								) : (
 									dateText
@@ -195,7 +195,7 @@ function TransactionAmount({
 		);
 	if (resolved) {
 		const label =
-			transaction.kind === "posting"
+			transaction.kind === "transaction"
 				? `Calculated for ${dateLabel(resolved.date, true)}`
 				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
 		return (

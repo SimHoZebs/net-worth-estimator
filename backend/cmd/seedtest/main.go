@@ -87,7 +87,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "clear bulk: %v\n", err)
 			return 1
 		}
-		fmt.Fprintf(stdout, "cleared bulk: %d accounts, %d postings, %d rules\n", result.Accounts, result.Postings, result.Rules)
+		fmt.Fprintf(stdout, "cleared bulk: %d accounts, %d transactions, %d rules\n", result.Accounts, result.Transactions, result.Rules)
 		return 0
 	}
 	result, err := integrationfixtures.InjectBulk(scoped, spec)
@@ -95,6 +95,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inject bulk: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "injected bulk: %d accounts, %d postings, %d rules\n", result.Accounts, result.Postings, result.Rules)
+	fmt.Fprintf(stdout, "injected bulk: %d accounts, %d transactions, %d rules\n", result.Accounts, result.Transactions, result.Rules)
 	return 0
 }

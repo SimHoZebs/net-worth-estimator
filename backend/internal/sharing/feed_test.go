@@ -9,9 +9,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-const feedGroupPostingA = "01900000-0000-7000-8000-0000000000d1"
-const feedGroupPostingB = "01900000-0000-7000-8000-0000000000d2"
-const feedGroupPostingC = "01900000-0000-7000-8000-0000000000d3"
+const feedGroupTransactionA = "01900000-0000-7000-8000-0000000000d1"
+const feedGroupTransactionB = "01900000-0000-7000-8000-0000000000d2"
+const feedGroupTransactionC = "01900000-0000-7000-8000-0000000000d3"
 
 type feedResponse struct {
 	GroupID string `json:"groupId"`
@@ -23,12 +23,12 @@ type feedResponse struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"audiences"`
-		Posting struct {
+		Transaction struct {
 			ID              string `json:"id"`
 			Name            string `json:"name"`
 			TransactionTime int64  `json:"transactionTime"`
 			Pending         bool   `json:"pending"`
-		} `json:"posting"`
+		} `json:"transaction"`
 	} `json:"items"`
 	Totals struct {
 		Count        int     `json:"count"`
@@ -86,18 +86,18 @@ func feedSetup(t *testing.T) (*sharing.Handler, store.Database, string, string, 
 	alice, storeA := mustUser(t, db, "alice")
 	_, _ = mustUser(t, db, "bob")
 	group := feedGroup(t, db, "alice", "Cabin", "bob")
-	mustPosting(t, storeA, feedGroupPostingA)
-	mustPosting(t, storeA, feedGroupPostingB)
-	mustPosting(t, storeA, feedGroupPostingC)
+	mustTransaction(t, storeA, feedGroupTransactionA)
+	mustTransaction(t, storeA, feedGroupTransactionB)
+	mustTransaction(t, storeA, feedGroupTransactionC)
 	return h, db, alice, group, ownerResource(alice)
 }
 
-// The feed serves the member's authorized postings with totals over the
+// The feed serves the member's authorized transactions with totals over the
 // same set; keyset pages walk the whole feed without repeats.
 func TestGroupFeedEndpoint(t *testing.T) {
 	h, db, alice, group, _ := feedSetup(t)
-	for _, id := range []string{feedGroupPostingA, feedGroupPostingB, feedGroupPostingC} {
-		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
+	for _, id := range []string{feedGroupTransactionA, feedGroupTransactionB, feedGroupTransactionC} {
+		if _, err := db.GrantSharedTransaction(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -116,7 +116,7 @@ func TestGroupFeedEndpoint(t *testing.T) {
 	if code != 200 || len(second.Items) != 1 || second.Page.HasMore {
 		t.Fatalf("second page = %d %+v, want 1 item without more", code, second.Page)
 	}
-	if second.Items[0].Posting.ID == first.Items[0].Posting.ID || second.Items[0].Posting.ID == first.Items[1].Posting.ID {
+	if second.Items[0].Transaction.ID == first.Items[0].Transaction.ID || second.Items[0].Transaction.ID == first.Items[1].Transaction.ID {
 		t.Fatalf("second page repeats the first page: %+v", second.Items)
 	}
 	// Totals stay over the whole filtered set on every page.
@@ -132,8 +132,8 @@ func TestGroupFeedEndpoint(t *testing.T) {
 // filters report 400 with a plain reason.
 func TestGroupFeedFilters(t *testing.T) {
 	h, db, alice, group, aliceResource := feedSetup(t)
-	for _, id := range []string{feedGroupPostingA, feedGroupPostingB} {
-		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
+	for _, id := range []string{feedGroupTransactionA, feedGroupTransactionB} {
+		if _, err := db.GrantSharedTransaction(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -176,7 +176,7 @@ func TestGroupFeedFilters(t *testing.T) {
 // fail closed without revealing group visibility.
 func TestGroupFeedClosedToOutsiders(t *testing.T) {
 	h, db, alice, group, _ := feedSetup(t)
-	if _, err := db.GrantSharedPosting(alice, feedGroupPostingA, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
+	if _, err := db.GrantSharedTransaction(alice, feedGroupTransactionA, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	mustUser(t, db, "carol")
@@ -199,12 +199,12 @@ func TestGroupFeedClosedToOutsiders(t *testing.T) {
 // rows stay visible with their marker while authorized.
 func TestGroupFeedExclusionsTotals(t *testing.T) {
 	h, db, alice, group, _ := feedSetup(t)
-	for _, id := range []string{feedGroupPostingA, feedGroupPostingB} {
-		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
+	for _, id := range []string{feedGroupTransactionA, feedGroupTransactionB} {
+		if _, err := db.GrantSharedTransaction(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.ExcludeSharedPosting(alice, feedGroupPostingA, store.SharingAudienceUser, mustUserID(t, db, "bob"), testRequestKey(t)); err != nil {
+	if _, err := db.ExcludeSharedTransaction(alice, feedGroupTransactionA, store.SharingAudienceUser, mustUserID(t, db, "bob"), testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	code, response := getFeed(t, h, "/v1/shared/groups/"+group+"/feed", "bob")

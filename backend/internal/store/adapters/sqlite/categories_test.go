@@ -17,21 +17,21 @@ func categoryFacts(description, category string) types.TransactionFacts {
 	}
 }
 
-func categoryUpsertDirective(posting types.Posting, provider, account, transaction string, facts types.TransactionFacts) BankDirective {
+func categoryUpsertDirective(transaction types.Transaction, provider, account, bankTransactionID string, facts types.TransactionFacts) BankDirective {
 	return BankDirective{Upsert: &BankUpsert{
-		Posting: posting,
-		Keys:    bankKeys(provider, account, transaction),
-		Facts:   &facts,
+		Transaction: transaction,
+		Keys:        bankKeys(provider, account, bankTransactionID),
+		Facts:       &facts,
 	}}
 }
 
-func loadedCategory(t *testing.T, s *sqliteStore, postingID string) types.PostingCategory {
+func loadedCategory(t *testing.T, s *sqliteStore, transactionID string) types.TransactionCategory {
 	t.Helper()
-	items, err := s.LoadPostingCategories([]string{postingID})
+	items, err := s.LoadTransactionCategories([]string{transactionID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return items[postingID]
+	return items[transactionID]
 }
 
 func TestBankCategoryStoresOnFirstUpsertWithFacts(t *testing.T) {
@@ -39,19 +39,19 @@ func TestBankCategoryStoresOnFirstUpsertWithFacts(t *testing.T) {
 	seedAccount(t, s, "checking")
 	facts := categoryFacts("WHOLE FOODS MARKET", "FOOD_AND_DRINK_GROCERIES")
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("WHOLE FOODS MARKET", "checking", "42.00", false), ProviderSimpleFIN, "bridge", "food", facts),
+		categoryUpsertDirective(bankSeedTransaction("WHOLE FOODS MARKET", "checking", "42.00", false), ProviderSimpleFIN, "bridge", "food", facts),
 	})
-	rows, err := s.LoadBankPostings()
+	rows, err := s.LoadBankTransactions()
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("bank=%+v err=%v", rows, err)
 	}
-	id := rows[0].Posting.ID
+	id := rows[0].Transaction.ID
 	got := loadedCategory(t, s, id)
 	if got.Category != types.CategoryFoodAndDrink || got.Source != types.CategorySourceBank || got.Producer != ProviderSimpleFIN {
 		t.Fatalf("category=%+v", got)
 	}
 	var raw string
-	if err := s.db.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE posting_id = ? AND user_id = :user_id`, id).Scan(&raw); err != nil {
+	if err := s.db.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE transaction_id = ? AND user_id = :user_id`, id).Scan(&raw); err != nil {
 		t.Fatalf("first upsert did not retain facts: %v", err)
 	}
 }
@@ -60,22 +60,22 @@ func TestUserCategoryWinsAndResetRestoresBankValue(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge", "food", categoryFacts("WHOLE FOODS", "FOOD_AND_DRINK")),
+		categoryUpsertDirective(bankSeedTransaction("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge", "food", categoryFacts("WHOLE FOODS", "FOOD_AND_DRINK")),
 	})
-	id := mustBankPostingID(t, s)
+	id := mustBankTransactionID(t, s)
 	userCategory := types.CategoryMedical
-	if _, err := s.SetUserPostingCategory(id, &userCategory); err != nil {
+	if _, err := s.SetUserTransactionCategory(id, &userCategory); err != nil {
 		t.Fatal(err)
 	}
 	// A later bank refresh with another supported value must not replace the
 	// owner's choice.
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("WHOLE FOODS", "checking", "48.00", false), ProviderSimpleFIN, "bridge", "food", categoryFacts("WHOLE FOODS", "GENERAL_MERCHANDISE")),
+		categoryUpsertDirective(bankSeedTransaction("WHOLE FOODS", "checking", "48.00", false), ProviderSimpleFIN, "bridge", "food", categoryFacts("WHOLE FOODS", "GENERAL_MERCHANDISE")),
 	})
 	if got := loadedCategory(t, s, id); got.Category != types.CategoryMedical || got.Source != types.CategorySourceUser {
 		t.Fatalf("user category lost: %+v", got)
 	}
-	if _, err := s.SetUserPostingCategory(id, nil); err != nil {
+	if _, err := s.SetUserTransactionCategory(id, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := loadedCategory(t, s, id); got.Category != types.CategoryGeneralMerchandise || got.Source != types.CategorySourceBank {
@@ -87,14 +87,14 @@ func TestResetWithoutBankValueClearsTheAssignment(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "UNKNOWN_PROVIDER_VALUE")),
+		categoryUpsertDirective(bankSeedTransaction("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "UNKNOWN_PROVIDER_VALUE")),
 	})
-	id := mustBankPostingID(t, s)
+	id := mustBankTransactionID(t, s)
 	userCategory := types.CategoryGeneralMerchandise
-	if _, err := s.SetUserPostingCategory(id, &userCategory); err != nil {
+	if _, err := s.SetUserTransactionCategory(id, &userCategory); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.SetUserPostingCategory(id, nil); err != nil {
+	if _, err := s.SetUserTransactionCategory(id, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := loadedCategory(t, s, id); got.Category != "" || got.Source != "" {
@@ -106,10 +106,10 @@ func TestInferredCategoryNeverReplacesBankOrUser(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "UNKNOWN_PROVIDER_VALUE")),
+		categoryUpsertDirective(bankSeedTransaction("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "UNKNOWN_PROVIDER_VALUE")),
 	})
-	id := mustBankPostingID(t, s)
-	if err := s.SetInferredPostingCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
+	id := mustBankTransactionID(t, s)
+	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
 		t.Fatal(err)
 	}
 	if got := loadedCategory(t, s, id); got.Category != types.CategoryTravel || got.Source != types.CategorySourceInferred {
@@ -117,22 +117,22 @@ func TestInferredCategoryNeverReplacesBankOrUser(t *testing.T) {
 	}
 	// A supported bank value replaces an inferred assignment.
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "GENERAL_MERCHANDISE")),
+		categoryUpsertDirective(bankSeedTransaction("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "GENERAL_MERCHANDISE")),
 	})
 	if got := loadedCategory(t, s, id); got.Category != types.CategoryGeneralMerchandise || got.Source != types.CategorySourceBank {
 		t.Fatalf("bank did not replace inferred: %+v", got)
 	}
-	if err := s.SetInferredPostingCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
+	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
 		t.Fatal(err)
 	}
 	if got := loadedCategory(t, s, id); got.Source != types.CategorySourceBank {
 		t.Fatalf("inferred replaced bank: %+v", got)
 	}
 	userCategory := types.CategoryMedical
-	if _, err := s.SetUserPostingCategory(id, &userCategory); err != nil {
+	if _, err := s.SetUserTransactionCategory(id, &userCategory); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetInferredPostingCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
+	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
 		t.Fatal(err)
 	}
 	if got := loadedCategory(t, s, id); got.Source != types.CategorySourceUser || got.Category != types.CategoryMedical {
@@ -144,10 +144,10 @@ func TestCategoryCandidatesSkipCategorizedVoidAndUserRows(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("PENDING HOLD", "checking", "12.00", true), ProviderSimpleFIN, "bridge", "pending", categoryFacts("PENDING HOLD", "")),
-		categoryUpsertDirective(bankSeedPosting("SETTLED SHOP", "checking", "20.00", false), ProviderSimpleFIN, "bridge", "settled", categoryFacts("SETTLED SHOP", "GENERAL_MERCHANDISE")),
+		categoryUpsertDirective(bankSeedTransaction("PENDING HOLD", "checking", "12.00", true), ProviderSimpleFIN, "bridge", "pending", categoryFacts("PENDING HOLD", "")),
+		categoryUpsertDirective(bankSeedTransaction("SETTLED SHOP", "checking", "20.00", false), ProviderSimpleFIN, "bridge", "settled", categoryFacts("SETTLED SHOP", "GENERAL_MERCHANDISE")),
 	})
-	candidates, err := s.ListPostingCategoryCandidates(10)
+	candidates, err := s.ListTransactionCategoryCandidates(10)
 	if err != nil || len(candidates) != 1 {
 		t.Fatalf("candidates=%+v err=%v", candidates, err)
 	}
@@ -156,18 +156,18 @@ func TestCategoryCandidatesSkipCategorizedVoidAndUserRows(t *testing.T) {
 	}
 }
 
-func TestDeletingPostingRemovesItsCategory(t *testing.T) {
+func TestDeletingTransactionRemovesItsCategory(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge", "food", categoryFacts("WHOLE FOODS", "FOOD_AND_DRINK")),
+		categoryUpsertDirective(bankSeedTransaction("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge", "food", categoryFacts("WHOLE FOODS", "FOOD_AND_DRINK")),
 	})
-	id := mustBankPostingID(t, s)
-	if err := s.DeletePosting(id); err != nil {
+	id := mustBankTransactionID(t, s)
+	if err := s.DeleteTransaction(id); err != nil {
 		t.Fatal(err)
 	}
 	var count int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM posting_categories WHERE posting_id = ? AND user_id = :user_id`, id).Scan(&count); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM transaction_categories WHERE transaction_id = ? AND user_id = :user_id`, id).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 0 {
@@ -182,14 +182,14 @@ func TestCategoryAssignmentsStayUserScoped(t *testing.T) {
 	seedAccount(t, b, "checking")
 	facts := categoryFacts("WHOLE FOODS", "FOOD_AND_DRINK")
 	applyDirectives(t, a, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge-a", "food", facts),
+		categoryUpsertDirective(bankSeedTransaction("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge-a", "food", facts),
 	})
 	applyDirectives(t, b, []BankDirective{
-		categoryUpsertDirective(bankSeedPosting("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge-b", "food", facts),
+		categoryUpsertDirective(bankSeedTransaction("WHOLE FOODS", "checking", "42.00", false), ProviderSimpleFIN, "bridge-b", "food", facts),
 	})
-	idA, idB := mustBankPostingID(t, a), mustBankPostingID(t, b)
+	idA, idB := mustBankTransactionID(t, a), mustBankTransactionID(t, b)
 	userCategory := types.CategoryMedical
-	if _, err := a.SetUserPostingCategory(idA, &userCategory); err != nil {
+	if _, err := a.SetUserTransactionCategory(idA, &userCategory); err != nil {
 		t.Fatal(err)
 	}
 	if got := loadedCategory(t, a, idA); got.Category != types.CategoryMedical {
@@ -198,16 +198,16 @@ func TestCategoryAssignmentsStayUserScoped(t *testing.T) {
 	if got := loadedCategory(t, b, idB); got.Category != types.CategoryFoodAndDrink {
 		t.Fatalf("b changed: %+v", got)
 	}
-	if _, err := b.SetUserPostingCategory(idA, &userCategory); !store.IsNotFound(err) {
+	if _, err := b.SetUserTransactionCategory(idA, &userCategory); !store.IsNotFound(err) {
 		t.Fatalf("cross-user write=%v", err)
 	}
 }
 
-func mustBankPostingID(t *testing.T, s *sqliteStore) string {
+func mustBankTransactionID(t *testing.T, s *sqliteStore) string {
 	t.Helper()
-	rows, err := s.LoadBankPostings()
+	rows, err := s.LoadBankTransactions()
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("bank=%+v err=%v", rows, err)
 	}
-	return rows[0].Posting.ID
+	return rows[0].Transaction.ID
 }

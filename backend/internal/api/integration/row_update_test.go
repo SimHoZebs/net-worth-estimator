@@ -22,7 +22,7 @@ func seedPatchAccounts(t *testing.T, handler http.Handler) {
 	}
 }
 
-func TestPostingUpdateLeavesAbsentMembersUntouched(t *testing.T) {
+func TestTransactionUpdateLeavesAbsentMembersUntouched(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	seedPatchAccounts(t, handler)
@@ -36,14 +36,14 @@ func TestPostingUpdateLeavesAbsentMembersUntouched(t *testing.T) {
 		"name":"Rent","sourceAccountId":"checking","destinations":["savings"],
 		"amount":{"value":1200},"date":"2026-08-01",
 		"claim":{"scheduleId":"salary","occurrenceDate":"2026-02-01"},"enabled":true}`)
-	created := decodeWriteResult[types.Posting](t, create.Code, create.Body.Bytes())
+	created := decodeWriteResult[types.Transaction](t, create.Code, create.Body.Bytes())
 	if !created.Saved {
 		t.Fatalf("create issues = %+v, want saved", created.Issues)
 	}
 
 	// One member changes; every other member keeps the stored value.
 	patched := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"enabled":false}`)
-	row := decodeWriteResult[types.Posting](t, patched.Code, patched.Body.Bytes())
+	row := decodeWriteResult[types.Transaction](t, patched.Code, patched.Body.Bytes())
 	if row.Result.Enabled {
 		t.Fatal("enabled = true after patch, want false")
 	}
@@ -60,18 +60,18 @@ func TestPostingUpdateLeavesAbsentMembersUntouched(t *testing.T) {
 	// Null clears a nullable member.
 	cleared := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/release", `{}`)
 	sourceCleared := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"sourceAccountId":null}`)
-	clean := decodeWriteResult[types.Posting](t, cleared.Code, cleared.Body.Bytes())
+	clean := decodeWriteResult[types.Transaction](t, cleared.Code, cleared.Body.Bytes())
 	if clean.Result.Claim != nil {
 		t.Fatalf("claim = %+v, want cleared", clean.Result.Claim)
 	}
-	sourceRow := decodeWriteResult[types.Posting](t, sourceCleared.Code, sourceCleared.Body.Bytes())
+	sourceRow := decodeWriteResult[types.Transaction](t, sourceCleared.Code, sourceCleared.Body.Bytes())
 	if sourceRow.Result.SourceAccountID != nil {
 		t.Fatalf("source = %+v, want cleared", sourceRow.Result.SourceAccountID)
 	}
 
 	// A semantic amount replaces only the amount descriptor.
 	repriced := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"amount":{"value":25.5}}`)
-	priced := decodeWriteResult[types.Posting](t, repriced.Code, repriced.Body.Bytes())
+	priced := decodeWriteResult[types.Transaction](t, repriced.Code, repriced.Body.Bytes())
 	expression, _ := priced.Result.Amount.Config["expression"].(string)
 	if expression != "25.5" {
 		t.Fatalf("amount expression = %q, want 25.5", expression)
@@ -140,15 +140,15 @@ func TestCreateBodiesAcceptSemanticAmounts(t *testing.T) {
 	handler := New(database, Config{})
 	seedPatchAccounts(t, handler)
 
-	posting := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+	transaction := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Groceries","sourceAccountId":"checking","destinations":["savings"],"amount":{"value":42.5},"date":"2026-08-01","enabled":true}`)
-	created := decodeWriteResult[types.Posting](t, posting.Code, posting.Body.Bytes())
+	created := decodeWriteResult[types.Transaction](t, transaction.Code, transaction.Body.Bytes())
 	if !created.Saved {
-		t.Fatalf("posting issues = %+v, want saved", created.Issues)
+		t.Fatalf("transaction issues = %+v, want saved", created.Issues)
 	}
 	expression, _ := created.Result.Amount.Config["expression"].(string)
 	if expression != "42.5" || created.Result.Amount.Resolver != "expression" {
-		t.Fatalf("posting amount = %+v, want expression 42.5", created.Result.Amount)
+		t.Fatalf("transaction amount = %+v, want expression 42.5", created.Result.Amount)
 	}
 
 	rule := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
@@ -172,10 +172,10 @@ func TestCreateBodiesAcceptSemanticAmounts(t *testing.T) {
 		t.Fatalf("replayed expression = %q, want stored 1+1", expression)
 	}
 
-	// Growth on a one-time posting is rejected rather than stored.
-	growthPosting := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+	// Growth on a one-time transaction is rejected rather than stored.
+	growthTransaction := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Grows","sourceAccountId":"checking","destinations":["savings"],"amount":{"value":10,"annualIncrease":1},"date":"2026-08-01","enabled":true}`)
-	if growthPosting.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("growth posting status = %d, want 422, body %s", growthPosting.Code, growthPosting.Body.String())
+	if growthTransaction.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("growth transaction status = %d, want 422, body %s", growthTransaction.Code, growthTransaction.Body.String())
 	}
 }

@@ -28,7 +28,7 @@ func deleteModelRows(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE user_id = :user_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM postings WHERE user_id = :user_id`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM transactions WHERE user_id = :user_id`); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE user_id = :user_id`); err != nil {
@@ -102,7 +102,7 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM projection_rows WHERE user_id = :user_id`); err != nil {
 		return err
 	}
-	for _, table := range []string{"net_worth_threshold_outputs", "account_balance_outputs", "posting_fulfillment_outputs", "cycle_fulfillment_outputs", "planned_purchases_outputs", "financial_independence_outputs", "whatif_outputs"} {
+	for _, table := range []string{"net_worth_threshold_outputs", "account_balance_outputs", "transaction_fulfillment_outputs", "cycle_fulfillment_outputs", "planned_purchases_outputs", "financial_independence_outputs", "whatif_outputs"} {
 		if _, err := tx.Exec(`DELETE FROM ` + table + ` WHERE user_id = :user_id`); err != nil {
 			return err
 		}
@@ -136,18 +136,18 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 	if err != nil {
 		return err
 	}
-	syncedPostings, err := loadSyncedPostings(tx)
+	syncedTransactions, err := loadSyncedTransactions(tx)
 	if err != nil {
 		return err
 	}
 	// Receipts can attach to settled bank rows, so evidence for preserved
 	// rows is snapshotted here and restored after the re-merge; row
 	// deletion would otherwise cascade to it.
-	bankReceipts, err := loadReceiptsForPostings(tx, bankPostingIDs(syncedPostings))
+	bankReceipts, err := loadReceiptsForTransactions(tx, bankTransactionIDs(syncedTransactions))
 	if err != nil {
 		return err
 	}
-	syncKeys, err := loadPostingSyncKeys(tx)
+	syncKeys, err := loadTransactionSyncKeys(tx)
 	if err != nil {
 		return err
 	}
@@ -180,11 +180,11 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 	for _, checkpoint := range syncedCheckpoints {
 		preserveAccount(checkpoint.AccountID)
 	}
-	for _, posting := range syncedPostings {
-		if posting.SourceAccountID != nil {
-			preserveAccount(*posting.SourceAccountID)
+	for _, transaction := range syncedTransactions {
+		if transaction.SourceAccountID != nil {
+			preserveAccount(*transaction.SourceAccountID)
 		}
-		for _, destinationID := range posting.Destinations {
+		for _, destinationID := range transaction.Destinations {
 			preserveAccount(destinationID)
 		}
 	}
@@ -208,7 +208,7 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 	if _, err := remergeCheckpoints(tx, model.Checkpoints, syncedCheckpoints, 0); err != nil {
 		return err
 	}
-	if _, err := remergePostings(tx, model.Postings, syncedPostings, 0); err != nil {
+	if _, err := remergeTransactions(tx, model.Transactions, syncedTransactions, 0); err != nil {
 		return err
 	}
 	for position, purchase := range model.PlannedPurchases {
@@ -217,7 +217,7 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		}
 	}
 	for _, key := range syncKeys {
-		if err := insertPostingSyncKey(tx, key); err != nil {
+		if err := insertTransactionSyncKey(tx, key); err != nil {
 			return err
 		}
 	}
@@ -251,62 +251,62 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 	return nil
 }
 
-// postingSelect lists the columns that build a types.Posting: core fields
-// from postings, order/enabled/execution state from posting_sim, and the
-// optional claim from posting_claims. Every postings read that builds a
-// wire Posting must use this fragment with postingJoins so all three stay
-// in sync. types.Posting.Destinations keeps its wire name; it reads from
+// transactionSelect lists the columns that build a types.Transaction: core fields
+// from transactions, order/enabled/execution state from transaction_sim, and the
+// optional claim from transaction_claims. Every transactions read that builds a
+// wire Transaction must use this fragment with transactionJoins so all three stay
+// in sync. types.Transaction.Destinations keeps its wire name; it reads from
 // the destination_account_ids column.
-const postingSelect = `p.id, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.posted_time, p.transaction_time, c.fulfills_rule_id, c.fulfills_occurrence_date, s.enabled, p.source, p.pending, p.void, s.execution_order`
+const transactionSelect = `p.id, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.posted_time, p.transaction_time, c.fulfills_rule_id, c.fulfills_occurrence_date, s.enabled, p.source, p.pending, p.void, s.execution_order`
 
-// postingJoins attaches the posting satellites to a postings alias p.
-const postingJoins = `FROM postings p LEFT JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id LEFT JOIN posting_claims c ON c.user_id = p.user_id AND c.posting_id = p.id`
+// transactionJoins attaches the transaction satellites to a transactions alias p.
+const transactionJoins = `FROM transactions p LEFT JOIN transaction_sim s ON s.user_id = p.user_id AND s.transaction_id = p.id LEFT JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id`
 
-func insertPosting(tx *userTx, position int, posting *types.Posting, source string) error {
-	if posting.ExecutionOrder == 0 {
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM posting_sim WHERE user_id = :user_id`).Scan(&posting.ExecutionOrder); err != nil {
-			return fmt.Errorf("allocate posting execution order: %w", err)
+func insertTransaction(tx *userTx, position int, transaction *types.Transaction, source string) error {
+	if transaction.ExecutionOrder == 0 {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM transaction_sim WHERE user_id = :user_id`).Scan(&transaction.ExecutionOrder); err != nil {
+			return fmt.Errorf("allocate transaction execution order: %w", err)
 		}
 	}
 	destinationsJSON := []byte("null")
-	if posting.Destinations != nil {
+	if transaction.Destinations != nil {
 		var err error
-		destinationsJSON, err = json.Marshal(posting.Destinations)
+		destinationsJSON, err = json.Marshal(transaction.Destinations)
 		if err != nil {
-			return fmt.Errorf("marshal destinations %s: %w", posting.ID, err)
+			return fmt.Errorf("marshal destinations %s: %w", transaction.ID, err)
 		}
 	}
-	amountJSON, err := json.Marshal(posting.Amount)
+	amountJSON, err := json.Marshal(transaction.Amount)
 	if err != nil {
-		return fmt.Errorf("marshal amount %s: %w", posting.ID, err)
+		return fmt.Errorf("marshal amount %s: %w", transaction.ID, err)
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id)
+		`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id)
 		 VALUES (?,?,?,?,?,?,?,?,?,?, :user_id)`,
-		posting.ID, posting.Name, nullable(posting.SourceAccountID), string(destinationsJSON), string(amountJSON),
-		posting.PostedTime, posting.TransactionTime, source, boolToInt(source != SourceUser && posting.Pending), boolToInt(posting.Void),
+		transaction.ID, transaction.Name, nullable(transaction.SourceAccountID), string(destinationsJSON), string(amountJSON),
+		transaction.PostedTime, transaction.TransactionTime, source, boolToInt(source != SourceUser && transaction.Pending), boolToInt(transaction.Void),
 	); err != nil {
-		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
+		return fmt.Errorf("insert transaction %s: %w", transaction.ID, err)
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id) VALUES (?, ?, ?, ?, :user_id)`,
-		posting.ID, position, boolToInt(posting.Enabled), posting.ExecutionOrder,
+		`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id) VALUES (?, ?, ?, ?, :user_id)`,
+		transaction.ID, position, boolToInt(transaction.Enabled), transaction.ExecutionOrder,
 	); err != nil {
-		return fmt.Errorf("insert posting sim %s: %w", posting.ID, err)
+		return fmt.Errorf("insert transaction sim %s: %w", transaction.ID, err)
 	}
-	if posting.Claim != nil {
+	if transaction.Claim != nil {
 		if _, err := tx.Exec(
-			`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)`,
-			posting.ID, posting.Claim.ScheduleID, posting.Claim.OccurrenceDate,
+			`INSERT INTO transaction_claims (transaction_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)`,
+			transaction.ID, transaction.Claim.ScheduleID, transaction.Claim.OccurrenceDate,
 		); err != nil {
-			return fmt.Errorf("insert posting claim %s: %w", posting.ID, err)
+			return fmt.Errorf("insert transaction claim %s: %w", transaction.ID, err)
 		}
 	}
 	// Group-share discovery stays consistent in the same write: every
 	// insert path (owner create, rule conversion, bank sync, seed import)
 	// funnels here, so late-imported and backdated rows qualify exactly
 	// like pre-existing ones with no extra review step.
-	return refreshVisibilityForPostingTx(tx, posting.ID)
+	return refreshVisibilityForTransactionTx(tx, transaction.ID)
 }
 
 func insertRule(tx *userTx, position int, rule *types.Schedule) error {
@@ -361,47 +361,47 @@ func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 	return checkpoint, nil
 }
 
-func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
-	// Receipt links live in the receipts table now; scanPostingRow only
-	// assembles the wire Posting from postings plus its sim and claim
-	// satellites. Callers must select postingSelect with postingJoins so
+func scanTransactionRow(rows *sql.Rows) (types.Transaction, error) {
+	// Receipt links live in the receipts table now; scanTransactionRow only
+	// assembles the wire Transaction from transactions plus its sim and claim
+	// satellites. Callers must select transactionSelect with transactionJoins so
 	// the column order below holds.
-	var posting types.Posting
+	var transaction types.Transaction
 	var sourceAccountID, claimScheduleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string
 	var enabled, executionOrder sql.NullInt64
 	var pending, voided int64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimScheduleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &executionOrder); err != nil {
-		return types.Posting{}, err
+	if err := rows.Scan(&transaction.ID, &transaction.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &transaction.PostedTime, &transaction.TransactionTime, &claimScheduleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &executionOrder); err != nil {
+		return types.Transaction{}, err
 	}
 	if sourceAccountID.Valid {
 		value := sourceAccountID.String
-		posting.SourceAccountID = &value
+		transaction.SourceAccountID = &value
 	}
 	if destinationsJSON != "null" {
-		if err := json.Unmarshal([]byte(destinationsJSON), &posting.Destinations); err != nil {
-			return types.Posting{}, fmt.Errorf("parse destinations %s: %w", posting.ID, err)
+		if err := json.Unmarshal([]byte(destinationsJSON), &transaction.Destinations); err != nil {
+			return types.Transaction{}, fmt.Errorf("parse destinations %s: %w", transaction.ID, err)
 		}
 	} else {
-		posting.Destinations = nil
+		transaction.Destinations = nil
 	}
-	if err := json.Unmarshal([]byte(amountJSON), &posting.Amount); err != nil {
-		return types.Posting{}, fmt.Errorf("parse amount %s: %w", posting.ID, err)
+	if err := json.Unmarshal([]byte(amountJSON), &transaction.Amount); err != nil {
+		return types.Transaction{}, fmt.Errorf("parse amount %s: %w", transaction.ID, err)
 	}
 	if claimScheduleID.Valid && claimOccurrenceDate.Valid {
-		posting.Claim = &types.PostingClaim{ScheduleID: claimScheduleID.String, OccurrenceDate: claimOccurrenceDate.String}
+		transaction.Claim = &types.TransactionClaim{ScheduleID: claimScheduleID.String, OccurrenceDate: claimOccurrenceDate.String}
 	}
-	posting.Enabled = enabled.Valid && enabled.Int64 != 0
-	posting.Pending = pending != 0
-	posting.Void = voided != 0
+	transaction.Enabled = enabled.Valid && enabled.Int64 != 0
+	transaction.Pending = pending != 0
+	transaction.Void = voided != 0
 	if executionOrder.Valid {
-		posting.ExecutionOrder = executionOrder.Int64
+		transaction.ExecutionOrder = executionOrder.Int64
 	}
 	if source.Valid {
-		posting.Source = source.String
+		transaction.Source = source.String
 	}
-	return posting, nil
+	return transaction, nil
 }
 
 func scanRuleRow(rows *sql.Rows) (types.Schedule, error) {
@@ -581,24 +581,24 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT ` + postingSelect + ` ` + postingJoins + ` WHERE p.user_id = :user_id AND p.projection_slice_id IS NULL ORDER BY s.position`)
+	transactionRows, err := q.Query(`SELECT ` + transactionSelect + ` ` + transactionJoins + ` WHERE p.user_id = :user_id AND p.projection_slice_id IS NULL ORDER BY s.position`)
 	if err != nil {
 		return nil, err
 	}
-	defer postingRows.Close()
-	for postingRows.Next() {
-		posting, err := scanPostingRow(postingRows)
+	defer transactionRows.Close()
+	for transactionRows.Next() {
+		transaction, err := scanTransactionRow(transactionRows)
 		if err != nil {
 			return nil, err
 		}
-		model.Postings = append(model.Postings, posting)
+		model.Transactions = append(model.Transactions, transaction)
 	}
-	if err := postingRows.Err(); err != nil {
-		postingRows.Close()
-		return nil, fmt.Errorf("iterate postings: %w", err)
+	if err := transactionRows.Err(); err != nil {
+		transactionRows.Close()
+		return nil, fmt.Errorf("iterate transactions: %w", err)
 	}
-	if err := postingRows.Close(); err != nil {
-		return nil, fmt.Errorf("close postings: %w", err)
+	if err := transactionRows.Close(); err != nil {
+		return nil, fmt.Errorf("close transactions: %w", err)
 	}
 	model.PlannedPurchases, err = loadPlannedPurchases(q)
 	if err != nil {
@@ -696,8 +696,8 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 	if model.Checkpoints == nil {
 		model.Checkpoints = []types.Checkpoint{}
 	}
-	if model.Postings == nil {
-		model.Postings = []types.Posting{}
+	if model.Transactions == nil {
+		model.Transactions = []types.Transaction{}
 	}
 	if model.Schedules == nil {
 		model.Schedules = []types.Schedule{}

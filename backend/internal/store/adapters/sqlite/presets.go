@@ -20,7 +20,7 @@ import (
 //
 // Referential rule: none. The amount descriptor may reference placeholder
 // IDs; placeholders resolve at authoring time when the UI copies the
-// descriptor into a posting or rule. Names are unique and immutable: the
+// descriptor into a transaction or rule. Names are unique and immutable: the
 // name is the stable key the UI binds to, while IDs stay internal.
 
 // ListAmountPresets returns presets in stored order.

@@ -89,7 +89,7 @@ it("uses the scoped binary transport for private receipt pixels", async () => {
 	).toBe(A);
 });
 
-it("generates a real file part and a scalar posting ID for receipt uploads", async () => {
+it("generates a real file part and a scalar transaction ID for receipt uploads", async () => {
 	const seen: RequestInit[] = [];
 	vi.stubGlobal(
 		"fetch",
@@ -99,9 +99,9 @@ it("generates a real file part and a scalar posting ID for receipt uploads", asy
 		}),
 	);
 	const image = new File(["pixels"], "receipt.png", { type: "image/png" });
-	await attachReceipt({ image, postingId: "posting" });
+	await attachReceipt({ image, transactionId: "transaction" });
 	const data = seen[0]?.body as FormData;
-	expect(data.get("postingId")).toBe("posting");
+	expect(data.get("transactionId")).toBe("transaction");
 	expect(data.get("image")).toBeInstanceOf(File);
 	expect(new Headers(seen[0]?.headers).has("Content-Type")).toBe(false);
 });

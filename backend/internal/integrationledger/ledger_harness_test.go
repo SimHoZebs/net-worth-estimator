@@ -201,9 +201,9 @@ func ledgerApplyFeeds(t *testing.T, world *ledgerWorld, from, to int) {
 		}
 		// Like the production runner, reconcile against the stored bank
 		// rows so vanished holds void in place instead of lingering.
-		bank, err := world.ownerSC.LoadBankPostings()
+		bank, err := world.ownerSC.LoadBankTransactions()
 		if err != nil {
-			t.Fatalf("load bank postings: %v", err)
+			t.Fatalf("load bank transactions: %v", err)
 		}
 		if _, err := world.ownerSC.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true})); err != nil {
 			t.Fatalf("apply bank feed: %v", err)
@@ -211,16 +211,16 @@ func ledgerApplyFeeds(t *testing.T, world *ledgerWorld, from, to int) {
 	}
 }
 
-// ledgerPostingIDs returns stored posting IDs by name.
-func ledgerPostingIDs(t *testing.T, scoped store.Store) map[string][]string {
+// ledgerTransactionIDs returns stored transaction IDs by name.
+func ledgerTransactionIDs(t *testing.T, scoped store.Store) map[string][]string {
 	t.Helper()
 	model, err := scoped.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	byName := map[string][]string{}
-	for _, posting := range model.Postings {
-		byName[posting.Name] = append(byName[posting.Name], posting.ID)
+	for _, transaction := range model.Transactions {
+		byName[transaction.Name] = append(byName[transaction.Name], transaction.ID)
 	}
 	return byName
 }

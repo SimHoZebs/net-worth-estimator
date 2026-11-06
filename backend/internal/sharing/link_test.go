@@ -10,47 +10,47 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// grantAndAccept shares alice's posting with bob and accepts it, returning
+// grantAndAccept shares alice's transaction with bob and accepts it, returning
 // the recipient-owned copy.
-func grantAndAccept(t *testing.T, h *sharing.Handler, db store.Database, alice, bob string) types.Posting {
+func grantAndAccept(t *testing.T, h *sharing.Handler, db store.Database, alice, bob string) types.Transaction {
 	t.Helper()
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob)); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedTransactionID, "user", bob)); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	w := do(t, h, "POST", "/v1/shared/copies", "bob", copyBody(t, resourceOf(alice), sharedPostingID))
+	w := do(t, h, "POST", "/v1/shared/copies", "bob", copyBody(t, resourceOf(alice), sharedTransactionID))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("copy = %d (%s), want 201", w.Code, w.Body.String())
 	}
 	var copied struct {
-		Posting types.Posting `json:"posting"`
+		Transaction types.Transaction `json:"transaction"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &copied); err != nil {
 		t.Fatal(err)
 	}
-	return copied.Posting
+	return copied.Transaction
 }
 
-func renamePosting(t *testing.T, scoped store.Store, posting types.Posting, name string) {
+func renameTransaction(t *testing.T, scoped store.Store, transaction types.Transaction, name string) {
 	t.Helper()
-	posting.Name = name
-	if _, err := scoped.UpdatePosting(posting); err != nil {
+	transaction.Name = name
+	if _, err := scoped.UpdateTransaction(transaction); err != nil {
 		t.Fatalf("rename to %q: %v", name, err)
 	}
 }
 
-func loadPosting(t *testing.T, scoped store.Store, id string) types.Posting {
+func loadTransaction(t *testing.T, scoped store.Store, id string) types.Transaction {
 	t.Helper()
 	model, err := scoped.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		if posting.ID == id {
-			return posting
+	for _, transaction := range model.Transactions {
+		if transaction.ID == id {
+			return transaction
 		}
 	}
-	t.Fatalf("posting %s not found in own model", id)
-	return types.Posting{}
+	t.Fatalf("transaction %s not found in own model", id)
+	return types.Transaction{}
 }
 
 // The link read returns the recipient's own provenance: the deterministic
@@ -61,7 +61,7 @@ func TestSharingHTTPLinkRead(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
 	mustUser(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 	copied := grantAndAccept(t, h, db, alice, bob)
 
 	w := do(t, h, "GET", "/v1/shared/copies/"+copied.ID+"/link", "bob", "")
@@ -74,16 +74,16 @@ func TestSharingHTTPLinkRead(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if want := store.SharingLinkID(alice, sharedPostingID, bob); got.Link.LinkID != want {
+	if want := store.SharingLinkID(alice, sharedTransactionID, bob); got.Link.LinkID != want {
 		t.Fatalf("link ID = %q, want deterministic %q", got.Link.LinkID, want)
 	}
-	if got.Link.SourceOwnerID != alice || got.Link.SourcePostingID != sharedPostingID {
-		t.Fatalf("link source = %v, want alice/%s", got.Link, sharedPostingID)
+	if got.Link.SourceOwnerID != alice || got.Link.SourceTransactionID != sharedTransactionID {
+		t.Fatalf("link source = %v, want alice/%s", got.Link, sharedTransactionID)
 	}
-	if got.Link.RecipientUserID != bob || got.Link.CopyPostingID != copied.ID {
+	if got.Link.RecipientUserID != bob || got.Link.CopyTransactionID != copied.ID {
 		t.Fatalf("link recipient = %v, want bob/%s", got.Link, copied.ID)
 	}
-	source := loadPosting(t, storeA, sharedPostingID)
+	source := loadTransaction(t, storeA, sharedTransactionID)
 	revision, err := store.SharingSourceRevision(source)
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func TestSharingHTTPRefreshSourceChanged(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
 	_, storeB := mustUser(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 	copied := grantAndAccept(t, h, db, alice, bob)
 	refreshTarget := "/v1/shared/copies/" + copied.ID + "/refresh"
 
@@ -120,8 +120,8 @@ func TestSharingHTTPRefreshSourceChanged(t *testing.T) {
 		t.Fatalf("refresh status = %q, want current", refreshed.Status)
 	}
 
-	renamePosting(t, storeB, copied, "Recipient edited copy")
-	renamePosting(t, storeA, loadPosting(t, storeA, sharedPostingID), "Owner edited original")
+	renameTransaction(t, storeB, copied, "Recipient edited copy")
+	renameTransaction(t, storeA, loadTransaction(t, storeA, sharedTransactionID), "Owner edited original")
 
 	w = do(t, h, "POST", refreshTarget, "bob", "")
 	if w.Code != http.StatusOK {
@@ -137,10 +137,10 @@ func TestSharingHTTPRefreshSourceChanged(t *testing.T) {
 	if refreshed.CurrentSourceRevision == "" || refreshed.CurrentSourceRevision != refreshed.Link.SourceRevision {
 		t.Fatalf("refresh revision = %+v, want recorded revision updated", refreshed)
 	}
-	if got := loadPosting(t, storeB, copied.ID); got.Name != "Recipient edited copy" {
+	if got := loadTransaction(t, storeB, copied.ID); got.Name != "Recipient edited copy" {
 		t.Fatalf("recipient copy = %q, want recipient edits kept", got.Name)
 	}
-	if got := loadPosting(t, storeA, sharedPostingID); got.Name != "Owner edited original" {
+	if got := loadTransaction(t, storeA, sharedTransactionID); got.Name != "Owner edited original" {
 		t.Fatalf("source original = %q, want owner edits kept", got.Name)
 	}
 }
@@ -154,15 +154,15 @@ func TestSharingHTTPRevocationKeepsEditableCopy(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
 	_, storeB := mustUser(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 	copied := grantAndAccept(t, h, db, alice, bob)
 
-	renamePosting(t, storeB, copied, "Recipient edited copy")
+	renameTransaction(t, storeB, copied, "Recipient edited copy")
 
-	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob)); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(t, sharedTransactionID, "user", bob)); w.Code != http.StatusOK {
 		t.Fatalf("revoke = %d, want 200", w.Code)
 	}
-	readTarget := "/v1/shared/postings/" + resourceOf(alice) + "/" + sharedPostingID
+	readTarget := "/v1/shared/transactions/" + resourceOf(alice) + "/" + sharedTransactionID
 	if w := do(t, h, "GET", readTarget, "bob", ""); w.Code != http.StatusNotFound {
 		t.Fatalf("shared read after revoke = %d, want 404", w.Code)
 	}
@@ -188,7 +188,7 @@ func TestSharingHTTPRevocationKeepsEditableCopy(t *testing.T) {
 		t.Fatalf("link after revoke = %d, want 200", w.Code)
 	}
 
-	kept := loadPosting(t, storeB, copied.ID)
+	kept := loadTransaction(t, storeB, copied.ID)
 	if kept.Name != "Recipient edited copy" {
 		t.Fatalf("recipient copy = %q, want edits kept after revocation", kept.Name)
 	}
@@ -206,7 +206,7 @@ func TestSharingHTTPLinkNotEnumerable(t *testing.T) {
 	bob := mustID(t, db, "bob")
 	mustUser(t, db, "bob")
 	mustUser(t, db, "carol")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 	copied := grantAndAccept(t, h, db, alice, bob)
 
 	if w := do(t, h, "GET", "/v1/shared/copies/"+copied.ID+"/link", "carol", ""); w.Code != http.StatusNotFound {
@@ -240,7 +240,7 @@ func TestSharingHTTPLinkReadOnly(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
 	mustUser(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 	copied := grantAndAccept(t, h, db, alice, bob)
 
 	ro := sharing.New(db, testIssuer, sharing.Config{ReadOnly: true})

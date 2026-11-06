@@ -9,21 +9,21 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-type postingSyncKey struct {
-	// provider/accountID/transactionID are the exact upstream identities.
-	provider, accountID, transactionID, postingID string
+type transactionSyncKey struct {
+	// provider/accountID/bankTransactionID are the exact upstream identities.
+	provider, accountID, bankTransactionID, transactionID string
 }
 
-func loadPostingSyncKeys(tx *userTx) ([]postingSyncKey, error) {
-	rows, err := tx.Query(`SELECT provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys WHERE user_id = :user_id`)
+func loadTransactionSyncKeys(tx *userTx) ([]transactionSyncKey, error) {
+	rows, err := tx.Query(`SELECT provider, bridge_account_id, bank_transaction_id, transaction_id FROM transaction_sync_keys WHERE user_id = :user_id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var keys []postingSyncKey
+	var keys []transactionSyncKey
 	for rows.Next() {
-		var key postingSyncKey
-		if err := rows.Scan(&key.provider, &key.accountID, &key.transactionID, &key.postingID); err != nil {
+		var key transactionSyncKey
+		if err := rows.Scan(&key.provider, &key.accountID, &key.bankTransactionID, &key.transactionID); err != nil {
 			return nil, err
 		}
 		keys = append(keys, key)
@@ -31,9 +31,9 @@ func loadPostingSyncKeys(tx *userTx) ([]postingSyncKey, error) {
 	return keys, rows.Err()
 }
 
-func insertPostingSyncKey(tx *userTx, key postingSyncKey) error {
-	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES (?, ?, ?, ?, :user_id)`,
-		key.provider, key.accountID, key.transactionID, key.postingID)
+func insertTransactionSyncKey(tx *userTx, key transactionSyncKey) error {
+	_, err := tx.Exec(`INSERT INTO transaction_sync_keys (provider, bridge_account_id, bank_transaction_id, transaction_id, user_id) VALUES (?, ?, ?, ?, :user_id)`,
+		key.provider, key.accountID, key.bankTransactionID, key.transactionID)
 	return err
 }
 
@@ -64,7 +64,7 @@ func (s *sqliteStore) ListSyncAccountKeys(provider string) ([]string, error) {
 	if err := ensureSuppressionSchemaDB(s.db); err != nil {
 		return nil, fmt.Errorf("ensure suppressed sync keys: %w", err)
 	}
-	rows, err := s.db.Query(`SELECT bridge_account_id FROM posting_sync_keys WHERE provider = ? AND user_id = :user_id
+	rows, err := s.db.Query(`SELECT bridge_account_id FROM transaction_sync_keys WHERE provider = ? AND user_id = :user_id
 		UNION
 		SELECT bridge_account_id FROM suppressed_sync_keys WHERE provider = ? AND user_id = :user_id
 		ORDER BY 1`, provider, provider)
@@ -83,18 +83,18 @@ func (s *sqliteStore) ListSyncAccountKeys(provider string) ([]string, error) {
 	return keys, rows.Err()
 }
 
-// suppressPostingKeys copies a row's bank ids onto the do-not-import list.
+// suppressTransactionKeys copies a row's bank ids onto the do-not-import list.
 // Keyless owner rows suppress nothing. All placeholders stay positional:
 // mixing ? with named arguments misbinds on this driver.
-func suppressPostingKeys(tx *userTx, postingID string, now int64) error {
-	_, err := tx.Exec(`INSERT OR IGNORE INTO suppressed_sync_keys (provider, bridge_account_id, transaction_id, suppressed_at, user_id)
-		SELECT provider, bridge_account_id, transaction_id, ?, ? FROM posting_sync_keys WHERE posting_id = ? AND user_id = ?`,
-		now, tx.userID, postingID, tx.userID)
+func suppressTransactionKeys(tx *userTx, transactionID string, now int64) error {
+	_, err := tx.Exec(`INSERT OR IGNORE INTO suppressed_sync_keys (provider, bridge_account_id, bank_transaction_id, suppressed_at, user_id)
+		SELECT provider, bridge_account_id, bank_transaction_id, ?, ? FROM transaction_sync_keys WHERE transaction_id = ? AND user_id = ?`,
+		now, tx.userID, transactionID, tx.userID)
 	return err
 }
 
 func loadSuppressedKeys(tx *userTx) (map[BankKey]struct{}, error) {
-	rows, err := tx.Query(`SELECT provider, bridge_account_id, transaction_id FROM suppressed_sync_keys WHERE user_id = :user_id`)
+	rows, err := tx.Query(`SELECT provider, bridge_account_id, bank_transaction_id FROM suppressed_sync_keys WHERE user_id = :user_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +125,10 @@ func suppressedUpsert(suppressed map[BankKey]struct{}, upsert *BankUpsert) bool 
 	return true
 }
 
-// LoadBankPostings returns every bank-reported posting with the upstream
+// LoadBankTransactions returns every bank-reported transaction with the upstream
 // identities pointing at it. Adapters reconcile snapshots against this.
-func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
-	rows, err := s.db.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.projection_slice_id IS NULL AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
+func (s *sqliteStore) LoadBankTransactions() ([]BankRow, error) {
+	rows, err := s.db.Query(`SELECT `+transactionSelect+` `+transactionJoins+` WHERE p.source != ? AND p.projection_slice_id IS NULL AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
 	for rows.Next() {
 		var row BankRow
 		var err error
-		row.Posting, err = scanPostingRow(rows)
+		row.Transaction, err = scanTransactionRow(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -146,24 +146,24 @@ func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	keys, err := s.db.Query(`SELECT provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys WHERE user_id = :user_id`)
+	keys, err := s.db.Query(`SELECT provider, bridge_account_id, bank_transaction_id, transaction_id FROM transaction_sync_keys WHERE user_id = :user_id`)
 	if err != nil {
 		return nil, err
 	}
 	defer keys.Close()
-	byPosting := map[string][]BankKey{}
+	byTransaction := map[string][]BankKey{}
 	for keys.Next() {
-		var provider, account, transaction, postingID string
-		if err := keys.Scan(&provider, &account, &transaction, &postingID); err != nil {
+		var provider, account, transaction, transactionID string
+		if err := keys.Scan(&provider, &account, &transaction, &transactionID); err != nil {
 			return nil, err
 		}
-		byPosting[postingID] = append(byPosting[postingID], BankKey{Provider: provider, AccountID: account, TransactionID: transaction})
+		byTransaction[transactionID] = append(byTransaction[transactionID], BankKey{Provider: provider, AccountID: account, TransactionID: transaction})
 	}
 	if err := keys.Err(); err != nil {
 		return nil, err
 	}
 	for i := range out {
-		out[i].Keys = byPosting[out[i].Posting.ID]
+		out[i].Keys = byTransaction[out[i].Transaction.ID]
 	}
 	return out, nil
 }
@@ -178,19 +178,19 @@ func resolveBankKeys(tx *userTx, keys []BankKey) (string, error) {
 		if !validBankKey(key) {
 			return "", fmt.Errorf("bank key requires provider, account, and transaction identities")
 		}
-		var postingID string
-		err := tx.QueryRow(`SELECT posting_id FROM posting_sync_keys WHERE provider = ? AND bridge_account_id = ? AND transaction_id = ? AND user_id = :user_id`,
-			key.Provider, key.AccountID, key.TransactionID).Scan(&postingID)
+		var transactionID string
+		err := tx.QueryRow(`SELECT transaction_id FROM transaction_sync_keys WHERE provider = ? AND bridge_account_id = ? AND bank_transaction_id = ? AND user_id = :user_id`,
+			key.Provider, key.AccountID, key.TransactionID).Scan(&transactionID)
 		if err == sql.ErrNoRows {
 			continue
 		}
 		if err != nil {
 			return "", err
 		}
-		if resolved != "" && resolved != postingID {
-			return "", fmt.Errorf("bank keys identify different postings")
+		if resolved != "" && resolved != transactionID {
+			return "", fmt.Errorf("bank keys identify different transactions")
 		}
-		resolved = postingID
+		resolved = transactionID
 	}
 	return resolved, nil
 }
@@ -231,18 +231,18 @@ func batchResolveBankKeys(tx *userTx, directives []BankDirective) (map[BankKey]s
 			tuples[i] = "(?,?,?)"
 			args = append(args, key.Provider, key.AccountID, key.TransactionID)
 		}
-		rows, err := tx.Query(`SELECT provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys WHERE (provider, bridge_account_id, transaction_id) IN (`+strings.Join(tuples, ",")+`) AND user_id = :user_id`, args...)
+		rows, err := tx.Query(`SELECT provider, bridge_account_id, bank_transaction_id, transaction_id FROM transaction_sync_keys WHERE (provider, bridge_account_id, bank_transaction_id) IN (`+strings.Join(tuples, ",")+`) AND user_id = :user_id`, args...)
 		if err != nil {
 			return nil, err
 		}
 		for rows.Next() {
 			var key BankKey
-			var postingID string
-			if err := rows.Scan(&key.Provider, &key.AccountID, &key.TransactionID, &postingID); err != nil {
+			var transactionID string
+			if err := rows.Scan(&key.Provider, &key.AccountID, &key.TransactionID, &transactionID); err != nil {
 				rows.Close()
 				return nil, err
 			}
-			out[key] = postingID
+			out[key] = transactionID
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
@@ -259,19 +259,19 @@ func resolveBankKeysFromMap(keys []BankKey, byKey map[BankKey]string) (string, e
 		if !validBankKey(key) {
 			return "", fmt.Errorf("bank key requires provider, account, and transaction identities")
 		}
-		postingID, ok := byKey[key]
+		transactionID, ok := byKey[key]
 		if !ok {
 			continue
 		}
-		if resolved != "" && resolved != postingID {
-			return "", fmt.Errorf("bank keys identify different postings")
+		if resolved != "" && resolved != transactionID {
+			return "", fmt.Errorf("bank keys identify different transactions")
 		}
-		resolved = postingID
+		resolved = transactionID
 	}
 	return resolved, nil
 }
 
-func recordBankKeys(tx *userTx, postingID string, keys []BankKey) error {
+func recordBankKeys(tx *userTx, transactionID string, keys []BankKey) error {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -284,34 +284,34 @@ func recordBankKeys(tx *userTx, postingID string, keys []BankKey) error {
 	args := make([]any, 0, len(keys)*4)
 	for i, key := range keys {
 		placeholders[i] = "(?,?,?,?, :user_id)"
-		args = append(args, key.Provider, key.AccountID, key.TransactionID, postingID)
+		args = append(args, key.Provider, key.AccountID, key.TransactionID, transactionID)
 	}
-	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES `+strings.Join(placeholders, ","),
+	_, err := tx.Exec(`INSERT INTO transaction_sync_keys (provider, bridge_account_id, bank_transaction_id, transaction_id, user_id) VALUES `+strings.Join(placeholders, ","),
 		args...)
 	return err
 }
 
-func writeBankValues(tx *userTx, id string, posting types.Posting) error {
+func writeBankValues(tx *userTx, id string, transaction types.Transaction) error {
 	// A claimed row is the owner's recorded occurrence: the feed still
 	// delivers its values (same-key settles and converts land here), but it
 	// never returns to a pending seed while the authorization still lingers
 	// in the feed, and it stays enabled so it keeps participating.
 	var claimed int
-	_ = tx.QueryRow(`SELECT 1 FROM posting_claims WHERE posting_id = ? AND user_id = :user_id`, id).Scan(&claimed)
-	pending, enabled := posting.Pending, posting.Enabled
+	_ = tx.QueryRow(`SELECT 1 FROM transaction_claims WHERE transaction_id = ? AND user_id = :user_id`, id).Scan(&claimed)
+	pending, enabled := transaction.Pending, transaction.Enabled
 	if claimed != 0 {
 		pending, enabled = false, true
 	}
-	amount, err := json.Marshal(posting.Amount)
+	amount, err := json.Marshal(transaction.Amount)
 	if err != nil {
 		return err
 	}
-	destinations, err := json.Marshal(posting.Destinations)
+	destinations, err := json.Marshal(transaction.Destinations)
 	if err != nil {
 		return err
 	}
-	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
-		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(pending), boolToInt(posting.Void), id, SourceUser)
+	result, err := tx.Exec(`UPDATE transactions SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
+		transaction.Name, nullable(transaction.SourceAccountID), string(destinations), string(amount), transaction.PostedTime, transaction.TransactionTime, boolToInt(pending), boolToInt(transaction.Void), id, SourceUser)
 	if err != nil {
 		return err
 	}
@@ -324,35 +324,35 @@ func writeBankValues(tx *userTx, id string, posting types.Posting) error {
 	}
 	// Enabled lives in the sim satellite; the core update above never
 	// touches it.
-	if _, err := tx.Exec(`UPDATE posting_sim SET enabled = ? WHERE posting_id = ? AND user_id = :user_id`,
+	if _, err := tx.Exec(`UPDATE transaction_sim SET enabled = ? WHERE transaction_id = ? AND user_id = :user_id`,
 		boolToInt(enabled), id); err != nil {
 		return err
 	}
 	// Settled conversions and bank refreshes reshape automatic visibility
 	// in the same write, including pending-to-posted transitions and
 	// backdated late inserts, which qualify exactly like pre-existing rows.
-	return refreshVisibilityForPostingTx(tx, id)
+	return refreshVisibilityForTransactionTx(tx, id)
 }
 
-func checkBankPosting(posting types.Posting) error {
-	if posting.Source == "" || posting.Source == SourceUser {
+func checkBankTransaction(transaction types.Transaction) error {
+	if transaction.Source == "" || transaction.Source == SourceUser {
 		return fmt.Errorf("bank rows must carry a non-user source")
 	}
-	if _, ok := mirrorAccount(posting); !ok {
+	if _, ok := mirrorAccount(transaction); !ok {
 		return fmt.Errorf("bank rows must touch a model account")
 	}
 	return nil
 }
 
-// mirrorAccount returns the single model account a bank-mirrored posting
+// mirrorAccount returns the single model account a bank-mirrored transaction
 // touches: the source account for outflows, the first destination for
 // inflows. Bank rows never carry both.
-func mirrorAccount(posting types.Posting) (string, bool) {
-	if posting.SourceAccountID != nil {
-		return *posting.SourceAccountID, true
+func mirrorAccount(transaction types.Transaction) (string, bool) {
+	if transaction.SourceAccountID != nil {
+		return *transaction.SourceAccountID, true
 	}
-	if len(posting.Destinations) > 0 {
-		return posting.Destinations[0], true
+	if len(transaction.Destinations) > 0 {
+		return transaction.Destinations[0], true
 	}
 	return "", false
 }
@@ -362,12 +362,12 @@ func mirrorAccount(posting types.Posting) (string, bool) {
 // behavior: inserts split on the carried lifecycle flag, updates count as
 // refreshes, conversions and void flips count on actual change.
 func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncApplySummary) error {
-	position, err := nextTablePosition(tx, "postings")
+	position, err := nextTablePosition(tx, "transactions")
 	if err != nil {
 		return err
 	}
 	var nextOrder int64
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) FROM posting_sim WHERE user_id = :user_id`).Scan(&nextOrder); err != nil {
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) FROM transaction_sim WHERE user_id = :user_id`).Scan(&nextOrder); err != nil {
 		return fmt.Errorf("read max execution order: %w", err)
 	}
 	nextOrder++
@@ -385,13 +385,13 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			// A voided authorization stops participating: translation
 			// stores pending/void rows disabled, so the transition
 			// clears Enabled alongside the lifecycle flags. Core flags
-			// land in postings, enabled in the sim satellite, in the
+			// land in transactions, enabled in the sim satellite, in the
 			// same transaction; the sim flip runs only when a pending
 			// row actually transitioned. The visibility reference is
 			// deliberately retained (lazy cleanup): every shared read
 			// re-checks void at read time, so the retained row can never
-			// serve a withdrawn posting.
-			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
+			// serve a withdrawn transaction.
+			result, err := tx.Exec(`UPDATE transactions SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
 			if err != nil {
 				return err
 			}
@@ -400,7 +400,7 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 				return err
 			}
 			if count == 1 {
-				if _, err := tx.Exec(`UPDATE posting_sim SET enabled = 0 WHERE posting_id = ? AND user_id = :user_id`, directive.Void); err != nil {
+				if _, err := tx.Exec(`UPDATE transaction_sim SET enabled = 0 WHERE transaction_id = ? AND user_id = :user_id`, directive.Void); err != nil {
 					return err
 				}
 				summary.PendingDeleted++
@@ -408,13 +408,13 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 		case directive.Convert != nil:
 			conversion := directive.Convert
 			if conversion.ID == "" {
-				return fmt.Errorf("bank conversion requires a posting ID")
+				return fmt.Errorf("bank conversion requires a transaction ID")
 			}
-			if err := checkBankPosting(conversion.Posting); err != nil {
+			if err := checkBankTransaction(conversion.Transaction); err != nil {
 				return err
 			}
 			var present int
-			err := tx.QueryRow(`SELECT 1 FROM postings WHERE id = ? AND user_id = :user_id`, conversion.ID).Scan(&present)
+			err := tx.QueryRow(`SELECT 1 FROM transactions WHERE id = ? AND user_id = :user_id`, conversion.ID).Scan(&present)
 			if err == sql.ErrNoRows {
 				// The row was removed after the snapshot loaded: the
 				// values have nowhere to land, and the removal stands.
@@ -423,10 +423,10 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			if err != nil {
 				return err
 			}
-			if err := writeBankValues(tx, conversion.ID, conversion.Posting); err != nil {
+			if err := writeBankValues(tx, conversion.ID, conversion.Transaction); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(`DELETE FROM posting_sync_keys WHERE posting_id = ? AND user_id = :user_id`, conversion.ID); err != nil {
+			if _, err := tx.Exec(`DELETE FROM transaction_sync_keys WHERE transaction_id = ? AND user_id = :user_id`, conversion.ID); err != nil {
 				return err
 			}
 			if err := recordBankKeys(tx, conversion.ID, conversion.AddKeys); err != nil {
@@ -440,35 +440,35 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			summary.SettledConverted++
 		case directive.Upsert != nil:
 			upsert := directive.Upsert
-			if err := checkBankPosting(upsert.Posting); err != nil {
+			if err := checkBankTransaction(upsert.Transaction); err != nil {
 				return err
 			}
 			if len(upsert.Keys) == 0 {
 				return fmt.Errorf("bank upsert requires at least one key")
 			}
-			postingID, err := resolveBankKeysFromMap(upsert.Keys, byKey)
+			transactionID, err := resolveBankKeysFromMap(upsert.Keys, byKey)
 			if err != nil {
 				return err
 			}
-			posting := upsert.Posting
-			if postingID == "" {
+			transaction := upsert.Transaction
+			if transactionID == "" {
 				// The adapter carries the resolved participation state
 				// (settled on, pending off); the store never overrides it.
 				// Execution order always allocates fresh from the batch
 				// counter, ignoring any carried value.
-				posting.ExecutionOrder = nextOrder
+				transaction.ExecutionOrder = nextOrder
 				nextOrder++
-				posting.ID, err = newRowID()
+				transaction.ID, err = newRowID()
 				if err != nil {
 					return err
 				}
-				if err := claimRowID(tx, posting.ID, "posting"); err != nil {
+				if err := claimRowID(tx, transaction.ID, "transaction"); err != nil {
 					return err
 				}
-				if err := insertPosting(tx, position, &posting, posting.Source); err != nil {
+				if err := insertTransaction(tx, position, &transaction, transaction.Source); err != nil {
 					return err
 				}
-				if err := recordBankKeys(tx, posting.ID, upsert.Keys); err != nil {
+				if err := recordBankKeys(tx, transaction.ID, upsert.Keys); err != nil {
 					return err
 				}
 				if upsert.Facts != nil {
@@ -477,15 +477,15 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 					}
 				}
 				position++
-				if posting.Pending {
+				if transaction.Pending {
 					summary.PendingInserted++
 				} else {
 					summary.SettledInserted++
 				}
 				continue
 			}
-			posting.ID = postingID
-			if err := writeBankValues(tx, posting.ID, posting); err != nil {
+			transaction.ID = transactionID
+			if err := writeBankValues(tx, transaction.ID, transaction); err != nil {
 				return err
 			}
 			if upsert.Facts != nil {

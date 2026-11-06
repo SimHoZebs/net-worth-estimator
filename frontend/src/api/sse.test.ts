@@ -17,7 +17,7 @@ const result = {
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
-		postingFulfillment: [],
+		transactionFulfillment: [],
 	},
 } as const;
 

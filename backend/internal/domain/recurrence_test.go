@@ -6,7 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Claim linkage: a manual posting records the actual for one scheduled rule
+// Claim linkage: a manual transaction records the actual for one scheduled rule
 // occurrence. History replays the actual and skips the generated occurrence,
 // so the balance takes one hit instead of two. Future occurrences are
 // unaffected.
@@ -21,16 +21,16 @@ func claimTestModel() *types.FinancialModel {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: checking, Balance: 10000, ObservedAt: 1764633599},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{
 				ID: "rent-feb-actual", Name: "February rent (actual)",
 				SourceAccountID: &checking,
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "950"},
 				},
 				PostedTime: 1770249600, TransactionTime: 1770249600,
-				Claim: &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"},
+				Claim: &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"},
 
 				Enabled: true,
 			},
@@ -39,7 +39,7 @@ func claimTestModel() *types.FinancialModel {
 			{
 				ID: "rent", Name: "Rent",
 				SourceAccountID: &checking,
-				Amount: types.PostingAmountResolution{
+				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "1000"},
 				},
@@ -87,7 +87,7 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 	if got := historicalBalance(t, path, "2026-02-05", "checking"); got != 8050 {
 		t.Fatalf("checking after actual = %v, want 8050 (one hit, not two)", got)
 	}
-	buckets := path.ProjectionStartPostingState.RealizedPostingAmountsByYear
+	buckets := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear
 	// Timestamp-only replay includes the start-day rule through the cut, so
 	// January plus March anchor in history; February stays claimed.
 	if buckets["rent"]["2026"] != 2000 {
@@ -100,7 +100,7 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 
 func TestUnclaimedOccurrenceReplaysNormally(t *testing.T) {
 	model := claimTestModel()
-	model.Postings[0].Claim = nil
+	model.Transactions[0].Claim = nil
 	path, _, err := ProjectRawFinancialModel(model, claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
@@ -122,7 +122,7 @@ func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
 		t.Fatalf("March history = %v, want 7050 (Jan plus Feb actual plus March)", got)
 	}
 	for _, event := range path.TransactionEvents {
-		if event.Origin.PostingID == "rent" && event.Date == "2026-03-01" {
+		if event.Origin.TransactionID == "rent" && event.Date == "2026-03-01" {
 			t.Fatalf("March rent must not simulate twice (already in history)")
 		}
 	}
@@ -131,18 +131,18 @@ func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
 func TestClaimValidation(t *testing.T) {
 	cases := []struct {
 		name  string
-		claim *types.PostingClaim
+		claim *types.TransactionClaim
 		code  string
 	}{
-		{"missing rule", &types.PostingClaim{ScheduleID: "ghost", OccurrenceDate: "2026-02-01"}, "posting.claim.schedule.missing"},
-		{"unscheduled date", &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-15"}, "posting.claim.date.unscheduled"},
-		{"before rule start", &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2025-12-01"}, "posting.claim.date.range"},
-		{"bad date format", &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "Feb 1"}, "posting.claim.date.format"},
+		{"missing rule", &types.TransactionClaim{ScheduleID: "ghost", OccurrenceDate: "2026-02-01"}, "transaction.claim.schedule.missing"},
+		{"unscheduled date", &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-15"}, "transaction.claim.date.unscheduled"},
+		{"before rule start", &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2025-12-01"}, "transaction.claim.date.range"},
+		{"bad date format", &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "Feb 1"}, "transaction.claim.date.format"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			model := claimTestModel()
-			model.Postings[0].Claim = testCase.claim
+			model.Transactions[0].Claim = testCase.claim
 			found := false
 			for _, issue := range ValidateFinancialModel(model) {
 				if issue.Code == testCase.code {
@@ -158,17 +158,17 @@ func TestClaimValidation(t *testing.T) {
 
 func TestDuplicateClaimRejected(t *testing.T) {
 	model := claimTestModel()
-	duplicate := model.Postings[0]
+	duplicate := model.Transactions[0]
 	duplicate.ID = "rent-feb-actual-2"
-	model.Postings = append(model.Postings, duplicate)
+	model.Transactions = append(model.Transactions, duplicate)
 	found := false
 	for _, issue := range ValidateFinancialModel(model) {
-		if issue.Code == "posting.claim.duplicate" {
+		if issue.Code == "transaction.claim.duplicate" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected posting.claim.duplicate, got %+v", ValidateFinancialModel(model))
+		t.Fatalf("expected transaction.claim.duplicate, got %+v", ValidateFinancialModel(model))
 	}
 }
 

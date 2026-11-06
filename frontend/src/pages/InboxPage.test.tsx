@@ -15,14 +15,14 @@ function item(overrides: Partial<InboxShareItem> = {}): InboxShareItem {
 	return {
 		kind: "share",
 		ownerUserId: "user:alice",
-		postingId: "posting-1",
+		transactionId: "transaction-1",
 		senderDisplayName: "Alice",
 		status: "pending",
 		unread: true,
 		dismissed: false,
 		receivedAt: 2,
-		posting: {
-			id: "posting-1",
+		transaction: {
+			id: "transaction-1",
 			name: "Dinner bill",
 			sourceAccountId: null,
 			destinations: null,
@@ -58,10 +58,10 @@ function stubInbox(items: InboxShareItem[], unreadCount = items.length) {
 								: path === "/v1/inbox/shares/decline"
 									? "declined"
 									: last.status,
-						copyPostingId:
+						copyTransactionId:
 							path === "/v1/inbox/shares/accept"
 								? "copy-1"
-								: last.copyPostingId,
+								: last.copyTransactionId,
 						dismissed:
 							path === "/v1/inbox/shares/dismiss" ? true : last.dismissed,
 						unread: path === "/v1/inbox/shares/read" ? false : last.unread,
@@ -122,7 +122,9 @@ it("accepts a share without duplicating the request", async () => {
 			requested.filter((entry) => entry === "POST /v1/inbox/shares/accept"),
 		).toHaveLength(1),
 	);
-	expect(bodies).toEqual([{ owner: "users/alice", postingId: "posting-1" }]);
+	expect(bodies).toEqual([
+		{ owner: "users/alice", transactionId: "transaction-1" },
+	]);
 });
 
 it("hides dismissed shares until the toggle reveals them", async () => {
@@ -135,7 +137,9 @@ it("hides dismissed shares until the toggle reveals them", async () => {
 });
 
 it("explains canceled shares without a preview", async () => {
-	stubInbox([item({ status: "canceled", unread: false, posting: undefined })]);
+	stubInbox([
+		item({ status: "canceled", unread: false, transaction: undefined }),
+	]);
 	render(<InboxPage />, { wrapper });
 	fireEvent.click(screen.getByRole("tab", { name: "Canceled" }));
 	await waitFor(() =>

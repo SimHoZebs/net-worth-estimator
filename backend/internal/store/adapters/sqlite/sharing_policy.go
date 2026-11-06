@@ -2,8 +2,8 @@
 // preference for one group: enabled flag (default off by absence),
 // selected owner-held accounts, a single transaction-date interval, and a
 // version bumped on every committed change for stale-generation fencing.
-// Eligibility itself derives live from current posting rows through
-// store.PolicyCoversPosting; no per-posting state is stored here.
+// Eligibility itself derives live from current transaction rows through
+// store.PolicyCoversTransaction; no per-transaction state is stored here.
 package sqlite
 
 import (
@@ -221,11 +221,11 @@ func (d *Database) ListSharingPolicies(ownerID string) ([]store.SharingPolicy, e
 	return policies, rows.Err()
 }
 
-// policyPosting carries the columns eligibility needs without the amount
+// policyTransaction carries the columns eligibility needs without the amount
 // payload: preview and list paths must never move financial content. It
-// converts to a minimal types.Posting so every path evaluates through the
-// single store.PolicyCoversPosting contract.
-type policyPosting struct {
+// converts to a minimal types.Transaction so every path evaluates through the
+// single store.PolicyCoversTransaction contract.
+type policyTransaction struct {
 	id           string
 	source       *string
 	destinations []string
@@ -233,8 +233,8 @@ type policyPosting struct {
 	void         bool
 }
 
-func (p policyPosting) toPosting() types.Posting {
-	return types.Posting{
+func (p policyTransaction) toTransaction() types.Transaction {
+	return types.Transaction{
 		ID:              p.id,
 		SourceAccountID: p.source,
 		Destinations:    p.destinations,
@@ -243,41 +243,41 @@ func (p policyPosting) toPosting() types.Posting {
 	}
 }
 
-func loadPolicyPostings(db *sql.DB, ownerID string) ([]policyPosting, error) {
-	rows, err := db.Query(`SELECT id, source_account_id, destination_account_ids, transaction_time, void FROM postings WHERE user_id = ?`, ownerID)
+func loadPolicyTransactions(db *sql.DB, ownerID string) ([]policyTransaction, error) {
+	rows, err := db.Query(`SELECT id, source_account_id, destination_account_ids, transaction_time, void FROM transactions WHERE user_id = ?`, ownerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []policyPosting
+	var out []policyTransaction
 	for rows.Next() {
-		var posting policyPosting
+		var transaction policyTransaction
 		var source sql.NullString
 		var destinationsJSON string
 		var voided int
-		if err := rows.Scan(&posting.id, &source, &destinationsJSON, &posting.txnTime, &voided); err != nil {
+		if err := rows.Scan(&transaction.id, &source, &destinationsJSON, &transaction.txnTime, &voided); err != nil {
 			return nil, err
 		}
 		if source.Valid {
 			value := source.String
-			posting.source = &value
+			transaction.source = &value
 		}
 		if destinationsJSON != "" && destinationsJSON != "null" {
-			if err := json.Unmarshal([]byte(destinationsJSON), &posting.destinations); err != nil {
-				return nil, fmt.Errorf("parse posting destinations: %w", err)
+			if err := json.Unmarshal([]byte(destinationsJSON), &transaction.destinations); err != nil {
+				return nil, fmt.Errorf("parse transaction destinations: %w", err)
 			}
 		}
-		posting.void = voided != 0
-		out = append(out, posting)
+		transaction.void = voided != 0
+		out = append(out, transaction)
 	}
 	return out, rows.Err()
 }
 
-func policyPostingEligible(policy store.SharingPolicy, posting policyPosting) bool {
-	return store.PolicyCoversPosting(policy, posting.toPosting())
+func policyTransactionEligible(policy store.SharingPolicy, transaction policyTransaction) bool {
+	return store.PolicyCoversTransaction(policy, transaction.toTransaction())
 }
 
-// PreviewSharingPolicy counts the currently eligible postings for one
+// PreviewSharingPolicy counts the currently eligible transactions for one
 // member's stored policy plus the current audience size. Existing and
 // late-imported in-range rows qualify alike; there is no sync-date filter.
 // The caller (consent UI) pairs these counts with the historical-disclosure
@@ -287,13 +287,13 @@ func (d *Database) PreviewSharingPolicy(ownerID, groupID string) (store.SharingP
 	if err != nil {
 		return store.SharingPolicyPreview{}, err
 	}
-	postings, err := loadPolicyPostings(d.db, ownerID)
+	transactions, err := loadPolicyTransactions(d.db, ownerID)
 	if err != nil {
 		return store.SharingPolicyPreview{}, err
 	}
 	eligible := 0
-	for _, posting := range postings {
-		if policyPostingEligible(policy, posting) {
+	for _, transaction := range transactions {
+		if policyTransactionEligible(policy, transaction) {
 			eligible++
 		}
 	}
@@ -304,11 +304,11 @@ func (d *Database) PreviewSharingPolicy(ownerID, groupID string) (store.SharingP
 	return store.SharingPolicyPreview{
 		OwnerUserID: policy.OwnerUserID, GroupID: policy.GroupID, Enabled: policy.Enabled,
 		AccountIDs: policy.AccountIDs, StartDate: policy.StartDate, EndDate: policy.EndDate,
-		Version: policy.Version, EligiblePostings: eligible, MemberCount: members,
+		Version: policy.Version, EligibleTransactions: eligible, MemberCount: members,
 	}, nil
 }
 
-// PreviewSharingPolicyDraft counts the currently eligible postings for
+// PreviewSharingPolicyDraft counts the currently eligible transactions for
 // unsaved preference values plus the current audience size, without
 // persisting anything. The caller must currently belong to the group;
 // anything else reports ErrNotFound so group membership is not enumerable.
@@ -348,7 +348,7 @@ func (d *Database) PreviewSharingPolicyDraft(ownerID, groupID string, input stor
 	if err := tx.Commit(); err != nil {
 		return store.SharingPolicyPreview{}, err
 	}
-	postings, err := loadPolicyPostings(d.db, ownerID)
+	transactions, err := loadPolicyTransactions(d.db, ownerID)
 	if err != nil {
 		return store.SharingPolicyPreview{}, err
 	}
@@ -357,8 +357,8 @@ func (d *Database) PreviewSharingPolicyDraft(ownerID, groupID string, input stor
 		AccountIDs: normalized.AccountIDs, StartDate: normalized.StartDate, EndDate: normalized.EndDate,
 	}
 	eligible := 0
-	for _, posting := range postings {
-		if policyPostingEligible(draft, posting) {
+	for _, transaction := range transactions {
+		if policyTransactionEligible(draft, transaction) {
 			eligible++
 		}
 	}
@@ -369,7 +369,7 @@ func (d *Database) PreviewSharingPolicyDraft(ownerID, groupID string, input stor
 	return store.SharingPolicyPreview{
 		OwnerUserID: ownerID, GroupID: groupID, Enabled: normalized.Enabled,
 		AccountIDs: normalized.AccountIDs, StartDate: normalized.StartDate, EndDate: normalized.EndDate,
-		EligiblePostings: eligible, MemberCount: members,
+		EligibleTransactions: eligible, MemberCount: members,
 	}, nil
 }
 
@@ -459,13 +459,13 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 }
 
 // automaticPolicyAccess evaluates the policy-derived automatic reason for
-// one posting: an enabled policy of the owner for a group where both the
-// owner and the requester hold current membership, covering the posting's
+// one transaction: an enabled policy of the owner for a group where both the
+// owner and the requester hold current membership, covering the transaction's
 // current accounts and transaction date. Exclusions are checked by the
 // caller before this runs, so a surviving policy always composes under
 // them, never over them.
-func (d *Database) automaticPolicyAccess(ownerID, postingID, requesterID string) (store.SharedPostingAccess, error) {
-	denied := store.SharedPostingAccess{Allowed: false}
+func (d *Database) automaticPolicyAccess(ownerID, transactionID, requesterID string) (store.SharedTransactionAccess, error) {
+	denied := store.SharedTransactionAccess{Allowed: false}
 	rows, err := d.db.Query(`SELECT sp.owner_user_id, sp.group_id, sp.enabled, sp.account_ids_json, sp.start_date, sp.end_date, sp.version, sp.updated_at
 		FROM sharing_policies sp
 		JOIN group_members requester ON requester.group_id = sp.group_id AND requester.user_id = ?
@@ -495,27 +495,27 @@ func (d *Database) automaticPolicyAccess(ownerID, postingID, requesterID string)
 	var destinationsJSON string
 	var txnTime int64
 	var voided int
-	err = d.db.QueryRow(`SELECT source_account_id, destination_account_ids, transaction_time, void FROM postings WHERE user_id = ? AND id = ?`,
-		ownerID, postingID).Scan(&source, &destinationsJSON, &txnTime, &voided)
+	err = d.db.QueryRow(`SELECT source_account_id, destination_account_ids, transaction_time, void FROM transactions WHERE user_id = ? AND id = ?`,
+		ownerID, transactionID).Scan(&source, &destinationsJSON, &txnTime, &voided)
 	if errors.Is(err, sql.ErrNoRows) {
 		return denied, nil
 	}
 	if err != nil {
 		return denied, err
 	}
-	posting := policyPosting{txnTime: txnTime, void: voided != 0}
+	transaction := policyTransaction{txnTime: txnTime, void: voided != 0}
 	if source.Valid {
 		value := source.String
-		posting.source = &value
+		transaction.source = &value
 	}
 	if destinationsJSON != "" && destinationsJSON != "null" {
-		if err := json.Unmarshal([]byte(destinationsJSON), &posting.destinations); err != nil {
-			return denied, fmt.Errorf("parse posting destinations: %w", err)
+		if err := json.Unmarshal([]byte(destinationsJSON), &transaction.destinations); err != nil {
+			return denied, fmt.Errorf("parse transaction destinations: %w", err)
 		}
 	}
 	for _, policy := range policies {
-		if policyPostingEligible(policy, posting) {
-			return store.SharedPostingAccess{Allowed: true, Reason: store.SharingPolicyReasonAutomatic}, nil
+		if policyTransactionEligible(policy, transaction) {
+			return store.SharedTransactionAccess{Allowed: true, Reason: store.SharingPolicyReasonAutomatic}, nil
 		}
 	}
 	return denied, nil

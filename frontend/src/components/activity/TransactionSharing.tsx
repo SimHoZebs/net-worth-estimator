@@ -5,10 +5,10 @@ import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { notifyError, notifySuccess } from "../../state/notifications.ts";
 import { mintShareRequestId } from "../../pages/sharingApi.ts";
 import {
-	useExcludeSharedPosting,
-	useGrantSharedPosting,
+	useExcludeSharedTransaction,
+	useGrantSharedTransaction,
 	useRemoveSharedExclusion,
-	useRevokeSharedPosting,
+	useRevokeSharedTransaction,
 	useSharingGrants,
 } from "../../state/sharing.ts";
 import { useGroups } from "../../state/groups.ts";
@@ -21,17 +21,17 @@ import { useGroups } from "../../state/groups.ts";
  * with a message safe to show.
  */
 export function TransactionSharing({
-	postingId,
+	transactionId,
 	readOnly,
 }: {
-	postingId: string;
+	transactionId: string;
 	readOnly: boolean;
 }) {
 	const grantsQuery = useSharingGrants();
 	const groupsQuery = useGroups();
-	const grantMutation = useGrantSharedPosting();
-	const revokeMutation = useRevokeSharedPosting();
-	const excludeMutation = useExcludeSharedPosting();
+	const grantMutation = useGrantSharedTransaction();
+	const revokeMutation = useRevokeSharedTransaction();
+	const excludeMutation = useExcludeSharedTransaction();
 	const removeExclusionMutation = useRemoveSharedExclusion();
 
 	const [shareTarget, setShareTarget] = useState("");
@@ -41,8 +41,10 @@ export function TransactionSharing({
 
 	const intents = useMemo(
 		() =>
-			(grantsQuery.data ?? []).filter((grant) => grant.postingId === postingId),
-		[grantsQuery.data, postingId],
+			(grantsQuery.data ?? []).filter(
+				(grant) => grant.transactionId === transactionId,
+			),
+		[grantsQuery.data, transactionId],
 	);
 	const groups = useMemo(() => groupsQuery.data ?? [], [groupsQuery.data]);
 	const groupName = useMemo(() => {
@@ -100,7 +102,7 @@ export function TransactionSharing({
 		void run(
 			() =>
 				grantMutation.mutateAsync({
-					postingId,
+					transactionId,
 					audienceId: shareTarget,
 					requestId,
 				}),
@@ -115,7 +117,7 @@ export function TransactionSharing({
 		void run(
 			() =>
 				excludeMutation.mutateAsync({
-					postingId,
+					transactionId,
 					audienceType: wildcard ? "all" : "group",
 					audienceId: wildcard ? "" : hideTarget,
 					requestId,
@@ -131,7 +133,7 @@ export function TransactionSharing({
 		void run(
 			() =>
 				revokeMutation.mutateAsync({
-					postingId,
+					transactionId,
 					audienceType,
 					audienceId,
 					requestId,
@@ -145,7 +147,7 @@ export function TransactionSharing({
 		void run(
 			() =>
 				removeExclusionMutation.mutateAsync({
-					postingId,
+					transactionId,
 					audienceType,
 					audienceId,
 					requestId,
@@ -239,7 +241,7 @@ export function TransactionSharing({
 					<div className="grid gap-2">
 						<label
 							className="grid gap-1 text-sm"
-							htmlFor={`share-group-${postingId}`}
+							htmlFor={`share-group-${transactionId}`}
 						>
 							<span className="font-medium">Share with a group</span>
 							<span className="text-muted">
@@ -249,7 +251,7 @@ export function TransactionSharing({
 						</label>
 						<div className="flex flex-wrap gap-2">
 							<select
-								id={`share-group-${postingId}`}
+								id={`share-group-${transactionId}`}
 								value={shareTarget}
 								disabled={busy || wildcardHidden || shareOptions.length === 0}
 								onChange={(event) => {
@@ -287,7 +289,7 @@ export function TransactionSharing({
 					<div className="grid gap-2">
 						<label
 							className="grid gap-1 text-sm"
-							htmlFor={`hide-group-${postingId}`}
+							htmlFor={`hide-group-${transactionId}`}
 						>
 							<span className="font-medium">Hide from a group or everyone</span>
 							<span className="text-muted">
@@ -297,7 +299,7 @@ export function TransactionSharing({
 						</label>
 						<div className="flex flex-wrap gap-2">
 							<select
-								id={`hide-group-${postingId}`}
+								id={`hide-group-${transactionId}`}
 								value={hideTarget}
 								disabled={busy || (wildcardHidden && hideOptions.length === 0)}
 								onChange={(event) => {

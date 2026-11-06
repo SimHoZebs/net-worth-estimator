@@ -81,22 +81,22 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	_ = created
 }
 
-func TestPostingEditLeavesStandalonePurchasesUntouched(t *testing.T) {
+func TestTransactionEditLeavesStandalonePurchasesUntouched(t *testing.T) {
 	store := openTestStore(t)
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
-	posting := testPostingFixture("01900000-0000-7000-8000-000000000002")
+	transaction := testTransactionFixture("01900000-0000-7000-8000-000000000002")
 	account := "checking"
 	if _, err := store.CreatePlannedPurchase(types.PlannedPurchase{ID: "01900000-0000-7000-8000-000000000003", Name: "Desk", FundingAccountID: &account, Cost: 100, EarliestDate: "2026-02-01", Priority: 2, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.CreatePosting(posting); err != nil {
-		t.Fatalf("seed posting: %v", err)
+	if _, err := store.CreateTransaction(transaction); err != nil {
+		t.Fatalf("seed transaction: %v", err)
 	}
-	renamed := testPostingFixture("01900000-0000-7000-8000-000000000002")
+	renamed := testTransactionFixture("01900000-0000-7000-8000-000000000002")
 	renamed.Name = "Renamed"
-	_, err := store.UpdatePosting(renamed)
+	_, err := store.UpdateTransaction(renamed)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}

@@ -37,7 +37,7 @@ var ErrPatternToNewScheduleConflict = errors.New("recurring pattern changed or a
 
 // ErrPatternToExistingScheduleInvalid reports an add request that cannot be honored:
 // a non-recurring finding, incoherent evidence, a missing rule, or a claim
-// update naming no posting, rule, or date. Handlers map it to 422 and may
+// update naming no transaction, rule, or date. Handlers map it to 422 and may
 // show its message. Disabled rules, routing mismatches, and off-schedule
 // patterns instead preview as Claimable=false with a plain-language reason.
 var ErrPatternToExistingScheduleInvalid = errors.New("recurring pattern cannot claim that forecast rule")
@@ -77,7 +77,7 @@ var ErrSettlementConflict = errors.New("settlement conflicts with a recorded set
 var ErrAccountSupersedeInvalid = errors.New("account cannot be replaced by a synced account")
 
 var (
-	ErrReceiptNotFound   = errors.New("receipt or posting not found")
+	ErrReceiptNotFound   = errors.New("receipt or transaction not found")
 	ErrReceiptConflict   = errors.New("receipt changed; reload before retrying")
 	ErrReceiptDuplicate  = errors.New("this image is already attached to the transaction")
 	ErrReceiptIneligible = errors.New("receipts require a saved settled transaction")
@@ -101,7 +101,7 @@ func IsNotFound(err error) bool {
 // IsIDConflict reports a duplicate-ID error.
 func IsIDConflict(err error) bool { return isRowCode(err, "id-conflict") }
 
-// IsInvalidID reports a posting ID that is not a canonical UUID.
+// IsInvalidID reports a transaction ID that is not a canonical UUID.
 func IsInvalidID(err error) bool { return isRowCode(err, "invalid-id") }
 
 // IsSyncOwned reports a write refused on a sync-owned row.

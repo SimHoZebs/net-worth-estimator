@@ -118,16 +118,16 @@ export function deriveFundingGaps({
 	transactions,
 	startDate,
 	projection,
-	postingIds = null,
+	transactionIds = null,
 }: {
 	accounts: Account[];
 	transactions: Transaction[];
 	startDate: string;
 	projection: Projection | null;
-	postingIds?: readonly string[] | null;
+	transactionIds?: readonly string[] | null;
 }): FundingGap[] {
 	if (!projection) return [];
-	const selectedIds = postingIds === null ? null : new Set(postingIds);
+	const selectedIds = transactionIds === null ? null : new Set(transactionIds);
 	const current = projection;
 	// Execution order is projection.transactions order (date, sequence).
 	const failures = current.transactions.filter(

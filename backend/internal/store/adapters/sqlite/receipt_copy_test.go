@@ -11,7 +11,7 @@ import (
 func TestReceiptCopyUsesBlobPortsAndRollsBackUnpublishedObjects(t *testing.T) {
 	source := openSharedTestDatabase(t)
 	s := privateTestPlan(t, source, "copy-source")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	image := types.ReceiptImage{Bytes: []byte("source pixels"), MediaType: "image/png"}
 	r, err := s.CreateReceipt(t.Context(), p.ID, "source.png", image)
 	if err != nil {

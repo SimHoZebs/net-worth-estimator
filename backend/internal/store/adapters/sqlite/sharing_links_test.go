@@ -3,7 +3,7 @@ package sqlite
 // Stable linked-transaction representation (FND-04): distinct source
 // transaction ID, link ID, source revision, recipient owner, and
 // sharing-grant identifiers; recipient edits surviving refresh and
-// revocation; no duplicate bank postings from accepting shares.
+// revocation; no duplicate bank transactions from accepting shares.
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const sharingBankPosting = "01900000-0000-7000-8000-0000000000b1"
+const sharingBankTransaction = "01900000-0000-7000-8000-0000000000b1"
 
 func sharingLink(t *testing.T, d *Database, recipient, copyID string) store.SharingLink {
 	t.Helper()
@@ -26,25 +26,25 @@ func sharingLink(t *testing.T, d *Database, recipient, copyID string) store.Shar
 }
 
 // The link binds every required identity, each distinct and stable: the
-// source transaction (owner plus posting), the deterministic link ID, the
+// source transaction (owner plus transaction), the deterministic link ID, the
 // source revision, the recipient owner (user plus copy), and the
 // authorizing grant identifiers.
 func TestSharingLinkIdentities(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	source := sharingPosting(t, storeA, sharingPostingA)
+	source := sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	link := sharingLink(t, d, bob, copied.ID)
 
-	wantLinkID := store.SharingLinkID(alice, sharingPostingA, bob)
+	wantLinkID := store.SharingLinkID(alice, sharingTransactionA, bob)
 	if link.LinkID != wantLinkID {
 		t.Fatalf("link ID = %q, want deterministic %q", link.LinkID, wantLinkID)
 	}
@@ -54,8 +54,8 @@ func TestSharingLinkIdentities(t *testing.T) {
 	if link.LinkID == source.ID || link.LinkID == copied.ID {
 		t.Fatal("link ID collides with a row ID namespace")
 	}
-	if link.SourceOwnerID != alice || link.SourcePostingID != sharingPostingA {
-		t.Fatalf("source identity = %q/%q, want %q/%q", link.SourceOwnerID, link.SourcePostingID, alice, sharingPostingA)
+	if link.SourceOwnerID != alice || link.SourceTransactionID != sharingTransactionA {
+		t.Fatalf("source identity = %q/%q, want %q/%q", link.SourceOwnerID, link.SourceTransactionID, alice, sharingTransactionA)
 	}
 	revision, err := store.SharingSourceRevision(source)
 	if err != nil {
@@ -64,8 +64,8 @@ func TestSharingLinkIdentities(t *testing.T) {
 	if link.SourceRevision != revision || link.SourceRevision == "" {
 		t.Fatalf("source revision = %q, want %q", link.SourceRevision, revision)
 	}
-	if link.RecipientUserID != bob || link.CopyPostingID != copied.ID {
-		t.Fatalf("recipient identity = %q/%q, want %q/%q", link.RecipientUserID, link.CopyPostingID, bob, copied.ID)
+	if link.RecipientUserID != bob || link.CopyTransactionID != copied.ID {
+		t.Fatalf("recipient identity = %q/%q, want %q/%q", link.RecipientUserID, link.CopyTransactionID, bob, copied.ID)
 	}
 	if link.GrantAudience != store.SharingAudienceUser || link.GrantAudienceID != bob || link.GrantReason != "manual-user" {
 		t.Fatalf("grant identity = %q/%q/%q, want user/%q/manual-user",
@@ -114,16 +114,16 @@ func TestSharingCopyIdempotent(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	first, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	first, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	second, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,15 +134,15 @@ func TestSharingCopyIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 {
-		t.Fatalf("recipient postings = %d, want 1", len(model.Postings))
+	if len(model.Transactions) != 1 {
+		t.Fatalf("recipient transactions = %d, want 1", len(model.Transactions))
 	}
 	var provenance int
-	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_posting_id = ?`,
-		bob, alice, sharingPostingA).Scan(&provenance); err != nil || provenance != 1 {
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_transaction_id = ?`,
+		bob, alice, sharingTransactionA).Scan(&provenance); err != nil || provenance != 1 {
 		t.Fatalf("link rows = %d, %v, want 1", provenance, err)
 	}
-	if link := sharingLink(t, d, bob, first.ID); link.LinkID != store.SharingLinkID(alice, sharingPostingA, bob) {
+	if link := sharingLink(t, d, bob, first.ID); link.LinkID != store.SharingLinkID(alice, sharingTransactionA, bob) {
 		t.Fatalf("link drifted across repeat accept: %q", link.LinkID)
 	}
 }
@@ -154,19 +154,19 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	edited, err := storeB.UpdatePosting(types.Posting{
+	edited, err := storeB.UpdateTransaction(types.Transaction{
 		ID: copied.ID, Name: "Recipient budget", SourceAccountID: copied.SourceAccountID,
 		Destinations: copied.Destinations,
-		Amount:       types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "99"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:       types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "99"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:   copied.PostedTime, TransactionTime: copied.TransactionTime, Enabled: copied.Enabled,
 	})
 	if err != nil {
@@ -184,18 +184,18 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].Name != edited.Name {
-		t.Fatalf("refresh rewrote the recipient copy: %+v", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].Name != edited.Name {
+		t.Fatalf("refresh rewrote the recipient copy: %+v", model.Transactions)
 	}
 
 	// The source owner edits their original. Refresh reports the change
 	// on the link while the recipient's edited copy stays untouched.
-	source, err := d.ReadSharedPosting(alice, sharingPostingA, alice)
+	source, err := d.ReadSharedTransaction(alice, sharingTransactionA, alice)
 	if err != nil {
 		t.Fatal(err)
 	}
 	source.Name = "Owner renamed"
-	if _, err := storeA.UpdatePosting(source); err != nil {
+	if _, err := storeA.UpdateTransaction(source); err != nil {
 		t.Fatal(err)
 	}
 	changed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
@@ -212,8 +212,8 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].Name != "Recipient budget" {
-		t.Fatalf("source change overwrote the recipient copy: %+v", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].Name != "Recipient budget" {
+		t.Fatalf("source change overwrote the recipient copy: %+v", model.Transactions)
 	}
 	if link := sharingLink(t, d, bob, copied.ID); link.SourceRevision != changed.CurrentSourceRevision {
 		t.Fatalf("link revision = %q, want recorded %q", link.SourceRevision, changed.CurrentSourceRevision)
@@ -233,17 +233,17 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	before := sharingLink(t, d, bob, copied.ID)
-	if _, err := storeB.UpdatePosting(types.Posting{
+	if _, err := storeB.UpdateTransaction(types.Transaction{
 		ID: copied.ID, Name: "Recipient edited", SourceAccountID: copied.SourceAccountID,
 		Destinations: copied.Destinations, Amount: copied.Amount,
 		PostedTime: copied.PostedTime, TransactionTime: copied.TransactionTime, Enabled: copied.Enabled,
@@ -251,7 +251,7 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	revoked, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
@@ -271,12 +271,12 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].Name != "Recipient edited" {
-		t.Fatalf("revocation touched the recipient copy: %+v", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].Name != "Recipient edited" {
+		t.Fatalf("revocation touched the recipient copy: %+v", model.Transactions)
 	}
 
 	// Re-grant heals the same link: no new identity, revision current.
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	healed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
@@ -288,31 +288,31 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 	}
 }
 
-// Accepting a settled bank posting mints an owner-authored copy with no
-// bank sync key: the share never manufactures a duplicate bank posting,
+// Accepting a settled bank transaction mints an owner-authored copy with no
+// bank sync key: the share never manufactures a duplicate bank transaction,
 // and repeat accepts add no rows on either side.
-func TestSharingCopyOfBankPostingMintsNoDuplicate(t *testing.T) {
+func TestSharingCopyOfBankTransactionMintsNoDuplicate(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, _ := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
 
 	const amountJSON = `{"resolver":"expression","config":{"expression":"50"},"inputs":{}}`
 	for _, stmt := range []string{
-		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id)
-		 VALUES ('` + sharingBankPosting + `', 'Bank charge', 'checking', 'null', '` + amountJSON + `', 1782950400, 1782950400, 'banksync', 0, 0, '` + alice + `')`,
-		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id) VALUES ('` + sharingBankPosting + `', 1, 1, 1, '` + alice + `')`,
-		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + sharingBankPosting + `', 'posting', '` + alice + `')`,
-		`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES ('simplefin', 'bridge-prime', 'tx-bank-1', '` + sharingBankPosting + `', '` + alice + `')`,
+		`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id)
+		 VALUES ('` + sharingBankTransaction + `', 'Bank charge', 'checking', 'null', '` + amountJSON + `', 1782950400, 1782950400, 'banksync', 0, 0, '` + alice + `')`,
+		`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id) VALUES ('` + sharingBankTransaction + `', 1, 1, 1, '` + alice + `')`,
+		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + sharingBankTransaction + `', 'transaction', '` + alice + `')`,
+		`INSERT INTO transaction_sync_keys (provider, bridge_account_id, bank_transaction_id, transaction_id, user_id) VALUES ('simplefin', 'bridge-prime', 'tx-bank-1', '` + sharingBankTransaction + `', '` + alice + `')`,
 	} {
 		if _, err := d.SQL().Exec(stmt); err != nil {
-			t.Fatalf("seed bank posting: %v", err)
+			t.Fatalf("seed bank transaction: %v", err)
 		}
 	}
 
-	if _, err := d.GrantSharedPosting(alice, sharingBankPosting, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingBankTransaction, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingBankPosting, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingBankTransaction, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,10 +320,10 @@ func TestSharingCopyOfBankPostingMintsNoDuplicate(t *testing.T) {
 		t.Fatalf("copy kept bank lifecycle: %+v", copied)
 	}
 	var keys int
-	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM posting_sync_keys WHERE posting_id = ?`, copied.ID).Scan(&keys); err != nil || keys != 0 {
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM transaction_sync_keys WHERE transaction_id = ?`, copied.ID).Scan(&keys); err != nil || keys != 0 {
 		t.Fatalf("copy sync keys = %d, %v, want 0", keys, err)
 	}
-	if again, err := d.CopySharedPosting(alice, sharingBankPosting, bob, sharingKey(t)); err != nil || again.ID != copied.ID {
+	if again, err := d.CopySharedTransaction(alice, sharingBankTransaction, bob, sharingKey(t)); err != nil || again.ID != copied.ID {
 		t.Fatalf("repeat bank accept = %q, %v, want existing %q", again.ID, err, copied.ID)
 	}
 	for name, tc := range map[string]struct {
@@ -333,17 +333,17 @@ func TestSharingCopyOfBankPostingMintsNoDuplicate(t *testing.T) {
 		"source keeps one bank row": {alice, 1},
 		"recipient keeps one copy":  {bob, 1},
 	} {
-		var postings int
-		if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM postings WHERE user_id = ?`, tc.userID).Scan(&postings); err != nil || postings != tc.want {
-			t.Fatalf("%s: postings = %d, %v, want %d", name, postings, err, tc.want)
+		var transactions int
+		if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM transactions WHERE user_id = ?`, tc.userID).Scan(&transactions); err != nil || transactions != tc.want {
+			t.Fatalf("%s: transactions = %d, %v, want %d", name, transactions, err, tc.want)
 		}
 	}
 	model, err := storeB.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if model.Postings[0].Source != SourceUser {
-		t.Fatalf("stored copy source = %q, want owner-authored", model.Postings[0].Source)
+	if model.Transactions[0].Source != SourceUser {
+		t.Fatalf("stored copy source = %q, want owner-authored", model.Transactions[0].Source)
 	}
 }
 
@@ -353,13 +353,13 @@ func TestSharingLinkGroupGrantAudience(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 	groupID := sharingGroup(t, d, "alice", "roommates", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, groupID, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceGroup, groupID, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,31 +370,31 @@ func TestSharingLinkGroupGrantAudience(t *testing.T) {
 	}
 }
 
-// Deleting the source posting keeps the recipient's copy as an ordinary
+// Deleting the source transaction keeps the recipient's copy as an ordinary
 // row while its link memory goes with the source consent: refresh then
 // fails closed instead of addressing a withdrawn transaction.
 func TestSharingRefreshAfterSourceDelete(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := storeA.DeletePosting(sharingPostingA); err != nil {
+	if err := storeA.DeleteTransaction(sharingTransactionA); err != nil {
 		t.Fatal(err)
 	}
 	model, err := storeB.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != copied.ID {
-		t.Fatalf("source delete touched the recipient copy: %+v", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].ID != copied.ID {
+		t.Fatalf("source delete touched the recipient copy: %+v", model.Transactions)
 	}
 	if _, err := d.GetSharingLink(bob, copied.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("deleted-source link lookup = %v, want not-found", err)
@@ -404,7 +404,7 @@ func TestSharingRefreshAfterSourceDelete(t *testing.T) {
 	}
 }
 
-// A link that outlives its source outside DeletePosting (which always
+// A link that outlives its source outside DeleteTransaction (which always
 // drops links with consent) refreshes as source-gone: the copy stays
 // intact, the link keeps its last recorded revision, and the status stays
 // put on repeat refreshes.
@@ -412,17 +412,17 @@ func TestSharingRefreshSourceGoneOutOfBand(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	before := sharingLink(t, d, bob, copied.ID)
-	if _, err := d.SQL().Exec(`DELETE FROM postings WHERE user_id = ? AND id = ?`, alice, sharingPostingA); err != nil {
+	if _, err := d.SQL().Exec(`DELETE FROM transactions WHERE user_id = ? AND id = ?`, alice, sharingTransactionA); err != nil {
 		t.Fatal(err)
 	}
 	gone, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
@@ -442,8 +442,8 @@ func TestSharingRefreshSourceGoneOutOfBand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != copied.ID {
-		t.Fatalf("source loss touched the recipient copy: %+v", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].ID != copied.ID {
+		t.Fatalf("source loss touched the recipient copy: %+v", model.Transactions)
 	}
 	again, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {

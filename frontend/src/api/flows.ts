@@ -35,7 +35,7 @@ export interface FlowNode {
 }
 
 export interface FlowSourceRecord {
-	postingId: string;
+	transactionId: string;
 	date: string;
 	sequence: number;
 	requestedAmount: number;
@@ -52,7 +52,7 @@ export interface FlowEdge {
 }
 
 export interface FlowUnmatchedEvent {
-	postingId: string;
+	transactionId: string;
 	date: string;
 	sequence: number;
 	realizedAmount: number;

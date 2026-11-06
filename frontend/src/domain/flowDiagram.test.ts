@@ -72,7 +72,7 @@ describe("aggregateFlowEdges", () => {
 				amount: 1,
 				sources: [
 					{
-						postingId: "p1",
+						transactionId: "p1",
 						date: "2026-02-01",
 						sequence: 0,
 						requestedAmount: 1,
@@ -86,7 +86,7 @@ describe("aggregateFlowEdges", () => {
 				amount: 2,
 				sources: [
 					{
-						postingId: "p2",
+						transactionId: "p2",
 						date: "2026-03-01",
 						sequence: 0,
 						requestedAmount: 2,
@@ -243,14 +243,14 @@ describe("describeLaneTooltip", () => {
 		amount: 300,
 		sources: [
 			{
-				postingId: "a",
+				transactionId: "a",
 				date: "2026-01-05",
 				sequence: 0,
 				requestedAmount: 100,
 				realizedAmount: 100,
 			},
 			{
-				postingId: "b",
+				transactionId: "b",
 				date: "2026-02-05",
 				sequence: 0,
 				requestedAmount: 200,
@@ -275,7 +275,7 @@ describe("describeLaneTooltip", () => {
 			...short,
 			amount: 1000,
 			sources: [1, 2, 3, 4, 5].map((n) => ({
-				postingId: `p${n}`,
+				transactionId: `p${n}`,
 				date: `2026-0${n}-01`,
 				sequence: 0,
 				requestedAmount: n * 100,
@@ -283,7 +283,7 @@ describe("describeLaneTooltip", () => {
 			})),
 		});
 		expect(topLaneSources(long)).toHaveLength(3);
-		expect(topLaneSources(long)[0]?.postingId).toBe("p5");
+		expect(topLaneSources(long)[0]?.transactionId).toBe("p5");
 		expect(
 			describeLaneTooltip(
 				long,

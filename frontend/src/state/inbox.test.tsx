@@ -16,7 +16,7 @@ function share(overrides: Partial<InboxShareItem> = {}): InboxShareItem {
 	return {
 		kind: "share",
 		ownerUserId: "user:alice",
-		postingId: "posting-1",
+		transactionId: "transaction-1",
 		status: "pending",
 		unread: true,
 		dismissed: false,
@@ -79,7 +79,7 @@ it("accepts once and refreshes every inbox entry", async () => {
 	await act(async () => {
 		await both.result.current.accept.mutateAsync({
 			ownerUserId: "user:alice",
-			postingId: "posting-1",
+			transactionId: "transaction-1",
 		});
 	});
 	const posts = recordedRequests(fetcher).filter(

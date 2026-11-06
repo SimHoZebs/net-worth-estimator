@@ -267,7 +267,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	// Sharing seed provisions a fresh second user, a group with the fixture
-	// user as a member, and group-granted postings for shared-feed browser
+	// user as a member, and group-granted transactions for shared-feed browser
 	// tests. Every call mints a new owner, so seeds never collide with state
 	// surviving the user-scoped reset; group names must be distinct per call
 	// within a run so the UI lists one matching group.
@@ -279,30 +279,30 @@ func main() {
 		mu.Lock()
 		defer mu.Unlock()
 		var body struct {
-			GroupName    string               `json:"groupName"`
-			OwnerDisplay string               `json:"ownerDisplay"`
-			Postings     []fixtureSeedPosting `json:"postings"`
+			GroupName    string                   `json:"groupName"`
+			OwnerDisplay string                   `json:"ownerDisplay"`
+			Transactions []fixtureSeedTransaction `json:"transactions"`
 		}
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			writer.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintln(writer, "invalid sharing seed")
 			return
 		}
-		if body.GroupName == "" || body.OwnerDisplay == "" || len(body.Postings) == 0 {
+		if body.GroupName == "" || body.OwnerDisplay == "" || len(body.Transactions) == 0 {
 			writer.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(writer, "groupName, ownerDisplay, and postings are required")
+			fmt.Fprintln(writer, "groupName, ownerDisplay, and transactions are required")
 			return
 		}
-		if err := seedFixtureSharing(application, body.GroupName, body.OwnerDisplay, body.Postings, writer); err != nil {
+		if err := seedFixtureSharing(application, body.GroupName, body.OwnerDisplay, body.Transactions, writer); err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}))
 	// Inbox seed provisions a fresh second user owning the requested
-	// postings and grants each one directly to the fixture user, so inbox
+	// transactions and grants each one directly to the fixture user, so inbox
 	// browser tests exercise real received shares. Every call mints a new
 	// owner, so seeds never collide with state surviving the user-scoped
-	// reset; named postings revoked here surface on the canceled tab.
+	// reset; named transactions revoked here surface on the canceled tab.
 	mux.Handle("/__fixture/inbox", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
 			writer.WriteHeader(http.StatusMethodNotAllowed)
@@ -311,20 +311,20 @@ func main() {
 		mu.Lock()
 		defer mu.Unlock()
 		var body struct {
-			Postings []fixtureSeedPosting `json:"postings"`
-			Revoked  []string             `json:"revoked"`
+			Transactions []fixtureSeedTransaction `json:"transactions"`
+			Revoked      []string                 `json:"revoked"`
 		}
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			writer.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintln(writer, "invalid inbox seed")
 			return
 		}
-		if len(body.Postings) == 0 {
+		if len(body.Transactions) == 0 {
 			writer.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(writer, "postings are required")
+			fmt.Fprintln(writer, "transactions are required")
 			return
 		}
-		if err := seedFixtureInbox(application, body.Postings, body.Revoked, writer); err != nil {
+		if err := seedFixtureInbox(application, body.Transactions, body.Revoked, writer); err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -414,11 +414,11 @@ func main() {
 	<-closed
 }
 
-// fixtureSeedPosting describes one seeded shared posting: a display name,
+// fixtureSeedTransaction describes one seeded shared transaction: a display name,
 // an amount recipe (a plain number counts as fixed, anything else stays
 // calculated), a transaction day, and whether the row is a pending bank
 // row.
-type fixtureSeedPosting struct {
+type fixtureSeedTransaction struct {
 	Name    string `json:"name"`
 	Amount  string `json:"amount"`
 	Day     string `json:"day"`
@@ -426,13 +426,13 @@ type fixtureSeedPosting struct {
 }
 
 // seedFixtureSharing provisions the shared-feed browser fixture: a second
-// user owning an account and the requested postings, a group naming the
-// fixture user as a member, and one group grant per posting. Pending rows
+// user owning an account and the requested transactions, a group naming the
+// fixture user as a member, and one group grant per transaction. Pending rows
 // flip through the same lifecycle columns bank sync writes. It answers the
-// seed request with the group ID, the owner resource, and the posting IDs.
+// seed request with the group ID, the owner resource, and the transaction IDs.
 var fixtureSeedOwners int64
 
-func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay string, postings []fixtureSeedPosting, writer http.ResponseWriter) error {
+func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay string, transactions []fixtureSeedTransaction, writer http.ResponseWriter) error {
 	subject := fmt.Sprintf("sharing-owner-%d", atomic.AddInt64(&fixtureSeedOwners, 1))
 	ownerID, err := application.EnsureGroupUser(fixtureIssuer, subject)
 	if err != nil {
@@ -458,9 +458,9 @@ func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay st
 		return err
 	}
 	seeded := []map[string]string{}
-	for _, seed := range postings {
+	for _, seed := range transactions {
 		if seed.Name == "" || seed.Amount == "" {
-			return fmt.Errorf("seeded postings require a name and an amount")
+			return fmt.Errorf("seeded transactions require a name and an amount")
 		}
 		day := seed.Day
 		if day == "" {
@@ -470,9 +470,9 @@ func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay st
 		if err != nil {
 			return fmt.Errorf("seeded day %q is not YYYY-MM-DD", seed.Day)
 		}
-		posted, err := scoped.CreatePosting(types.Posting{
+		posted, err := scoped.CreateTransaction(types.Transaction{
 			Name: seed.Name, SourceAccountID: &source,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
 			Enabled:         true,
@@ -481,32 +481,32 @@ func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay st
 			return err
 		}
 		if seed.Pending {
-			if _, err := application.SQL().Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
+			if _, err := application.SQL().Exec(`UPDATE transactions SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
 				return err
 			}
 		}
-		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceGroup, group.ID, uuid.NewString()); err != nil {
+		if _, err := application.GrantSharedTransaction(ownerID, posted.ID, store.SharingAudienceGroup, group.ID, uuid.NewString()); err != nil {
 			return err
 		}
 		seeded = append(seeded, map[string]string{"id": posted.ID, "name": seed.Name})
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(writer).Encode(map[string]any{
-		"groupId":  group.ID,
-		"owner":    "users/" + ownerID[len("user:"):],
-		"postings": seeded,
+		"groupId":      group.ID,
+		"owner":        "users/" + ownerID[len("user:"):],
+		"transactions": seeded,
 	})
 }
 
 // seedFixtureInbox provisions the inbox browser fixture: a second user
-// owning an account and the requested postings, with one direct grant per
-// posting to the fixture user. Named postings are revoked after a sighting
+// owning an account and the requested transactions, with one direct grant per
+// transaction to the fixture user. Named transactions are revoked after a sighting
 // pass so they surface on the canceled tab without content; the rest stay
 // pending. It answers the seed request with the owner resource and the
-// posting IDs.
+// transaction IDs.
 var fixtureInboxOwners int64
 
-func seedFixtureInbox(application *sqlite.Database, postings []fixtureSeedPosting, revoked []string, writer http.ResponseWriter) error {
+func seedFixtureInbox(application *sqlite.Database, transactions []fixtureSeedTransaction, revoked []string, writer http.ResponseWriter) error {
 	subject := fmt.Sprintf("inbox-owner-%d", atomic.AddInt64(&fixtureInboxOwners, 1))
 	ownerID, err := application.EnsureGroupUser(fixtureIssuer, subject)
 	if err != nil {
@@ -522,12 +522,12 @@ func seedFixtureInbox(application *sqlite.Database, postings []fixtureSeedPostin
 	}
 	seeded := []map[string]string{}
 	byName := map[string]string{}
-	for _, seed := range postings {
+	for _, seed := range transactions {
 		if seed.Name == "" || seed.Amount == "" {
-			return fmt.Errorf("seeded postings require a name and an amount")
+			return fmt.Errorf("seeded transactions require a name and an amount")
 		}
 		if _, dup := byName[seed.Name]; dup {
-			return fmt.Errorf("seeded posting %q is not unique", seed.Name)
+			return fmt.Errorf("seeded transaction %q is not unique", seed.Name)
 		}
 		day := seed.Day
 		if day == "" {
@@ -537,9 +537,9 @@ func seedFixtureInbox(application *sqlite.Database, postings []fixtureSeedPostin
 		if err != nil {
 			return fmt.Errorf("seeded day %q is not YYYY-MM-DD", seed.Day)
 		}
-		posted, err := scoped.CreatePosting(types.Posting{
+		posted, err := scoped.CreateTransaction(types.Transaction{
 			Name: seed.Name, SourceAccountID: &source,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
 			Enabled:         true,
@@ -548,11 +548,11 @@ func seedFixtureInbox(application *sqlite.Database, postings []fixtureSeedPostin
 			return err
 		}
 		if seed.Pending {
-			if _, err := application.SQL().Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
+			if _, err := application.SQL().Exec(`UPDATE transactions SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
 				return err
 			}
 		}
-		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceUser, fixtureActor, uuid.NewString()); err != nil {
+		if _, err := application.GrantSharedTransaction(ownerID, posted.ID, store.SharingAudienceUser, fixtureActor, uuid.NewString()); err != nil {
 			return err
 		}
 		seeded = append(seeded, map[string]string{"id": posted.ID, "name": seed.Name})
@@ -568,18 +568,18 @@ func seedFixtureInbox(application *sqlite.Database, postings []fixtureSeedPostin
 	for _, name := range revoked {
 		id, ok := byName[name]
 		if !ok {
-			return fmt.Errorf("revoked posting %q is not a seeded posting", name)
+			return fmt.Errorf("revoked transaction %q is not a seeded transaction", name)
 		}
-		if err := application.RevokeSharedPosting(ownerID, id, store.SharingAudienceUser, fixtureActor, uuid.NewString()); err != nil {
+		if err := application.RevokeSharedTransaction(ownerID, id, store.SharingAudienceUser, fixtureActor, uuid.NewString()); err != nil {
 			return err
 		}
 		unshared = append(unshared, map[string]string{"id": id, "name": name})
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(writer).Encode(map[string]any{
-		"owner":    "users/" + ownerID[len("user:"):],
-		"postings": seeded,
-		"revoked":  unshared,
+		"owner":        "users/" + ownerID[len("user:"):],
+		"transactions": seeded,
+		"revoked":      unshared,
 	})
 }
 

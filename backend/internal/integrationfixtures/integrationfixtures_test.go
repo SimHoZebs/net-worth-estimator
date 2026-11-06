@@ -98,23 +98,23 @@ func TestPackSeedRoundTrip(t *testing.T) {
 			if len(model.Accounts) != len(seedModel.Accounts) {
 				t.Fatalf("accounts = %d, want %d", len(model.Accounts), len(seedModel.Accounts))
 			}
-			if len(model.Postings) != len(seedModel.Postings) {
-				t.Fatalf("postings = %d, want %d", len(model.Postings), len(seedModel.Postings))
+			if len(model.Transactions) != len(seedModel.Transactions) {
+				t.Fatalf("transactions = %d, want %d", len(model.Transactions), len(seedModel.Transactions))
 			}
 			if len(model.Schedules) != len(seedModel.Schedules) {
 				t.Fatalf("rules = %d, want %d", len(model.Schedules), len(seedModel.Schedules))
 			}
 			byID := map[string]string{}
-			for _, posting := range model.Postings {
-				byID[posting.ID] = posting.Name
+			for _, transaction := range model.Transactions {
+				byID[transaction.ID] = transaction.Name
 			}
-			for _, want := range seedModel.Postings {
+			for _, want := range seedModel.Transactions {
 				got, ok := byID[want.ID]
 				if !ok {
-					t.Fatalf("posting %q missing after seed", want.ID)
+					t.Fatalf("transaction %q missing after seed", want.ID)
 				}
 				if got != want.Name {
-					t.Fatalf("posting %q name = %q, want byte-identical %q", want.ID, got, want.Name)
+					t.Fatalf("transaction %q name = %q, want byte-identical %q", want.ID, got, want.Name)
 				}
 			}
 		})

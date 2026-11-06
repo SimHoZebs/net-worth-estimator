@@ -29,7 +29,7 @@ func testPlannedPurchases(t *testing.T, newStore func(*testing.T) store.Store) {
 		t.Fatal(err)
 	}
 	doc, err := s.LoadModel()
-	if err != nil || len(doc.Postings) != 0 || len(doc.PlannedPurchases) != 2 || doc.PlannedPurchases[0].ID != b.ID || doc.PlannedPurchases[0].Priority != 0 {
+	if err != nil || len(doc.Transactions) != 0 || len(doc.PlannedPurchases) != 2 || doc.PlannedPurchases[0].ID != b.ID || doc.PlannedPurchases[0].Priority != 0 {
 		t.Fatalf("queue: %+v %v", doc, err)
 	}
 	imported, err := s.ImportModel(doc)

@@ -9,45 +9,48 @@ import {
 import { isRecord } from "../domain/guards.ts";
 
 /**
- * Removing a posting usually leaves projections untouched. Several read
- * paths still consume a posting directly: fulfillment, financial
+ * Removing a transaction usually leaves projections untouched. Several read
+ * paths still consume a transaction directly: fulfillment, financial
  * independence, and what-if configurations can name it, and the projection
- * start can fall back to the first posting when no checkpoint or rule
+ * start can fall back to the first transaction when no checkpoint or rule
  * supplies a date.
  */
 export function transactionRemovalNeedsProjectionRefresh(id: string): boolean {
 	const model = getServerModel()?.model;
 	if (!model) return true;
-	for (const evaluation of model.evaluations.postingFulfillment) {
+	for (const evaluation of model.evaluations.transactionFulfillment) {
 		if (!isRecord(evaluation.config)) continue;
-		const postingIds = evaluation.config.postingIds;
-		if (Array.isArray(postingIds) && postingIds.includes(id)) return true;
+		const transactionIds = evaluation.config.transactionIds;
+		if (Array.isArray(transactionIds) && transactionIds.includes(id))
+			return true;
 	}
 	for (const evaluation of model.evaluations.financialIndependence) {
 		if (!isRecord(evaluation.config)) continue;
 		const sources = evaluation.config.sources;
 		if (
 			Array.isArray(sources) &&
-			sources.some((source) => isRecord(source) && source.postingId === id)
+			sources.some((source) => isRecord(source) && source.transactionId === id)
 		)
 			return true;
-		const continuing = evaluation.config.continuingPostingIds;
+		const continuing = evaluation.config.continuingTransactionIds;
 		if (Array.isArray(continuing) && continuing.includes(id)) return true;
 	}
 	for (const evaluation of model.evaluations.whatIf ?? []) {
 		if (!isRecord(evaluation.config)) continue;
-		const disabled = evaluation.config.disabledPostingIds;
+		const disabled = evaluation.config.disabledTransactionIds;
 		if (Array.isArray(disabled) && disabled.includes(id)) return true;
-		const added = evaluation.config.addedPostings;
+		const added = evaluation.config.addedTransactions;
 		if (
 			Array.isArray(added) &&
-			added.some((posting) => isRecord(posting) && posting.id === id)
+			added.some(
+				(transaction) => isRecord(transaction) && transaction.id === id,
+			)
 		)
 			return true;
 	}
 	if (model.checkpoints.length > 0 || (model.schedules ?? []).length > 0)
 		return false;
-	return model.postings[0]?.id === id;
+	return model.transactions[0]?.id === id;
 }
 
 /**

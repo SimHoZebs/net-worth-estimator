@@ -94,10 +94,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [
+        "transactions": [
           {
             "id": "01900000-0000-7000-8000-000000000111",
             "name": "Card charge A",

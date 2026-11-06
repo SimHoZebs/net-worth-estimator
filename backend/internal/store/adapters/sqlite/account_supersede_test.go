@@ -40,7 +40,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}}, nil); err != nil {
 		t.Fatalf("seed bank checkpoint: %v", err)
 	}
-	policyRow(t, scoped, sharingPostingA, "manual", nil, "2026-06-02")
+	policyRow(t, scoped, sharingTransactionA, "manual", nil, "2026-06-02")
 	if _, err := scoped.SaveCheckpoint(types.Checkpoint{
 		AccountID: "manual", Balance: 500, ObservedAt: policyNoon("2026-06-01"),
 	}); err != nil {
@@ -49,7 +49,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	if _, err := scoped.CreateSchedule(types.Schedule{
 		ID: "01900000-0000-7000-8000-0000000000b4", Name: "Rent", SourceAccountID: supersedeStringPtr("manual"),
 		Destinations: []string{"savings"},
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression", Config: map[string]any{"expression": "manual"},
 			Inputs: map[string]types.AmountInputBinding{
 				"manual": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "manual"}},
@@ -59,10 +59,10 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed rule: %v", err)
 	}
-	if _, err := scoped.CreatePosting(types.Posting{
+	if _, err := scoped.CreateTransaction(types.Transaction{
 		ID: "01900000-0000-7000-8000-0000000000b5", Name: "Savings sweep",
 		SourceAccountID: supersedeStringPtr("savings"),
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression", Config: map[string]any{"expression": "manual"},
 			Inputs: map[string]types.AmountInputBinding{
 				"manual": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "manual"}},
@@ -70,7 +70,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		},
 		PostedTime: 1782950400, TransactionTime: 1782950400, Enabled: true,
 	}); err != nil {
-		t.Fatalf("seed surviving posting: %v", err)
+		t.Fatalf("seed surviving transaction: %v", err)
 	}
 	if _, err := scoped.CreatePlannedPurchase(types.PlannedPurchase{
 		ID: "01900000-0000-7000-8000-0000000000b2", Name: "Car", FundingAccountID: supersedeStringPtr("manual"),
@@ -90,7 +90,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		SpendingAccountIDs: []string{"manual"},
 		IncomeAccountIDs:   []string{"manual"},
 		IncomeScheduleIDs:  []string{"01900000-0000-7000-8000-0000000000b4"},
-		TransactionIDs:     []string{sharingPostingA},
+		TransactionIDs:     []string{sharingTransactionA},
 		StatementDaySet:    true,
 	}); err != nil {
 		t.Fatalf("seed safe spending: %v", err)
@@ -145,9 +145,9 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	if len(model.Accounts) != 3 || model.Accounts[0].ID != "checking" || model.Accounts[1].ID != "synced" || model.Accounts[2].ID != "savings" {
 		t.Fatalf("account order = %+v, want checking, synced, savings", model.Accounts)
 	}
-	for _, posting := range model.Postings {
-		if posting.SourceAccountID != nil && *posting.SourceAccountID == "manual" {
-			t.Fatalf("manual posting survived: %+v", posting)
+	for _, transaction := range model.Transactions {
+		if transaction.SourceAccountID != nil && *transaction.SourceAccountID == "manual" {
+			t.Fatalf("manual transaction survived: %+v", transaction)
 		}
 	}
 	for _, checkpoint := range model.Checkpoints {
@@ -165,17 +165,17 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	if got := model.Schedules[0].Amount.Inputs["manual"].Arguments["id"]; got != "synced" {
 		t.Fatalf("rule amount reference = %v, want synced", got)
 	}
-	var sweep *types.Posting
-	for index := range model.Postings {
-		if model.Postings[index].ID == "01900000-0000-7000-8000-0000000000b5" {
-			sweep = &model.Postings[index]
+	var sweep *types.Transaction
+	for index := range model.Transactions {
+		if model.Transactions[index].ID == "01900000-0000-7000-8000-0000000000b5" {
+			sweep = &model.Transactions[index]
 		}
 	}
 	if sweep == nil {
-		t.Fatal("surviving posting disappeared")
+		t.Fatal("surviving transaction disappeared")
 	}
 	if got := sweep.Amount.Inputs["manual"].Arguments["id"]; got != "synced" {
-		t.Fatalf("posting amount reference = %v, want synced", got)
+		t.Fatalf("transaction amount reference = %v, want synced", got)
 	}
 	if len(model.PlannedPurchases) != 1 || model.PlannedPurchases[0].FundingAccountID == nil ||
 		*model.PlannedPurchases[0].FundingAccountID != "synced" {
@@ -326,23 +326,23 @@ func TestSupersedeAccountRejectsNonManualAccounts(t *testing.T) {
 			t.Fatalf("supersede empty-source checkpoint = %v, want invalid", err)
 		}
 	})
-	t.Run("manual has bank posting", func(t *testing.T) {
+	t.Run("manual has bank transaction", func(t *testing.T) {
 		d := openSharingTestDB(t)
 		alice, scoped := policyMember(t, d, "alice", "manual", "synced")
 		if _, err := scoped.SaveAccountLink(store.AccountLink{BridgeAccountID: "bridge-1", ModelAccountID: "synced", Origin: store.LinkOriginAuto}); err != nil {
 			t.Fatal(err)
 		}
-		const bankPosting = "01900000-0000-7000-8000-0000000000c2"
-		if _, err := d.SQL().Exec(`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id) VALUES (?, ?, ?, 'null', ?, ?, ?, 'banksync', 0, 0, ?)`,
-			bankPosting, "Bank sweep", "manual", syncTestAmountJSON, 1782950400, 1782950400, alice); err != nil {
+		const bankTransaction = "01900000-0000-7000-8000-0000000000c2"
+		if _, err := d.SQL().Exec(`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id) VALUES (?, ?, ?, 'null', ?, ?, ?, 'banksync', 0, 0, ?)`,
+			bankTransaction, "Bank sweep", "manual", syncTestAmountJSON, 1782950400, 1782950400, alice); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := d.SQL().Exec(`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id) VALUES (?, 0, 1, 0, ?)`,
-			bankPosting, alice); err != nil {
+		if _, err := d.SQL().Exec(`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id) VALUES (?, 0, 1, 0, ?)`,
+			bankTransaction, alice); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := scoped.SupersedeAccount("manual", "synced", "bridge-1"); !errors.Is(err, store.ErrAccountSupersedeInvalid) {
-			t.Fatalf("supersede bank posting = %v, want invalid", err)
+			t.Fatalf("supersede bank transaction = %v, want invalid", err)
 		}
 	})
 }
@@ -355,10 +355,10 @@ func TestSupersedeAccountRollsBackInvalidCandidate(t *testing.T) {
 	}
 	// A pre-existing invalid route gives the candidate a finance error. The
 	// operation must report issues and leave every stored row unchanged.
-	if _, err := scoped.CreatePosting(types.Posting{
+	if _, err := scoped.CreateTransaction(types.Transaction{
 		ID: "01900000-0000-7000-8000-0000000000b1", Name: "Broken", SourceAccountID: supersedeStringPtr("synced"),
 		Destinations: []string{"ghost"},
-		Amount:       types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:       types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:   1782950400, TransactionTime: 1782950400, Enabled: true,
 	}); err != nil {
 		t.Fatal(err)

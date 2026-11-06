@@ -7,12 +7,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Posting fulfillment evaluation.
+// Transaction fulfillment evaluation.
 
 type fulfillmentEventJSON struct {
 	Date                     IsoDate           `json:"date"`
 	Sequence                 int               `json:"sequence"`
-	PostingID                string            `json:"postingId"`
+	TransactionID            string            `json:"transactionId"`
 	RequestedAmount          float64           `json:"requestedAmount"`
 	RealizedAmount           float64           `json:"realizedAmount"`
 	DestinationLimitedAmount float64           `json:"destinationLimitedAmount"`
@@ -21,8 +21,8 @@ type fulfillmentEventJSON struct {
 	AccountDeltas            []types.JsonValue `json:"accountDeltas"`
 }
 
-// PostingFulfillmentPathResult is the deterministic result shape.
-type PostingFulfillmentPathResult struct {
+// TransactionFulfillmentPathResult is the deterministic result shape.
+type TransactionFulfillmentPathResult struct {
 	RequestedAmount          float64                `json:"requestedAmount"`
 	RealizedAmount           float64                `json:"realizedAmount"`
 	DestinationLimitedAmount float64                `json:"destinationLimitedAmount"`
@@ -31,10 +31,10 @@ type PostingFulfillmentPathResult struct {
 	FirstUnderfulfilledDate  *IsoDate               `json:"firstUnderfulfilledDate"`
 	Events                   []fulfillmentEventJSON `json:"events"`
 	Dates                    []map[string]any       `json:"dates"`
-	Postings                 []map[string]any       `json:"postings"`
+	Transactions             []map[string]any       `json:"transactions"`
 }
 
-func (r *PostingFulfillmentPathResult) ToJSON() types.JsonValue {
+func (r *TransactionFulfillmentPathResult) ToJSON() types.JsonValue {
 	events := make([]types.JsonValue, len(r.Events))
 	for i, event := range r.Events {
 		events[i] = event
@@ -43,9 +43,9 @@ func (r *PostingFulfillmentPathResult) ToJSON() types.JsonValue {
 	for i, date := range r.Dates {
 		dates[i] = date
 	}
-	postings := make([]types.JsonValue, len(r.Postings))
-	for i, posting := range r.Postings {
-		postings[i] = posting
+	transactions := make([]types.JsonValue, len(r.Transactions))
+	for i, transaction := range r.Transactions {
+		transactions[i] = transaction
 	}
 	return map[string]any{
 		"requestedAmount":          r.RequestedAmount,
@@ -56,7 +56,7 @@ func (r *PostingFulfillmentPathResult) ToJSON() types.JsonValue {
 		"firstUnderfulfilledDate":  r.FirstUnderfulfilledDate,
 		"events":                   events,
 		"dates":                    dates,
-		"postings":                 postings,
+		"transactions":             transactions,
 	}
 }
 
@@ -82,7 +82,7 @@ func toFulfillmentEvent(evaluated evaluatedTransactionEvent) fulfillmentEventJSO
 	return fulfillmentEventJSON{
 		Date:                     event.Date,
 		Sequence:                 event.Sequence,
-		PostingID:                event.Origin.PostingID,
+		TransactionID:            event.Origin.TransactionID,
 		RequestedAmount:          roundAmount(event.RequestedAmount),
 		RealizedAmount:           roundAmount(event.RealizedAmount),
 		DestinationLimitedAmount: fulfillment.DestinationLimitedAmount,
@@ -92,7 +92,7 @@ func toFulfillmentEvent(evaluated evaluatedTransactionEvent) fulfillmentEventJSO
 	}
 }
 
-type postingTotals struct {
+type transactionTotals struct {
 	requestedAmount          float64
 	realizedAmount           float64
 	destinationLimitedAmount float64
@@ -100,27 +100,27 @@ type postingTotals struct {
 	firstUnderfulfilledDate  *string
 }
 
-// EvaluatePostingFulfillment evaluates fulfillment over the selected postings.
-func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.PostingFulfillmentConfig, includeDetails bool) *PostingFulfillmentPathResult {
+// EvaluateTransactionFulfillment evaluates fulfillment over the selected transactions.
+func EvaluateTransactionFulfillment(path *types.ProjectionPath, config types.TransactionFulfillmentConfig, includeDetails bool) *TransactionFulfillmentPathResult {
 	var selectedIDs map[string]bool
-	if config.PostingIDs != nil {
+	if config.TransactionIDs != nil {
 		selectedIDs = map[string]bool{}
-		for _, id := range config.PostingIDs {
+		for _, id := range config.TransactionIDs {
 			selectedIDs[id] = true
 		}
 	}
 	evaluatedEvents := evaluateTransactionEvents(path)
-	result := &PostingFulfillmentPathResult{Events: []fulfillmentEventJSON{}, Dates: []map[string]any{}, Postings: []map[string]any{}}
-	totalsByPostingID := map[string]*postingTotals{}
+	result := &TransactionFulfillmentPathResult{Events: []fulfillmentEventJSON{}, Dates: []map[string]any{}, Transactions: []map[string]any{}}
+	totalsByTransactionID := map[string]*transactionTotals{}
 	type dateTotals struct {
-		totals postingTotals
+		totals transactionTotals
 	}
 	totalsByDate := map[string]*dateTotals{}
-	var overall postingTotals
+	var overall transactionTotals
 
 	for _, evaluated := range evaluatedEvents {
 		event := evaluated.event
-		if selectedIDs != nil && !selectedIDs[event.Origin.PostingID] {
+		if selectedIDs != nil && !selectedIDs[event.Origin.TransactionID] {
 			continue
 		}
 		overall.requestedAmount += event.RequestedAmount
@@ -135,19 +135,19 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 			continue
 		}
 		result.Events = append(result.Events, toFulfillmentEvent(evaluated))
-		postingID := event.Origin.PostingID
-		postingTotalsEntry, ok := totalsByPostingID[postingID]
+		transactionID := event.Origin.TransactionID
+		transactionTotalsEntry, ok := totalsByTransactionID[transactionID]
 		if !ok {
-			postingTotalsEntry = &postingTotals{}
-			totalsByPostingID[postingID] = postingTotalsEntry
+			transactionTotalsEntry = &transactionTotals{}
+			totalsByTransactionID[transactionID] = transactionTotalsEntry
 		}
-		postingTotalsEntry.requestedAmount += event.RequestedAmount
-		postingTotalsEntry.realizedAmount += event.RealizedAmount
-		postingTotalsEntry.destinationLimitedAmount += evaluated.destinationLimited
-		postingTotalsEntry.unfulfilledAmount += evaluated.unfulfilled
-		if postingTotalsEntry.firstUnderfulfilledDate == nil && evaluated.unfulfilled > 0 {
+		transactionTotalsEntry.requestedAmount += event.RequestedAmount
+		transactionTotalsEntry.realizedAmount += event.RealizedAmount
+		transactionTotalsEntry.destinationLimitedAmount += evaluated.destinationLimited
+		transactionTotalsEntry.unfulfilledAmount += evaluated.unfulfilled
+		if transactionTotalsEntry.firstUnderfulfilledDate == nil && evaluated.unfulfilled > 0 {
 			date := event.Date
-			postingTotalsEntry.firstUnderfulfilledDate = &date
+			transactionTotalsEntry.firstUnderfulfilledDate = &date
 		}
 		dateEntry, ok := totalsByDate[event.Date]
 		if !ok {
@@ -167,19 +167,19 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 		}
 	}
 	if includeDetails {
-		detailTransactions := ResolvedTransactionPostings(&path.EffectiveModel)
+		detailTransactions := ResolvedTransactionTransactions(&path.EffectiveModel)
 		detailCaps := RuleCapsByID(&path.EffectiveModel)
 		for index := range detailTransactions {
-			posting := &detailTransactions[index]
-			if selectedIDs != nil && !selectedIDs[posting.ID] {
+			transaction := &detailTransactions[index]
+			if selectedIDs != nil && !selectedIDs[transaction.ID] {
 				continue
 			}
-			totals, ok := totalsByPostingID[posting.ID]
+			totals, ok := totalsByTransactionID[transaction.ID]
 			if !ok {
-				totals = &postingTotals{}
+				totals = &transactionTotals{}
 			}
 			sourceLabel := (*string)(nil)
-			if sourceAccount, ok := PostingSourceAccount(posting); ok {
+			if sourceAccount, ok := TransactionSourceAccount(transaction); ok {
 				name := sourceAccount
 				if account, ok := accountByID[sourceAccount]; ok {
 					name = account.Name
@@ -187,9 +187,9 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				sourceLabel = &name
 			}
 			var destinations any
-			if posting.Destinations != nil {
+			if transaction.Destinations != nil {
 				destList := []map[string]string{}
-				for _, accountID := range posting.Destinations {
+				for _, accountID := range transaction.Destinations {
 					name := accountID
 					if account, ok := accountByID[accountID]; ok {
 						name = account.Name
@@ -207,9 +207,9 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				completionRate = math.Max(0, 1-totals.unfulfilledAmount/totals.requestedAmount)
 			}
 			entry := map[string]any{
-				"postingId":                posting.ID,
-				"name":                     posting.Name,
-				"sourceAccountId":          posting.SourceAccountID,
+				"transactionId":            transaction.ID,
+				"name":                     transaction.Name,
+				"sourceAccountId":          transaction.SourceAccountID,
 				"sourceAccountLabel":       sourceLabel,
 				"destinations":             destinations,
 				"requestedAmount":          roundAmount(totals.requestedAmount),
@@ -220,10 +220,10 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				"firstUnderfulfilledDate":  totals.firstUnderfulfilledDate,
 				"unfulfilledAmount":        roundAmount(totals.unfulfilledAmount),
 			}
-			if cap, ok := detailCaps[posting.ID]; ok {
+			if cap, ok := detailCaps[transaction.ID]; ok {
 				entry["annualCap"] = cap
 			}
-			result.Postings = append(result.Postings, entry)
+			result.Transactions = append(result.Transactions, entry)
 		}
 	}
 
@@ -256,19 +256,19 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 	return result
 }
 
-func diagnoseFulfillmentConfig(path *types.ProjectionPath, config types.PostingFulfillmentConfig) []types.EvaluationDiagnostic {
-	if config.PostingIDs == nil {
+func diagnoseFulfillmentConfig(path *types.ProjectionPath, config types.TransactionFulfillmentConfig) []types.EvaluationDiagnostic {
+	if config.TransactionIDs == nil {
 		return nil
 	}
-	postingIDs := TransactionIDs(&path.EffectiveModel)
+	transactionIDs := TransactionIDs(&path.EffectiveModel)
 	diagnostics := []types.EvaluationDiagnostic{}
-	for _, postingID := range config.PostingIDs {
-		if !postingIDs[postingID] {
+	for _, transactionID := range config.TransactionIDs {
+		if !transactionIDs[transactionID] {
 			diagnostics = append(diagnostics, types.EvaluationDiagnostic{
-				Code:              "posting-fulfillment.posting.missing",
-				Severity:          "warning",
-				Message:           "Posting '" + postingID + "' does not exist.",
-				RelatedPostingIDs: []string{postingID},
+				Code:                  "transaction-fulfillment.transaction.missing",
+				Severity:              "warning",
+				Message:               "Transaction '" + transactionID + "' does not exist.",
+				RelatedTransactionIDs: []string{transactionID},
 			})
 		}
 	}
@@ -281,9 +281,9 @@ type fulfillmentAccumulator struct {
 	unfulfilledAmounts []float64
 }
 
-var postingFulfillmentDefinition = &EvaluationDefinition{
-	Type: types.EvaluationTypePostingFulfillment,
-	Name: "Posting fulfillment",
+var transactionFulfillmentDefinition = &EvaluationDefinition{
+	Type: types.EvaluationTypeTransactionFulfillment,
+	Name: "Transaction fulfillment",
 
 	// Reader: answers from the cached path's transaction events only.
 	Kind: EvaluationKindReader,
@@ -298,18 +298,18 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 	},
 
 	EvaluatePath: func(ctx *EvaluationContext, config any) (PathResult, error) {
-		typed := config.(types.PostingFulfillmentConfig)
+		typed := config.(types.TransactionFulfillmentConfig)
 		// Served projections always use summary detail: the only reader of
 		// this envelope takes scalars (firstUnderfulfilledDate,
 		// completionRate) while per-event evidence travels once on the
 		// public transactionEvents timeline. Building the per-event, per-date,
-		// and per-posting arrays here duplicated those 7446 events (~2.3 MB).
-		// EvaluatePostingFulfillment keeps its detail capability for direct
+		// and per-transaction arrays here duplicated those 7446 events (~2.3 MB).
+		// EvaluateTransactionFulfillment keeps its detail capability for direct
 		// callers; the served path never pays for it.
-		return EvaluatePostingFulfillment(ctx.Path, typed, false), nil
+		return EvaluateTransactionFulfillment(ctx.Path, typed, false), nil
 	},
 	DiagnoseConfig: func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic {
-		return diagnoseFulfillmentConfig(ctx.Path, config.(types.PostingFulfillmentConfig))
+		return diagnoseFulfillmentConfig(ctx.Path, config.(types.TransactionFulfillmentConfig))
 	},
 
 	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
@@ -317,7 +317,7 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 	},
 	Accumulate: func(accumulator Accumulator, pathResult PathResult) error {
 		acc := accumulator.(*fulfillmentAccumulator)
-		result := pathResult.(*PostingFulfillmentPathResult)
+		result := pathResult.(*TransactionFulfillmentPathResult)
 		acc.runCount++
 		if result.FirstUnderfulfilledDate == nil {
 			acc.fulfilledRunCount++
@@ -347,7 +347,7 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 			}
 			return types.StatusNotSatisfied
 		}
-		if deterministic != nil && deterministic.(*PostingFulfillmentPathResult).FirstUnderfulfilledDate == nil {
+		if deterministic != nil && deterministic.(*TransactionFulfillmentPathResult).FirstUnderfulfilledDate == nil {
 			return types.StatusSatisfied
 		}
 		return types.StatusNotSatisfied

@@ -7,7 +7,7 @@ import (
 )
 
 // Shared state transitions; Go is the owner and single semantic source for
-// posting execution across deterministic, branch (FI), and Monte Carlo runs.
+// transaction execution across deterministic, branch (FI), and Monte Carlo runs.
 
 // AppliedTransactionTransition carries a transaction result plus per-account deltas.
 type AppliedTransactionTransition struct {
@@ -15,10 +15,10 @@ type AppliedTransactionTransition struct {
 	AccountDeltas []AccountDeltaEntry
 }
 
-// PostingExecutionTransition extends AppliedTransactionTransition for postings.
-type PostingExecutionTransition struct {
+// TransactionExecutionTransition extends AppliedTransactionTransition for transactions.
+type TransactionExecutionTransition struct {
 	AppliedTransactionTransition
-	PostingID string
+	TransactionID string
 }
 
 // AccountDeltaEntry is one account balance change.
@@ -67,28 +67,28 @@ type SimulationState = types.SimulationState
 // CloneSimulationState deep-copies balances and realized amount maps.
 func CloneSimulationState(state SimulationState) SimulationState {
 	cloned := SimulationState{
-		Balances:                     SnapshotBalances(state.Balances),
-		LatestRealizedPostingAmounts: make(map[string]float64, len(state.LatestRealizedPostingAmounts)),
-		LatestRealizedPostingDates:   make(map[string]string, len(state.LatestRealizedPostingDates)),
-		RealizedPostingAmountsByYear: make(map[string]map[string]float64, len(state.RealizedPostingAmountsByYear)),
+		Balances:                         SnapshotBalances(state.Balances),
+		LatestRealizedTransactionAmounts: make(map[string]float64, len(state.LatestRealizedTransactionAmounts)),
+		LatestRealizedTransactionDates:   make(map[string]string, len(state.LatestRealizedTransactionDates)),
+		RealizedTransactionAmountsByYear: make(map[string]map[string]float64, len(state.RealizedTransactionAmountsByYear)),
 	}
-	for id, amount := range state.LatestRealizedPostingAmounts {
-		cloned.LatestRealizedPostingAmounts[id] = amount
+	for id, amount := range state.LatestRealizedTransactionAmounts {
+		cloned.LatestRealizedTransactionAmounts[id] = amount
 	}
-	for id, date := range state.LatestRealizedPostingDates {
-		cloned.LatestRealizedPostingDates[id] = date
+	for id, date := range state.LatestRealizedTransactionDates {
+		cloned.LatestRealizedTransactionDates[id] = date
 	}
-	for postingID, byYear := range state.RealizedPostingAmountsByYear {
+	for transactionID, byYear := range state.RealizedTransactionAmountsByYear {
 		years := make(map[string]float64, len(byYear))
 		for year, amount := range byYear {
 			years[year] = amount
 		}
-		cloned.RealizedPostingAmountsByYear[postingID] = years
+		cloned.RealizedTransactionAmountsByYear[transactionID] = years
 	}
 	return cloned
 }
 
-// TransitionRuntime executes postings/generated transactions against one state.
+// TransitionRuntime executes transactions/generated transactions against one state.
 type TransitionRuntime struct {
 	State            SimulationState
 	model            types.SimulationInputs
@@ -118,27 +118,27 @@ func CreateTransitionRuntime(model types.SimulationInputs, initialState Simulati
 	}
 }
 
-func (t *TransitionRuntime) observePosting(postingID string, realizedAmount float64, date string) {
-	t.State.LatestRealizedPostingAmounts[postingID] = realizedAmount
-	if t.State.LatestRealizedPostingDates == nil {
-		t.State.LatestRealizedPostingDates = map[string]string{}
+func (t *TransitionRuntime) observeTransaction(transactionID string, realizedAmount float64, date string) {
+	t.State.LatestRealizedTransactionAmounts[transactionID] = realizedAmount
+	if t.State.LatestRealizedTransactionDates == nil {
+		t.State.LatestRealizedTransactionDates = map[string]string{}
 	}
-	t.State.LatestRealizedPostingDates[postingID] = date
+	t.State.LatestRealizedTransactionDates[transactionID] = date
 	year := date[:4]
-	byYear, ok := t.State.RealizedPostingAmountsByYear[postingID]
+	byYear, ok := t.State.RealizedTransactionAmountsByYear[transactionID]
 	if !ok {
 		byYear = map[string]float64{}
-		t.State.RealizedPostingAmountsByYear[postingID] = byYear
+		t.State.RealizedTransactionAmountsByYear[transactionID] = byYear
 	}
 	byYear[year] += realizedAmount
 }
 
-// observeLossPosting records a loss realization for dependent amount
+// observeLossTransaction records a loss realization for dependent amount
 // resolution without touching the annual-cap ledger. Losses are balance
 // adjustments: they must neither consume nor inflate cap headroom, so only
 // the latest realized amount carries the (negative) value.
-func (t *TransitionRuntime) observeLossPosting(postingID string, realizedAmount float64) {
-	t.State.LatestRealizedPostingAmounts[postingID] = realizedAmount
+func (t *TransitionRuntime) observeLossTransaction(transactionID string, realizedAmount float64) {
+	t.State.LatestRealizedTransactionAmounts[transactionID] = realizedAmount
 }
 
 func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResult, apply func()) AppliedTransactionTransition {
@@ -150,8 +150,8 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResul
 	}
 }
 
-// ExecutePosting executes one occurrence through the shared transitions.
-// Amount work and simulation work are separate phases: PreparePostingExecution
+// ExecuteTransaction executes one occurrence through the shared transitions.
+// Amount work and simulation work are separate phases: PrepareTransactionExecution
 // calculates the request from snapshots without touching runtime state, and
 // ApplyPreparedExecution resolves it against constraints, applies it, and
 // records the outcome. The historicalActual policy is explicit, not a second
@@ -159,33 +159,33 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResul
 // hypothetical funding clamps (history describes what moved), while modeled
 // rules and all forecast requests retain funding constraints. Annual caps
 // still apply to rule instances; one-time actuals carry no cap.
-func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string, historicalActual bool) (PostingExecutionTransition, error) {
-	posting := occurrence.Posting
+func (t *TransitionRuntime) ExecuteTransaction(occurrence DatedTransactionOccurrence, date string, historicalActual bool) (TransactionExecutionTransition, error) {
+	transaction := occurrence.Transaction
 	var sampledRate *float64
 	// Sampling is coordinator-owned: volatile amounts look up their
 	// transaction's pre-sampled annual rate for this projection year.
 	// Providers never draw RNG; a missing entry for a volatile transaction
 	// is a preparation defect, not a fresh draw.
-	if _, volatile := VolatileRateInputOf(posting.Amount); volatile && t.monteCarloSample != nil {
+	if _, volatile := VolatileRateInputOf(transaction.Amount); volatile && t.monteCarloSample != nil {
 		yearIndex := ProjectionYearIndex(t.projectionStart, date)
-		rates, ok := t.monteCarloSample.AnnualRatesByPostingID[posting.ID]
+		rates, ok := t.monteCarloSample.AnnualRatesByTransactionID[transaction.ID]
 		if !ok || yearIndex >= len(rates) {
-			return PostingExecutionTransition{}, fmt.Errorf(
-				"Missing sampled annual rate for posting %q in projection year %d.", posting.ID, yearIndex)
+			return TransactionExecutionTransition{}, fmt.Errorf(
+				"Missing sampled annual rate for transaction %q in projection year %d.", transaction.ID, yearIndex)
 		}
 		rate := rates[yearIndex]
 		sampledRate = &rate
 	}
-	prepared, err := PreparePostingExecution(occurrence, date, historicalActual, t.snapshotExecutionState(), sampledRate)
+	prepared, err := PrepareTransactionExecution(occurrence, date, historicalActual, t.snapshotExecutionState(), sampledRate)
 	if err != nil {
-		return PostingExecutionTransition{}, err
+		return TransactionExecutionTransition{}, err
 	}
 	return t.ApplyPreparedExecution(prepared, date)
 }
 
-// ObservePosting records a realized amount without moving balances.
-func (t *TransitionRuntime) ObservePosting(postingID string, realizedAmount float64, date string) {
-	t.observePosting(postingID, realizedAmount, date)
+// ObserveTransaction records a realized amount without moving balances.
+func (t *TransitionRuntime) ObserveTransaction(transactionID string, realizedAmount float64, date string) {
+	t.observeTransaction(transactionID, realizedAmount, date)
 }
 
 // ExecuteGeneratedTransaction applies a reactive behavior transaction.

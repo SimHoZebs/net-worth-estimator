@@ -1,6 +1,6 @@
 // Package inbox serves the received-share inbox over HTTP (FND-03): one
 // place for transaction shares the caller received through FND-02 grants.
-// Items derive from the ListSharedPostings primitive; inbox rows only
+// Items derive from the ListSharedTransactions primitive; inbox rows only
 // record the recipient's own decision, read, and dismissed state and
 // never authorize. Previews appear only while the recipient is currently
 // authorized; revoked shares surface as canceled without content.
@@ -135,11 +135,11 @@ func resourceOwner(resource string) (string, error) {
 }
 
 type shareInput struct {
-	Owner     string `json:"owner"`
-	PostingID string `json:"postingId"`
+	Owner         string `json:"owner"`
+	TransactionID string `json:"transactionId"`
 }
 
-func decodeShareInput(body []byte) (owner, postingID string, ok bool) {
+func decodeShareInput(body []byte) (owner, transactionID string, ok bool) {
 	var input shareInput
 	if err := json.Unmarshal(body, &input); err != nil {
 		return "", "", false
@@ -148,11 +148,11 @@ func decodeShareInput(body []byte) (owner, postingID string, ok bool) {
 	if err != nil {
 		return "", "", false
 	}
-	postingID = strings.TrimSpace(input.PostingID)
-	if postingID == "" {
+	transactionID = strings.TrimSpace(input.TransactionID)
+	if transactionID == "" {
 		return "", "", false
 	}
-	return owner, postingID, true
+	return owner, transactionID, true
 }
 
 // serveInbox lists the recipient's received shares, newest first. The
@@ -232,7 +232,7 @@ func (h *Handler) serveAccept(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "The inbox request is invalid.")
 		return
 	}
-	owner, postingID, ok := decodeShareInput(body)
+	owner, transactionID, ok := decodeShareInput(body)
 	if !ok {
 		writeProblem(w, http.StatusBadRequest, "The inbox request is invalid.")
 		return
@@ -244,7 +244,7 @@ func (h *Handler) serveAccept(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusServiceUnavailable, "Shared transaction storage is temporarily unavailable.")
 		return
 	}
-	item, err := h.db.AcceptInboxShare(recipient, owner, postingID)
+	item, err := h.db.AcceptInboxShare(recipient, owner, transactionID)
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return
@@ -274,12 +274,12 @@ func (h *Handler) serveDecline(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "The inbox request is invalid.")
 		return
 	}
-	owner, postingID, ok := decodeShareInput(body)
+	owner, transactionID, ok := decodeShareInput(body)
 	if !ok {
 		writeProblem(w, http.StatusBadRequest, "The inbox request is invalid.")
 		return
 	}
-	item, err := h.db.DeclineInboxShare(recipient, owner, postingID)
+	item, err := h.db.DeclineInboxShare(recipient, owner, transactionID)
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return
@@ -317,7 +317,7 @@ func (h *Handler) serveDismiss(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owner, err := resourceOwner(strings.TrimSpace(input.Owner))
-	if err != nil || strings.TrimSpace(input.PostingID) == "" {
+	if err != nil || strings.TrimSpace(input.TransactionID) == "" {
 		writeProblem(w, http.StatusBadRequest, "The inbox request is invalid.")
 		return
 	}
@@ -325,7 +325,7 @@ func (h *Handler) serveDismiss(w http.ResponseWriter, r *http.Request) {
 	if input.Dismissed != nil {
 		dismissed = *input.Dismissed
 	}
-	item, err := h.db.SetInboxShareDismissed(recipient, owner, strings.TrimSpace(input.PostingID), dismissed)
+	item, err := h.db.SetInboxShareDismissed(recipient, owner, strings.TrimSpace(input.TransactionID), dismissed)
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return
@@ -363,7 +363,7 @@ func (h *Handler) serveRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owner, err := resourceOwner(strings.TrimSpace(input.Owner))
-	if err != nil || strings.TrimSpace(input.PostingID) == "" {
+	if err != nil || strings.TrimSpace(input.TransactionID) == "" {
 		writeProblem(w, http.StatusBadRequest, "The inbox request is invalid.")
 		return
 	}
@@ -371,7 +371,7 @@ func (h *Handler) serveRead(w http.ResponseWriter, r *http.Request) {
 	if input.Read != nil {
 		read = *input.Read
 	}
-	item, err := h.db.SetInboxShareRead(recipient, owner, strings.TrimSpace(input.PostingID), read)
+	item, err := h.db.SetInboxShareRead(recipient, owner, strings.TrimSpace(input.TransactionID), read)
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return

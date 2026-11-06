@@ -21,15 +21,15 @@ sqlite3 "$db" ".backup '$backup'"
 
 sqlite3 "$db" "
 BEGIN IMMEDIATE;
-UPDATE postings SET source = 'banksync' WHERE source = 'simplefin';
+UPDATE transactions SET source = 'banksync' WHERE source = 'simplefin';
 UPDATE checkpoints SET source = 'banksync' WHERE source = 'simplefin';
 COMMIT;
 "
 
-postings=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM postings WHERE source = 'simplefin';")
+transactions=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM transactions WHERE source = 'simplefin';")
 checkpoints=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM checkpoints WHERE source = 'simplefin';")
-test "$postings" = "0" || {
-	printf 'bank-source: %s postings still carry simplefin; restore %s\n' "$postings" "$backup" >&2
+test "$transactions" = "0" || {
+	printf 'bank-source: %s transactions still carry simplefin; restore %s\n' "$transactions" "$backup" >&2
 	exit 1
 }
 test "$checkpoints" = "0" || {

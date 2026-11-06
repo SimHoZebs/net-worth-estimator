@@ -165,7 +165,7 @@ func (Recurring) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]t
 		}
 		ids := make([]string, 0, len(kept))
 		for _, item := range kept {
-			ids = append(ids, item.transaction.PostingID)
+			ids = append(ids, item.transaction.TransactionID)
 		}
 		sort.Strings(ids)
 		merchant := strings.Split(key, "\x00")[4]
@@ -179,9 +179,9 @@ func (Recurring) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]t
 		reason := fmt.Sprintf("%d transactions from %q occur approximately %s (median interval %d days, typical source amount %s %s, %s to %s). This pattern suggests recurrence but does not establish a forecast rule.",
 			len(kept), merchant, cadence, int64(math.Round(medianGap)), strconv.FormatFloat(typical, 'f', 2, 64), currency, first, last)
 		for _, item := range kept {
-			findings = append(findings, types.AnalysisDetection{PostingID: item.transaction.PostingID, Kind: "recurring", Provider: merchant, Product: cadence, Role: role, Strength: "moderate", Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: reason, PostingIDs: ids}}})
+			findings = append(findings, types.AnalysisDetection{TransactionID: item.transaction.TransactionID, Kind: "recurring", Provider: merchant, Product: cadence, Role: role, Strength: "moderate", Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: reason, TransactionIDs: ids}}})
 		}
 	}
-	sort.Slice(findings, func(i, j int) bool { return findings[i].PostingID < findings[j].PostingID })
+	sort.Slice(findings, func(i, j int) bool { return findings[i].TransactionID < findings[j].TransactionID })
 	return findings, nil
 }

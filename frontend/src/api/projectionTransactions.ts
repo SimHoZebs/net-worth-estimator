@@ -10,7 +10,7 @@ type TransactionSource = {
 
 /** Structural rows shared by the model document and the projection source. */
 export type TransactionNaming = {
-	postings: {
+	transactions: {
 		id: string;
 		name: string;
 		sourceAccountId: string | null;
@@ -36,7 +36,7 @@ function transactionSourceIndex(
 ): Map<string, TransactionSource> {
 	const index = new Map<string, TransactionSource>();
 	if (!model) return index;
-	for (const item of model.postings) {
+	for (const item of model.transactions) {
 		if (!index.has(item.id))
 			index.set(item.id, {
 				name: item.name,
@@ -104,7 +104,7 @@ export function projectionTransactions(
 				event.date > start || (event.date === start && !startCheckpoint),
 		)
 		.map((event) => {
-			const source = sources.get(event.origin.postingId);
+			const source = sources.get(event.origin.transactionId);
 			const deltas = event.accountDeltas ?? [];
 			const constraints = Array.isArray(event.bindingConstraints)
 				? event.bindingConstraints
@@ -115,8 +115,8 @@ export function projectionTransactions(
 			});
 			return {
 				date: event.date,
-				transactionId: event.origin.postingId,
-				name: source?.name || event.origin.postingId,
+				transactionId: event.origin.transactionId,
+				name: source?.name || event.origin.transactionId,
 				requested: event.requestedAmount,
 				realized: event.realizedAmount,
 				fromId:

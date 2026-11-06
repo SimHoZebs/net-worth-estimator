@@ -22,7 +22,7 @@ type AnalysisStore interface {
 }
 
 // BankObservation refreshes evidence for an already mapped bank transaction.
-// Its exact keys resolve ownership. It never rewrites the financial posting.
+// Its exact keys resolve ownership. It never rewrites the financial transaction.
 type BankObservation struct {
 	Keys  []BankKey
 	Facts types.TransactionFacts

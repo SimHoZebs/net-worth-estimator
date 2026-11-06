@@ -60,7 +60,7 @@ AI requests contain only the captured product data.
 
 Save uses `POST /v1/planned-purchases`, exactly like the app's editor:
 `name`, `fundingAccountId`, `cost`, `earliestDate`, `priority`, and `enabled`.
-Purchases remain separate from postings. The app's validation and
+Purchases remain separate from transactions. The app's validation and
 storage remain authoritative. Concurrent app and extension writes use the same
 last-write rules. Source URL, price text and variant stay in the local draft.
 

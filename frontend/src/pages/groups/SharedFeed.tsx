@@ -117,11 +117,11 @@ export function SharedFeed({
 	const totals = pages.at(-1)?.totals ?? null;
 
 	async function onSave(item: FeedItem) {
-		const key = `${item.ownerUserId}/${item.posting.id}`;
+		const key = `${item.ownerUserId}/${item.transaction.id}`;
 		const requestId = mintShareRequestId();
 		setSaving(key);
 		try {
-			await saveSharedCopy(item.ownerUserId, item.posting.id, requestId);
+			await saveSharedCopy(item.ownerUserId, item.transaction.id, requestId);
 			setSaved((previous) => ({ ...previous, [key]: true }));
 			notifySuccess("groups-notice", "Saved to your transactions.");
 		} catch {
@@ -209,11 +209,13 @@ export function SharedFeed({
 			{items.length > 0 && (
 				<TransactionTable caption="Shared transactions">
 					{items.map((item) => {
-						const key = `${item.ownerUserId}/${item.posting.id}`;
-						const literal = literalAmountOf(item.posting.amount);
-						const day = isoDateFromEpochSeconds(item.posting.transactionTime);
-						const from = item.posting.sourceAccountId;
-						const to = item.posting.destinations;
+						const key = `${item.ownerUserId}/${item.transaction.id}`;
+						const literal = literalAmountOf(item.transaction.amount);
+						const day = isoDateFromEpochSeconds(
+							item.transaction.transactionTime,
+						);
+						const from = item.transaction.sourceAccountId;
+						const to = item.transaction.destinations;
 						const tone = from
 							? to.length > 0
 								? ("transfer" as const)
@@ -233,7 +235,7 @@ export function SharedFeed({
 								date={<time dateTime={day}>{dateLabel(day, true)}</time>}
 								icon={<DirectionIcon size={16} aria-hidden="true" />}
 								tone={tone}
-								title={item.posting.name}
+								title={item.transaction.name}
 								slots={{
 									subtitle: (
 										<span>
@@ -241,9 +243,9 @@ export function SharedFeed({
 										</span>
 									),
 									mobile: <time dateTime={day}>{dateLabel(day, true)}</time>,
-									badges: (item.posting.pending || isSaved) && (
+									badges: (item.transaction.pending || isSaved) && (
 										<>
-											{item.posting.pending && (
+											{item.transaction.pending && (
 												<Badge
 													tone="neutral"
 													className={transactionBadgeStyles()}
@@ -284,7 +286,7 @@ export function SharedFeed({
 										</strong>
 									)
 								}
-								actionLabel={`Save a copy of ${item.posting.name} on ${dateLabel(day, true)}${item.posting.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
+								actionLabel={`Save a copy of ${item.transaction.name} on ${dateLabel(day, true)}${item.transaction.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
 								onSelect={() => void onSave(item)}
 								selectDisabled={isSaved || busy}
 							/>

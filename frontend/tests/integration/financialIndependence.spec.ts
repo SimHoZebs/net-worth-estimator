@@ -30,7 +30,7 @@ async function addIndependence(
 				principalPolicy: "preserve-real-principal",
 				annualExpenseTargetBasis: "fi-date-dollars",
 				sources: [{ type: "asset", accountId: "brokerage", included: true }],
-				continuingPostingIds: ["brokerage_growth"],
+				continuingTransactionIds: ["brokerage_growth"],
 				...overrides,
 			},
 		},
@@ -225,8 +225,8 @@ test("a self-sustaining projection date remains distinct from its spending cover
 		annualExpenseTarget: 100,
 		annualExpenseGrowthRate: 0,
 		principalPolicy: "allow-drawdown",
-		continuingPostingIds: [],
-		sources: [{ type: "cashflow", postingId: "salary", included: true }],
+		continuingTransactionIds: [],
+		sources: [{ type: "cashflow", transactionId: "salary", included: true }],
 	});
 	await page.goto("/#evaluations");
 	const card = page.getByRole("region", {

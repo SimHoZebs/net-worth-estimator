@@ -11,12 +11,12 @@ const model = {
 	sourcePath: "models/household",
 	accounts: [{ id: "cash", name: "Cash", enabled: true }],
 	checkpoints: [{ AccountId: "cash", Balance: 100, observedAt: 1769903999 }],
-	postings: [{ id: "pay", name: "Pay", enabled: true }],
+	transactions: [{ id: "pay", name: "Pay", enabled: true }],
 	schedules: [{ id: "salary", name: "Salary", enabled: true }],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
-		postingFulfillment: [],
+		transactionFulfillment: [],
 	},
 };
 
@@ -39,7 +39,7 @@ describe("server model import parsing", () => {
 		{ ...model, evaluations: {} },
 		{
 			...model,
-			evaluations: { ...model.evaluations, postingFulfillment: null },
+			evaluations: { ...model.evaluations, transactionFulfillment: null },
 		},
 		{ ...model, accounts: [null] },
 		{ ...model, accounts: [{ id: "cash", name: "Cash" }] },
@@ -49,7 +49,7 @@ describe("server model import parsing", () => {
 				{ AccountId: "cash", Balance: "100", observedAt: 1769903999 },
 			],
 		},
-		{ ...model, postings: [{ id: "pay", name: 1, enabled: true }] },
+		{ ...model, transactions: [{ id: "pay", name: 1, enabled: true }] },
 		{
 			...model,
 			schedules: [{ id: "salary", name: 1, enabled: true }],
@@ -68,7 +68,7 @@ describe("server model import parsing", () => {
 				...model,
 				accounts: [],
 				checkpoints: [],
-				postings: [],
+				transactions: [],
 				schedules: [],
 			}),
 		).toBe(true);

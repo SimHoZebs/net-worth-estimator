@@ -122,7 +122,7 @@ export function activityProjection(
 	const transactions: TransactionResult[] = [];
 	for (const transaction of model.transactions) {
 		if (!transaction.enabled) continue;
-		if (transaction.kind === "posting") {
+		if (transaction.kind === "transaction") {
 			const shortfall = transaction.id === "renovation";
 			transactions.push(
 				event(

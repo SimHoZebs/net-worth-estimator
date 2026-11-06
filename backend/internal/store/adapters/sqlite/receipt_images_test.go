@@ -15,7 +15,7 @@ import (
 func TestReceiptImageReplacementClearsContentAtomically(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "replace-image")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	before, _ := s.LoadModel()
 	financialRevision, _ := ModelETag(before)
 	r, err := s.CreateReceipt(context.Background(), p.ID, "old.png", types.ReceiptImage{Bytes: []byte("old pixels"), MediaType: "image/png"})
@@ -36,7 +36,7 @@ func TestReceiptImageReplacementClearsContentAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.ID != r.ID || updated.PostingID != r.PostingID || updated.CreatedAt != r.CreatedAt || updated.Revision != r.Revision+1 || updated.Digest == r.Digest || updated.Filename != "new.png" {
+	if updated.ID != r.ID || updated.TransactionID != r.TransactionID || updated.CreatedAt != r.CreatedAt || updated.Revision != r.Revision+1 || updated.Digest == r.Digest || updated.Filename != "new.png" {
 		t.Fatalf("replacement = %+v", updated)
 	}
 	if updated.Status != "attached" || updated.ExtractionStartedAt != 0 || updated.Extraction != nil || updated.Draft != nil || updated.Confirmed != nil || updated.Problem != nil || updated.DraftProvenance != nil || updated.ConfirmedProvenance != nil {
@@ -70,10 +70,10 @@ func TestReceiptReplacementIsolationDuplicateAndQuota(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "replace-a"), privateTestPlan(t, d, "replace-b")
 	for _, s := range []store.Store{a, b} {
-		seedReceiptPosting(t, s)
+		seedReceiptTransaction(t, s)
 	}
 	image := types.ReceiptImage{Bytes: []byte("old image pixels"), MediaType: "image/png"}
-	r, err := a.CreateReceipt(context.Background(), receiptPostingID, "old.png", image)
+	r, err := a.CreateReceipt(context.Background(), receiptTransactionID, "old.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestReceiptReplacementIsolationDuplicateAndQuota(t *testing.T) {
 		t.Fatalf("cross-plan replace = %v", err)
 	}
 	otherImage := types.ReceiptImage{Bytes: []byte("other pixels"), MediaType: "image/png"}
-	other, err := a.CreateReceipt(context.Background(), receiptPostingID, "other.png", otherImage)
+	other, err := a.CreateReceipt(context.Background(), receiptTransactionID, "other.png", otherImage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestReceiptReplacementIsolationDuplicateAndQuota(t *testing.T) {
 func TestReceiptImageReadsStayConsistentDuringReplacement(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "replace-read")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	images := []types.ReceiptImage{
 		{Bytes: []byte("PNG pixels"), MediaType: "image/png"},
 		{Bytes: []byte("JPEG pixels"), MediaType: "image/jpeg"},

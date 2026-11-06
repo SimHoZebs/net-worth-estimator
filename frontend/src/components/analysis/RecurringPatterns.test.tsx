@@ -53,10 +53,10 @@ vi.mock("@/state/savedState.ts", () => ({
 	useSavedAccounts: () => [{ id: "checking", name: "Everyday checking" }],
 }));
 
-function recurringFinding(id: string, postingId: string): AnalysisFinding {
+function recurringFinding(id: string, transactionId: string): AnalysisFinding {
 	return {
 		id,
-		postingId,
+		transactionId,
 		kind: "recurring",
 		provider: "grocer",
 		product: "monthly",
@@ -68,7 +68,7 @@ function recurringFinding(id: string, postingId: string): AnalysisFinding {
 		runId: "run",
 		feedbackRevision: 0,
 		evidence: [
-			{ code: "recurring.cadence", reason: "test", postingIds: ["a", "b"] },
+			{ code: "recurring.cadence", reason: "test", transactionIds: ["a", "b"] },
 		],
 	} as AnalysisFinding;
 }
@@ -80,8 +80,8 @@ function creatablePreview(): PatternToNewSchedulePreview {
 		merchant: "grocer",
 		cadence: "monthly",
 		occurrences: [
-			{ postingId: "a", date: "2026-01-15", amount: "30.00" },
-			{ postingId: "b", date: "2026-02-15", amount: "30.00" },
+			{ transactionId: "a", date: "2026-01-15", amount: "30.00" },
+			{ transactionId: "b", date: "2026-02-15", amount: "30.00" },
 		],
 		typicalAmount: "30.00",
 		currency: "USD",
@@ -233,8 +233,8 @@ describe("repeating-payment patterns", () => {
 			claimable: true,
 			reason: "",
 			assignments: [
-				{ postingId: "a", date: "2026-01-15", amount: "30.00" },
-				{ postingId: "b", date: "2026-02-15", amount: "30.00" },
+				{ transactionId: "a", date: "2026-01-15", amount: "30.00" },
+				{ transactionId: "b", date: "2026-02-15", amount: "30.00" },
 			],
 		};
 		render(
@@ -280,7 +280,9 @@ describe("repeating-payment patterns", () => {
 			accountId: "checking",
 			claimable: true,
 			reason: "",
-			assignments: [{ postingId: "a", date: "2026-01-15", amount: "30.00" }],
+			assignments: [
+				{ transactionId: "a", date: "2026-01-15", amount: "30.00" },
+			],
 		};
 		render(
 			<RecurringPatterns

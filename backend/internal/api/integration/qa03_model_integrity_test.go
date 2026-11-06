@@ -17,7 +17,7 @@ import (
 // Receipt review, sharing grants, and inbox decisions must never move the
 // financial model or its forecast; only a genuine model edit may. Bank
 // source rows stay byte-identical unless the bank itself sends new rows,
-// and no flow may mint duplicate accounts, postings, rules, or receipts.
+// and no flow may mint duplicate accounts, transactions, rules, or receipts.
 func qa03CanonicalModel(t *testing.T, scoped store.Store) string {
 	t.Helper()
 	model, err := scoped.LoadModel()
@@ -31,8 +31,8 @@ func qa03CanonicalModel(t *testing.T, scoped store.Store) string {
 	return string(raw)
 }
 
-func qa03CountRows(model *types.FinancialModel) (accounts, postings, rules int) {
-	return len(model.Accounts), len(model.Postings), len(model.Schedules)
+func qa03CountRows(model *types.FinancialModel) (accounts, transactions, rules int) {
+	return len(model.Accounts), len(model.Transactions), len(model.Schedules)
 }
 
 func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
@@ -51,10 +51,10 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 	}
 	handler := New(scoped, Config{ReceiptSource: source})
 	model, err := scoped.LoadModel()
-	if err != nil || len(model.Postings) != 1 {
-		t.Fatalf("seeded postings = %+v err = %v", model, err)
+	if err != nil || len(model.Transactions) != 1 {
+		t.Fatalf("seeded transactions = %+v err = %v", model, err)
 	}
-	postingID := model.Postings[0].ID
+	transactionID := model.Transactions[0].ID
 
 	baselineModel := qa03CanonicalModel(t, scoped)
 	baselineForecast := qa03StoredProjection(t, handler)
@@ -62,7 +62,7 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 
 	// Receipt review is evidence-only: attach, extract (harness adapter),
 	// and confirm must leave the model and its forecast untouched.
-	receipt := decodeReceipt(t, qa03UploadToPosting(t, handler, postingID, receiptmock.SampleImage))
+	receipt := decodeReceipt(t, qa03UploadToTransaction(t, handler, transactionID, receiptmock.SampleImage))
 	extracted := decodeReceipt(t, receiptRequest(handler, "POST", "/v1/receipts/"+receipt.ID+"/extract", nil))
 	details := extracted.Extraction.Details
 	details.Merchant = "Confirmed store"
@@ -78,7 +78,7 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 	}
 
 	// A bank re-sync with identical rows changes nothing; one new bank row
-	// adds exactly one posting and revises the forecast.
+	// adds exactly one transaction and revises the forecast.
 	qa03BankSync(t, scoped, []simplefin.Transaction{
 		qa03BankTxn("bank-a", "GROCER 123", "-12.50", stamp),
 	})
@@ -93,16 +93,16 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accounts, postings, rules := qa03CountRows(model); accounts != 1 || postings != 2 || rules != 0 {
-		t.Fatalf("rows = %d/%d/%d, want 1/2/0 with no duplicates", accounts, postings, rules)
+	if accounts, transactions, rules := qa03CountRows(model); accounts != 1 || transactions != 2 || rules != 0 {
+		t.Fatalf("rows = %d/%d/%d, want 1/2/0 with no duplicates", accounts, transactions, rules)
 	}
 	seen := map[string]int{}
-	for _, posting := range model.Postings {
-		seen[posting.ID]++
+	for _, transaction := range model.Transactions {
+		seen[transaction.ID]++
 	}
 	for id, count := range seen {
 		if count != 1 {
-			t.Fatalf("posting %s appears %d times", id, count)
+			t.Fatalf("transaction %s appears %d times", id, count)
 		}
 	}
 
@@ -119,8 +119,8 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if accounts, postings, rules := qa03CountRows(model); accounts != 1 || postings != 2 || rules != 1 {
-		t.Fatalf("rows = %d/%d/%d, want 1/2/1", accounts, postings, rules)
+	if accounts, transactions, rules := qa03CountRows(model); accounts != 1 || transactions != 2 || rules != 1 {
+		t.Fatalf("rows = %d/%d/%d, want 1/2/1", accounts, transactions, rules)
 	}
 
 	// Deleting the rule restores the pre-rule forecast byte-for-byte: the

@@ -103,16 +103,16 @@ function CategoryOption({
  * Category assignment is sidecar metadata, so it saves on its own instead of
  * riding the transaction form. It renders as one field row beside the other
  * transaction fields, with a picker that shows one icon per category. Pending
- * bank rows stay editable because the posting ID survives settlement.
+ * bank rows stay editable because the transaction ID survives settlement.
  */
 export function TransactionCategory({
-	postingId,
+	transactionId,
 	category,
 	source,
 	readOnly,
 	labelClassName = "w-36 flex-none text-sm font-semibold text-muted",
 }: {
-	postingId: string;
+	transactionId: string;
 	category: string | null | undefined;
 	source: string | null | undefined;
 	readOnly?: boolean;
@@ -134,7 +134,7 @@ export function TransactionCategory({
 	const [error, setError] = useState<string | null>(null);
 	// Follow the saved rows after a save so the control reflects the server
 	// result without copying props into state through an effect.
-	const saved = useSavedTransactions()?.find((row) => row.id === postingId);
+	const saved = useSavedTransactions()?.find((row) => row.id === transactionId);
 	const currentCategory = saved ? saved.category : category;
 	const currentSource = saved ? saved.categorySource : source;
 	const normalizedSource = transactionCategorySourceOf(currentSource);
@@ -213,7 +213,7 @@ export function TransactionCategory({
 		setSaving(true);
 		setError(null);
 		const ok = await performSave({
-			call: () => categorizeTransaction(postingId, { category: next }),
+			call: () => categorizeTransaction(transactionId, { category: next }),
 			refresh: refreshTransactions,
 			failureMessage: "The category could not be saved.",
 		});

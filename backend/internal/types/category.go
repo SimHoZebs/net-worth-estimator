@@ -126,21 +126,21 @@ func normalizeCategoryToken(value string) string {
 	return value
 }
 
-// PostingCategory is the current category assignment for one posting. Source
+// TransactionCategory is the current category assignment for one transaction. Source
 // names the producer kind; Producer names the exact bank or classifier that
 // supplied it.
-type PostingCategory struct {
-	PostingID string `json:"postingId"`
-	Category  string `json:"category"`
-	Source    string `json:"source"`
-	Producer  string `json:"producer,omitempty"`
+type TransactionCategory struct {
+	TransactionID string `json:"transactionId"`
+	Category      string `json:"category"`
+	Source        string `json:"source"`
+	Producer      string `json:"producer,omitempty"`
 }
 
-// PostingCategoryCandidate is one uncategorized bank posting offered to the
+// TransactionCategoryCandidate is one uncategorized bank transaction offered to the
 // classifier. Facts stay raw evidence and never leave the server scope.
-type PostingCategoryCandidate struct {
-	PostingID string
-	Name      string
-	Direction string
-	Facts     *TransactionFacts
+type TransactionCategoryCandidate struct {
+	TransactionID string
+	Name          string
+	Direction     string
+	Facts         *TransactionFacts
 }

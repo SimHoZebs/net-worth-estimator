@@ -11,7 +11,7 @@ Synchronize the narrow set of source data that the financial model cannot infer 
 Each synchronization run may write only:
 
 1. **Balance checkpoints** for mapped accounts.
-2. **Pending card-charge seeds** as disabled one-time postings for configured card accounts.
+2. **Pending card-charge seeds** as disabled one-time transactions for configured card accounts.
 
 The integration does not materialize:
 
@@ -48,9 +48,9 @@ Startup rules:
 
 ## Row Ownership, Links, and Migration
 
-Schema version 3 adds `source TEXT NOT NULL DEFAULT 'model'` to checkpoints and postings. Existing rows are owner rows. Schema version 8 adds `entity_ids` (shared ID registry) and `account_links` (bridge-to-model bindings with snapshot, origin, and last-seen date).
+Schema version 3 adds `source TEXT NOT NULL DEFAULT 'model'` to checkpoints and transactions. Existing rows are owner rows. Schema version 8 adds `entity_ids` (shared ID registry) and `account_links` (bridge-to-model bindings with snapshot, origin, and last-seen date).
 
-The reserved `store.SyncPostingPrefix` is `sfin-`. Pending posting IDs use `sfin-pending-<model-account>-<sanitized-transaction-id>`.
+The reserved `store.SyncTransactionPrefix` is `sfin-`. Pending transaction IDs use `sfin-pending-<model-account>-<sanitized-transaction-id>`.
 
 ### Linking and provisioning
 
@@ -70,10 +70,10 @@ Checkpoint behavior:
 - an incoming owner checkpoint with the same key wins and becomes the owner row;
 - a later synchronization skips the owner-owned key until owner data is removed.
 
-Posting behavior:
+Transaction behavior:
 
 - incoming `sfin-` IDs are dropped;
-- stored sync pending postings are re-merged;
+- stored sync pending transactions are re-merged;
 - removing an account from the seed does not garbage-collect sync rows or links, because sync persistence is independent of linking.
 
 Any future ownership migration must preserve this collision contract and add a package test before runtime rollout. Migrations are forward-only, transactional, data-preserving, and applied by `store.Open`.
@@ -99,7 +99,7 @@ For mapped model accounts listed in the card set:
 - skip posted rows;
 - require a parseable negative amount;
 - skip zero and positive amounts;
-- create one disabled one-time external-outflow posting;
+- create one disabled one-time external-outflow transaction;
 - set `sourceAccountId` to the mapped card;
 - leave destinations absent;
 - use a literal expression containing the absolute decimal amount;
@@ -216,7 +216,7 @@ Required coverage:
 - positive, posted, non-USD, invalid, and unmapped skip reasons;
 - deterministic pending IDs and row shape;
 - checkpoint insert/update/owner-skip behavior;
-- pending snapshot replacement and owner-posting preservation;
+- pending snapshot replacement and owner-transaction preservation;
 - row-write guards (reserved IDs, sync ownership, dangling references);
 - forged reserved IDs being dropped;
 - exact owner checkpoint collision precedence;
@@ -230,7 +230,7 @@ Required coverage:
 
 1. First real run creates or updates only mapped balance checkpoints.
 2. Only configured card accounts receive pending rows.
-3. Pending rows are disabled one-time postings with negative charge magnitude and reserved IDs.
+3. Pending rows are disabled one-time transactions with negative charge magnitude and reserved IDs.
 4. A second real run refreshes pending rows without duplicating checkpoints.
 5. An owner checkpoint at the same account/date is not overwritten.
 6. A rejected trigger leaves the database unchanged.

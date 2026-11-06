@@ -42,7 +42,7 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
-		occurrenceIDs = append(occurrenceIDs, evidence.PostingIDs...)
+		occurrenceIDs = append(occurrenceIDs, evidence.TransactionIDs...)
 	}
 	seen := map[string]bool{}
 	ordered := occurrenceIDs[:0]
@@ -79,7 +79,7 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 			placeholders += "?"
 			args = append(args, id)
 		}
-		rows, err := s.db.Query(`SELECT posting_id, facts_json FROM transaction_source_facts WHERE posting_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
+		rows, err := s.db.Query(`SELECT transaction_id, facts_json FROM transaction_source_facts WHERE transaction_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
 		if err != nil {
 			return preview, err
 		}
@@ -106,7 +106,7 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 		ScheduleName: rule.Name,
 		Merchant:     anchor.Provider,
 		Cadence:      anchor.Product,
-		AccountID:    accountOfPattern(model.Postings, occurrenceIDs),
+		AccountID:    accountOfPattern(model.Transactions, occurrenceIDs),
 	}
 	if anchor.Status != "active" {
 		preview.Claimable = false
@@ -119,7 +119,7 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 		return preview, nil
 	}
 	assignments, err := analysis.BuildPatternToExistingSchedule(analysis.PatternToExistingScheduleInput{
-		Anchor: anchor, Postings: model.Postings, Facts: facts, Rule: *rule, OccurrenceIDs: occurrenceIDs,
+		Anchor: anchor, Transactions: model.Transactions, Facts: facts, Rule: *rule, OccurrenceIDs: occurrenceIDs,
 	})
 	if err != nil {
 		preview.Claimable = false
@@ -148,15 +148,15 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 	return preview, nil
 }
 
-func accountOfPattern(postings []types.Posting, ids []string) string {
-	for _, posting := range postings {
+func accountOfPattern(transactions []types.Transaction, ids []string) string {
+	for _, transaction := range transactions {
 		for _, id := range ids {
-			if posting.ID == id {
-				if posting.SourceAccountID != nil {
-					return *posting.SourceAccountID
+			if transaction.ID == id {
+				if transaction.SourceAccountID != nil {
+					return *transaction.SourceAccountID
 				}
-				if len(posting.Destinations) > 0 {
-					return posting.Destinations[0]
+				if len(transaction.Destinations) > 0 {
+					return transaction.Destinations[0]
 				}
 				return ""
 			}

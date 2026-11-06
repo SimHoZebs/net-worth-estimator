@@ -13,7 +13,7 @@ func init() {
 	evaluationRegistryInstance.Register(financialIndependenceDefinition)
 	evaluationRegistryInstance.Register(netWorthThresholdDefinition)
 	evaluationRegistryInstance.Register(accountBalanceDefinition)
-	evaluationRegistryInstance.Register(postingFulfillmentDefinition)
+	evaluationRegistryInstance.Register(transactionFulfillmentDefinition)
 	evaluationRegistryInstance.Register(cycleFulfillmentDefinition)
 	evaluationRegistryInstance.Register(plannedPurchasesDefinition)
 	evaluationRegistryInstance.Register(whatIfDefinition)

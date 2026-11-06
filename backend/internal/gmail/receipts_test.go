@@ -286,7 +286,7 @@ func TestScanIsolatesMessageFailures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load model: %v", err)
 	}
-	if model != nil && (len(model.Postings) != 0 || len(model.Accounts) != 0) {
+	if model != nil && (len(model.Transactions) != 0 || len(model.Accounts) != 0) {
 		t.Fatalf("scan touched financial state: %+v", model)
 	}
 }

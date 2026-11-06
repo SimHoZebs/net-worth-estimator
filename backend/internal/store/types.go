@@ -168,11 +168,11 @@ type SyncProvision struct {
 	Kind     types.AccountKind
 }
 
-// GeneratedPosting is one engine-output transaction for a slice. Generated
+// GeneratedTransaction is one engine-output transaction for a slice. Generated
 // rows carry the public event as JSON and never participate in model reads,
 // sync reconciliation, or analysis: every model query filters them out by
 // null slice.
-type GeneratedPosting struct {
+type GeneratedTransaction struct {
 	SliceID         string
 	Name            string
 	SourceAccountID *string
@@ -191,10 +191,10 @@ type ProjectionRowPayload struct {
 	Payload string
 }
 
-// SyncPosting separates the exact provider identity from the local posting ID.
+// SyncTransaction separates the exact provider identity from the local transaction ID.
 // The store allocates the UUID. Provider keys are never sanitized or exposed as IDs.
-type SyncPosting struct {
-	types.Posting
+type SyncTransaction struct {
+	types.Transaction
 	ProviderAccountID string
 	TransactionID     string
 	Facts             *types.TransactionFacts
@@ -208,12 +208,12 @@ type BankKey struct {
 	TransactionID string
 }
 
-// BankRow is one stored bank-reported posting with every upstream identity
+// BankRow is one stored bank-reported transaction with every upstream identity
 // pointing at it. Adapters read these to reconcile a snapshot without
 // reimplementing storage.
 type BankRow struct {
-	Posting types.Posting
-	Keys    []BankKey
+	Transaction types.Transaction
+	Keys        []BankKey
 }
 
 // BankDirective is one reconciled bank write. Adapters translate provider
@@ -230,18 +230,18 @@ type BankDirective struct {
 // carries the source evidence observed in the same snapshot, so the first
 // sync stores evidence and category hints without waiting for a later pass.
 type BankUpsert struct {
-	Posting types.Posting
-	Keys    []BankKey
-	Facts   *types.TransactionFacts
+	Transaction types.Transaction
+	Keys        []BankKey
+	Facts       *types.TransactionFacts
 }
 
 // BankConvert carries settled values for an existing row the adapter
 // matched, plus replacement keys.
 type BankConvert struct {
-	ID      string
-	Posting types.Posting
-	AddKeys []BankKey
-	Facts   *types.TransactionFacts
+	ID          string
+	Transaction types.Transaction
+	AddKeys     []BankKey
+	Facts       *types.TransactionFacts
 }
 
 // Group describes one user group plus the caller's role in it.
@@ -283,7 +283,7 @@ type GroupInvite struct {
 }
 
 // Sharing audience kinds for cross-user transaction authorization (FND-02).
-// A grant names one posting owned by one user and visible to one audience:
+// A grant names one transaction owned by one user and visible to one audience:
 // a single user, every current member of a group, or (exclusions only) all
 // current and future audiences.
 const (
@@ -292,7 +292,7 @@ const (
 	SharingAudienceAll   = "all"
 )
 
-// Sharing intent states. Explicit intent for one posting plus one audience
+// Sharing intent states. Explicit intent for one transaction plus one audience
 // is a single row: default (absent), explicitly shared, or excluded.
 // Explicit share and exclusion cannot coexist for the same audience.
 const (
@@ -300,17 +300,17 @@ const (
 	SharingIntentExcluded = "excluded"
 )
 
-// SharingGrant is one explicit owner decision for one posting and audience.
-// OwnerUserID and PostingID form the owner-scoped transaction identity;
+// SharingGrant is one explicit owner decision for one transaction and audience.
+// OwnerUserID and TransactionID form the owner-scoped transaction identity;
 // AudienceType is user, group, or all (wildcard exclusions only);
 // AudienceID is the grantee user ID, group ID, or empty for wildcard.
 type SharingGrant struct {
-	OwnerUserID string `json:"ownerUserId"`
-	PostingID   string `json:"postingId"`
-	Audience    string `json:"audienceType"`
-	AudienceID  string `json:"audienceId"`
-	Intent      string `json:"intent"`
-	CreatedAt   int64  `json:"createdAt"`
+	OwnerUserID   string `json:"ownerUserId"`
+	TransactionID string `json:"transactionId"`
+	Audience      string `json:"audienceType"`
+	AudienceID    string `json:"audienceId"`
+	Intent        string `json:"intent"`
+	CreatedAt     int64  `json:"createdAt"`
 }
 
 // SharingPolicy is one member's automatic transaction-sharing preference
@@ -346,56 +346,56 @@ type SharingPolicyInput struct {
 // enabling history. It carries audience size and eligible-row counts plus
 // the interval and account coverage, never amounts, payees, or row IDs.
 type SharingPolicyPreview struct {
-	OwnerUserID      string   `json:"ownerUserId"`
-	GroupID          string   `json:"groupId"`
-	Enabled          bool     `json:"enabled"`
-	AccountIDs       []string `json:"accountIds"`
-	StartDate        string   `json:"startDate"`
-	EndDate          string   `json:"endDate,omitempty"`
-	Version          int64    `json:"version"`
-	EligiblePostings int      `json:"eligiblePostings"`
-	MemberCount      int      `json:"memberCount"`
+	OwnerUserID          string   `json:"ownerUserId"`
+	GroupID              string   `json:"groupId"`
+	Enabled              bool     `json:"enabled"`
+	AccountIDs           []string `json:"accountIds"`
+	StartDate            string   `json:"startDate"`
+	EndDate              string   `json:"endDate,omitempty"`
+	Version              int64    `json:"version"`
+	EligibleTransactions int      `json:"eligibleTransactions"`
+	MemberCount          int      `json:"memberCount"`
 }
 
-// SharedPostingAccess is the result of a read-time authorization check.
+// SharedTransactionAccess is the result of a read-time authorization check.
 // Allowed is true only when at least one independent valid grant survives
 // current membership, exclusion, and revocation state. Reason names the
 // surviving grant kind ("manual-user", "manual-group") or the
 // policy-derived automatic reason ("automatic-group", GRP-02).
-type SharedPostingAccess struct {
+type SharedTransactionAccess struct {
 	Allowed bool   `json:"allowed"`
 	Reason  string `json:"reason,omitempty"`
 }
 
-// SharedPostingRef pairs a shared posting with its source owner. The
-// posting value reuses the existing transaction model; there is no
+// SharedTransactionRef pairs a shared transaction with its source owner. The
+// transaction value reuses the existing transaction model; there is no
 // separate cross-user DTO and no column-level ACL.
-type SharedPostingRef struct {
-	OwnerUserID string        `json:"ownerUserId"`
-	Posting     types.Posting `json:"posting"`
+type SharedTransactionRef struct {
+	OwnerUserID string            `json:"ownerUserId"`
+	Transaction types.Transaction `json:"transaction"`
 }
 
 // Linked-transaction representation (FND-04). A SharingLink binds one
-// source-owner posting to one recipient-owned private copy through
+// source-owner transaction to one recipient-owned private copy through
 // immutable identities: the source transaction ID (SourceOwnerID plus
-// SourcePostingID), the stable LinkID, the SourceRevision observed at the
+// SourceTransactionID), the stable LinkID, the SourceRevision observed at the
 // last authorized refresh, the recipient owner (RecipientUserID plus
-// CopyPostingID), and the sharing-grant identifiers (GrantAudience,
+// CopyTransactionID), and the sharing-grant identifiers (GrantAudience,
 // GrantAudienceID, GrantReason) that authorized the link. The copy itself
-// stays an ordinary recipient-owned posting: recipient edits never
+// stays an ordinary recipient-owned transaction: recipient edits never
 // propagate to the source, and refresh never rewrites the copy.
 type SharingLink struct {
-	LinkID          string `json:"linkId"`
-	SourceOwnerID   string `json:"sourceOwnerId"`
-	SourcePostingID string `json:"sourcePostingId"`
-	SourceRevision  string `json:"sourceRevision"`
-	RecipientUserID string `json:"recipientUserId"`
-	CopyPostingID   string `json:"copyPostingId"`
-	GrantAudience   string `json:"grantAudienceType"`
-	GrantAudienceID string `json:"grantAudienceId"`
-	GrantReason     string `json:"grantReason"`
-	CopiedAt        int64  `json:"copiedAt"`
-	RefreshedAt     int64  `json:"refreshedAt"`
+	LinkID              string `json:"linkId"`
+	SourceOwnerID       string `json:"sourceOwnerId"`
+	SourceTransactionID string `json:"sourceTransactionId"`
+	SourceRevision      string `json:"sourceRevision"`
+	RecipientUserID     string `json:"recipientUserId"`
+	CopyTransactionID   string `json:"copyTransactionId"`
+	GrantAudience       string `json:"grantAudienceType"`
+	GrantAudienceID     string `json:"grantAudienceId"`
+	GrantReason         string `json:"grantReason"`
+	CopiedAt            int64  `json:"copiedAt"`
+	RefreshedAt         int64  `json:"refreshedAt"`
 }
 
 // Refresh outcomes for a sharing link. "current" means the recipient is
@@ -424,7 +424,7 @@ type SharingLinkRefresh struct {
 }
 
 // Inbox item kinds (FND-03). "share" items arrive through FND-02 grants and
-// are derived from the ListSharedPostings primitive. "split-request" is the
+// are derived from the ListSharedTransactions primitive. "split-request" is the
 // producer contract for SOC-03 (assigned shares) and SOC-04C (split
 // requests): those producers persist their own request rows (split
 // persistence itself belongs to SOC-04B) and surface them through the same
@@ -447,21 +447,21 @@ const (
 )
 
 // InboxShareItem is one received transaction share in the recipient's
-// inbox. Preview (Posting) is present only while the recipient is
+// inbox. Preview (Transaction) is present only while the recipient is
 // currently authorized; without authorization the item carries sender
 // identity, status, and timestamps only, never transaction content.
 type InboxShareItem struct {
-	Kind              string         `json:"kind"`
-	OwnerUserID       string         `json:"ownerUserId"`
-	PostingID         string         `json:"postingId"`
-	SenderDisplayName string         `json:"senderDisplayName,omitempty"`
-	Status            string         `json:"status"`
-	Unread            bool           `json:"unread"`
-	Dismissed         bool           `json:"dismissed"`
-	ReceivedAt        int64          `json:"receivedAt"`
-	DecidedAt         int64          `json:"decidedAt,omitempty"`
-	CopyPostingID     string         `json:"copyPostingId,omitempty"`
-	Posting           *types.Posting `json:"posting,omitempty"`
+	Kind              string             `json:"kind"`
+	OwnerUserID       string             `json:"ownerUserId"`
+	TransactionID     string             `json:"transactionId"`
+	SenderDisplayName string             `json:"senderDisplayName,omitempty"`
+	Status            string             `json:"status"`
+	Unread            bool               `json:"unread"`
+	Dismissed         bool               `json:"dismissed"`
+	ReceivedAt        int64              `json:"receivedAt"`
+	DecidedAt         int64              `json:"decidedAt,omitempty"`
+	CopyTransactionID string             `json:"copyTransactionId,omitempty"`
+	Transaction       *types.Transaction `json:"transaction,omitempty"`
 }
 
 // Social audit actions for accepted copies and link refreshes. Consent
@@ -481,17 +481,17 @@ const (
 // carry link, status, and key. The event never carries transaction
 // evidence.
 type SharingAuditEvent struct {
-	Seq         int64  `json:"seq"`
-	ActorUserID string `json:"actorUserId"`
-	Action      string `json:"action"`
-	OwnerUserID string `json:"ownerUserId"`
-	PostingID   string `json:"postingId"`
-	Audience    string `json:"audienceType,omitempty"`
-	AudienceID  string `json:"audienceId,omitempty"`
-	LinkID      string `json:"linkId,omitempty"`
-	Status      string `json:"status,omitempty"`
-	RequestID   string `json:"requestId,omitempty"`
-	CreatedAt   int64  `json:"createdAt"`
+	Seq           int64  `json:"seq"`
+	ActorUserID   string `json:"actorUserId"`
+	Action        string `json:"action"`
+	OwnerUserID   string `json:"ownerUserId"`
+	TransactionID string `json:"transactionId"`
+	Audience      string `json:"audienceType,omitempty"`
+	AudienceID    string `json:"audienceId,omitempty"`
+	LinkID        string `json:"linkId,omitempty"`
+	Status        string `json:"status,omitempty"`
+	RequestID     string `json:"requestId,omitempty"`
+	CreatedAt     int64  `json:"createdAt"`
 }
 
 // SharingRevocation names one removed consent row: the owner-scoped
@@ -499,11 +499,11 @@ type SharingAuditEvent struct {
 // outcome of a revoke or exclusion-removal request, so retries replay it.
 // It carries identities only, never transaction evidence.
 type SharingRevocation struct {
-	OwnerUserID string `json:"ownerUserId"`
-	PostingID   string `json:"postingId"`
-	Audience    string `json:"audienceType"`
-	AudienceID  string `json:"audienceId"`
-	Intent      string `json:"intent"`
+	OwnerUserID   string `json:"ownerUserId"`
+	TransactionID string `json:"transactionId"`
+	Audience      string `json:"audienceType"`
+	AudienceID    string `json:"audienceId"`
+	Intent        string `json:"intent"`
 }
 
 // Feed audience types naming one path through which the viewer is
@@ -523,23 +523,23 @@ type GroupFeedAudience struct {
 	Name string `json:"name"`
 }
 
-// GroupFeedItem is one transaction in a group feed. The posting reuses the
+// GroupFeedItem is one transaction in a group feed. The transaction reuses the
 // existing transaction shape; SourceDisplayName is the name the group
 // knows the source member by, and Audiences lists every path authorizing
-// this viewer (group names plus direct share), so a posting reachable
+// this viewer (group names plus direct share), so a transaction reachable
 // several ways still lists once.
 type GroupFeedItem struct {
 	OwnerUserID       string              `json:"ownerUserId"`
 	SourceDisplayName string              `json:"sourceDisplayName"`
 	Audiences         []GroupFeedAudience `json:"audiences"`
-	Posting           types.Posting       `json:"posting"`
+	Transaction       types.Transaction   `json:"transaction"`
 }
 
 // GroupFeedTotals are the viewer-specific totals over the filtered feed
-// set: Count lists each authorized posting once, TotalAmount sums the
-// fixed-amount postings rounded to cents, VaryingCount names how many
-// counted postings carry calculated amounts outside the sum, and
-// PendingCount names how many counted postings are pending bank rows.
+// set: Count lists each authorized transaction once, TotalAmount sums the
+// fixed-amount transactions rounded to cents, VaryingCount names how many
+// counted transactions carry calculated amounts outside the sum, and
+// PendingCount names how many counted transactions are pending bank rows.
 type GroupFeedTotals struct {
 	Count        int     `json:"count"`
 	TotalAmount  float64 `json:"totalAmount"`
@@ -639,13 +639,13 @@ func ModelETag(model *types.FinancialModel) (string, error) {
 	return fmt.Sprintf(`"sha256-%x"`, digest), nil
 }
 
-// PostingReceiptFingerprint derives recovery state without I/O.
-func PostingReceiptFingerprint(p types.Posting) string {
+// TransactionReceiptFingerprint derives recovery state without I/O.
+func TransactionReceiptFingerprint(p types.Transaction) string {
 	data, _ := json.Marshal(struct {
 		Name         string
 		Source       *string
 		Destinations []string
-		Amount       types.PostingAmountResolution
+		Amount       types.TransactionAmountResolution
 		Time         int64
 	}{p.Name, p.SourceAccountID, p.Destinations, p.Amount, p.TransactionTime})
 	hash := sha256.Sum256(data)

@@ -24,7 +24,7 @@ func TestPrivateAnalysisEvidenceIsExcludedFromPublicCopy(t *testing.T) {
 	}
 	account := "checking"
 	key := store.BankKey{Provider: store.ProviderSimpleFIN, AccountID: "bank", TransactionID: "one"}
-	_, err = scoped.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{Posting: types.Posting{Name: "Klarna", Source: store.SourceBankSync, SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}}, PostedTime: 1785628800, TransactionTime: 1785628800}, Keys: []store.BankKey{key}}}, {Observe: &store.BankObservation{Keys: []store.BankKey{key}, Facts: types.TransactionFacts{Description: "PRIVATE KLARNA PAY IN 4", Amount: "-25", Currency: "USD"}}}})
+	_, err = scoped.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{Transaction: types.Transaction{Name: "Klarna", Source: store.SourceBankSync, SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}}, PostedTime: 1785628800, TransactionTime: 1785628800}, Keys: []store.BankKey{key}}}, {Observe: &store.BankObservation{Keys: []store.BankKey{key}, Facts: types.TransactionFacts{Description: "PRIVATE KLARNA PAY IN 4", Amount: "-25", Currency: "USD"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestPrivateAnalysisEvidenceIsExcludedFromPublicCopy(t *testing.T) {
 	if err != nil || !claimed {
 		t.Fatalf("claim=%v %v", claimed, err)
 	}
-	if err := scoped.CompleteAnalysis(run, []types.AnalysisDetection{{PostingID: input.Transactions[0].PostingID, Kind: "bnpl"}}, ""); err != nil {
+	if err := scoped.CompleteAnalysis(run, []types.AnalysisDetection{{TransactionID: input.Transactions[0].TransactionID, Kind: "bnpl"}}, ""); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

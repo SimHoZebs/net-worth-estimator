@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from "react";
-import type { PostingAmountResolution } from "../../api/contracts.ts";
+import type { TransactionAmountResolution } from "../../api/contracts.ts";
 import {
 	BUILT_IN_TEMPLATE_IDS,
 	FALLBACK_PROVIDERS,
@@ -95,7 +95,7 @@ export function AmountCatalog() {
 		id: account.id,
 		name: account.name,
 	}));
-	const postings = (catalog?.items ?? []).map((item) => ({
+	const transactions = (catalog?.items ?? []).map((item) => ({
 		id: item.id,
 		name: item.name,
 	}));
@@ -118,7 +118,7 @@ export function AmountCatalog() {
 	const [editing, setEditing] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [stagedAmount, setStagedAmount] =
-		useState<PostingAmountResolution | null>(null);
+		useState<TransactionAmountResolution | null>(null);
 
 	const recipes = mergeCopy(FALLBACK_RESOLVERS, remote?.resolvers ?? []);
 	const values = mergeCopy(FALLBACK_PROVIDERS, remote?.providers ?? []);
@@ -294,7 +294,7 @@ export function AmountCatalog() {
 					</label>
 					<AmountBuilder
 						accounts={accounts}
-						postings={postings}
+						transactions={transactions}
 						templates={templates}
 						initialTemplateId="fixed"
 						onChange={setStagedAmount}
@@ -354,7 +354,7 @@ export function AmountCatalog() {
 						<summary>Replace amount</summary>
 						<AmountBuilder
 							accounts={accounts}
-							postings={postings}
+							transactions={transactions}
 							templates={templates}
 							initialTemplateId={
 								BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name)
@@ -399,7 +399,7 @@ export function AmountCatalog() {
 				<AmountBuilder
 					key={selected.id}
 					accounts={accounts}
-					postings={postings}
+					transactions={transactions}
 					templates={templates}
 					initialTemplateId={selected.id}
 					hidePicker

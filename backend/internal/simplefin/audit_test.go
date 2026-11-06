@@ -9,12 +9,12 @@ import (
 
 func reconcileInflowBankRow(id, name, account, amount string, keys ...store.BankKey) store.BankRow {
 	return store.BankRow{
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			ID:              id,
 			Name:            name,
 			Source:          store.SourceBankSync,
 			Destinations:    []string{account},
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785715200,
 			TransactionTime: 1785715200,
 			Enabled:         true,
@@ -84,7 +84,7 @@ func TestAuditHistoricalVoidsSkipsNonMatches(t *testing.T) {
 			pendingKey("prime_card", "old-zero")),
 		reconcileBankRow("uuid-settled-zero", "Bistro", "prime_card", "2.00", false, false,
 			pendingKey("prime_card", "post-zero")),
-		// Direction mismatch: outflow auth never joins an inflow posting.
+		// Direction mismatch: outflow auth never joins an inflow transaction.
 		reconcileBankRow("uuid-void-dir", "Refund Desk", "prime_card", "42.10", false, true,
 			pendingKey("prime_card", "old-dir")),
 		// Other account: scoped out.
@@ -121,7 +121,7 @@ func TestAuditHistoricalVoidsFlagsAgainstDisabledSettled(t *testing.T) {
 		pendingKey("prime_card", "old-auth"))
 	settled := reconcileBankRow("uuid-settled", "Bistro", "prime_card", "58.00", false, false,
 		pendingKey("prime_card", "post-a"))
-	settled.Posting.Enabled = false
+	settled.Transaction.Enabled = false
 	bank := []store.BankRow{voided, settled}
 	pairs := AuditHistoricalVoids(bank, "prime_card")
 	if len(pairs) != 1 || pairs[0].VoidID != "uuid-void" {

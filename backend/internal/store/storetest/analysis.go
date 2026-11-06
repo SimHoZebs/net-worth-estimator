@@ -17,7 +17,7 @@ func testAnalysisConformance(t *testing.T, newStore func(*testing.T) store.Store
 	key := store.BankKey{Provider: "bank-provider", AccountID: "bank", TransactionID: "charge"}
 	facts := types.TransactionFacts{Description: "Provider installment", Amount: "-25", Currency: "USD"}
 	_, err := s.ApplySync(nil, []store.BankDirective{
-		{Upsert: &store.BankUpsert{Keys: []store.BankKey{key}, Posting: types.Posting{Name: "Display label", Source: "bank-provider", SourceAccountID: &account, PostedTime: 1785628800, TransactionTime: 1785628800, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}}}}},
+		{Upsert: &store.BankUpsert{Keys: []store.BankKey{key}, Transaction: types.Transaction{Name: "Display label", Source: "bank-provider", SourceAccountID: &account, PostedTime: 1785628800, TransactionTime: 1785628800, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}}}}},
 		{Observe: &store.BankObservation{Keys: []store.BankKey{key}, Facts: facts}},
 	})
 	if err != nil {
@@ -35,11 +35,11 @@ func testAnalysisConformance(t *testing.T, newStore func(*testing.T) store.Store
 	if err != nil || !claimed || len(input.Transactions) != 1 || input.Transactions[0].Facts.Description != facts.Description {
 		t.Fatalf("claim=%v input=%+v err=%v", claimed, input, err)
 	}
-	detection := types.AnalysisDetection{PostingID: input.Transactions[0].PostingID, Kind: "test", Strength: "moderate"}
+	detection := types.AnalysisDetection{TransactionID: input.Transactions[0].TransactionID, Kind: "test", Strength: "moderate"}
 	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{detection}, ""); err != nil {
 		t.Fatal(err)
 	}
-	findings, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{detection.PostingID}})
+	findings, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{detection.TransactionID}})
 	if err != nil || len(findings) != 1 || findings[0].Stale || findings[0].Status != "active" {
 		t.Fatalf("findings=%+v err=%v", findings, err)
 	}

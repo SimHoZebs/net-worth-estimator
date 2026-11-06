@@ -8,8 +8,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func flowTestAmount(expression string) types.PostingAmountResolution {
-	return types.PostingAmountResolution{
+func flowTestAmount(expression string) types.TransactionAmountResolution {
+	return types.TransactionAmountResolution{
 		Resolver: "expression",
 		Config:   map[string]any{"expression": expression},
 		Inputs:   map[string]types.AmountInputBinding{},
@@ -25,7 +25,7 @@ func flowTestModel() *types.FinancialModel {
 			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
 			{ID: "vault", Name: "Vault", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{
 				ID:              "paycheck",
 				Name:            "Paycheck",
@@ -79,7 +79,7 @@ func findFlowEdge(t *testing.T, graph *types.FlowGraph, from, to, kind, movement
 	return types.FlowEdge{}
 }
 
-// The graph separates recorded postings (actual) from rule-generated
+// The graph separates recorded transactions (actual) from rule-generated
 // occurrences (projected) and counts a structural transfer once: one
 // transfer edge, never an income-plus-expense pair.
 func TestFlowGraphSeparatesActualProjectedAndCountsTransferOnce(t *testing.T) {
@@ -97,7 +97,7 @@ func TestFlowGraphSeparatesActualProjectedAndCountsTransferOnce(t *testing.T) {
 	if inflow.Amount != 1000 {
 		t.Errorf("actual inflow = %v, want 1000", inflow.Amount)
 	}
-	if len(inflow.Sources) != 1 || inflow.Sources[0].PostingID != "paycheck" {
+	if len(inflow.Sources) != 1 || inflow.Sources[0].TransactionID != "paycheck" {
 		t.Errorf("inflow sources = %+v, want the paycheck record", inflow.Sources)
 	}
 	transfer := findFlowEdge(t, graph, "checking", "savings", types.FlowKindTransfer, types.FlowMovementActual)
@@ -144,7 +144,7 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 	events := []types.TransactionEvent{
 		{
 			Date: "2026-02-15", Sequence: 0,
-			Origin:          types.TransactionOrigin{Type: "posting", PostingID: "paycheck"},
+			Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: "paycheck"},
 			RequestedAmount: 1000, RealizedAmount: 1000,
 			AccountDeltas: []struct {
 				AccountID string  `json:"accountId"`
@@ -153,7 +153,7 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 		},
 		{
 			Date: "2026-04-01", Sequence: 1,
-			Origin:          types.TransactionOrigin{Type: "posting", PostingID: "ghost"},
+			Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: "ghost"},
 			RequestedAmount: 50, RealizedAmount: 50,
 		},
 	}
@@ -170,7 +170,7 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 		t.Fatalf("build flow graph: %v", err)
 	}
 
-	if len(graph.Unmatched) != 1 || graph.Unmatched[0].PostingID != "ghost" {
+	if len(graph.Unmatched) != 1 || graph.Unmatched[0].TransactionID != "ghost" {
 		t.Errorf("unmatched = %+v, want the ghost event", graph.Unmatched)
 	}
 	if graph.Totals.Unmatched != 50 {
@@ -188,7 +188,7 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 	}
 	for _, edge := range graph.Edges {
 		for _, source := range edge.Sources {
-			if source.PostingID == "ghost" {
+			if source.TransactionID == "ghost" {
 				t.Errorf("unmatched event entered edge %+v", edge)
 			}
 		}
@@ -241,7 +241,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 	for month := 0; month < 7; month++ {
 		current := time.Month(6 + month)
 		at := stamp(2025, current, 15)
-		model.Postings = append(model.Postings, types.Posting{
+		model.Transactions = append(model.Transactions, types.Transaction{
 			ID:              fmt.Sprintf("salary-2025-%02d", 6+month),
 			Name:            "Salary",
 			Destinations:    []string{"checking"},
@@ -253,7 +253,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 		})
 		for i := 0; i < 80; i++ {
 			day := stamp(2025, current, (i%28)+1)
-			model.Postings = append(model.Postings, types.Posting{
+			model.Transactions = append(model.Transactions, types.Transaction{
 				ID:              fmt.Sprintf("grocery-2025-%02d-%03d", 6+month, i),
 				Name:            "Groceries",
 				SourceAccountID: &checking,
@@ -266,7 +266,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 		}
 	}
 	moveAt := stamp(2025, time.September, 10)
-	model.Postings = append(model.Postings, types.Posting{
+	model.Transactions = append(model.Transactions, types.Transaction{
 		ID:              "save-september",
 		Name:            "Move to savings",
 		SourceAccountID: &checking,
@@ -280,7 +280,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 	// Rows that must never draw edges: a void authorization, an
 	// owner-disabled row, a zero amount, each dated inside the window. An
 	// enabled pending row counts like a posted one.
-	edgeCases := []types.Posting{
+	edgeCases := []types.Transaction{
 		{
 			ID: "void-hold", Name: "Voided hold", SourceAccountID: &checking,
 			Amount: flowTestAmount("90"), PostedTime: moveAt, TransactionTime: moveAt,
@@ -302,11 +302,11 @@ func settledHistoryTestModel() *types.FinancialModel {
 			Enabled: true, Source: "banksync", Pending: true,
 		},
 	}
-	model.Postings = append(model.Postings, edgeCases...)
+	model.Transactions = append(model.Transactions, edgeCases...)
 	return model
 }
 
-// Hundreds of settled postings across months must yield nonzero actuals
+// Hundreds of settled transactions across months must yield nonzero actuals
 // even though the projection emits no events for them: they all predate
 // its start. The transfer appears once with its full amount and stays out
 // of inflow and outflow.
@@ -321,7 +321,7 @@ func TestFlowGraphSettledHistoryYieldsActuals(t *testing.T) {
 		t.Fatalf("project: %v", err)
 	}
 	if len(result.TransactionEvents) != 0 {
-		t.Fatalf("events = %d, want none: every posting predates the projection start", len(result.TransactionEvents))
+		t.Fatalf("events = %d, want none: every transaction predates the projection start", len(result.TransactionEvents))
 	}
 	graph, err := BuildFlowGraph(&path.EffectiveModel, result.TransactionEvents, result.Timeline.Rows, "2025-06-01", "2025-12-31")
 	if err != nil {
@@ -359,10 +359,10 @@ func TestFlowGraphSettledHistoryYieldsActuals(t *testing.T) {
 		}
 		transfers++
 		if edge.Amount != wantTransfer || edge.Movement != types.FlowMovementActual {
-			t.Errorf("transfer edge = %+v, want the 500 posting counted once as actual", edge)
+			t.Errorf("transfer edge = %+v, want the 500 transaction counted once as actual", edge)
 		}
-		if len(edge.Sources) != 1 || edge.Sources[0].PostingID != "save-september" {
-			t.Errorf("transfer sources = %+v, want the single savings posting", edge.Sources)
+		if len(edge.Sources) != 1 || edge.Sources[0].TransactionID != "save-september" {
+			t.Errorf("transfer sources = %+v, want the single savings transaction", edge.Sources)
 		}
 	}
 	if transfers != 1 {
@@ -386,16 +386,16 @@ func TestFlowGraphSettledHistoryYieldsActuals(t *testing.T) {
 			if source.Date < graph.StartDate || source.Date > graph.EndDate {
 				t.Errorf("edge source %+v outside window", source)
 			}
-			seen[source.PostingID]++
+			seen[source.TransactionID]++
 		}
 	}
 	for _, id := range []string{"void-hold", "disabled-groceries", "zero-fee"} {
 		if seen[id] != 0 {
-			t.Errorf("posting %s appears in %d edge sources, want none", id, seen[id])
+			t.Errorf("transaction %s appears in %d edge sources, want none", id, seen[id])
 		}
 	}
 	if seen["pending-fuel"] != 1 {
-		t.Errorf("pending posting appears in %d edge sources, want exactly once", seen["pending-fuel"])
+		t.Errorf("pending transaction appears in %d edge sources, want exactly once", seen["pending-fuel"])
 	}
 
 	// Nodes describe the same money as the edges, and the reconciliation

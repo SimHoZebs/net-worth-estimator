@@ -50,29 +50,29 @@ type Store interface {
 	// account linked to bridgeAccountID. The synced account inherits the
 	// manual account's profile and account-scoped configuration, while its
 	// bank rows and bridge link stay authoritative. The manual account, its
-	// postings, and its checkpoints are deleted in the same transaction. A
+	// transactions, and its checkpoints are deleted in the same transaction. A
 	// candidate that fails model validation is not persisted and reports
 	// Issues. The exact bridge link is rechecked inside the transaction.
 	SupersedeAccount(manualAccountID, syncedAccountID, bridgeAccountID string) (AccountSupersedeResult, error)
-	CreatePosting(posting types.Posting) (types.Posting, error)
-	UpdatePosting(posting types.Posting) (types.Posting, error)
-	// SetPostingClaims replaces occurrence claims for the named postings in
-	// one transaction. It touches only posting_claims (plus pending clearing
+	CreateTransaction(transaction types.Transaction) (types.Transaction, error)
+	UpdateTransaction(transaction types.Transaction) (types.Transaction, error)
+	// SetTransactionClaims replaces occurrence claims for the named transactions in
+	// one transaction. It touches only transaction_claims (plus pending clearing
 	// when a pending bank row becomes a claimed occurrence) so concurrent
 	// name or amount edits never lose data.
-	SetPostingClaims(claims []types.PostingClaimUpdate) ([]types.Posting, error)
-	DeletePosting(id string) error
-	MovePosting(id, beforeID string) error
+	SetTransactionClaims(claims []types.TransactionClaimUpdate) ([]types.Transaction, error)
+	DeleteTransaction(id string) error
+	MoveTransaction(id, beforeID string) error
 	CreatePlannedPurchase(purchase types.PlannedPurchase) (types.PlannedPurchase, error)
 	UpdatePlannedPurchase(purchase types.PlannedPurchase) (types.PlannedPurchase, error)
 	DeletePlannedPurchase(id string) error
 	MovePlannedPurchase(id, beforeID string) error
-	// CreateScheduleClaimingPosting creates a schedule and records an
+	// CreateScheduleClaimingTransaction creates a schedule and records an
 	// existing transaction as its first occurrence, atomically.
-	CreateScheduleClaimingPosting(schedule types.Schedule, postingID, occurrenceDate string) (types.Schedule, error)
-	// DeleteScheduleCreatingPosting records the one-time transaction that
+	CreateScheduleClaimingTransaction(schedule types.Schedule, transactionID, occurrenceDate string) (types.Schedule, error)
+	// DeleteScheduleCreatingTransaction records the one-time transaction that
 	// happened and removes the schedule, atomically.
-	DeleteScheduleCreatingPosting(scheduleID string, posting types.Posting) (types.Posting, error)
+	DeleteScheduleCreatingTransaction(scheduleID string, transaction types.Transaction) (types.Transaction, error)
 	CreateSchedule(rule types.Schedule) (types.Schedule, error)
 	UpdateSchedule(rule types.Schedule) (types.Schedule, error)
 	DeleteSchedule(id string) error
@@ -157,7 +157,7 @@ type Store interface {
 	// original extraction and provenance are preserved.
 	ReviewEmailReceipt(id string, correction *EmailReceiptCorrection) (EmailReceipt, error)
 	ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
-	LoadBankPostings() ([]BankRow, error)
+	LoadBankTransactions() ([]BankRow, error)
 	// Unified projection state: single dirty date plus slice manifest.
 	GetProjectionState() (types.ProjectionState, error)
 	SaveProjectionState(state types.ProjectionState) (types.ProjectionState, error)
@@ -173,17 +173,17 @@ type Store interface {
 	ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error)
 	SaveMonteCarloStatistics(stats []types.MonteCarloStatistic) error
 	DeleteMonteCarloStatistics(sliceIDs []string) error
-	// SaveGeneratedPostings replaces every touched slice's stored
+	// SaveGeneratedTransactions replaces every touched slice's stored
 	// engine-output transactions atomically. Generated rows never enter
 	// model reads: every model query filters them by null slice.
-	SaveGeneratedPostings(rows []GeneratedPosting) error
+	SaveGeneratedTransactions(rows []GeneratedTransaction) error
 	// SaveDeterministicEvaluations records the deterministic evaluation
 	// fingerprint for one revision without touching revision or dirty
 	// bookkeeping. Reports false when a newer write already moved the
 	// revision, so the caller can skip publishing a stale build.
 	SaveDeterministicEvaluations(stateID string, revision int64, evalJSON string) (bool, error)
-	ListGeneratedPostings(sliceIDs []string) ([]GeneratedPosting, error)
-	DeleteGeneratedPostings(sliceIDs []string) error
+	ListGeneratedTransactions(sliceIDs []string) ([]GeneratedTransaction, error)
+	DeleteGeneratedTransactions(sliceIDs []string) error
 	SaveProjectionRows(rows []ProjectionRowPayload) error
 	ListProjectionRows(sliceIDs []string) ([]ProjectionRowPayload, error)
 	DeleteProjectionRows(sliceIDs []string) error
@@ -194,8 +194,8 @@ type Store interface {
 	ListNetWorthThresholdOutputs(stateID, kind string) ([]types.NetWorthThresholdOutput, error)
 	SaveAccountBalanceOutputs(stateID, kind string, outputs []types.AccountBalanceOutput, builtRevision int64) error
 	ListAccountBalanceOutputs(stateID, kind string) ([]types.AccountBalanceOutput, error)
-	SavePostingFulfillmentOutputs(stateID, kind string, outputs []types.PostingFulfillmentOutput, builtRevision int64) error
-	ListPostingFulfillmentOutputs(stateID, kind string) ([]types.PostingFulfillmentOutput, error)
+	SaveTransactionFulfillmentOutputs(stateID, kind string, outputs []types.TransactionFulfillmentOutput, builtRevision int64) error
+	ListTransactionFulfillmentOutputs(stateID, kind string) ([]types.TransactionFulfillmentOutput, error)
 	SaveCycleFulfillmentOutputs(stateID, kind string, outputs []types.CycleFulfillmentOutput, builtRevision int64) error
 	ListCycleFulfillmentOutputs(stateID, kind string) ([]types.CycleFulfillmentOutput, error)
 	SavePlannedPurchasesOutputs(stateID, kind string, outputs []types.PlannedPurchasesOutput, builtRevision int64) error
@@ -212,9 +212,9 @@ type Store interface {
 
 // ReceiptStore is the user-scoped persistence boundary for evidence only.
 type ReceiptStore interface {
-	CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (types.Receipt, error)
-	ListReceipts(postingID string) ([]types.Receipt, error)
-	ListPostingReceiptIDs() (map[string][]string, error)
+	CreateReceipt(ctx context.Context, transactionID, filename string, image types.ReceiptImage) (types.Receipt, error)
+	ListReceipts(transactionID string) ([]types.Receipt, error)
+	ListTransactionReceiptIDs() (map[string][]string, error)
 	GetReceipt(id string) (types.Receipt, error)
 	GetReceiptImage(ctx context.Context, id string) (types.ReceiptImage, error)
 	ReplaceReceiptImage(ctx context.Context, id string, expectedRevision int64, filename string, image types.ReceiptImage) (types.Receipt, error)
@@ -253,8 +253,8 @@ type Database interface {
 	TouchFriendDisplay(userID, displayName string)
 	TouchMemberDisplay(userID, displayName string)
 	RemoveGroupMembershipsForUser(userID string) error
-	// GrantSharedPosting records the owner's explicit decision to share one
-	// of their postings with one audience (a user or a group). Only the
+	// GrantSharedTransaction records the owner's explicit decision to share one
+	// of their transactions with one audience (a user or a group). Only the
 	// source owner may grant; callers must pass the authenticated owner's
 	// own user ID. A grant for an audience with an active exclusion is
 	// rejected until the exclusion is removed. requestID is a
@@ -263,59 +263,59 @@ type Database interface {
 	// fails with ErrSharingConflict. Failed attempts never consume the
 	// key. Every committed grant appends one sharing_audit row carrying
 	// the request key in its detail payload.
-	GrantSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (SharingGrant, error)
-	// RevokeSharedPosting deletes one explicit grant. Subsequent reads deny
+	GrantSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) (SharingGrant, error)
+	// RevokeSharedTransaction deletes one explicit grant. Subsequent reads deny
 	// access unless another independent valid grant survives. requestID
 	// carries the grant idempotency contract: a retry replays the recorded
 	// revocation instead of reporting the now-missing grant.
-	RevokeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) error
-	// ExcludeSharedPosting records the owner's explicit exclusion of one
-	// audience for one posting, including a wildcard (audience "all") that
+	RevokeSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) error
+	// ExcludeSharedTransaction records the owner's explicit exclusion of one
+	// audience for one transaction, including a wildcard (audience "all") that
 	// covers current and future audiences. An audience with an active grant
 	// cannot be excluded until the grant is revoked. Exclusions are
 	// idempotent. A user exclusion denies that person even through group
 	// grants; other group members stay authorized. requestID carries the
 	// grant idempotency contract.
-	ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (SharingGrant, error)
+	ExcludeSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) (SharingGrant, error)
 	// RemoveSharedExclusion deletes one explicit exclusion. requestID
 	// carries the grant idempotency contract: a retry replays the recorded
 	// removal.
-	RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID, requestID string) error
+	RemoveSharedExclusion(ownerID, transactionID, audienceType, audienceID, requestID string) error
 	// ListSharingGrants returns the owner's explicit grants and exclusions.
 	ListSharingGrants(ownerID string) ([]SharingGrant, error)
-	// CheckSharedPostingAccess evaluates read-time authorization for one
-	// owner-scoped posting and requester: current group and source-owner
+	// CheckSharedTransactionAccess evaluates read-time authorization for one
+	// owner-scoped transaction and requester: current group and source-owner
 	// membership, owner consent (explicit grant or enabled automatic-sharing
-	// policy covering the posting's current accounts and transaction date),
+	// policy covering the transaction's current accounts and transaction date),
 	// exclusions, and revocation state. It queries current rows on every call;
 	// there is no positive auth cache and no materialized index shortcut:
 	// the visibility index only discovers list candidates, while this
 	// function alone decides every list and detail read from live rows.
-	CheckSharedPostingAccess(ownerID, postingID, requesterID string) (SharedPostingAccess, error)
-	// ReadSharedPosting returns the owner's posting in the existing
+	CheckSharedTransactionAccess(ownerID, transactionID, requesterID string) (SharedTransactionAccess, error)
+	// ReadSharedTransaction returns the owner's transaction in the existing
 	// transaction shape when the requester is currently authorized. Missing
-	// and denied postings both report ErrNotFound so existence is not
+	// and denied transactions both report ErrNotFound so existence is not
 	// enumerable. It never exposes accounts, balances, models, secrets,
 	// or receipts.
-	ReadSharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
-	// ListSharedPostings returns every posting currently shared with the
+	ReadSharedTransaction(ownerID, transactionID, requesterID string) (types.Transaction, error)
+	// ListSharedTransactions returns every transaction currently shared with the
 	// requester, each in the existing transaction shape with its owner.
 	// Automatic discovery reads the write-maintained visibility index at
-	// the current policy version, ordered by owner then posting; one
-	// posting lists once however many accounts, groups, or reasons match.
-	ListSharedPostings(requesterID string) ([]SharedPostingRef, error)
+	// the current policy version, ordered by owner then transaction; one
+	// transaction lists once however many accounts, groups, or reasons match.
+	ListSharedTransactions(requesterID string) ([]SharedTransactionRef, error)
 	// RebuildSharingIndex re-derives one owner's whole visibility index
-	// from live policies and postings in one transaction for operator
+	// from live policies and transactions in one transaction for operator
 	// recovery. Normal writes maintain the index incrementally; a rebuild
-	// only lands live-covered postings for current memberships, so it
+	// only lands live-covered transactions for current memberships, so it
 	// never over-shares.
 	RebuildSharingIndex(ownerID string) error
-	// CopySharedPosting accepts one authorized shared posting into the
+	// CopySharedTransaction accepts one authorized shared transaction into the
 	// requester's own private model as an independent row: new ID,
 	// recipient ownership, no claim, and no remote coupling. The copy is
 	// owner-authored (SourceUser, never pending or void) with no bank sync
 	// key, so accepting a share never manufactures a duplicate bank
-	// posting. Copies are idempotent per source-plus-recipient triple:
+	// transaction. Copies are idempotent per source-plus-recipient triple:
 	// repeat accepts return the existing recipient row, with its edits
 	// intact, instead of minting duplicates. requestID is a
 	// client-generated UUID: retries with the same key replay the recorded
@@ -328,13 +328,13 @@ type Database interface {
 	// carrying the link and the request key. Later revocation never rewrites or
 	// erases the copy. Source-original writes by another member stay
 	// deferred (no such path exists).
-	CopySharedPosting(ownerID, postingID, requesterID, requestID string) (types.Posting, error)
+	CopySharedTransaction(ownerID, transactionID, requesterID, requestID string) (types.Transaction, error)
 	// GetSharingLink resolves the stable link for one of the recipient's
 	// own copies. It reports ErrNotFound for unknown copies, copies owned
 	// by another recipient, and malformed IDs, so link memory is never
 	// enumerable across users. It performs no source authorization check:
 	// the link is the recipient's own provenance.
-	GetSharingLink(recipientID, copyPostingID string) (SharingLink, error)
+	GetSharingLink(recipientID, copyTransactionID string) (SharingLink, error)
 	// GetSharingLinkByID resolves one of the recipient's links by its
 	// stable link ID, for callers that hold links (group feeds, splits,
 	// audit) rather than copy row IDs. Scope and failure behavior match
@@ -348,41 +348,41 @@ type Database interface {
 	// each committed refresh appends one link-refreshed audit row carrying
 	// the link, the outcome status, and the request key. See
 	// SharingLinkRefresh for the status contract.
-	RefreshSharingLink(recipientID, copyPostingID, requestID string) (SharingLinkRefresh, error)
+	RefreshSharingLink(recipientID, copyTransactionID, requestID string) (SharingLinkRefresh, error)
 	// WithdrawUserGrant deletes a direct user-audience grant addressed to
 	// the recipient themselves. It is the recipient's own refusal path: it
 	// never touches grants addressed to anyone else or group-audience
 	// grants (which belong to the source owner and their whole audience).
 	// Missing grants report ErrNotFound; malformed IDs report
 	// ErrGroupInvalid.
-	WithdrawUserGrant(recipientID, ownerID, postingID string) error
+	WithdrawUserGrant(recipientID, ownerID, transactionID string) error
 	// ListInboxItems returns the recipient's received-share inbox. Entries
-	// derive from the ListSharedPostings primitive: currently authorized
+	// derive from the ListSharedTransactions primitive: currently authorized
 	// shares appear with their preview, previously seen shares that lost
 	// authorization appear as canceled without content, and recorded
 	// decisions (accepted/declined) survive later revocation. Sighting rows
 	// never authorize; every preview re-checks current access.
 	ListInboxItems(recipientID string) ([]InboxShareItem, error)
 	// AcceptInboxShare records acceptance and saves one personal
-	// recipient-owned copy, reusing CopySharedPosting. It is idempotent
+	// recipient-owned copy, reusing CopySharedTransaction. It is idempotent
 	// under retry: an already-accepted share returns its recorded item
 	// without minting another copy, including adoption of a copy the
 	// recipient saved through the shared-copies path first. Unauthorized
 	// shares report ErrNotFound.
-	AcceptInboxShare(recipientID, ownerID, postingID string) (InboxShareItem, error)
+	AcceptInboxShare(recipientID, ownerID, transactionID string) (InboxShareItem, error)
 	// DeclineInboxShare records the refusal and withdraws the recipient's
 	// own direct grant when one addresses them, so they leave the sender's
 	// sharing list; group-audience shares stay shared with the group and
 	// the refusal remains recipient-local. Retries return the recorded
 	// item. Unauthorized shares report ErrNotFound.
-	DeclineInboxShare(recipientID, ownerID, postingID string) (InboxShareItem, error)
+	DeclineInboxShare(recipientID, ownerID, transactionID string) (InboxShareItem, error)
 	// SetInboxShareDismissed hides (or unhides) an item without changing
 	// its decision state. Dismissed items leave the default list and
 	// return under an explicit show-dismissed request.
-	SetInboxShareDismissed(recipientID, ownerID, postingID string, dismissed bool) (InboxShareItem, error)
+	SetInboxShareDismissed(recipientID, ownerID, transactionID string, dismissed bool) (InboxShareItem, error)
 	// SetInboxShareRead marks an item read or unread. Unread state only
 	// changes here: listing, viewing, and deciding never clear it.
-	SetInboxShareRead(recipientID, ownerID, postingID string, read bool) (InboxShareItem, error)
+	SetInboxShareRead(recipientID, ownerID, transactionID string, read bool) (InboxShareItem, error)
 	// SetSharingPolicy creates or replaces one member's automatic-sharing
 	// preference for one group (GRP-02). Only the owning member may set
 	// their own policy: callers must pass the authenticated member's own
@@ -398,12 +398,12 @@ type Database interface {
 	GetSharingPolicy(ownerID, groupID string) (SharingPolicy, error)
 	// ListSharingPolicies returns every stored preference for one member.
 	ListSharingPolicies(ownerID string) ([]SharingPolicy, error)
-	// PreviewSharingPolicy counts the currently eligible postings for one
+	// PreviewSharingPolicy counts the currently eligible transactions for one
 	// member's stored policy plus the current audience size. Counts only:
 	// no amounts, payees, or row IDs leave the owner's scope.
 	PreviewSharingPolicy(ownerID, groupID string) (SharingPolicyPreview, error)
 	// ListSharingAudit returns the committed cross-user changes for one
-	// owner-scoped posting in sequence order: consent rows (grant, revoke,
+	// owner-scoped transaction in sequence order: consent rows (grant, revoke,
 	// exclude, unexclude), accepted-copy and link-refresh rows, and
 	// split-created, split-updated, and split-accepted rows. Callers must
 	// pass the source owner's own user ID: audit reads are owner-scoped
@@ -412,20 +412,20 @@ type Database interface {
 	// time only, never transaction evidence. Link, status, and key decode
 	// from the audit detail payload; actions that name none leave them
 	// empty.
-	ListSharingAudit(ownerID, postingID string) ([]SharingAuditEvent, error)
+	ListSharingAudit(ownerID, transactionID string) ([]SharingAuditEvent, error)
 	// CreateSplit persists version 1 of a split obligation dividing one
 	// shared transaction across its participants. The actor must be the
 	// initiator, and every participant (initiator included) must hold
-	// current shared-posting access to the source; anything else fails
+	// current shared-transaction access to the source; anything else fails
 	// closed without revealing who holds access. Shares come from
 	// domain.AllocateSplit over the caller's total, currency, participants,
 	// and overrides. requestID is a client-generated UUID: a retry with the
 	// same key replays the recorded split, while the same key naming a
 	// different action or target fails with ErrSharingConflict. One key
-	// creates one split per source posting: a second, intentionally
+	// creates one split per source transaction: a second, intentionally
 	// different split needs a fresh key. The recorded source revision names
 	// the source content the version divides. Split writes never touch
-	// postings, checkpoints, or balances.
+	// transactions, checkpoints, or balances.
 	CreateSplit(actorID string, input SplitInput, requestID string) (Split, error)
 	// UpdateSplit appends a new version to a split with status proposed and
 	// reset acceptances; accepted shares only change through this explicit
@@ -444,7 +444,7 @@ type Database interface {
 	// expectedVersion must name the current version; accepting a
 	// superseded version fails with ErrSharingConflict. When every
 	// participant has accepted, the version's status becomes accepted.
-	// Acceptance writes no postings, checkpoints, or balances: it moves no
+	// Acceptance writes no transactions, checkpoints, or balances: it moves no
 	// money. requestID carries the CreateSplit idempotency contract
 	// against the split link; a replay additionally requires the caller's
 	// expected version to equal the recorded version.
@@ -467,13 +467,13 @@ type Database interface {
 	// participant's share of one split (SOC-05). The actor and the
 	// participant must be provisioned users; the split ID must be a
 	// canonical UUID. The amount must be positive. An optional link to
-	// one real payment (owner plus posting) must name both halves or
+	// one real payment (owner plus transaction) must name both halves or
 	// neither, and one real payment backs at most one settlement, so a
 	// linked payment is never double-counted. requestID is a
 	// client-generated UUID: a retry with the same key replays the
 	// recorded settlement, while the same key naming a different
 	// settlement fails with ErrSettlementConflict. The write touches
-	// only settlement rows: it never writes postings, checkpoints,
+	// only settlement rows: it never writes transactions, checkpoints,
 	// accounts, or balances, so recording a settlement moves no money.
 	// Split-membership fencing (only current split participants may
 	// record and read) lands with the SOC-04B split reads; until then
@@ -484,7 +484,7 @@ type Database interface {
 	// Split-membership fencing lands with the SOC-04B split reads;
 	// until then any provisioned user may read.
 	ListSettlements(requesterID, splitID string) ([]Settlement, error)
-	// PreviewSharingPolicyDraft counts the currently eligible postings for
+	// PreviewSharingPolicyDraft counts the currently eligible transactions for
 	// unsaved preference values plus the current audience size, without
 	// persisting anything (GRP-04 consent preview). Counts are computed
 	// as if the draft were enabled; the echoed Enabled flag stays as
@@ -492,18 +492,18 @@ type Database interface {
 	// owner's scope. Non-members report ErrNotFound.
 	PreviewSharingPolicyDraft(ownerID, groupID string, input SharingPolicyInput) (SharingPolicyPreview, error)
 	// ListGroupSharedFeed returns the per-group shared transaction feed
-	// (GRP-03): every posting the requester is currently authorized to
+	// (GRP-03): every transaction the requester is currently authorized to
 	// read that belongs in the named group, each listed once however
 	// many group grants, policies, accounts, or direct shares match.
 	// Candidates come from the indexed references plus the explicit
-	// manual grants, and every candidate passes CheckSharedPostingAccess
+	// manual grants, and every candidate passes CheckSharedTransactionAccess
 	// before it is read, so a stale reference under-shares but never
-	// over-shares. A posting belongs in the group feed when the viewer
+	// over-shares. A transaction belongs in the group feed when the viewer
 	// reaches it through the group (manual group grant or automatic
 	// policy) or through a direct share from one of the group's current
 	// members. Non-members and unknown groups report ErrNotFound so
 	// group visibility is not enumerable. Results order by owner then
-	// posting; keyset feed pagination over the result belongs to the
+	// transaction; keyset feed pagination over the result belongs to the
 	// HTTP consumer.
 	ListGroupSharedFeed(requesterID, groupID string) ([]GroupFeedItem, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error

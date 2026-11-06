@@ -9,7 +9,7 @@
 
 ### Acceptance criteria
 
-- [ ] Pick source posting and recipient.
+- [ ] Pick source transaction and recipient.
 - [ ] Preview original total and assigned portion.
 - [ ] Recipient sees permitted source context and allocation.
 - [ ] Support accept, decline, view, and save as linked copy.

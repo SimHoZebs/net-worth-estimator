@@ -18,9 +18,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func sharingAudit(t *testing.T, d *Database, owner, posting string) []store.SharingAuditEvent {
+func sharingAudit(t *testing.T, d *Database, owner, transaction string) []store.SharingAuditEvent {
 	t.Helper()
-	events, err := d.ListSharingAudit(owner, posting)
+	events, err := d.ListSharingAudit(owner, transaction)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,27 +42,27 @@ func TestSharingGrantReplayIdentical(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
 	key := sharingKey(t)
-	first, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key)
+	first, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key)
+	second, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first != second {
 		t.Fatalf("grant replay = %+v, want %+v", second, first)
 	}
-	events := sharingAudit(t, d, alice, sharingPostingA)
+	events := sharingAudit(t, d, alice, sharingTransactionA)
 	if len(events) != 1 {
 		t.Fatalf("audit rows = %d, want 1", len(events))
 	}
 	event := events[0]
 	if event.Action != "grant" || event.ActorUserID != alice || event.OwnerUserID != alice ||
-		event.PostingID != sharingPostingA || event.Audience != store.SharingAudienceUser ||
+		event.TransactionID != sharingTransactionA || event.Audience != store.SharingAudienceUser ||
 		event.AudienceID != bob || event.RequestID != key {
 		t.Fatalf("grant audit = %+v, want actor/action/target/key", event)
 	}
@@ -77,80 +77,80 @@ func TestSharingKeyReuseAcrossActionsConflicts(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	sharingPosting(t, storeA, sharingPostingB)
+	sharingTransaction(t, storeA, sharingTransactionA)
+	sharingTransaction(t, storeA, sharingTransactionB)
 
 	key := sharingKey(t)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); err != nil {
 		t.Fatal(err)
 	}
 	// Same key, different action.
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
+	if _, err := d.ExcludeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("exclude with grant key = %v, want conflict", err)
 	}
 	// Same key and action, different target.
-	if _, err := d.GrantSharedPosting(alice, sharingPostingB, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
-		t.Fatalf("grant for other posting with same key = %v, want conflict", err)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionB, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
+		t.Fatalf("grant for other transaction with same key = %v, want conflict", err)
 	}
 	// Revoke and exclusion-removal replays match on their own actions.
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
+	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("revoke with grant key = %v, want conflict", err)
 	}
-	if err := d.RemoveSharedExclusion(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
+	if err := d.RemoveSharedExclusion(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("remove-exclusion with grant key = %v, want conflict", err)
 	}
-	if events := sharingAudit(t, d, alice, sharingPostingA); len(events) != 1 {
+	if events := sharingAudit(t, d, alice, sharingTransactionA); len(events) != 1 {
 		t.Fatalf("audit rows = %d, want only the committed grant", len(events))
 	}
-	if events := sharingAudit(t, d, alice, sharingPostingB); len(events) != 0 {
-		t.Fatalf("other posting audit = %d, want none", len(events))
+	if events := sharingAudit(t, d, alice, sharingTransactionB); len(events) != 0 {
+		t.Fatalf("other transaction audit = %d, want none", len(events))
 	}
 }
 
 // Failed attempts never consume the key: malformed keys, unknown owners
-// and postings, and missing-grant revokes record nothing, and the same
+// and transactions, and missing-grant revokes record nothing, and the same
 // key shape executes fresh afterwards.
 func TestSharingRejectedKeysConsumeNothing(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
 	bad := []string{"", "not-a-uuid", "01900000-0000-7000-8000-0000000000A1"}
 	for _, key := range bad {
-		if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
+		if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
 			t.Fatalf("grant with key %q = %v, want invalid", key, err)
 		}
-		if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
+		if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
 			t.Fatalf("revoke with key %q = %v, want invalid", key, err)
 		}
-		if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
+		if _, err := d.ExcludeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
 			t.Fatalf("exclude with key %q = %v, want invalid", key, err)
 		}
-		if err := d.RemoveSharedExclusion(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
+		if err := d.RemoveSharedExclusion(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
 			t.Fatalf("remove-exclusion with key %q = %v, want invalid", key, err)
 		}
-		if _, err := d.CopySharedPosting(alice, sharingPostingA, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
+		if _, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key); !errors.Is(err, store.ErrGroupInvalid) {
 			t.Fatalf("accept with key %q = %v, want invalid", key, err)
 		}
 	}
 	if n := sharingRequestCount(t, d); n != 0 {
 		t.Fatalf("request rows after rejections = %d, want 0", n)
 	}
-	if events := sharingAudit(t, d, alice, sharingPostingA); len(events) != 0 {
+	if events := sharingAudit(t, d, alice, sharingTransactionA); len(events) != 0 {
 		t.Fatalf("audit rows after rejections = %d, want 0", len(events))
 	}
 	// A well-formed key against a missing grant reports not-found and
 	// consumes nothing; the same key executes fresh on retry.
 	key := sharingKey(t)
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrNotFound) {
+	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("revoke of missing grant = %v, want not-found", err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); err != nil {
 		t.Fatalf("grant with unspent key = %v, want success", err)
 	}
 	fresh := sharingKey(t)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, fresh); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, fresh); err != nil {
 		t.Fatalf("grant with fresh key = %v, want success", err)
 	}
 }
@@ -161,26 +161,26 @@ func TestSharingRevokeReplayAndOrdering(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
 	grantKey, revokeKey, regrantKey := sharingKey(t), sharingKey(t), sharingKey(t)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, grantKey); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, grantKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, revokeKey); err != nil {
+	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, revokeKey); err != nil {
 		t.Fatal(err)
 	}
 	// The revoke retry replays success, not the now-missing grant.
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, revokeKey); err != nil {
+	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, revokeKey); err != nil {
 		t.Fatalf("revoke replay = %v, want nil", err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, regrantKey); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, regrantKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	events := sharingAudit(t, d, alice, sharingPostingA)
+	events := sharingAudit(t, d, alice, sharingTransactionA)
 	want := []struct {
 		action, key string
 	}{
@@ -208,49 +208,49 @@ func TestSharingAcceptReplayAndConverge(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	sharingTransaction(t, storeA, sharingTransactionA)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 
 	key, other := sharingKey(t), sharingKey(t)
-	first, err := d.CopySharedPosting(alice, sharingPostingA, bob, key)
+	first, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	replay, err := d.CopySharedPosting(alice, sharingPostingA, bob, key)
+	replay, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if replay.ID != first.ID || replay.Name != first.Name {
 		t.Fatalf("accept replay = %+v, want %+v", replay, first)
 	}
-	converged, err := d.CopySharedPosting(alice, sharingPostingA, bob, other)
+	converged, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, other)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if converged.ID != first.ID {
 		t.Fatalf("distinct-key accept = %q, want winner %q", converged.ID, first.ID)
 	}
-	if replay, err := d.CopySharedPosting(alice, sharingPostingA, bob, other); err != nil || replay.ID != first.ID {
+	if replay, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, other); err != nil || replay.ID != first.ID {
 		t.Fatalf("converged key replay = %+v, %v, want %q", replay, err, first.ID)
 	}
 	var copies int
-	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_posting_id = ?`,
-		bob, alice, sharingPostingA).Scan(&copies); err != nil {
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_transaction_id = ?`,
+		bob, alice, sharingTransactionA).Scan(&copies); err != nil {
 		t.Fatal(err)
 	}
 	if copies != 1 {
 		t.Fatalf("provenance rows = %d, want 1", copies)
 	}
-	events := sharingAudit(t, d, alice, sharingPostingA)
+	events := sharingAudit(t, d, alice, sharingTransactionA)
 	accepted := 0
 	for _, event := range events {
 		if event.Action != store.SharingAuditCopyAccepted {
 			continue
 		}
 		accepted++
-		if event.ActorUserID != bob || event.LinkID != store.SharingLinkID(alice, sharingPostingA, bob) || event.RequestID == "" {
+		if event.ActorUserID != bob || event.LinkID != store.SharingLinkID(alice, sharingTransactionA, bob) || event.RequestID == "" {
 			t.Fatalf("accept audit = %+v, want recipient actor, link, and key", event)
 		}
 	}
@@ -261,8 +261,8 @@ func TestSharingAcceptReplayAndConverge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != first.ID {
-		t.Fatalf("recipient model = %+v, want the one copy", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].ID != first.ID {
+		t.Fatalf("recipient model = %+v, want the one copy", model.Transactions)
 	}
 }
 
@@ -273,8 +273,8 @@ func TestSharingDoubleAcceptRaceConverges(t *testing.T) {
 		d := openSharingTestDB(t)
 		alice, storeA := sharingUser(t, d, "alice")
 		bob, _ := sharingUser(t, d, "bob")
-		sharingPosting(t, storeA, sharingPostingA)
-		if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+		sharingTransaction(t, storeA, sharingTransactionA)
+		if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 			t.Fatal(err)
 		}
 		const racers = 16
@@ -293,7 +293,7 @@ func TestSharingDoubleAcceptRaceConverges(t *testing.T) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, keys[i])
+				copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, keys[i])
 				if err == nil {
 					ids[i] = copied.ID
 				}
@@ -309,7 +309,7 @@ func TestSharingDoubleAcceptRaceConverges(t *testing.T) {
 				t.Fatalf("shared=%v racer %d copy = %q, want %q", shared, i, ids[i], ids[0])
 			}
 		}
-		events := sharingAudit(t, d, alice, sharingPostingA)
+		events := sharingAudit(t, d, alice, sharingTransactionA)
 		accepted := 0
 		for _, event := range events {
 			if event.Action == store.SharingAuditCopyAccepted {
@@ -326,8 +326,8 @@ func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	source := sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	source := sharingTransaction(t, storeA, sharingTransactionA)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := store.SharingSourceRevision(source)
@@ -336,10 +336,10 @@ func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
 	}
 	edited := source
 	edited.Name = "Concurrent revision"
-	if _, err := storeA.UpdatePosting(edited); err != nil {
+	if _, err := storeA.UpdateTransaction(edited); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.verifySharingSourceCurrent(alice, sharingPostingA, bob, snapshot); !errors.Is(err, store.ErrSharingConflict) {
+	if _, err := d.verifySharingSourceCurrent(alice, sharingTransactionA, bob, snapshot); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("stale verify = %v, want conflict", err)
 	}
 	current, err := store.SharingSourceRevision(source)
@@ -347,7 +347,7 @@ func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = current
-	live, err := d.ReadSharedPosting(alice, sharingPostingA, bob)
+	live, err := d.ReadSharedTransaction(alice, sharingTransactionA, bob)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,10 +358,10 @@ func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
 	if liveRevision == snapshot {
 		t.Fatalf("owner edit did not move the source revision")
 	}
-	if _, err := d.verifySharingSourceCurrent(alice, sharingPostingA, bob, liveRevision); err != nil {
+	if _, err := d.verifySharingSourceCurrent(alice, sharingTransactionA, bob, liveRevision); err != nil {
 		t.Fatalf("current verify = %v, want nil", err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,11 +378,11 @@ func TestSharingRefreshReplayAndStatuses(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	source := sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	source := sharingTransaction(t, storeA, sharingTransactionA)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestSharingRefreshReplayAndStatuses(t *testing.T) {
 	}
 	edited := source
 	edited.Name = "Edited source"
-	if _, err := storeA.UpdatePosting(edited); err != nil {
+	if _, err := storeA.UpdateTransaction(edited); err != nil {
 		t.Fatal(err)
 	}
 	moved, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
@@ -415,7 +415,7 @@ func TestSharingRefreshReplayAndStatuses(t *testing.T) {
 	if moved.Status != store.SharingLinkSourceChange || moved.CurrentSourceRevision == link.SourceRevision {
 		t.Fatalf("post-edit refresh = %+v, want source-changed with a moved revision", moved)
 	}
-	events := sharingAudit(t, d, alice, sharingPostingA)
+	events := sharingAudit(t, d, alice, sharingTransactionA)
 	var refreshed []store.SharingAuditEvent
 	for _, event := range events {
 		if event.Action == store.SharingAuditLinkRefreshed {
@@ -434,7 +434,7 @@ func TestSharingRefreshReplayAndStatuses(t *testing.T) {
 		}
 	}
 	// Key reuse across actions conflicts even for refresh keys.
-	if _, err := d.CopySharedPosting(alice, sharingPostingA, bob, key); !errors.Is(err, store.ErrSharingConflict) {
+	if _, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("accept with refresh key = %v, want conflict", err)
 	}
 }
@@ -446,11 +446,11 @@ func TestSharingConcurrentRefreshSameKeyConverges(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	sharingTransaction(t, storeA, sharingTransactionA)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,7 +480,7 @@ func TestSharingConcurrentRefreshSameKeyConverges(t *testing.T) {
 			t.Fatalf("racer %d outcome = %q/%d, want %q/%d", i, statuses[i], touches[i], statuses[0], touches[0])
 		}
 	}
-	events := sharingAudit(t, d, alice, sharingPostingA)
+	events := sharingAudit(t, d, alice, sharingTransactionA)
 	refreshed := 0
 	for _, event := range events {
 		if event.Action == store.SharingAuditLinkRefreshed {
@@ -498,13 +498,13 @@ func TestSharingKeysArePerActor(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
 	key := sharingKey(t)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.CopySharedPosting(alice, sharingPostingA, bob, key); err != nil {
+	if _, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key); err != nil {
 		t.Fatalf("recipient accept with owner's key value = %v, want success", err)
 	}
 }
@@ -515,13 +515,13 @@ func TestSharingClearResetsKeysAndAudit(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
+	sharingTransaction(t, storeA, sharingTransactionA)
 
 	key := sharingKey(t)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); err != nil {
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); err != nil {
 		t.Fatal(err)
 	}
-	if len(sharingAudit(t, d, alice, sharingPostingA)) != 1 {
+	if len(sharingAudit(t, d, alice, sharingTransactionA)) != 1 {
 		t.Fatal("want one audit row before clear")
 	}
 	scoped, err := d.User(alice)
@@ -531,7 +531,7 @@ func TestSharingClearResetsKeysAndAudit(t *testing.T) {
 	if err := scoped.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if events := sharingAudit(t, d, alice, sharingPostingA); len(events) != 0 {
+	if events := sharingAudit(t, d, alice, sharingTransactionA); len(events) != 0 {
 		t.Fatalf("audit after clear = %d, want empty trace", len(events))
 	}
 	if n := sharingRequestCount(t, d); n != 0 {
@@ -539,46 +539,46 @@ func TestSharingClearResetsKeysAndAudit(t *testing.T) {
 	}
 	// The same key executes fresh afterwards with a new audit row.
 	// Clear removes model rows including accounts, so re-provision
-	// before re-creating the posting.
+	// before re-creating the transaction.
 	if _, err := storeA.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, key); err != nil {
+	sharingTransaction(t, storeA, sharingTransactionA)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); err != nil {
 		t.Fatalf("re-grant with cleared key = %v, want success", err)
 	}
-	if events := sharingAudit(t, d, alice, sharingPostingA); len(events) != 1 || events[0].RequestID != key {
+	if events := sharingAudit(t, d, alice, sharingTransactionA); len(events) != 1 || events[0].RequestID != key {
 		t.Fatalf("audit after re-grant = %+v, want one row with the reused key", events)
 	}
 }
 
 // Audit reads carry identities only: no amounts, names, accounts, memos,
-// or posting content travel in events or detail payloads.
+// or transaction content travel in events or detail payloads.
 func TestSharingAuditCarriesNoEvidence(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
-	sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
+	sharingTransaction(t, storeA, sharingTransactionA)
+	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
+	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	events := sharingAudit(t, d, alice, sharingPostingA)
+	events := sharingAudit(t, d, alice, sharingTransactionA)
 	if len(events) == 0 {
 		t.Fatal("want audit rows to scan")
 	}
 	raw := ""
 	for _, event := range events {
-		raw += event.ActorUserID + event.Action + event.OwnerUserID + event.PostingID +
+		raw += event.ActorUserID + event.Action + event.OwnerUserID + event.TransactionID +
 			event.Audience + event.AudienceID + event.LinkID + event.Status + event.RequestID
 	}
-	for _, leak := range []string{"amount", "balance", "Checking", "checking", "expression", "memo", "receipt", "secret", "password", "Posting "} {
+	for _, leak := range []string{"amount", "balance", "Checking", "checking", "expression", "memo", "receipt", "secret", "password", "Transaction "} {
 		if strings.Contains(raw, leak) {
 			t.Fatalf("audit trace leaks %q: %s", leak, raw)
 		}

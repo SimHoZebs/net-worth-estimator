@@ -5,7 +5,7 @@
 // same key naming a different action or target fails with
 // ErrSharingConflict. Committed mutations also append one row to
 // sharing_audit carrying actor, action, target identities, and time only:
-// no amounts, names, accounts, memos, or posting content ever enter audit
+// no amounts, names, accounts, memos, or transaction content ever enter audit
 // payloads. Recorded outcomes return to their own actor only: grant,
 // revocation, and refresh outcomes are identity-only, while an accept
 // replay returns the recipient's own copy. Outcomes are never exposed
@@ -40,7 +40,7 @@ func sharingRequestsSchemaStatements() []string {
 			request_id TEXT NOT NULL,
 			action TEXT NOT NULL,
 			owner_user_id TEXT NOT NULL,
-			posting_id TEXT NOT NULL,
+			transaction_id TEXT NOT NULL,
 			audience_type TEXT NOT NULL DEFAULT '',
 			audience_id TEXT NOT NULL DEFAULT '',
 			link_id TEXT NOT NULL DEFAULT '',
@@ -63,16 +63,16 @@ type sharingStorage interface {
 // sharingRequestOutcome is the stored envelope for one (actor, request ID).
 // Result carries the operation's recorded return value: a SharingGrant for
 // grants and exclusions, a SharingRevocation for revokes and
-// exclusion removals, a Posting for accepts, a SharingLinkRefresh for
+// exclusion removals, a Transaction for accepts, a SharingLinkRefresh for
 // refreshes.
 type sharingRequestOutcome struct {
-	Action      string          `json:"action"`
-	OwnerUserID string          `json:"ownerUserId"`
-	PostingID   string          `json:"postingId"`
-	Audience    string          `json:"audienceType"`
-	AudienceID  string          `json:"audienceId"`
-	LinkID      string          `json:"linkId"`
-	Result      json.RawMessage `json:"result"`
+	Action        string          `json:"action"`
+	OwnerUserID   string          `json:"ownerUserId"`
+	TransactionID string          `json:"transactionId"`
+	Audience      string          `json:"audienceType"`
+	AudienceID    string          `json:"audienceId"`
+	LinkID        string          `json:"linkId"`
+	Result        json.RawMessage `json:"result"`
 }
 
 // checkSharingRequestID rejects empty or non-UUID request keys. Keys are
@@ -91,8 +91,8 @@ func checkSharingRequestID(requestID string) error {
 func lookupSharingRequest(db sharingStorage, actor, requestID string) (sharingRequestOutcome, error) {
 	var outcome sharingRequestOutcome
 	var raw string
-	err := db.QueryRow(`SELECT action, owner_user_id, posting_id, audience_type, audience_id, link_id, outcome_json FROM sharing_requests WHERE actor_user_id = ? AND request_id = ?`,
-		actor, requestID).Scan(&outcome.Action, &outcome.OwnerUserID, &outcome.PostingID, &outcome.Audience, &outcome.AudienceID, &outcome.LinkID, &raw)
+	err := db.QueryRow(`SELECT action, owner_user_id, transaction_id, audience_type, audience_id, link_id, outcome_json FROM sharing_requests WHERE actor_user_id = ? AND request_id = ?`,
+		actor, requestID).Scan(&outcome.Action, &outcome.OwnerUserID, &outcome.TransactionID, &outcome.Audience, &outcome.AudienceID, &outcome.LinkID, &raw)
 	if err != nil {
 		return sharingRequestOutcome{}, err
 	}
@@ -103,8 +103,8 @@ func lookupSharingRequest(db sharingStorage, actor, requestID string) (sharingRe
 // matchSharingRequest verifies a recorded outcome names the same operation.
 // A key reused for a different action or target fails as a conflict: the
 // recorded result must never alias an unrelated request.
-func matchSharingRequest(recorded sharingRequestOutcome, action, ownerID, postingID, audienceType, audienceID, linkID string) error {
-	if recorded.Action != action || recorded.OwnerUserID != ownerID || recorded.PostingID != postingID ||
+func matchSharingRequest(recorded sharingRequestOutcome, action, ownerID, transactionID, audienceType, audienceID, linkID string) error {
+	if recorded.Action != action || recorded.OwnerUserID != ownerID || recorded.TransactionID != transactionID ||
 		recorded.Audience != audienceType || recorded.AudienceID != audienceID || recorded.LinkID != linkID {
 		return fmt.Errorf("%w: sharing request ID already completed a different action", store.ErrSharingConflict)
 	}
@@ -125,14 +125,14 @@ func decodeSharingResult[T any](recorded sharingRequestOutcome) (T, error) {
 // Callers invoke it after the mutation commits (or in the same
 // transaction); failed attempts never consume the key, so a conflicted or
 // interrupted request retries with the same key as a fresh execution.
-func recordSharingRequest(db sharingStorage, actor, requestID, action, ownerID, postingID, audienceType, audienceID, linkID string, result any) error {
+func recordSharingRequest(db sharingStorage, actor, requestID, action, ownerID, transactionID, audienceType, audienceID, linkID string, result any) error {
 	raw, err := json.Marshal(result)
 	if err != nil {
 		return err
 	}
 	now := time.Now().Unix()
-	if _, err := db.Exec(`INSERT INTO sharing_requests(actor_user_id, request_id, action, owner_user_id, posting_id, audience_type, audience_id, link_id, outcome_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		actor, requestID, action, ownerID, postingID, audienceType, audienceID, linkID, string(raw), now); err != nil {
+	if _, err := db.Exec(`INSERT INTO sharing_requests(actor_user_id, request_id, action, owner_user_id, transaction_id, audience_type, audience_id, link_id, outcome_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		actor, requestID, action, ownerID, transactionID, audienceType, audienceID, linkID, string(raw), now); err != nil {
 		return fmt.Errorf("record sharing request: %w", err)
 	}
 	return nil

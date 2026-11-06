@@ -13,15 +13,15 @@ import (
 
 func rateTestContext(divisor int, startDate string, sampled *float64) *AmountProviderContext {
 	return &AmountProviderContext{
-		Balances:                     map[string]float64{},
-		LatestRealizedPostingAmounts: map[string]float64{},
-		LatestRealizedPostingDates:   map[string]string{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
-		PaymentTerms:                 map[string]types.PaymentTerms{},
-		Date:                         "2026-03-01",
-		FrequencyDivisor:             divisor,
-		RuleStartDate:                startDate,
-		SampledAnnualRate:            sampled,
+		Balances:                         map[string]float64{},
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		LatestRealizedTransactionDates:   map[string]string{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
+		PaymentTerms:                     map[string]types.PaymentTerms{},
+		Date:                             "2026-03-01",
+		FrequencyDivisor:                 divisor,
+		RuleStartDate:                    startDate,
+		SampledAnnualRate:                sampled,
 	}
 }
 
@@ -102,7 +102,7 @@ func TestGrowthFactorNeutralWithoutStartDate(t *testing.T) {
 }
 
 func TestMultipleVolatileInputsRejected(t *testing.T) {
-	amount := types.PostingAmountResolution{
+	amount := types.TransactionAmountResolution{
 		Resolver: "expression",
 		Config:   map[string]any{"expression": "a + b"},
 		Inputs: map[string]types.AmountInputBinding{
@@ -122,7 +122,7 @@ func TestMultipleVolatileInputsRejected(t *testing.T) {
 	issues := ValidateFinancialModel(model)
 	found := false
 	for _, issue := range issues {
-		if issue.Code == "posting.amount.multiple_volatile_rates" {
+		if issue.Code == "transaction.amount.multiple_volatile_rates" {
 			found = true
 		}
 	}

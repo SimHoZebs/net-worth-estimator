@@ -122,7 +122,7 @@ function seedServerState() {
 						sources: [
 							{ type: "asset", accountId: "brokerage", included: true },
 						],
-						continuingPostingIds: [],
+						continuingTransactionIds: [],
 					},
 				},
 			],
@@ -133,7 +133,7 @@ function seedServerState() {
 		{ id: "cash", name: "Cash", kind: "cash", color: null },
 		{ id: "brokerage", name: "Brokerage", kind: "investment", color: null },
 	];
-	catalogState.items = [{ id: "salary", kind: "posting", name: "Salary" }];
+	catalogState.items = [{ id: "salary", kind: "transaction", name: "Salary" }];
 }
 
 describe("fiConfigureState", () => {
@@ -144,7 +144,7 @@ describe("fiConfigureState", () => {
 			sources: [
 				{ type: "asset", accountId: "brokerage", included: true },
 				{ type: "asset", accountId: "cash", included: false },
-				{ type: "cashflow", postingId: "salary", included: true },
+				{ type: "cashflow", transactionId: "salary", included: true },
 			],
 		});
 		expect(state.minimum).toBe(2500);
@@ -177,7 +177,7 @@ describe("buildFiConfig", () => {
 						withdrawalRateOverride: 0.05,
 					},
 				],
-				continuingPostingIds: ["growth"],
+				continuingTransactionIds: ["growth"],
 			},
 			{
 				minimum: 5000,
@@ -189,7 +189,7 @@ describe("buildFiConfig", () => {
 		expect(next.minimumNetWorth).toBe(5000);
 		expect(next.evaluationYears).toBe(12);
 		expect(next.annualExpenseTarget).toBe(80000);
-		expect(next.continuingPostingIds).toEqual(["growth"]);
+		expect(next.continuingTransactionIds).toEqual(["growth"]);
 		expect(next.sources).toEqual([
 			{
 				type: "asset",
@@ -198,7 +198,7 @@ describe("buildFiConfig", () => {
 				withdrawalRateOverride: 0.05,
 			},
 			{ type: "asset", accountId: "cash", included: true },
-			{ type: "cashflow", postingId: "salary", included: true },
+			{ type: "cashflow", transactionId: "salary", included: true },
 		]);
 	});
 });
@@ -276,7 +276,7 @@ describe("IndependenceConfigure", () => {
 		expect(input.config.sources).toEqual([
 			{ type: "asset", accountId: "brokerage", included: true },
 			{ type: "asset", accountId: "cash", included: true },
-			{ type: "cashflow", postingId: "salary", included: true },
+			{ type: "cashflow", transactionId: "salary", included: true },
 		]);
 	});
 

@@ -51,7 +51,7 @@ func ledgerFlows(t *testing.T, world *ledgerWorld, start, end string) *types.Flo
 
 func ledgerDeletePhantom(t *testing.T, world *ledgerWorld) {
 	t.Helper()
-	ids := ledgerPostingIDs(t, world.ownerSC)["PHANTOM"]
+	ids := ledgerTransactionIDs(t, world.ownerSC)["PHANTOM"]
 	if len(ids) != 1 {
 		t.Fatalf("phantom rows = %d, want the 1 synced row before deletion", len(ids))
 	}
@@ -61,7 +61,7 @@ func ledgerDeletePhantom(t *testing.T, world *ledgerWorld) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("delete phantom = %d %s", response.Code, response.Body.String())
 	}
-	if gone := ledgerPostingIDs(t, world.ownerSC)["PHANTOM"]; len(gone) != 0 {
+	if gone := ledgerTransactionIDs(t, world.ownerSC)["PHANTOM"]; len(gone) != 0 {
 		t.Fatalf("phantom survives deletion: %v", gone)
 	}
 }
@@ -70,7 +70,7 @@ func ledgerEdgeSources(graph *types.FlowGraph) map[string]int {
 	seen := map[string]int{}
 	for _, edge := range graph.Edges {
 		for _, source := range edge.Sources {
-			seen[source.PostingID]++
+			seen[source.TransactionID]++
 		}
 	}
 	return seen
@@ -104,13 +104,13 @@ func TestLedgerDiagramShowsEverySettledRowOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	settled := map[string]bool{}
-	for _, posting := range model.Postings {
-		if posting.Pending || posting.Void || !posting.Enabled {
+	for _, transaction := range model.Transactions {
+		if transaction.Pending || transaction.Void || !transaction.Enabled {
 			continue
 		}
-		settled[posting.ID] = true
-		if seen[posting.ID] != 1 {
-			t.Fatalf("row %q appears in %d edge sources, want exactly once", posting.Name, seen[posting.ID])
+		settled[transaction.ID] = true
+		if seen[transaction.ID] != 1 {
+			t.Fatalf("row %q appears in %d edge sources, want exactly once", transaction.Name, seen[transaction.ID])
 		}
 	}
 	for id := range seen {
@@ -135,8 +135,8 @@ func TestLedgerDiagramShowsEverySettledRowOnce(t *testing.T) {
 	}
 	// Pending, void, and deleted rows move nothing and stay out.
 	byName := map[string]string{}
-	for _, posting := range model.Postings {
-		byName[posting.Name] = posting.ID
+	for _, transaction := range model.Transactions {
+		byName[transaction.Name] = transaction.ID
 	}
 	for _, name := range []string{"PENDING EATS", "VOIDED MART"} {
 		if id, ok := byName[name]; ok && seen[id] != 0 {
@@ -170,10 +170,10 @@ func TestLedgerNarrowWindowDropsApril(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		isApril := posting.TransactionTime >= ledgerAprilStart
-		if isApril && !posting.Pending && !posting.Void && posting.Enabled && seen[posting.ID] != 0 {
-			t.Fatalf("april row %q leaks into the narrowed window", posting.Name)
+	for _, transaction := range model.Transactions {
+		isApril := transaction.TransactionTime >= ledgerAprilStart
+		if isApril && !transaction.Pending && !transaction.Void && transaction.Enabled && seen[transaction.ID] != 0 {
+			t.Fatalf("april row %q leaks into the narrowed window", transaction.Name)
 		}
 	}
 }
@@ -234,8 +234,8 @@ func TestLedgerTransactionListShowsSeedRows(t *testing.T) {
 	want := world.expected
 
 	rows := ledgerList(t, world)
-	if len(rows) != want.ListedPostings {
-		t.Fatalf("listed rows = %d, want %d seed rows, no more no less", len(rows), want.ListedPostings)
+	if len(rows) != want.ListedTransactions {
+		t.Fatalf("listed rows = %d, want %d seed rows, no more no less", len(rows), want.ListedTransactions)
 	}
 	byID := map[string]ledgerListRow{}
 	for _, row := range rows {

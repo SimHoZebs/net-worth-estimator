@@ -30,19 +30,19 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 	accountID := accountPayload.Result.ID
 
 	holdTime := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC).Unix()
-	hold := types.Posting{
+	hold := types.Transaction{
 		Name:            "LYFT *TEMP AUTH HOLD",
 		Source:          store.SourceBankSync,
 		SourceAccountID: ptr(accountID),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "74.94"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "74.94"}, Inputs: map[string]types.AmountInputBinding{}},
 		TransactionTime: holdTime,
 		Enabled:         false,
 		Pending:         true,
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
 		Upsert: &store.BankUpsert{
-			Posting: hold,
-			Keys:    []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}},
+			Transaction: hold,
+			Keys:        []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}},
 		},
 	}}); err != nil {
 		t.Fatalf("hold upsert: %v", err)
@@ -52,32 +52,32 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 		t.Fatalf("load model: %v", err)
 	}
 	var holdID string
-	for _, posting := range model.Postings {
-		if posting.Name == hold.Name {
-			holdID = posting.ID
+	for _, transaction := range model.Transactions {
+		if transaction.Name == hold.Name {
+			holdID = transaction.ID
 		}
 	}
 	if holdID == "" {
-		t.Fatalf("hold missing in %+v", model.Postings)
+		t.Fatalf("hold missing in %+v", model.Transactions)
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{Void: holdID}}); err != nil {
 		t.Fatalf("hold void: %v", err)
 	}
 
 	postedTime := time.Date(2026, 11, 1, 14, 36, 0, 0, time.UTC).Unix()
-	settled := types.Posting{
+	settled := types.Transaction{
 		Name:            "LYFT *STANDARD 10-30",
 		Source:          store.SourceBankSync,
 		SourceAccountID: ptr(accountID),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "81.22"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "81.22"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      postedTime,
 		TransactionTime: postedTime,
 		Enabled:         true,
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
 		Upsert: &store.BankUpsert{
-			Posting: settled,
-			Keys:    []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}},
+			Transaction: settled,
+			Keys:        []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}},
 		},
 	}}); err != nil {
 		t.Fatalf("settled upsert: %v", err)
@@ -87,13 +87,13 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 		t.Fatalf("reload model: %v", err)
 	}
 	var settledID string
-	for _, posting := range model.Postings {
-		if posting.Name == settled.Name {
-			settledID = posting.ID
+	for _, transaction := range model.Transactions {
+		if transaction.Name == settled.Name {
+			settledID = transaction.ID
 		}
 	}
 	if settledID == "" {
-		t.Fatalf("settled charge missing in %+v", model.Postings)
+		t.Fatalf("settled charge missing in %+v", model.Transactions)
 	}
 
 	response := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/"+holdID+"/settle-candidates", "")
@@ -101,9 +101,9 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 		t.Fatalf("settle candidates status = %d, body %s", response.Code, response.Body.String())
 	}
 	var payload struct {
-		PostingID  string `json:"postingId"`
-		Candidates []struct {
-			PostingID         string  `json:"postingId"`
+		TransactionID string `json:"transactionId"`
+		Candidates    []struct {
+			TransactionID     string  `json:"transactionId"`
 			Name              string  `json:"name"`
 			Amount            float64 `json:"amount"`
 			Date              string  `json:"date"`
@@ -116,7 +116,7 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode candidates: %v", err)
 	}
-	if payload.PostingID != holdID || len(payload.Candidates) != 1 {
+	if payload.TransactionID != holdID || len(payload.Candidates) != 1 {
 		t.Fatalf("candidates = %+v, want one for %s", payload, holdID)
 	}
 	candidate := payload.Candidates[0]
@@ -132,7 +132,7 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 
 	notHold := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/"+settledID+"/settle-candidates", "")
 	if notHold.Code != http.StatusBadRequest {
-		t.Fatalf("settled posting status = %d, want 400", notHold.Code)
+		t.Fatalf("settled transaction status = %d, want 400", notHold.Code)
 	}
 	missing := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/missing/settle-candidates", "")
 	if missing.Code != http.StatusNotFound {

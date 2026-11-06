@@ -153,7 +153,7 @@ func selectedCashflowIDs(plan *types.FIPlan) map[string]bool {
 	ids := map[string]bool{}
 	for _, source := range plan.Sources {
 		if source.Type == "cashflow" && source.Included {
-			ids[source.PostingID] = true
+			ids[source.TransactionID] = true
 		}
 	}
 	return ids
@@ -213,7 +213,7 @@ func realizedCashflowBetween(events []types.TransactionEvent, cashflowIDs map[st
 		if event.Date > endDate {
 			break
 		}
-		if cashflowIDs[event.Origin.PostingID] {
+		if cashflowIDs[event.Origin.TransactionID] {
 			total += event.RealizedAmount
 		}
 	}
@@ -237,7 +237,7 @@ func realizedCashflowByMonth(events []types.TransactionEvent, cashflowIDs map[st
 		if month >= monthCount {
 			break
 		}
-		if cashflowIDs[event.Origin.PostingID] {
+		if cashflowIDs[event.Origin.TransactionID] {
 			amounts[month] += event.RealizedAmount
 		}
 	}
@@ -263,16 +263,16 @@ func optimisticLaterYearWithdrawalCapacity(balances map[string]float64, assetRat
 	return capacity
 }
 
-type postingDisposition int
+type transactionDisposition int
 
 const (
-	dispositionDisabled postingDisposition = iota
+	dispositionDisabled transactionDisposition = iota
 	dispositionObserveBasePath
 	dispositionReplayInBranch
 )
 
-func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, continuingIDs map[string]bool) map[string]postingDisposition {
-	dispositions := map[string]postingDisposition{}
+func classifyTransactionDispositions(path *types.ProjectionPath, cashflowIDs, continuingIDs map[string]bool) map[string]transactionDisposition {
+	dispositions := map[string]transactionDisposition{}
 	for id := range TransactionIDs(&path.EffectiveModel) {
 		switch {
 		case cashflowIDs[id]:
@@ -287,32 +287,32 @@ func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, contin
 }
 
 func initializeBranchSimulationState(balances map[string]float64, events []types.TransactionEvent, candidateDate IsoDate, startState *types.ProjectionPath) SimulationState {
-	// Deep-copy the prepared projection-start posting ledger through the
+	// Deep-copy the prepared projection-start transaction ledger through the
 	// shared cloner (the same copy the purchases candidate rebuilds from),
 	// then replay base-path events up to the candidate date. Losses are
 	// balance adjustments, not cap consumption: only non-negative
 	// realizations accrue against the annual cap.
 	state := CloneSimulationState(SimulationState{
-		Balances:                     balances,
-		LatestRealizedPostingAmounts: startState.ProjectionStartPostingState.LatestRealizedPostingAmounts,
-		LatestRealizedPostingDates:   startState.ProjectionStartPostingState.LatestRealizedPostingDates,
-		RealizedPostingAmountsByYear: startState.ProjectionStartPostingState.RealizedPostingAmountsByYear,
+		Balances:                         balances,
+		LatestRealizedTransactionAmounts: startState.ProjectionStartTransactionState.LatestRealizedTransactionAmounts,
+		LatestRealizedTransactionDates:   startState.ProjectionStartTransactionState.LatestRealizedTransactionDates,
+		RealizedTransactionAmountsByYear: startState.ProjectionStartTransactionState.RealizedTransactionAmountsByYear,
 	})
-	latest := state.LatestRealizedPostingAmounts
-	dates := state.LatestRealizedPostingDates
-	byYear := state.RealizedPostingAmountsByYear
+	latest := state.LatestRealizedTransactionAmounts
+	dates := state.LatestRealizedTransactionDates
+	byYear := state.RealizedTransactionAmountsByYear
 	for index := range events {
 		event := &events[index]
 		if event.Date > candidateDate {
 			break
 		}
-		postingID := event.Origin.PostingID
-		latest[postingID] = event.RealizedAmount
-		dates[postingID] = string(event.Date)
-		yearMap, ok := byYear[postingID]
+		transactionID := event.Origin.TransactionID
+		latest[transactionID] = event.RealizedAmount
+		dates[transactionID] = string(event.Date)
+		yearMap, ok := byYear[transactionID]
 		if !ok {
 			yearMap = map[string]float64{}
-			byYear[postingID] = yearMap
+			byYear[transactionID] = yearMap
 		}
 		// Losses are balance adjustments, not cap consumption: only
 		// non-negative realizations accrue against the annual cap.
@@ -323,30 +323,30 @@ func initializeBranchSimulationState(balances map[string]float64, events []types
 
 type branchEventGroup struct {
 	date        IsoDate
-	occurrences []DatedPostingOccurrence
+	occurrences []DatedTransactionOccurrence
 }
 
-func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPosting map[string]float64, baseEventsByDateAndPosting map[string]*types.TransactionEvent, dispositions map[string]postingDisposition, transitions *TransitionRuntime) (float64, error) {
+func applyBranchTransactionEvents(events []branchEventGroup, baseRealizedByDateAndTransaction map[string]float64, baseEventsByDateAndTransaction map[string]*types.TransactionEvent, dispositions map[string]transactionDisposition, transitions *TransitionRuntime) (float64, error) {
 	observedDirectIncome := 0.0
 	for _, group := range events {
-		sorted := make([]DatedPostingOccurrence, len(group.occurrences))
+		sorted := make([]DatedTransactionOccurrence, len(group.occurrences))
 		copy(sorted, group.occurrences)
 		sortOccurrences(sorted)
 		for _, occurrence := range sorted {
-			posting := occurrence.Posting
-			disposition, ok := dispositions[posting.ID]
+			transaction := occurrence.Transaction
+			disposition, ok := dispositions[transaction.ID]
 			if !ok || disposition == dispositionDisabled {
 				continue
 			}
 			if disposition == dispositionObserveBasePath {
-				key := fmt.Sprintf("%s:%s", group.date, posting.ID)
-				realizedAmount := baseRealizedByDateAndPosting[key]
-				transitions.ObservePosting(posting.ID, realizedAmount, group.date)
+				key := fmt.Sprintf("%s:%s", group.date, transaction.ID)
+				realizedAmount := baseRealizedByDateAndTransaction[key]
+				transitions.ObserveTransaction(transaction.ID, realizedAmount, group.date)
 				observedDirectIncome += realizedAmount
 				continue
 			}
-			if _, err := transitions.ExecutePosting(occurrence, group.date, false); err != nil {
-				return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
+			if _, err := transitions.ExecuteTransaction(occurrence, group.date, false); err != nil {
+				return 0, fmt.Errorf("replay transaction %q on %s: %w", transaction.ID, group.date, err)
 			}
 		}
 	}
@@ -361,18 +361,18 @@ type cycleOutcome struct {
 // evaluation. EvaluateFinancialIndependence builds it once per evaluation;
 // per-candidate evaluateCycle calls previously rebuilt these maps (O(E))
 // for every candidate date (O(M*E) total). Sharing them is read-only and
-// bit-identical: branch execution never mutates postings, dispositions, or
+// bit-identical: branch execution never mutates transactions, dispositions, or
 // base-event pointers.
 type fiCycleShared struct {
-	assetRates                   map[string]float64
-	assetRateOrder               []string
-	cashflowIDs                  map[string]bool
-	accountsByID                 map[string]types.Account
-	dispositions                 map[string]postingDisposition
-	branchPostings               []types.Posting
-	branchRules                  []types.Schedule
-	baseRealizedByDateAndPosting map[string]float64
-	baseEventsByDateAndPosting   map[string]*types.TransactionEvent
+	assetRates                       map[string]float64
+	assetRateOrder                   []string
+	cashflowIDs                      map[string]bool
+	accountsByID                     map[string]types.Account
+	dispositions                     map[string]transactionDisposition
+	branchTransactions               []types.Transaction
+	branchRules                      []types.Schedule
+	baseRealizedByDateAndTransaction map[string]float64
+	baseEventsByDateAndTransaction   map[string]*types.TransactionEvent
 }
 
 func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleShared {
@@ -384,17 +384,17 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 		accountsByID[account.ID] = account
 	}
 	continuingIDs := map[string]bool{}
-	for _, id := range plan.ContinuingPostingIDs {
+	for _, id := range plan.ContinuingTransactionIDs {
 		if !cashflowIDs[id] {
 			continuingIDs[id] = true
 		}
 	}
-	dispositions := classifyPostingDispositions(path, cashflowIDs, continuingIDs)
-	branchPostings := []types.Posting{}
-	for index := range path.EffectiveModel.Postings {
-		posting := &path.EffectiveModel.Postings[index]
-		if posting.Enabled && dispositions[posting.ID] != dispositionDisabled {
-			branchPostings = append(branchPostings, *posting)
+	dispositions := classifyTransactionDispositions(path, cashflowIDs, continuingIDs)
+	branchTransactions := []types.Transaction{}
+	for index := range path.EffectiveModel.Transactions {
+		transaction := &path.EffectiveModel.Transactions[index]
+		if transaction.Enabled && dispositions[transaction.ID] != dispositionDisabled {
+			branchTransactions = append(branchTransactions, *transaction)
 		}
 	}
 	branchRules := []types.Schedule{}
@@ -404,24 +404,24 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 			branchRules = append(branchRules, *rule)
 		}
 	}
-	baseRealizedByDateAndPosting := make(map[string]float64, len(path.TransactionEvents))
-	baseEventsByDateAndPosting := make(map[string]*types.TransactionEvent, len(path.TransactionEvents))
+	baseRealizedByDateAndTransaction := make(map[string]float64, len(path.TransactionEvents))
+	baseEventsByDateAndTransaction := make(map[string]*types.TransactionEvent, len(path.TransactionEvents))
 	for index := range path.TransactionEvents {
 		event := &path.TransactionEvents[index]
-		key := event.Date + ":" + event.Origin.PostingID
-		baseRealizedByDateAndPosting[key] = event.RealizedAmount
-		baseEventsByDateAndPosting[key] = event
+		key := event.Date + ":" + event.Origin.TransactionID
+		baseRealizedByDateAndTransaction[key] = event.RealizedAmount
+		baseEventsByDateAndTransaction[key] = event
 	}
 	return &fiCycleShared{
-		assetRates:                   assetRates,
-		assetRateOrder:               assetRateOrder,
-		cashflowIDs:                  cashflowIDs,
-		accountsByID:                 accountsByID,
-		dispositions:                 dispositions,
-		branchPostings:               branchPostings,
-		branchRules:                  branchRules,
-		baseRealizedByDateAndPosting: baseRealizedByDateAndPosting,
-		baseEventsByDateAndPosting:   baseEventsByDateAndPosting,
+		assetRates:                       assetRates,
+		assetRateOrder:                   assetRateOrder,
+		cashflowIDs:                      cashflowIDs,
+		accountsByID:                     accountsByID,
+		dispositions:                     dispositions,
+		branchTransactions:               branchTransactions,
+		branchRules:                      branchRules,
+		baseRealizedByDateAndTransaction: baseRealizedByDateAndTransaction,
+		baseEventsByDateAndTransaction:   baseEventsByDateAndTransaction,
 	}
 }
 
@@ -482,13 +482,13 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 		startingSelectedAssetBalance += math.Max(0, candidateBalances[accountID])
 	}
 	dispositions := shared.dispositions
-	branchPostings := shared.branchPostings
+	branchTransactions := shared.branchTransactions
 	branchRules := shared.branchRules
-	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
-	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
+	baseRealizedByDateAndTransaction := shared.baseRealizedByDateAndTransaction
+	baseEventsByDateAndTransaction := shared.baseEventsByDateAndTransaction
 	transitions := CreateTransitionRuntime(types.SimulationInputs{
 		Accounts:     path.EffectiveModel.Accounts,
-		Postings:     branchPostings,
+		Transactions: branchTransactions,
 		Schedules:    branchRules,
 		PaymentTerms: path.EffectiveModel.PaymentTerms,
 	}, initializeBranchSimulationState(candidateBalances, path.TransactionEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
@@ -506,7 +506,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	}
 
 	cycleEnd := AddYearsClamped(candidate.Date, plan.EvaluationYears)
-	eventDates := ResolveOccurrences(branchRules, branchPostings, candidate.Date, cycleEnd, false).ByDate
+	eventDates := ResolveOccurrences(branchRules, branchTransactions, candidate.Date, cycleEnd, false).ByDate
 	periods := make([]BehaviorPeriod, plan.EvaluationYears*12)
 	for index := range periods {
 		periods[index] = BehaviorPeriod{
@@ -562,7 +562,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 					state.remainingWithdrawalByAccount[accountID] = math.Max(0, balances[accountID]) * rate
 				}
 			}
-			directIncome, err := applyBranchPostingEvents(eventsByPeriod[period.Index], baseRealizedByDateAndPosting, baseEventsByDateAndPosting, dispositions, transitions)
+			directIncome, err := applyBranchTransactionEvents(eventsByPeriod[period.Index], baseRealizedByDateAndTransaction, baseEventsByDateAndTransaction, dispositions, transitions)
 			if err != nil && branchErr == nil {
 				branchErr = err
 				return
@@ -831,13 +831,13 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 	return result, nil
 }
 
-// AvailableFIPlan filters sources to existing accounts/postings.
+// AvailableFIPlan filters sources to existing accounts/transactions.
 func AvailableFIPlan(path *types.ProjectionPath, config *types.FIPlan) *types.FIPlan {
 	accountIDs := map[string]bool{}
 	for _, account := range path.EffectiveModel.Accounts {
 		accountIDs[account.ID] = true
 	}
-	postingIDs := TransactionIDs(&path.EffectiveModel)
+	transactionIDs := TransactionIDs(&path.EffectiveModel)
 	filtered := *config
 	filtered.Sources = []types.FISource{}
 	for _, source := range config.Sources {
@@ -845,14 +845,14 @@ func AvailableFIPlan(path *types.ProjectionPath, config *types.FIPlan) *types.FI
 			if accountIDs[source.AccountID] {
 				filtered.Sources = append(filtered.Sources, source)
 			}
-		} else if postingIDs[source.PostingID] {
+		} else if transactionIDs[source.TransactionID] {
 			filtered.Sources = append(filtered.Sources, source)
 		}
 	}
-	filtered.ContinuingPostingIDs = []string{}
-	for _, id := range config.ContinuingPostingIDs {
-		if postingIDs[id] {
-			filtered.ContinuingPostingIDs = append(filtered.ContinuingPostingIDs, id)
+	filtered.ContinuingTransactionIDs = []string{}
+	for _, id := range config.ContinuingTransactionIDs {
+		if transactionIDs[id] {
+			filtered.ContinuingTransactionIDs = append(filtered.ContinuingTransactionIDs, id)
 		}
 	}
 	return &filtered
@@ -881,7 +881,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 	Type: types.EvaluationTypeFinancialIndependence,
 	Name: "Financial independence",
 
-	// Simulator: FI replays continuing postings in branch transitions against
+	// Simulator: FI replays continuing transactions in branch transitions against
 	// the shared base path. Branch state only; never a fresh Prepare.
 	Kind:            EvaluationKindSimulator,
 	AllowSimulation: true,
@@ -917,7 +917,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 		for _, account := range ctx.Path.EffectiveModel.Accounts {
 			accountIDs[account.ID] = true
 		}
-		postingIDs := TransactionIDs(&ctx.Path.EffectiveModel)
+		transactionIDs := TransactionIDs(&ctx.Path.EffectiveModel)
 		diagnostics := []types.EvaluationDiagnostic{}
 		for _, source := range typed.Sources {
 			if !source.Included {
@@ -927,7 +927,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 			if source.Type == "asset" {
 				missing = !accountIDs[source.AccountID]
 			} else {
-				missing = !postingIDs[source.PostingID]
+				missing = !transactionIDs[source.TransactionID]
 			}
 			if !missing {
 				continue
@@ -940,7 +940,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 			if source.Type == "asset" {
 				diagnostic.RelatedAccountIDs = []string{source.AccountID}
 			} else {
-				diagnostic.RelatedPostingIDs = []string{source.PostingID}
+				diagnostic.RelatedTransactionIDs = []string{source.TransactionID}
 			}
 			diagnostics = append(diagnostics, diagnostic)
 		}

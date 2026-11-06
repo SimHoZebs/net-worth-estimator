@@ -41,7 +41,7 @@ func TestAnalysisFeedbackSameIDsStayUserScoped(t *testing.T) {
 			t.Fatalf("scoped audit=%+v %v", items, err)
 		}
 	}
-	if err := a.DeletePosting(fa.PostingID); err != nil {
+	if err := a.DeleteTransaction(fa.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 	items, _ := a.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})

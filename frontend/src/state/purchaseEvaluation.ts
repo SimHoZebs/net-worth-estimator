@@ -15,7 +15,7 @@ export const PURCHASE_EVALUATIONS: EvaluationTables = {
 	financialIndependence: [],
 	netWorthThreshold: [],
 	accountBalance: [],
-	postingFulfillment: [],
+	transactionFulfillment: [],
 	cycleFulfillment: [],
 	plannedPurchases: [
 		{

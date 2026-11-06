@@ -88,7 +88,7 @@ func runUnsampledSession(ctx context.Context, session *stochasticSession) error 
 }
 
 func runStochasticSession(ctx context.Context, session *stochasticSession) error {
-	if len(session.sampleCountsByPostingID) == 0 {
+	if len(session.sampleCountsByTransactionID) == 0 {
 		return runUnsampledSession(ctx, session)
 	}
 	// Scale the pool with available CPUs: accumulation stays ordered in

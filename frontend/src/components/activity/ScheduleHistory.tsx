@@ -6,8 +6,8 @@ import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
 
 /**
- * Postings that record an occurrence of one schedule, newest first. The
- * claim is the association, so this reads saved postings rather than the
+ * Transactions that record an occurrence of one schedule, newest first. The
+ * claim is the association, so this reads saved transactions rather than the
  * projected occurrence list. The shared transaction table owns the row
  * layout, status badges, and click-through.
  */

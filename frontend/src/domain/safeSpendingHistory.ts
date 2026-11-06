@@ -6,7 +6,7 @@ import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
 
 /**
  * Posted rows joined to the projection under shared rule identities.
- * Claimed postings keep their schedule id; the claim names the guessed
+ * Claimed transactions keep their schedule id; the claim names the guessed
  * occurrence it fulfills, and that guess drops out of the stream, so the
  * row shows the day it happened. Posted income maps to the selected source
  * with the matching amount, and selected bills with no posted or projected
@@ -75,7 +75,7 @@ export function safeSpendingResults({
 	const posted: TransactionResult[] = [];
 	const claimedKeys = new Set<string>();
 	for (const row of transactions) {
-		if (row.kind !== "posting" || !row.enabled || row.void || row.pending)
+		if (row.kind !== "transaction" || !row.enabled || row.void || row.pending)
 			continue;
 		if (!row.startDate) continue;
 		const transactionId = row.claimScheduleId ?? incomeRuleFor(row) ?? row.id;

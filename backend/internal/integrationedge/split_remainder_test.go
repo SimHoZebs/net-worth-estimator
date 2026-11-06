@@ -40,13 +40,13 @@ func TestIntegrationEdgeSplitRemainderTheft_RealSQLite(t *testing.T) {
 		if world.second != "" {
 			realParticipants = append(realParticipants, world.second)
 		}
-		sourceRow := advMustPosting(t, world.ownerSC, "Split source", "100.00", 1781524800)
+		sourceRow := advMustTransaction(t, world.ownerSC, "Split source", "100.00", 1781524800)
 		if world.groupID != "" {
-			if _, err := world.db.GrantSharedPosting(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
+			if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
 				t.Fatal(err)
 			}
 		} else if world.second != "" {
-			if _, err := world.db.GrantSharedPosting(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
+			if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -88,7 +88,7 @@ func TestIntegrationEdgeSplitRemainderTheft_RealSQLite(t *testing.T) {
 			}
 			// The same division persisted through the real store must agree.
 			split, err := world.db.CreateSplit(world.owner, store.SplitInput{
-				SourceOwnerID: world.owner, SourcePostingID: sourceRow,
+				SourceOwnerID: world.owner, SourceTransactionID: sourceRow,
 				InitiatorID: world.owner, Currency: probe.Currency,
 				TotalMinor: probe.TotalMinor, ParticipantIDs: realParticipants,
 			}, advRequestID(t))
@@ -113,16 +113,16 @@ func TestIntegrationEdgeSplitOverrideMismatch_RealSQLite(t *testing.T) {
 		t.Skip("needs a second participant")
 	}
 	participants := []string{world.owner, world.second}
-	sourceRow := advMustPosting(t, world.ownerSC, "Override source", "100.00", 1781524800)
+	sourceRow := advMustTransaction(t, world.ownerSC, "Override source", "100.00", 1781524800)
 	if world.groupID != "" {
-		if _, err := world.db.GrantSharedPosting(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
+		if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
 			t.Fatal(err)
 		}
-	} else if _, err := world.db.GrantSharedPosting(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
+	} else if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
 		t.Fatal(err)
 	}
 	_, err := world.db.CreateSplit(world.owner, store.SplitInput{
-		SourceOwnerID: world.owner, SourcePostingID: sourceRow,
+		SourceOwnerID: world.owner, SourceTransactionID: sourceRow,
 		InitiatorID: world.owner, Currency: "USD",
 		TotalMinor: 100, ParticipantIDs: participants,
 		Overrides: map[string]int64{world.owner: 60, world.second: 39},
@@ -131,7 +131,7 @@ func TestIntegrationEdgeSplitOverrideMismatch_RealSQLite(t *testing.T) {
 		t.Fatal("override short by one minor unit was stored: silent theft of 1")
 	}
 	exact, err := world.db.CreateSplit(world.owner, store.SplitInput{
-		SourceOwnerID: world.owner, SourcePostingID: sourceRow,
+		SourceOwnerID: world.owner, SourceTransactionID: sourceRow,
 		InitiatorID: world.owner, Currency: "USD",
 		TotalMinor: 100, ParticipantIDs: participants,
 		Overrides: map[string]int64{world.owner: 60, world.second: 40},

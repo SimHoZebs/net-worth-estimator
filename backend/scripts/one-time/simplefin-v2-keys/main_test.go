@@ -34,8 +34,8 @@ func seedLegacyKeys(t *testing.T, database *sqlite.Database, userID string) {
 	}
 	statements := []string{
 		`INSERT INTO account_links(user_id, bridge_account_id, model_account_id, origin) VALUES (?, 'bridge-checking', 'checking', 'manual')`,
-		`INSERT INTO posting_sync_keys(user_id, provider, bridge_account_id, transaction_id, posting_id) VALUES (?, 'simplefin', 'bridge-checking', 'tx1', 'posting-1')`,
-		`INSERT INTO suppressed_sync_keys(user_id, provider, bridge_account_id, transaction_id, suppressed_at) VALUES (?, 'simplefin', 'bridge-checking', 'tx2', 1)`,
+		`INSERT INTO transaction_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, transaction_id) VALUES (?, 'simplefin', 'bridge-checking', 'tx1', 'transaction-1')`,
+		`INSERT INTO suppressed_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at) VALUES (?, 'simplefin', 'bridge-checking', 'tx2', 1)`,
 	}
 	for _, statement := range statements {
 		if _, err := database.SQL().Exec(statement, userID); err != nil {
@@ -66,7 +66,7 @@ func TestUpgradeRewritesAllKeyTables(t *testing.T) {
 	key := simplefin.AccountKey("CON-1", "bridge-checking")
 	for _, query := range []string{
 		`SELECT bridge_account_id FROM account_links WHERE user_id = '` + userID + `'`,
-		`SELECT bridge_account_id FROM posting_sync_keys WHERE user_id = '` + userID + `'`,
+		`SELECT bridge_account_id FROM transaction_sync_keys WHERE user_id = '` + userID + `'`,
 		`SELECT bridge_account_id FROM suppressed_sync_keys WHERE user_id = '` + userID + `'`,
 	} {
 		var got string

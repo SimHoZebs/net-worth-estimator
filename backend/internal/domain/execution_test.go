@@ -16,39 +16,39 @@ func executionTestAccount(id string, minBalance float64) types.Account {
 func executionTestRuntime(accounts []types.Account, balances map[string]float64) *TransitionRuntime {
 	inputs := types.SimulationInputs{Accounts: accounts}
 	state := types.SimulationState{
-		Balances:                     balances,
-		LatestRealizedPostingAmounts: map[string]float64{},
-		LatestRealizedPostingDates:   map[string]string{},
-		RealizedPostingAmountsByYear: map[string]map[string]float64{},
+		Balances:                         balances,
+		LatestRealizedTransactionAmounts: map[string]float64{},
+		LatestRealizedTransactionDates:   map[string]string{},
+		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 	}
 	return CreateTransitionRuntime(inputs, state, "2026-01-01", nil)
 }
 
-func fixedOccurrence(posting *types.Posting, rule *types.Schedule) DatedPostingOccurrence {
-	return DatedPostingOccurrence{Posting: posting, Rule: rule}
+func fixedOccurrence(transaction *types.Transaction, rule *types.Schedule) DatedTransactionOccurrence {
+	return DatedTransactionOccurrence{Transaction: transaction, Rule: rule}
 }
 
-func expressionAmount(expression string) types.PostingAmountResolution {
-	return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
+func expressionAmount(expression string) types.TransactionAmountResolution {
+	return types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
 }
 
 // Prepare is pure: identical inputs give identical outputs and the inputs
 // are never mutated.
-func TestPreparePostingExecutionIsPure(t *testing.T) {
+func TestPrepareTransactionExecutionIsPure(t *testing.T) {
 	account := "checking"
 	floor := 0.0
-	posting := &types.Posting{
+	transaction := &types.Transaction{
 		ID: "pay", Name: "Pay", SourceAccountID: &account,
 		Amount: expressionAmount("50"),
 	}
 	rt := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, map[string]float64{account: 1000})
 	before := CloneSimulationState(rt.State)
-	occurrence := fixedOccurrence(posting, &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", Enabled: true})
-	first, err := PreparePostingExecution(occurrence, "2026-02-01", false, rt.snapshotExecutionState(), nil)
+	occurrence := fixedOccurrence(transaction, &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", Enabled: true})
+	first, err := PrepareTransactionExecution(occurrence, "2026-02-01", false, rt.snapshotExecutionState(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := PreparePostingExecution(occurrence, "2026-02-01", false, rt.snapshotExecutionState(), nil)
+	second, err := PrepareTransactionExecution(occurrence, "2026-02-01", false, rt.snapshotExecutionState(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,8 +70,8 @@ func TestPreparePostingExecutionIsPure(t *testing.T) {
 func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
 	account := "checking"
 	floor := 0.0
-	outflow := func(id, expression string) *types.Posting {
-		return &types.Posting{
+	outflow := func(id, expression string) *types.Transaction {
+		return &types.Transaction{
 			ID: id, Name: id, SourceAccountID: &account,
 			Amount: expressionAmount(expression), Enabled: true,
 		}
@@ -80,16 +80,16 @@ func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
 		return &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", AnnualCap: cap, Enabled: true}
 	}
 	cap := 100.0
-	loss := &types.Posting{
+	loss := &types.Transaction{
 		ID: "p5", Name: "Loss", Destinations: []string{account},
 		Amount: expressionAmount("-30"), Enabled: true,
 	}
 	cases := []struct {
-		name       string
-		posting    *types.Posting
-		rule       *types.Schedule
-		historical bool
-		balances   map[string]float64
+		name        string
+		transaction *types.Transaction
+		rule        *types.Schedule
+		historical  bool
+		balances    map[string]float64
 	}{
 		{"funded outflow", outflow("p1", "50"), rule(nil), false, map[string]float64{account: 1000}},
 		{"underfunded outflow clamps", outflow("p2", "50"), rule(nil), false, map[string]float64{account: 10}},
@@ -98,14 +98,14 @@ func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
 		{"loss path", loss, nil, false, map[string]float64{account: 1000}},
 	}
 	for _, tc := range cases {
-		occurrence := fixedOccurrence(tc.posting, tc.rule)
+		occurrence := fixedOccurrence(tc.transaction, tc.rule)
 		fused := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, tc.balances)
-		fusedResult, err := fused.ExecutePosting(occurrence, "2026-02-01", tc.historical)
+		fusedResult, err := fused.ExecuteTransaction(occurrence, "2026-02-01", tc.historical)
 		if err != nil {
 			t.Fatalf("%s: fused: %v", tc.name, err)
 		}
 		split := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, tc.balances)
-		prepared, err := PreparePostingExecution(occurrence, "2026-02-01", tc.historical, split.snapshotExecutionState(), nil)
+		prepared, err := PrepareTransactionExecution(occurrence, "2026-02-01", tc.historical, split.snapshotExecutionState(), nil)
 		if err != nil {
 			t.Fatalf("%s: prepare: %v", tc.name, err)
 		}
@@ -119,7 +119,7 @@ func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
 		if !reflect.DeepEqual(fused.State.Balances, split.State.Balances) {
 			t.Fatalf("%s: balances diverge: %v vs %v", tc.name, fused.State.Balances, split.State.Balances)
 		}
-		if !reflect.DeepEqual(fused.State.RealizedPostingAmountsByYear, split.State.RealizedPostingAmountsByYear) {
+		if !reflect.DeepEqual(fused.State.RealizedTransactionAmountsByYear, split.State.RealizedTransactionAmountsByYear) {
 			t.Fatalf("%s: cap ledgers diverge", tc.name)
 		}
 	}
@@ -131,7 +131,7 @@ func TestApplyHandlesImpossibleStates(t *testing.T) {
 	account := "checking"
 	floor := 0.0
 	ghost := "ghost"
-	apply := func(prepared PreparedPostingExecution, balances map[string]float64) AccountTransactionResult {
+	apply := func(prepared PreparedTransactionExecution, balances map[string]float64) AccountTransactionResult {
 		t.Helper()
 		rt := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, balances)
 		transition, err := rt.ApplyPreparedExecution(prepared, "2026-02-01")
@@ -140,9 +140,9 @@ func TestApplyHandlesImpossibleStates(t *testing.T) {
 		}
 		return transition.Result
 	}
-	mkPrepared := func(source *string, requested, cap float64, isLoss bool) PreparedPostingExecution {
-		return PreparedPostingExecution{
-			Posting:            &types.Posting{ID: "p", SourceAccountID: source},
+	mkPrepared := func(source *string, requested, cap float64, isLoss bool) PreparedTransactionExecution {
+		return PreparedTransactionExecution{
+			Transaction:        &types.Transaction{ID: "p", SourceAccountID: source},
 			RequestedAmount:    requested,
 			AnnualCapRemaining: cap,
 			IsLoss:             isLoss,
@@ -173,9 +173,9 @@ func TestExpandProjectionSchedule(t *testing.T) {
 		}
 		return r
 	}
-	claimed := types.Posting{
+	claimed := types.Transaction{
 		ID: "actual", SourceAccountID: func() *string { s := "checking"; return &s }(),
-		Claim:   &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"},
+		Claim:   &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"},
 		Enabled: true,
 	}
 	rules := []types.Schedule{
@@ -183,11 +183,11 @@ func TestExpandProjectionSchedule(t *testing.T) {
 		rule("old", "2025-01-01", "2025-06-01", true),
 		rule("off", "2026-01-01", "", false),
 	}
-	resolved := ExpandProjectionSchedule(rules, []types.Posting{claimed}, "2026-01-01", "2026-04-01", true)
+	resolved := ExpandProjectionSchedule(rules, []types.Transaction{claimed}, "2026-01-01", "2026-04-01", true)
 	seen := map[string][]string{}
 	for date, occurrences := range resolved.ByDate {
 		for _, occurrence := range occurrences {
-			seen[date] = append(seen[date], occurrence.Posting.ID)
+			seen[date] = append(seen[date], occurrence.Transaction.ID)
 		}
 	}
 	if len(seen["2026-01-01"]) != 1 || seen["2026-01-01"][0] != "rent" {
@@ -213,9 +213,9 @@ func TestExpandProjectionSchedule(t *testing.T) {
 func TestStochasticShortCircuitMatchesFullRun(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
-		Postings: []types.Posting{{
+		Transactions: []types.Transaction{{
 			ID: "bonus", Name: "Bonus", Destinations: []string{"checking"},
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      midnightUnix("2026-03-15"),
 			TransactionTime: midnightUnix("2026-03-15"),
 			Enabled:         true,
@@ -223,7 +223,7 @@ func TestStochasticShortCircuitMatchesFullRun(t *testing.T) {
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-01-01", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables()}
-	if counts := buildSampleCountsByPostingId(model.Schedules, model.Postings, settings.HorizonYears, "2026-01-01", "2027-01-01", false); len(counts) != 0 {
+	if counts := buildSampleCountsByTransactionId(model.Schedules, model.Transactions, settings.HorizonYears, "2026-01-01", "2027-01-01", false); len(counts) != 0 {
 		t.Fatalf("fixture must have no volatile inputs, got %v", counts)
 	}
 	seed := int64(7)

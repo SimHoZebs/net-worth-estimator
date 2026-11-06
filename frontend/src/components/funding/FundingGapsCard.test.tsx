@@ -58,7 +58,7 @@ afterEach(() => {
 const item: OtherEvaluation = {
 	id: "funding",
 	name: "Funding gaps",
-	type: "postingFulfillment",
+	type: "transactionFulfillment",
 	enabled: true,
 	status: "not-satisfied",
 	goal: null,
@@ -66,7 +66,7 @@ const item: OtherEvaluation = {
 	outcomeText: "Unfunded",
 	qualifier: null,
 	progress: null,
-	postingIds: null,
+	transactionIds: null,
 };
 
 function cardProps(
@@ -109,7 +109,7 @@ describe("FundingGapsCard", () => {
 			<FundingGapsCard
 				{...cardProps()}
 				projection={refresh}
-				item={{ ...item, postingIds: [] }}
+				item={{ ...item, transactionIds: [] }}
 			/>,
 		);
 		expect(view.queryByTestId("funding-selection")).toBeNull();
@@ -137,7 +137,7 @@ describe("FundingGapsCard", () => {
 		view.rerender(
 			<FundingGapsCard
 				{...cardProps({ projection })}
-				item={{ ...item, postingIds: ["other"] }}
+				item={{ ...item, transactionIds: ["other"] }}
 			/>,
 		);
 		expect(view.queryByTestId("funding-selection")).toBeNull();

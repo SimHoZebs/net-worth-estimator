@@ -16,9 +16,9 @@ import (
 
 const policySchema = `CREATE TABLE purchase_policies (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	posting_id TEXT NOT NULL, priority INTEGER NOT NULL,
-	PRIMARY KEY(user_id, posting_id),
-	FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
+	transaction_id TEXT NOT NULL, priority INTEGER NOT NULL,
+	PRIMARY KEY(user_id, transaction_id),
+	FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 )`
 
 func policyDatabase(t *testing.T, bad, evidence bool) string {
@@ -43,8 +43,8 @@ func policyDatabase(t *testing.T, bad, evidence bool) string {
 		}
 		for i, name := range []string{user + " laptop", "Established payment", user + " monitor"} {
 			id := []string{"01900000-0000-7000-8000-000000000001", "01900000-0000-7000-8000-000000000002", "01900000-0000-7000-8000-000000000003"}[i]
-			p := types.Posting{ID: id, Name: name, SourceAccountID: &account, PostedTime: 1769904000, TransactionTime: 1769904000, Enabled: true,
-				Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "500.25"}}}
+			p := types.Transaction{ID: id, Name: name, SourceAccountID: &account, PostedTime: 1769904000, TransactionTime: 1769904000, Enabled: true,
+				Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "500.25"}}}
 			if i == 0 && bad && user == "bob" {
 				p.Amount.Config["expression"] = "not a fixed cost"
 			}
@@ -52,7 +52,7 @@ func policyDatabase(t *testing.T, bad, evidence bool) string {
 				p.Amount.Config["expression"] = "50"
 				p.Enabled, p.TransactionTime, p.PostedTime = false, 0, 1769990400
 			}
-			if _, err := s.CreatePosting(p); err != nil {
+			if _, err := s.CreateTransaction(p); err != nil {
 				t.Fatal(err)
 			}
 			if i == 0 && evidence && user == "bob" {
@@ -67,7 +67,7 @@ func policyDatabase(t *testing.T, bad, evidence bool) string {
 			if i == 2 {
 				priority = 2
 			}
-			if _, err := db.SQL().Exec(`INSERT INTO purchase_policies(posting_id, priority, user_id) VALUES (?, ?, ?)`, p.ID, priority, user); err != nil {
+			if _, err := db.SQL().Exec(`INSERT INTO purchase_policies(transaction_id, priority, user_id) VALUES (?, ?, ?)`, p.ID, priority, user); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -95,7 +95,7 @@ func TestUpgradePreservesBothUsers(t *testing.T) {
 			t.Fatal(err)
 		}
 		doc, err := s.LoadModel()
-		if err != nil || len(doc.Postings) != 1 || len(doc.PlannedPurchases) != 2 {
+		if err != nil || len(doc.Transactions) != 1 || len(doc.PlannedPurchases) != 2 {
 			t.Fatalf("upgrade: %+v %v", doc, err)
 		}
 		p := doc.PlannedPurchases[1]
@@ -141,7 +141,7 @@ func TestUpgradeFailureRollsBackAllUsers(t *testing.T) {
 		{name: "invalid-cost", bad: true},
 		{name: "attached-evidence", evidence: true},
 		{name: "identity-conflict", mutation: `UPDATE entity_ids SET kind = 'account' WHERE user_id = 'bob' AND id = '01900000-0000-7000-8000-000000000001'`},
-		{name: "analysis-evidence", mutation: `INSERT INTO transaction_source_facts(user_id, posting_id, facts_json) VALUES ('bob', '01900000-0000-7000-8000-000000000001', '{}')`},
+		{name: "analysis-evidence", mutation: `INSERT INTO transaction_source_facts(user_id, transaction_id, facts_json) VALUES ('bob', '01900000-0000-7000-8000-000000000001', '{}')`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := policyDatabase(t, tc.bad, tc.evidence)
@@ -167,7 +167,7 @@ func TestUpgradeFailureRollsBackAllUsers(t *testing.T) {
 			var count int
 			for query, want := range map[string]int{
 				`SELECT COUNT(*) FROM purchase_policies`:                            4,
-				`SELECT COUNT(*) FROM postings`:                                     6,
+				`SELECT COUNT(*) FROM transactions`:                                 6,
 				`SELECT COUNT(*) FROM sqlite_master WHERE name='planned_purchases'`: 0,
 			} {
 				if err := db.QueryRow(query).Scan(&count); err != nil || count != want {

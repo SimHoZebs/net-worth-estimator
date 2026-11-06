@@ -21,21 +21,21 @@ func TestSharingHTTPRequiresRequestID(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 
 	bodies := []struct{ method, target, body string }{
-		{"POST", "/v1/shared/grants", grantBodyNoKey(sharedPostingID, "user", bob)},
-		{"DELETE", "/v1/shared/grants", grantBodyNoKey(sharedPostingID, "user", bob)},
-		{"POST", "/v1/shared/exclusions", grantBodyNoKey(sharedPostingID, "all", "")},
-		{"DELETE", "/v1/shared/exclusions", grantBodyNoKey(sharedPostingID, "all", "")},
-		{"POST", "/v1/shared/grants", grantBodyBadKey(sharedPostingID, "user", bob)},
+		{"POST", "/v1/shared/grants", grantBodyNoKey(sharedTransactionID, "user", bob)},
+		{"DELETE", "/v1/shared/grants", grantBodyNoKey(sharedTransactionID, "user", bob)},
+		{"POST", "/v1/shared/exclusions", grantBodyNoKey(sharedTransactionID, "all", "")},
+		{"DELETE", "/v1/shared/exclusions", grantBodyNoKey(sharedTransactionID, "all", "")},
+		{"POST", "/v1/shared/grants", grantBodyBadKey(sharedTransactionID, "user", bob)},
 		{
 			"POST", "/v1/shared/copies",
-			`{"owner":"` + resourceOf(alice) + `","postingId":"` + sharedPostingID + `"}`,
+			`{"owner":"` + resourceOf(alice) + `","transactionId":"` + sharedTransactionID + `"}`,
 		},
 		{
 			"POST", "/v1/shared/copies",
-			`{"owner":"` + resourceOf(alice) + `","postingId":"` + sharedPostingID + `","requestId":"nope"}`,
+			`{"owner":"` + resourceOf(alice) + `","transactionId":"` + sharedTransactionID + `","requestId":"nope"}`,
 		},
 	}
 	for _, route := range bodies {
@@ -49,13 +49,13 @@ func TestSharingHTTPRequiresRequestID(t *testing.T) {
 	}
 }
 
-func grantBodyNoKey(postingID, audienceType, audienceID string) string {
-	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID})
+func grantBodyNoKey(transactionID, audienceType, audienceID string) string {
+	out, _ := json.Marshal(map[string]string{"transactionId": transactionID, "audienceType": audienceType, "audienceId": audienceID})
 	return string(out)
 }
 
-func grantBodyBadKey(postingID, audienceType, audienceID string) string {
-	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID, "requestId": "not-a-uuid"})
+func grantBodyBadKey(transactionID, audienceType, audienceID string) string {
+	out, _ := json.Marshal(map[string]string{"transactionId": transactionID, "audienceType": audienceType, "audienceId": audienceID, "requestId": "not-a-uuid"})
 	return string(out)
 }
 
@@ -65,10 +65,10 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 
 	key := testRequestKey(t)
-	body := grantBodyKey(sharedPostingID, "user", bob, key)
+	body := grantBodyKey(sharedTransactionID, "user", bob, key)
 	first := do(t, h, "POST", "/v1/shared/grants", "alice", body)
 	if first.Code != http.StatusCreated {
 		t.Fatalf("grant = %d (%s), want 201", first.Code, first.Body.String())
@@ -78,7 +78,7 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 		t.Fatalf("grant replay = %d (%s), want byte-identical 201", second.Code, second.Body.String())
 	}
 	acceptKey := testRequestKey(t)
-	accept := copyBodyKey(resourceOf(alice), sharedPostingID, acceptKey)
+	accept := copyBodyKey(resourceOf(alice), sharedTransactionID, acceptKey)
 	third := do(t, h, "POST", "/v1/shared/copies", "bob", accept)
 	if third.Code != http.StatusCreated {
 		t.Fatalf("accept = %d (%s), want 201", third.Code, third.Body.String())
@@ -87,7 +87,7 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 	if fourth.Code != http.StatusCreated || fourth.Body.String() != third.Body.String() {
 		t.Fatalf("accept replay = %d (%s), want byte-identical 201", fourth.Code, fourth.Body.String())
 	}
-	w := do(t, h, "GET", "/v1/shared/audit?postingId="+sharedPostingID, "alice", "")
+	w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("audit = %d (%s), want 200", w.Code, w.Body.String())
 	}
@@ -108,26 +108,26 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 	}
 }
 
-func grantBodyKey(postingID, audienceType, audienceID, key string) string {
-	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID, "requestId": key})
+func grantBodyKey(transactionID, audienceType, audienceID, key string) string {
+	out, _ := json.Marshal(map[string]string{"transactionId": transactionID, "audienceType": audienceType, "audienceId": audienceID, "requestId": key})
 	return string(out)
 }
 
 // grantKeyBody aliases grantBodyKey under the name the QA-02 security
 // track uses, so its keyed grant bodies compile unchanged.
-func grantKeyBody(postingID, audienceType, audienceID, key string) string {
-	return grantBodyKey(postingID, audienceType, audienceID, key)
+func grantKeyBody(transactionID, audienceType, audienceID, key string) string {
+	return grantBodyKey(transactionID, audienceType, audienceID, key)
 }
 
-func copyBodyKey(owner, postingID, key string) string {
-	out, _ := json.Marshal(map[string]string{"owner": owner, "postingId": postingID, "requestId": key})
+func copyBodyKey(owner, transactionID, key string) string {
+	out, _ := json.Marshal(map[string]string{"owner": owner, "transactionId": transactionID, "requestId": key})
 	return string(out)
 }
 
 // copyKeyBody aliases copyBodyKey under the name the QA-02 security
 // track uses, so its keyed accept bodies compile unchanged.
-func copyKeyBody(owner, postingID, key string) string {
-	return copyBodyKey(owner, postingID, key)
+func copyKeyBody(owner, transactionID, key string) string {
+	return copyBodyKey(owner, transactionID, key)
 }
 
 // A key reused for a different action reports 409 with no session
@@ -136,13 +136,13 @@ func TestSharingHTTPKeyReuseConflicts(t *testing.T) {
 	h, db := testHandler(t, false)
 	_, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 
 	key := testRequestKey(t)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBodyKey(sharedPostingID, "user", bob, key)); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBodyKey(sharedTransactionID, "user", bob, key)); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grantBodyKey(sharedPostingID, "user", bob, key))
+	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grantBodyKey(sharedTransactionID, "user", bob, key))
 	if w.Code != http.StatusConflict {
 		t.Fatalf("exclusion with grant key = %d (%s), want 409", w.Code, w.Body.String())
 	}
@@ -153,17 +153,17 @@ func TestSharingHTTPKeyReuseConflicts(t *testing.T) {
 
 // The audit read is owner-scoped: the source owner sees the trace,
 // another owner sees an empty list, anonymous callers fail, and the
-// posting selector is required.
+// transaction selector is required.
 func TestSharingHTTPAuditOwnerScoped(t *testing.T) {
 	h, db := testHandler(t, false)
 	_, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
 	mustUser(t, db, "carol")
-	mustPosting(t, storeA, sharedPostingID)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob)); w.Code != http.StatusCreated {
+	mustTransaction(t, storeA, sharedTransactionID)
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedTransactionID, "user", bob)); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	w := do(t, h, "GET", "/v1/shared/audit?postingId="+sharedPostingID, "alice", "")
+	w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("owner audit = %d (%s), want 200", w.Code, w.Body.String())
 	}
@@ -182,17 +182,17 @@ func TestSharingHTTPAuditOwnerScoped(t *testing.T) {
 		}
 	}
 	// A different owner reads an empty trace, never another owner's.
-	if w := do(t, h, "GET", "/v1/shared/audit?postingId="+sharedPostingID, "carol", ""); w.Code != http.StatusOK ||
+	if w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "carol", ""); w.Code != http.StatusOK ||
 		!strings.Contains(w.Body.String(), `"audit":[]`) {
 		t.Fatalf("cross-owner audit = %d (%s), want 200 with []", w.Code, w.Body.String())
 	}
-	if w := do(t, h, "GET", "/v1/shared/audit?postingId="+sharedPostingID, "", ""); w.Code != http.StatusUnauthorized {
+	if w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "", ""); w.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous audit = %d, want 401", w.Code)
 	}
 	if w := do(t, h, "GET", "/v1/shared/audit", "alice", ""); w.Code != http.StatusBadRequest {
-		t.Fatalf("audit without posting = %d, want 400", w.Code)
+		t.Fatalf("audit without transaction = %d, want 400", w.Code)
 	}
-	if w := do(t, h, "POST", "/v1/shared/audit?postingId="+sharedPostingID, "alice", ""); w.Code != http.StatusMethodNotAllowed {
+	if w := do(t, h, "POST", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", ""); w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("audit POST = %d, want 405", w.Code)
 	}
 }
@@ -203,10 +203,10 @@ func TestSharingHTTPReadOnlyRejectsReplay(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
-	mustPosting(t, storeA, sharedPostingID)
+	mustTransaction(t, storeA, sharedTransactionID)
 
 	key := testRequestKey(t)
-	body := grantBodyKey(sharedPostingID, "user", bob, key)
+	body := grantBodyKey(sharedTransactionID, "user", bob, key)
 	if w := do(t, h, "POST", "/v1/shared/grants", "alice", body); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
@@ -216,13 +216,13 @@ func TestSharingHTTPReadOnlyRejectsReplay(t *testing.T) {
 		{"DELETE", "/v1/shared/grants", body},
 		{"POST", "/v1/shared/exclusions", body},
 		{"DELETE", "/v1/shared/exclusions", body},
-		{"POST", "/v1/shared/copies", copyBodyKey(resourceOf(alice), sharedPostingID, testRequestKey(t))},
+		{"POST", "/v1/shared/copies", copyBodyKey(resourceOf(alice), sharedTransactionID, testRequestKey(t))},
 	} {
 		if w := do(t, ro, route.method, route.target, "alice", route.body); w.Code != http.StatusForbidden {
 			t.Fatalf("read-only replay %s %s = %d, want 403", route.method, route.target, w.Code)
 		}
 	}
-	if w := do(t, ro, "GET", "/v1/shared/audit?postingId="+sharedPostingID, "alice", ""); w.Code != http.StatusOK {
+	if w := do(t, ro, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", ""); w.Code != http.StatusOK {
 		t.Fatalf("read-only audit = %d, want 200", w.Code)
 	}
 }

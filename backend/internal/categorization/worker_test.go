@@ -36,11 +36,11 @@ func seedCharge(t *testing.T, scoped store.Store, name, transactionID, bankCateg
 		facts.Metadata = map[string]string{"category": bankCategory}
 	}
 	summary, err := scoped.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            name,
 			Source:          store.SourceBankSync,
 			SourceAccountID: &account,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.00"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.00"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785628800,
 			TransactionTime: 1785628800,
 			Enabled:         true,
@@ -51,25 +51,25 @@ func seedCharge(t *testing.T, scoped store.Store, name, transactionID, bankCateg
 	if err != nil || summary.SettledInserted != 1 {
 		t.Fatalf("seed=%+v err=%v", summary, err)
 	}
-	rows, err := scoped.LoadBankPostings()
+	rows, err := scoped.LoadBankTransactions()
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("bank=%+v err=%v", rows, err)
 	}
-	return rows[0].Posting.ID
+	return rows[0].Transaction.ID
 }
 
-func categoryOf(t *testing.T, scoped store.Store, postingID string) types.PostingCategory {
+func categoryOf(t *testing.T, scoped store.Store, transactionID string) types.TransactionCategory {
 	t.Helper()
-	items, err := scoped.LoadPostingCategories([]string{postingID})
+	items, err := scoped.LoadTransactionCategories([]string{transactionID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return items[postingID]
+	return items[transactionID]
 }
 
 func TestWorkerFillsUncategorizedBankRows(t *testing.T) {
 	scoped, database := newCategoryStore(t)
-	postingID := seedCharge(t, scoped, "WHOLE FOODS MARKET", "food", "")
+	transactionID := seedCharge(t, scoped, "WHOLE FOODS MARKET", "food", "")
 	worker, err := categorization.NewWorker(database, categorization.KeywordClassifier{})
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestWorkerFillsUncategorizedBankRows(t *testing.T) {
 	if err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	got := categoryOf(t, scoped, postingID)
+	got := categoryOf(t, scoped, transactionID)
 	if got.Category != types.CategoryFoodAndDrink || got.Source != types.CategorySourceInferred || got.Producer != "keyword-v1" {
 		t.Fatalf("category=%+v", got)
 	}
@@ -85,25 +85,25 @@ func TestWorkerFillsUncategorizedBankRows(t *testing.T) {
 	if err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if again := categoryOf(t, scoped, postingID); again != got {
+	if again := categoryOf(t, scoped, transactionID); again != got {
 		t.Fatalf("repeat changed category: %+v", again)
 	}
 	// The owner wins over a later classifier pass.
 	userCategory := types.CategoryMedical
-	if _, err := scoped.SetUserPostingCategory(postingID, &userCategory); err != nil {
+	if _, err := scoped.SetUserTransactionCategory(transactionID, &userCategory); err != nil {
 		t.Fatal(err)
 	}
 	if err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if again := categoryOf(t, scoped, postingID); again.Category != types.CategoryMedical || again.Source != types.CategorySourceUser {
+	if again := categoryOf(t, scoped, transactionID); again.Category != types.CategoryMedical || again.Source != types.CategorySourceUser {
 		t.Fatalf("classifier replaced user: %+v", again)
 	}
 }
 
 func TestWorkerLeavesSupportedBankValuesAndSkipsClassifiedRows(t *testing.T) {
 	scoped, database := newCategoryStore(t)
-	postingID := seedCharge(t, scoped, "WHOLE FOODS MARKET", "food", "GENERAL_MERCHANDISE")
+	transactionID := seedCharge(t, scoped, "WHOLE FOODS MARKET", "food", "GENERAL_MERCHANDISE")
 	worker, err := categorization.NewWorker(database, categorization.KeywordClassifier{})
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +111,7 @@ func TestWorkerLeavesSupportedBankValuesAndSkipsClassifiedRows(t *testing.T) {
 	if err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	got := categoryOf(t, scoped, postingID)
+	got := categoryOf(t, scoped, transactionID)
 	if got.Category != types.CategoryGeneralMerchandise || got.Source != types.CategorySourceBank {
 		t.Fatalf("category=%+v", got)
 	}
@@ -119,7 +119,7 @@ func TestWorkerLeavesSupportedBankValuesAndSkipsClassifiedRows(t *testing.T) {
 
 func TestWorkerLeavesUnknownRowsUncategorized(t *testing.T) {
 	scoped, database := newCategoryStore(t)
-	postingID := seedCharge(t, scoped, "LOCAL SHOP", "shop", "")
+	transactionID := seedCharge(t, scoped, "LOCAL SHOP", "shop", "")
 	worker, err := categorization.NewWorker(database, categorization.KeywordClassifier{})
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +127,7 @@ func TestWorkerLeavesUnknownRowsUncategorized(t *testing.T) {
 	if err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := categoryOf(t, scoped, postingID); got.Category != "" {
+	if got := categoryOf(t, scoped, transactionID); got.Category != "" {
 		t.Fatalf("unknown row gained a category: %+v", got)
 	}
 }

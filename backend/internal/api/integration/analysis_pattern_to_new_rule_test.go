@@ -41,11 +41,11 @@ func seedAPIRecurringPattern(t *testing.T, scoped store.Store, cadence string) [
 	if err != nil || !claimed || len(input.Transactions) != 3 {
 		t.Fatalf("claim=%v %v %+v", claimed, err, input)
 	}
-	ids := []string{input.Transactions[0].PostingID, input.Transactions[1].PostingID, input.Transactions[2].PostingID}
+	ids := []string{input.Transactions[0].TransactionID, input.Transactions[1].TransactionID, input.Transactions[2].TransactionID}
 	detections := make([]types.AnalysisDetection, 0, len(ids))
 	for _, id := range ids {
-		detections = append(detections, types.AnalysisDetection{PostingID: id, Kind: "recurring", Provider: "grocer", Product: cadence, Role: "outflow", Strength: "moderate",
-			Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test pattern", PostingIDs: ids}}})
+		detections = append(detections, types.AnalysisDetection{TransactionID: id, Kind: "recurring", Provider: "grocer", Product: cadence, Role: "outflow", Strength: "moderate",
+			Evidence: []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test pattern", TransactionIDs: ids}}})
 	}
 	if err := scoped.CompleteAnalysis(run, detections, ""); err != nil {
 		t.Fatal(err)

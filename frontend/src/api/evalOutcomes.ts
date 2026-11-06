@@ -111,7 +111,7 @@ export interface OtherOutcome {
 	progress: OtherEvaluationProgress | null;
 }
 
-export function postingOutcome(
+export function transactionOutcome(
 	deterministic: Record<string, unknown> | null,
 ): OtherOutcome {
 	const fulfilled: OtherOutcome = {
@@ -215,7 +215,7 @@ function withEnvelopeExtras(
 
 export interface OtherEvalContext {
 	envelope: EvaluationResultEnvelope | undefined;
-	postingIds: string[] | null;
+	transactionIds: string[] | null;
 	enabled: boolean;
 }
 
@@ -245,7 +245,7 @@ export const OTHER_EVAL_OUTCOME_RENDERERS = {
 			),
 			context.envelope,
 		),
-	postingFulfillment: (
+	transactionFulfillment: (
 		evaluation: EditableEvaluation,
 		context: OtherEvalContext,
 	): OtherEvaluation =>
@@ -253,11 +253,11 @@ export const OTHER_EVAL_OUTCOME_RENDERERS = {
 			{
 				id: evaluation.instanceId,
 				name: fundingEvaluationName(evaluation.name),
-				type: "postingFulfillment" as const,
-				postingIds: context.postingIds,
+				type: "transactionFulfillment" as const,
+				transactionIds: context.transactionIds,
 				enabled: evaluation.enabled,
 				status: context.envelope?.status ?? "indeterminate",
-				...postingOutcome(valueRecord(context.envelope?.deterministic)),
+				...transactionOutcome(valueRecord(context.envelope?.deterministic)),
 			},
 			context.envelope,
 		),

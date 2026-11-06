@@ -17,12 +17,12 @@ export function isHistoricalTransaction(
 	projectionStartDate: string,
 ): boolean {
 	return (
-		transaction.kind === "posting" &&
+		transaction.kind === "transaction" &&
 		transaction.startDate <= projectionStartDate
 	);
 }
 
-/** Pending state comes from bank metadata, never the posting ID. */
+/** Pending state comes from bank metadata, never the transaction ID. */
 export function isPendingTransaction(
 	transaction: Pick<Transaction, "pending">,
 ): boolean {

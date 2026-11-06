@@ -34,9 +34,9 @@
     "evaluations": {
       "financialIndependence": [],
       "netWorthThreshold": [],
-      "postingFulfillment": []
+      "transactionFulfillment": []
     },
-    "postings": [],
+    "transactions": [],
     "schedules": [
       {
         "id": "salary-gross",
@@ -182,13 +182,13 @@
     "evaluations": {
       "financialIndependence": [],
       "netWorthThreshold": [],
-      "postingFulfillment": [
+      "transactionFulfillment": [
         {
           "instanceId": "pf-all",
-          "name": "Posting fulfillment",
+          "name": "Transaction fulfillment",
           "enabled": true,
           "config": {
-            "postingIds": null
+            "transactionIds": null
           }
         }
       ]
@@ -196,9 +196,9 @@
   },
   "overrides": {
     "addedAccounts": [],
-    "addedPostings": [],
+    "addedTransactions": [],
     "disabledAccountIds": [],
-    "disabledPostingIds": []
+    "disabledTransactionIds": []
   },
   "result": {
     "timeline": {
@@ -248,7 +248,7 @@
       "cycleFulfillment": [],
       "financialIndependence": [],
       "netWorthThreshold": [],
-      "postingFulfillment": [
+      "transactionFulfillment": [
         {
           "deterministic": {
             "completionRate": 1,
@@ -256,14 +256,14 @@
             "destinationLimitedAmount": 0,
             "events": [],
             "firstUnderfulfilledDate": null,
-            "postings": [],
+            "transactions": [],
             "realizedAmount": 0,
             "requestedAmount": 0,
             "unfulfilledAmount": 0
           },
           "diagnostics": [],
           "instanceId": "pf-all",
-          "name": "Posting fulfillment",
+          "name": "Transaction fulfillment",
           "probabilistic": null,
           "status": "satisfied"
         }

@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func supersedeEvaluations(tx *userTx, manualID, syncedID string, deletedPostings, deletedRules map[string]bool) error {
+func supersedeEvaluations(tx *userTx, manualID, syncedID string, deletedTransactions, deletedRules map[string]bool) error {
 	rows, err := tx.Query(`SELECT type, instance_id, config_json FROM evaluations WHERE user_id = :user_id`)
 	if err != nil {
 		return fmt.Errorf("read evaluations for account merge: %w", err)
@@ -25,7 +25,7 @@ func supersedeEvaluations(tx *userTx, manualID, syncedID string, deletedPostings
 			rows.Close()
 			return err
 		}
-		if supersedeConfigNeedsRewrite(row.config, manualID, deletedPostings, deletedRules) {
+		if supersedeConfigNeedsRewrite(row.config, manualID, deletedTransactions, deletedRules) {
 			pending = append(pending, row)
 		}
 	}
@@ -35,7 +35,7 @@ func supersedeEvaluations(tx *userTx, manualID, syncedID string, deletedPostings
 	}
 	rows.Close()
 	for _, row := range pending {
-		updated, err := supersedeRewriteConfig(row.evalType, row.config, manualID, syncedID, deletedPostings, deletedRules)
+		updated, err := supersedeRewriteConfig(row.evalType, row.config, manualID, syncedID, deletedTransactions, deletedRules)
 		if err != nil {
 			return fmt.Errorf("rewrite evaluation %s: %w", row.instanceID, err)
 		}
@@ -47,11 +47,11 @@ func supersedeEvaluations(tx *userTx, manualID, syncedID string, deletedPostings
 	return nil
 }
 
-func supersedeConfigNeedsRewrite(raw, manualID string, deletedPostings, deletedRules map[string]bool) bool {
+func supersedeConfigNeedsRewrite(raw, manualID string, deletedTransactions, deletedRules map[string]bool) bool {
 	if strings.Contains(raw, manualID) {
 		return true
 	}
-	for id := range deletedPostings {
+	for id := range deletedTransactions {
 		if strings.Contains(raw, id) {
 			return true
 		}
@@ -64,7 +64,7 @@ func supersedeConfigNeedsRewrite(raw, manualID string, deletedPostings, deletedR
 	return false
 }
 
-func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPostings, deletedRules map[string]bool) (string, error) {
+func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedTransactions, deletedRules map[string]bool) (string, error) {
 	switch evalType {
 	case types.EvaluationTypeAccountBalance:
 		var config types.AccountBalanceConfig
@@ -82,12 +82,12 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 		}
 		config.AccountIDs = supersedeReplaceIDs(config.AccountIDs, manualID, syncedID)
 		return supersedeMarshal(config)
-	case types.EvaluationTypePostingFulfillment:
-		var config types.PostingFulfillmentConfig
+	case types.EvaluationTypeTransactionFulfillment:
+		var config types.TransactionFulfillmentConfig
 		if err := json.Unmarshal([]byte(raw), &config); err != nil {
 			return "", err
 		}
-		config.PostingIDs = supersedeRemoveIDs(config.PostingIDs, deletedPostings)
+		config.TransactionIDs = supersedeRemoveIDs(config.TransactionIDs, deletedTransactions)
 		return supersedeMarshal(config)
 	case types.EvaluationTypeFinancialIndependence:
 		var plan types.FIPlan
@@ -96,7 +96,7 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 		}
 		sources := plan.Sources[:0]
 		for _, source := range plan.Sources {
-			if source.PostingID != "" && deletedPostings[source.PostingID] {
+			if source.TransactionID != "" && deletedTransactions[source.TransactionID] {
 				continue
 			}
 			if source.AccountID == manualID {
@@ -105,7 +105,7 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 			sources = append(sources, source)
 		}
 		plan.Sources = sources
-		plan.ContinuingPostingIDs = supersedeRemoveIDs(plan.ContinuingPostingIDs, deletedPostings)
+		plan.ContinuingTransactionIDs = supersedeRemoveIDs(plan.ContinuingTransactionIDs, deletedTransactions)
 		return supersedeMarshal(plan)
 	case types.EvaluationTypeWhatIf:
 		var config types.WhatIfConfig
@@ -120,23 +120,23 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 			accounts = append(accounts, account)
 		}
 		config.AddedAccounts = accounts
-		postings := config.AddedPostings[:0]
-		for _, posting := range config.AddedPostings {
-			if posting.SourceAccountID != nil && *posting.SourceAccountID == manualID {
+		transactions := config.AddedTransactions[:0]
+		for _, transaction := range config.AddedTransactions {
+			if transaction.SourceAccountID != nil && *transaction.SourceAccountID == manualID {
 				replacement := syncedID
-				posting.SourceAccountID = &replacement
+				transaction.SourceAccountID = &replacement
 			}
-			posting.Destinations = supersedeReplaceIDs(posting.Destinations, manualID, syncedID)
-			supersedeAmountResolution(&posting.Amount, manualID, syncedID)
-			if posting.SourceAccountID != nil && supersedeContains(posting.Destinations, *posting.SourceAccountID) {
+			transaction.Destinations = supersedeReplaceIDs(transaction.Destinations, manualID, syncedID)
+			supersedeAmountResolution(&transaction.Amount, manualID, syncedID)
+			if transaction.SourceAccountID != nil && supersedeContains(transaction.Destinations, *transaction.SourceAccountID) {
 				continue
 			}
-			if posting.Claim != nil && deletedRules[posting.Claim.ScheduleID] {
-				posting.Claim = nil
+			if transaction.Claim != nil && deletedRules[transaction.Claim.ScheduleID] {
+				transaction.Claim = nil
 			}
-			postings = append(postings, posting)
+			transactions = append(transactions, transaction)
 		}
-		config.AddedPostings = postings
+		config.AddedTransactions = transactions
 		rules := config.AddedRules[:0]
 		for _, rule := range config.AddedRules {
 			if rule.SourceAccountID != nil && *rule.SourceAccountID == manualID {
@@ -152,7 +152,7 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 		}
 		config.AddedRules = rules
 		config.DisabledAccountIDs = supersedeReplaceIDs(config.DisabledAccountIDs, manualID, syncedID)
-		config.DisabledPostingIDs = supersedeRemoveIDs(config.DisabledPostingIDs, deletedPostings)
+		config.DisabledTransactionIDs = supersedeRemoveIDs(config.DisabledTransactionIDs, deletedTransactions)
 		config.DisabledScheduleIDs = supersedeRemoveIDs(config.DisabledScheduleIDs, deletedRules)
 		return supersedeMarshal(config)
 	default:

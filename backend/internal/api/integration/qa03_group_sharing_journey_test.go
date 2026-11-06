@@ -23,7 +23,7 @@ import (
 // QA-03 journey 3: group sharing between two real users in one database.
 //
 // The owner and the recipient live in the same physical SQLite file with
-// identical posting IDs, so row-level isolation is proven rather than
+// identical transaction IDs, so row-level isolation is proven rather than
 // assumed. Owner sets policy, recipient reads the feed with viewer totals,
 // saves a copy, owner revokes, recipient is denied while the copy survives.
 // A direct-share inbox leg (accept, decline, dismiss) rides the same two
@@ -130,17 +130,17 @@ func qa03SocialSetup(t *testing.T) *qa03Social {
 	return social
 }
 
-func qa03MustPosting(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
+func qa03MustTransaction(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
 	t.Helper()
 	source := "checking"
-	if _, err := scoped.CreatePosting(types.Posting{
+	if _, err := scoped.CreateTransaction(types.Transaction{
 		ID: id, Name: name, SourceAccountID: &source,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      day,
 		TransactionTime: day,
 		Enabled:         true,
 	}); err != nil {
-		t.Fatalf("create posting %s: %v", id, err)
+		t.Fatalf("create transaction %s: %v", id, err)
 	}
 }
 
@@ -153,11 +153,11 @@ func TestQA03GroupSharingPolicyFeedCopyRevokeJourney(t *testing.T) {
 	social := qa03SocialSetup(t)
 	day := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC).Unix()
 
-	// Both users hold a posting with the identical ID in the same file:
+	// Both users hold a transaction with the identical ID in the same file:
 	// reads must stay row-scoped to the caller.
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", day)
-	qa03MustPosting(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", day)
-	qa03MustPosting(t, social.memberSC, qa03SharedGroceries, "Member private row", "1.00", day)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", day)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", day)
+	qa03MustTransaction(t, social.memberSC, qa03SharedGroceries, "Member private row", "1.00", day)
 
 	// Owner creates the group and the member joins through an invite code.
 	created := qa03Decode(t, qa03Serve(t, social.groups.Routes(), http.MethodPost, "/v1/groups", "qa03-owner", `{"name":"Household"}`), http.StatusCreated)
@@ -193,9 +193,9 @@ func TestQA03GroupSharingPolicyFeedCopyRevokeJourney(t *testing.T) {
 	}
 	for _, raw := range items {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		if posting["id"] == qa03SharedGroceries {
-			if posting["name"] == "Member private row" {
+		transaction, _ := item["transaction"].(map[string]any)
+		if transaction["id"] == qa03SharedGroceries {
+			if transaction["name"] == "Member private row" {
 				t.Fatal("feed leaked the member's own same-ID private row")
 			}
 		}
@@ -208,10 +208,10 @@ func TestQA03GroupSharingPolicyFeedCopyRevokeJourney(t *testing.T) {
 	// grant naming the group. The owner grants the first row, then the
 	// recipient saves an independent copy into their own model.
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/grants", "qa03-owner",
-		`{"postingId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+		`{"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
 	copied := qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/copies", "qa03-member",
-		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"postingId":`+qa03Quote(qa03SharedGroceries)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
-	saved, _ := copied["posting"].(map[string]any)
+		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+	saved, _ := copied["transaction"].(map[string]any)
 	copyID, _ := saved["id"].(string)
 	if copyID == "" || copyID == qa03SharedGroceries {
 		t.Fatalf("copy = %+v, want a new recipient-owned row", copied)
@@ -219,7 +219,7 @@ func TestQA03GroupSharingPolicyFeedCopyRevokeJourney(t *testing.T) {
 
 	// Owner excludes the second row: the feed and its totals narrow together.
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/exclusions", "qa03-owner",
-		`{"postingId":`+qa03Quote(qa03SharedFuel)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+		`{"transactionId":`+qa03Quote(qa03SharedFuel)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
 	narrowed := qa03Feed(t, social, "qa03-member", feedTarget)
 	if narrowed["totals"].(map[string]any)["count"] != float64(1) {
 		t.Fatalf("narrowed totals = %+v, want count 1 after exclusion", narrowed["totals"])
@@ -230,10 +230,10 @@ func TestQA03GroupSharingPolicyFeedCopyRevokeJourney(t *testing.T) {
 	// read is denied without existence leakage while the saved copy
 	// survives as an editable private row.
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodDelete, "/v1/shared/grants", "qa03-owner",
-		`{"postingId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
+		`{"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPut, "/v1/shared/policies/"+groupID, "qa03-owner",
 		`{"enabled":false,"accountIds":["checking"],"startDate":"2026-01-01","endDate":"2026-12-31"}`), http.StatusOK)
-	denied := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/postings/"+qa03Resource(social.owner)+"/"+qa03SharedGroceries, "qa03-member", "")
+	denied := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/transactions/"+qa03Resource(social.owner)+"/"+qa03SharedGroceries, "qa03-member", "")
 	if denied.Code != http.StatusNotFound {
 		t.Fatalf("revoked read = %d, want 404 without existence leakage", denied.Code)
 	}
@@ -242,49 +242,49 @@ func TestQA03GroupSharingPolicyFeedCopyRevokeJourney(t *testing.T) {
 		t.Fatal(err)
 	}
 	survives := false
-	for _, posting := range memberModel.Postings {
-		if posting.ID == copyID {
+	for _, transaction := range memberModel.Transactions {
+		if transaction.ID == copyID {
 			survives = true
-			posting.Name = "Renamed after revocation"
-			if _, err := social.memberSC.UpdatePosting(posting); err != nil {
+			transaction.Name = "Renamed after revocation"
+			if _, err := social.memberSC.UpdateTransaction(transaction); err != nil {
 				t.Fatalf("copy not editable after revocation: %v", err)
 			}
 		}
 	}
 	if !survives {
-		t.Fatalf("recipient model = %+v, want the saved copy to survive revocation", memberModel.Postings)
+		t.Fatalf("recipient model = %+v, want the saved copy to survive revocation", memberModel.Transactions)
 	}
 	// The recipient's pre-existing same-ID private row is untouched.
-	for _, posting := range memberModel.Postings {
-		if posting.ID == qa03SharedGroceries && posting.Name != "Member private row" {
-			t.Fatalf("member private row = %+v, want it untouched by the copy", posting)
+	for _, transaction := range memberModel.Transactions {
+		if transaction.ID == qa03SharedGroceries && transaction.Name != "Member private row" {
+			t.Fatalf("member private row = %+v, want it untouched by the copy", transaction)
 		}
 	}
 	ownerModel, err := social.ownerSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ownerModel.Postings) != 2 {
-		t.Fatalf("owner postings = %d, want the journey to create no duplicate expenses", len(ownerModel.Postings))
+	if len(ownerModel.Transactions) != 2 {
+		t.Fatalf("owner transactions = %d, want the journey to create no duplicate expenses", len(ownerModel.Transactions))
 	}
 }
 
 func TestQA03DirectShareInboxAcceptDeclineDismissJourney(t *testing.T) {
 	social := qa03SocialSetup(t)
 	day := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC).Unix()
-	qa03MustPosting(t, social.ownerSC, qa03DirectGift, "Gift", "25.00", day)
-	qa03MustPosting(t, social.ownerSC, qa03DirectDeclined, "Declined gift", "10.00", day)
+	qa03MustTransaction(t, social.ownerSC, qa03DirectGift, "Gift", "25.00", day)
+	qa03MustTransaction(t, social.ownerSC, qa03DirectDeclined, "Declined gift", "10.00", day)
 
-	grant := func(postingID string) {
+	grant := func(transactionID string) {
 		t.Helper()
 		qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/grants", "qa03-owner",
-			`{"postingId":`+qa03Quote(postingID)+`,"audienceType":"user","audienceId":`+qa03Quote(social.member)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+			`{"transactionId":`+qa03Quote(transactionID)+`,"audienceType":"user","audienceId":`+qa03Quote(social.member)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
 	}
 	grant(qa03DirectGift)
 	grant(qa03DirectDeclined)
 
-	shareRef := func(postingID string) string {
-		return `{"owner":` + qa03Quote(qa03Resource(social.owner)) + `,"postingId":` + qa03Quote(postingID) + `}`
+	shareRef := func(transactionID string) string {
+		return `{"owner":` + qa03Quote(qa03Resource(social.owner)) + `,"transactionId":` + qa03Quote(transactionID) + `}`
 	}
 
 	// Both shares arrive pending.
@@ -303,7 +303,7 @@ func TestQA03DirectShareInboxAcceptDeclineDismissJourney(t *testing.T) {
 		t.Fatalf("dismissed still listed: %+v", hidden)
 	}
 	qa03Decode(t, qa03Serve(t, social.inbox.Routes(), http.MethodPost, "/v1/inbox/shares/dismiss", "qa03-member",
-		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"postingId":`+qa03Quote(qa03DirectGift)+`,"dismissed":false}`), http.StatusOK)
+		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"transactionId":`+qa03Quote(qa03DirectGift)+`,"dismissed":false}`), http.StatusOK)
 	restored := qa03Decode(t, qa03Serve(t, social.inbox.Routes(), http.MethodGet, "/v1/inbox", "qa03-member", ""), http.StatusOK)
 	if items, _ := restored["items"].([]any); len(items) != 2 {
 		t.Fatalf("unhidden = %+v, want both shares pending again", restored)
@@ -312,12 +312,12 @@ func TestQA03DirectShareInboxAcceptDeclineDismissJourney(t *testing.T) {
 	// Accepting saves an independent copy; retrying returns the same copy.
 	accepted := qa03Decode(t, qa03Serve(t, social.inbox.Routes(), http.MethodPost, "/v1/inbox/shares/accept", "qa03-member", shareRef(qa03DirectGift)), http.StatusOK)
 	acceptedItem, _ := accepted["item"].(map[string]any)
-	firstCopy, _ := acceptedItem["copyPostingId"].(string)
+	firstCopy, _ := acceptedItem["copyTransactionId"].(string)
 	if firstCopy == "" {
 		t.Fatalf("accept = %+v, want a saved copy", accepted)
 	}
 	retried := qa03Decode(t, qa03Serve(t, social.inbox.Routes(), http.MethodPost, "/v1/inbox/shares/accept", "qa03-member", shareRef(qa03DirectGift)), http.StatusOK)
-	if retried["item"].(map[string]any)["copyPostingId"] != firstCopy {
+	if retried["item"].(map[string]any)["copyTransactionId"] != firstCopy {
 		t.Fatalf("accept retry = %+v, want the same copy without duplicates", retried)
 	}
 
@@ -331,7 +331,7 @@ func TestQA03DirectShareInboxAcceptDeclineDismissJourney(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, g := range grants {
-		if g.PostingID == qa03DirectDeclined {
+		if g.TransactionID == qa03DirectDeclined {
 			t.Fatalf("grants = %+v, want the declined share gone", grants)
 		}
 	}
@@ -339,8 +339,8 @@ func TestQA03DirectShareInboxAcceptDeclineDismissJourney(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(memberModel.Postings) != 1 || memberModel.Postings[0].ID != firstCopy {
-		t.Fatalf("member postings = %+v, want only the accepted copy", memberModel.Postings)
+	if len(memberModel.Transactions) != 1 || memberModel.Transactions[0].ID != firstCopy {
+		t.Fatalf("member transactions = %+v, want only the accepted copy", memberModel.Transactions)
 	}
 }
 

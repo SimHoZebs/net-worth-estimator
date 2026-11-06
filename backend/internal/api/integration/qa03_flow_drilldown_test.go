@@ -96,12 +96,12 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	known := map[string]bool{}
-	for _, posting := range model.Postings {
-		known[posting.ID] = true
+	for _, transaction := range model.Transactions {
+		known[transaction.ID] = true
 	}
 	for _, id := range []string{outflowJune, inflowJune, transferJune, outflowJuly} {
 		if !known[id] {
-			t.Fatalf("posting %s missing from the stored model", id)
+			t.Fatalf("transaction %s missing from the stored model", id)
 		}
 	}
 
@@ -124,15 +124,15 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 			if source.Date < graph.StartDate || source.Date > graph.EndDate {
 				t.Fatalf("source %+v outside the window", source)
 			}
-			if !known[source.PostingID] {
-				t.Fatalf("source %+v names no stored posting", source)
+			if !known[source.TransactionID] {
+				t.Fatalf("source %+v names no stored transaction", source)
 			}
-			seen[source.PostingID]++
+			seen[source.TransactionID]++
 		}
 	}
 	for _, id := range []string{outflowJune, inflowJune, transferJune, outflowJuly} {
 		if seen[id] != 1 {
-			t.Fatalf("posting %s appears in %d edge sources, want exactly once", id, seen[id])
+			t.Fatalf("transaction %s appears in %d edge sources, want exactly once", id, seen[id])
 		}
 	}
 
@@ -164,7 +164,7 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 			nodeIn, nodeOut, edgeAll)
 	}
 
-	// The transfer counts once: one transfer edge carrying the full posting
+	// The transfer counts once: one transfer edge carrying the full transaction
 	// amount, excluded from inflow and outflow.
 	transfers := 0
 	for _, edge := range graph.Edges {
@@ -173,7 +173,7 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 		}
 		transfers++
 		if math.Abs(edge.Amount-500) > 0.001 {
-			t.Fatalf("transfer edge = %+v, want the 500 posting counted once", edge)
+			t.Fatalf("transfer edge = %+v, want the 500 transaction counted once", edge)
 		}
 	}
 	if transfers != 1 {
@@ -194,7 +194,7 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 	}
 	for _, edge := range june.Edges {
 		for _, source := range edge.Sources {
-			if source.PostingID == outflowJuly {
+			if source.TransactionID == outflowJuly {
 				t.Fatalf("july source %+v leaks into the june window", source)
 			}
 		}

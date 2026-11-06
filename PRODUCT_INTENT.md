@@ -97,7 +97,7 @@ The product must make these concepts understandable without specialist documenta
 | **Range**                   | A percentile band across sampled scenarios. Its meaning must remain clear without requiring specialist terminology.                                                                                                                                                                                                                            |
 | **Goal check**              | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned transactions are fulfilled.                                                                                                                                                                                                      |
 | **Financial independence**  | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing transactions, a principal policy, and required confidence. Continuing transactions are user-selected and never inferred from labels, categories, identity, or rates. |
-| **Evidence analysis**       | An independent inference from posting-derived external inflows, such as an estimate of posting-derived net pay. It does not independently verify bank provenance.                                                                                                                                                                              |
+| **Evidence analysis**       | An independent inference from transaction-derived external inflows, such as an estimate of transaction-derived net pay. It does not independently verify bank provenance.                                                                                                                                                                              |
 | **Comparison**              | A descriptive snapshot of selected measures. It does not store or restore another saved model.                                                                                                                                                                                                                                                 |
 | **Household safe spending** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them.                                                                                                                                       |
 
@@ -203,9 +203,9 @@ The product must support deliberate maintenance of:
 
 Every proposed change must be understandable before it is saved or promoted. Saved edits apply immediately and are reversed by a further edit. A removed item must remain distinguishable from a newly added item or an exclusion. Interrupted what-if work survives only as its saved evaluation instance. Interrupted immediate saves and interrupted promotes leave only completed row writes; recovery is re-promote of the remainder or re-edit.
 
-### 5.8 Posting-derived pay evidence
+### 5.8 Transaction-derived pay evidence
 
-Posting-derived evidence must answer a narrow question:
+Transaction-derived evidence must answer a narrow question:
 
 > What can be inferred about net pay from the one-time external inflows currently saved?
 
@@ -215,7 +215,7 @@ When evidence is available, the product must establish:
 - whether annualization is justified;
 - payer and cadence;
 - evidence strength;
-- posting-derived and comparable-record counts;
+- transaction-derived and comparable-record counts;
 - outliers and exclusions;
 - limitations; and
 - the supporting and excluded transactions.
@@ -292,7 +292,7 @@ The product must visibly distinguish:
 - projections;
 - ranges derived from sampled scenarios;
 - goal outcomes; and
-- posting-derived inferences.
+- transaction-derived inferences.
 
 ### Use plain outcomes and preserve depth
 
@@ -398,7 +398,7 @@ The product is aligned with this intent when a user can:
 - test a change safely and compare the consequence under a known context;
 - distinguish near-term safe spending from longer-term structural constraints;
 - recover from invalid data or failed calculation with a specific next step;
-- inspect the evidence and limitations behind posting-derived inference; and
+- inspect the evidence and limitations behind transaction-derived inference; and
 - complete the primary decisions with assistive technology and at different display sizes.
 
 Feature count is not a product goal. Trustworthy understanding and deliberate action are the goals.
@@ -411,7 +411,7 @@ The product does not settle the following questions:
 - Should model and source onboarding be part of the product experience?
 - Which goal check or diagnosis should receive primary emphasis when several are configured?
 - What rule, if any, should combine near-term safe spending constraints and longer-term structural constraints?
-- How much record-level evidence should be available for posting-derived inference?
+- How much record-level evidence should be available for transaction-derived inference?
 - How many what-if scenarios should persist, and should comparisons ever become durable records?
 - Should household safe spending become a reusable household concept or remain a personal extension?
 - Which approximation labels are acceptable for debt payoff and other derived dates?

@@ -28,10 +28,10 @@ func ledgerGroup(t *testing.T, world *ledgerWorld) string {
 	return groupID
 }
 
-func ledgerGrant(t *testing.T, world *ledgerWorld, postingID, audienceType, audienceID string) {
+func ledgerGrant(t *testing.T, world *ledgerWorld, transactionID, audienceType, audienceID string) {
 	t.Helper()
 	ledgerDecode(t, ledgerServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/grants", world.ownerSubject,
-		`{"postingId":`+ledgerQuote(postingID)+`,"audienceType":`+ledgerQuote(audienceType)+`,"audienceId":`+ledgerQuote(audienceID)+`,"requestId":`+ledgerQuote(ledgerRequestID(t))+`}`), http.StatusCreated)
+		`{"transactionId":`+ledgerQuote(transactionID)+`,"audienceType":`+ledgerQuote(audienceType)+`,"audienceId":`+ledgerQuote(audienceID)+`,"requestId":`+ledgerQuote(ledgerRequestID(t))+`}`), http.StatusCreated)
 }
 
 func ledgerFeed(t *testing.T, world *ledgerWorld, subject, groupID string) map[string]any {
@@ -43,7 +43,7 @@ func TestLedgerSharedRowVisibleOpenableRevocable(t *testing.T) {
 	world := ledgerSetup(t, nil)
 	ledgerDeletePhantom(t, world)
 	groupID := ledgerGroup(t, world)
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	groceries := byName["GROCER 123"]
 	if len(groceries) != 4 {
 		t.Fatalf("grocery rows = %d, want 4", len(groceries))
@@ -60,14 +60,14 @@ func TestLedgerSharedRowVisibleOpenableRevocable(t *testing.T) {
 		t.Fatalf("feed = %+v totals = %+v, want the 1 shared row at 150", items, totals)
 	}
 	item, _ := items[0].(map[string]any)
-	posting, _ := item["posting"].(map[string]any)
-	if posting["id"] != shared {
+	transaction, _ := item["transaction"].(map[string]any)
+	if transaction["id"] != shared {
 		t.Fatalf("feed item = %+v, want the shared grocery row", item)
 	}
 
 	// The row opens through the detail read.
 	detail := ledgerServe(t, world.sharing.Routes(), http.MethodGet,
-		"/v1/shared/postings/"+ledgerResource(world.owner)+"/"+shared, world.secondSubject, "")
+		"/v1/shared/transactions/"+ledgerResource(world.owner)+"/"+shared, world.secondSubject, "")
 	if detail.Code != http.StatusOK {
 		t.Fatalf("detail = %d %s, want the row openable", detail.Code, detail.Body.String())
 	}
@@ -76,13 +76,13 @@ func TestLedgerSharedRowVisibleOpenableRevocable(t *testing.T) {
 	// the feed and the detail read everywhere, totals drop to zero, and
 	// the saved copy survives as an editable private row.
 	copied := ledgerDecode(t, ledgerServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/copies", world.secondSubject,
-		`{"owner":`+ledgerQuote(ledgerResource(world.owner))+`,"postingId":`+ledgerQuote(shared)+`,"requestId":`+ledgerQuote(ledgerRequestID(t))+`}`), http.StatusCreated)
-	copyID, _ := copied["posting"].(map[string]any)["id"].(string)
+		`{"owner":`+ledgerQuote(ledgerResource(world.owner))+`,"transactionId":`+ledgerQuote(shared)+`,"requestId":`+ledgerQuote(ledgerRequestID(t))+`}`), http.StatusCreated)
+	copyID, _ := copied["transaction"].(map[string]any)["id"].(string)
 	if copyID == "" || copyID == shared {
 		t.Fatalf("copy = %+v, want a new recipient-owned row", copied)
 	}
 	ledgerDecode(t, ledgerServe(t, world.sharing.Routes(), http.MethodDelete, "/v1/shared/grants", world.ownerSubject,
-		`{"postingId":`+ledgerQuote(shared)+`,"audienceType":"group","audienceId":`+ledgerQuote(groupID)+`,"requestId":`+ledgerQuote(ledgerRequestID(t))+`}`), http.StatusOK)
+		`{"transactionId":`+ledgerQuote(shared)+`,"audienceType":"group","audienceId":`+ledgerQuote(groupID)+`,"requestId":`+ledgerQuote(ledgerRequestID(t))+`}`), http.StatusOK)
 	emptied := ledgerFeed(t, world, world.secondSubject, groupID)
 	emptiedItems, _ := emptied["items"].([]any)
 	emptiedTotals, _ := emptied["totals"].(map[string]any)
@@ -90,7 +90,7 @@ func TestLedgerSharedRowVisibleOpenableRevocable(t *testing.T) {
 		t.Fatalf("revoked feed = %+v totals = %+v, want empty with zero totals", emptiedItems, emptiedTotals)
 	}
 	if got := ledgerServe(t, world.sharing.Routes(), http.MethodGet,
-		"/v1/shared/postings/"+ledgerResource(world.owner)+"/"+shared, world.secondSubject, ""); got.Code != http.StatusNotFound {
+		"/v1/shared/transactions/"+ledgerResource(world.owner)+"/"+shared, world.secondSubject, ""); got.Code != http.StatusNotFound {
 		t.Fatalf("revoked detail = %d, want 404", got.Code)
 	}
 	secondModel, err := world.secondSC.LoadModel()
@@ -98,11 +98,11 @@ func TestLedgerSharedRowVisibleOpenableRevocable(t *testing.T) {
 		t.Fatal(err)
 	}
 	survives := false
-	for _, row := range secondModel.Postings {
+	for _, row := range secondModel.Transactions {
 		if row.ID == copyID {
 			survives = true
 			row.Name = "Kept groceries"
-			if _, err := world.secondSC.UpdatePosting(row); err != nil {
+			if _, err := world.secondSC.UpdateTransaction(row); err != nil {
 				t.Fatalf("copy not editable after revocation: %v", err)
 			}
 		}
@@ -119,13 +119,13 @@ func ledgerResource(user string) string {
 func TestLedgerInboxAcceptDeclineCounts(t *testing.T) {
 	world := ledgerSetup(t, nil)
 	ledgerDeletePhantom(t, world)
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	bookshop := byName["Bookshop order"][0]
 	refund := byName["Refund desk"][0]
 	ledgerGrant(t, world, bookshop, store.SharingAudienceUser, world.second)
 	ledgerGrant(t, world, refund, store.SharingAudienceUser, world.second)
-	shareRef := func(posting string) string {
-		return `{"owner":` + ledgerQuote(ledgerResource(world.owner)) + `,"postingId":` + ledgerQuote(posting) + `}`
+	shareRef := func(transaction string) string {
+		return `{"owner":` + ledgerQuote(ledgerResource(world.owner)) + `,"transactionId":` + ledgerQuote(transaction) + `}`
 	}
 
 	// Both shares list pending with the unread count to match.
@@ -137,20 +137,20 @@ func TestLedgerInboxAcceptDeclineCounts(t *testing.T) {
 
 	// Accepting saves exactly one copy; retrying returns the same one.
 	accepted := ledgerDecode(t, ledgerServe(t, world.inbox.Routes(), http.MethodPost, "/v1/inbox/shares/accept", world.secondSubject, shareRef(bookshop)), http.StatusOK)
-	firstCopy, _ := accepted["item"].(map[string]any)["copyPostingId"].(string)
+	firstCopy, _ := accepted["item"].(map[string]any)["copyTransactionId"].(string)
 	if firstCopy == "" {
 		t.Fatalf("accept = %+v, want a saved copy", accepted)
 	}
 	retried := ledgerDecode(t, ledgerServe(t, world.inbox.Routes(), http.MethodPost, "/v1/inbox/shares/accept", world.secondSubject, shareRef(bookshop)), http.StatusOK)
-	if retried["item"].(map[string]any)["copyPostingId"] != firstCopy {
+	if retried["item"].(map[string]any)["copyTransactionId"] != firstCopy {
 		t.Fatalf("accept retry = %+v, want the same copy", retried)
 	}
 	secondModel, err := world.secondSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(secondModel.Postings) != 1 || secondModel.Postings[0].ID != firstCopy {
-		t.Fatalf("recipient rows = %+v, want exactly the accepted copy", secondModel.Postings)
+	if len(secondModel.Transactions) != 1 || secondModel.Transactions[0].ID != firstCopy {
+		t.Fatalf("recipient rows = %+v, want exactly the accepted copy", secondModel.Transactions)
 	}
 
 	// Declining removes the share without saving anything.
@@ -162,8 +162,8 @@ func TestLedgerInboxAcceptDeclineCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(secondModel.Postings) != 1 {
-		t.Fatalf("recipient rows = %d after decline, want still 1", len(secondModel.Postings))
+	if len(secondModel.Transactions) != 1 {
+		t.Fatalf("recipient rows = %d after decline, want still 1", len(secondModel.Transactions))
 	}
 	remaining := ledgerDecode(t, ledgerServe(t, world.inbox.Routes(), http.MethodGet, "/v1/inbox?status=all", world.secondSubject, ""), http.StatusOK)
 	leftovers, _ := remaining["items"].([]any)

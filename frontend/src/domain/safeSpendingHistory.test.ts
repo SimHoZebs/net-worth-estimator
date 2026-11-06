@@ -8,7 +8,7 @@ import {
 } from "./safeSpendingHistory.ts";
 
 const posted = (overrides: Partial<Transaction>): Transaction => ({
-	kind: "posting",
+	kind: "transaction",
 	id: "posted-row",
 	name: "Posted row",
 	amount: 0,

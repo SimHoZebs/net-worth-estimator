@@ -74,9 +74,9 @@ func run(args []string) error {
 	if !known {
 		return fmt.Errorf("unknown model account %s", *account)
 	}
-	bank, err := scoped.LoadBankPostings()
+	bank, err := scoped.LoadBankTransactions()
 	if err != nil {
-		return fmt.Errorf("load bank postings: %w", err)
+		return fmt.Errorf("load bank transactions: %w", err)
 	}
 	return printPairs(*format, simplefin.AuditHistoricalVoids(bank, *account))
 }

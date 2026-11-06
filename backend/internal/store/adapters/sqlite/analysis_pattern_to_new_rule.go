@@ -44,7 +44,7 @@ func (s *sqliteStore) PreviewPatternToNewSchedule(findingID string) (types.Patte
 	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
-		occurrenceIDs = append(occurrenceIDs, evidence.PostingIDs...)
+		occurrenceIDs = append(occurrenceIDs, evidence.TransactionIDs...)
 	}
 	patternKey := analysis.RecurringPatternKey(anchor.Kind, anchor.Product, occurrenceIDs)
 	model, err := s.LoadModel()
@@ -73,7 +73,7 @@ func (s *sqliteStore) PreviewPatternToNewSchedule(findingID string) (types.Patte
 			placeholders += "?"
 			args = append(args, id)
 		}
-		rows, err := s.db.Query(`SELECT posting_id, facts_json FROM transaction_source_facts WHERE posting_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
+		rows, err := s.db.Query(`SELECT transaction_id, facts_json FROM transaction_source_facts WHERE transaction_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
 		if err != nil {
 			return preview, err
 		}
@@ -94,9 +94,9 @@ func (s *sqliteStore) PreviewPatternToNewSchedule(findingID string) (types.Patte
 		}
 	}
 	preview, err = analysis.BuildPatternToNewSchedulePreview(analysis.PatternToNewScheduleInput{
-		Anchor:   anchor,
-		Postings: model.Postings,
-		Facts:    facts,
+		Anchor:       anchor,
+		Transactions: model.Transactions,
+		Facts:        facts,
 		AccountIDs: func() []string {
 			ids := make([]string, 0, len(model.Accounts))
 			for _, account := range model.Accounts {

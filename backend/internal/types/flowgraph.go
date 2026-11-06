@@ -5,20 +5,20 @@ package types
 // text/table alternative without renderer-specific shaping.
 //
 // Movement separation is structural, never inferred:
-//   - actual: transaction events whose origin is a manual posting, including
-//     bank-settled rows and claimed actuals, plus settled postings dated
+//   - actual: transaction events whose origin is a manual transaction, including
+//     bank-settled rows and claimed actuals, plus settled transactions dated
 //     inside the window that the projection never replays as events
 //     (history before its start date). Recorded money.
 //   - projected: events whose origin is a recurrence-rule instance.
 //     Planned money.
-// IDs share one namespace across postings and rules, so an origin is
-// exactly one of the two. Future-dated manual postings still count as
+// IDs share one namespace across transactions and rules, so an origin is
+// exactly one of the two. Future-dated manual transactions still count as
 // actual; whether they should read as planned is an open product question.
 //
-// Direction is structural: from/to follow the posting route (source to
+// Direction is structural: from/to follow the transaction route (source to
 // destinations, with the external counterparty at the open end) and amounts
 // stay signed. A negative realized amount (for example an investment loss
-// on an inflow posting) keeps its route with a negative amount.
+// on an inflow transaction) keeps its route with a negative amount.
 
 // FlowNodeIDExternal is the node ID for the external counterparty: the
 // funder of inflows and the receiver of outflows.
@@ -58,7 +58,7 @@ type FlowNode struct {
 // splits across destinations, every edge it feeds carries the same record
 // while each edge Amount holds only its share.
 type FlowSourceRecord struct {
-	PostingID       string  `json:"postingId"`
+	TransactionID   string  `json:"transactionId"`
 	Date            IsoDate `json:"date"`
 	Sequence        int     `json:"sequence"`
 	RequestedAmount float64 `json:"requestedAmount"`
@@ -80,11 +80,11 @@ type FlowEdge struct {
 }
 
 // FlowUnmatchedEvent is an in-window transaction event whose origin names
-// no posting or rule in the effective model. It is excluded from edges and
+// no transaction or rule in the effective model. It is excluded from edges and
 // reported here so totals stay honest. Planned-purchase spend lands here:
-// like the timeline row totals, edges cover postings and rules only.
+// like the timeline row totals, edges cover transactions and rules only.
 type FlowUnmatchedEvent struct {
-	PostingID      string  `json:"postingId"`
+	TransactionID  string  `json:"transactionId"`
 	Date           IsoDate `json:"date"`
 	Sequence       int     `json:"sequence"`
 	RealizedAmount float64 `json:"realizedAmount"`
@@ -92,7 +92,7 @@ type FlowUnmatchedEvent struct {
 
 // FlowUnobservedCorrection is a balance-check correction inside the window:
 // money the observations assert without any contributing transaction.
-// Model SETs balance; postings CHANGE it, so a nonzero adjustment is flow
+// Model SETs balance; transactions CHANGE it, so a nonzero adjustment is flow
 // with no observed path.
 type FlowUnobservedCorrection struct {
 	AccountID       string  `json:"accountId"`
@@ -128,7 +128,7 @@ type FlowTotals struct {
 
 // FlowReconciliation lets a renderer verify edge totals against the source
 // records they claim to summarize. Event-side sums come from in-window
-// transaction events plus replayed settled postings; edge-side sums come
+// transaction events plus replayed settled transactions; edge-side sums come
 // from aggregated edges. Reconciled is true only when every class agrees
 // exactly.
 type FlowReconciliation struct {

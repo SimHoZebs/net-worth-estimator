@@ -49,7 +49,7 @@ function settleCandidate(transaction: {
 	claimOccurrenceDate?: string | null;
 }) {
 	return {
-		postingId: transaction.id,
+		transactionId: transaction.id,
 		name: transaction.name,
 		amount: transaction.amount,
 		date: transaction.startDate,
@@ -192,7 +192,7 @@ it("deletes the transaction through the row endpoint", async () => {
 		...financialModelFixture.transactions[0]!,
 		id: "renovation-once",
 		name: "Home renovation",
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		amountKnown: true,
 		readOnly: false,
 	};
@@ -235,7 +235,7 @@ it("marks holds that did not post instead of posted", () => {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,
@@ -277,7 +277,7 @@ it("marks holds that did not post instead of posted", () => {
 	);
 	expect(screen.getByText("Did not post")).toBeTruthy();
 	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
-	expect(screen.getByText(/vanished without posting/)).toBeTruthy();
+	expect(screen.getByText(/vanished without a posted charge/)).toBeTruthy();
 	// The details grid keeps a "Posted" section label; only status badges
 	// must stay absent. Labels carry the uppercase tracking class.
 	expect(
@@ -298,7 +298,7 @@ it("marks a live hold as not yet posted", () => {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,
@@ -353,7 +353,7 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,
@@ -563,7 +563,7 @@ it("opens and closes the sharing sheet without closing the detail", async () => 
 it("keeps the vanished hold in the lists when the delete fails", async () => {
 	const holdId = "01900000-0000-7000-8000-000000000094";
 	const serverModel = fixtureModel(financialModelFixture);
-	serverModel.postings.push({
+	serverModel.transactions.push({
 		id: holdId,
 		name: "Bistro",
 		sourceAccountId: "checking",
@@ -596,7 +596,7 @@ it("keeps the vanished hold in the lists when the delete fails", async () => {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,
@@ -670,7 +670,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-10-21",
 		endDate: null,
 		annualIncrease: 0,
@@ -691,7 +691,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,
@@ -814,12 +814,12 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
 
-it("saves row edits through the posting endpoint and closes", async () => {
+it("saves row edits through the transaction endpoint and closes", async () => {
 	// Raw row carries server shapes the display never shows: non-midnight
 	// seconds that a date-unchanged save must keep verbatim.
 	const model = fixtureModel(financialModelFixture);
 	const day = Math.floor(Date.parse("2028-06-15T00:00:00Z") / 1000);
-	const raw = model.postings.find((row) => row.id === "renovation")!;
+	const raw = model.transactions.find((row) => row.id === "renovation")!;
 	raw.postedTime = day + 45245;
 	raw.transactionTime = day + 123;
 	const server = stubTestServer(undefined, model);
@@ -890,7 +890,7 @@ it("stops a rejected amend before the claim leg and keeps the form", async () =>
 			issues: [
 				{
 					severity: "error",
-					code: "posting.claim.duplicate",
+					code: "transaction.claim.duplicate",
 					message: "That occurrence is already claimed.",
 					path: [],
 				},
@@ -1056,13 +1056,13 @@ it("retries a failed schedule start with the same identity", async () => {
 
 it("shows the category control on recordings but not on rules or void holds", () => {
 	stubTestServer();
-	const posting = financialModelFixture.transactions.find(
+	const transaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	render(
 		<TransactionDetail
-			transaction={occurrence(posting)}
-			savedTransaction={posting}
+			transaction={occurrence(transaction)}
+			savedTransaction={transaction}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={() => {}}
@@ -1070,7 +1070,11 @@ it("shows the category control on recordings but not on rules or void holds", ()
 	);
 	expect(screen.getByRole("button", { name: /Category/ })).toBeTruthy();
 	cleanup();
-	const rule = { ...posting, id: "renovation-rule", kind: "schedule" as const };
+	const rule = {
+		...transaction,
+		id: "renovation-rule",
+		kind: "schedule" as const,
+	};
 	render(
 		<TransactionDetail
 			transaction={occurrence(rule)}
@@ -1082,7 +1086,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 	);
 	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
 	cleanup();
-	const voided = { ...posting, id: "vanished", void: true };
+	const voided = { ...transaction, id: "vanished", void: true };
 	render(
 		<TransactionDetail
 			transaction={occurrence(voided)}
@@ -1097,11 +1101,11 @@ it("shows the category control on recordings but not on rules or void holds", ()
 
 it("keeps category edits enabled on a pending bank row", () => {
 	stubTestServer();
-	const posting = financialModelFixture.transactions.find(
+	const transaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	const pending = {
-		...posting,
+		...transaction,
 		id: "pending-charge",
 		pending: true,
 		readOnly: true,
@@ -1122,39 +1126,39 @@ it("keeps category edits enabled on a pending bank row", () => {
 });
 
 it("keeps one-time transactions free of recurrence controls", () => {
-	const posting = financialModelFixture.transactions.find(
+	const transaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	render(
 		<TransactionDetail
-			transaction={occurrence(posting)}
-			savedTransaction={posting}
+			transaction={occurrence(transaction)}
+			savedTransaction={transaction}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={() => {}}
 		/>,
 	);
 	// A transaction happens once. Frequency, growth, and end dates belong to
-	// schedules, so a posting offers only its occurrence claim.
+	// schedules, so a transaction offers only its occurrence claim.
 	expect(screen.queryByLabelText("Frequency")).toBeNull();
 	expect(screen.queryByLabelText("Annual amount increase (%)")).toBeNull();
 	expect(screen.getByLabelText("Records an occurrence of")).toBeTruthy();
 });
 
 it("shows the account route only inside the transfer details", () => {
-	const posting = {
+	const transaction = {
 		...financialModelFixture.transactions.find(
 			(item) => item.id === "renovation",
 		)!,
 		id: "renovation-transfer",
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		fromId: "checking",
 		toId: "mortgage",
 	};
 	render(
 		<TransactionDetail
-			transaction={occurrence(posting)}
-			savedTransaction={posting}
+			transaction={occurrence(transaction)}
+			savedTransaction={transaction}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={() => {}}
@@ -1168,19 +1172,19 @@ it("shows the account route only inside the transfer details", () => {
 });
 
 it("names the single account under the amount on income and spending rows", () => {
-	const posting = {
+	const transaction = {
 		...financialModelFixture.transactions.find(
 			(item) => item.id === "renovation",
 		)!,
 		id: "renovation-spending",
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		fromId: "checking",
 		toId: null,
 	};
 	render(
 		<TransactionDetail
-			transaction={occurrence(posting)}
-			savedTransaction={posting}
+			transaction={occurrence(transaction)}
+			savedTransaction={transaction}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={() => {}}
@@ -1192,11 +1196,11 @@ it("names the single account under the amount on income and spending rows", () =
 });
 
 it("keeps cadence and growth on schedules", () => {
-	const posting = financialModelFixture.transactions.find(
+	const transaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	const rule = {
-		...posting,
+		...transaction,
 		id: "renovation-rule",
 		kind: "schedule" as const,
 	};
@@ -1229,7 +1233,7 @@ it("lists recorded transactions that claim the schedule's occurrences", () => {
 		...base,
 		id: "march-renovation",
 		name: "March renovation",
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-03-02",
 		postedDate: "2026-03-02",
 		claimScheduleId: rule.id,
@@ -1239,7 +1243,7 @@ it("lists recorded transactions that claim the schedule's occurrences", () => {
 		...base,
 		id: "february-renovation",
 		name: "February renovation",
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		startDate: "2026-02-02",
 		postedDate: "2026-02-02",
 		claimScheduleId: rule.id,
@@ -1289,7 +1293,7 @@ it("keeps pending and void lifecycle badges ahead of excluded", () => {
 		...base,
 		id: "pending-claim",
 		name: "Pending renovation",
-		kind: "posting" as const,
+		kind: "transaction" as const,
 		pending: true,
 		enabled: false,
 		postedDate: null,
@@ -1314,11 +1318,11 @@ it("keeps pending and void lifecycle badges ahead of excluded", () => {
 
 it("says when a schedule has no recorded transactions", () => {
 	stubTestServer();
-	const posting = financialModelFixture.transactions.find(
+	const transaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	const rule = {
-		...posting,
+		...transaction,
 		id: "empty-rule",
 		kind: "schedule" as const,
 	};
@@ -1341,11 +1345,11 @@ it("says when a schedule has no recorded transactions", () => {
 it("ends a schedule by recording one transaction", async () => {
 	const server = stubTestServer();
 	setServerModelFixture(financialModelFixture);
-	const posting = financialModelFixture.transactions.find(
+	const transaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	const rule = {
-		...posting,
+		...transaction,
 		id: "01900000-0000-7000-8000-0000000000aa",
 		name: "Monthly investing",
 		kind: "schedule" as const,

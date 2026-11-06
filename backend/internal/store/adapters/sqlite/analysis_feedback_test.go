@@ -110,13 +110,13 @@ func TestAnalysisFeedbackValidationAndSourceConflicts(t *testing.T) {
 		t.Fatalf("run=%v", err)
 	}
 	for _, column := range []string{"pending", "void"} {
-		if _, err := s.db.Exec(`UPDATE postings SET `+column+`=1 WHERE id=? AND user_id=:user_id`, finding.PostingID); err != nil {
+		if _, err := s.db.Exec(`UPDATE transactions SET `+column+`=1 WHERE id=? AND user_id=:user_id`, finding.TransactionID); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.ReviewAnalysisFinding(finding.ID, feedbackInput(t, finding, "confirm")); !errors.Is(err, store.ErrAnalysisFeedbackInvalid) {
 			t.Fatalf("%s=%v", column, err)
 		}
-		if _, err := s.db.Exec(`UPDATE postings SET `+column+`=0 WHERE id=? AND user_id=:user_id`, finding.PostingID); err != nil {
+		if _, err := s.db.Exec(`UPDATE transactions SET `+column+`=0 WHERE id=? AND user_id=:user_id`, finding.TransactionID); err != nil {
 			t.Fatal(err)
 		}
 	}

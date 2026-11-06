@@ -8,20 +8,20 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func supersedePostingAmounts(tx *userTx, model *types.FinancialModel, deleted map[string]bool, manualID, syncedID string) error {
-	for _, posting := range model.Postings {
-		if deleted[posting.ID] {
+func supersedeTransactionAmounts(tx *userTx, model *types.FinancialModel, deleted map[string]bool, manualID, syncedID string) error {
+	for _, transaction := range model.Transactions {
+		if deleted[transaction.ID] {
 			continue
 		}
-		if !supersedeAmountResolution(&posting.Amount, manualID, syncedID) {
+		if !supersedeAmountResolution(&transaction.Amount, manualID, syncedID) {
 			continue
 		}
-		encoded, err := json.Marshal(posting.Amount)
+		encoded, err := json.Marshal(transaction.Amount)
 		if err != nil {
-			return fmt.Errorf("marshal posting amount %s: %w", posting.ID, err)
+			return fmt.Errorf("marshal transaction amount %s: %w", transaction.ID, err)
 		}
-		if _, err := tx.Exec(`UPDATE postings SET amount_resolution_json = ? WHERE id = ? AND user_id = :user_id`, string(encoded), posting.ID); err != nil {
-			return fmt.Errorf("move posting amount reference %s: %w", posting.ID, err)
+		if _, err := tx.Exec(`UPDATE transactions SET amount_resolution_json = ? WHERE id = ? AND user_id = :user_id`, string(encoded), transaction.ID); err != nil {
+			return fmt.Errorf("move transaction amount reference %s: %w", transaction.ID, err)
 		}
 	}
 	return nil
@@ -49,7 +49,7 @@ func supersedeRuleAmounts(tx *userTx, model *types.FinancialModel, deleted map[s
 	return nil
 }
 
-func supersedeAmountResolution(amount *types.PostingAmountResolution, manualID, syncedID string) bool {
+func supersedeAmountResolution(amount *types.TransactionAmountResolution, manualID, syncedID string) bool {
 	if amount == nil || len(amount.Inputs) == 0 {
 		return false
 	}
@@ -72,4 +72,4 @@ func supersedeAmountResolution(amount *types.PostingAmountResolution, manualID, 
 // supersedeRules moves rule routes from the manual account to the synced
 // account. A rule whose source and destination both land on the synced
 // account is a self-transfer and is deleted; claims on that rule go first
-// because posting_claims references the rule without a cascade.
+// because transaction_claims references the rule without a cascade.

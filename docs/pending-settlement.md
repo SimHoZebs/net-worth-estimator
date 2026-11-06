@@ -2,7 +2,7 @@
 
 A pending bank row is an authorization, not a posted charge. Sync stores it
 disabled, so it never moves balances. A live hold shows **Pending**; a hold
-that vanished without posting shows **Did not post**.
+that vanished without a posted charge shows **Did not post**.
 
 ## Settlement updates the hold in place
 

@@ -22,10 +22,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [],
+        "transactions": [],
         "schedules": []
       }
     },

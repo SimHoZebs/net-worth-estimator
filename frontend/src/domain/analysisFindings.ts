@@ -2,11 +2,11 @@ import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 
 export function activeBNPLFinding(
 	findings: AnalysisFinding[],
-	postingId: string,
+	transactionId: string,
 ) {
 	return findings.find(
 		(finding) =>
-			finding.postingId === postingId &&
+			finding.transactionId === transactionId &&
 			finding.kind === "bnpl" &&
 			!finding.dismissed &&
 			finding.review?.decision !== "rejected" &&

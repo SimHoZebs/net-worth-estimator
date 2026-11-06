@@ -117,7 +117,7 @@ func convert(tx *sql.Tx) (int, error) {
 		return 0, nil
 	}
 	// Analysis evidence belongs to established transactions, not optional
-	// purchases. Reject it before a posting deletion can cascade into evidence.
+	// purchases. Reject it before a transaction deletion can cascade into evidence.
 	for _, table := range []string{"transaction_source_facts", "analysis_findings"} {
 		if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count); err != nil {
 			return 0, err
@@ -125,7 +125,7 @@ func convert(tx *sql.Tx) (int, error) {
 		if count == 0 {
 			continue
 		}
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM ` + table + ` f JOIN purchase_policies q ON f.user_id=q.user_id AND f.posting_id=q.posting_id`).Scan(&count); err != nil {
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM ` + table + ` f JOIN purchase_policies q ON f.user_id=q.user_id AND f.transaction_id=q.transaction_id`).Scan(&count); err != nil {
 			return 0, err
 		}
 		if count != 0 {
@@ -137,11 +137,11 @@ func convert(tx *sql.Tx) (int, error) {
 	}
 	rows, err := tx.Query(`SELECT p.user_id, p.id, s.position, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.transaction_time, p.posted_time, q.priority, s.enabled,
 		p.source, p.pending, p.void, c.fulfills_rule_id,
-		EXISTS(SELECT 1 FROM receipts r WHERE r.user_id = p.user_id AND r.posting_id = p.id),
-		EXISTS(SELECT 1 FROM posting_sync_keys k WHERE k.user_id = p.user_id AND k.posting_id = p.id)
-		FROM postings p JOIN purchase_policies q ON p.user_id = q.user_id AND p.id = q.posting_id
-		JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id
-		LEFT JOIN posting_claims c ON c.user_id = p.user_id AND c.posting_id = p.id
+		EXISTS(SELECT 1 FROM receipts r WHERE r.user_id = p.user_id AND r.transaction_id = p.id),
+		EXISTS(SELECT 1 FROM transaction_sync_keys k WHERE k.user_id = p.user_id AND k.transaction_id = p.id)
+		FROM transactions p JOIN purchase_policies q ON p.user_id = q.user_id AND p.id = q.transaction_id
+		JOIN transaction_sim s ON s.user_id = p.user_id AND s.transaction_id = p.id
+		LEFT JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id
 		ORDER BY p.user_id, q.priority, s.position`)
 	if err != nil {
 		return 0, err
@@ -204,7 +204,7 @@ func convert(tx *sql.Tx) (int, error) {
 		return 0, err
 	}
 	if count != len(purchases) {
-		return 0, fmt.Errorf("purchase policies contain orphaned posting references")
+		return 0, fmt.Errorf("purchase policies contain orphaned transaction references")
 	}
 	for _, p := range purchases {
 		var kind string
@@ -212,7 +212,7 @@ func convert(tx *sql.Tx) (int, error) {
 		if err != nil && err != sql.ErrNoRows {
 			return 0, err
 		}
-		if err == nil && kind != "posting" {
+		if err == nil && kind != "transaction" {
 			return 0, fmt.Errorf("purchase %s has a conflicting identity kind", p.id)
 		}
 		if _, err := tx.Exec(`INSERT INTO planned_purchases(user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, p.user, p.id, p.position, p.name, p.account, p.cost, p.date, p.priority, p.enabled); err != nil {
@@ -224,7 +224,7 @@ func convert(tx *sql.Tx) (int, error) {
 		if _, err := tx.Exec(`INSERT OR IGNORE INTO entity_ids(id, kind, user_id) VALUES (?, 'planned-purchase', ?)`, p.id, p.user); err != nil {
 			return 0, err
 		}
-		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND user_id = ?`, p.id, p.user); err != nil {
+		if _, err := tx.Exec(`DELETE FROM transactions WHERE id = ? AND user_id = ?`, p.id, p.user); err != nil {
 			return 0, err
 		}
 	}

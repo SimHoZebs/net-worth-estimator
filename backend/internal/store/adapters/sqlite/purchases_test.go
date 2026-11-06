@@ -46,7 +46,7 @@ func TestStandalonePurchasePersistsAcrossRestart(t *testing.T) {
 	}
 	defer database.Close()
 	loaded, err := database.LoadModel()
-	if err != nil || len(loaded.Postings) != 0 || len(loaded.PlannedPurchases) != 1 || !reflect.DeepEqual(loaded.PlannedPurchases[0], purchase) {
+	if err != nil || len(loaded.Transactions) != 0 || len(loaded.PlannedPurchases) != 1 || !reflect.DeepEqual(loaded.PlannedPurchases[0], purchase) {
 		t.Fatalf("loaded = %+v %v", loaded, err)
 	}
 	purchase.Priority = 1
@@ -60,11 +60,11 @@ func TestStandalonePurchasePersistsAcrossRestart(t *testing.T) {
 	if err := database.DeletePlannedPurchase(purchase.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.CreatePosting(testPostingFixture(purchase.ID)); err != nil {
+	if _, err := database.CreateTransaction(testTransactionFixture(purchase.ID)); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = database.LoadModel()
-	if err != nil || len(loaded.PlannedPurchases) != 0 || len(loaded.Postings) != 1 {
+	if err != nil || len(loaded.PlannedPurchases) != 0 || len(loaded.Transactions) != 1 {
 		t.Fatalf("stale purchase survived: %+v %v", loaded, err)
 	}
 }

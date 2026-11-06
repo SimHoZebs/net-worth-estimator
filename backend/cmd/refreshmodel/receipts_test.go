@@ -23,7 +23,7 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	account := "checking"
-	p, err := s.CreatePosting(types.Posting{Name: "Private receipt expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
+	p, err := s.CreateTransaction(types.Transaction{Name: "Private receipt expense", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 	}
 }
 
-func TestRefreshPreservesPostingReceiptLinksPrivatelyButClearsThemForFinancialOnly(t *testing.T) {
+func TestRefreshPreservesTransactionReceiptLinksPrivatelyButClearsThemForFinancialOnly(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
@@ -60,7 +60,7 @@ func TestRefreshPreservesPostingReceiptLinksPrivatelyButClearsThemForFinancialOn
 		t.Fatal(err)
 	}
 	account := "checking"
-	p, err := s.CreatePosting(types.Posting{Name: "Field expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
+	p, err := s.CreateTransaction(types.Transaction{Name: "Field expense", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestRefreshPreservesPostingReceiptLinksPrivatelyButClearsThemForFinancialOn
 	if err := refresh(target, source, "other", "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner' AND posting_id=? AND id=?", p.ID, r.ID); got != "1" {
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner' AND transaction_id=? AND id=?", p.ID, r.ID); got != "1" {
 		t.Fatalf("private receipt link count = %s", got)
 	}
 	// A second ordinary destination proves the private copy above stays
@@ -89,10 +89,10 @@ func TestRefreshPreservesPostingReceiptLinksPrivatelyButClearsThemForFinancialOn
 	if err := refresh(target, source, "other", "second", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='second' AND posting_id=?", p.ID); got != "0" {
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='second' AND transaction_id=?", p.ID); got != "0" {
 		t.Fatalf("financial-only receipt link count = %s", got)
 	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner' AND posting_id=? AND id=?", p.ID, r.ID); got != "1" {
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner' AND transaction_id=? AND id=?", p.ID, r.ID); got != "1" {
 		t.Fatalf("financial-only publication changed private receipt links = %s", got)
 	}
 }

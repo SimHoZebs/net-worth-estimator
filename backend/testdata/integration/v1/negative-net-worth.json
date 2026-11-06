@@ -75,10 +75,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [
+        "transactions": [
           {
             "id": "4471aed2-883e-474b-8a92-bfac6639954b",
             "name": "Leveraged blowup",

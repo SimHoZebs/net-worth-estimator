@@ -9,13 +9,13 @@ export const AnalysisFindingsContext = createContext<AnalysisFinding[]>([]);
 
 /** One batch request per visible transaction page, never one request per row. */
 export function TransactionAnalysisProvider({
-	postingIds,
+	transactionIds,
 	children,
 }: {
-	postingIds: string[];
+	transactionIds: string[];
 	children: ReactNode;
 }) {
-	const findings = useAnalysisFindings(postingIds);
+	const findings = useAnalysisFindings(transactionIds);
 	return (
 		<AnalysisFindingsContext value={findings.data?.findings ?? []}>
 			{children}
@@ -23,20 +23,20 @@ export function TransactionAnalysisProvider({
 	);
 }
 
-export function useTransactionBNPL(postingId: string) {
-	return activeBNPLFinding(useContext(AnalysisFindingsContext), postingId);
+export function useTransactionBNPL(transactionId: string) {
+	return activeBNPLFinding(useContext(AnalysisFindingsContext), transactionId);
 }
 
 export function TransactionAnalysisPanel({
-	postingId,
+	transactionId,
 	readOnly,
 }: {
-	postingId: string;
+	transactionId: string;
 	readOnly: boolean;
 }) {
-	const query = useAnalysisFindings([postingId]);
+	const query = useAnalysisFindings([transactionId]);
 	const findings = (query.data?.findings ?? []).filter((item) =>
-		activeBNPLFinding([item], postingId),
+		activeBNPLFinding([item], transactionId),
 	);
 	// Quiet detection: pending questions live in the suggestions sheet.
 	// The detail body shows only completed facts (a confirmed plan with its

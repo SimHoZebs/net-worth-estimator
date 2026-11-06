@@ -35,7 +35,7 @@ func ledgerCanonicalModel(t *testing.T, scoped store.Store) string {
 func TestLedgerSplitAcceptMovesNoMoney(t *testing.T) {
 	world := ledgerSetup(t, nil)
 	ledgerDeletePhantom(t, world)
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	groceries := byName["GROCER 123"]
 	if len(groceries) != 4 {
 		t.Fatalf("grocery rows = %d, want 4", len(groceries))
@@ -46,12 +46,12 @@ func TestLedgerSplitAcceptMovesNoMoney(t *testing.T) {
 	// current access to the source row first.
 	ledgerGrant(t, world, groceries[0], store.SharingAudienceUser, world.second)
 	split, err := world.db.CreateSplit(world.owner, store.SplitInput{
-		SourceOwnerID:   world.owner,
-		SourcePostingID: groceries[0],
-		InitiatorID:     world.owner,
-		Currency:        "USD",
-		TotalMinor:      15000,
-		ParticipantIDs:  []string{world.owner, world.second},
+		SourceOwnerID:       world.owner,
+		SourceTransactionID: groceries[0],
+		InitiatorID:         world.owner,
+		Currency:            "USD",
+		TotalMinor:          15000,
+		ParticipantIDs:      []string{world.owner, world.second},
 	}, ledgerRequestID(t))
 	if err != nil {
 		t.Fatalf("propose split: %v", err)
@@ -96,7 +96,7 @@ func TestLedgerYenSplitAllocatesExactShares(t *testing.T) {
 	if len(probe) != 1 || probe[0].Currency != "JPY" {
 		t.Fatalf("split probes = %+v, want the yen probe beside the seed", probe)
 	}
-	// Posting-level currency is not in the model (amounts are bare
+	// Transaction-level currency is not in the model (amounts are bare
 	// expressions): the yen row lives as this split probe, stated here.
 	participants := []string{world.owner, world.second, "ledger-guest"}
 	shares, err := domain.AllocateSplit(domain.SplitInput{
@@ -180,7 +180,7 @@ func TestLedgerHealthYieldsDocumentedVerdicts(t *testing.T) {
 	if rate := (inflow - outflow) / inflow; rate < 0.49 || rate >= 0.50 {
 		t.Fatalf("savings rate = %.4f, want just under half", rate)
 	}
-	if report.FlowCoverage.WindowPostings == 0 || report.FlowCoverage.InflowTotal <= 0 {
+	if report.FlowCoverage.WindowTransactions == 0 || report.FlowCoverage.InflowTotal <= 0 {
 		t.Fatalf("coverage = %+v, want the seed's flows behind the verdicts", report.FlowCoverage)
 	}
 }

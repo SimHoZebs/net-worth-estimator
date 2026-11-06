@@ -26,20 +26,20 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	want := world.expected
 
 	findings, _ := ledgerDetect(t, world.ownerSC)
-	byPosting := map[string]types.AnalysisFinding{}
+	byTransaction := map[string]types.AnalysisFinding{}
 	for _, finding := range findings {
 		if finding.Kind != "recurring" {
 			t.Fatalf("finding kind = %q, want recurring", finding.Kind)
 		}
-		byPosting[finding.PostingID] = finding
+		byTransaction[finding.TransactionID] = finding
 	}
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	groceries := byName["GROCER 123"]
 	if len(groceries) != want.DetectCount {
 		t.Fatalf("grocery rows = %d, want %d", len(groceries), want.DetectCount)
 	}
 	for _, id := range groceries {
-		finding, ok := byPosting[id]
+		finding, ok := byTransaction[id]
 		if !ok {
 			t.Fatalf("grocery row %s has no monthly proposal", id)
 		}
@@ -54,7 +54,7 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	// spellings, pending, void, and (deleted) phantom rows.
 	for _, name := range []string{"FUEL STOP", "GROCERY OUTLET", "CORNER GROCER", "PENDING EATS", "VOIDED MART"} {
 		for _, id := range byName[name] {
-			if _, ok := byPosting[id]; ok {
+			if _, ok := byTransaction[id]; ok {
 				t.Fatalf("lookalike row %q joined the monthly proposal", name)
 			}
 		}

@@ -58,7 +58,9 @@ it("keeps account controls out of recovery while the model is empty", () => {
 			.getByRole("button", { name: "Choose server model JSON" })
 			.hasAttribute("disabled"),
 	).toBe(false);
-	expect(screen.getByRole("button", { name: "Retry server load" })).toBeTruthy();
+	expect(
+		screen.getByRole("button", { name: "Retry server load" }),
+	).toBeTruthy();
 	// Account controls live in Configs → Account, so the recovery body stays
 	// free of session actions; the shared layout owns navigation.
 	expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();

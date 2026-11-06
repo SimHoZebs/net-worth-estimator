@@ -9,7 +9,7 @@ On the server, add available funds to the existing `evaluatedTransactionEvent` e
 - Example and browser summary: `frontend/src/domain/fundingGaps.test.ts:47-68`, `frontend/src/domain/fundingGaps.ts:61-83,186-201`.
 - Result mapping: `frontend/src/state/useRemoteProjection.ts:451-469`.
 - Server duplication: `backend/internal/domain/evaluation_fulfillment.go:85-179`, `backend/internal/domain/path.go:94-180`.
-- Existing constraint tests: `backend/internal/api/model_handlers_test.go:442-713`, `backend/internal/domain/posting_loss_test.go:159-219`.
+- Existing constraint tests: `backend/internal/api/model_handlers_test.go:442-713`, `backend/internal/domain/transaction_loss_test.go:159-219`.
 
 Concurrent shortfall and chart work may already resolve this. Inspect the current inspector and `fundingGapChartModel` in `frontend/src/domain/chart.ts` first.
 

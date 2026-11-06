@@ -60,13 +60,13 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 	before := protectedRows(t, db.SQL(), users[1])
 	model := t.TempDir()
 	files := map[string]string{
-		"accounts.csv":                        "id,name,kind,enabled\nsame-id,Imported account,cash,true\n",
-		"checkpoints.csv":                     "AccountId,Balance,ObservedAt\nsame-id,456,1767311999\n",
-		"postings.csv":                        "id,name,postedTime,amount\n",
-		"behavior/financial-independence.csv": "id\n",
-		"behavior/net-worth-threshold.csv":    "id\n",
-		"behavior/account-balance.csv":        "id\n",
-		"behavior/posting-fulfillment.csv":    "id\n",
+		"accounts.csv":                         "id,name,kind,enabled\nsame-id,Imported account,cash,true\n",
+		"checkpoints.csv":                      "AccountId,Balance,ObservedAt\nsame-id,456,1767311999\n",
+		"transactions.csv":                     "id,name,postedTime,amount\n",
+		"behavior/financial-independence.csv":  "id\n",
+		"behavior/net-worth-threshold.csv":     "id\n",
+		"behavior/account-balance.csv":         "id\n",
+		"behavior/transaction-fulfillment.csv": "id\n",
 	}
 	for name, contents := range files {
 		p := filepath.Join(model, name)

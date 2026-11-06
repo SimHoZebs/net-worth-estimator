@@ -73,7 +73,7 @@ function ReceiptEditor({
 	reload: () => void;
 }) {
 	const receipt = payload.receipt;
-	const actions = useReceiptActions(receipt.postingId);
+	const actions = useReceiptActions(receipt.transactionId);
 	const [edit, setEdit] = useState<{
 		revision: number;
 		draft: ReceiptDraft;

@@ -7,11 +7,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func cycleEvent(date, postingID, accountID string, delta float64, sequence int) types.TransactionEvent {
+func cycleEvent(date, transactionID, accountID string, delta float64, sequence int) types.TransactionEvent {
 	return types.TransactionEvent{
 		Date:            types.IsoDate(date),
 		Sequence:        sequence,
-		Origin:          types.TransactionOrigin{Type: "posting", PostingID: postingID},
+		Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: transactionID},
 		RequestedAmount: math.Abs(delta),
 		RealizedAmount:  math.Abs(delta),
 		AccountDeltas: []struct {
@@ -21,14 +21,14 @@ func cycleEvent(date, postingID, accountID string, delta float64, sequence int) 
 	}
 }
 
-func cyclePath(start string, postings []types.Posting, events []types.TransactionEvent, buckets map[string]map[string]float64) *types.ProjectionPath {
+func cyclePath(start string, transactions []types.Transaction, events []types.TransactionEvent, buckets map[string]map[string]float64) *types.ProjectionPath {
 	path := &types.ProjectionPath{
 		TransactionEvents:   events,
-		EffectiveModel:      types.FinancialModel{Postings: postings},
+		EffectiveModel:      types.FinancialModel{Transactions: transactions},
 		ProjectionStartDate: types.IsoDate(start),
 		ProjectionEndDate:   types.IsoDate("2027-09-20"),
 	}
-	path.ProjectionStartPostingState.RealizedPostingAmountsByYear = buckets
+	path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear = buckets
 	return path
 }
 
@@ -86,8 +86,8 @@ func TestValidateFinancialModelFlagsDanglingCycleFulfillmentEvaluation(t *testin
 		Accounts: []types.Account{
 			{ID: "checking", Name: "Checking", Enabled: true},
 		},
-		Checkpoints: []types.Checkpoint{},
-		Postings:    []types.Posting{},
+		Checkpoints:  []types.Checkpoint{},
+		Transactions: []types.Transaction{},
 		Evaluations: types.EvaluationTables{
 			CycleFulfillment: []types.CycleEvaluation{{
 				InstanceID: "ghost-cycle",
@@ -117,8 +117,8 @@ func TestValidateFinancialModelAcceptsLiveCycleFulfillmentEvaluation(t *testing.
 		Accounts: []types.Account{
 			{ID: "prime_card", Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
 		},
-		Checkpoints: []types.Checkpoint{},
-		Postings:    []types.Posting{},
+		Checkpoints:  []types.Checkpoint{},
+		Transactions: []types.Transaction{},
 		Evaluations: types.EvaluationTables{
 			CycleFulfillment: []types.CycleEvaluation{{
 				InstanceID: "prime-cycle",
@@ -148,7 +148,7 @@ func TestResolveStatementCycleAnchors(t *testing.T) {
 
 func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 	card := "prime_card"
-	postings := []types.Posting{{
+	transactions := []types.Transaction{{
 		ID: "charge-sep-16", Name: "Groceries", SourceAccountID: &card,
 		PostedTime: 1789516800, TransactionTime: 1789516800, Enabled: true,
 	}}
@@ -159,7 +159,7 @@ func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 		cycleEvent("2026-09-23", "payment", card, 200, 3),
 		cycleEvent("2026-10-20", "after-window", card, -500, 4),
 	}
-	path := cyclePath("2026-09-20", postings, events, buckets)
+	path := cyclePath("2026-09-20", transactions, events, buckets)
 	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.CycleStart != "2026-09-15" || result.CycleEnd != "2026-10-14" {
 		t.Fatalf("window = %s/%s", result.CycleStart, result.CycleEnd)
@@ -203,13 +203,13 @@ func TestEvaluateCycleFulfillmentCombinesAccountSet(t *testing.T) {
 func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A start-date occurrence covered by a transaction event (no checkpoint
 	// suppression) must count once, through the event.
 	card := "prime_card"
-	postings := []types.Posting{{
+	transactions := []types.Transaction{{
 		ID: "charge-start", Name: "Start charge", SourceAccountID: &card,
 		PostedTime: 1789862400, TransactionTime: 1789862400, Enabled: true,
 	}}
 	buckets := map[string]map[string]float64{"charge-start": {"2026": 25}}
 	events := []types.TransactionEvent{cycleEvent("2026-09-20", "charge-start", card, -25, 1)}
-	path := cyclePath("2026-09-20", postings, events, buckets)
+	path := cyclePath("2026-09-20", transactions, events, buckets)
 	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.Spent != 25 {
 		t.Fatalf("spent = %v, want 25", result.Spent)

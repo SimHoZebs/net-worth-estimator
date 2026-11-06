@@ -88,7 +88,7 @@ export function independenceConfig(
 			principalPolicy: "preserve-real-principal",
 			annualExpenseTargetBasis: "fi-date-dollars",
 			sources: [{ type: "asset", accountId: "cash", included: true }],
-			continuingPostingIds: [],
+			continuingTransactionIds: [],
 			...overrides,
 		},
 	};

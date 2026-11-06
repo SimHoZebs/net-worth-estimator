@@ -9,7 +9,7 @@ import (
 )
 
 type settleCandidateRow struct {
-	PostingID           string  `json:"postingId"`
+	TransactionID       string  `json:"transactionId"`
 	Name                string  `json:"name"`
 	Amount              float64 `json:"amount"`
 	Date                string  `json:"date"`
@@ -23,9 +23,9 @@ type settleCandidateRow struct {
 
 type settleCandidatesOutput struct {
 	Body struct {
-		PostingID  string               `json:"postingId"`
-		Candidates []settleCandidateRow `json:"candidates"`
-		Revision   string               `json:"revision"`
+		TransactionID string               `json:"transactionId"`
+		Candidates    []settleCandidateRow `json:"candidates"`
+		Revision      string               `json:"revision"`
 	} `json:"body"`
 }
 
@@ -35,22 +35,22 @@ type settleCandidatesOutput struct {
 func (s *handler) listSettleCandidates(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*settleCandidatesOutput, error) {
-	bank, err := s.store.LoadBankPostings()
+	bank, err := s.store.LoadBankTransactions()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	var hold *store.BankRow
 	for index := range bank {
-		if bank[index].Posting.ID == input.ID {
+		if bank[index].Transaction.ID == input.ID {
 			hold = &bank[index]
 			break
 		}
 	}
 	if hold == nil {
-		return nil, huma.Error404NotFound("posting not found")
+		return nil, huma.Error404NotFound("transaction not found")
 	}
-	if !hold.Posting.Void || hold.Posting.Pending {
-		return nil, huma.Error400BadRequest("posting is not a vanished hold")
+	if !hold.Transaction.Void || hold.Transaction.Pending {
+		return nil, huma.Error400BadRequest("transaction is not a vanished hold")
 	}
 	model, err := s.store.LoadModel()
 	if err != nil {
@@ -64,8 +64,8 @@ func (s *handler) listSettleCandidates(_ context.Context, input *struct {
 	rows := make([]settleCandidateRow, 0, len(candidates))
 	for index, candidate := range candidates {
 		row := settleCandidateRow{
-			PostingID:         candidate.Posting.ID,
-			Name:              candidate.Posting.Name,
+			TransactionID:     candidate.Transaction.ID,
+			Name:              candidate.Transaction.Name,
 			Amount:            float64(candidate.Cents) / 100,
 			Date:              simplefin.SettleCandidateDate(candidate),
 			DayGap:            candidate.DayGapDays,
@@ -73,16 +73,16 @@ func (s *handler) listSettleCandidates(_ context.Context, input *struct {
 			DescriptorChanged: candidate.DescriptorChanged,
 			Recommended:       index == 0,
 		}
-		if candidate.Posting.Claim != nil {
-			ruleID := candidate.Posting.Claim.ScheduleID
-			occurrenceDate := candidate.Posting.Claim.OccurrenceDate
+		if candidate.Transaction.Claim != nil {
+			ruleID := candidate.Transaction.Claim.ScheduleID
+			occurrenceDate := candidate.Transaction.Claim.OccurrenceDate
 			row.ClaimScheduleID = &ruleID
 			row.ClaimOccurrenceDate = &occurrenceDate
 		}
 		rows = append(rows, row)
 	}
 	output := &settleCandidatesOutput{}
-	output.Body.PostingID = input.ID
+	output.Body.TransactionID = input.ID
 	output.Body.Candidates = rows
 	output.Body.Revision = revision
 	return output, nil

@@ -22,10 +22,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [
+        "transactions": [
           {
             "amount": {
               "config": {
@@ -51,17 +51,17 @@
         {
           "action": "grant",
           "audienceType": "group",
-          "postingId": "92b6bd7d-6c2e-568e-9fd8-cec8ef347677"
+          "transactionId": "92b6bd7d-6c2e-568e-9fd8-cec8ef347677"
         },
         {
           "action": "revoke",
           "audienceType": "group",
-          "postingId": "92b6bd7d-6c2e-568e-9fd8-cec8ef347677"
+          "transactionId": "92b6bd7d-6c2e-568e-9fd8-cec8ef347677"
         },
         {
           "action": "regrant",
           "audienceType": "group",
-          "postingId": "92b6bd7d-6c2e-568e-9fd8-cec8ef347677"
+          "transactionId": "92b6bd7d-6c2e-568e-9fd8-cec8ef347677"
         }
       ]
     }

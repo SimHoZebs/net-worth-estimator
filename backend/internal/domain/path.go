@@ -133,28 +133,28 @@ type classifiedAttempts struct {
 	internalTransferAmount float64
 }
 
-func classifyAttempts(attempts []*types.TransactionEvent, postingsByID map[string]*types.Posting) classifiedAttempts {
+func classifyAttempts(attempts []*types.TransactionEvent, transactionsByID map[string]*types.Transaction) classifiedAttempts {
 	result := classifiedAttempts{accountImpacts: map[string][]types.AccountDelta{}}
 	for _, attempt := range attempts {
-		posting, ok := postingsByID[attempt.Origin.PostingID]
+		transaction, ok := transactionsByID[attempt.Origin.TransactionID]
 		if !ok {
 			continue
 		}
 		for _, delta := range attempt.AccountDeltas {
 			result.accountImpacts[delta.AccountID] = append(result.accountImpacts[delta.AccountID], types.AccountDelta{
-				PostingID: posting.ID,
-				Delta:     delta.Delta,
+				TransactionID: transaction.ID,
+				Delta:         delta.Delta,
 			})
 		}
 		switch {
-		case IsExternalInflow(posting):
+		case IsExternalInflow(transaction):
 			// Inflow totals are net of investment losses: a negative
-			// realized amount on a sourceless inflow posting is money
+			// realized amount on a sourceless inflow transaction is money
 			// actually lost, and balances already reflect it.
 			result.externalInflowAmount += attempt.RealizedAmount
-		case IsExternalOutflow(posting):
+		case IsExternalOutflow(transaction):
 			result.externalOutflowAmount += attempt.RealizedAmount
-		case IsInternalTransfer(posting):
+		case IsInternalTransfer(transaction):
 			result.internalTransferAmount += attempt.RealizedAmount
 		}
 	}
@@ -169,7 +169,7 @@ func BuildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 // BuildStochasticSamplePath adapts one Monte Carlo sample run. Sample
 // consumers (percentile bands plus the threshold, fulfillment, and FI
 // accumulators) read row dates, net worth, per-account balances, transaction
-// events, and posting state — never per-account impacts or classified
+// events, and transaction state — never per-account impacts or classified
 // cashflow totals — so impact classification is skipped. Every retained
 // field is bit-identical to BuildProjectionPath.
 func BuildStochasticSamplePath(prepared *types.PreparedProjection, run *types.SimulationRun) *types.ProjectionPath {
@@ -178,14 +178,14 @@ func BuildStochasticSamplePath(prepared *types.PreparedProjection, run *types.Si
 
 func buildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun, detailed bool) *types.ProjectionPath {
 	effectiveModel := prepared.EffectiveModel
-	var postingsByID map[string]*types.Posting
+	var transactionsByID map[string]*types.Transaction
 	var attemptsByDate map[string][]*types.TransactionEvent
 	if detailed {
-		transactions := ResolvedTransactionPostings(&effectiveModel)
-		postingsByID = map[string]*types.Posting{}
+		transactions := ResolvedTransactionTransactions(&effectiveModel)
+		transactionsByID = map[string]*types.Transaction{}
 		for index := range transactions {
-			posting := &transactions[index]
-			postingsByID[posting.ID] = posting
+			transaction := &transactions[index]
+			transactionsByID[transaction.ID] = transaction
 		}
 		attemptsByDate = map[string][]*types.TransactionEvent{}
 		for index := range run.TransactionAttempts {
@@ -205,7 +205,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	for _, snapshot := range run.Snapshots {
 		classified := classifiedAttempts{}
 		if detailed {
-			classified = classifyAttempts(attemptsByDate[snapshot.Date], postingsByID)
+			classified = classifyAttempts(attemptsByDate[snapshot.Date], transactionsByID)
 		}
 		projectedRows = append(projectedRows, createRow(
 			snapshot.Date, false, snapshot.Balances, effectiveModel.Accounts,
@@ -224,9 +224,9 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 		HistoryCutInstant:   prepared.Request.HistoryCutInstant,
 	}
 	initialStateClone := CloneSimulationState(run.InitialState)
-	path.ProjectionStartPostingState.LatestRealizedPostingAmounts = initialStateClone.LatestRealizedPostingAmounts
-	path.ProjectionStartPostingState.LatestRealizedPostingDates = initialStateClone.LatestRealizedPostingDates
-	path.ProjectionStartPostingState.RealizedPostingAmountsByYear = initialStateClone.RealizedPostingAmountsByYear
+	path.ProjectionStartTransactionState.LatestRealizedTransactionAmounts = initialStateClone.LatestRealizedTransactionAmounts
+	path.ProjectionStartTransactionState.LatestRealizedTransactionDates = initialStateClone.LatestRealizedTransactionDates
+	path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear = initialStateClone.RealizedTransactionAmountsByYear
 	return path
 }
 

@@ -2,10 +2,7 @@ import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeS
 import { Suspense } from "react";
 import { useWorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 import type { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
-import {
-	WorkspaceDialogs,
-	WorkspaceEvidence,
-} from "./WorkspaceDialogs.tsx";
+import { WorkspaceDialogs, WorkspaceEvidence } from "./WorkspaceDialogs.tsx";
 import { WorkspacePage } from "./WorkspacePage.tsx";
 import { WorkspacePageSkeleton } from "./WorkspacePageSkeleton.tsx";
 

@@ -25,10 +25,10 @@ function emptyModel(): FinancialModel {
 			financialIndependence: [],
 			netWorthThreshold: [],
 			accountBalance: [],
-			postingFulfillment: [],
+			transactionFulfillment: [],
 			cycleFulfillment: [],
 		},
-		postings: [],
+		transactions: [],
 		schedules: [],
 		plannedPurchases: [],
 	};
@@ -67,8 +67,8 @@ describe("saved rows", () => {
 			accounts.result.current?.map((account) => account.id).sort(),
 		).toEqual(["cash", "loan"]);
 		await waitFor(() => expect(transactions.result.current).not.toBeNull());
-		// The narrow transaction query carries postings only; the fixture
-		// model holds a rule and no postings.
+		// The narrow transaction query carries transactions only; the fixture
+		// model holds a rule and no transactions.
 		expect(transactions.result.current).toEqual([]);
 		await waitFor(() => expect(rules.result.current).not.toBeNull());
 		expect(rules.result.current?.map((rule) => rule.id)).toEqual(["salary"]);

@@ -20,20 +20,20 @@ import { userResourceKey } from "./workspaceResources.ts";
 import { useUserScope } from "./useUserScope.ts";
 
 export const receiptCollectionKey = (
-	postingId: string,
+	transactionId: string,
 	scope = getUserScope(),
-) => ["receipts", scope.key, postingId] as const;
+) => ["receipts", scope.key, transactionId] as const;
 export const receiptDetailKey = (id: string, scope = getUserScope()) =>
 	["receipt-detail", scope.key, id] as const;
 
-export function useReceipts(postingId: string, enabled: boolean) {
+export function useReceipts(transactionId: string, enabled: boolean) {
 	const scope = useUserScope();
 	return useQuery(
 		{
-			queryKey: receiptCollectionKey(postingId, scope),
+			queryKey: receiptCollectionKey(transactionId, scope),
 			enabled: enabled && scope.status === "ready",
 			queryFn: async ({ signal }) =>
-				(await listReceipts(postingId, { signal })).data,
+				(await listReceipts(transactionId, { signal })).data,
 		},
 		serverQueryClient(),
 	);
@@ -69,14 +69,14 @@ export function useReceiptImage(id: string, digest: string) {
 }
 
 function useReceiptWrite<T>(
-	postingId: string,
+	transactionId: string,
 	perform: (input: T) => Promise<ReceiptOutputBody | undefined>,
 ) {
 	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
-			mutationKey: ["receipt-write", scope.key, postingId],
+			mutationKey: ["receipt-write", scope.key, transactionId],
 			retry: false,
 			mutationFn: async (input: T) => {
 				if (scope !== getUserScope() || scope.status !== "ready")
@@ -93,7 +93,7 @@ function useReceiptWrite<T>(
 						result,
 					);
 				await cache.invalidateQueries({
-					queryKey: receiptCollectionKey(postingId, scope),
+					queryKey: receiptCollectionKey(transactionId, scope),
 				});
 				// Row badges read receiptIds from the transaction list. The
 				// model envelope also carries the reverse lookup for any
@@ -110,17 +110,17 @@ function useReceiptWrite<T>(
 	);
 }
 
-export function useReceiptActions(postingId: string) {
+export function useReceiptActions(transactionId: string) {
 	const attach = useReceiptWrite(
-		postingId,
-		async (image: File) => (await attachReceipt({ image, postingId })).data,
+		transactionId,
+		async (image: File) => (await attachReceipt({ image, transactionId })).data,
 	);
 	const extract = useReceiptWrite(
-		postingId,
+		transactionId,
 		async (id: string) => (await extractReceipt(id)).data,
 	);
 	const review = useReceiptWrite(
-		postingId,
+		transactionId,
 		async (input: {
 			id: string;
 			revision: number;
@@ -135,12 +135,12 @@ export function useReceiptActions(postingId: string) {
 				})
 			).data,
 	);
-	const remove = useReceiptWrite(postingId, async (id: string) => {
+	const remove = useReceiptWrite(transactionId, async (id: string) => {
 		await deleteReceipt(id);
 		return undefined;
 	});
 	const replace = useReceiptWrite(
-		postingId,
+		transactionId,
 		async (input: { id: string; revision: number; image: File }) =>
 			(
 				await replaceReceiptImage(input.id, {

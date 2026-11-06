@@ -4,7 +4,7 @@ erDiagram
     PROJECTION_SLICE ||--o{ MONTE_CARLO_STATISTIC : generates
     PROJECTION_STATE ||--o{ NET_WORTH_THRESHOLD_OUTPUT : publishes
     PROJECTION_STATE ||--o{ ACCOUNT_BALANCE_OUTPUT : publishes
-    PROJECTION_STATE ||--o{ POSTING_FULFILLMENT_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ TRANSACTION_FULFILLMENT_OUTPUT : publishes
     PROJECTION_STATE ||--o{ CYCLE_FULFILLMENT_OUTPUT : publishes
     PROJECTION_STATE ||--o{ PLANNED_PURCHASES_OUTPUT : publishes
     PROJECTION_STATE ||--o{ FINANCIAL_INDEPENDENCE_OUTPUT : publishes
@@ -57,7 +57,7 @@ erDiagram
         date prob_median_date
         date prob_p90_date
     }
-    POSTING_FULFILLMENT_OUTPUT {
+    TRANSACTION_FULFILLMENT_OUTPUT {
         uuid projection_state_id FK
         string kind
         uuid instance_id PK

@@ -15,8 +15,8 @@ func TestIntegrationEdgeMembershipRemovedMidFeed_RealSQLite_RealHTTP(t *testing.
 		t.Skip("needs the group identity set")
 	}
 	day := int64(1781524800)
-	leaveRow := advMustPosting(t, world.ownerSC, "Leave row", "30.00", day)
-	if _, err := world.db.GrantSharedPosting(world.owner, leaveRow, "group", world.groupID, advRequestID(t)); err != nil {
+	leaveRow := advMustTransaction(t, world.ownerSC, "Leave row", "30.00", day)
+	if _, err := world.db.GrantSharedTransaction(world.owner, leaveRow, "group", world.groupID, advRequestID(t)); err != nil {
 		t.Fatal(err)
 	}
 	feedTarget := "/v1/shared/groups/" + world.groupID + "/feed"
@@ -42,7 +42,7 @@ func TestIntegrationEdgeMembershipRemovedMidFeed_RealSQLite_RealHTTP(t *testing.
 	}
 	// The direct read closes too.
 	read := advServe(t, world.sharing.Routes(), http.MethodGet,
-		"/v1/shared/postings/"+advResource(world.owner)+"/"+leaveRow, world.secondSubject, "")
+		"/v1/shared/transactions/"+advResource(world.owner)+"/"+leaveRow, world.secondSubject, "")
 	if read.Code != http.StatusNotFound {
 		t.Fatalf("ex-member read status = %d, want 404: %s", read.Code, read.Body.String())
 	}
@@ -56,7 +56,7 @@ func TestIntegrationEdgePolicyNarrowedToZeroMidList_RealSQLite_RealHTTP(t *testi
 		t.Skip("needs the group identity set")
 	}
 	day := int64(1781524800)
-	narrowRow := advMustPosting(t, world.ownerSC, "Narrow row", "30.00", day)
+	narrowRow := advMustTransaction(t, world.ownerSC, "Narrow row", "30.00", day)
 	_ = narrowRow
 	policyTarget := "/v1/shared/policies/" + world.groupID
 	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
@@ -65,8 +65,8 @@ func TestIntegrationEdgePolicyNarrowedToZeroMidList_RealSQLite_RealHTTP(t *testi
 	beforeIDs := map[string]bool{}
 	for _, raw := range before["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		beforeIDs[id] = true
 	}
 	if !beforeIDs[narrowRow] {
@@ -78,8 +78,8 @@ func TestIntegrationEdgePolicyNarrowedToZeroMidList_RealSQLite_RealHTTP(t *testi
 	advFeedTotalsAgreement(t, after)
 	for _, raw := range after["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		if posting["id"] == narrowRow {
+		transaction, _ := item["transaction"].(map[string]any)
+		if transaction["id"] == narrowRow {
 			t.Fatal("narrowed row still lists after the policy narrowed to off")
 		}
 	}
@@ -100,7 +100,7 @@ func TestIntegrationEdgeAccountDeletedMidPolicy_RealSQLite_RealHTTP(t *testing.T
 		t.Skip("needs the group identity set")
 	}
 	day := int64(1781524800)
-	delRow := advMustPosting(t, world.ownerSC, "Doomed account row", "30.00", day)
+	delRow := advMustTransaction(t, world.ownerSC, "Doomed account row", "30.00", day)
 	_ = delRow
 	policyTarget := "/v1/shared/policies/" + world.groupID
 	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
@@ -113,8 +113,8 @@ func TestIntegrationEdgeAccountDeletedMidPolicy_RealSQLite_RealHTTP(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		if err := world.ownerSC.DeletePosting(posting.ID); err != nil {
+	for _, transaction := range model.Transactions {
+		if err := world.ownerSC.DeleteTransaction(transaction.ID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -137,11 +137,11 @@ func TestIntegrationEdgeGroupDeletedAndModelClearedMidFlow_RealSQLite_RealHTTP(t
 		t.Skip("needs the group identity set")
 	}
 	day := int64(1781524800)
-	goneRow := advMustPosting(t, world.ownerSC, "Gone row", "30.00", day)
-	if _, err := world.db.GrantSharedPosting(world.owner, goneRow, "group", world.groupID, advRequestID(t)); err != nil {
+	goneRow := advMustTransaction(t, world.ownerSC, "Gone row", "30.00", day)
+	if _, err := world.db.GrantSharedTransaction(world.owner, goneRow, "group", world.groupID, advRequestID(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := world.db.GrantSharedPosting(world.owner, goneRow, "user", world.second, advRequestID(t)); err != nil {
+	if _, err := world.db.GrantSharedTransaction(world.owner, goneRow, "user", world.second, advRequestID(t)); err != nil {
 		t.Fatal(err)
 	}
 	if err := world.db.DeleteGroup(world.groupID, world.owner); err != nil {
@@ -153,7 +153,7 @@ func TestIntegrationEdgeGroupDeletedAndModelClearedMidFlow_RealSQLite_RealHTTP(t
 	}
 	// The direct-share inbox leg survives the group deletion untouched.
 	accept := advDecode(t, advServe(t, world.inbox.Routes(), http.MethodPost, "/v1/inbox/shares/accept", world.secondSubject,
-		`{"owner":`+advQuote(advResource(world.owner))+`,"postingId":`+advQuote(goneRow)+`}`), http.StatusOK)
+		`{"owner":`+advQuote(advResource(world.owner))+`,"transactionId":`+advQuote(goneRow)+`}`), http.StatusOK)
 	if accept["item"] == nil {
 		t.Fatalf("inbox accept = %+v, want the direct share unaffected by the group deletion", accept)
 	}
@@ -162,7 +162,7 @@ func TestIntegrationEdgeGroupDeletedAndModelClearedMidFlow_RealSQLite_RealHTTP(t
 		t.Fatal(err)
 	}
 	leak := advServe(t, world.sharing.Routes(), http.MethodGet,
-		"/v1/shared/postings/"+advResource(world.owner)+"/"+goneRow, world.secondSubject, "")
+		"/v1/shared/transactions/"+advResource(world.owner)+"/"+goneRow, world.secondSubject, "")
 	if leak.Code != http.StatusNotFound {
 		t.Fatalf("cleared-model read status = %d, want 404: %s", leak.Code, leak.Body.String())
 	}

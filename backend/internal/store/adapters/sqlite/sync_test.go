@@ -13,9 +13,9 @@ import (
 )
 
 const syncTestAmountJSON = `{"resolver":"expression","config":{"expression":"50"},"inputs":{}}`
-const ownerPostingID = "01900000-0000-7000-8000-000000000010"
-const rawSyncedPostingID = "01900000-0000-7000-8000-000000000011"
-const otherSyncedPostingID = "01900000-0000-7000-8000-000000000012"
+const ownerTransactionID = "01900000-0000-7000-8000-000000000010"
+const rawSyncedTransactionID = "01900000-0000-7000-8000-000000000011"
+const otherSyncedTransactionID = "01900000-0000-7000-8000-000000000012"
 
 func withSourceUser(checkpoints []types.Checkpoint) []types.Checkpoint {
 	out := make([]types.Checkpoint, len(checkpoints))
@@ -49,12 +49,12 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 		`INSERT INTO accounts (id, position, name, enabled, user_id) VALUES ('prime_card', 1, 'Prime', 1, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('prime_card', 'account', :user_id)`,
 		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, provider, observed_at, user_id) VALUES (10, 10, 'checking', 111, 'banksync', 'simplefin', 1785628799, :user_id)`,
-		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
-		 VALUES ('` + rawSyncedPostingID + `', 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'banksync', 1, :user_id)`,
-		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id)
-		 VALUES ('` + rawSyncedPostingID + `', 10, 0, 0, :user_id)`,
-		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + rawSyncedPostingID + `', 'posting', :user_id)`,
-		`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES ('simplefin', 'bridge-prime', 'tx1', '` + rawSyncedPostingID + `', :user_id)`,
+		`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
+		 VALUES ('` + rawSyncedTransactionID + `', 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'banksync', 1, :user_id)`,
+		`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id)
+		 VALUES ('` + rawSyncedTransactionID + `', 10, 0, 0, :user_id)`,
+		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + rawSyncedTransactionID + `', 'transaction', :user_id)`,
+		`INSERT INTO transaction_sync_keys (provider, bridge_account_id, bank_transaction_id, transaction_id, user_id) VALUES ('simplefin', 'bridge-prime', 'tx1', '` + rawSyncedTransactionID + `', :user_id)`,
 	})
 }
 
@@ -73,9 +73,9 @@ func seedOwnerModel(t *testing.T, store store.Store) {
 			t.Fatalf("seed checkpoint: %v", err)
 		}
 	}
-	for _, posting := range model.Postings {
-		if _, err := store.CreatePosting(posting); err != nil {
-			t.Fatalf("seed posting %s: %v", posting.ID, err)
+	for _, transaction := range model.Transactions {
+		if _, err := store.CreateTransaction(transaction); err != nil {
+			t.Fatalf("seed transaction %s: %v", transaction.ID, err)
 		}
 	}
 }
@@ -91,22 +91,22 @@ func ownerModel() *types.FinancialModel {
 			{AccountID: "checking", Balance: 500, ObservedAt: 1782950399},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
-		Postings: []types.Posting{{
-			ID: ownerPostingID, Name: "Owner", SourceAccountID: &checking,
-			Amount:     types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Transactions: []types.Transaction{{
+			ID: ownerTransactionID, Name: "Owner", SourceAccountID: &checking,
+			Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime: 1782950400, TransactionTime: 1782950400,
 		}},
 	}
 }
 
 // seedSyncState creates one synced checkpoint plus one synced pending
-// posting through the public API, so conformance tests never depend on SQL.
+// transaction through the public API, so conformance tests never depend on SQL.
 func seedSyncState(t *testing.T, store store.Store) {
 	t.Helper()
 	if _, err := store.CreateAccount(types.Account{ID: "prime_card", Name: "Prime", Enabled: true}); err != nil {
 		t.Fatalf("seed card account: %v", err)
 	}
-	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
+	seed := syncPendingTransaction("tx1", "prime_card", "2026-08-02")
 	summary, err := store.ApplySync(
 		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, Source: SourceBankSync, Provider: ProviderSimpleFIN, ObservedAt: 1785628799}},
 		[]BankDirective{syncPendingDirective(seed)})
@@ -115,23 +115,23 @@ func seedSyncState(t *testing.T, store store.Store) {
 	}
 }
 
-func loadPostingIDs(t *testing.T, store store.Store) (ids []string, sources map[string]string) {
+func loadTransactionIDs(t *testing.T, store store.Store) (ids []string, sources map[string]string) {
 	t.Helper()
 	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load model: %v", err)
 	}
-	return postingIDsFromModel(loaded)
+	return transactionIDsFromModel(loaded)
 }
 
-func postingIDsFromModel(model *types.FinancialModel) (ids []string, sources map[string]string) {
+func transactionIDsFromModel(model *types.FinancialModel) (ids []string, sources map[string]string) {
 	sources = map[string]string{}
 	if model == nil {
 		return ids, sources
 	}
-	for _, posting := range model.Postings {
-		ids = append(ids, posting.ID)
-		sources[posting.ID] = posting.Source
+	for _, transaction := range model.Transactions {
+		ids = append(ids, transaction.ID)
+		sources[transaction.ID] = transaction.Source
 	}
 	return ids, sources
 }
@@ -157,7 +157,7 @@ func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 		t.Fatalf("sync checkpoint was garbage-collected: %+v", loaded.Checkpoints)
 	}
 	if len(syncedPendingIDs(loaded)) != 1 {
-		t.Fatal("sync pending posting was garbage-collected")
+		t.Fatal("sync pending transaction was garbage-collected")
 	}
 	links, err := store.ListAccountLinks()
 	if err != nil {
@@ -185,11 +185,11 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	seedSyncRows(t, store)
 	execSyncSetup(t, store, []string{
 		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, provider, observed_at, user_id) VALUES (11, 11, 'checking', 222, 'banksync', 'simplefin', 1785715199, :user_id)`,
-		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
-		 VALUES ('` + otherSyncedPostingID + `', 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'banksync', 1, :user_id)`,
-		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id)
-		 VALUES ('` + otherSyncedPostingID + `', 11, 0, 0, :user_id)`,
-		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + otherSyncedPostingID + `', 'posting', :user_id)`,
+		`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
+		 VALUES ('` + otherSyncedTransactionID + `', 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'banksync', 1, :user_id)`,
+		`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id)
+		 VALUES ('` + otherSyncedTransactionID + `', 11, 0, 0, :user_id)`,
+		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + otherSyncedTransactionID + `', 'transaction', :user_id)`,
 	})
 	tx, err := store.db.Begin()
 	if err != nil {
@@ -210,16 +210,16 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	for _, checkpoint := range loaded.Checkpoints {
 		sources["checkpoint:"+checkpoint.AccountID+":"+strconv.FormatInt(checkpoint.ObservedAt, 10)] = checkpoint.Source
 	}
-	for _, posting := range loaded.Postings {
-		sources["posting:"+posting.ID] = posting.Source
+	for _, transaction := range loaded.Transactions {
+		sources["transaction:"+transaction.ID] = transaction.Source
 	}
 	for key, want := range map[string]string{
-		"checkpoint:checking:1785628799":  "banksync",
-		"checkpoint:checking:1785715199":  "banksync",
-		"checkpoint:checking:1782950399":  "user",
-		"posting:" + rawSyncedPostingID:   "banksync",
-		"posting:" + otherSyncedPostingID: "banksync",
-		"posting:" + ownerPostingID:       "user",
+		"checkpoint:checking:1785628799":          "banksync",
+		"checkpoint:checking:1785715199":          "banksync",
+		"checkpoint:checking:1782950399":          "user",
+		"transaction:" + rawSyncedTransactionID:   "banksync",
+		"transaction:" + otherSyncedTransactionID: "banksync",
+		"transaction:" + ownerTransactionID:       "user",
 	} {
 		if sources[key] != want {
 			t.Fatalf("source %q = %q, want %q (all rows: %v)", key, sources[key], want, sources)
@@ -227,18 +227,18 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	}
 }
 
-func syncPendingPosting(id, accountID, day string) SyncPosting {
+func syncPendingTransaction(id, accountID, day string) SyncTransaction {
 	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
 	if err != nil {
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
-	return SyncPosting{
+	return SyncTransaction{
 		ProviderAccountID: "bridge-" + accountID,
 		TransactionID:     id,
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            "Pending " + id,
 			SourceAccountID: &accountID,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
 		},
@@ -272,16 +272,16 @@ func findCheckpoint(model *types.FinancialModel, accountID string, observedAt in
 	return types.Checkpoint{}, false
 }
 
-// syncedPendingIDs lists explicitly pending sync posting IDs in a loaded
-// model, replacing raw COUNT queries over the postings table.
+// syncedPendingIDs lists explicitly pending sync transaction IDs in a loaded
+// model, replacing raw COUNT queries over the transactions table.
 func syncedPendingIDs(model *types.FinancialModel) []string {
 	var ids []string
 	if model == nil {
 		return ids
 	}
-	for _, posting := range model.Postings {
-		if posting.Pending && posting.Source != SourceUser {
-			ids = append(ids, posting.ID)
+	for _, transaction := range model.Transactions {
+		if transaction.Pending && transaction.Source != SourceUser {
+			ids = append(ids, transaction.ID)
 		}
 	}
 	return ids
@@ -289,12 +289,12 @@ func syncedPendingIDs(model *types.FinancialModel) []string {
 
 // syncPendingDirective mirrors what adapters emit for a pending seed:
 // bank source with explicit pending lifecycle.
-func syncPendingDirective(item SyncPosting) BankDirective {
+func syncPendingDirective(item SyncTransaction) BankDirective {
 	item.Source = SourceBankSync
 	item.Pending = true
 	return BankDirective{Upsert: &BankUpsert{
-		Posting: item.Posting,
-		Keys:    []BankKey{{Provider: ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+		Transaction: item.Transaction,
+		Keys:        []BankKey{{Provider: ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
 	}}
 }
 
@@ -303,18 +303,18 @@ func TestApplySyncPendingDeleteSparesUserRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedAccount(t, store, "prime_card")
 	execSyncSetup(t, store, []string{
-		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
-		 VALUES ('` + ownerPostingID + `', 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'user', 1, :user_id)`,
-		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id)
-		 VALUES ('` + ownerPostingID + `', 0, 1, 0, :user_id)`,
+		`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
+		 VALUES ('` + ownerTransactionID + `', 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'user', 1, :user_id)`,
+		`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id)
+		 VALUES ('` + ownerTransactionID + `', 0, 1, 0, :user_id)`,
 	})
 	summary, err := store.ApplySync(nil, []BankDirective{
-		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
+		syncPendingDirective(syncPendingTransaction("a", "prime_card", "2026-08-02")),
 	})
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
-	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
+	if got := countRows(t, store, "transactions", "id = '"+ownerTransactionID+"'"); got != 1 {
 		t.Fatal("owner row was deleted")
 	}
 }
@@ -322,34 +322,34 @@ func TestApplySyncPendingDeleteSparesUserRows(t *testing.T) {
 func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedAccount(t, store, "prime_card")
-	seed := syncPendingPosting("a", "prime_card", "2026-08-02")
+	seed := syncPendingTransaction("a", "prime_card", "2026-08-02")
 	if _, err := store.ApplySync(nil, []BankDirective{syncPendingDirective(seed)}); err != nil {
 		t.Fatal(err)
 	}
 	model, err := store.LoadModel()
-	if err != nil || len(model.Postings) != 1 {
+	if err != nil || len(model.Transactions) != 1 {
 		t.Fatal("seed pending missing")
 	}
-	id := model.Postings[0].ID
-	settled := syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03")
+	id := model.Transactions[0].ID
+	settled := syncSettledTransaction("posted-a", "prime_card", "Pending a", "2026-08-03")
 	settled.Source = SourceBankSync
 	summary, err := store.ApplySync(nil, []BankDirective{{Convert: &BankConvert{
-		ID:      id,
-		Posting: settled.Posting,
-		AddKeys: []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+		ID:          id,
+		Transaction: settled.Transaction,
+		AddKeys:     []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
 	}}})
 	if err != nil || summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v, err %v", summary, err)
 	}
 	converted, err := store.LoadModel()
-	if err != nil || len(converted.Postings) != 1 {
+	if err != nil || len(converted.Transactions) != 1 {
 		t.Fatal("convert changed row count")
 	}
-	row := converted.Postings[0]
+	row := converted.Transactions[0]
 	if row.ID != id || row.Source != SourceBankSync || row.Pending || row.Void || !row.Enabled {
 		t.Fatalf("converted row = %+v, want enabled settled participant", row)
 	}
-	rows, err := store.LoadBankPostings()
+	rows, err := store.LoadBankTransactions()
 	if err != nil || len(rows) != 1 || len(rows[0].Keys) != 1 || rows[0].Keys[0].TransactionID != "posted-a" {
 		t.Fatalf("keys after rotation = %+v, %v", rows, err)
 	}
@@ -358,11 +358,11 @@ func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
-	settled := syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03")
+	settled := syncSettledTransaction("posted-a", "prime_card", "Corner Store", "2026-08-03")
 	settled.Source = SourceBankSync
 	if _, err := database.ApplySync(nil, []BankDirective{{Upsert: &BankUpsert{
-		Posting: settled.Posting,
-		Keys:    []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+		Transaction: settled.Transaction,
+		Keys:        []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
 	}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -371,9 +371,9 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	var id string
-	for _, posting := range model.Postings {
-		if posting.Name == "Corner Store" {
-			id = posting.ID
+	for _, transaction := range model.Transactions {
+		if transaction.Name == "Corner Store" {
+			id = transaction.ID
 		}
 	}
 	if id == "" {
@@ -387,27 +387,27 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	restored, err := database.GetReceipt(receipt.ID)
-	if err != nil || restored.PostingID != id {
+	if err != nil || restored.TransactionID != id {
 		t.Fatalf("replacement dropped bank evidence: %+v, %v", restored, err)
 	}
-	links, err := database.ListPostingReceiptIDs()
+	links, err := database.ListTransactionReceiptIDs()
 	if err != nil || len(links[id]) != 1 || links[id][0] != receipt.ID {
-		t.Fatalf("replacement dropped posting field: %+v, %v", links, err)
+		t.Fatalf("replacement dropped transaction field: %+v, %v", links, err)
 	}
 }
 
-func syncSettledPosting(id, accountID, name, day string) SyncPosting {
+func syncSettledTransaction(id, accountID, name, day string) SyncTransaction {
 	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
 	if err != nil {
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
-	return SyncPosting{
+	return SyncTransaction{
 		ProviderAccountID: "bridge-" + accountID,
 		TransactionID:     id,
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name:            name,
 			SourceAccountID: &accountID,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
 			Enabled:         true,

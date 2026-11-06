@@ -60,24 +60,24 @@ const suppressedSyncKeysDDL = `CREATE TABLE IF NOT EXISTS suppressed_sync_keys (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	provider TEXT NOT NULL,
 	bridge_account_id TEXT NOT NULL,
-	transaction_id TEXT NOT NULL,
+	bank_transaction_id TEXT NOT NULL,
 	suppressed_at INTEGER NOT NULL,
-	PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
+	PRIMARY KEY (user_id, provider, bridge_account_id, bank_transaction_id)
 )`
 
-// postingCategoriesDDL is one assignment per posting. It is a sidecar table,
+// transactionCategoriesDDL is one assignment per transaction. It is a sidecar table,
 // not a taxonomy: the supported keys live in Go. Fresh databases get it from
 // schemaStatements; existing databases self-heal at first use so no operator
 // migration is needed for this additive metadata.
-const postingCategoriesDDL = `CREATE TABLE IF NOT EXISTS posting_categories (
+const transactionCategoriesDDL = `CREATE TABLE IF NOT EXISTS transaction_categories (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	posting_id TEXT NOT NULL,
+	transaction_id TEXT NOT NULL,
 	category TEXT NOT NULL,
 	source TEXT NOT NULL CHECK(source IN ('bank', 'inferred', 'user')),
 	producer TEXT NOT NULL DEFAULT '',
 	updated_at INTEGER NOT NULL,
-	PRIMARY KEY (user_id, posting_id),
-	FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
+	PRIMARY KEY (user_id, transaction_id),
+	FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 )`
 
 // checkpointAvailableBalancesDDL is bank evidence tied to one checkpoint.
@@ -161,7 +161,7 @@ func schemaStatements() []string {
 			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		checkpointAvailableBalancesDDL,
-		`CREATE TABLE IF NOT EXISTS postings (
+		`CREATE TABLE IF NOT EXISTS transactions (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
 			name TEXT NOT NULL,
@@ -180,37 +180,37 @@ func schemaStatements() []string {
 			PRIMARY KEY (user_id, id),
 			FOREIGN KEY(user_id, source_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
-		`CREATE INDEX IF NOT EXISTS postings_projection_slice ON postings(user_id, projection_slice_id)`,
-		`CREATE TABLE IF NOT EXISTS posting_sim (
+		`CREATE INDEX IF NOT EXISTS transactions_projection_slice ON transactions(user_id, projection_slice_id)`,
+		`CREATE TABLE IF NOT EXISTS transaction_sim (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			posting_id TEXT NOT NULL,
+			transaction_id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
 			execution_order INTEGER NOT NULL DEFAULT 0 CHECK(execution_order >= 0),
-			PRIMARY KEY(user_id, posting_id),
-			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
+			PRIMARY KEY(user_id, transaction_id),
+			FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 		)`,
-		`CREATE TABLE IF NOT EXISTS posting_claims (
+		`CREATE TABLE IF NOT EXISTS transaction_claims (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			posting_id TEXT NOT NULL,
+			transaction_id TEXT NOT NULL,
 			fulfills_rule_id TEXT NOT NULL,
 			fulfills_occurrence_date TEXT NOT NULL,
-			PRIMARY KEY(user_id, posting_id),
-			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
+			PRIMARY KEY(user_id, transaction_id),
+			FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
 			FOREIGN KEY(user_id, fulfills_rule_id) REFERENCES recurrence_rules(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
-		`CREATE TABLE IF NOT EXISTS posting_sync_keys (
+		`CREATE TABLE IF NOT EXISTS transaction_sync_keys (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			provider TEXT NOT NULL,
 			bridge_account_id TEXT NOT NULL,
+			bank_transaction_id TEXT NOT NULL,
 			transaction_id TEXT NOT NULL,
-			posting_id TEXT NOT NULL,
-			UNIQUE(user_id, posting_id),
-			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
-			PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
+			UNIQUE(user_id, transaction_id),
+			FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
+			PRIMARY KEY (user_id, provider, bridge_account_id, bank_transaction_id)
 		)`,
 		suppressedSyncKeysDDL,
-		postingCategoriesDDL,
+		transactionCategoriesDDL,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,
@@ -422,7 +422,7 @@ func schemaStatements() []string {
 			prob_p90_date TEXT,
 			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
 		)`,
-		`CREATE TABLE IF NOT EXISTS posting_fulfillment_outputs (
+		`CREATE TABLE IF NOT EXISTS transaction_fulfillment_outputs (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			projection_state_id TEXT NOT NULL,
 			kind TEXT NOT NULL,
@@ -442,7 +442,7 @@ func schemaStatements() []string {
 			first_underfulfilled_date TEXT,
 			events_json TEXT NOT NULL DEFAULT '[]',
 			dates_json TEXT NOT NULL DEFAULT '[]',
-			postings_json TEXT NOT NULL DEFAULT '[]',
+			transactions_json TEXT NOT NULL DEFAULT '[]',
 			prob_run_count INTEGER,
 			prob_fulfilled_count INTEGER,
 			prob_full_probability REAL,
@@ -592,8 +592,8 @@ func schemaStatements() []string {
 // seedAmountPresets is the factory default recipe list. It runs once on a
 // fresh plan; afterwards presets are ordinary rows the user owns.
 func seedAmountPresets() []types.AmountPreset {
-	fixed := func(expression string) types.PostingAmountResolution {
-		return types.PostingAmountResolution{
+	fixed := func(expression string) types.TransactionAmountResolution {
+		return types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": expression},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -610,7 +610,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "growth", Label: "Grows yearly by %", Enabled: true,
 			Summary: "Starts at a base amount, then grows by a yearly percent from the start date.",
 			WhenUse: "Salary that rises 3% a year, rent that climbs.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "(base) * growth"},
 				Inputs: map[string]types.AmountInputBinding{
@@ -623,7 +623,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "account-percent", Label: "Percent of account", Enabled: true,
 			Summary: "A percent of a live account balance. Example: 4% withdrawal.",
 			WhenUse: "Withdrawals tied to balance, fees tied to what you owe.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "balance * pct"},
 				Inputs: map[string]types.AmountInputBinding{
@@ -636,7 +636,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "investment-growth", Label: "Investment growth", Enabled: true,
 			Summary: "Balance times a yearly rate, split across paychecks. Add wobble to model uncertainty ranges.",
 			WhenUse: "Brokerage or savings growth with optional volatility.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "brokerage * rate"},
 				Inputs: map[string]types.AmountInputBinding{
@@ -649,7 +649,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "debt-minimum", Label: "Card minimum due", Enabled: true,
 			Summary: "Pays exactly what the card requires, no more.",
 			WhenUse: "Minimum-only debt payments.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "minimum"},
 				Inputs: map[string]types.AmountInputBinding{
@@ -661,7 +661,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "late-fee", Label: "Late fee if short", Enabled: true,
 			Summary: "Adds a flat fee only when the payment was short this month.",
 			WhenUse: "Model penalties without overcharging on-time months.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "fee"},
 				Inputs: map[string]types.AmountInputBinding{
@@ -673,7 +673,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "low-balance-fee", Label: "Low-balance fee", Enabled: true,
 			Summary: "Adds a flat fee only when the balance drops below a limit.",
 			WhenUse: "Bank fees tied to minimum balances.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "fee"},
 				Inputs: map[string]types.AmountInputBinding{
@@ -685,7 +685,7 @@ func seedAmountPresets() []types.AmountPreset {
 			Name: "federal-tax", Label: "Federal tax owed", Enabled: true,
 			Summary: "Progressive tax on gross pay minus pre-tax slices, per occurrence.",
 			WhenUse: "Tax withholding rules that read gross and 401(k) rules.",
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "progressive-bracket",
 				Config: map[string]any{
 					"deduction": 1341.67,
@@ -706,66 +706,66 @@ func seedAmountPresets() []types.AmountPreset {
 // requiredSchemaColumns covers every application table, including identity.
 // Validation prepares read-only queries; it never executes DDL or repairs shape.
 var requiredSchemaColumns = map[string]string{
-	"transaction_source_facts":       "user_id, posting_id, facts_json",
-	"analysis_inputs":                "user_id, revision",
-	"analysis_runs":                  "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
-	"analysis_findings":              "user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
-	"analysis_feedback":              "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
-	"analysis_promotions":            "user_id, pattern_key, rule_id, created_at",
-	"receipts":                       receiptColumns,
-	"blob_objects":                   "key, state, expires_at",
-	"blob_data":                      "key, data",
-	"sessions":                       "token, data, expiry",
-	"identity_grants":                "id, issuer, subject, sid, expiry, data",
-	"identity_logout_marks":          "issuer, kind, identifier, seen_at, expiry",
-	"identity_logout_tokens":         "issuer, jti, expiry",
-	"users":                          "id, issuer, subject",
-	"user_groups":                    "id, name, created_by_user_id, created_at",
-	"group_members":                  "group_id, user_id, role, joined_at, display_name",
-	"group_invites":                  "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
-	"sharing_grants":                 "owner_user_id, posting_id, audience_type, audience_id, intent, created_at",
-	"sharing_copies":                 "recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, link_id, source_revision, grant_audience_type, grant_audience_id, grant_reason, copied_at, refreshed_at",
-	"inbox_share_state":              "recipient_user_id, owner_user_id, posting_id, status, unread, dismissed, received_at, decided_at, copy_posting_id",
-	"sharing_policies":               "owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at",
-	"sharing_visibility":             "owner_user_id, posting_id, group_id, policy_version, updated_at",
-	"sharing_audit":                  "id, owner_user_id, actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at",
-	"sharing_requests":               "actor_user_id, request_id, action, owner_user_id, posting_id, audience_type, audience_id, link_id, outcome_json, created_at",
-	"splits":                         "split_id, version, source_owner_id, source_posting_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at",
-	"split_allocations":              "split_id, version, position, participant_id, amount_minor, accepted, accepted_at",
-	"split_settlements":              "settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_posting_id, actor_id, request_id, created_at",
-	"split_settlement_requests":      "actor_id, request_id, settlement_id, input_hash, created_at",
-	"friendships":                    "user_id, friend_user_id, display_name, created_at",
-	"accounts":                       "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
-	"checkpoints":                    "user_id, id, position, model_account_id, balance, source, provider, observed_at",
-	"postings":                       "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome",
-	"posting_sim":                    "user_id, posting_id, position, enabled, execution_order",
-	"posting_claims":                 "user_id, posting_id, fulfills_rule_id, fulfills_occurrence_date",
-	"posting_sync_keys":              "user_id, provider, bridge_account_id, transaction_id, posting_id",
-	"schema_migrations":              "name",
-	"planned_purchases":              "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
-	"recurrence_rules":               "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
-	"evaluations":                    "user_id, type, instance_id, position, name, enabled, config_json",
-	"model_metadata":                 "user_id, id, source_path, document_present",
-	"payment_terms":                  "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
-	"entity_ids":                     "user_id, id, kind",
-	"account_links":                  "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
-	"pinned_evaluations":             "user_id, instance_id, position",
-	"safe_spending_settings":         "user_id, id, settings_json",
-	"sync_state":                     "user_id, id, last_sync_at",
-	"sync_credentials":               "user_id, id, access_url, bridge_host, updated_at, cards_json",
-	"amount_presets":                 "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
-	"provider_connections":           "user_id, id, provider_key, status, sync_cursor, last_synced_at",
-	"projection_states":              "user_id, id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json",
-	"projection_slices":              "user_id, id, projection_state_id, from_at, to_at, built_revision, status",
-	"monte_carlo_statistics":         "user_id, id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p25, p50, p75, p90, std_dev, probability_below_zero",
-	"projection_rows":                "user_id, projection_slice_id, date, payload",
-	"net_worth_threshold_outputs":    "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date",
-	"account_balance_outputs":        "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date",
-	"posting_fulfillment_outputs":    "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, destination_limited_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, events_json, dates_json, postings_json, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90",
-	"cycle_fulfillment_outputs":      "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90",
-	"planned_purchases_outputs":      "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date",
-	"financial_independence_outputs": "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob",
-	"whatif_outputs":                 "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count",
+	"transaction_source_facts":        "user_id, transaction_id, facts_json",
+	"analysis_inputs":                 "user_id, revision",
+	"analysis_runs":                   "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
+	"analysis_findings":               "user_id, id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
+	"analysis_feedback":               "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
+	"analysis_promotions":             "user_id, pattern_key, rule_id, created_at",
+	"receipts":                        receiptColumns,
+	"blob_objects":                    "key, state, expires_at",
+	"blob_data":                       "key, data",
+	"sessions":                        "token, data, expiry",
+	"identity_grants":                 "id, issuer, subject, sid, expiry, data",
+	"identity_logout_marks":           "issuer, kind, identifier, seen_at, expiry",
+	"identity_logout_tokens":          "issuer, jti, expiry",
+	"users":                           "id, issuer, subject",
+	"user_groups":                     "id, name, created_by_user_id, created_at",
+	"group_members":                   "group_id, user_id, role, joined_at, display_name",
+	"group_invites":                   "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
+	"sharing_grants":                  "owner_user_id, transaction_id, audience_type, audience_id, intent, created_at",
+	"sharing_copies":                  "recipient_user_id, copy_transaction_id, source_owner_id, source_transaction_id, link_id, source_revision, grant_audience_type, grant_audience_id, grant_reason, copied_at, refreshed_at",
+	"inbox_share_state":               "recipient_user_id, owner_user_id, transaction_id, status, unread, dismissed, received_at, decided_at, copy_transaction_id",
+	"sharing_policies":                "owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at",
+	"sharing_visibility":              "owner_user_id, transaction_id, group_id, policy_version, updated_at",
+	"sharing_audit":                   "id, owner_user_id, actor_user_id, kind, transaction_id, audience_type, audience_id, group_id, detail_json, created_at",
+	"sharing_requests":                "actor_user_id, request_id, action, owner_user_id, transaction_id, audience_type, audience_id, link_id, outcome_json, created_at",
+	"splits":                          "split_id, version, source_owner_id, source_transaction_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at",
+	"split_allocations":               "split_id, version, position, participant_id, amount_minor, accepted, accepted_at",
+	"split_settlements":               "settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_transaction_id, actor_id, request_id, created_at",
+	"split_settlement_requests":       "actor_id, request_id, settlement_id, input_hash, created_at",
+	"friendships":                     "user_id, friend_user_id, display_name, created_at",
+	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
+	"checkpoints":                     "user_id, id, position, model_account_id, balance, source, provider, observed_at",
+	"transactions":                    "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome",
+	"transaction_sim":                 "user_id, transaction_id, position, enabled, execution_order",
+	"transaction_claims":              "user_id, transaction_id, fulfills_rule_id, fulfills_occurrence_date",
+	"transaction_sync_keys":           "user_id, provider, bridge_account_id, bank_transaction_id, transaction_id",
+	"schema_migrations":               "name",
+	"planned_purchases":               "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
+	"recurrence_rules":                "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
+	"evaluations":                     "user_id, type, instance_id, position, name, enabled, config_json",
+	"model_metadata":                  "user_id, id, source_path, document_present",
+	"payment_terms":                   "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
+	"entity_ids":                      "user_id, id, kind",
+	"account_links":                   "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
+	"pinned_evaluations":              "user_id, instance_id, position",
+	"safe_spending_settings":          "user_id, id, settings_json",
+	"sync_state":                      "user_id, id, last_sync_at",
+	"sync_credentials":                "user_id, id, access_url, bridge_host, updated_at, cards_json",
+	"amount_presets":                  "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
+	"provider_connections":            "user_id, id, provider_key, status, sync_cursor, last_synced_at",
+	"projection_states":               "user_id, id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json",
+	"projection_slices":               "user_id, id, projection_state_id, from_at, to_at, built_revision, status",
+	"monte_carlo_statistics":          "user_id, id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p25, p50, p75, p90, std_dev, probability_below_zero",
+	"projection_rows":                 "user_id, projection_slice_id, date, payload",
+	"net_worth_threshold_outputs":     "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date",
+	"account_balance_outputs":         "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date",
+	"transaction_fulfillment_outputs": "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, destination_limited_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, events_json, dates_json, transactions_json, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90",
+	"cycle_fulfillment_outputs":       "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90",
+	"planned_purchases_outputs":       "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date",
+	"financial_independence_outputs":  "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob",
+	"whatif_outputs":                  "user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count",
 }
 
 func validateSchemaObjects(db queryer) error {
@@ -830,11 +830,11 @@ func expectedSchemaTables() []string {
 		"accounts",
 		"checkpoints",
 		"checkpoint_available_balances",
-		"postings",
-		"posting_sim",
-		"posting_claims",
-		"posting_sync_keys",
-		"posting_categories",
+		"transactions",
+		"transaction_sim",
+		"transaction_claims",
+		"transaction_sync_keys",
+		"transaction_categories",
 		"schema_migrations",
 		"planned_purchases",
 		"recurrence_rules",
@@ -855,7 +855,7 @@ func expectedSchemaTables() []string {
 		"projection_rows",
 		"net_worth_threshold_outputs",
 		"account_balance_outputs",
-		"posting_fulfillment_outputs",
+		"transaction_fulfillment_outputs",
 		"cycle_fulfillment_outputs",
 		"planned_purchases_outputs",
 		"financial_independence_outputs",

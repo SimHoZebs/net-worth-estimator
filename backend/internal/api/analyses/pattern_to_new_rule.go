@@ -96,7 +96,7 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 		Name:            preview.Schedule.Name,
 		SourceAccountID: preview.Schedule.SourceAccountID,
 		Destinations:    append([]string(nil), preview.Schedule.Destinations...),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": preview.Schedule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": preview.Schedule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency:       preview.Schedule.Frequency,
 		StartDate:       preview.Schedule.StartDate,
 		Enabled:         true,

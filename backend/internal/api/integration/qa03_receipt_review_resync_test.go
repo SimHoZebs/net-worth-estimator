@@ -21,14 +21,14 @@ import (
 // QA-03 journey 1: receipt review against the real backend and store.
 //
 // Two receipt systems cross one bank re-sync here. Image receipts attach to a
-// saved posting and are reviewed through the production receipts API; mail
+// saved transaction and are reviewed through the production receipts API; mail
 // receipts arrive through the real Gmail scan/storage path. The extraction
 // step in each path is a harness stand-in (the local image adapter, the
 // Gmail fetch boundary), which the test names say outright. Everything else
 // — transport, permissions, SQLite, the sync reconcile — is production code.
 
 // qa03BankSync applies bank rows through the real reconcile path and returns
-// the stored postings keyed by bank transaction ID.
+// the stored transactions keyed by bank transaction ID.
 func qa03BankSync(t *testing.T, scoped store.Store, transactions []simplefin.Transaction) {
 	t.Helper()
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{
@@ -47,7 +47,7 @@ func qa03BankTxn(id, description, amount string, posted int64) simplefin.Transac
 	return simplefin.Transaction{ID: id, Description: description, Amount: amount, Posted: posted}
 }
 
-// qa03BankFacts snapshots every stored posting as canonical JSON keyed by
+// qa03BankFacts snapshots every stored transaction as canonical JSON keyed by
 // ID: the byte-level record a re-sync must leave untouched.
 func qa03BankFacts(t *testing.T, scoped store.Store) map[string]string {
 	t.Helper()
@@ -56,17 +56,17 @@ func qa03BankFacts(t *testing.T, scoped store.Store) map[string]string {
 		t.Fatalf("load model: %v", err)
 	}
 	facts := map[string]string{}
-	for _, posting := range model.Postings {
-		raw, err := json.Marshal(posting)
+	for _, transaction := range model.Transactions {
+		raw, err := json.Marshal(transaction)
 		if err != nil {
-			t.Fatalf("marshal posting: %v", err)
+			t.Fatalf("marshal transaction: %v", err)
 		}
-		facts[posting.ID] = string(raw)
+		facts[transaction.ID] = string(raw)
 	}
 	return facts
 }
 
-func qa03PostingIDs(facts map[string]string) []string {
+func qa03TransactionIDs(facts map[string]string) []string {
 	ids := make([]string, 0, len(facts))
 	for id := range facts {
 		ids = append(ids, id)
@@ -75,11 +75,11 @@ func qa03PostingIDs(facts map[string]string) []string {
 	return ids
 }
 
-func qa03UploadToPosting(t *testing.T, handler http.Handler, postingID string, image []byte) *httptest.ResponseRecorder {
+func qa03UploadToTransaction(t *testing.T, handler http.Handler, transactionID string, image []byte) *httptest.ResponseRecorder {
 	t.Helper()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	if err := form.WriteField("postingId", postingID); err != nil {
+	if err := form.WriteField("transactionId", transactionID); err != nil {
 		t.Fatal(err)
 	}
 	part, err := form.CreatePart(textproto.MIMEHeader{
@@ -103,7 +103,7 @@ func qa03UploadToPosting(t *testing.T, handler http.Handler, postingID string, i
 }
 
 // An image receipt reviewed through the production API keeps its confirmed
-// evidence and its posting link across a real bank re-sync, while
+// evidence and its transaction link across a real bank re-sync, while
 // untouched bank rows stay byte-identical and no duplicate rows appear.
 // Extraction here runs on the harness image adapter, named as such.
 func TestQA03ImageReceiptReviewSurvivesBankResyncWithHarnessExtraction(t *testing.T) {
@@ -118,9 +118,9 @@ func TestQA03ImageReceiptReviewSurvivesBankResyncWithHarnessExtraction(t *testin
 	})
 	before := qa03BankFacts(t, scoped)
 	if len(before) != 2 {
-		t.Fatalf("seeded postings = %d, want 2", len(before))
+		t.Fatalf("seeded transactions = %d, want 2", len(before))
 	}
-	targetID := qa03PostingIDs(before)[0]
+	targetID := qa03TransactionIDs(before)[0]
 
 	source, err := receiptmock.New()
 	if err != nil {
@@ -128,7 +128,7 @@ func TestQA03ImageReceiptReviewSurvivesBankResyncWithHarnessExtraction(t *testin
 	}
 	handler := New(scoped, Config{ReceiptSource: source})
 
-	upload := qa03UploadToPosting(t, handler, targetID, receiptmock.SampleImage)
+	upload := qa03UploadToTransaction(t, handler, targetID, receiptmock.SampleImage)
 	receipt := decodeReceipt(t, upload)
 	if receipt.Extraction != nil {
 		t.Fatal("upload must not trigger extraction")
@@ -157,11 +157,11 @@ func TestQA03ImageReceiptReviewSurvivesBankResyncWithHarnessExtraction(t *testin
 	})
 	after := qa03BankFacts(t, scoped)
 	if len(after) != 3 {
-		t.Fatalf("postings after re-sync = %d, want 3", len(after))
+		t.Fatalf("transactions after re-sync = %d, want 3", len(after))
 	}
 	for id, fact := range before {
 		if after[id] != fact {
-			t.Fatalf("bank posting %s changed across re-sync:\nbefore %s\nafter  %s", id, fact, after[id])
+			t.Fatalf("bank transaction %s changed across re-sync:\nbefore %s\nafter  %s", id, fact, after[id])
 		}
 	}
 
@@ -274,16 +274,16 @@ func TestQA03MailReceiptReviewSurvivesBankResyncWithFakeGmailFetch(t *testing.T)
 	})
 	bankAfter := qa03BankFacts(t, scoped)
 	if len(bankAfter) != len(bankBefore)+1 {
-		t.Fatalf("postings = %d, want one new row", len(bankAfter))
+		t.Fatalf("transactions = %d, want one new row", len(bankAfter))
 	}
 	for id, fact := range bankBefore {
 		if bankAfter[id] != fact {
-			t.Fatalf("bank posting %s changed across re-sync", id)
+			t.Fatalf("bank transaction %s changed across re-sync", id)
 		}
 	}
 
 	// The re-sync must not disturb the mail review, and a repeat scan must
-	// dedupe instead of duplicating either receipts or postings.
+	// dedupe instead of duplicating either receipts or transactions.
 	reread := httptest.NewRecorder()
 	handler.ServeHTTP(reread, httptest.NewRequest(http.MethodGet, "/v1/integrations/gmail/receipts?verdict=receipt,refund", nil))
 	var relisted struct {
@@ -302,6 +302,6 @@ func TestQA03MailReceiptReviewSurvivesBankResyncWithFakeGmailFetch(t *testing.T)
 	}
 	final := qa03BankFacts(t, scoped)
 	if len(final) != len(bankAfter) {
-		t.Fatalf("postings = %d, want no duplicates from the rescan", len(final))
+		t.Fatalf("transactions = %d, want no duplicates from the rescan", len(final))
 	}
 }

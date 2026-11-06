@@ -60,7 +60,7 @@ function bnplFinding(
 ): AnalysisFinding {
 	return {
 		id: "bnpl-1",
-		postingId: "posting-1",
+		transactionId: "transaction-1",
 		kind: "bnpl",
 		provider: "afterpay",
 		product: "",
@@ -75,7 +75,7 @@ function bnplFinding(
 			{
 				code: "bnpl.provider",
 				reason: "Afterpay appears.",
-				postingIds: ["posting-1"],
+				transactionIds: ["transaction-1"],
 			},
 		],
 		...overrides,
@@ -84,12 +84,12 @@ function bnplFinding(
 
 function recurringFinding(
 	id: string,
-	postingId: string,
+	transactionId: string,
 	overrides: Partial<AnalysisFinding> = {},
 ): AnalysisFinding {
 	return {
 		id,
-		postingId,
+		transactionId,
 		kind: "recurring",
 		provider: "grocer",
 		product: "monthly",
@@ -101,7 +101,7 @@ function recurringFinding(
 		runId: "run-1",
 		feedbackRevision: 1,
 		evidence: [
-			{ code: "recurring.cadence", reason: "test", postingIds: ["a", "b"] },
+			{ code: "recurring.cadence", reason: "test", transactionIds: ["a", "b"] },
 		],
 		...overrides,
 	} as AnalysisFinding;
@@ -116,7 +116,7 @@ function bankRow(overrides: Partial<Transaction> = {}): Transaction {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		kind: "posting",
+		kind: "transaction",
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,
@@ -136,7 +136,7 @@ function settleCandidate(
 	overrides: Partial<SettleCandidateRow> = {},
 ): SettleCandidateRow {
 	return {
-		postingId: "settled-1",
+		transactionId: "settled-1",
 		name: "Bistro dinner",
 		amount: 58,
 		date: "2026-10-21",
@@ -164,39 +164,39 @@ describe("buildInsightSuggestions", () => {
 		const suggestions = buildInsightSuggestions({
 			findings: [
 				recurringFinding("rec-1", "a"),
-				bnplFinding({ postingId: "posting-1" }),
+				bnplFinding({ transactionId: "transaction-1" }),
 			],
-			postingId: "posting-1",
+			transactionId: "transaction-1",
 		});
-		// The recurring fixture names other postings, so only BNPL queues.
+		// The recurring fixture names other transactions, so only BNPL queues.
 		expect(suggestions.map((item) => item.kind)).toEqual(["bnpl"]);
 	});
 
-	it("queues a repeating pattern that touches the current posting", () => {
+	it("queues a repeating pattern that touches the current transaction", () => {
 		const findings = [
 			recurringFinding("rec-1", "a", {
-				postingId: "posting-1",
+				transactionId: "transaction-1",
 				evidence: [
 					{
 						code: "recurring.cadence",
 						reason: "test",
-						postingIds: ["posting-1", "posting-2"],
+						transactionIds: ["transaction-1", "transaction-2"],
 					},
 				],
 			}),
-			recurringFinding("rec-2", "posting-2", {
+			recurringFinding("rec-2", "transaction-2", {
 				evidence: [
 					{
 						code: "recurring.cadence",
 						reason: "test",
-						postingIds: ["posting-1", "posting-2"],
+						transactionIds: ["transaction-1", "transaction-2"],
 					},
 				],
 			}),
 		];
 		const suggestions = buildInsightSuggestions({
 			findings,
-			postingId: "posting-1",
+			transactionId: "transaction-1",
 		});
 		expect(suggestions.map((item) => item.kind)).toEqual(["recurring"]);
 	});
@@ -215,7 +215,7 @@ describe("buildInsightSuggestions", () => {
 		expect(
 			buildInsightSuggestions({
 				findings: [decidedWithDuration, dismissed, stale],
-				postingId: "posting-1",
+				transactionId: "transaction-1",
 			}),
 		).toEqual([]);
 	});
@@ -226,7 +226,7 @@ describe("buildInsightSuggestions", () => {
 		});
 		const suggestions = buildInsightSuggestions({
 			findings: [confirmed],
-			postingId: "posting-1",
+			transactionId: "transaction-1",
 		});
 		expect(suggestions.map((item) => item.kind)).toEqual(["bnpl"]);
 	});
@@ -234,8 +234,8 @@ describe("buildInsightSuggestions", () => {
 	it("queues a vanished hold with a posted match before BNPL", () => {
 		const hold = bankRow();
 		const suggestions = buildInsightSuggestions({
-			findings: [bnplFinding({ postingId: hold.id })],
-			postingId: hold.id,
+			findings: [bnplFinding({ transactionId: hold.id })],
+			transactionId: hold.id,
 			voidRow: hold,
 			candidates: [settleCandidate()],
 		});
@@ -246,7 +246,7 @@ describe("buildInsightSuggestions", () => {
 		const hold = bankRow();
 		const suggestions = buildInsightSuggestions({
 			findings: [],
-			postingId: hold.id,
+			transactionId: hold.id,
 			voidRow: hold,
 			candidates: [],
 		});
@@ -276,9 +276,9 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [bnplFinding()],
-					postingId: "posting-1",
+					transactionId: "transaction-1",
 				})}
-				names={new Map([["posting-1", "Afterpay"]])}
+				names={new Map([["transaction-1", "Afterpay"]])}
 				readOnly={false}
 				onDone={() => {}}
 			/>,
@@ -298,7 +298,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [],
-					postingId: hold.id,
+					transactionId: hold.id,
 					voidRow: hold,
 					candidates: [settled],
 				})}
@@ -313,7 +313,7 @@ describe("TransactionInsightsPanel", () => {
 			screen.getByRole("button", { name: "Merge and remove hold" }),
 		);
 		await waitFor(() =>
-			expect(onMergeVoid).toHaveBeenCalledWith(settled.postingId),
+			expect(onMergeVoid).toHaveBeenCalledWith(settled.transactionId),
 		);
 		expect(screen.getByText("All caught up")).toBeTruthy();
 	});
@@ -327,7 +327,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [],
-					postingId: hold.id,
+					transactionId: hold.id,
 					voidRow: hold,
 					candidates: [settleCandidate()],
 				})}
@@ -355,7 +355,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [],
-					postingId: hold.id,
+					transactionId: hold.id,
 					voidRow: hold,
 					candidates: [settled],
 				})}
@@ -373,7 +373,7 @@ describe("TransactionInsightsPanel", () => {
 		const hold = bankRow();
 		const first = settleCandidate();
 		const second = settleCandidate({
-			postingId: "settled-2",
+			transactionId: "settled-2",
 			name: "Bistro lunch",
 			amount: 51,
 		});
@@ -381,7 +381,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [],
-					postingId: hold.id,
+					transactionId: hold.id,
 					voidRow: hold,
 					candidates: [first, second],
 				})}
@@ -392,13 +392,13 @@ describe("TransactionInsightsPanel", () => {
 			/>,
 		);
 		fireEvent.change(screen.getByLabelText("Posted as"), {
-			target: { value: second.postingId },
+			target: { value: second.transactionId },
 		});
 		fireEvent.click(
 			screen.getByRole("button", { name: "Merge and remove hold" }),
 		);
 		await waitFor(() =>
-			expect(onMergeVoid).toHaveBeenCalledWith(second.postingId),
+			expect(onMergeVoid).toHaveBeenCalledWith(second.transactionId),
 		);
 	});
 
@@ -412,7 +412,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [bnplFinding()],
-					postingId: "posting-1",
+					transactionId: "transaction-1",
 				})}
 				names={new Map()}
 				readOnly={false}
@@ -439,7 +439,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [bnplFinding()],
-					postingId: "posting-1",
+					transactionId: "transaction-1",
 				})}
 				names={new Map()}
 				readOnly={false}
@@ -464,7 +464,7 @@ describe("TransactionInsightsPanel", () => {
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [bnplFinding()],
-					postingId: "posting-1",
+					transactionId: "transaction-1",
 				})}
 				names={new Map()}
 				readOnly={false}
@@ -501,7 +501,7 @@ describe("TransactionInsightsPanel", () => {
 							},
 						}),
 					],
-					postingId: "posting-1",
+					transactionId: "transaction-1",
 				})}
 				names={new Map()}
 				readOnly={false}

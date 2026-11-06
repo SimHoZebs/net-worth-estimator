@@ -102,12 +102,12 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 	validateUniqueIDs(&issues, accountIDList, "account.id", func(index int, field string) []any {
 		return pathWithField([]any{"accounts", index}, field)
 	})
-	postingIDList := make([]string, len(model.Postings))
-	for i, posting := range model.Postings {
-		postingIDList[i] = posting.ID
+	transactionIDList := make([]string, len(model.Transactions))
+	for i, transaction := range model.Transactions {
+		transactionIDList[i] = transaction.ID
 	}
-	validateUniqueIDs(&issues, postingIDList, "posting.id", func(index int, field string) []any {
-		return pathWithField([]any{"postings", index}, field)
+	validateUniqueIDs(&issues, transactionIDList, "transaction.id", func(index int, field string) []any {
+		return pathWithField([]any{"transactions", index}, field)
 	})
 	ruleIDList := make([]string, len(model.Schedules))
 	for i, rule := range model.Schedules {
@@ -127,11 +127,11 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 		validateEvaluationInstanceIDs(&issues, model)
 	}
 
-	// Transaction identity checks: posting, rule, and planned-purchase IDs share
+	// Transaction identity checks: transaction, rule, and planned-purchase IDs share
 	// one namespace with account IDs.
-	transactionIDs := make(map[string]bool, len(model.Postings)+len(model.Schedules)+len(model.PlannedPurchases))
-	for _, posting := range model.Postings {
-		transactionIDs[posting.ID] = true
+	transactionIDs := make(map[string]bool, len(model.Transactions)+len(model.Schedules)+len(model.PlannedPurchases))
+	for _, transaction := range model.Transactions {
+		transactionIDs[transaction.ID] = true
 	}
 	for index, rule := range model.Schedules {
 		if transactionIDs[rule.ID] {
@@ -194,10 +194,10 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 
 	dependencies := validateTransactionAmounts(&issues, model, accountIDs, transactionIDs)
 	validatePurchases(&issues, model, dependencies)
-	validatePostingDependencies(&issues, model, dependencies)
-	validatePostingRoutes(&issues, model.Postings, accountIDs)
+	validateTransactionDependencies(&issues, model, dependencies)
+	validateTransactionRoutes(&issues, model.Transactions, accountIDs)
 	validateSchedules(&issues, model, accountIDs)
-	validatePostingClaims(&issues, model)
+	validateTransactionClaims(&issues, model)
 	validateAccountBounds(&issues, model.Accounts)
 	if includeEvaluation {
 		validateEvaluationConfigs(&issues, model)
@@ -279,15 +279,15 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, m
 	}
 }
 
-// validateTransactionAmounts validates amount descriptors for manual postings
+// validateTransactionAmounts validates amount descriptors for manual transactions
 // and schedule templates together. References may name transaction or schedule IDs, so
 // the dependency graph spans both.
 func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool, transactionIDsSet map[string]bool) map[string][]string {
 	dependencies := map[string][]string{}
-	validateAmount := func(id string, amount types.PostingAmountResolution, path []any) {
+	validateAmount := func(id string, amount types.TransactionAmountResolution, path []any) {
 		deps, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{
-			AccountIDs: accountIDs,
-			PostingIDs: transactionIDsSet,
+			AccountIDs:     accountIDs,
+			TransactionIDs: transactionIDsSet,
 		})
 		if err != nil {
 			message := err.Error()
@@ -298,26 +298,26 @@ func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *typ
 			} else if parseErr, ok := err.(*ParseError); ok {
 				message = parseErr.Error()
 			}
-			addIssue(issues, types.SeverityError, "posting.amount.invalid", message,
+			addIssue(issues, types.SeverityError, "transaction.amount.invalid", message,
 				pathWithField(path, "amount")...)
 			return
 		}
 		dependencies[id] = deps
 	}
-	for index := range model.Postings {
-		posting := &model.Postings[index]
-		validateAmount(posting.ID, posting.Amount, []any{"postings", index})
-		if CountVolatileRateInputs(posting.Amount) > 1 {
-			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
+	for index := range model.Transactions {
+		transaction := &model.Transactions[index]
+		validateAmount(transaction.ID, transaction.Amount, []any{"transactions", index})
+		if CountVolatileRateInputs(transaction.Amount) > 1 {
+			addIssue(issues, types.SeverityError, "transaction.amount.multiple_volatile_rates",
 				"Amounts carry at most one volatile provider input: one transaction shares one pre-sampled annual rate.",
-				pathWithField([]any{"postings", index}, "amount")...)
+				pathWithField([]any{"transactions", index}, "amount")...)
 		}
 	}
 	for index := range model.Schedules {
 		rule := &model.Schedules[index]
 		validateAmount(rule.ID, rule.Amount, []any{"schedules", index})
 		if CountVolatileRateInputs(rule.Amount) > 1 {
-			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
+			addIssue(issues, types.SeverityError, "transaction.amount.multiple_volatile_rates",
 				"Amounts carry at most one volatile provider input: one transaction shares one pre-sampled annual rate.",
 				pathWithField([]any{"schedules", index}, "amount")...)
 		}
@@ -325,7 +325,7 @@ func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *typ
 	return dependencies
 }
 
-func validatePostingDependencies(issues *[]types.ModelValidationIssue, model *types.FinancialModel, dependencies map[string][]string) {
+func validateTransactionDependencies(issues *[]types.ModelValidationIssue, model *types.FinancialModel, dependencies map[string][]string) {
 	visiting := map[string]bool{}
 	visited := map[string]bool{}
 	cyclic := map[string]bool{}
@@ -353,71 +353,71 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, model *ty
 		return hasCycle
 	}
 
-	for index := range model.Postings {
-		posting := &model.Postings[index]
-		if !visit(posting.ID) {
+	for index := range model.Transactions {
+		transaction := &model.Transactions[index]
+		if !visit(transaction.ID) {
 			continue
 		}
-		addIssue(issues, types.SeverityError, "posting.amount.circular",
-			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", posting.ID),
-			pathWithField([]any{"postings", index}, "amount")...)
+		addIssue(issues, types.SeverityError, "transaction.amount.circular",
+			fmt.Sprintf("Amount resolution for '%s' creates a circular transaction dependency.", transaction.ID),
+			pathWithField([]any{"transactions", index}, "amount")...)
 	}
 	for index := range model.Schedules {
 		rule := &model.Schedules[index]
 		if !visit(rule.ID) {
 			continue
 		}
-		addIssue(issues, types.SeverityError, "posting.amount.circular",
-			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", rule.ID),
+		addIssue(issues, types.SeverityError, "transaction.amount.circular",
+			fmt.Sprintf("Amount resolution for '%s' creates a circular transaction dependency.", rule.ID),
 			pathWithField([]any{"schedules", index}, "amount")...)
 	}
 }
 
-func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []types.Posting, accountIDs map[string]bool) {
-	for index := range postings {
-		posting := &postings[index]
-		if posting.SourceAccountID != nil && !accountIDs[*posting.SourceAccountID] {
-			addIssue(issues, types.SeverityError, "posting.source.missing",
-				fmt.Sprintf("Transaction source account '%s' does not exist.", *posting.SourceAccountID),
-				pathWithField([]any{"postings", index}, "sourceAccountId")...)
+func validateTransactionRoutes(issues *[]types.ModelValidationIssue, transactions []types.Transaction, accountIDs map[string]bool) {
+	for index := range transactions {
+		transaction := &transactions[index]
+		if transaction.SourceAccountID != nil && !accountIDs[*transaction.SourceAccountID] {
+			addIssue(issues, types.SeverityError, "transaction.source.missing",
+				fmt.Sprintf("Transaction source account '%s' does not exist.", *transaction.SourceAccountID),
+				pathWithField([]any{"transactions", index}, "sourceAccountId")...)
 		}
-		if posting.Destinations != nil {
+		if transaction.Destinations != nil {
 			seen := map[string]bool{}
-			for _, destinationID := range posting.Destinations {
+			for _, destinationID := range transaction.Destinations {
 				if !accountIDs[destinationID] {
-					addIssue(issues, types.SeverityError, "posting.destination.missing",
+					addIssue(issues, types.SeverityError, "transaction.destination.missing",
 						fmt.Sprintf("Transaction destination account '%s' does not exist.", destinationID),
-						pathWithField([]any{"postings", index}, "destinations")...)
+						pathWithField([]any{"transactions", index}, "destinations")...)
 				}
 				if seen[destinationID] {
 					addIssue(issues, types.SeverityError, "schedule.destinations.duplicate",
 						fmt.Sprintf("Destination account '%s' appears more than once.", destinationID),
-						pathWithField([]any{"postings", index}, "destinations")...)
+						pathWithField([]any{"transactions", index}, "destinations")...)
 				}
 				seen[destinationID] = true
 			}
 		}
-		if posting.SourceAccountID == nil && len(posting.Destinations) == 0 {
-			addIssue(issues, types.SeverityError, "posting.accounts.empty",
+		if transaction.SourceAccountID == nil && len(transaction.Destinations) == 0 {
+			addIssue(issues, types.SeverityError, "transaction.accounts.empty",
 				"Transactions must set sourceAccountId, destinations, or both.",
-				[]any{"postings", index}...)
+				[]any{"transactions", index}...)
 		}
-		if posting.SourceAccountID != nil && containsString(posting.Destinations, *posting.SourceAccountID) {
-			addIssue(issues, types.SeverityError, "posting.accounts.same",
+		if transaction.SourceAccountID != nil && containsString(transaction.Destinations, *transaction.SourceAccountID) {
+			addIssue(issues, types.SeverityError, "transaction.accounts.same",
 				"Transaction sourceAccountId must not appear in destinations.",
-				[]any{"postings", index}...)
+				[]any{"transactions", index}...)
 		}
 		// Pending seeds and void holds carry no posted date: the bridge
 		// reports Posted == 0 until a charge posts.
-		if posting.PostedTime <= 0 && !posting.Pending && !posting.Void {
-			addIssue(issues, types.SeverityError, "posting.postedTime.invalid",
-				fmt.Sprintf("Transaction '%s' posted time must be positive Unix seconds.", posting.ID),
-				pathWithField([]any{"postings", index}, "postedTime")...)
+		if transaction.PostedTime <= 0 && !transaction.Pending && !transaction.Void {
+			addIssue(issues, types.SeverityError, "transaction.postedTime.invalid",
+				fmt.Sprintf("Transaction '%s' posted time must be positive Unix seconds.", transaction.ID),
+				pathWithField([]any{"transactions", index}, "postedTime")...)
 		}
-		if posting.TransactionTime <= 0 {
-			addIssue(issues, types.SeverityError, "posting.transactionTime.invalid",
-				fmt.Sprintf("Transaction '%s' transaction time must be positive Unix seconds.", posting.ID),
-				pathWithField([]any{"postings", index}, "transactionTime")...)
+		if transaction.TransactionTime <= 0 {
+			addIssue(issues, types.SeverityError, "transaction.transactionTime.invalid",
+				fmt.Sprintf("Transaction '%s' transaction time must be positive Unix seconds.", transaction.ID),
+				pathWithField([]any{"transactions", index}, "transactionTime")...)
 		}
 	}
 }
@@ -486,33 +486,33 @@ func validateSchedules(issues *[]types.ModelValidationIssue, model *types.Financ
 	}
 }
 
-// validatePostingClaims checks that each claim names a real scheduled
+// validateTransactionClaims checks that each claim names a real scheduled
 // occurrence of its schedule, and that no occurrence is claimed twice. Claims
 // are manual: validation only verifies the named occurrence exists.
-func validatePostingClaims(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
+func validateTransactionClaims(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
 	rulesByID := make(map[string]*types.Schedule, len(model.Schedules))
 	for index := range model.Schedules {
 		rule := &model.Schedules[index]
 		rulesByID[rule.ID] = rule
 	}
 	claimed := map[string]bool{}
-	for index := range model.Postings {
-		posting := &model.Postings[index]
-		if posting.Claim == nil {
+	for index := range model.Transactions {
+		transaction := &model.Transactions[index]
+		if transaction.Claim == nil {
 			continue
 		}
-		base := []any{"postings", index, "claim"}
-		claim := posting.Claim
+		base := []any{"transactions", index, "claim"}
+		claim := transaction.Claim
 		rule, ok := rulesByID[claim.ScheduleID]
 		if !ok {
-			addIssue(issues, types.SeverityError, "posting.claim.schedule.missing",
-				fmt.Sprintf("Transaction '%s' claims schedule '%s', which does not exist.", posting.ID, claim.ScheduleID),
+			addIssue(issues, types.SeverityError, "transaction.claim.schedule.missing",
+				fmt.Sprintf("Transaction '%s' claims schedule '%s', which does not exist.", transaction.ID, claim.ScheduleID),
 				append(base, "scheduleId")...)
 			continue
 		}
 		if !IsValidIsoDate(claim.OccurrenceDate) {
-			addIssue(issues, types.SeverityError, "posting.claim.date.format",
-				fmt.Sprintf("Transaction '%s' claim occurrenceDate must be a YYYY-MM-DD calendar date.", posting.ID),
+			addIssue(issues, types.SeverityError, "transaction.claim.date.format",
+				fmt.Sprintf("Transaction '%s' claim occurrenceDate must be a YYYY-MM-DD calendar date.", transaction.ID),
 				append(base, "occurrenceDate")...)
 			continue
 		}
@@ -520,21 +520,21 @@ func validatePostingClaims(issues *[]types.ModelValidationIssue, model *types.Fi
 			continue // reported by validateSchedules
 		}
 		if CompareIsoDates(claim.OccurrenceDate, rule.StartDate) < 0 {
-			addIssue(issues, types.SeverityError, "posting.claim.date.range",
-				fmt.Sprintf("Transaction '%s' claims %s, which is before schedule '%s' starts.", posting.ID, claim.OccurrenceDate, rule.ID),
+			addIssue(issues, types.SeverityError, "transaction.claim.date.range",
+				fmt.Sprintf("Transaction '%s' claims %s, which is before schedule '%s' starts.", transaction.ID, claim.OccurrenceDate, rule.ID),
 				append(base, "occurrenceDate")...)
 			continue
 		}
 		scheduled := ruleOccursOn(rule, claim.OccurrenceDate)
 		if !scheduled {
-			addIssue(issues, types.SeverityError, "posting.claim.date.unscheduled",
-				fmt.Sprintf("Transaction '%s' claims %s, which is not a scheduled occurrence of schedule '%s'.", posting.ID, claim.OccurrenceDate, rule.ID),
+			addIssue(issues, types.SeverityError, "transaction.claim.date.unscheduled",
+				fmt.Sprintf("Transaction '%s' claims %s, which is not a scheduled occurrence of schedule '%s'.", transaction.ID, claim.OccurrenceDate, rule.ID),
 				append(base, "occurrenceDate")...)
 			continue
 		}
 		key := claim.ScheduleID + "\x00" + claim.OccurrenceDate
 		if claimed[key] {
-			addIssue(issues, types.SeverityError, "posting.claim.duplicate",
+			addIssue(issues, types.SeverityError, "transaction.claim.duplicate",
 				fmt.Sprintf("Schedule '%s' occurrence on %s is claimed more than once.", claim.ScheduleID, claim.OccurrenceDate),
 				base...)
 			continue

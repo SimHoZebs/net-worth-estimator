@@ -20,10 +20,10 @@ import { useUserScope } from "./useUserScope.ts";
 export const analysisFindingsKey = (scope = getUserScope()) =>
 	["user-resources", scope.key, "analysis-findings"] as const;
 
-export function useAnalysisFindings(postingIds?: string[], cursor = "") {
+export function useAnalysisFindings(transactionIds?: string[], cursor = "") {
 	const scope = useUserScope();
-	const ids = postingIds
-		? [...new Set(postingIds)].sort().join(",")
+	const ids = transactionIds
+		? [...new Set(transactionIds)].sort().join(",")
 		: undefined;
 	return useQuery(
 		{
@@ -32,7 +32,7 @@ export function useAnalysisFindings(postingIds?: string[], cursor = "") {
 			queryFn: async ({ signal }) => {
 				const result = (
 					await listAnalysisFindings(
-						{ postingIds: ids, cursor, limit: 100 },
+						{ transactionIds: ids, cursor, limit: 100 },
 						{ signal },
 					)
 				).data;

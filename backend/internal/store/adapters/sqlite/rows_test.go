@@ -7,13 +7,13 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func testPostingFixture(id string) types.Posting {
+func testTransactionFixture(id string) types.Transaction {
 	source := "checking"
-	return types.Posting{
+	return types.Transaction{
 		ID:              id,
-		Name:            "Posting " + id,
+		Name:            "Transaction " + id,
 		SourceAccountID: &source,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1782950400, TransactionTime: 1782950400,
 		Enabled: true,
 	}
@@ -24,7 +24,7 @@ func testRuleFixture(id string) types.Schedule {
 		ID:        id,
 		Name:      "Rule " + id,
 		Frequency: types.FrequencyMonthly,
-		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		StartDate: "2026-01-01",
 		Enabled:   true,
 	}
@@ -91,8 +91,8 @@ func TestRowIDRegistrySpansTables(t *testing.T) {
 	if _, err := store.CreateAccount(types.Account{ID: shared, Name: "Account"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	if _, err := store.CreatePosting(testPostingFixture(shared)); !IsIDConflict(err) {
-		t.Fatalf("posting over account id err = %v, want id-conflict", err)
+	if _, err := store.CreateTransaction(testTransactionFixture(shared)); !IsIDConflict(err) {
+		t.Fatalf("transaction over account id err = %v, want id-conflict", err)
 	}
 	if _, err := store.CreateSchedule(testRuleFixture(shared)); !IsIDConflict(err) {
 		t.Fatalf("rule over account id err = %v, want id-conflict", err)
@@ -103,18 +103,18 @@ func TestRowIDRegistrySpansTables(t *testing.T) {
 	if err := store.DeleteAccount(shared); err != nil {
 		t.Fatalf("delete account: %v", err)
 	}
-	if _, err := store.CreatePosting(testPostingFixture(shared)); err != nil {
-		t.Fatalf("posting over released id: %v", err)
+	if _, err := store.CreateTransaction(testTransactionFixture(shared)); err != nil {
+		t.Fatalf("transaction over released id: %v", err)
 	}
 }
 
-func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
+func TestRowTransactionRuleCheckpointCRUD(t *testing.T) {
 	store := openTestStore(t)
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	if _, err := store.CreatePosting(testPostingFixture("")); err != nil {
-		t.Fatalf("create generated posting: %v", err)
+	if _, err := store.CreateTransaction(testTransactionFixture("")); err != nil {
+		t.Fatalf("create generated transaction: %v", err)
 	}
 	rule, err := store.CreateSchedule(testRuleFixture("rent"))
 	if err != nil {
@@ -155,8 +155,8 @@ func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
 	if len(loaded.Checkpoints) != 0 || len(loaded.Schedules) != 0 || len(loaded.PaymentTerms) != 0 {
 		t.Fatalf("residual rows: %+v", loaded)
 	}
-	if len(loaded.Postings) != 1 {
-		t.Fatalf("postings = %+v, want the generated one", loaded.Postings)
+	if len(loaded.Transactions) != 1 {
+		t.Fatalf("transactions = %+v, want the generated one", loaded.Transactions)
 	}
 }
 

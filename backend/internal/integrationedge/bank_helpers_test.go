@@ -8,11 +8,11 @@ import (
 )
 
 // advSplitInput builds a two-participant split over one real shared source
-// posting. Splits authorize every participant against the live source, so
+// transaction. Splits authorize every participant against the live source, so
 // the source must exist and be shared; a random ID fails closed upstream.
-func advSplitInput(world *advWorld, sourcePostingID string) store.SplitInput {
+func advSplitInput(world *advWorld, sourceTransactionID string) store.SplitInput {
 	return store.SplitInput{
-		SourceOwnerID: world.owner, SourcePostingID: sourcePostingID,
+		SourceOwnerID: world.owner, SourceTransactionID: sourceTransactionID,
 		InitiatorID: world.owner, Currency: "USD",
 		TotalMinor: 100, ParticipantIDs: []string{world.owner, world.second},
 	}
@@ -24,9 +24,9 @@ func advSeedBankPending(t *testing.T, scoped store.Store, name, amount string, d
 	t.Helper()
 	source := "checking"
 	_, err := scoped.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
-		Posting: types.Posting{
+		Transaction: types.Transaction{
 			Name: name, Source: store.SourceBankSync, SourceAccountID: &source,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      day,
 			TransactionTime: day,
 			Enabled:         true,
@@ -41,9 +41,9 @@ func advSeedBankPending(t *testing.T, scoped store.Store, name, amount string, d
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range model.Postings {
-		if posting.Name == name && posting.Pending {
-			return posting.ID
+	for _, transaction := range model.Transactions {
+		if transaction.Name == name && transaction.Pending {
+			return transaction.ID
 		}
 	}
 	t.Fatalf("bank row %q missing after apply", name)

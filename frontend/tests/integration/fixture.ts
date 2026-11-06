@@ -70,7 +70,7 @@ export async function readSavedServerModel() {
 		type account = { id: string; minBalance: number };
 		return {
 			accounts: body.model.accounts as account[],
-			postings: body.model.postings as transaction[],
+			transactions: body.model.transactions as transaction[],
 			schedules: (body.model.schedules ?? []) as transaction[],
 		};
 	} finally {
@@ -78,7 +78,7 @@ export async function readSavedServerModel() {
 	}
 }
 
-export interface SharingSeedPosting {
+export interface SharingSeedTransaction {
 	name: string;
 	amount: string;
 	day?: string;
@@ -88,19 +88,19 @@ export interface SharingSeedPosting {
 export interface SharingSeed {
 	groupId: string;
 	owner: string;
-	postings: Array<{ id: string; name: string }>;
+	transactions: Array<{ id: string; name: string }>;
 }
 
-/** Seed one group with granted postings for the fixture user to view. */
+/** Seed one group with granted transactions for the fixture user to view. */
 export async function seedSharingFixture(
 	groupName: string,
 	ownerDisplay: string,
-	postings: SharingSeedPosting[],
+	transactions: SharingSeedTransaction[],
 ): Promise<SharingSeed> {
 	const api = await request.newContext();
 	try {
 		const response = await api.post(`${FIXTURE_API}/__fixture/sharing`, {
-			data: { groupName, ownerDisplay, postings },
+			data: { groupName, ownerDisplay, transactions },
 		});
 		if (!response.ok())
 			throw new Error(
@@ -114,20 +114,20 @@ export async function seedSharingFixture(
 
 export interface InboxSeed {
 	owner: string;
-	postings: Array<{ id: string; name: string }>;
+	transactions: Array<{ id: string; name: string }>;
 	revoked: Array<{ id: string; name: string }>;
 }
 
-/** Seed direct shares to the fixture user. Named postings in `revoked` are
+/** Seed direct shares to the fixture user. Named transactions in `revoked` are
  * taken back before the test starts, so they surface on the canceled tab. */
 export async function seedInboxFixture(
-	postings: SharingSeedPosting[],
+	transactions: SharingSeedTransaction[],
 	revoked: string[] = [],
 ): Promise<InboxSeed> {
 	const api = await request.newContext();
 	try {
 		const response = await api.post(`${FIXTURE_API}/__fixture/inbox`, {
-			data: { postings, revoked },
+			data: { transactions, revoked },
 		});
 		if (!response.ok())
 			throw new Error(

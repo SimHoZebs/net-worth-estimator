@@ -17,7 +17,7 @@ const (
 
 type FISource struct {
 	Type                   string   `json:"type"` // "cashflow" | "asset"
-	PostingID              string   `json:"postingId,omitempty"`
+	TransactionID          string   `json:"transactionId,omitempty"`
 	AccountID              string   `json:"accountId,omitempty"`
 	Included               bool     `json:"included"`
 	WithdrawalRateOverride *float64 `json:"withdrawalRateOverride,omitempty"`
@@ -32,7 +32,7 @@ type FIPlan struct {
 	EvaluationYears          int               `json:"evaluationYears"`
 	RequiredConfidence       float64           `json:"requiredConfidence"`
 	Sources                  []FISource        `json:"sources"`
-	ContinuingPostingIDs     []string          `json:"continuingPostingIds"`
+	ContinuingTransactionIDs []string          `json:"continuingTransactionIds"`
 	PrincipalPolicy          FIPrincipalPolicy `json:"principalPolicy"`
 }
 
@@ -49,8 +49,8 @@ type AccountBalanceConfig struct {
 	Target    float64 `json:"target"`
 }
 
-type PostingFulfillmentConfig struct {
-	PostingIDs []string `json:"postingIds"` // nil = null (all)
+type TransactionFulfillmentConfig struct {
+	TransactionIDs []string `json:"transactionIds"` // nil = null (all)
 }
 
 // CycleFulfillmentConfig targets a statement cycle shared across a
@@ -69,12 +69,12 @@ type CycleFulfillmentConfig struct {
 // addition with the same identity. The simulator overlays this set in a branch
 // without mutating saved rows. Promote replays it as sequential row writes.
 type WhatIfConfig struct {
-	AddedAccounts       []Account  `json:"addedAccounts,omitempty"`
-	AddedPostings       []Posting  `json:"addedPostings,omitempty"`
-	AddedRules          []Schedule `json:"addedSchedules,omitempty"`
-	DisabledAccountIDs  []string   `json:"disabledAccountIds,omitempty"`
-	DisabledPostingIDs  []string   `json:"disabledPostingIds,omitempty"`
-	DisabledScheduleIDs []string   `json:"disabledScheduleIds,omitempty"`
+	AddedAccounts          []Account     `json:"addedAccounts,omitempty"`
+	AddedTransactions      []Transaction `json:"addedTransactions,omitempty"`
+	AddedRules             []Schedule    `json:"addedSchedules,omitempty"`
+	DisabledAccountIDs     []string      `json:"disabledAccountIds,omitempty"`
+	DisabledTransactionIDs []string      `json:"disabledTransactionIds,omitempty"`
+	DisabledScheduleIDs    []string      `json:"disabledScheduleIds,omitempty"`
 }
 
 // EvaluationInstance is the generic configured evaluation row.
@@ -97,22 +97,22 @@ type (
 )
 
 type EvaluationTables struct {
-	FinancialIndependence []FIEvaluation                  `json:"financialIndependence"`
-	NetWorthThreshold     []ThresholdEvaluation           `json:"netWorthThreshold"`
-	AccountBalance        []BalanceEvaluation             `json:"accountBalance"`
-	PostingFulfillment    []FulfillmentEvaluation         `json:"postingFulfillment"`
-	CycleFulfillment      []CycleEvaluation               `json:"cycleFulfillment"`
-	PlannedPurchases      []EvaluationInstance[JsonValue] `json:"plannedPurchases,omitempty"`
-	WhatIf                []WhatIfEvaluation              `json:"whatIf,omitempty"`
+	FinancialIndependence  []FIEvaluation                  `json:"financialIndependence"`
+	NetWorthThreshold      []ThresholdEvaluation           `json:"netWorthThreshold"`
+	AccountBalance         []BalanceEvaluation             `json:"accountBalance"`
+	TransactionFulfillment []FulfillmentEvaluation         `json:"transactionFulfillment"`
+	CycleFulfillment       []CycleEvaluation               `json:"cycleFulfillment"`
+	PlannedPurchases       []EvaluationInstance[JsonValue] `json:"plannedPurchases,omitempty"`
+	WhatIf                 []WhatIfEvaluation              `json:"whatIf,omitempty"`
 }
 
 func EmptyEvaluationTables() EvaluationTables {
 	return EvaluationTables{
-		FinancialIndependence: []FIEvaluation{},
-		NetWorthThreshold:     []ThresholdEvaluation{},
-		AccountBalance:        []BalanceEvaluation{},
-		PostingFulfillment:    []FulfillmentEvaluation{},
-		CycleFulfillment:      []CycleEvaluation{},
+		FinancialIndependence:  []FIEvaluation{},
+		NetWorthThreshold:      []ThresholdEvaluation{},
+		AccountBalance:         []BalanceEvaluation{},
+		TransactionFulfillment: []FulfillmentEvaluation{},
+		CycleFulfillment:       []CycleEvaluation{},
 	}
 }
 

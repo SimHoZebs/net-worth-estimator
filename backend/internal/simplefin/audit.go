@@ -26,13 +26,13 @@ type HistoricalVoidPair struct {
 func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []HistoricalVoidPair {
 	var pairs []HistoricalVoidPair
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !row.Posting.Void || !hasSimpleFINKey(row) {
+		if row.Transaction.Source != store.SourceBankSync || !row.Transaction.Void || !hasSimpleFINKey(row) {
 			continue
 		}
-		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
+		if account, ok := rowAccount(row.Transaction); !ok || account != modelAccountID {
 			continue
 		}
-		if !profileForPosting(row.Posting).AutoConvert {
+		if !profileForTransaction(row.Transaction).AutoConvert {
 			continue
 		}
 		candidates := SettleCandidates(row, bank)
@@ -40,16 +40,16 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 			continue
 		}
 		match := candidates[0]
-		voidAmount, _ := row.Posting.Amount.Config["expression"].(string)
-		settledAmount, _ := match.Posting.Amount.Config["expression"].(string)
+		voidAmount, _ := row.Transaction.Amount.Config["expression"].(string)
+		settledAmount, _ := match.Transaction.Amount.Config["expression"].(string)
 		pairs = append(pairs, HistoricalVoidPair{
-			VoidID:        row.Posting.ID,
-			SettledID:     match.Posting.ID,
-			Name:          match.Posting.Name,
+			VoidID:        row.Transaction.ID,
+			SettledID:     match.Transaction.ID,
+			Name:          match.Transaction.Name,
 			VoidAmount:    voidAmount,
 			SettledAmount: settledAmount,
-			VoidTime:      row.Posting.TransactionTime,
-			SettledTime:   match.Posting.PostedTime,
+			VoidTime:      row.Transaction.TransactionTime,
+			SettledTime:   match.Transaction.PostedTime,
 		})
 	}
 	return pairs

@@ -46,8 +46,8 @@ func TestIntegrationEdgeFeedPagination10k_RealSQLite_RealHTTP(t *testing.T) {
 		}
 		for _, raw := range items {
 			item, _ := raw.(map[string]any)
-			posting, _ := item["posting"].(map[string]any)
-			id, _ := posting["id"].(string)
+			transaction, _ := item["transaction"].(map[string]any)
+			id, _ := transaction["id"].(string)
 			if seen[id] {
 				t.Fatalf("page %d duplicates row %q across pages", page, id)
 			}
@@ -111,8 +111,8 @@ func TestIntegrationEdgeFeedChain1k_RealSQLite_RealHTTP(t *testing.T) {
 		}
 		for _, raw := range items {
 			item, _ := raw.(map[string]any)
-			posting, _ := item["posting"].(map[string]any)
-			id, _ := posting["id"].(string)
+			transaction, _ := item["transaction"].(map[string]any)
+			id, _ := transaction["id"].(string)
 			if seen[id] {
 				t.Fatalf("page %d duplicates row %q: page overlap", pages, id)
 			}
@@ -160,9 +160,9 @@ func seedFeedRows(t *testing.T, world *advWorld, count int) map[string]bool {
 	source := "checking"
 	seeded := map[string]bool{}
 	for i := 0; i < count; i++ {
-		created, err := world.ownerSC.CreatePosting(types.Posting{
+		created, err := world.ownerSC.CreateTransaction(types.Transaction{
 			ID: uuid.NewString(), Name: fmt.Sprintf("Page row %05d", i), SourceAccountID: &source,
-			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1.00"}, Inputs: map[string]types.AmountInputBinding{}},
+			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1.00"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      day,
 			TransactionTime: day,
 			Enabled:         true,

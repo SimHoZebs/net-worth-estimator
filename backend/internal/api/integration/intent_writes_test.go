@@ -256,7 +256,7 @@ func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
 	if created.Code != http.StatusOK {
 		t.Fatalf("record status = %d, body %s", created.Code, created.Body.String())
 	}
-	recorded := decodeWriteResult[types.Posting](t, created.Code, created.Body.Bytes())
+	recorded := decodeWriteResult[types.Transaction](t, created.Code, created.Body.Bytes())
 	if !recorded.Saved {
 		t.Fatalf("record issues = %+v", recorded.Issues)
 	}
@@ -273,12 +273,12 @@ func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != recorded.Result.ID {
-		t.Fatalf("postings = %+v, want the recorded transaction kept", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].ID != recorded.Result.ID {
+		t.Fatalf("transactions = %+v, want the recorded transaction kept", model.Transactions)
 	}
-	if model.Postings[0].Claim == nil || model.Postings[0].Claim.ScheduleID != schedule.Result.ID ||
-		model.Postings[0].Claim.OccurrenceDate != "2026-07-02" {
-		t.Fatalf("claim = %+v, want the first occurrence", model.Postings[0].Claim)
+	if model.Transactions[0].Claim == nil || model.Transactions[0].Claim.ScheduleID != schedule.Result.ID ||
+		model.Transactions[0].Claim.OccurrenceDate != "2026-07-02" {
+		t.Fatalf("claim = %+v, want the first occurrence", model.Transactions[0].Claim)
 	}
 	if len(model.Schedules) != 1 || model.Schedules[0].ID != schedule.Result.ID {
 		t.Fatalf("schedules = %+v", model.Schedules)
@@ -294,9 +294,9 @@ func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	if len(after.Schedules) != 1 ||
-		after.Postings[0].Claim == nil ||
-		after.Postings[0].Claim.ScheduleID != schedule.Result.ID {
-		t.Fatalf("second start changed the model: schedules=%+v claim=%+v", after.Schedules, after.Postings[0].Claim)
+		after.Transactions[0].Claim == nil ||
+		after.Transactions[0].Claim.ScheduleID != schedule.Result.ID {
+		t.Fatalf("second start changed the model: schedules=%+v claim=%+v", after.Schedules, after.Transactions[0].Claim)
 	}
 }
 
@@ -316,9 +316,9 @@ func TestEndScheduleWithTransactionRecordsFact(t *testing.T) {
 		t.Fatalf("end status = %d, body %s", ended.Code, ended.Body.String())
 	}
 	var body struct {
-		Result          types.Posting `json:"value"`
-		EndedScheduleID string        `json:"endedScheduleId"`
-		Saved           bool          `json:"saved"`
+		Result          types.Transaction `json:"value"`
+		EndedScheduleID string            `json:"endedScheduleId"`
+		Saved           bool              `json:"saved"`
 	}
 	if err := json.Unmarshal(ended.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -333,8 +333,8 @@ func TestEndScheduleWithTransactionRecordsFact(t *testing.T) {
 	if len(model.Schedules) != 0 {
 		t.Fatalf("schedules = %+v, want none", model.Schedules)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].Name != "Gym" || model.Postings[0].TransactionTime <= 0 {
-		t.Fatalf("postings = %+v, want the recorded fact", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].Name != "Gym" || model.Transactions[0].TransactionTime <= 0 {
+		t.Fatalf("transactions = %+v, want the recorded fact", model.Transactions)
 	}
 }
 
@@ -364,8 +364,8 @@ func TestDeleteScheduleReleasesClaims(t *testing.T) {
 	if len(model.Schedules) != 0 {
 		t.Fatalf("schedules = %+v, want none", model.Schedules)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].Claim != nil {
-		t.Fatalf("postings = %+v, want the fact without a claim", model.Postings)
+	if len(model.Transactions) != 1 || model.Transactions[0].Claim != nil {
+		t.Fatalf("transactions = %+v, want the fact without a claim", model.Transactions)
 	}
 }
 
@@ -402,18 +402,18 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
-		if len(model.Postings) != 1 {
-			t.Fatalf("postings = %+v, want 1", model.Postings)
+		if len(model.Transactions) != 1 {
+			t.Fatalf("transactions = %+v, want 1", model.Transactions)
 		}
-		return model.Postings[0].Destinations
+		return model.Transactions[0].Destinations
 	}
 	amount := `{"resolver":"expression","config":{"expression":"10"},"inputs":{}}`
-	postingBody := func(destinations string) string {
+	transactionBody := func(destinations string) string {
 		return `{"name":"Split","destinations":` + destinations +
 			`,"date":"2026-07-02","amount":` + amount + `,"enabled":true}`
 	}
-	create := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", postingBody(`["checking","savings"]`))
-	created := decodeWriteResult[types.Posting](t, create.Code, create.Body.Bytes())
+	create := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", transactionBody(`["checking","savings"]`))
+	created := decodeWriteResult[types.Transaction](t, create.Code, create.Body.Bytes())
 	if len(created.Result.Destinations) != 2 {
 		t.Fatalf("created destinations = %+v, want both legs", created.Result.Destinations)
 	}
@@ -421,7 +421,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	// the editor states only the members an edit changes, so an untouched
 	// route can never trim legs it never modeled.
 	renamed := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"name":"Split renamed"}`)
-	updated := decodeWriteResult[types.Posting](t, renamed.Code, renamed.Body.Bytes())
+	updated := decodeWriteResult[types.Transaction](t, renamed.Code, renamed.Body.Bytes())
 	if updated.Result.Name != "Split renamed" {
 		t.Fatalf("patched name = %q, want Split renamed", updated.Result.Name)
 	}
@@ -433,7 +433,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	}
 	// An explicit destinations member replaces the set verbatim.
 	moved := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"destinations":["savings"]}`)
-	replaced := decodeWriteResult[types.Posting](t, moved.Code, moved.Body.Bytes())
+	replaced := decodeWriteResult[types.Transaction](t, moved.Code, moved.Body.Bytes())
 	if len(replaced.Result.Destinations) != 1 || replaced.Result.Destinations[0] != "savings" {
 		t.Fatalf("changed destinations = %+v, want [savings]", replaced.Result.Destinations)
 	}
@@ -455,8 +455,8 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 
 	// Starting a schedule from a recorded transaction carries the stored
 	// multi-destination set into the new instruction.
-	splitCreate := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", postingBody(`["checking","savings"]`))
-	split := decodeWriteResult[types.Posting](t, splitCreate.Code, splitCreate.Body.Bytes())
+	splitCreate := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", transactionBody(`["checking","savings"]`))
+	split := decodeWriteResult[types.Transaction](t, splitCreate.Code, splitCreate.Body.Bytes())
 	toSchedule := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/schedule",
 		`{"frequency":"monthly","startDate":"2026-04-01"}`)
 	if toSchedule.Code != http.StatusOK {

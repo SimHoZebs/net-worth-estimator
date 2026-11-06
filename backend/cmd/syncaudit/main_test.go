@@ -23,10 +23,10 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 	if _, err := scoped.CreateAccount(types.Account{ID: "prime_card", Name: "Prime"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	upsert := func(posting types.Posting, key string) {
+	upsert := func(transaction types.Transaction, key string) {
 		t.Helper()
 		_, err := scoped.ApplySync(nil, []store.BankDirective{{
-			Upsert: &store.BankUpsert{Posting: posting, Keys: []store.BankKey{
+			Upsert: &store.BankUpsert{Transaction: transaction, Keys: []store.BankKey{
 				{Provider: store.ProviderSimpleFIN, AccountID: "bridge-prime", TransactionID: key},
 			}},
 		}})
@@ -35,21 +35,21 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 		}
 	}
 	source := "prime_card"
-	amount := func(expression string) types.PostingAmountResolution {
-		return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
+	amount := func(expression string) types.TransactionAmountResolution {
+		return types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
 	}
-	upsert(types.Posting{
+	upsert(types.Transaction{
 		Name: "Bistro", Source: store.SourceBankSync, SourceAccountID: &source,
 		Amount: amount("50.00"), PostedTime: 1785628800, TransactionTime: 1785628800, Pending: true,
 	}, "auth-a")
-	rows, err := scoped.LoadBankPostings()
+	rows, err := scoped.LoadBankTransactions()
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("bank rows = %+v, err %v", rows, err)
 	}
-	if _, err := scoped.ApplySync(nil, []store.BankDirective{{Void: rows[0].Posting.ID}}); err != nil {
+	if _, err := scoped.ApplySync(nil, []store.BankDirective{{Void: rows[0].Transaction.ID}}); err != nil {
 		t.Fatalf("void: %v", err)
 	}
-	upsert(types.Posting{
+	upsert(types.Transaction{
 		Name: "Bistro", Source: store.SourceBankSync, SourceAccountID: &source,
 		Amount: amount("58.00"), PostedTime: 1785715200, TransactionTime: 1785715200, Enabled: true,
 	}, "post-a")
@@ -62,7 +62,7 @@ func TestSyncAuditListsPairs(t *testing.T) {
 	if err := run([]string{"--db", path, "--user", "u1", "--account", "prime_card"}); err != nil {
 		t.Fatalf("list = %v", err)
 	}
-	rows, err := scoped.LoadBankPostings()
+	rows, err := scoped.LoadBankTransactions()
 	if err != nil || len(rows) != 2 {
 		t.Fatalf("list mode must not write: rows = %+v, err %v", rows, err)
 	}

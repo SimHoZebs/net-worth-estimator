@@ -29,10 +29,10 @@ func (stubClaims) Analyze(_ context.Context, input types.AnalysisSnapshot) ([]ty
 			continue
 		}
 		findings = append(findings, types.AnalysisDetection{
-			PostingID: transaction.PostingID,
-			Kind:      "stub-claim",
-			Strength:  "moderate",
-			Evidence:  []types.AnalysisEvidence{{Code: "stub.independent-claim", Reason: "A second independent producer observed the same transaction.", PostingIDs: []string{transaction.PostingID}}},
+			TransactionID: transaction.TransactionID,
+			Kind:          "stub-claim",
+			Strength:      "moderate",
+			Evidence:      []types.AnalysisEvidence{{Code: "stub.independent-claim", Reason: "A second independent producer observed the same transaction.", TransactionIDs: []string{transaction.TransactionID}}},
 		})
 	}
 	return findings, nil
@@ -80,7 +80,7 @@ func TestWorkerKeepsIndependentClaimsForOneTransaction(t *testing.T) {
 			t.Fatalf("claim without active evidence-backed standing: %+v", item)
 		}
 		seen[item.AnalysisType+"/"+item.Kind] = true
-		if findings[0].PostingID != item.PostingID {
+		if findings[0].TransactionID != item.TransactionID {
 			t.Fatalf("claims split across transactions: %+v", findings)
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Future-dated and timezone-edge postings against sharing intervals. The
+// Future-dated and timezone-edge transactions against sharing intervals. The
 // UTC day of the transaction time decides membership: a row one second
 // before the interval start stays out, the midnight row is in, future
 // rows past the end stay out, and leap-day rows behave like any other
@@ -33,7 +33,7 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 	}
 	ids := map[string]string{}
 	for _, row := range rows {
-		ids[row.label] = advMustPosting(t, world.ownerSC, "Time edge "+row.label, row.amount, row.posted)
+		ids[row.label] = advMustTransaction(t, world.ownerSC, "Time edge "+row.label, row.amount, row.posted)
 	}
 	feedTarget := "/v1/shared/groups/" + world.groupID + "/feed"
 	feed := advFeedList(t, world, world.secondSubject)
@@ -41,14 +41,14 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 	seen := map[string]bool{}
 	for _, raw := range feed["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		seen[id] = true
 	}
 	for _, row := range rows {
 		id := ids[row.label]
 		if seen[id] != row.wantIn {
-			t.Fatalf("posting %q (time %d) listed = %v, want %v: interval edge mishandled",
+			t.Fatalf("transaction %q (time %d) listed = %v, want %v: interval edge mishandled",
 				row.label, row.posted, seen[id], row.wantIn)
 		}
 	}
@@ -68,8 +68,8 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 	dayIDs := map[string]bool{}
 	for _, raw := range filtered["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		dayIDs[id] = true
 	}
 	for _, label := range []string{"midnight", "plus1"} {
@@ -81,15 +81,15 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 		t.Fatal("new-year-day filter lists the pre-interval row: off-by-one")
 	}
 	// Leap-day rows behave like any other day under a covering interval.
-	leapRow := advMustPosting(t, world.ownerSC, "Leap lunch", "29.00", 1709208000)
+	leapRow := advMustTransaction(t, world.ownerSC, "Leap lunch", "29.00", 1709208000)
 	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
 		`{"enabled":true,"accountIds":["checking"],"startDate":"2024-02-29","endDate":"2024-02-29"}`), http.StatusOK)
 	leap := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
 	found := false
 	for _, raw := range leap["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		if posting["id"] == leapRow {
+		transaction, _ := item["transaction"].(map[string]any)
+		if transaction["id"] == leapRow {
 			found = true
 		}
 	}

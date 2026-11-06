@@ -9,12 +9,12 @@ import (
 // Literal detection mirrors the record lists: numeric expressions and
 // numeric configured values count; calculated recipes stay varying.
 func TestFeedLiteralAmount(t *testing.T) {
-	expression := func(config map[string]any) types.PostingAmountResolution {
-		return types.PostingAmountResolution{Resolver: "expression", Config: config, Inputs: map[string]types.AmountInputBinding{}}
+	expression := func(config map[string]any) types.TransactionAmountResolution {
+		return types.TransactionAmountResolution{Resolver: "expression", Config: config, Inputs: map[string]types.AmountInputBinding{}}
 	}
 	cases := []struct {
 		name   string
-		amount types.PostingAmountResolution
+		amount types.TransactionAmountResolution
 		value  float64
 		fixed  bool
 	}{

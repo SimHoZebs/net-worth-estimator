@@ -11,13 +11,13 @@ import {
 
 function recurringFinding(
 	id: string,
-	postingId: string,
+	transactionId: string,
 	product = "monthly",
 	review?: AnalysisFinding["review"],
 ): AnalysisFinding {
 	return {
 		id,
-		postingId,
+		transactionId,
 		kind: "recurring",
 		provider: "grocer",
 		product,
@@ -27,7 +27,7 @@ function recurringFinding(
 		stale: false,
 		dismissed: false,
 		evidence: [
-			{ code: "recurring.cadence", reason: "test", postingIds: ["a", "b"] },
+			{ code: "recurring.cadence", reason: "test", transactionIds: ["a", "b"] },
 		],
 		review,
 	} as AnalysisFinding;
@@ -40,7 +40,7 @@ describe("repeating-payment patterns", () => {
 		const other = {
 			...recurringFinding("three", "c"),
 			evidence: [
-				{ code: "recurring.cadence", reason: "test", postingIds: ["c"] },
+				{ code: "recurring.cadence", reason: "test", transactionIds: ["c"] },
 			],
 		};
 		const unrelated = { ...first, id: "four", kind: "bnpl" };

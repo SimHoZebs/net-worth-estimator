@@ -44,7 +44,8 @@ function selectedIncome(sources: Record<string, unknown>[]): Set<string> {
 	const ids = new Set<string>();
 	for (const source of sources) {
 		if (source.type === "cashflow" && source.included === true) {
-			const id = typeof source.postingId === "string" ? source.postingId : null;
+			const id =
+				typeof source.transactionId === "string" ? source.transactionId : null;
 			if (id) ids.add(id);
 		}
 	}
@@ -99,8 +100,8 @@ export function buildFiConfig(
 					},
 		);
 	}
-	for (const postingId of [...next.income].sort()) {
-		sources.push({ type: "cashflow", postingId, included: true });
+	for (const transactionId of [...next.income].sort()) {
+		sources.push({ type: "cashflow", transactionId, included: true });
 	}
 	return {
 		...raw,
@@ -226,12 +227,12 @@ function IndependenceForm({
 			return next;
 		});
 	};
-	const toggleIncome = (postingId: string) => {
+	const toggleIncome = (transactionId: string) => {
 		setSaved(false);
 		setIncome((previous) => {
 			const next = new Set(previous);
-			if (next.has(postingId)) next.delete(postingId);
-			else next.add(postingId);
+			if (next.has(transactionId)) next.delete(transactionId);
+			else next.add(transactionId);
 			return next;
 		});
 	};

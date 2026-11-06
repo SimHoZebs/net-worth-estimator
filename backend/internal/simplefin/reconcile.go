@@ -13,11 +13,11 @@ import (
 // Hold settlement uses the merchant profile's window instead.
 const settleMatchWindowSeconds = 7 * 24 * 3600
 
-func postingAmountCents(posting types.Posting) (int64, bool) {
-	if posting.Amount.Resolver != "expression" {
+func transactionAmountCents(transaction types.Transaction) (int64, bool) {
+	if transaction.Amount.Resolver != "expression" {
 		return 0, false
 	}
-	raw, ok := posting.Amount.Config["expression"].(string)
+	raw, ok := transaction.Amount.Config["expression"].(string)
 	if !ok {
 		return 0, false
 	}
@@ -28,24 +28,24 @@ func postingAmountCents(posting types.Posting) (int64, bool) {
 	return int64(math.Round(value * 100)), true
 }
 
-// rowOutflow reports whether a bank posting moves money out of its mirror
+// rowOutflow reports whether a bank transaction moves money out of its mirror
 // account. Bank rows never carry both sides, so the source leg alone
 // distinguishes an outflow authorization from an inflow one.
-func rowOutflow(posting types.Posting) bool {
-	return posting.SourceAccountID != nil
+func rowOutflow(transaction types.Transaction) bool {
+	return transaction.SourceAccountID != nil
 }
 
 // settleStrictJoinKeys keeps the containment rule for settled-to-settled
 // deduplication. The wider merchant key is only for hold-to-posted
 // settlement: two posted charges at the same chain but different store
 // numbers can be genuine separate charges.
-func settleStrictJoinKeys(stale types.Posting, candidate types.Posting) (staleCents, candidateCents int64, ok bool) {
+func settleStrictJoinKeys(stale types.Transaction, candidate types.Transaction) (staleCents, candidateCents int64, ok bool) {
 	return settleJoinKeysWith(stale, candidate, settleMatchWindowSeconds, merchantNamesContain)
 }
 
 // settleJoinKeysWith checks the account, direction, positive amounts, window,
 // and the injected name rule. It returns both amounts in cents.
-func settleJoinKeysWith(stale types.Posting, candidate types.Posting, windowSeconds int64, namesMatch func(string, string) bool) (staleCents, candidateCents int64, ok bool) {
+func settleJoinKeysWith(stale types.Transaction, candidate types.Transaction, windowSeconds int64, namesMatch func(string, string) bool) (staleCents, candidateCents int64, ok bool) {
 	staleAccount, ok := rowAccount(stale)
 	if !ok {
 		return 0, 0, false
@@ -57,11 +57,11 @@ func settleJoinKeysWith(stale types.Posting, candidate types.Posting, windowSeco
 	if rowOutflow(stale) != rowOutflow(candidate) {
 		return 0, 0, false
 	}
-	staleCents, ok = postingAmountCents(stale)
+	staleCents, ok = transactionAmountCents(stale)
 	if !ok || staleCents <= 0 {
 		return 0, 0, false
 	}
-	candidateCents, ok = postingAmountCents(candidate)
+	candidateCents, ok = transactionAmountCents(candidate)
 	if !ok || candidateCents <= 0 {
 		return 0, 0, false
 	}
@@ -75,7 +75,7 @@ func settleJoinKeysWith(stale types.Posting, candidate types.Posting, windowSeco
 	return staleCents, candidateCents, true
 }
 
-func settleMatch(stale types.Posting, candidate types.Posting) bool {
+func settleMatch(stale types.Transaction, candidate types.Transaction) bool {
 	staleCents, candidateCents, ok := settleStrictJoinKeys(stale, candidate)
 	return ok && staleCents == candidateCents
 }
@@ -83,18 +83,18 @@ func settleMatch(stale types.Posting, candidate types.Posting) bool {
 // settleMatchTolerant applies the merchant profile's amount policy. Exact
 // matches always qualify. Near matches still require a unique candidate,
 // enforced by the caller's ambiguity guard.
-func settleMatchTolerant(stale types.Posting, candidate types.Posting) bool {
+func settleMatchTolerant(stale types.Transaction, candidate types.Transaction) bool {
 	_, ok := settleCandidate(stale, candidate)
 	return ok
 }
 
-// rowAccount returns the model account a bank posting touches.
-func rowAccount(posting types.Posting) (string, bool) {
-	if posting.SourceAccountID != nil {
-		return *posting.SourceAccountID, true
+// rowAccount returns the model account a bank transaction touches.
+func rowAccount(transaction types.Transaction) (string, bool) {
+	if transaction.SourceAccountID != nil {
+		return *transaction.SourceAccountID, true
 	}
-	if len(posting.Destinations) > 0 {
-		return posting.Destinations[0], true
+	if len(transaction.Destinations) > 0 {
+		return transaction.Destinations[0], true
 	}
 	return "", false
 }
@@ -122,7 +122,7 @@ func hasSimpleFINKey(row store.BankRow) bool {
 	return false
 }
 
-func candidateKey(item store.SyncPosting) store.BankKey {
+func candidateKey(item store.SyncTransaction) store.BankKey {
 	// The provider identity is SimpleFIN knowledge: pending authorizations
 	// and posted charges from this bridge share one key namespace, which is
 	// what lets a posted charge convert the pending row it settles.
@@ -142,19 +142,19 @@ func candidateKey(item store.SyncPosting) store.BankKey {
 // point only at pending or void rows never suppress a settled candidate. The
 // settled-to-settled duplicate check stays exact so near-amount repeats never
 // suppress a genuine second charge.
-func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
+func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync {
+		if row.Transaction.Source != store.SourceBankSync {
 			continue
 		}
-		byID[row.Posting.ID] = row
+		byID[row.Transaction.ID] = row
 		for _, key := range row.Keys {
 			if key.Provider != store.ProviderSimpleFIN {
 				continue
 			}
-			byKey[key] = row.Posting.ID
+			byKey[key] = row.Transaction.ID
 		}
 	}
 	var directives []store.BankDirective
@@ -163,7 +163,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	// emits them only for resolved accounts.
 	for _, item := range pending {
 		directives = append(directives, store.BankDirective{
-			Upsert: &store.BankUpsert{Posting: item.Posting, Keys: []store.BankKey{candidateKey(item)}, Facts: item.Facts},
+			Upsert: &store.BankUpsert{Transaction: item.Transaction, Keys: []store.BankKey{candidateKey(item)}, Facts: item.Facts},
 		})
 		if id, ok := byKey[candidateKey(item)]; ok {
 			seen[id] = true
@@ -175,14 +175,14 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var stale []staleRow
 	for _, row := range bank {
-		if seen[row.Posting.ID] || row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
+		if seen[row.Transaction.ID] || row.Transaction.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
 			continue
 		}
-		if row.Posting.Pending || row.Posting.Void {
-			stale = append(stale, staleRow{id: row.Posting.ID, pending: row.Posting.Pending})
+		if row.Transaction.Pending || row.Transaction.Void {
+			stale = append(stale, staleRow{id: row.Transaction.ID, pending: row.Transaction.Pending})
 		}
 	}
-	recordedSettled := func(item store.SyncPosting) bool {
+	recordedSettled := func(item store.SyncTransaction) bool {
 		id, ok := byKey[candidateKey(item)]
 		if !ok {
 			return false
@@ -191,46 +191,46 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		if !ok {
 			return true
 		}
-		return !row.Posting.Pending && !row.Posting.Void
+		return !row.Transaction.Pending && !row.Transaction.Void
 	}
-	coveredAccount := func(item store.SyncPosting) bool {
-		account, ok := rowAccount(item.Posting)
+	coveredAccount := func(item store.SyncTransaction) bool {
+		account, ok := rowAccount(item.Transaction)
 		return ok && covered[account]
 	}
 	settledByAccount := map[string][]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
+		if row.Transaction.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
 			continue
 		}
-		if row.Posting.Pending || row.Posting.Void {
+		if row.Transaction.Pending || row.Transaction.Void {
 			continue
 		}
 		// Claimed occurrences never suppress: a settlement matching one
 		// joins it through the convert below instead of dropping as an
 		// already-imported repeat.
-		if row.Posting.Claim != nil {
+		if row.Transaction.Claim != nil {
 			continue
 		}
-		account, ok := rowAccount(row.Posting)
+		account, ok := rowAccount(row.Transaction)
 		if !ok {
 			continue
 		}
-		key := settledGroupKey(account, rowOutflow(row.Posting))
+		key := settledGroupKey(account, rowOutflow(row.Transaction))
 		settledByAccount[key] = append(settledByAccount[key], row)
 	}
-	duplicateSuppressed := func(candidate store.SyncPosting) bool {
+	duplicateSuppressed := func(candidate store.SyncTransaction) bool {
 		// A candidate matching an existing settled bank row is already
 		// imported. The check stays exact: a near-amount repeat at the
 		// same merchant is a genuine second charge, not a repost.
 		// Void rows never suppress: the void record stays and the
 		// posted charge inserts as its own row.
-		account, ok := rowAccount(candidate.Posting)
+		account, ok := rowAccount(candidate.Transaction)
 		if !ok {
 			return false
 		}
-		key := settledGroupKey(account, rowOutflow(candidate.Posting))
+		key := settledGroupKey(account, rowOutflow(candidate.Transaction))
 		for _, row := range settledByAccount[key] {
-			if settleMatch(row.Posting, candidate.Posting) {
+			if settleMatch(row.Transaction, candidate.Transaction) {
 				return true
 			}
 		}
@@ -255,15 +255,15 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		feedKeys[candidateKey(candidate)] = true
 	}
 	type convertTarget struct {
-		id      string
-		posting types.Posting
+		id          string
+		transaction types.Transaction
 	}
 	var targets []convertTarget
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
+		if row.Transaction.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
 			continue
 		}
-		account, ok := rowAccount(row.Posting)
+		account, ok := rowAccount(row.Transaction)
 		if !ok || !covered[account] {
 			continue
 		}
@@ -277,13 +277,13 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		if live {
 			continue
 		}
-		if row.Posting.Pending {
-			targets = append(targets, convertTarget{id: row.Posting.ID, posting: row.Posting})
-		} else if row.Posting.Claim != nil && !row.Posting.Void {
-			targets = append(targets, convertTarget{id: row.Posting.ID, posting: row.Posting})
+		if row.Transaction.Pending {
+			targets = append(targets, convertTarget{id: row.Transaction.ID, transaction: row.Transaction})
+		} else if row.Transaction.Claim != nil && !row.Transaction.Void {
+			targets = append(targets, convertTarget{id: row.Transaction.ID, transaction: row.Transaction})
 		}
 	}
-	consumable := func(candidate store.SyncPosting) bool {
+	consumable := func(candidate store.SyncTransaction) bool {
 		if recordedSettled(candidate) || !coveredAccount(candidate) || duplicateSuppressed(candidate) {
 			return false
 		}
@@ -299,10 +299,10 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 			continue
 		}
 		for ti := range targets {
-			if !profileForPosting(targets[ti].posting).AutoConvert {
+			if !profileForTransaction(targets[ti].transaction).AutoConvert {
 				continue
 			}
-			if settleMatchTolerant(targets[ti].posting, candidate.Posting) {
+			if settleMatchTolerant(targets[ti].transaction, candidate.Transaction) {
 				matches[ci] = append(matches[ci], ti)
 				targetHits[ti]++
 			}
@@ -320,10 +320,10 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		}
 		target := targets[ti]
 		directives = append(directives, store.BankDirective{Convert: &store.BankConvert{
-			ID:      target.id,
-			Posting: candidate.Posting,
-			AddKeys: []store.BankKey{candidateKey(candidate)},
-			Facts:   candidate.Facts,
+			ID:          target.id,
+			Transaction: candidate.Transaction,
+			AddKeys:     []store.BankKey{candidateKey(candidate)},
+			Facts:       candidate.Facts,
 		}})
 		convertedCandidate[ci] = true
 		convertedTarget[target.id] = true
@@ -353,7 +353,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	// hold above: the hold then carries the posted values under its own id.
 	for _, entry := range stale {
 		row := byID[entry.id]
-		if account, ok := rowAccount(row.Posting); !ok || !covered[account] {
+		if account, ok := rowAccount(row.Transaction); !ok || !covered[account] {
 			continue
 		}
 		if entry.pending {
@@ -374,12 +374,12 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 			continue
 		}
 		directives = append(directives, store.BankDirective{
-			Upsert: &store.BankUpsert{Posting: candidate.Posting, Keys: []store.BankKey{candidateKey(candidate)}, Facts: candidate.Facts},
+			Upsert: &store.BankUpsert{Transaction: candidate.Transaction, Keys: []store.BankKey{candidateKey(candidate)}, Facts: candidate.Facts},
 		})
 	}
 	// Evidence refreshes also apply to known settled keys, independently of the
-	// posting directives. This preserves metadata without overwriting owner edits.
-	for _, items := range [][]store.SyncPosting{pending, settled} {
+	// transaction directives. This preserves metadata without overwriting owner edits.
+	for _, items := range [][]store.SyncTransaction{pending, settled} {
 		for _, item := range items {
 			if item.Facts != nil {
 				directives = append(directives, store.BankDirective{Observe: &store.BankObservation{Keys: []store.BankKey{candidateKey(item)}, Facts: *item.Facts}})

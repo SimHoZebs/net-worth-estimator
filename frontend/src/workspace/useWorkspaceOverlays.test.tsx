@@ -7,7 +7,9 @@ import { useWorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 vi.mock("../state/savedState.ts", () => ({
 	useSavedAccounts: () => financialModelFixture.accounts,
 	useSavedTransactions: () =>
-		financialModelFixture.transactions.filter((row) => row.kind === "posting"),
+		financialModelFixture.transactions.filter(
+			(row) => row.kind === "transaction",
+		),
 	useSavedSchedules: () =>
 		financialModelFixture.transactions
 			.filter((row) => row.kind === "schedule")

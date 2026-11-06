@@ -68,7 +68,7 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	}
 }) (*struct {
 	Body struct {
-		Matches    []types.Posting              `json:"matches"`
+		Matches    []types.Transaction          `json:"matches"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
 		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
@@ -123,19 +123,19 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	}
 	baseline := domain.EvaluationReferenceIssues(model)
 	candidate := *model
-	byIndex := make(map[string]int, len(candidate.Postings))
-	for i := range candidate.Postings {
-		byIndex[candidate.Postings[i].ID] = i
+	byIndex := make(map[string]int, len(candidate.Transactions))
+	for i := range candidate.Transactions {
+		byIndex[candidate.Transactions[i].ID] = i
 	}
-	claims := make([]types.PostingClaimUpdate, 0, len(preview.Assignments))
+	claims := make([]types.TransactionClaimUpdate, 0, len(preview.Assignments))
 	for _, item := range preview.Assignments {
-		index, ok := byIndex[item.PostingID]
+		index, ok := byIndex[item.TransactionID]
 		if !ok {
 			return nil, huma.Error409Conflict("A recorded movement changed. Review the pattern again.")
 		}
-		claim := types.PostingClaim{ScheduleID: preview.ScheduleID, OccurrenceDate: item.Date}
-		candidate.Postings[index].Claim = &claim
-		claims = append(claims, types.PostingClaimUpdate{PostingID: item.PostingID, Claim: claim})
+		claim := types.TransactionClaim{ScheduleID: preview.ScheduleID, OccurrenceDate: item.Date}
+		candidate.Transactions[index].Claim = &claim
+		claims = append(claims, types.TransactionClaimUpdate{TransactionID: item.TransactionID, Claim: claim})
 	}
 	issues := domain.ValidateFinanceWriteChange(baseline, &candidate)
 	for _, issue := range issues {
@@ -143,7 +143,7 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 			return nil, huma.Error422UnprocessableEntity(issue.Message)
 		}
 	}
-	rows, err := s.store.SetPostingClaims(claims)
+	rows, err := s.store.SetTransactionClaims(claims)
 	if err != nil {
 		if errors.Is(err, store.ErrPatternToExistingScheduleInvalid) {
 			return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
@@ -164,7 +164,7 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	}
 	output := &struct {
 		Body struct {
-			Matches    []types.Posting              `json:"matches"`
+			Matches    []types.Transaction          `json:"matches"`
 			Issues     []types.ModelValidationIssue `json:"issues"`
 			Saved      bool                         `json:"saved"`
 			Revision   string                       `json:"revision"`

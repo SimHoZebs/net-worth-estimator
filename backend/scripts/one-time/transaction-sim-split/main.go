@@ -1,5 +1,5 @@
-// This standalone, one-time operator script splits pre-split posting rows
-// into core postings plus the posting_sim and posting_claims satellites.
+// This standalone, one-time operator script splits pre-split transaction rows
+// into core transactions plus the transaction_sim and transaction_claims satellites.
 // Neither setupdb nor the server calls it.
 package main
 
@@ -19,46 +19,46 @@ import (
 )
 
 // Frozen target DDL for this upgrade, independent of the application's
-// schema. Posting display order, enablement, and execution order move to
-// posting_sim; the occurrence claim moves to posting_claims. The receipts
-// table already links receipts to postings, so the postings receipt_ids
+// schema. Transaction display order, enablement, and execution order move to
+// transaction_sim; the occurrence claim moves to transaction_claims. The receipts
+// table already links receipts to transactions, so the transactions receipt_ids
 // back-reference is dropped after verification instead of being carried.
-const postingSimSchema = `CREATE TABLE posting_sim (
+const transactionSimSchema = `CREATE TABLE transaction_sim (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	posting_id TEXT NOT NULL,
+	transaction_id TEXT NOT NULL,
 	position INTEGER NOT NULL,
 	enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
 	execution_order INTEGER NOT NULL DEFAULT 0 CHECK(execution_order >= 0),
-	PRIMARY KEY(user_id, posting_id),
-	FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
+	PRIMARY KEY(user_id, transaction_id),
+	FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 )`
 
-const postingClaimsSchema = `CREATE TABLE posting_claims (
+const transactionClaimsSchema = `CREATE TABLE transaction_claims (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	posting_id TEXT NOT NULL,
+	transaction_id TEXT NOT NULL,
 	fulfills_rule_id TEXT NOT NULL,
 	fulfills_occurrence_date TEXT NOT NULL,
-	PRIMARY KEY(user_id, posting_id),
-	FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
+	PRIMARY KEY(user_id, transaction_id),
+	FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
 	FOREIGN KEY(user_id, fulfills_rule_id) REFERENCES recurrence_rules(user_id, id) DEFERRABLE INITIALLY DEFERRED
 )`
 
-const analysisPostingLifecycleTrigger = `CREATE TRIGGER IF NOT EXISTS analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
+const analysisTransactionLifecycleTrigger = `CREATE TRIGGER IF NOT EXISTS analysis_transaction_lifecycle AFTER UPDATE OF pending, void ON transactions
 		WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
-		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.id)
+		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`
 
-const analysisPostingSimLifecycleTrigger = `CREATE TRIGGER IF NOT EXISTS analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
+const analysisTransactionSimLifecycleTrigger = `CREATE TRIGGER IF NOT EXISTS analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON transaction_sim
 		WHEN (OLD.enabled != NEW.enabled)
-		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.posting_id)
+		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`
 
-// oldPostingColumns are the pre-split postings columns that leave the core
+// oldTransactionColumns are the pre-split transactions columns that leave the core
 // table. Every one must be present for conversion; a subset is a partial or
 // mixed shape and fails closed.
-var oldPostingColumns = []string{
+var oldTransactionColumns = []string{
 	"destinations", "position", "enabled", "execution_order",
 	"fulfills_rule_id", "fulfills_occurrence_date", "receipt_ids",
 }
@@ -66,22 +66,22 @@ var oldPostingColumns = []string{
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("posting-sim-split", flag.ContinueOnError)
+	flags := flag.NewFlagSet("transaction-sim-split", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	path := flags.String("db", "", "existing SQLite database to upgrade in place, with the app stopped")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
 	if strings.TrimSpace(*path) == "" || flags.NArg() != 0 {
-		fmt.Fprintln(stderr, "usage: go run ./scripts/one-time/posting-sim-split --db PATH")
+		fmt.Fprintln(stderr, "usage: go run ./scripts/one-time/transaction-sim-split --db PATH")
 		return 2
 	}
 	count, err := upgrade(*path)
 	if err != nil {
-		fmt.Fprintf(stderr, "posting sim split: %v\n", err)
+		fmt.Fprintf(stderr, "transaction sim split: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "posting sim split complete (%d rows converted)\n", count)
+	fmt.Fprintf(stdout, "transaction sim split complete (%d rows converted)\n", count)
 	return 0
 }
 
@@ -157,31 +157,31 @@ func tableExists(tx *sql.Tx, table string) (bool, error) {
 }
 
 func convert(tx *sql.Tx) (int, error) {
-	columns, err := tableColumns(tx, "postings")
+	columns, err := tableColumns(tx, "transactions")
 	if err != nil {
 		return 0, err
 	}
 	_, hasNew := columns["destination_account_ids"]
 	var missingOld []string
-	for _, column := range oldPostingColumns {
+	for _, column := range oldTransactionColumns {
 		if !columns[column] {
 			missingOld = append(missingOld, column)
 		}
 	}
-	simExists, err := tableExists(tx, "posting_sim")
+	simExists, err := tableExists(tx, "transaction_sim")
 	if err != nil {
 		return 0, err
 	}
-	claimsExists, err := tableExists(tx, "posting_claims")
+	claimsExists, err := tableExists(tx, "transaction_claims")
 	if err != nil {
 		return 0, err
 	}
-	if hasNew && len(missingOld) == len(oldPostingColumns) && simExists && claimsExists {
+	if hasNew && len(missingOld) == len(oldTransactionColumns) && simExists && claimsExists {
 		// A repeated invocation verifies its frozen target without changing it.
 		for _, query := range []string{
-			`SELECT user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void FROM postings LIMIT 0`,
-			`SELECT user_id, posting_id, position, enabled, execution_order FROM posting_sim LIMIT 0`,
-			`SELECT user_id, posting_id, fulfills_rule_id, fulfills_occurrence_date FROM posting_claims LIMIT 0`,
+			`SELECT user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void FROM transactions LIMIT 0`,
+			`SELECT user_id, transaction_id, position, enabled, execution_order FROM transaction_sim LIMIT 0`,
+			`SELECT user_id, transaction_id, fulfills_rule_id, fulfills_occurrence_date FROM transaction_claims LIMIT 0`,
 		} {
 			if err := tx.QueryRow(query).Scan(); err != sql.ErrNoRows {
 				return 0, fmt.Errorf("expected the completed split target schema")
@@ -193,15 +193,15 @@ func convert(tx *sql.Tx) (int, error) {
 		return 0, nil
 	}
 	if hasNew || len(missingOld) != 0 {
-		return 0, fmt.Errorf("expected either the pre-split postings shape (%s) or the completed split target", strings.Join(oldPostingColumns, ", "))
+		return 0, fmt.Errorf("expected either the pre-split transactions shape (%s) or the completed split target", strings.Join(oldTransactionColumns, ", "))
 	}
-	if _, err := tx.Exec(postingSimSchema); err != nil {
+	if _, err := tx.Exec(transactionSimSchema); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(postingClaimsSchema); err != nil {
+	if _, err := tx.Exec(transactionClaimsSchema); err != nil {
 		return 0, err
 	}
-	for _, table := range []string{"posting_sim", "posting_claims"} {
+	for _, table := range []string{"transaction_sim", "transaction_claims"} {
 		var count int
 		if err := tx.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&count); err != nil {
 			return 0, err
@@ -216,7 +216,7 @@ func convert(tx *sql.Tx) (int, error) {
 	}
 	rows, err := tx.Query(`SELECT user_id, id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, source, pending, void,
 		position, enabled, execution_order, fulfills_rule_id, fulfills_occurrence_date, receipt_ids
-		FROM postings ORDER BY user_id, position, id`)
+		FROM transactions ORDER BY user_id, position, id`)
 	if err != nil {
 		return 0, err
 	}
@@ -242,20 +242,20 @@ func convert(tx *sql.Tx) (int, error) {
 			var parsed []string
 			if err := json.Unmarshal([]byte(s.destinations), &parsed); err != nil {
 				rows.Close()
-				return 0, fmt.Errorf("posting %s has invalid destinations data", s.id)
+				return 0, fmt.Errorf("transaction %s has invalid destinations data", s.id)
 			}
 		}
 		if !json.Valid([]byte(s.amount)) {
 			rows.Close()
-			return 0, fmt.Errorf("posting %s has invalid amount data", s.id)
+			return 0, fmt.Errorf("transaction %s has invalid amount data", s.id)
 		}
 		if enabled != 0 && enabled != 1 {
 			rows.Close()
-			return 0, fmt.Errorf("posting %s has invalid enabled state", s.id)
+			return 0, fmt.Errorf("transaction %s has invalid enabled state", s.id)
 		}
 		if s.rule.Valid != s.date.Valid {
 			rows.Close()
-			return 0, fmt.Errorf("posting %s has a partial occurrence claim", s.id)
+			return 0, fmt.Errorf("transaction %s has a partial occurrence claim", s.id)
 		}
 		if s.rule.Valid {
 			var exists bool
@@ -265,14 +265,14 @@ func convert(tx *sql.Tx) (int, error) {
 			}
 			if !exists {
 				rows.Close()
-				return 0, fmt.Errorf("posting %s claims a missing recurrence rule", s.id)
+				return 0, fmt.Errorf("transaction %s claims a missing recurrence rule", s.id)
 			}
 		}
 		s.enabled, s.pending, s.void = enabled, pending != 0, void != 0
 		var field []string
 		if err := json.Unmarshal([]byte(receiptIDs), &field); err != nil {
 			rows.Close()
-			return 0, fmt.Errorf("posting %s has invalid receipt data", s.id)
+			return 0, fmt.Errorf("transaction %s has invalid receipt data", s.id)
 		}
 		seen := make(map[string]bool, len(field))
 		for _, id := range field {
@@ -280,13 +280,13 @@ func convert(tx *sql.Tx) (int, error) {
 				// The writer deduplicated; a repeated ID is corruption,
 				// not a set to preserve.
 				rows.Close()
-				return 0, fmt.Errorf("posting %s has duplicate receipt data", s.id)
+				return 0, fmt.Errorf("transaction %s has duplicate receipt data", s.id)
 			}
 			seen[id] = true
 		}
 		var stored []string
 		if receiptsExists {
-			storedRows, err := tx.Query(`SELECT id FROM receipts WHERE user_id = ? AND posting_id = ? ORDER BY id`, s.user, s.id)
+			storedRows, err := tx.Query(`SELECT id FROM receipts WHERE user_id = ? AND transaction_id = ? ORDER BY id`, s.user, s.id)
 			if err != nil {
 				rows.Close()
 				return 0, err
@@ -316,7 +316,7 @@ func convert(tx *sql.Tx) (int, error) {
 		slices.Sort(stored)
 		if !slices.Equal(field, stored) {
 			rows.Close()
-			return 0, fmt.Errorf("posting %s receipt links do not match stored receipts", s.id)
+			return 0, fmt.Errorf("transaction %s receipt links do not match stored receipts", s.id)
 		}
 		splits = append(splits, s)
 	}
@@ -328,21 +328,21 @@ func convert(tx *sql.Tx) (int, error) {
 		return 0, err
 	}
 	for _, s := range splits {
-		if _, err := tx.Exec(`INSERT INTO posting_sim(user_id, posting_id, position, enabled, execution_order) VALUES (?, ?, ?, ?, ?)`,
+		if _, err := tx.Exec(`INSERT INTO transaction_sim(user_id, transaction_id, position, enabled, execution_order) VALUES (?, ?, ?, ?, ?)`,
 			s.user, s.id, s.position, s.enabled, s.execution); err != nil {
 			return 0, err
 		}
 		if s.rule.Valid {
-			if _, err := tx.Exec(`INSERT INTO posting_claims(user_id, posting_id, fulfills_rule_id, fulfills_occurrence_date) VALUES (?, ?, ?, ?)`,
+			if _, err := tx.Exec(`INSERT INTO transaction_claims(user_id, transaction_id, fulfills_rule_id, fulfills_occurrence_date) VALUES (?, ?, ?, ?)`,
 				s.user, s.id, s.rule.String, s.date.String); err != nil {
 				return 0, err
 			}
 		}
 	}
-	// Rebuild postings into the post-split core shape. Dropping columns one
+	// Rebuild transactions into the post-split core shape. Dropping columns one
 	// at a time fails on legacy schemas whose foreign keys reference a removed
 	// column, so recreate the table explicitly.
-	if _, err := tx.Exec(`CREATE TABLE postings_new (
+	if _, err := tx.Exec(`CREATE TABLE transactions_new (
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		id TEXT NOT NULL,
 		name TEXT NOT NULL,
@@ -359,15 +359,15 @@ func convert(tx *sql.Tx) (int, error) {
 	)`); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(`INSERT INTO postings_new(user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void)
+	if _, err := tx.Exec(`INSERT INTO transactions_new(user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void)
 		SELECT user_id, id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, source, pending, void
-		FROM postings`); err != nil {
+		FROM transactions`); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(`DROP TABLE postings`); err != nil {
+	if _, err := tx.Exec(`DROP TABLE transactions`); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(`ALTER TABLE postings_new RENAME TO postings`); err != nil {
+	if _, err := tx.Exec(`ALTER TABLE transactions_new RENAME TO transactions`); err != nil {
 		return 0, err
 	}
 	if err := ensureAnalysisTriggers(tx); err != nil {
@@ -384,10 +384,10 @@ func ensureAnalysisTriggers(tx *sql.Tx) error {
 	if count == 0 {
 		return nil
 	}
-	if _, err := tx.Exec(analysisPostingLifecycleTrigger); err != nil {
+	if _, err := tx.Exec(analysisTransactionLifecycleTrigger); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(analysisPostingSimLifecycleTrigger); err != nil {
+	if _, err := tx.Exec(analysisTransactionSimLifecycleTrigger); err != nil {
 		return err
 	}
 	return nil

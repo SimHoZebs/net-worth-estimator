@@ -37,7 +37,7 @@ const financialIndependence: OtherEvaluation = {
 	outcomeText: "Satisfied",
 	qualifier: null,
 	progress: null,
-	postingIds: null,
+	transactionIds: null,
 };
 
 const cycleBase: OtherEvaluation = {
@@ -51,7 +51,7 @@ const cycleBase: OtherEvaluation = {
 	outcomeText: "Within budget",
 	qualifier: null,
 	progress: { fraction: 0.9, current: "$900", share: "90%" },
-	postingIds: null,
+	transactionIds: null,
 };
 
 function renderCard(item: OtherEvaluation) {

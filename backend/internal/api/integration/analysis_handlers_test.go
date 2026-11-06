@@ -70,7 +70,7 @@ func TestAnalysisReadsArePassiveAndReviewDoesNotChangeModel(t *testing.T) {
 	if err := scoped.CompleteAnalysis(run, findings, ""); err != nil {
 		t.Fatal(err)
 	}
-	response := request(handler, "GET", "/v1/analysis-findings?postingIds="+input.Transactions[0].PostingID, "")
+	response := request(handler, "GET", "/v1/analysis-findings?transactionIds="+input.Transactions[0].TransactionID, "")
 	var output struct {
 		Findings []types.AnalysisFinding `json:"findings"`
 	}

@@ -9,10 +9,10 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// CreateScheduleClaimingPosting creates a schedule and records an existing
+// CreateScheduleClaimingTransaction creates a schedule and records an existing
 // transaction as its first occurrence in one transaction. The transaction is
 // not modified.
-func (s *sqliteStore) CreateScheduleClaimingPosting(schedule types.Schedule, postingID, occurrenceDate string) (types.Schedule, error) {
+func (s *sqliteStore) CreateScheduleClaimingTransaction(schedule types.Schedule, transactionID, occurrenceDate string) (types.Schedule, error) {
 	if schedule.ID == "" {
 		id, err := newRowID()
 		if err != nil {
@@ -22,11 +22,11 @@ func (s *sqliteStore) CreateScheduleClaimingPosting(schedule types.Schedule, pos
 	}
 	err := withRowTx(s.db, func(tx *userTx) error {
 		var exists int
-		if err := tx.QueryRow(`SELECT 1 FROM postings WHERE id = ? AND user_id = :user_id`, postingID).Scan(&exists); err != nil {
+		if err := tx.QueryRow(`SELECT 1 FROM transactions WHERE id = ? AND user_id = :user_id`, transactionID).Scan(&exists); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return store.NotFound(postingID)
+				return store.NotFound(transactionID)
 			}
-			return fmt.Errorf("find transaction %s: %w", postingID, err)
+			return fmt.Errorf("find transaction %s: %w", transactionID, err)
 		}
 		if err := claimRowID(tx, schedule.ID, "rule"); err != nil {
 			return err
@@ -39,14 +39,14 @@ func (s *sqliteStore) CreateScheduleClaimingPosting(schedule types.Schedule, pos
 			return err
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id)
+			`INSERT INTO transaction_claims (transaction_id, fulfills_rule_id, fulfills_occurrence_date, user_id)
 			 VALUES (?,?,?, :user_id)
-			 ON CONFLICT(user_id, posting_id) DO UPDATE SET
+			 ON CONFLICT(user_id, transaction_id) DO UPDATE SET
 			   fulfills_rule_id = excluded.fulfills_rule_id,
 			   fulfills_occurrence_date = excluded.fulfills_occurrence_date`,
-			postingID, schedule.ID, occurrenceDate,
+			transactionID, schedule.ID, occurrenceDate,
 		); err != nil {
-			return fmt.Errorf("claim transaction %s for schedule %s: %w", postingID, schedule.ID, err)
+			return fmt.Errorf("claim transaction %s for schedule %s: %w", transactionID, schedule.ID, err)
 		}
 		return nil
 	})
@@ -59,22 +59,22 @@ func (s *sqliteStore) CreateScheduleClaimingPosting(schedule types.Schedule, pos
 	return schedule, nil
 }
 
-// DeleteScheduleCreatingPosting removes a schedule and records the one-time
+// DeleteScheduleCreatingTransaction removes a schedule and records the one-time
 // transaction that actually happened in its place. Occurrence claims that
 // pointed at the schedule are removed; the transactions they belonged to
 // remain as facts.
-func (s *sqliteStore) DeleteScheduleCreatingPosting(scheduleID string, posting types.Posting) (types.Posting, error) {
-	if posting.ID == "" {
+func (s *sqliteStore) DeleteScheduleCreatingTransaction(scheduleID string, transaction types.Transaction) (types.Transaction, error) {
+	if transaction.ID == "" {
 		id, err := newRowID()
 		if err != nil {
-			return types.Posting{}, err
+			return types.Transaction{}, err
 		}
-		posting.ID = id
+		transaction.ID = id
 	}
-	posting.Source = store.SourceUser
+	transaction.Source = store.SourceUser
 	err := withRowTx(s.db, func(tx *userTx) error {
 		if _, err := tx.Exec(
-			`DELETE FROM posting_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`,
+			`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`,
 			scheduleID,
 		); err != nil {
 			return fmt.Errorf("release claims for schedule %s: %w", scheduleID, err)
@@ -93,20 +93,20 @@ func (s *sqliteStore) DeleteScheduleCreatingPosting(scheduleID string, posting t
 		if err := releaseRowID(tx, scheduleID); err != nil {
 			return err
 		}
-		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
+		if err := claimRowID(tx, transaction.ID, "transaction"); err != nil {
 			return err
 		}
-		position, err := nextTablePosition(tx, "postings")
+		position, err := nextTablePosition(tx, "transactions")
 		if err != nil {
 			return err
 		}
-		return insertPosting(tx, position, &posting, store.SourceUser)
+		return insertTransaction(tx, position, &transaction, store.SourceUser)
 	})
 	if err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
 	if err := s.markDirtyStart(); err != nil {
-		return types.Posting{}, err
+		return types.Transaction{}, err
 	}
-	return posting, nil
+	return transaction, nil
 }

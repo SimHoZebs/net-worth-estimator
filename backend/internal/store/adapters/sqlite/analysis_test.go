@@ -14,14 +14,14 @@ func seedAnalysisEvidence(t *testing.T, s *sqliteStore) string {
 	keys := bankKeys(ProviderSimpleFIN, "bank", "charge")
 	facts := types.TransactionFacts{Description: "KLARNA PAY IN 4", Amount: "-25.00", Currency: "USD", PostedTime: 1785628800}
 	applyDirectives(t, s, []BankDirective{
-		bankUpsertDirective(bankSeedPosting("KLARNA", "checking", "25", false), ProviderSimpleFIN, "bank", "charge"),
+		bankUpsertDirective(bankSeedTransaction("KLARNA", "checking", "25", false), ProviderSimpleFIN, "bank", "charge"),
 		{Observe: &BankObservation{Keys: keys, Facts: facts}},
 	})
-	rows, err := s.LoadBankPostings()
+	rows, err := s.LoadBankTransactions()
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("bank=%+v err=%v", rows, err)
 	}
-	return rows[0].Posting.ID
+	return rows[0].Transaction.ID
 }
 
 func completeTestAnalysis(t *testing.T, s *sqliteStore, version string) types.AnalysisFinding {
@@ -30,7 +30,7 @@ func completeTestAnalysis(t *testing.T, s *sqliteStore, version string) types.An
 	if err != nil || !claimed || len(input.Transactions) != 1 {
 		t.Fatalf("claim=%+v input=%+v claimed=%v err=%v", run, input, claimed, err)
 	}
-	detection := types.AnalysisDetection{PostingID: input.Transactions[0].PostingID, Kind: "bnpl", Provider: "klarna", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "test", PostingIDs: []string{input.Transactions[0].PostingID}}}}
+	detection := types.AnalysisDetection{TransactionID: input.Transactions[0].TransactionID, Kind: "bnpl", Provider: "klarna", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "test", TransactionIDs: []string{input.Transactions[0].TransactionID}}}}
 	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{detection}, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestAnalysisEvidenceIsIndependentAndDeduplicated(t *testing.T) {
 	id := seedAnalysisEvidence(t, s)
 	before, _ := s.LoadModel()
 	finding := completeTestAnalysis(t, s, "v1")
-	if finding.Stale || finding.Status != "active" || finding.PostingID != id {
+	if finding.Stale || finding.Status != "active" || finding.TransactionID != id {
 		t.Fatalf("finding=%+v", finding)
 	}
 	if _, _, claimed, err := s.ClaimAnalysis("bnpl", "v1"); err != nil || claimed {
@@ -117,7 +117,7 @@ func TestAnalysisStaleCompletionRecoveryAndWithdrawal(t *testing.T) {
 	if findings[0].RunID != original.RunID || findings[0].AnalyzerVersion != "v1" {
 		t.Fatal("withdrawal rewrote original detection provenance")
 	}
-	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{{PostingID: findings[0].PostingID, Kind: "bnpl"}}, ""); err != nil {
+	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{{TransactionID: findings[0].TransactionID, Kind: "bnpl"}}, ""); err != nil {
 		t.Fatal(err)
 	}
 	findings, _ = s.ListAnalysisFindings(types.AnalysisFindingFilter{})
@@ -132,17 +132,17 @@ func TestAnalysisIsolationImportAndClear(t *testing.T) {
 	const sharedID = "01900000-0000-7000-8000-000000000099"
 	for _, scoped := range []*sqliteStore{a, b} {
 		seedAccount(t, scoped, "checking")
-		if _, err := scoped.CreatePosting(testPostingFixture(sharedID)); err != nil {
+		if _, err := scoped.CreateTransaction(testTransactionFixture(sharedID)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := scoped.db.Exec(`UPDATE postings SET source = 'banksync' WHERE id = ? AND user_id = :user_id`, sharedID); err != nil {
+		if _, err := scoped.db.Exec(`UPDATE transactions SET source = 'banksync' WHERE id = ? AND user_id = :user_id`, sharedID); err != nil {
 			t.Fatal(err)
 		}
 		tx, err := scoped.db.Begin()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := insertPostingSyncKey(tx, postingSyncKey{provider: ProviderSimpleFIN, accountID: "bank", transactionID: "charge", postingID: sharedID}); err != nil {
+		if err := insertTransactionSyncKey(tx, transactionSyncKey{provider: ProviderSimpleFIN, accountID: "bank", bankTransactionID: "charge", transactionID: sharedID}); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}
@@ -159,7 +159,7 @@ func TestAnalysisIsolationImportAndClear(t *testing.T) {
 	if err := a.DismissAnalysisFinding(fb.ID, true, ""); err != ErrNotFound {
 		t.Fatalf("cross-user review=%v", err)
 	}
-	filtered, err := a.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{"missing"}})
+	filtered, err := a.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{"missing"}})
 	if err != nil || len(filtered) != 0 {
 		t.Fatalf("cross-user query=%+v %v", filtered, err)
 	}
@@ -170,7 +170,7 @@ func TestAnalysisIsolationImportAndClear(t *testing.T) {
 	if err := b.DismissAnalysisFinding(fb.ID, true, ""); err != nil {
 		t.Fatal(err)
 	}
-	owned, err := a.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{sharedID}})
+	owned, err := a.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{sharedID}})
 	if err != nil || len(owned) != 1 || owned[0].Dismissed {
 		t.Fatalf("same IDs crossed user scope: %+v %v", owned, err)
 	}

@@ -27,7 +27,7 @@ Guarded routes are row writes and sync triggers defined in `writeAuthMiddleware`
 
 Historical note: this plan assumed a whole-document save; current code uses one-row create/replace/delete/move writes. A successful write can change the canonical plan and its evaluation configuration.
 
-Incoming checkpoint and posting `source` values are ignored. The store recomputes ownership, drops the reserved `sfin-` posting namespace, preserves stored `simplefin` rows, and lets owner checkpoints win account/date collisions. Access control protects the model-save boundary; it does not give model payloads control over sync-owned rows.
+Incoming checkpoint and transaction `source` values are ignored. The store recomputes ownership, drops the reserved `sfin-` transaction namespace, preserves stored `simplefin` rows, and lets owner checkpoints win account/date collisions. Access control protects the model-save boundary; it does not give model payloads control over sync-owned rows.
 
 ### Projection computation
 
@@ -112,7 +112,7 @@ Verify:
 - error-severity documents do not persist;
 - stored sync-owned rows survive model saves;
 - an owner checkpoint can override a sync checkpoint at the same account/date key;
-- a subsequent save cannot forge or delete sync-owned postings.
+- a subsequent save cannot forge or delete sync-owned transactions.
 
 ### Phase 4 — Trigger authorization
 

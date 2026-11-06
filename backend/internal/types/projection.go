@@ -3,18 +3,18 @@ package types
 // Projection output types: transaction events, path rows, public results.
 
 type AccountDelta struct {
-	PostingID string  `json:"postingId"`
-	Delta     float64 `json:"delta"`
+	TransactionID string  `json:"transactionId"`
+	Delta         float64 `json:"delta"`
 }
 
-// TransactionOrigin has the posting transaction-origin JSON shape.
+// TransactionOrigin has the transaction transaction-origin JSON shape.
 type TransactionOrigin struct {
-	Type      string `json:"type"` // always "posting"
-	PostingID string `json:"postingId"`
+	Type          string `json:"type"` // always "transaction"
+	TransactionID string `json:"transactionId"`
 }
 
 // TransactionFulfillment is the per-event assessment shared by public evidence
-// and configured posting-fulfillment evaluations. Destination limits do not
+// and configured transaction-fulfillment evaluations. Destination limits do not
 // count as unfulfilled funding.
 type TransactionFulfillment struct {
 	UnfulfilledAmount        float64 `json:"unfulfilledAmount"`
@@ -107,14 +107,14 @@ type ProjectionResult struct {
 
 // ProjectionPath is the evaluator-facing immutable timeline.
 type ProjectionPath struct {
-	Rows                        []ProjectionRow    `json:"rows"`
-	TransactionEvents           []TransactionEvent `json:"transactionEvents"`
-	EffectiveModel              FinancialModel     `json:"effectiveModel"`
-	ProjectionStartPostingState struct {
-		LatestRealizedPostingAmounts map[string]float64            `json:"latestRealizedPostingAmounts"`
-		LatestRealizedPostingDates   map[string]string             `json:"latestRealizedPostingDates,omitempty"`
-		RealizedPostingAmountsByYear map[string]map[string]float64 `json:"realizedPostingAmountsByYear"`
-	} `json:"projectionStartPostingState"`
+	Rows                            []ProjectionRow    `json:"rows"`
+	TransactionEvents               []TransactionEvent `json:"transactionEvents"`
+	EffectiveModel                  FinancialModel     `json:"effectiveModel"`
+	ProjectionStartTransactionState struct {
+		LatestRealizedTransactionAmounts map[string]float64            `json:"latestRealizedTransactionAmounts"`
+		LatestRealizedTransactionDates   map[string]string             `json:"latestRealizedTransactionDates,omitempty"`
+		RealizedTransactionAmountsByYear map[string]map[string]float64 `json:"realizedTransactionAmountsByYear"`
+	} `json:"projectionStartTransactionState"`
 	ProjectionStartDate IsoDate `json:"projectionStartDate"`
 	ProjectionEndDate   IsoDate `json:"projectionEndDate"`
 	// HistoryCutInstant carries the replay cut for branch simulations so a

@@ -30,16 +30,16 @@ func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCa
 	return types.SimulationRequest{
 		Model: types.SimulationInputs{
 			Accounts:         model.Accounts,
-			Postings:         model.Postings,
+			Transactions:     model.Transactions,
 			Schedules:        model.Schedules,
 			PaymentTerms:     model.PaymentTerms,
 			PlannedPurchases: model.PlannedPurchases,
 		},
 		InitialState: CloneSimulationState(SimulationState{
-			Balances:                     balancesAt(latestHistorical, model.Accounts),
-			LatestRealizedPostingAmounts: path.ProjectionStartPostingState.LatestRealizedPostingAmounts,
-			LatestRealizedPostingDates:   path.ProjectionStartPostingState.LatestRealizedPostingDates,
-			RealizedPostingAmountsByYear: path.ProjectionStartPostingState.RealizedPostingAmountsByYear,
+			Balances:                         balancesAt(latestHistorical, model.Accounts),
+			LatestRealizedTransactionAmounts: path.ProjectionStartTransactionState.LatestRealizedTransactionAmounts,
+			LatestRealizedTransactionDates:   path.ProjectionStartTransactionState.LatestRealizedTransactionDates,
+			RealizedTransactionAmountsByYear: path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear,
 		}),
 		StartDate:              path.ProjectionStartDate,
 		EndDate:                path.ProjectionEndDate,
@@ -49,11 +49,11 @@ func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCa
 	}
 }
 
-func plannedToPosting(p *types.PlannedPurchase) *types.Posting {
+func plannedToTransaction(p *types.PlannedPurchase) *types.Transaction {
 	costExpr := strconv.FormatFloat(p.Cost, 'f', -1, 64)
-	return &types.Posting{
+	return &types.Transaction{
 		ID: p.ID, Name: p.Name, SourceAccountID: p.FundingAccountID,
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": costExpr},
 		},
@@ -63,10 +63,10 @@ func plannedToPosting(p *types.PlannedPurchase) *types.Posting {
 	}
 }
 
-func appendScheduledPurchases(byDate map[string][]DatedPostingOccurrence, purchases []scheduledPurchase) {
+func appendScheduledPurchases(byDate map[string][]DatedTransactionOccurrence, purchases []scheduledPurchase) {
 	for index, purchase := range purchases {
-		byDate[purchase.date] = append(byDate[purchase.date], DatedPostingOccurrence{
-			Posting: plannedToPosting(purchase.purchase), Purchase: purchase.purchase, Index: index,
+		byDate[purchase.date] = append(byDate[purchase.date], DatedTransactionOccurrence{
+			Transaction: plannedToTransaction(purchase.purchase), Purchase: purchase.purchase, Index: index,
 		})
 	}
 }
@@ -106,7 +106,7 @@ func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, er
 	if firstDate <= request.EndDate {
 		dateSet[firstDate] = true
 	}
-	resolved := ResolveOccurrences(request.Model.Schedules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	resolved := ResolveOccurrences(request.Model.Schedules, request.Model.Transactions, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	for date := range resolved.ByDate {
 		dateSet[date] = true
 	}
@@ -164,7 +164,7 @@ func accountIndex(accounts []types.Account) map[string]types.Account {
 func fullyFundedPurchase(run *types.SimulationRun, id string) *types.TransactionEvent {
 	for index := range run.TransactionAttempts {
 		event := &run.TransactionAttempts[index]
-		if event.Origin.PostingID == id && event.RequestedAmount-event.RealizedAmount <= transactionEpsilon {
+		if event.Origin.TransactionID == id && event.RequestedAmount-event.RealizedAmount <= transactionEpsilon {
 			return event
 		}
 	}
@@ -174,7 +174,7 @@ func fullyFundedPurchase(run *types.SimulationRun, id string) *types.Transaction
 func simulationPath(run *types.SimulationRun) *types.ProjectionPath {
 	return BuildStochasticSamplePath(&types.PreparedProjection{
 		EffectiveModel: types.FinancialModel{
-			Accounts: run.Request.Model.Accounts, Postings: run.Request.Model.Postings,
+			Accounts: run.Request.Model.Accounts, Transactions: run.Request.Model.Transactions,
 			Schedules:        run.Request.Model.Schedules,
 			PaymentTerms:     run.Request.Model.PaymentTerms,
 			PlannedPurchases: run.Request.Model.PlannedPurchases,

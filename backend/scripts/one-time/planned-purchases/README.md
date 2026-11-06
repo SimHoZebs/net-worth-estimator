@@ -1,7 +1,7 @@
 # One-time planned-purchase upgrade
 
 This standalone script upgrades a user-scoped `shared-accounts-v1` database that
-stores purchases as postings with `purchase_policies`. It has no imports
+stores purchases as transactions with `purchase_policies`. It has no imports
 from the app or store. The server and `setupdb` never invoke it.
 
 The API image includes the independent executable at
@@ -22,7 +22,7 @@ the candidate before API startup. See [the deployment SOP](../../../../deploy/MI
 
 The script opens only an explicit existing regular file. It converts all users
 in one transaction, preserves purchase IDs and values, and removes the retired
-posting rows and policy table. Repeated execution leaves the completed target
+transaction rows and policy table. Repeated execution leaves the completed target
 unchanged. No environment variable selects a database.
 
 Variable or invalid costs, receipts, bank links, Analysis evidence, claims, and bank-owned rows stop

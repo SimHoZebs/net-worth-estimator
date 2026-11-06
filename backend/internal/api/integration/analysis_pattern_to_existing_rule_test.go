@@ -60,7 +60,7 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	}
 	want := map[string]string{}
 	for _, item := range preview.Preview.Assignments {
-		want[item.PostingID] = item.Date
+		want[item.TransactionID] = item.Date
 	}
 	if len(want) != 3 {
 		t.Fatalf("assignments=%+v", preview.Preview.Assignments)
@@ -71,7 +71,7 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 		t.Fatalf("add=%d %s", res.Code, res.Body.String())
 	}
 	var added struct {
-		Matches    []types.Posting              `json:"matches"`
+		Matches    []types.Transaction          `json:"matches"`
 		Saved      bool                         `json:"saved"`
 		PatternKey string                       `json:"patternKey"`
 		ScheduleID string                       `json:"scheduleId"`
@@ -89,13 +89,13 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	claimed := 0
-	for _, posting := range model.Postings {
-		if posting.Claim != nil && posting.Claim.ScheduleID == ruleID {
+	for _, transaction := range model.Transactions {
+		if transaction.Claim != nil && transaction.Claim.ScheduleID == ruleID {
 			claimed++
 		}
 	}
 	if claimed != 3 {
-		t.Fatalf("claimed=%d model=%+v", claimed, model.Postings)
+		t.Fatalf("claimed=%d model=%+v", claimed, model.Transactions)
 	}
 	// Idempotent retry keeps the same claims.
 	res = callAPI(t, handler, "POST", addPath, string(addBody))

@@ -130,7 +130,7 @@ func (a bridgeAdapter) Translate(ctx context.Context, st store.Store, native any
 			ObservedAt:       checkpoint.ObservedAt,
 		})
 	}
-	bank, err := st.LoadBankPostings()
+	bank, err := st.LoadBankTransactions()
 	if err != nil {
 		return nil, nil, nil, err
 	}

@@ -78,7 +78,7 @@ Extract a shared helper like `runWithGuards(ctx context.Context, mode guardMode)
 
 ## Finding 6: SQLite sync re-merge helpers duplication
 **Background**
-In `internal/store/adapters/sqlite/sync.go`, `remergeCheckpoints` and `remergePostings` have similar structure (build maps, iterate incoming, skip if synced-owned in some cases, append). Also position management via `nextTablePosition`. The patterns are similar but differ in keying and insert logic.
+In `internal/store/adapters/sqlite/sync.go`, `remergeCheckpoints` and `remergeTransactions` have similar structure (build maps, iterate incoming, skip if synced-owned in some cases, append). Also position management via `nextTablePosition`. The patterns are similar but differ in keying and insert logic.
 
 **Direct change**
 Consider a small generic helper only if types align cleanly without adding complexity; probably not worth it. The duplication is moderate.

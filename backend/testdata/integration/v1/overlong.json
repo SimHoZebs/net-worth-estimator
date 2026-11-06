@@ -22,10 +22,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [
+        "transactions": [
           {
             "id": "9548accc-98f0-5d75-aef8-e7a72983b041",
             "name": "Merchant AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",

@@ -34,7 +34,7 @@ function storedConfig(instanceId: string): Record<string, unknown> {
 		...tables.financialIndependence,
 		...tables.netWorthThreshold,
 		...tables.accountBalance,
-		...tables.postingFulfillment,
+		...tables.transactionFulfillment,
 		...(tables.cycleFulfillment ?? []),
 	].find((item) => item.instanceId === instanceId);
 	return isRecord(row?.config) ? { ...row.config } : {};

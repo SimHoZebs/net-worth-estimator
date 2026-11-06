@@ -42,7 +42,7 @@ func qa03MemberRole(members []map[string]any, accountID string) string {
 // view.
 func TestQA03MembershipLifecycleDeniesImmediately(t *testing.T) {
 	social := qa03SocialSetup(t)
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
 	created := qa03Decode(t, qa03Serve(t, social.groups.Routes(), http.MethodPost, "/v1/groups", "qa03-owner", `{"name":"Household"}`), http.StatusCreated)
 	groupID := created["group"].(map[string]any)["id"].(string)
 	qa03SetPolicy(t, social, "qa03-owner", groupID, qa03PolicyBody(true, `["checking"]`, "2026-01-01", "2026-12-31"), http.StatusOK)
@@ -187,13 +187,13 @@ func TestQA03RoleGatesMoveManagementExactly(t *testing.T) {
 // (copy and edits survive), and no copy minted from a denied accept.
 func TestQA03CopiesAndRefreshUnderMembershipChanges(t *testing.T) {
 	social := qa03SocialSetup(t)
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
 	groupID := qa03MatrixGroup(t, social)
 	qa03Grant(t, social, "qa03-owner", qa03SharedGroceries, store.SharingAudienceGroup, groupID)
 
 	copied := qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/copies", "qa03-member",
-		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"postingId":`+qa03Quote(qa03SharedGroceries)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
-	copyID := copied["posting"].(map[string]any)["id"].(string)
+		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusCreated)
+	copyID := copied["transaction"].(map[string]any)["id"].(string)
 
 	refresh := func() (int, map[string]any) {
 		t.Helper()
@@ -210,35 +210,35 @@ func TestQA03CopiesAndRefreshUnderMembershipChanges(t *testing.T) {
 
 	// The owner edits the source: refresh reports the change while the
 	// recipient's copy keeps its own edits.
-	renamed := qa03OwnerPosting(t, social, qa03SharedGroceries)
+	renamed := qa03OwnerTransaction(t, social, qa03SharedGroceries)
 	renamed.Name = "Groceries (corrected)"
-	if _, err := social.ownerSC.UpdatePosting(renamed); err != nil {
+	if _, err := social.ownerSC.UpdateTransaction(renamed); err != nil {
 		t.Fatal(err)
 	}
-	edited := qa03MemberPosting(t, social, copyID)
+	edited := qa03MemberTransaction(t, social, copyID)
 	edited.Name = "My groceries"
-	if _, err := social.memberSC.UpdatePosting(edited); err != nil {
+	if _, err := social.memberSC.UpdateTransaction(edited); err != nil {
 		t.Fatal(err)
 	}
 	if code, out := refresh(); code != http.StatusOK || out["status"] != store.SharingLinkSourceChange {
 		t.Fatalf("refresh = %d %+v, want source-changed", code, out)
 	}
-	if got := qa03MemberPosting(t, social, copyID); got.Name != "My groceries" {
+	if got := qa03MemberTransaction(t, social, copyID); got.Name != "My groceries" {
 		t.Fatalf("copy = %+v, want the recipient edit intact", got)
 	}
 
 	// Revocation flips refresh to unauthorized; the copy and its edits
 	// stay intact, and a fresh accept mints nothing.
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodDelete, "/v1/shared/grants", "qa03-owner",
-		`{"postingId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
+		`{"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
 	if code, out := refresh(); code != http.StatusOK || out["status"] != store.SharingLinkUnauthorized {
 		t.Fatalf("refresh = %d %+v, want unauthorized", code, out)
 	}
-	if got := qa03MemberPosting(t, social, copyID); got.Name != "My groceries" {
+	if got := qa03MemberTransaction(t, social, copyID); got.Name != "My groceries" {
 		t.Fatalf("copy = %+v, want it intact after revocation", got)
 	}
 	denied := qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/copies", "qa03-member",
-		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"postingId":`+qa03Quote(qa03SharedGroceries)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`)
+		`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`)
 	if denied.Code != http.StatusNotFound {
 		t.Fatalf("copy-after-revoke = %d, want 404", denied.Code)
 	}
@@ -252,7 +252,7 @@ func TestQA03CopiesAndRefreshUnderMembershipChanges(t *testing.T) {
 	if code, out := refresh(); code != http.StatusOK || out["status"] != store.SharingLinkUnauthorized {
 		t.Fatalf("refresh = %d %+v, want unauthorized after removal", code, out)
 	}
-	if got := qa03MemberPosting(t, social, copyID); got.Name != "My groceries" {
+	if got := qa03MemberTransaction(t, social, copyID); got.Name != "My groceries" {
 		t.Fatalf("copy = %+v, want it intact after removal", got)
 	}
 }
@@ -261,7 +261,7 @@ func TestQA03CopiesAndRefreshUnderMembershipChanges(t *testing.T) {
 // saves that stay local with a clean retry.
 func TestQA03ErrorAndEmptyStates(t *testing.T) {
 	social := qa03SocialSetup(t)
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
 	groupID := qa03MatrixGroup(t, social)
 	unknownGroup := "00000000-0000-4000-8000-000000000000"
 
@@ -276,7 +276,7 @@ func TestQA03ErrorAndEmptyStates(t *testing.T) {
 	if unknownFeed.Body.String() != outsiderFeed.Body.String() {
 		t.Fatalf("shapes differ: %q vs %q", unknownFeed.Body.String(), outsiderFeed.Body.String())
 	}
-	unknownDetail := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/postings/"+qa03Resource(social.owner)+"/"+qa03SharedGroceries, "qa03-stranger", "")
+	unknownDetail := qa03Serve(t, social.sharing.Routes(), http.MethodGet, "/v1/shared/transactions/"+qa03Resource(social.owner)+"/"+qa03SharedGroceries, "qa03-stranger", "")
 	if unknownDetail.Code != http.StatusNotFound {
 		t.Fatalf("stranger detail = %d, want 404", unknownDetail.Code)
 	}
@@ -309,7 +309,7 @@ func TestQA03ErrorAndEmptyStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	failed := qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/grants", "qa03-owner",
-		`{"postingId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"sideways","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`)
+		`{"transactionId":`+qa03Quote(qa03SharedGroceries)+`,"audienceType":"sideways","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`)
 	if failed.Code != http.StatusBadRequest && failed.Code != http.StatusNotFound {
 		t.Fatalf("bad grant = %d, want a 4xx with nothing written", failed.Code)
 	}
@@ -331,8 +331,8 @@ func TestQA03ErrorAndEmptyStates(t *testing.T) {
 // and never stale authorization after a settled revoke.
 func TestQA03ConcurrentReadsStayFailClosed(t *testing.T) {
 	social := qa03SocialSetup(t)
-	qa03MustPosting(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
-	qa03MustPosting(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedGroceries, "Groceries", "42.50", qa03MatrixDay)
+	qa03MustTransaction(t, social.ownerSC, qa03SharedFuel, "Fuel", "30.00", qa03MatrixDay)
 	groupID := qa03MatrixGroup(t, social)
 	qa03SetPolicy(t, social, "qa03-owner", groupID, qa03PolicyBody(true, `["checking"]`, "2026-01-01", "2026-12-31"), http.StatusOK)
 	qa03Grant(t, social, "qa03-owner", qa03SharedGroceries, store.SharingAudienceGroup, groupID)
@@ -411,7 +411,7 @@ func TestQA03ConcurrentReadsStayFailClosed(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < 10; i++ {
 				response := qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/copies", "qa03-member",
-					`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"postingId":`+qa03Quote(qa03SharedFuel)+`,"requestId":`+qa03Quote(keys[r*10+i])+`}`)
+					`{"owner":`+qa03Quote(qa03Resource(social.owner))+`,"transactionId":`+qa03Quote(qa03SharedFuel)+`,"requestId":`+qa03Quote(keys[r*10+i])+`}`)
 				if response.Code != http.StatusCreated && response.Code != http.StatusNotFound {
 					t.Errorf("copy race = %d", response.Code)
 					return
@@ -420,15 +420,15 @@ func TestQA03ConcurrentReadsStayFailClosed(t *testing.T) {
 		}(r)
 	}
 	qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodDelete, "/v1/shared/grants", "qa03-owner",
-		`{"postingId":`+qa03Quote(qa03SharedFuel)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
+		`{"transactionId":`+qa03Quote(qa03SharedFuel)+`,"audienceType":"group","audienceId":`+qa03Quote(groupID)+`,"requestId":`+qa03Quote(qa03RequestID(t))+`}`), http.StatusOK)
 	wg.Wait()
 	model, err := social.memberSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	fuelCopies := 0
-	for _, posting := range model.Postings {
-		if posting.Name == "Fuel" {
+	for _, transaction := range model.Transactions {
+		if transaction.Name == "Fuel" {
 			fuelCopies++
 		}
 	}

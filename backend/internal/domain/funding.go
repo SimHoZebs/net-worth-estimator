@@ -39,20 +39,20 @@ func (evaluated evaluatedTransactionEvent) fulfillment() types.TransactionFulfil
 // rules: min of withdrawable source, destination headroom, and remaining cap.
 // Returns nil when unconstrained inputs leave an infinite bound or when
 // pre-event balances are unavailable.
-func availableAmountFromLimits(posting *types.Posting, balancesBefore map[string]float64, hasBalances bool, accountsByID map[string]types.Account, capRemaining *float64) *float64 {
-	if posting == nil || !hasBalances {
+func availableAmountFromLimits(transaction *types.Transaction, balancesBefore map[string]float64, hasBalances bool, accountsByID map[string]types.Account, capRemaining *float64) *float64 {
+	if transaction == nil || !hasBalances {
 		return nil
 	}
 	available := math.Inf(1)
-	if posting.SourceAccountID != nil {
-		if _, exists := accountsByID[*posting.SourceAccountID]; exists {
-			available = math.Min(available, GetWithdrawableAmount(balancesBefore, accountsByID, *posting.SourceAccountID))
+	if transaction.SourceAccountID != nil {
+		if _, exists := accountsByID[*transaction.SourceAccountID]; exists {
+			available = math.Min(available, GetWithdrawableAmount(balancesBefore, accountsByID, *transaction.SourceAccountID))
 		} else {
 			available = 0
 		}
 	}
-	if posting.Destinations != nil {
-		available = math.Min(available, GetTotalDestinationHeadroom(balancesBefore, accountsByID, posting.Destinations))
+	if transaction.Destinations != nil {
+		available = math.Min(available, GetTotalDestinationHeadroom(balancesBefore, accountsByID, transaction.Destinations))
 	}
 	if capRemaining != nil {
 		available = math.Min(available, *capRemaining)
@@ -78,17 +78,17 @@ func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactio
 	for _, account := range path.EffectiveModel.Accounts {
 		accountsByID[account.ID] = account
 	}
-	postingsByID := map[string]*types.Posting{}
-	transactions := ResolvedTransactionPostings(&path.EffectiveModel)
+	transactionsByID := map[string]*types.Transaction{}
+	transactions := ResolvedTransactionTransactions(&path.EffectiveModel)
 	for index := range transactions {
-		posting := &transactions[index]
-		postingsByID[posting.ID] = posting
+		transaction := &transactions[index]
+		transactionsByID[transaction.ID] = transaction
 	}
 	capsByID := RuleCapsByID(&path.EffectiveModel)
-	realizedByPostingAndYear := map[string]float64{}
-	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
+	realizedByTransactionAndYear := map[string]float64{}
+	for transactionID, byYear := range path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear {
 		for year, amount := range byYear {
-			realizedByPostingAndYear[postingID+":"+year] = amount
+			realizedByTransactionAndYear[transactionID+":"+year] = amount
 		}
 	}
 
@@ -105,12 +105,12 @@ func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactio
 
 	out := make([]evaluatedTransactionEvent, 0, len(sorted))
 	for _, event := range sorted {
-		posting := postingsByID[event.Origin.PostingID]
-		capKey := event.Origin.PostingID + ":" + event.Date[:4]
-		realizedBefore := realizedByPostingAndYear[capKey]
+		transaction := transactionsByID[event.Origin.TransactionID]
+		capKey := event.Origin.TransactionID + ":" + event.Date[:4]
+		realizedBefore := realizedByTransactionAndYear[capKey]
 		var bindingConstraints []accountTransactionConstraint
 		var capRemaining *float64
-		if cap, capped := capsByID[event.Origin.PostingID]; capped && posting != nil {
+		if cap, capped := capsByID[event.Origin.TransactionID]; capped && transaction != nil {
 			limitRemaining := math.Max(0, cap-realizedBefore)
 			remaining := limitRemaining
 			capRemaining = &remaining
@@ -119,22 +119,22 @@ func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactio
 				beforeBalances = map[string]float64{}
 			}
 			bindingConstraints = ClassifyTransactionConstraints(transactionConstraintInput{
-				SourceAccountID: posting.SourceAccountID,
-				Destinations:    posting.Destinations,
+				SourceAccountID: transaction.SourceAccountID,
+				Destinations:    transaction.Destinations,
 				RequestedAmount: event.RequestedAmount,
 				RealizedAmount:  event.RealizedAmount,
 				BalancesBefore:  beforeBalances,
 				AccountsByID:    accountsByID,
 				LimitRemaining:  &limitRemaining,
 			})
-		} else if posting != nil {
+		} else if transaction != nil {
 			beforeBalances := balancesBeforeBySequence[event.Sequence]
 			if beforeBalances == nil {
 				beforeBalances = map[string]float64{}
 			}
 			bindingConstraints = ClassifyTransactionConstraints(transactionConstraintInput{
-				SourceAccountID: posting.SourceAccountID,
-				Destinations:    posting.Destinations,
+				SourceAccountID: transaction.SourceAccountID,
+				Destinations:    transaction.Destinations,
 				RequestedAmount: event.RequestedAmount,
 				RealizedAmount:  event.RealizedAmount,
 				BalancesBefore:  beforeBalances,
@@ -162,13 +162,13 @@ func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactio
 			fundingShortfall = math.Max(0, event.RequestedAmount-event.RealizedAmount)
 		}
 		var availableAmount *float64
-		if len(bindingConstraints) > 0 && posting != nil {
+		if len(bindingConstraints) > 0 && transaction != nil {
 			if balancesRaw, ok := balancesBeforeBySequence[event.Sequence]; ok {
-				availableAmount = availableAmountFromLimits(posting, balancesRaw, true, accountsByID, capRemaining)
+				availableAmount = availableAmountFromLimits(transaction, balancesRaw, true, accountsByID, capRemaining)
 			}
 		}
 		// Losses are balance adjustments, not cap consumption.
-		realizedByPostingAndYear[capKey] = realizedBefore + maxFloat(0, event.RealizedAmount)
+		realizedByTransactionAndYear[capKey] = realizedBefore + maxFloat(0, event.RealizedAmount)
 		out = append(out, evaluatedTransactionEvent{
 			event: event, bindingConstraints: bindingConstraints,
 			destinationLimited: destinationLimitedAmount, unfulfilled: unfulfilledAmount,

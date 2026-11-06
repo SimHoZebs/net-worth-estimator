@@ -1,7 +1,7 @@
 {
   "pack": "timezones",
   "version": 2,
-  "concern": "Postings on UTC midnight boundaries (±1-2 seconds), month and year edges, and leap day 2024-02-29.",
+  "concern": "Transactions on UTC midnight boundaries (±1-2 seconds), month and year edges, and leap day 2024-02-29.",
   "breaksIfMishandled": "Off-by-one day grouping pushes midnight rows into the wrong sharing interval, feed filter, or statement period. Leap-day rows must survive date parsing; year-edge rows must not shift intervals.",
   "seeds": [
     {
@@ -22,10 +22,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [
+        "transactions": [
           {
             "amount": {
               "config": {

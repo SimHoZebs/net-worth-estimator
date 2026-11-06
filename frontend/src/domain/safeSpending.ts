@@ -14,7 +14,7 @@ import type { TransactionResult } from "./result.ts";
 // `transactions` are adapted `ProjectionResult.transactionEvents` (requested and
 // realized per event); `spendingBalance` reads saved account balances surfaced
 // as `ProjectionAccountSummary.startingBalance`. The Gap check
-// (`requested - realized`) is the same gap the posting-fulfillment Goal
+// (`requested - realized`) is the same gap the transaction-fulfillment Goal
 // check aggregates. Income source selection lives in safeSpendingIncome.ts.
 // Only the windows stay client-side:
 // they follow user-selected accounts, bills, statement day, and reserve,
@@ -214,7 +214,7 @@ export function realizedCheckingOutflows({
 /**
  * Canonical unfulfilled amounts inside (after, through], scoped to the
  * spendable accounts and bills window. The backend owns reportability and
- * destination-limit classification, just as for posting fulfillment.
+ * destination-limit classification, just as for transaction fulfillment.
  */
 export function checkingShortfall({
 	transactions,

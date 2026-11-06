@@ -29,7 +29,7 @@ type AnalysisFeedbackInput struct {
 type AnalysisFeedback struct {
 	ID              string                `json:"id"`
 	FindingID       string                `json:"findingId"`
-	PostingID       string                `json:"postingId"`
+	TransactionID   string                `json:"transactionId"`
 	AnalysisType    string                `json:"analysisType"`
 	RunID           string                `json:"runId"`
 	AnalyzerVersion string                `json:"analyzerVersion"`

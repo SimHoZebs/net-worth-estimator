@@ -9,7 +9,7 @@ import (
 )
 
 // Chronological event ordering for history replay. This file is the single
-// owner of observation/posting ordering: history replay, current position,
+// owner of observation/transaction ordering: history replay, current position,
 // and projection preparation all share it, so a second ordering engine
 // must never be added elsewhere (including the frontend).
 //
@@ -76,22 +76,22 @@ func SortObservations(observations []types.Checkpoint) {
 
 // EffectiveOccurrenceInstant is the instant an occurrence replays or
 // simulates at: confirmed actuals carry their stored Unix time (including
-// 00:00 — every stored posting time is timed); rule instances take effect
+// 00:00 — every stored transaction time is timed); rule instances take effect
 // in the day-close phase of their date.
-func EffectiveOccurrenceInstant(occurrence DatedPostingOccurrence, date string) int64 {
+func EffectiveOccurrenceInstant(occurrence DatedTransactionOccurrence, date string) int64 {
 	if occurrence.Rule != nil {
 		return dayCloseUnix(date)
 	}
-	return PostingInstant(occurrence.Posting)
+	return TransactionInstant(occurrence.Transaction)
 }
 
-// PostingInstant returns the ordering instant of one posting: transaction
-// time with posted time as fallback, matching postingDay.
-func PostingInstant(posting *types.Posting) int64 {
-	if posting.TransactionTime > 0 {
-		return posting.TransactionTime
+// TransactionInstant returns the ordering instant of one transaction: transaction
+// time with posted time as fallback, matching transactionDay.
+func TransactionInstant(transaction *types.Transaction) int64 {
+	if transaction.TransactionTime > 0 {
+		return transaction.TransactionTime
 	}
-	return posting.PostedTime
+	return transaction.PostedTime
 }
 
 // ObservationAtOrBefore reports whether an observation instant falls at or

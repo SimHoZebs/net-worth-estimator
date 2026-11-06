@@ -29,7 +29,7 @@ export function AnalysisFindings() {
 	const review = useDismissAnalysisFinding();
 	const catalog = useTransactionCatalog().data;
 	const readOnly = useUserReadOnly();
-	const postings = (catalog?.items ?? []).map((item) => ({
+	const transactions = (catalog?.items ?? []).map((item) => ({
 		id: item.id,
 		name: item.name,
 	}));
@@ -38,7 +38,9 @@ export function AnalysisFindings() {
 	const recurring = allFindings.filter(
 		(finding) => finding.kind === "recurring",
 	);
-	const names = new Map(postings.map((posting) => [posting.id, posting.name]));
+	const names = new Map(
+		transactions.map((transaction) => [transaction.id, transaction.name]),
+	);
 	const state = analyses.data?.analyses?.find(
 		(item) => item.type === "bnpl",
 	)?.state;
@@ -85,7 +87,7 @@ export function AnalysisFindings() {
 							<TableRow key={finding.id}>
 								<TableHeader scope="row">
 									<span className="text-sm font-semibold">
-										{names.get(finding.postingId) ?? "Saved transaction"}
+										{names.get(finding.transactionId) ?? "Saved transaction"}
 									</span>
 									<p className="mb-0 mt-1 text-xs text-muted">
 										{providerLabel(finding.provider)} · {finding.role}
@@ -106,7 +108,7 @@ export function AnalysisFindings() {
 											type="button"
 											variant="secondary"
 											size="sm"
-											aria-label={`${finding.dismissed ? "Restore" : "Dismiss"} flag for ${names.get(finding.postingId) ?? finding.postingId}`}
+											aria-label={`${finding.dismissed ? "Restore" : "Dismiss"} flag for ${names.get(finding.transactionId) ?? finding.transactionId}`}
 											disabled={review.isPending}
 											onClick={() =>
 												review.mutate({

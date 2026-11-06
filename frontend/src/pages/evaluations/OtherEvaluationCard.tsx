@@ -56,7 +56,7 @@ export const EVAL_CARD_REGISTRY: Record<
 	OtherEvaluation["type"],
 	ComponentType<OtherEvaluationCardProps>
 > = {
-	postingFulfillment: FundingGapsCard,
+	transactionFulfillment: FundingGapsCard,
 	financialIndependence: (props: OtherEvaluationCardProps) => (
 		<FinancialIndependenceCard
 			item={props.item}

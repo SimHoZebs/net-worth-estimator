@@ -12,7 +12,7 @@ func TestClipProjectionRange(t *testing.T) {
 	source := &types.ProjectionResult{
 		AccountSummaries: []types.ProjectionAccountSummary{{AccountID: "cash", EndingBalance: 42}},
 		Evaluations: types.EvaluationResultTables{
-			PostingFulfillment: []types.EvaluationResultEnvelope{{}},
+			TransactionFulfillment: []types.EvaluationResultEnvelope{{}},
 		},
 	}
 	source.Summary.FinalNetWorth = 42

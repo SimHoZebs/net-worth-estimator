@@ -172,7 +172,7 @@ func TestRefreshToleratesMissingSuppressionTable(t *testing.T) {
 		return n
 	}
 	// Suppressions travel with a refresh like sync keys do.
-	exec(source, `INSERT INTO suppressed_sync_keys(provider, bridge_account_id, transaction_id, suppressed_at, user_id) VALUES ('simplefin','bridge-prime','post9',1,'other')`)
+	exec(source, `INSERT INTO suppressed_sync_keys(provider, bridge_account_id, bank_transaction_id, suppressed_at, user_id) VALUES ('simplefin','bridge-prime','post9',1,'other')`)
 	if err := refresh(target, source, "other", "owner", false); err != nil {
 		t.Fatalf("refresh = %v", err)
 	}
@@ -207,7 +207,7 @@ func TestRefreshCreatesSuppressionTableOnTarget(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	exec(source, `INSERT INTO suppressed_sync_keys(provider, bridge_account_id, transaction_id, suppressed_at, user_id) VALUES ('simplefin','bridge-prime','post9',1,'other')`)
+	exec(source, `INSERT INTO suppressed_sync_keys(provider, bridge_account_id, bank_transaction_id, suppressed_at, user_id) VALUES ('simplefin','bridge-prime','post9',1,'other')`)
 	// A destination predating the do-not-import list gains the table on
 	// the way in instead of dropping the incoming suppressions.
 	exec(target, `DROP TABLE suppressed_sync_keys`)
@@ -295,7 +295,7 @@ func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='owner'"); got != "owner" {
 		t.Fatal(got)
 	}
-	for _, table := range []string{"account_links", "posting_sync_keys", "provider_connections", "projection_states", "projection_slices", "monte_carlo_statistics"} {
+	for _, table := range []string{"account_links", "transaction_sync_keys", "provider_connections", "projection_states", "projection_slices", "monte_carlo_statistics"} {
 		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE user_id='owner'"); got != "0" {
 			t.Fatal(table, got)
 		}

@@ -11,18 +11,18 @@ import { ErrorNotice } from "../ErrorNotice.tsx";
 import { ReceiptReviewDialog } from "./ReceiptReviewDialog.tsx";
 
 export function ReceiptPanel({
-	postingId,
-	posting,
+	transactionId,
+	transaction,
 	readOnly,
 }: {
-	postingId: string;
-	posting: Transaction;
+	transactionId: string;
+	transaction: Transaction;
 	readOnly: boolean;
 }) {
 	const scope = useUserScope();
 	const status = useServerStatus({ enabled: false });
-	const collection = useReceipts(postingId, true);
-	const actions = useReceiptActions(postingId);
+	const collection = useReceipts(transactionId, true);
+	const actions = useReceiptActions(transactionId);
 	const camera = useRef<HTMLInputElement>(null);
 	const upload = useRef<HTMLInputElement>(null);
 	const [selection, setSelection] = useState<{
@@ -31,7 +31,9 @@ export function ReceiptPanel({
 	} | null>(null);
 	const locked = readOnly || status.data?.readOnly !== false;
 	const eligible = Boolean(
-		(posting.fromId || posting.toId) && !posting.pending && !posting.void,
+		(transaction.fromId || transaction.toId) &&
+		!transaction.pending &&
+		!transaction.void,
 	);
 	const attach = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];

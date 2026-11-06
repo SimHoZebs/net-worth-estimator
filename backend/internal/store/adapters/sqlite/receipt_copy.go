@@ -88,14 +88,14 @@ func (d *Database) PrepareReceiptCopy(ctx context.Context, source *sql.DB, blobs
 }
 
 // Apply publishes the copied objects and metadata in the caller's financial
-// replacement transaction. Parent postings must already exist in that transaction.
+// replacement transaction. Parent transactions must already exist in that transaction.
 func (c *ReceiptCopy) Apply(tx *sql.Tx, accountID string) error {
 	for _, row := range c.rows {
 		if err := publishBlob(tx, row.key); err != nil {
 			return err
 		}
 		r := row.receipt
-		if _, err := tx.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, accountID, r.ID, r.PostingID, r.Digest, r.Size, row.key, r.Revision, row.payload); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts(user_id,id,transaction_id,digest,size,blob_key,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, accountID, r.ID, r.TransactionID, r.Digest, r.Size, row.key, r.Revision, row.payload); err != nil {
 			return err
 		}
 	}

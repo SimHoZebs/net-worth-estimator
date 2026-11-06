@@ -66,15 +66,15 @@ func TestSyncRejectsBareBridgeKeys(t *testing.T) {
 	}
 }
 
-func TestSyncRejectsBarePostingKeyWithoutLink(t *testing.T) {
+func TestSyncRejectsBareTransactionKeyWithoutLink(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
 	account := "checking"
-	posting := types.Posting{
+	transaction := types.Transaction{
 		Name:            "Hold",
 		Source:          store.SourceBankSync,
 		SourceAccountID: &account,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785628800,
 		TransactionTime: 1785628800,
 		Enabled:         false,
@@ -82,8 +82,8 @@ func TestSyncRejectsBarePostingKeyWithoutLink(t *testing.T) {
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
 		Upsert: &store.BankUpsert{
-			Posting: posting,
-			Keys:    []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-checking", TransactionID: "tx1"}},
+			Transaction: transaction,
+			Keys:        []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-checking", TransactionID: "tx1"}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestSyncRejectsBarePostingKeyWithoutLink(t *testing.T) {
 	}
 	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
-		t.Fatal("fetch ran with a bare posting key")
+		t.Fatal("fetch ran with a bare transaction key")
 		return nil, nil
 	}
 	_, err := runner.Sync(context.Background())
@@ -168,14 +168,14 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 		t.Fatalf("stale account double-counted as unmapped: %+v", summary.Skipped)
 	}
 	if summary.CheckpointsInserted != 0 || summary.SettledInserted != 0 || summary.PendingInserted != 0 || summary.AccountsProvisioned != 0 {
-		t.Fatalf("summary = %+v, want no checkpoint/posting writes or provisioning", summary)
+		t.Fatalf("summary = %+v, want no checkpoint/transaction writes or provisioning", summary)
 	}
 	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.Postings) != 0 || len(model.Checkpoints) != 0 {
-		t.Fatalf("stale sync wrote rows: postings=%d checkpoints=%d", len(model.Postings), len(model.Checkpoints))
+	if len(model.Transactions) != 0 || len(model.Checkpoints) != 0 {
+		t.Fatalf("stale sync wrote rows: transactions=%d checkpoints=%d", len(model.Transactions), len(model.Checkpoints))
 	}
 	if len(model.Accounts) != 2 {
 		t.Fatalf("stale sync recreated the deleted account: %+v", model.Accounts)

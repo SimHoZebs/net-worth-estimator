@@ -32,7 +32,7 @@ export const E2E_QUARANTINE = [];
 // idempotency keys stay unique per attempt (UUID), but no assertion depends
 // on their values.
 export const E2E_SEED = Object.freeze({
-  postingDay: "2026-06-15",
+  transactionDay: "2026-06-15",
   postedTime: Date.UTC(2026, 5, 15, 12, 0, 0) / 1000,
   rangeStart: "2026-01-01",
   rangeEnd: "2026-12-31",

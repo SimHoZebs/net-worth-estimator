@@ -19,7 +19,7 @@ stopped. A schema downgrade requires a compatible backup.
 Image bytes use the private blob storage port (`backend/internal/blobstore`,
 SQLite default plus filesystem adapter, lifecycle in
 `backend/internal/store/adapters/sqlite/blob_storage.go`). Repeat setup preserves
-receipt metadata, image bytes, and stored posting receipt links without a backfill.
+receipt metadata, image bytes, and stored transaction receipt links without a backfill.
 
 Manual attachments and review need no extraction service. The ordinary deployment
 default is `NET_WORTH_ESTIMATOR_RECEIPT_SOURCE=disabled`. The dev Compose stack and
@@ -65,7 +65,7 @@ void rows record authorizations that never settled. Recurrence rules and
 generated occurrences cannot receive attachments; attach to a saved
 transaction instead. Receipt review remains separate from unsaved
 financial-account edits. Converted settled rows are owner transactions, so they
-accept receipts and keep the original posting UUID. Posted charges with no
+accept receipts and keep the original transaction UUID. Posted charges with no
 pending predecessor insert as new disabled owner rows; they accept receipts
 once saved and never duplicate across repeat syncs.
 
@@ -110,9 +110,9 @@ The mock proves workflow contracts, not OCR accuracy or provider reliability.
 
 | Endpoint | Behavior |
 | --- | --- |
-| `GET /v1/financial-model` | Financial model, issues, revision, and stored `receiptLinks` (posting ID to receipt IDs). |
+| `GET /v1/financial-model` | Financial model, issues, revision, and stored `receiptLinks` (transaction ID to receipt IDs). |
 | `GET /v1/transactions/{id}/receipts` | Metadata and extraction availability. |
-| `POST /v1/receipts` | Multipart `postingId` string and `image` file. No automatic extraction. |
+| `POST /v1/receipts` | Multipart `transactionId` string and `image` file. No automatic extraction. |
 | `GET /v1/receipts/{id}` | Extraction, drafts, confirmed values, provenance, diagnostics, revision. |
 | `GET /v1/receipts/{id}/image` | Private pixels. `download=true` adds a safe attachment filename. |
 | `PUT /v1/receipts/{id}/image` | Multipart `revision` and `image`. Atomically publish a new image reference and clear receipt content. |
@@ -134,8 +134,8 @@ scope change. Receipt content never enters browser persistent storage.
 - Apply JPEG orientation and remove metadata through pixel re-encoding.
 - Reject normalized images over 3 MiB instead of silently degrading text.
 - Limit each user to 100 MiB of pixels and 500 receipts.
-- Deduplicate identical normalized images within one posting.
-- Reject replacement images already attached as another receipt on that posting.
+- Deduplicate identical normalized images within one transaction.
+- Reject replacement images already attached as another receipt on that transaction.
 - Permit two active extraction calls per source, one per receipt.
 - Bound extraction attempts to 45 seconds. Interrupted attachments remain saved.
 - Persist failed extraction attempts as recovery state without provider secrets.
@@ -161,8 +161,8 @@ as stale.
 
 ## Lifecycle and privacy
 
-Posting edits and reorders preserve receipts. Explicit posting deletion, CSV
-replacement of postings, and clearing a user's data remove dependent receipts. The
+Transaction edits and reorders preserve receipts. Explicit transaction deletion, CSV
+replacement of transactions, and clearing a user's data remove dependent receipts. The
 transaction-removal confirmation explains this consequence before save.
 
 With the default SQLite blob adapter, database backups include receipt pixels
@@ -176,16 +176,16 @@ provider outage can delay removal of stored bytes. Cleanup retries after restart
 
 ### Reverse lookup
 
-Each posting row carries a stored `receipt_ids` back-reference (storage column
-only; see `scanPostingRow` in `backend/internal/store/model.go` — it never
+Each transaction row carries a stored `receipt_ids` back-reference (storage column
+only; see `scanTransactionRow` in `backend/internal/store/model.go` — it never
 enters `FinancialModel`, financial revisions, or projection
 identities). Receipt creation appends and receipt deletion removes the ID in the
-same transaction as the receipt row, so the field never drifts. Posting edits
-leave it untouched, posting deletion removes it with the row, and CSV
+same transaction as the receipt row, so the field never drifts. Transaction edits
+leave it untouched, transaction deletion removes it with the row, and CSV
 replacement resets it with the new rows.
 
 The financial-model response exposes it as `receiptLinks`, mapping each
-posting ID to its receipt IDs. Transaction rows also carry `receiptIds`, so
+transaction ID to its receipt IDs. Transaction rows also carry `receiptIds`, so
 the list badge reads the row it already fetched instead of the model document.
 Opening a receipt still fetches full details through
 `GET /v1/transactions/{id}/receipts`. Receipt mutations invalidate the

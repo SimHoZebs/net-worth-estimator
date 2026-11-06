@@ -85,13 +85,13 @@ func TestSupersedeAccountEndpointReturnsIssuesWithoutPersisting(t *testing.T) {
 		t.Fatalf("seed link: %v", err)
 	}
 	source := "synced"
-	if _, err := database.CreatePosting(types.Posting{
+	if _, err := database.CreateTransaction(types.Transaction{
 		ID: "01900000-0000-7000-8000-0000000000c1", Name: "Broken",
 		SourceAccountID: &source, Destinations: []string{"ghost"},
-		Amount:     types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime: 1782950400, TransactionTime: 1782950400, Enabled: true,
 	}); err != nil {
-		t.Fatalf("seed broken posting: %v", err)
+		t.Fatalf("seed broken transaction: %v", err)
 	}
 	handler := New(database, Config{})
 	response := doRowRequest(t, handler, http.MethodPost, "/v1/sync/simplefin/accounts/bridge-1/supersede",

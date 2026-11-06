@@ -12,7 +12,7 @@ func TestLedgerIdentitiesUniqueAcrossSurfaces(t *testing.T) {
 	world := ledgerSetup(t, nil)
 	ledgerDeletePhantom(t, world)
 	groupID := ledgerGroup(t, world)
-	byName := ledgerPostingIDs(t, world.ownerSC)
+	byName := ledgerTransactionIDs(t, world.ownerSC)
 	ledgerGrant(t, world, byName["GROCER 123"][0], "group", groupID)
 	findings, _ := ledgerDetect(t, world.ownerSC)
 
@@ -34,8 +34,8 @@ func TestLedgerIdentitiesUniqueAcrossSurfaces(t *testing.T) {
 	ownerIDs := map[string]bool{}
 	for _, raw := range ownerFeed["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		if ownerIDs[id] {
 			t.Fatalf("row %s twice in the owner feed", id)
 		}
@@ -47,15 +47,15 @@ func TestLedgerIdentitiesUniqueAcrossSurfaces(t *testing.T) {
 	memberFeed := ledgerFeed(t, world, world.secondSubject, groupID)
 	for _, raw := range memberFeed["items"].([]any) {
 		item, _ := raw.(map[string]any)
-		posting, _ := item["posting"].(map[string]any)
-		id, _ := posting["id"].(string)
+		transaction, _ := item["transaction"].(map[string]any)
+		id, _ := transaction["id"].(string)
 		if _, ok := seen[id]; !ok {
 			t.Fatalf("feed row %s names no listed row", id)
 		}
 	}
 	for _, finding := range findings {
-		if _, ok := seen[finding.PostingID]; !ok {
-			t.Fatalf("finding row %s names no listed row", finding.PostingID)
+		if _, ok := seen[finding.TransactionID]; !ok {
+			t.Fatalf("finding row %s names no listed row", finding.TransactionID)
 		}
 	}
 	graph := ledgerFlows(t, world, world.expected.WindowStart, world.expected.WindowEnd)
@@ -74,8 +74,8 @@ func TestLedgerResyncAddsNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	beforeIDs := map[string]bool{}
-	for _, posting := range before.Postings {
-		beforeIDs[posting.ID] = true
+	for _, transaction := range before.Transactions {
+		beforeIDs[transaction.ID] = true
 	}
 	// The pack repeats its final feed: the repeat must add no rows and
 	// must not resurrect the deleted phantom.
@@ -85,14 +85,14 @@ func TestLedgerResyncAddsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(after.Postings) != len(before.Postings) {
-		t.Fatalf("postings = %d after re-sync, want %d", len(after.Postings), len(before.Postings))
+	if len(after.Transactions) != len(before.Transactions) {
+		t.Fatalf("transactions = %d after re-sync, want %d", len(after.Transactions), len(before.Transactions))
 	}
-	for _, posting := range after.Postings {
-		if !beforeIDs[posting.ID] {
-			t.Fatalf("re-sync minted row %q", posting.Name)
+	for _, transaction := range after.Transactions {
+		if !beforeIDs[transaction.ID] {
+			t.Fatalf("re-sync minted row %q", transaction.Name)
 		}
-		if posting.Name == "PHANTOM" {
+		if transaction.Name == "PHANTOM" {
 			t.Fatal("deleted phantom resurrected by re-sync")
 		}
 	}

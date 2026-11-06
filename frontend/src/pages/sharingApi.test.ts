@@ -2,13 +2,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { ok } from "../mocks/fetch.ts";
 import {
-	excludeSharedPosting,
+	excludeSharedTransaction,
 	getSharingPolicy,
-	grantSharedPosting,
+	grantSharedTransaction,
 	listSharingGrants,
 	previewSharingPolicy,
 	removeSharedExclusion,
-	revokeSharedPosting,
+	revokeSharedTransaction,
 	setSharingPolicy,
 } from "./sharingApi.ts";
 
@@ -64,7 +64,7 @@ it("saves the preference with the member's own values", async () => {
 it("previews unsaved values without persisting", async () => {
 	const preview = {
 		...policy(),
-		eligiblePostings: 4,
+		eligibleTransactions: 4,
 		memberCount: 3,
 	};
 	const fetcher = vi.fn(async () => ok({ preview }));
@@ -83,7 +83,7 @@ it("previews unsaved values without persisting", async () => {
 it("lists grants and shares, revokes, excludes, and removes", async () => {
 	const grant = {
 		ownerUserId: "user:abc",
-		postingId: "p1",
+		transactionId: "p1",
 		audienceType: "group",
 		audienceId: "g1",
 		intent: "shared",
@@ -105,9 +105,11 @@ it("lists grants and shares, revokes, excludes, and removes", async () => {
 		}),
 	);
 	await expect(listSharingGrants()).resolves.toEqual([grant]);
-	await expect(grantSharedPosting("p1", "group", "g1")).resolves.toEqual(grant);
-	await revokeSharedPosting("p1", "group", "g1");
-	await excludeSharedPosting("p1", "group", "g1");
+	await expect(grantSharedTransaction("p1", "group", "g1")).resolves.toEqual(
+		grant,
+	);
+	await revokeSharedTransaction("p1", "group", "g1");
+	await excludeSharedTransaction("p1", "group", "g1");
 	await removeSharedExclusion("p1", "group", "g1");
 	expect(calls.map((call) => call.method ?? "GET")).toEqual([
 		"GET",
@@ -127,17 +129,17 @@ it("lists grants and shares, revokes, excludes, and removes", async () => {
 		return rest;
 	});
 	expect(bodies).toEqual([
-		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
-		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
-		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
-		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
+		{ transactionId: "p1", audienceType: "group", audienceId: "g1" },
+		{ transactionId: "p1", audienceType: "group", audienceId: "g1" },
+		{ transactionId: "p1", audienceType: "group", audienceId: "g1" },
+		{ transactionId: "p1", audienceType: "group", audienceId: "g1" },
 	]);
 });
 
 it("reuses one key for one share action and mints fresh keys per action", async () => {
 	const grant = {
 		ownerUserId: "user:abc",
-		postingId: "p1",
+		transactionId: "p1",
 		audienceType: "group",
 		audienceId: "g1",
 		intent: "shared",
@@ -154,10 +156,10 @@ it("reuses one key for one share action and mints fresh keys per action", async 
 		}),
 	);
 	const key = "11111111-2222-4333-8444-555555555555";
-	await grantSharedPosting("p1", "group", "g1", key);
-	await grantSharedPosting("p1", "group", "g1", key);
+	await grantSharedTransaction("p1", "group", "g1", key);
+	await grantSharedTransaction("p1", "group", "g1", key);
 	expect(keys).toEqual([key, key]);
-	await grantSharedPosting("p1", "group", "g1");
+	await grantSharedTransaction("p1", "group", "g1");
 	expect(keys).toHaveLength(3);
 	expect(keys[2]).toMatch(
 		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,

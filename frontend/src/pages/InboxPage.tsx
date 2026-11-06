@@ -1,6 +1,6 @@
 import { Inbox } from "lucide-react";
 import { useState } from "react";
-import type { Posting } from "@/api/contracts.ts";
+import type { Transaction } from "@/api/contracts.ts";
 import { Badge } from "../components/Badge.tsx";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
@@ -21,8 +21,8 @@ import {
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 
 /** Stored literal figure from a shared amount, or null for recipes. */
-function previewAmount(posting: Posting): number | null {
-	return literalAmountOf(posting.amount);
+function previewAmount(transaction: Transaction): number | null {
+	return literalAmountOf(transaction.amount);
 }
 
 const tabs: Array<{ id: InboxStatus; label: string }> = [
@@ -82,11 +82,11 @@ function InboxItemCard({
 	onMarkRead: () => void;
 	onMarkUnread: () => void;
 }) {
-	const posting = item.posting;
-	const amount = posting ? previewAmount(posting) : null;
+	const transaction = item.transaction;
+	const amount = transaction ? previewAmount(transaction) : null;
 	return (
 		<article
-			aria-label={`Shared transaction ${item.postingId}`}
+			aria-label={`Shared transaction ${item.transactionId}`}
 			className="grid gap-2 rounded-surface border border-solid border-line bg-surface p-4"
 		>
 			<div className="flex flex-wrap items-center gap-2">
@@ -96,18 +96,18 @@ function InboxItemCard({
 			</div>
 			<div>
 				<h3 className="m-0 text-base">
-					{posting?.name ?? "Shared transaction"}
+					{transaction?.name ?? "Shared transaction"}
 				</h3>
 				<p className="mt-1 mb-0 text-sm text-muted">
 					{item.senderDisplayName
 						? `Shared by ${item.senderDisplayName}`
 						: "Shared with you"}
-					{posting
-						? ` · ${dateLabel(isoDateFromEpochSeconds(posting.postedTime), true)}`
+					{transaction
+						? ` · ${dateLabel(isoDateFromEpochSeconds(transaction.postedTime), true)}`
 						: ""}
 				</p>
 			</div>
-			{posting ? (
+			{transaction ? (
 				<p className="m-0 text-sm">
 					{amount != null ? <strong>{money(amount)}</strong> : "Varies"}
 				</p>
@@ -118,13 +118,13 @@ function InboxItemCard({
 						: "This share is no longer available to view."}
 				</p>
 			)}
-			{item.status === "accepted" && item.copyPostingId && (
+			{item.status === "accepted" && item.copyTransactionId && (
 				<p className="m-0 text-sm text-muted">
 					Saved to your own records as an independent copy.
 				</p>
 			)}
 			<div className="flex flex-wrap gap-2">
-				{item.status === "pending" && posting && (
+				{item.status === "pending" && transaction && (
 					<>
 						<Button
 							size="sm"
@@ -197,7 +197,7 @@ export function InboxPage() {
 		markUnreadMutation.isPending;
 
 	function target(item: InboxShareItem) {
-		return { ownerUserId: item.ownerUserId, postingId: item.postingId };
+		return { ownerUserId: item.ownerUserId, transactionId: item.transactionId };
 	}
 
 	async function onAccept(item: InboxShareItem) {
@@ -297,7 +297,7 @@ export function InboxPage() {
 								<div className="grid gap-3">
 									{items.map((item) => (
 										<InboxItemCard
-											key={`${item.ownerUserId}/${item.postingId}`}
+											key={`${item.ownerUserId}/${item.transactionId}`}
 											item={item}
 											busy={busy}
 											onAccept={() => void onAccept(item)}

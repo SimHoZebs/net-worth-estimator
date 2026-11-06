@@ -16,8 +16,8 @@ func bracketTestConfig() map[string]types.JsonValue {
 	}
 }
 
-func bracketTestAmount() types.PostingAmountResolution {
-	return types.PostingAmountResolution{
+func bracketTestAmount() types.TransactionAmountResolution {
+	return types.TransactionAmountResolution{
 		Resolver: "progressive-bracket",
 		Config:   bracketTestConfig(),
 		Inputs: map[string]types.AmountInputBinding{
@@ -62,7 +62,7 @@ func TestProgressiveBracketConfigValidation(t *testing.T) {
 			"brackets":  []any{map[string]any{"upTo": 5000.0, "rate": 0.1}},
 		},
 	} {
-		if _, err := ValidateAmountDescriptor(types.PostingAmountResolution{
+		if _, err := ValidateAmountDescriptor(types.TransactionAmountResolution{
 			Resolver: "progressive-bracket",
 			Config:   config,
 			Inputs: map[string]types.AmountInputBinding{
@@ -77,7 +77,7 @@ func TestProgressiveBracketConfigValidation(t *testing.T) {
 
 func TestProgressiveBracketResolvesLiability(t *testing.T) {
 	// Taxable = 10000 - 1000 - 1000 = 8000 → 5000*0.10 + 3000*0.20 = 1100.
-	value, err := ResolvePostingAmountDescriptor(bracketTestAmount(), &AmountProviderContext{})
+	value, err := ResolveTransactionAmountDescriptor(bracketTestAmount(), &AmountProviderContext{})
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestProgressiveBracketResolvesLiability(t *testing.T) {
 func TestProgressiveBracketComposesWithModelValue(t *testing.T) {
 	// The chaining a paycheck decomposition needs: inputs read earlier
 	// same-day rule realizations through the generic model-value provider.
-	amount := types.PostingAmountResolution{
+	amount := types.TransactionAmountResolution{
 		Resolver: "progressive-bracket",
 		Config:   bracketTestConfig(),
 		Inputs: map[string]types.AmountInputBinding{
@@ -98,8 +98,8 @@ func TestProgressiveBracketComposesWithModelValue(t *testing.T) {
 		},
 	}
 	refs := &AmountReferenceContext{
-		AccountIDs: map[string]bool{"checking": true},
-		PostingIDs: map[string]bool{"gross-rule": true, "contrib-rule": true, "tax-rule": true},
+		AccountIDs:     map[string]bool{"checking": true},
+		TransactionIDs: map[string]bool{"gross-rule": true, "contrib-rule": true, "tax-rule": true},
 	}
 	deps, err := ValidateAmountDescriptor(amount, refs)
 	if err != nil {
@@ -108,8 +108,8 @@ func TestProgressiveBracketComposesWithModelValue(t *testing.T) {
 	if len(deps) != 2 {
 		t.Fatalf("dependencies = %v, want both referenced rules", deps)
 	}
-	value, err := ResolvePostingAmountDescriptor(amount, &AmountProviderContext{
-		LatestRealizedPostingAmounts: map[string]float64{"gross-rule": 10000, "contrib-rule": 1000},
+	value, err := ResolveTransactionAmountDescriptor(amount, &AmountProviderContext{
+		LatestRealizedTransactionAmounts: map[string]float64{"gross-rule": 10000, "contrib-rule": 1000},
 	})
 	if err != nil {
 		t.Fatalf("resolve chained amount: %v", err)

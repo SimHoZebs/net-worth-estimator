@@ -10,19 +10,19 @@ func seedTransferLeg(t *testing.T, s *sqliteStore, name, account, bridge, transa
 	t.Helper()
 	seedAccount(t, s, account)
 	applyDirectives(t, s, []BankDirective{
-		bankUpsertDirective(bankSeedPosting(name, account, amount, false), ProviderSimpleFIN, bridge, transaction),
+		bankUpsertDirective(bankSeedTransaction(name, account, amount, false), ProviderSimpleFIN, bridge, transaction),
 		{Observe: &BankObservation{
 			Keys:  bankKeys(ProviderSimpleFIN, bridge, transaction),
 			Facts: types.TransactionFacts{Description: name, Amount: amount, Currency: "USD", PostedTime: 1785628800},
 		}},
 	})
-	rows, err := s.LoadBankPostings()
+	rows, err := s.LoadBankTransactions()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, row := range rows {
-		if row.Posting.Name == name {
-			return row.Posting.ID
+		if row.Transaction.Name == name {
+			return row.Transaction.ID
 		}
 	}
 	t.Fatalf("missing leg %q in %+v", name, rows)
@@ -53,8 +53,8 @@ func TestTransferFindingsPairLegsAndSurviveReruns(t *testing.T) {
 	checking := seedTransferLeg(t, s, "CREDIT CARD PAYMENT", "checking", "bridge-checking", "out-1", "-500.00")
 	card := seedTransferLeg(t, s, "PAYMENT RECEIVED", "card", "bridge-card", "in-1", "500.00")
 	detections := []types.AnalysisDetection{
-		{PostingID: checking, Kind: "transfer", Provider: "simplefin", Product: "internal-transfer", Role: "outflow", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", PostingIDs: []string{checking, card}}}},
-		{PostingID: card, Kind: "transfer", Provider: "simplefin", Product: "internal-transfer", Role: "inflow", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", PostingIDs: []string{checking, card}}}},
+		{TransactionID: checking, Kind: "transfer", Provider: "simplefin", Product: "internal-transfer", Role: "outflow", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", TransactionIDs: []string{checking, card}}}},
+		{TransactionID: card, Kind: "transfer", Provider: "simplefin", Product: "internal-transfer", Role: "inflow", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", TransactionIDs: []string{checking, card}}}},
 	}
 	first := completeTransferAnalysis(t, s, detections)
 	if len(first) != 2 {
@@ -65,19 +65,19 @@ func TestTransferFindingsPairLegsAndSurviveReruns(t *testing.T) {
 	if len(second) != 2 {
 		t.Fatalf("rerun findings=%+v", second)
 	}
-	byPosting := map[string]types.AnalysisFinding{}
+	byTransaction := map[string]types.AnalysisFinding{}
 	for _, item := range first {
-		byPosting[item.PostingID] = item
+		byTransaction[item.TransactionID] = item
 	}
 	for _, item := range second {
-		original, ok := byPosting[item.PostingID]
+		original, ok := byTransaction[item.TransactionID]
 		if !ok || original.ID != item.ID || original.FirstDetectedAt != item.FirstDetectedAt {
 			t.Fatalf("rerun rewrote finding identity: %+v vs %+v", original, item)
 		}
 	}
 	// A user correction persists across detector reruns. New evidence (an
 	// updated memo on the same bank keys) schedules a fresh run.
-	if err := s.DismissAnalysisFinding(byPosting[checking].ID, true, ""); err != nil {
+	if err := s.DismissAnalysisFinding(byTransaction[checking].ID, true, ""); err != nil {
 		t.Fatal(err)
 	}
 	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{
@@ -89,10 +89,10 @@ func TestTransferFindingsPairLegsAndSurviveReruns(t *testing.T) {
 		t.Fatalf("rereun findings=%+v", third)
 	}
 	for _, item := range third {
-		if item.PostingID == checking && !item.Dismissed {
+		if item.TransactionID == checking && !item.Dismissed {
 			t.Fatalf("dismissal lost: %+v", item)
 		}
-		if original, ok := byPosting[item.PostingID]; !ok || original.ID != item.ID || original.FirstDetectedAt != item.FirstDetectedAt {
+		if original, ok := byTransaction[item.TransactionID]; !ok || original.ID != item.ID || original.FirstDetectedAt != item.FirstDetectedAt {
 			t.Fatalf("rerun rewrote finding identity: %+v vs %+v", original, item)
 		}
 	}
@@ -103,24 +103,24 @@ func TestTransferClaimCoexistsWithBNPLOnOneTransaction(t *testing.T) {
 	checking := seedTransferLeg(t, s, "CREDIT CARD PAYMENT", "checking", "bridge-checking", "out-1", "-500.00")
 	card := seedTransferLeg(t, s, "PAYMENT RECEIVED", "card", "bridge-card", "in-1", "500.00")
 	completeTransferAnalysis(t, s, []types.AnalysisDetection{
-		{PostingID: checking, Kind: "transfer", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", PostingIDs: []string{checking, card}}}},
-		{PostingID: card, Kind: "transfer", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", PostingIDs: []string{checking, card}}}},
+		{TransactionID: checking, Kind: "transfer", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", TransactionIDs: []string{checking, card}}}},
+		{TransactionID: card, Kind: "transfer", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", TransactionIDs: []string{checking, card}}}},
 	})
 	run, _, claimed, err := s.ClaimAnalysis("bnpl", "v1")
 	if err != nil || !claimed {
 		t.Fatalf("claim=%+v claimed=%v err=%v", run, claimed, err)
 	}
-	bnpl := types.AnalysisDetection{PostingID: card, Kind: "bnpl", Provider: "klarna", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "bnpl.product-descriptor", PostingIDs: []string{card}}}}
+	bnpl := types.AnalysisDetection{TransactionID: card, Kind: "bnpl", Provider: "klarna", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "bnpl.product-descriptor", TransactionIDs: []string{card}}}}
 	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{bnpl}, ""); err != nil {
 		t.Fatal(err)
 	}
-	findings, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{PostingIDs: []string{card}})
+	findings, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{card}})
 	if err != nil || len(findings) != 2 {
 		t.Fatalf("claims=%+v err=%v", findings, err)
 	}
 	kinds := map[string]bool{}
 	for _, item := range findings {
-		kinds[item.PostingID+"\x00"+item.Kind] = true
+		kinds[item.TransactionID+"\x00"+item.Kind] = true
 	}
 	if !kinds[card+"\x00transfer"] || !kinds[card+"\x00bnpl"] {
 		t.Fatalf("independent claims collided: %+v", findings)

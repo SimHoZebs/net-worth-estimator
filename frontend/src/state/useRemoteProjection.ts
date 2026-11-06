@@ -66,7 +66,7 @@ export interface ProjectionDateRange {
 type ProjectionRows = {
 	evaluations: EvaluationTables;
 	checkpoints: { observedAt: number }[];
-	postings: {
+	transactions: {
 		id: string;
 		name: string;
 		sourceAccountId: string | null;
@@ -310,7 +310,7 @@ export function projectionResultToLocal(
 		]),
 	);
 	const fulfillmentByID = new Map(
-		result.evaluations.postingFulfillment.map((evaluation) => [
+		result.evaluations.transactionFulfillment.map((evaluation) => [
 			evaluation.instanceId,
 			evaluation,
 		]),
@@ -353,18 +353,20 @@ export function projectionResultToLocal(
 		...(model?.evaluations.financialIndependence ?? []).map((evaluation) =>
 			OTHER_EVAL_OUTCOME_RENDERERS.financialIndependence(evaluation, {
 				envelope: independenceByID.get(evaluation.instanceId),
-				postingIds: null,
+				transactionIds: null,
 				enabled: evaluation.enabled,
 				model,
 				projectionStartDate,
 				horizonEndDate: horizonEnd,
 			}),
 		),
-		...(model?.evaluations.postingFulfillment ?? []).map((evaluation) =>
-			OTHER_EVAL_OUTCOME_RENDERERS.postingFulfillment(evaluation, {
+		...(model?.evaluations.transactionFulfillment ?? []).map((evaluation) =>
+			OTHER_EVAL_OUTCOME_RENDERERS.transactionFulfillment(evaluation, {
 				envelope: fulfillmentByID.get(evaluation.instanceId),
-				postingIds: Array.isArray(valueRecord(evaluation.config)?.postingIds)
-					? (valueRecord(evaluation.config)!.postingIds as string[])
+				transactionIds: Array.isArray(
+					valueRecord(evaluation.config)?.transactionIds,
+				)
+					? (valueRecord(evaluation.config)!.transactionIds as string[])
 					: null,
 				enabled: evaluation.enabled,
 			}),
@@ -372,7 +374,7 @@ export function projectionResultToLocal(
 		...(model?.evaluations.cycleFulfillment ?? []).map((evaluation) =>
 			OTHER_EVAL_OUTCOME_RENDERERS.cycleFulfillment(evaluation, {
 				envelope: cycleByID.get(evaluation.instanceId),
-				postingIds: null,
+				transactionIds: null,
 				enabled: evaluation.enabled,
 			}),
 		),
@@ -401,11 +403,11 @@ function aggregateFulfillmentEvaluation(
 	result: StochasticProjectionResult,
 ): EvaluationResultEnvelope | undefined {
 	return (
-		result.evaluations.postingFulfillment.find((evaluation) => {
+		result.evaluations.transactionFulfillment.find((evaluation) => {
 			const deterministic = valueRecord(evaluation.deterministic);
-			const ids = deterministic?.postingIds;
+			const ids = deterministic?.transactionIds;
 			return ids === null || ids === undefined;
-		}) ?? result.evaluations.postingFulfillment[0]
+		}) ?? result.evaluations.transactionFulfillment[0]
 	);
 }
 
@@ -488,9 +490,9 @@ export function mergeEvaluationResults(
 				base.evaluations.accountBalance,
 				overlay.evaluations.accountBalance,
 			),
-			postingFulfillment: pick(
-				base.evaluations.postingFulfillment,
-				overlay.evaluations.postingFulfillment,
+			transactionFulfillment: pick(
+				base.evaluations.transactionFulfillment,
+				overlay.evaluations.transactionFulfillment,
 			),
 			cycleFulfillment: pick(
 				base.evaluations.cycleFulfillment ?? [],
@@ -625,7 +627,7 @@ function useProjectionSource(enabled: boolean): {
 				id: account.id,
 				name: account.name,
 			})),
-			postings: transactionRows,
+			transactions: transactionRows,
 			schedules: scheduleRows,
 			plannedPurchases: purchases.data!.plannedPurchases,
 			checkpoints: checkpointRows,

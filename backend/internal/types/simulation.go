@@ -5,21 +5,21 @@ package types
 // SimulationInputs contains the executable rows for a prepared simulation.
 type SimulationInputs struct {
 	Accounts         []Account         `json:"accounts"`
-	Postings         []Posting         `json:"postings"`
+	Transactions     []Transaction     `json:"transactions"`
 	Schedules        []Schedule        `json:"schedules"`
 	PaymentTerms     []PaymentTerms    `json:"paymentTerms,omitempty"`
 	PlannedPurchases []PlannedPurchase `json:"plannedPurchases,omitempty"`
 }
 
 type SimulationState struct {
-	Balances                     map[string]float64            `json:"balances"`
-	LatestRealizedPostingAmounts map[string]float64            `json:"latestRealizedPostingAmounts"`
-	LatestRealizedPostingDates   map[string]string             `json:"latestRealizedPostingDates,omitempty"`
-	RealizedPostingAmountsByYear map[string]map[string]float64 `json:"realizedPostingAmountsByYear"`
+	Balances                         map[string]float64            `json:"balances"`
+	LatestRealizedTransactionAmounts map[string]float64            `json:"latestRealizedTransactionAmounts"`
+	LatestRealizedTransactionDates   map[string]string             `json:"latestRealizedTransactionDates,omitempty"`
+	RealizedTransactionAmountsByYear map[string]map[string]float64 `json:"realizedTransactionAmountsByYear"`
 }
 
 type MonteCarloSample struct {
-	AnnualRatesByPostingID map[string][]float64 `json:"annualRatesByPostingId"`
+	AnnualRatesByTransactionID map[string][]float64 `json:"annualRatesByTransactionId"`
 }
 
 type SimulationRequest struct {

@@ -5,28 +5,28 @@ import { serverQueryClient } from "./serverQuery.ts";
 import { useUserScope } from "./useUserScope.ts";
 
 export const settleCandidatesKey = (
-	postingId: string,
+	transactionId: string,
 	revision: string | null | undefined,
 	scope = getUserScope(),
-) => ["settle-candidates", scope.key, postingId, revision ?? ""] as const;
+) => ["settle-candidates", scope.key, transactionId, revision ?? ""] as const;
 
 /**
  * Server-owned settlement candidates for one vanished hold. The model
- * revision belongs in the key so a sync or a posting edit cannot serve a
+ * revision belongs in the key so a sync or a transaction edit cannot serve a
  * stale pair list.
  */
 export function useSettleCandidates(
-	postingId: string,
+	transactionId: string,
 	enabled: boolean,
 	revision: string | null | undefined,
 ) {
 	const scope = useUserScope();
 	return useQuery(
 		{
-			queryKey: settleCandidatesKey(postingId, revision, scope),
+			queryKey: settleCandidatesKey(transactionId, revision, scope),
 			enabled: enabled && scope.status === "ready",
 			queryFn: async ({ signal }) =>
-				(await listSettleCandidates(postingId, { signal })).data,
+				(await listSettleCandidates(transactionId, { signal })).data,
 		},
 		serverQueryClient(),
 	);

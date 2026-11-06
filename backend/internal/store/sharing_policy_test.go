@@ -16,13 +16,13 @@ func policyNoon(t *testing.T, day string) int64 {
 	return stamp.Add(12 * time.Hour).Unix()
 }
 
-func policyFixturePosting(source string, destinations []string, txnTime int64) types.Posting {
-	return types.Posting{
+func policyFixtureTransaction(source string, destinations []string, txnTime int64) types.Transaction {
+	return types.Transaction{
 		ID:              "01900000-0000-7000-8000-000000000001",
 		Name:            "Policy test",
 		SourceAccountID: &source,
 		Destinations:    destinations,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      txnTime,
 		TransactionTime: txnTime,
 		Enabled:         true,
@@ -79,7 +79,7 @@ func TestNormalizeSharingPolicyInputCanonicalizes(t *testing.T) {
 	}
 }
 
-func TestPolicyCoversPostingMatrix(t *testing.T) {
+func TestPolicyCoversTransactionMatrix(t *testing.T) {
 	policy := SharingPolicy{
 		Enabled:    true,
 		AccountIDs: []string{"checking", "savings"},
@@ -89,32 +89,32 @@ func TestPolicyCoversPostingMatrix(t *testing.T) {
 	openEnded := SharingPolicy{Enabled: true, AccountIDs: []string{"checking"}, StartDate: "2026-01-01"}
 	disabled := SharingPolicy{Enabled: false, AccountIDs: []string{"checking"}, StartDate: "2026-01-01"}
 	unselected := SharingPolicy{Enabled: true, StartDate: "2026-01-01"}
-	voidRow := policyFixturePosting("checking", nil, policyNoon(t, "2026-06-15"))
+	voidRow := policyFixtureTransaction("checking", nil, policyNoon(t, "2026-06-15"))
 	voidRow.Void = true
-	pendingRow := policyFixturePosting("checking", nil, policyNoon(t, "2026-06-15"))
+	pendingRow := policyFixtureTransaction("checking", nil, policyNoon(t, "2026-06-15"))
 	pendingRow.Pending = true
 	for _, tc := range []struct {
-		name    string
-		policy  SharingPolicy
-		posting types.Posting
-		want    bool
+		name        string
+		policy      SharingPolicy
+		transaction types.Transaction
+		want        bool
 	}{
-		{"source match", policy, policyFixturePosting("checking", nil, policyNoon(t, "2026-06-15")), true},
-		{"destination match", policy, policyFixturePosting("other", []string{"savings"}, policyNoon(t, "2026-06-15")), true},
-		{"transfer either side", policy, policyFixturePosting("checking", []string{"savings"}, policyNoon(t, "2026-06-15")), true},
-		{"start edge inclusive", policy, policyFixturePosting("checking", nil, policyNoon(t, "2026-01-01")), true},
-		{"end edge inclusive", policy, policyFixturePosting("checking", nil, policyNoon(t, "2026-12-31")), true},
-		{"before start", policy, policyFixturePosting("checking", nil, policyNoon(t, "2025-12-31")), false},
-		{"after end", policy, policyFixturePosting("checking", nil, policyNoon(t, "2027-01-01")), false},
-		{"unselected account", policy, policyFixturePosting("other", []string{"elsewhere"}, policyNoon(t, "2026-06-15")), false},
-		{"policy disabled", disabled, policyFixturePosting("checking", nil, policyNoon(t, "2026-06-15")), false},
-		{"zero selected accounts", unselected, policyFixturePosting("checking", nil, policyNoon(t, "2026-06-15")), false},
+		{"source match", policy, policyFixtureTransaction("checking", nil, policyNoon(t, "2026-06-15")), true},
+		{"destination match", policy, policyFixtureTransaction("other", []string{"savings"}, policyNoon(t, "2026-06-15")), true},
+		{"transfer either side", policy, policyFixtureTransaction("checking", []string{"savings"}, policyNoon(t, "2026-06-15")), true},
+		{"start edge inclusive", policy, policyFixtureTransaction("checking", nil, policyNoon(t, "2026-01-01")), true},
+		{"end edge inclusive", policy, policyFixtureTransaction("checking", nil, policyNoon(t, "2026-12-31")), true},
+		{"before start", policy, policyFixtureTransaction("checking", nil, policyNoon(t, "2025-12-31")), false},
+		{"after end", policy, policyFixtureTransaction("checking", nil, policyNoon(t, "2027-01-01")), false},
+		{"unselected account", policy, policyFixtureTransaction("other", []string{"elsewhere"}, policyNoon(t, "2026-06-15")), false},
+		{"policy disabled", disabled, policyFixtureTransaction("checking", nil, policyNoon(t, "2026-06-15")), false},
+		{"zero selected accounts", unselected, policyFixtureTransaction("checking", nil, policyNoon(t, "2026-06-15")), false},
 		{"void excluded", policy, voidRow, false},
 		{"pending like posted", policy, pendingRow, true},
-		{"open end", openEnded, policyFixturePosting("checking", nil, policyNoon(t, "2027-06-15")), true},
+		{"open end", openEnded, policyFixtureTransaction("checking", nil, policyNoon(t, "2027-06-15")), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := PolicyCoversPosting(tc.policy, tc.posting); got != tc.want {
+			if got := PolicyCoversTransaction(tc.policy, tc.transaction); got != tc.want {
 				t.Fatalf("eligible = %v, want %v", got, tc.want)
 			}
 		})

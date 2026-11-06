@@ -153,7 +153,7 @@ user clear removes pattern-to-new-schedule records with the model rows they name
 
 A confirmed pattern can also claim an existing schedule's occurrences instead
 of creating a new schedule. Each recorded movement becomes a manual
-`PostingClaim` against its nearest free scheduled occurrence, so the
+`TransactionClaim` against its nearest free scheduled occurrence, so the
 projection stops double-counting and the recorded rows stay intact.
 
 - `GET /v1/analysis-findings/{id}/pattern-to-existing-schedule-preview?scheduleId=...`
@@ -166,7 +166,7 @@ projection stops double-counting and the recorded rows stay intact.
   requires a confirmed finding and applies all claims through the
   ordinary finance validation boundary in one atomic store write
   (concurrent additions serialize on a process-wide mutex). Already-correct
-  claims stay put; other enabled postings' claims on the same dates are
+  claims stay put; other enabled transactions' claims on the same dates are
   never reused (disabled rows claim nothing, so their dates stay free).
   Success returns the claimed rows, finance warnings, and the
   model revision. Retries are idempotent.
@@ -180,7 +180,7 @@ projection stops double-counting and the recorded rows stay intact.
 
 Transfer means one internal money movement observed as two opposite legs on
 different accounts. The detector pairs legs by exact absolute amount, opposite
-direction, and posting dates within 7 days. A leg with exactly one
+direction, and transaction dates within 7 days. A leg with exactly one
 mutual candidate produces a **strong** match; a leg with several candidates
 produces a **moderate** match that lists every candidate for review.
 
@@ -203,7 +203,7 @@ produces a **moderate** match that lists every candidate for review.
 ## API and interface
 
 - `GET /v1/analyses` reads execution status without starting work.
-- `GET /v1/analysis-findings` reads paginated findings. `postingIds` accepts up to
+- `GET /v1/analysis-findings` reads paginated findings. `transactionIds` accepts up to
   200 comma-separated IDs for batch lookup. `limit` is at most 100. `cursor`
   selects the next page. Responses remain private and uncached.
 - `PATCH /v1/analysis-findings/{id}` saves `{dismissed: boolean}`. It requires

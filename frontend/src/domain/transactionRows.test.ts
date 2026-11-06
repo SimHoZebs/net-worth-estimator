@@ -88,13 +88,13 @@ describe("transaction rows", () => {
 			amountKnown: true,
 			fromId: null,
 			toId: "cash",
-			kind: "posting",
+			kind: "transaction",
 			annualIncrease: 3,
 			postedDate: null,
 			pending: false,
 			void: false,
 		});
-		const posting = transactionToDisplay({
+		const transaction = transactionToDisplay({
 			id: "once-1",
 			name: "Groceries",
 			sourceAccountId: "cash",
@@ -110,8 +110,8 @@ describe("transaction rows", () => {
 			syncOwned: false,
 			readOnly: false,
 		} as never);
-		expect(posting).toMatchObject({
-			kind: "posting",
+		expect(transaction).toMatchObject({
+			kind: "transaction",
 			amount: 200,
 			amountKnown: true,
 			annualIncrease: 0,
@@ -134,7 +134,7 @@ describe("transaction rows", () => {
 		expect(varied).toMatchObject({
 			amount: 0,
 			amountKnown: false,
-			kind: "posting",
+			kind: "transaction",
 		});
 		const bankRow = transactionToDisplay({
 			id: "void-1",

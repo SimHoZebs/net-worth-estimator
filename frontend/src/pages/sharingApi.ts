@@ -34,13 +34,13 @@ export interface SharingPolicyPreview {
 	startDate: string;
 	endDate?: string;
 	version: number;
-	eligiblePostings: number;
+	eligibleTransactions: number;
 	memberCount: number;
 }
 
 export interface SharingGrant {
 	ownerUserId: string;
-	postingId: string;
+	transactionId: string;
 	audienceType: SharingAudienceType;
 	audienceId: string;
 	intent: SharingIntent;
@@ -150,8 +150,8 @@ export async function listSharingGrants(
 	return response.data.grants ?? [];
 }
 
-export async function grantSharedPosting(
-	postingId: string,
+export async function grantSharedTransaction(
+	transactionId: string,
 	audienceType: "group",
 	audienceId: string,
 	requestId: string = mintShareRequestId(),
@@ -159,13 +159,18 @@ export async function grantSharedPosting(
 	const response = await waypointFetch<GrantResponse>("/v1/shared/grants", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ postingId, audienceType, audienceId, requestId }),
+		body: JSON.stringify({
+			transactionId,
+			audienceType,
+			audienceId,
+			requestId,
+		}),
 	});
 	return response.data.grant;
 }
 
-export async function revokeSharedPosting(
-	postingId: string,
+export async function revokeSharedTransaction(
+	transactionId: string,
 	audienceType: string,
 	audienceId: string,
 	requestId: string = mintShareRequestId(),
@@ -173,12 +178,17 @@ export async function revokeSharedPosting(
 	await waypointFetch("/v1/shared/grants", {
 		method: "DELETE",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ postingId, audienceType, audienceId, requestId }),
+		body: JSON.stringify({
+			transactionId,
+			audienceType,
+			audienceId,
+			requestId,
+		}),
 	});
 }
 
-export async function excludeSharedPosting(
-	postingId: string,
+export async function excludeSharedTransaction(
+	transactionId: string,
 	audienceType: "group" | "all",
 	audienceId: string,
 	requestId: string = mintShareRequestId(),
@@ -187,7 +197,7 @@ export async function excludeSharedPosting(
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
-			postingId,
+			transactionId,
 			audienceType,
 			audienceId,
 			requestId,
@@ -197,7 +207,7 @@ export async function excludeSharedPosting(
 }
 
 export async function removeSharedExclusion(
-	postingId: string,
+	transactionId: string,
 	audienceType: string,
 	audienceId: string,
 	requestId: string = mintShareRequestId(),
@@ -205,6 +215,11 @@ export async function removeSharedExclusion(
 	await waypointFetch("/v1/shared/exclusions", {
 		method: "DELETE",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ postingId, audienceType, audienceId, requestId }),
+		body: JSON.stringify({
+			transactionId,
+			audienceType,
+			audienceId,
+			requestId,
+		}),
 	});
 }

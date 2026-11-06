@@ -28,7 +28,7 @@ const date = (value: unknown): string | null =>
 /** Display names the analysis needs, shared by the model and row sources. */
 type ProjectionNaming = {
 	accounts?: { id: string; name: string }[];
-	postings?: { id: string; name: string }[];
+	transactions?: { id: string; name: string }[];
 	schedules?: { id: string; name: string }[];
 	plannedPurchases?: { id: string; name: string }[];
 };
@@ -174,7 +174,7 @@ function mapAnalysis(
 	);
 	const transactions = new Map(
 		[
-			...(model?.postings ?? []),
+			...(model?.transactions ?? []),
 			...(model?.schedules ?? []),
 			...(model?.plannedPurchases ?? []),
 		].map((item) => [item.id, item.name]),
@@ -215,10 +215,10 @@ function mapAnalysis(
 			)
 			.map(
 				(source) =>
-					transactions.get(String(source.postingId)) ??
-					String(source.postingId),
+					transactions.get(String(source.transactionId)) ??
+					String(source.transactionId),
 			),
-		continuingNames: strings(config.continuingPostingIds).map(
+		continuingNames: strings(config.continuingTransactionIds).map(
 			(id) => transactions.get(id) ?? id,
 		),
 	};

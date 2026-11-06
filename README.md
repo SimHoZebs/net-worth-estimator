@@ -10,12 +10,12 @@ The server never reads CSV directories. An empty database stays empty until impo
 public/configs/
 ├── accounts.csv
 ├── checkpoints.csv
-├── postings.csv
+├── transactions.csv
 ├── recurrence-rules.csv
 └── behavior/
     ├── financial-independence.csv
     ├── net-worth-threshold.csv
-    └── posting-fulfillment.csv
+    └── transaction-fulfillment.csv
 
 public/data/income/
 ├── income-sources.csv
@@ -43,7 +43,7 @@ Database setup is a deployment step handled by `setupdb` (see [the shared databa
 
 ## SimpleFIN Synchronization
 
-SimpleFIN sync writes balance checkpoints and disabled pending-charge postings. Sync rows are not garbage-collected; keep mappings valid or purge source rows deliberately.
+SimpleFIN sync writes balance checkpoints and disabled pending-charge transactions. Sync rows are not garbage-collected; keep mappings valid or purge source rows deliberately.
 
 ## Development
 

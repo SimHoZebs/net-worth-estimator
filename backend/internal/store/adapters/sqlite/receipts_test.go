@@ -16,12 +16,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const receiptPostingID = "01900000-0000-7000-8000-000000000099"
+const receiptTransactionID = "01900000-0000-7000-8000-000000000099"
 
-func seedReceiptPosting(t *testing.T, s store.Store) types.Posting {
+func seedReceiptTransaction(t *testing.T, s store.Store) types.Transaction {
 	t.Helper()
 	seedAccount(t, s, "checking")
-	p, err := s.CreatePosting(testPostingFixture(receiptPostingID))
+	p, err := s.CreateTransaction(testTransactionFixture(receiptTransactionID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,16 +32,16 @@ func TestReceiptsStayPlanScopedAndPreserveModel(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "receipt-a"), privateTestPlan(t, d, "receipt-b")
 	for _, s := range []store.Store{a, b} {
-		seedReceiptPosting(t, s)
+		seedReceiptTransaction(t, s)
 	}
 	before, _ := a.LoadModel()
 	revision, _ := ModelETag(before)
 	image := types.ReceiptImage{Bytes: []byte("normalized pixels"), MediaType: "image/png"}
-	r, err := a.CreateReceipt(context.Background(), receiptPostingID, "receipt.png", image)
+	r, err := a.CreateReceipt(context.Background(), receiptTransactionID, "receipt.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	duplicate, err := a.CreateReceipt(context.Background(), receiptPostingID, "renamed.png", image)
+	duplicate, err := a.CreateReceipt(context.Background(), receiptTransactionID, "renamed.png", image)
 	if err != nil || duplicate.ID != r.ID {
 		t.Fatalf("duplicate = %+v, %v", duplicate, err)
 	}
@@ -57,7 +57,7 @@ func TestReceiptsStayPlanScopedAndPreserveModel(t *testing.T) {
 	if err := b.DeleteReceipt(context.Background(), r.ID); !errors.Is(err, ErrReceiptNotFound) {
 		t.Fatalf("cross-plan delete = %v", err)
 	}
-	rb, err := b.CreateReceipt(context.Background(), receiptPostingID, "other.png", image)
+	rb, err := b.CreateReceipt(context.Background(), receiptTransactionID, "other.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,24 +103,24 @@ func TestReceiptsStayPlanScopedAndPreserveModel(t *testing.T) {
 	}
 }
 
-func TestReceiptLifecyclePostingEditsAndRestart(t *testing.T) {
+func TestReceiptLifecycleTransactionEditsAndRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "receipts.db")
 	s, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	image := types.ReceiptImage{Bytes: []byte("image"), MediaType: "image/png"}
 	r, err := s.CreateReceipt(context.Background(), p.ID, "receipt.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.Name = "Updated expense"
-	updated, err := s.UpdatePosting(p)
+	updated, err := s.UpdateTransaction(p)
 	if err != nil || updated.ExecutionOrder != p.ExecutionOrder {
-		t.Fatalf("posting = %+v, %v", updated, err)
+		t.Fatalf("transaction = %+v, %v", updated, err)
 	}
-	if err := s.MovePosting(p.ID, ""); err != nil {
+	if err := s.MoveTransaction(p.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.GetReceipt(r.ID); err != nil {
@@ -138,7 +138,7 @@ func TestReceiptLifecyclePostingEditsAndRestart(t *testing.T) {
 	if err != nil || !bytes.Equal(saved.Bytes, image.Bytes) {
 		t.Fatalf("restored image = %+v, %v", saved, err)
 	}
-	if err := s.DeletePosting(p.ID); err != nil {
+	if err := s.DeleteTransaction(p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.GetReceipt(r.ID); !errors.Is(err, ErrReceiptNotFound) {
@@ -149,7 +149,7 @@ func TestReceiptLifecyclePostingEditsAndRestart(t *testing.T) {
 func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "receipt-quota")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	image := types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"}
 	if _, err := s.CreateReceipt(context.Background(), "missing", "a.png", image); !errors.Is(err, ErrReceiptNotFound) {
 		t.Fatal(err)
@@ -160,15 +160,15 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateReceipt(context.Background(), purchase.ID, "a.png", image); !errors.Is(err, ErrReceiptNotFound) {
-		t.Fatal("standalone purchase accepted posting evidence", err)
+		t.Fatal("standalone purchase accepted transaction evidence", err)
 	}
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'banksync' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET pending = 1, source = 'banksync' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateReceipt(context.Background(), p.ID, "b.png", image); !errors.Is(err, ErrReceiptIneligible) {
 		t.Fatal("pending sync row accepted evidence")
 	}
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 0, source = 'user' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET pending = 0, source = 'user' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image)
@@ -210,20 +210,20 @@ func TestSetupRejectsMissingReceiptSchema(t *testing.T) {
 func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "receipt-replacement")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	r, err := s.CreateReceipt(context.Background(), p.ID, "receipt.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The old replace-on-write path always recomputed owner pending state.
-	if _, err := s.db.Exec(`UPDATE postings SET pending=1 WHERE id=? AND user_id=:user_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE transactions SET pending=1 WHERE id=? AND user_id=:user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.UpdatePosting(p); err != nil {
+	if _, err := s.UpdateTransaction(p); err != nil {
 		t.Fatal(err)
 	}
 	doc, err := s.LoadModel()
-	if err != nil || doc.Postings[0].Pending {
+	if err != nil || doc.Transactions[0].Pending {
 		t.Fatal("owner update did not recompute pending metadata", err)
 	}
 	if _, err := s.GetReceipt(r.ID); err != nil {
@@ -237,10 +237,10 @@ func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 	}
 }
 
-func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
+func TestTransactionReceiptLinksTrackLifecycle(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "receipt-field")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	image := types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"}
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image)
 	if err != nil {
@@ -248,7 +248,7 @@ func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
 	}
 	links := func() []string {
 		t.Helper()
-		got, err := s.ListPostingReceiptIDs()
+		got, err := s.ListTransactionReceiptIDs()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -256,7 +256,7 @@ func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
 	}
 	stored := func() []string {
 		t.Helper()
-		rows, err := s.db.Query(`SELECT id FROM receipts WHERE posting_id = ? AND user_id = :user_id ORDER BY id`, p.ID)
+		rows, err := s.db.Query(`SELECT id FROM receipts WHERE transaction_id = ? AND user_id = :user_id ORDER BY id`, p.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -298,9 +298,9 @@ func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
 	if got := links(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("links = %v, want %v", got, want)
 	}
-	// Ordinary posting edits preserve the links and keep them out of the model.
+	// Ordinary transaction edits preserve the links and keep them out of the model.
 	p.Name = "Updated"
-	if _, err := s.UpdatePosting(p); err != nil {
+	if _, err := s.UpdateTransaction(p); err != nil {
 		t.Fatal(err)
 	}
 	if got := links(); !reflect.DeepEqual(got, want) {
@@ -320,7 +320,7 @@ func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
 	if err := s.DeleteReceipt(context.Background(), other.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := s.ListPostingReceiptIDs(); err != nil || len(got) != 0 {
+	if got, err := s.ListTransactionReceiptIDs(); err != nil || len(got) != 0 {
 		t.Fatalf("links after full delete = %+v, %v", got, err)
 	}
 	if got := stored(); len(got) != 0 {
@@ -328,14 +328,14 @@ func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
 	}
 }
 
-func TestRepeatedSetupPreservesPostingReceipts(t *testing.T) {
+func TestRepeatedSetupPreservesTransactionReceipts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "receipt-field.db")
 	d, err := SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := privateTestPlan(t, d, "owner")
-	p := seedReceiptPosting(t, s)
+	p := seedReceiptTransaction(t, s)
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
@@ -348,7 +348,7 @@ func TestRepeatedSetupPreservesPostingReceipts(t *testing.T) {
 	// rows and the derived links, then prove reopening preserves them.
 	snapshot := func() (string, map[string][]string) {
 		t.Helper()
-		rows, err := d.SQL().Query(`SELECT user_id, id, posting_id, digest, size, blob_key, revision, payload FROM receipts ORDER BY user_id, id`)
+		rows, err := d.SQL().Query(`SELECT user_id, id, transaction_id, digest, size, blob_key, revision, payload FROM receipts ORDER BY user_id, id`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -372,7 +372,7 @@ func TestRepeatedSetupPreservesPostingReceipts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		links, err := s.ListPostingReceiptIDs()
+		links, err := s.ListTransactionReceiptIDs()
 		if err != nil {
 			t.Fatal(err)
 		}

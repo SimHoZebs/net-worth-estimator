@@ -3,25 +3,25 @@ import type { Transaction } from "../../domain/model.ts";
 import {
 	claimUpdate,
 	combineDayTime,
-	detailPostingValues,
+	detailTransactionValues,
 	detailScheduleValues,
-	postingBody,
-	postingUpdate,
+	transactionBody,
+	transactionUpdate,
 	scheduleBody,
 	scheduleUpdate,
 	timeOfDay,
-	validatePostingValues,
+	validateTransactionValues,
 	validateScheduleValues,
 } from "./transactionBodies.ts";
 
-const baselinePosting: Transaction = {
+const baselineTransaction: Transaction = {
 	id: "renovation",
 	name: "Home renovation",
 	amount: 48000,
 	amountKnown: true,
 	fromId: "checking",
 	toId: "savings",
-	kind: "posting",
+	kind: "transaction",
 	startDate: "2028-06-15",
 	endDate: null,
 	annualIncrease: 0,
@@ -53,20 +53,20 @@ const baselineSchedule: Transaction = {
 	void: false,
 };
 
-function postingValues(
-	overrides: Partial<Parameters<typeof postingUpdate>[0]["values"]> = {},
-): Parameters<typeof postingUpdate>[0]["values"] {
+function transactionValues(
+	overrides: Partial<Parameters<typeof transactionUpdate>[0]["values"]> = {},
+): Parameters<typeof transactionUpdate>[0]["values"] {
 	return {
-		name: baselinePosting.name,
-		amount: baselinePosting.amount,
-		fromId: baselinePosting.fromId,
-		toId: baselinePosting.toId,
-		startDate: baselinePosting.startDate,
-		postedDate: baselinePosting.postedDate,
-		enabled: baselinePosting.enabled,
+		name: baselineTransaction.name,
+		amount: baselineTransaction.amount,
+		fromId: baselineTransaction.fromId,
+		toId: baselineTransaction.toId,
+		startDate: baselineTransaction.startDate,
+		postedDate: baselineTransaction.postedDate,
+		enabled: baselineTransaction.enabled,
 		claimScheduleId: null,
 		claimOccurrenceDate: null,
-		transactionTime: baselinePosting.transactionTime,
+		transactionTime: baselineTransaction.transactionTime,
 		...overrides,
 	};
 }
@@ -88,69 +88,74 @@ function scheduleValues(
 	};
 }
 
-describe("posting patches", () => {
+describe("transaction patches", () => {
 	it("states only the edited member on a rename", () => {
-		const patch = postingUpdate({
-			baseline: baselinePosting,
-			values: postingValues({ name: "Home renovation revised" }),
+		const patch = transactionUpdate({
+			baseline: baselineTransaction,
+			values: transactionValues({ name: "Home renovation revised" }),
 		});
 		expect(patch).toEqual({ name: "Home renovation revised" });
 	});
 
 	it("returns an empty patch when nothing changed", () => {
 		expect(
-			postingUpdate({ baseline: baselinePosting, values: postingValues() }),
+			transactionUpdate({
+				baseline: baselineTransaction,
+				values: transactionValues(),
+			}),
 		).toEqual({});
 	});
 
 	it("sends the wall time when the time changes", () => {
-		const changed = combineDayTime(baselinePosting.startDate, "11:00");
-		const patch = postingUpdate({
-			baseline: baselinePosting,
-			values: postingValues({ transactionTime: changed }),
+		const changed = combineDayTime(baselineTransaction.startDate, "11:00");
+		const patch = transactionUpdate({
+			baseline: baselineTransaction,
+			values: transactionValues({ transactionTime: changed }),
 		});
 		expect(patch).toEqual({ time: "11:00" });
 	});
 
 	it("keeps second precision out of the patch when the time is untouched", () => {
-		const formValues = detailPostingValues({
+		const formValues = detailTransactionValues({
 			draft: {
-				name: baselinePosting.name,
+				name: baselineTransaction.name,
 				amount: "48000",
 				fromId: "checking",
 				toId: "savings",
-				startDate: baselinePosting.startDate,
-				postedDate: baselinePosting.postedDate ?? "",
+				startDate: baselineTransaction.startDate,
+				postedDate: baselineTransaction.postedDate ?? "",
 				enabled: true,
 				claimScheduleId: "",
 				claimOccurrenceDate: "",
-				transactionTime: timeOfDay(baselinePosting.transactionTime),
+				transactionTime: timeOfDay(baselineTransaction.transactionTime),
 			},
-			item: baselinePosting,
+			item: baselineTransaction,
 		});
 		if (formValues instanceof Error) throw formValues;
-		expect(formValues.transactionTime).toBe(baselinePosting.transactionTime);
+		expect(formValues.transactionTime).toBe(
+			baselineTransaction.transactionTime,
+		);
 		expect(
-			postingUpdate({ baseline: baselinePosting, values: formValues }),
+			transactionUpdate({ baseline: baselineTransaction, values: formValues }),
 		).toEqual({});
 	});
 
 	it("clears nullable endpoint members explicitly", () => {
-		const cleared = postingUpdate({
-			baseline: baselinePosting,
-			values: postingValues({ fromId: null, toId: null }),
+		const cleared = transactionUpdate({
+			baseline: baselineTransaction,
+			values: transactionValues({ fromId: null, toId: null }),
 		});
 		expect(cleared).toEqual({ sourceAccountId: null, destinations: null });
 	});
 
 	it("leaves claims to the separate claim action", () => {
-		const patch = postingUpdate({
+		const patch = transactionUpdate({
 			baseline: {
-				...baselinePosting,
+				...baselineTransaction,
 				claimScheduleId: "salary",
 				claimOccurrenceDate: "2026-02-01",
 			},
-			values: postingValues({
+			values: transactionValues({
 				claimScheduleId: null,
 				claimOccurrenceDate: null,
 			}),
@@ -159,23 +164,29 @@ describe("posting patches", () => {
 	});
 
 	it("carries no cadence, growth, or end date", () => {
-		const body = postingBody(postingValues());
+		const body = transactionBody(transactionValues());
 		expect(body).not.toHaveProperty("frequency");
 		expect(body).not.toHaveProperty("endDate");
 		expect(body.amount).toEqual({ value: 48000 });
 		expect(
-			postingUpdate({ baseline: baselinePosting, values: postingValues() }),
+			transactionUpdate({
+				baseline: baselineTransaction,
+				values: transactionValues(),
+			}),
 		).not.toHaveProperty("annualIncrease");
 	});
 
-	it("validates the posting fields without asking for recurrence", () => {
-		expect(validatePostingValues(postingValues())).toBeNull();
-		expect(validatePostingValues(postingValues({ name: "  " }))).toBe(
+	it("validates the transaction fields without asking for recurrence", () => {
+		expect(validateTransactionValues(transactionValues())).toBeNull();
+		expect(validateTransactionValues(transactionValues({ name: "  " }))).toBe(
 			"Give the transaction a name.",
 		);
 		expect(
-			validatePostingValues(
-				postingValues({ claimScheduleId: "salary", claimOccurrenceDate: null }),
+			validateTransactionValues(
+				transactionValues({
+					claimScheduleId: "salary",
+					claimOccurrenceDate: null,
+				}),
 			),
 		).toBe("Choose which occurrence this replaces.");
 	});
@@ -268,7 +279,7 @@ describe("schedule patches", () => {
 
 describe("create bodies", () => {
 	it("authors a semantic transaction amount and calendar day", () => {
-		const body = postingBody(postingValues());
+		const body = transactionBody(transactionValues());
 		expect(body.amount).toEqual({ value: 48000 });
 		expect(body.date).toBe("2028-06-15");
 		expect(body.time).toBe("19:40:12");

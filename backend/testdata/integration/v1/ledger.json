@@ -34,10 +34,10 @@
           "financialIndependence": [],
           "netWorthThreshold": [],
           "plannedPurchases": [],
-          "postingFulfillment": [],
+          "transactionFulfillment": [],
           "whatIf": []
         },
-        "postings": [
+        "transactions": [
           {
             "amount": {
               "config": {
@@ -500,7 +500,7 @@
           333
         ],
         "jpyTotal": 1000,
-        "listedPostings": 25,
+        "listedTransactions": 25,
         "narrowEnd": "2026-03-31",
         "narrowIn": 9046,
         "narrowOut": 4468,

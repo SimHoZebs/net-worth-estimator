@@ -15,10 +15,10 @@ func importTestModel() types.FinancialModel {
 			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
 		},
 		Checkpoints: []types.Checkpoint{},
-		Postings: []types.Posting{{
+		Transactions: []types.Transaction{{
 			ID: "01900000-0000-7000-8000-000000000001", Name: "Rent", SourceAccountID: ptr("checking"),
 			Destinations: []string{"savings"},
-			Amount: types.PostingAmountResolution{
+			Amount: types.TransactionAmountResolution{
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "100"},
 				Inputs:   map[string]types.AmountInputBinding{},
@@ -33,12 +33,12 @@ func importTestModel() types.FinancialModel {
 		Schedules: []types.Schedule{
 			{
 				ID: "01900000-0000-7000-8000-000000000003", Name: "Salary", Destinations: []string{"checking"},
-				Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
+				Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
 				Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", Priority: 1, Enabled: true,
 			},
 			{
 				ID: "01900000-0000-7000-8000-000000000004", Name: "Gym", Destinations: []string{"checking"},
-				Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "40"}, Inputs: map[string]types.AmountInputBinding{}},
+				Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "40"}, Inputs: map[string]types.AmountInputBinding{}},
 				Frequency: types.FrequencyMonthly, StartDate: "2026-02-01", Priority: 2, Enabled: true,
 			},
 		},
@@ -77,11 +77,11 @@ func TestImportModelMergesReviewedDocument(t *testing.T) {
 	handler := New(database, Config{})
 
 	document := importTestModel()
-	document.Postings[0].Name = "Rent revised"
-	document.Postings = append(document.Postings, types.Posting{
+	document.Transactions[0].Name = "Rent revised"
+	document.Transactions = append(document.Transactions, types.Transaction{
 		ID: "01900000-0000-7000-8000-000000000002", Name: "Food", SourceAccountID: ptr("checking"),
 		Destinations: []string{"savings"},
-		Amount: types.PostingAmountResolution{
+		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "25"},
 			Inputs:   map[string]types.AmountInputBinding{},
@@ -100,18 +100,18 @@ func TestImportModelMergesReviewedDocument(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(stored.Postings) != 2 {
-		t.Fatalf("postings = %+v, want the reviewed rows", stored.Postings)
+	if len(stored.Transactions) != 2 {
+		t.Fatalf("transactions = %+v, want the reviewed rows", stored.Transactions)
 	}
-	rent := stored.Postings[0]
+	rent := stored.Transactions[0]
 	if rent.Name != "Rent revised" {
 		t.Fatalf("name = %q, want the document value", rent.Name)
 	}
 	if rent.Source != "user" || rent.ExecutionOrder != 7 {
 		t.Fatalf("lifecycle = source %q order %d, want stored values", rent.Source, rent.ExecutionOrder)
 	}
-	if stored.Postings[1].ID != "01900000-0000-7000-8000-000000000002" {
-		t.Fatalf("second posting = %+v, want the new row", stored.Postings[1])
+	if stored.Transactions[1].ID != "01900000-0000-7000-8000-000000000002" {
+		t.Fatalf("second transaction = %+v, want the new row", stored.Transactions[1])
 	}
 	if len(stored.Schedules) != 2 || stored.Schedules[0].ID != "01900000-0000-7000-8000-000000000004" || stored.Schedules[0].Name != "Gym" {
 		t.Fatalf("schedules = %+v, want the document order", stored.Schedules)
@@ -124,7 +124,7 @@ func TestImportModelMergesReviewedDocument(t *testing.T) {
 func TestImportModelReleasesClaimsBeforeDeletingSchedule(t *testing.T) {
 	database := openAPIStore(t)
 	seed := importTestModel()
-	seed.Postings[0].Claim = &types.PostingClaim{
+	seed.Transactions[0].Claim = &types.TransactionClaim{
 		ScheduleID:     seed.Schedules[0].ID,
 		OccurrenceDate: "2026-01-01",
 	}
@@ -134,7 +134,7 @@ func TestImportModelReleasesClaimsBeforeDeletingSchedule(t *testing.T) {
 	handler := New(database, Config{})
 
 	document := importTestModel()
-	document.Postings[0].Claim = nil
+	document.Transactions[0].Claim = nil
 	document.Schedules = document.Schedules[1:]
 	result := importRequest(t, handler, map[string]any{"model": document})
 	if !result.Saved {
@@ -147,8 +147,8 @@ func TestImportModelReleasesClaimsBeforeDeletingSchedule(t *testing.T) {
 	if len(stored.Schedules) != 1 || stored.Schedules[0].ID != seed.Schedules[1].ID {
 		t.Fatalf("schedules = %+v, want the removed schedule gone", stored.Schedules)
 	}
-	if stored.Postings[0].Claim != nil {
-		t.Fatalf("claim = %+v, want the document's release", stored.Postings[0].Claim)
+	if stored.Transactions[0].Claim != nil {
+		t.Fatalf("claim = %+v, want the document's release", stored.Transactions[0].Claim)
 	}
 }
 
@@ -156,7 +156,7 @@ func TestImportModelCreatesClaimedOccurrenceOnEmptyServer(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	document := importTestModel()
-	document.Postings[0].Claim = &types.PostingClaim{
+	document.Transactions[0].Claim = &types.TransactionClaim{
 		ScheduleID:     document.Schedules[0].ID,
 		OccurrenceDate: "2026-01-01",
 	}
@@ -168,8 +168,8 @@ func TestImportModelCreatesClaimedOccurrenceOnEmptyServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if stored == nil || len(stored.Postings) != 1 || stored.Postings[0].Claim == nil {
-		t.Fatalf("postings = %+v, want the claimed occurrence", stored)
+	if stored == nil || len(stored.Transactions) != 1 || stored.Transactions[0].Claim == nil {
+		t.Fatalf("transactions = %+v, want the claimed occurrence", stored)
 	}
 }
 
@@ -182,7 +182,7 @@ func TestImportModelRejectsInvalidDocumentWithoutWriting(t *testing.T) {
 	handler := New(database, Config{})
 
 	document := importTestModel()
-	document.Postings[0].Destinations = []string{"missing"}
+	document.Transactions[0].Destinations = []string{"missing"}
 	result := importRequest(t, handler, map[string]any{"model": document})
 	if result.Saved {
 		t.Fatal("invalid import reported saved")
@@ -194,7 +194,7 @@ func TestImportModelRejectsInvalidDocumentWithoutWriting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if stored.Postings[0].Destinations[0] != "savings" {
-		t.Fatalf("stored destinations = %+v, want the original row", stored.Postings[0].Destinations)
+	if stored.Transactions[0].Destinations[0] != "savings" {
+		t.Fatalf("stored destinations = %+v, want the original row", stored.Transactions[0].Destinations)
 	}
 }

@@ -83,10 +83,10 @@ func TestExplainFinancialHealthCompleteFixture(t *testing.T) {
 func TestExplainFinancialHealthMissingIncome(t *testing.T) {
 	model, position := finHealthFixture()
 	checking := "checking"
-	model.Postings = []types.Posting{
-		finHealthLiteralPosting("rent-aug", "Rent", &checking, nil, "1500", "2026-08-05"),
-		finHealthLiteralPosting("rent-sep", "Rent", &checking, nil, "1500", "2026-09-05"),
-		finHealthLiteralPosting("rent-oct", "Rent", &checking, nil, "1500", "2026-10-05"),
+	model.Transactions = []types.Transaction{
+		finHealthLiteralTransaction("rent-aug", "Rent", &checking, nil, "1500", "2026-08-05"),
+		finHealthLiteralTransaction("rent-sep", "Rent", &checking, nil, "1500", "2026-09-05"),
+		finHealthLiteralTransaction("rent-oct", "Rent", &checking, nil, "1500", "2026-10-05"),
 	}
 	model.Checkpoints = []types.Checkpoint{
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},

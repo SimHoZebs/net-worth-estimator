@@ -74,19 +74,19 @@ func mergeStoredLifecycle(candidate *types.FinancialModel, current *types.Financ
 	if current == nil {
 		return
 	}
-	postings := map[string]types.Posting{}
-	for _, posting := range current.Postings {
-		postings[posting.ID] = posting
+	transactions := map[string]types.Transaction{}
+	for _, transaction := range current.Transactions {
+		transactions[transaction.ID] = transaction
 	}
-	for index := range candidate.Postings {
-		stored, ok := postings[candidate.Postings[index].ID]
+	for index := range candidate.Transactions {
+		stored, ok := transactions[candidate.Transactions[index].ID]
 		if !ok {
 			continue
 		}
-		candidate.Postings[index].Source = stored.Source
-		candidate.Postings[index].Pending = stored.Pending
-		candidate.Postings[index].Void = stored.Void
-		candidate.Postings[index].ExecutionOrder = stored.ExecutionOrder
+		candidate.Transactions[index].Source = stored.Source
+		candidate.Transactions[index].Pending = stored.Pending
+		candidate.Transactions[index].Void = stored.Void
+		candidate.Transactions[index].ExecutionOrder = stored.ExecutionOrder
 	}
 	checkpoints := map[string]types.Checkpoint{}
 	for _, checkpoint := range current.Checkpoints {
@@ -108,9 +108,9 @@ func importCheckpointKey(checkpoint types.Checkpoint) string {
 // promise; every row was validated against the candidate first.
 func applyImportedModel(st store.Store, current *types.FinancialModel, next *types.FinancialModel) error {
 	// Deletions run children-first so account removal cannot strand rows.
-	for _, posting := range current.Postings {
-		if !containsID(next.Postings, posting.ID, func(row types.Posting) string { return row.ID }) {
-			if err := st.DeletePosting(posting.ID); err != nil && !store.IsNotFound(err) {
+	for _, transaction := range current.Transactions {
+		if !containsID(next.Transactions, transaction.ID, func(row types.Transaction) string { return row.ID }) {
+			if err := st.DeleteTransaction(transaction.ID); err != nil && !store.IsNotFound(err) {
 				return err
 			}
 		}
@@ -134,7 +134,7 @@ func applyImportedModel(st store.Store, current *types.FinancialModel, next *typ
 	}
 
 	// Upserts keep authored fields. Accounts exist before rows that
-	// reference them, and schedules before posting claims.
+	// reference them, and schedules before transaction claims.
 	for _, account := range next.Accounts {
 		if containsID(current.Accounts, account.ID, func(row types.Account) string { return row.ID }) {
 			if _, err := st.UpdateAccount(account); err != nil {
@@ -153,17 +153,17 @@ func applyImportedModel(st store.Store, current *types.FinancialModel, next *typ
 			return err
 		}
 	}
-	for _, posting := range next.Postings {
-		if containsID(current.Postings, posting.ID, func(row types.Posting) string { return row.ID }) {
-			if _, err := st.UpdatePosting(posting); err != nil {
+	for _, transaction := range next.Transactions {
+		if containsID(current.Transactions, transaction.ID, func(row types.Transaction) string { return row.ID }) {
+			if _, err := st.UpdateTransaction(transaction); err != nil {
 				return err
 			}
-		} else if _, err := st.CreatePosting(posting); err != nil {
+		} else if _, err := st.CreateTransaction(transaction); err != nil {
 			return err
 		}
 	}
 
-	// Remove schedules after posting writes release or move their claims.
+	// Remove schedules after transaction writes release or move their claims.
 	for _, schedule := range current.Schedules {
 		if !containsID(next.Schedules, schedule.ID, func(row types.Schedule) string { return row.ID }) {
 			if err := st.DeleteSchedule(schedule.ID); err != nil && !store.IsNotFound(err) {
@@ -202,9 +202,9 @@ func applyImportedModel(st store.Store, current *types.FinancialModel, next *typ
 	for index, account := range next.Accounts {
 		accountIDs[index] = account.ID
 	}
-	postingIDs := make([]string, len(next.Postings))
-	for index, posting := range next.Postings {
-		postingIDs[index] = posting.ID
+	transactionIDs := make([]string, len(next.Transactions))
+	for index, transaction := range next.Transactions {
+		transactionIDs[index] = transaction.ID
 	}
 	scheduleIDs := make([]string, len(next.Schedules))
 	for index, schedule := range next.Schedules {
@@ -217,7 +217,7 @@ func applyImportedModel(st store.Store, current *types.FinancialModel, next *typ
 	if err := reorderIDs(accountIDs, func(id, beforeID string) error { return st.MoveAccount(id, beforeID) }); err != nil {
 		return err
 	}
-	if err := reorderIDs(postingIDs, func(id, beforeID string) error { return st.MovePosting(id, beforeID) }); err != nil {
+	if err := reorderIDs(transactionIDs, func(id, beforeID string) error { return st.MoveTransaction(id, beforeID) }); err != nil {
 		return err
 	}
 	if err := reorderIDs(scheduleIDs, func(id, beforeID string) error { return st.MoveSchedule(id, beforeID) }); err != nil {
@@ -245,8 +245,8 @@ func createImportedModel(st store.Store, next *types.FinancialModel) error {
 			return err
 		}
 	}
-	for _, posting := range next.Postings {
-		if _, err := st.CreatePosting(posting); err != nil {
+	for _, transaction := range next.Transactions {
+		if _, err := st.CreateTransaction(transaction); err != nil {
 			return err
 		}
 	}
@@ -312,7 +312,7 @@ func evaluationTables(model *types.FinancialModel) []evaluationTable {
 		{kind: "financialIndependence", rows: evaluations.FinancialIndependence},
 		{kind: "netWorthThreshold", rows: evaluations.NetWorthThreshold},
 		{kind: "accountBalance", rows: evaluations.AccountBalance},
-		{kind: "postingFulfillment", rows: evaluations.PostingFulfillment},
+		{kind: "transactionFulfillment", rows: evaluations.TransactionFulfillment},
 		{kind: "cycleFulfillment", rows: evaluations.CycleFulfillment},
 		{kind: "plannedPurchases", rows: evaluations.PlannedPurchases},
 		{kind: "whatIf", rows: evaluations.WhatIf},

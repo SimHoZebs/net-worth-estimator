@@ -20,17 +20,17 @@
 --
 -- Preview (run before deleting):
 -- SELECT observed_at, model_account_id, balance FROM checkpoints WHERE user_id = :user_id AND source = 'banksync' AND provider = 'simplefin' ORDER BY observed_at;
--- SELECT id, source_account_id FROM postings WHERE user_id = :user_id AND source = 'banksync' AND id IN (SELECT posting_id FROM posting_sync_keys WHERE user_id = :user_id AND provider = 'simplefin') ORDER BY id;
+-- SELECT id, source_account_id FROM transactions WHERE user_id = :user_id AND source = 'banksync' AND id IN (SELECT transaction_id FROM transaction_sync_keys WHERE user_id = :user_id AND provider = 'simplefin') ORDER BY id;
 -- An omitted :user_id matches no rows. There is no all-users fallback.
 
 PRAGMA foreign_keys = ON;
 BEGIN;
 DELETE FROM entity_ids WHERE user_id = :user_id AND id IN (
-    SELECT id FROM postings WHERE user_id = :user_id AND source = 'banksync' AND id IN (SELECT posting_id FROM posting_sync_keys WHERE user_id = :user_id AND provider = 'simplefin')
+    SELECT id FROM transactions WHERE user_id = :user_id AND source = 'banksync' AND id IN (SELECT transaction_id FROM transaction_sync_keys WHERE user_id = :user_id AND provider = 'simplefin')
 );
-DELETE FROM postings WHERE user_id = :user_id AND source = 'banksync' AND id IN (SELECT posting_id FROM posting_sync_keys WHERE user_id = :user_id AND provider = 'simplefin');
+DELETE FROM transactions WHERE user_id = :user_id AND source = 'banksync' AND id IN (SELECT transaction_id FROM transaction_sync_keys WHERE user_id = :user_id AND provider = 'simplefin');
 DELETE FROM checkpoints WHERE user_id = :user_id AND source = 'banksync' AND provider = 'simplefin';
-DELETE FROM posting_sync_keys WHERE user_id = :user_id AND provider = 'simplefin';
+DELETE FROM transaction_sync_keys WHERE user_id = :user_id AND provider = 'simplefin';
 -- Reset the last-sync timestamp so the sidebar does not report a stale
 -- time against an empty sync state. The next successful sync re-stamps it.
 UPDATE sync_state SET last_sync_at = '' WHERE user_id = :user_id;

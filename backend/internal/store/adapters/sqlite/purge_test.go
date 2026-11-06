@@ -28,8 +28,8 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if err := store.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
 		t.Fatalf("record last sync: %v", err)
 	}
-	if got := countRows(t, store, "postings", "source = 'banksync'"); got != 1 {
-		t.Fatalf("sync postings before purge = %d, want 1", got)
+	if got := countRows(t, store, "transactions", "source = 'banksync'"); got != 1 {
+		t.Fatalf("sync transactions before purge = %d, want 1", got)
 	}
 
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "scripts", "purge-simplefin-sync.sql"))
@@ -52,30 +52,30 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if _, err := store.owned.SQL().Exec(string(raw), sql.Named("user_id", nil)); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRows(t, store, "postings", "source = 'banksync'"); got != 1 {
+	if got := countRows(t, store, "transactions", "source = 'banksync'"); got != 1 {
 		t.Fatal("unbound purge deleted financial data")
 	}
 	if _, err := store.owned.SQL().Exec(string(raw), sql.Named("user_id", store.db.userID)); err != nil {
 		t.Fatalf("purge transaction: %v", err)
 	}
 
-	if got := countRows(t, store, "postings", "source = 'banksync'"); got != 0 {
-		t.Fatalf("sync postings after purge = %d, want 0", got)
+	if got := countRows(t, store, "transactions", "source = 'banksync'"); got != 0 {
+		t.Fatalf("sync transactions after purge = %d, want 0", got)
 	}
 	if got := countRows(t, store, "checkpoints", "source = 'banksync'"); got != 0 {
 		t.Fatalf("sync checkpoints after purge = %d, want 0", got)
 	}
-	if got := countRows(t, store, "entity_ids", "id = '"+rawSyncedPostingID+"'"); got != 0 {
+	if got := countRows(t, store, "entity_ids", "id = '"+rawSyncedTransactionID+"'"); got != 0 {
 		t.Fatalf("sync registry rows after purge = %d, want 0", got)
 	}
-	if got := countRows(t, store, "posting_sync_keys", ""); got != 0 {
+	if got := countRows(t, store, "transaction_sync_keys", ""); got != 0 {
 		t.Fatal("sync keys survived the purge")
 	}
-	if got := countRows(t, store, "entity_ids", "id = '"+ownerPostingID+"'"); got != 1 {
+	if got := countRows(t, store, "entity_ids", "id = '"+ownerTransactionID+"'"); got != 1 {
 		t.Fatal("owner registry row was purged")
 	}
-	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
-		t.Fatal("owner posting was purged")
+	if got := countRows(t, store, "transactions", "id = '"+ownerTransactionID+"'"); got != 1 {
+		t.Fatal("owner transaction was purged")
 	}
 	if got := countRows(t, store, "checkpoints", "source = 'user'"); got != 1 {
 		t.Fatalf("owner checkpoints = %d, want 1", got)
@@ -83,7 +83,7 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if got, err := store.GetLastSyncTime(); err != nil || got != "" {
 		t.Fatalf("last sync after purge = %q, err %v, want empty", got, err)
 	}
-	if got := countRows(t, other.(*sqliteStore), "postings", "source = 'banksync'"); got != 1 {
+	if got := countRows(t, other.(*sqliteStore), "transactions", "source = 'banksync'"); got != 1 {
 		t.Fatal("purge crossed plan boundary")
 	}
 	if got, err := other.GetLastSyncTime(); err != nil || got != "2026-10-18T14:30:00Z" {

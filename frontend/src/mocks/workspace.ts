@@ -59,7 +59,7 @@ export function setServerModelFixture(
 	});
 	serverQueryClient().setQueryData([...userResourceKey("transactions"), ""], {
 		transactions: data.transactions
-			.filter((row) => row.kind === "posting")
+			.filter((row) => row.kind === "transaction")
 			.map((row) => ({
 				...row,
 				sourceAccountId: row.fromId,

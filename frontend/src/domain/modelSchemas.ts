@@ -69,7 +69,7 @@ export const transactionSchema = z.object({
 	// Which record this is: a one-time transaction or a schedule. The
 	// schedule itself lives on the schedule record; the row only carries
 	// the tag.
-	kind: z.enum(["posting", "schedule"]),
+	kind: z.enum(["transaction", "schedule"]),
 	startDate: date,
 	endDate: date.nullable(),
 	annualIncrease: z.number().min(-50).max(50),
@@ -85,7 +85,7 @@ export const transactionSchema = z.object({
 	postedDate: date.nullable().default(null),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
-	// Void marks a bank hold that vanished without posting. The UI shows
+	// Void marks a bank hold that vanished without a posted charge. The UI shows
 	// it as "Did not post". Every transaction carries it explicitly.
 	void: z.boolean(),
 	// Bank-owned row (importer output). Settled bank rows participate
@@ -101,7 +101,7 @@ export const transactionSchema = z.object({
 	// Exact Unix transaction time. Day display stays on startDate; the
 	// instant orders intraday execution.
 	transactionTime: z.number().int().nullable().optional(),
-	// Receipt IDs attached to this posting. Read with the row list so a
+	// Receipt IDs attached to this transaction. Read with the row list so a
 	// receipt badge does not need the full model document.
 	receiptIds: z.array(z.string()).optional(),
 });

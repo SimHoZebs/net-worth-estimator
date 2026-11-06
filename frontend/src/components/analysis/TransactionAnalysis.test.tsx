@@ -34,7 +34,7 @@ function bnplFinding(
 		provider: "klarna",
 		product: "",
 		role: "outflow",
-		postingId: "posting-1",
+		transactionId: "transaction-1",
 		evidence: [],
 		...overrides,
 	} as AnalysisFinding;
@@ -57,7 +57,12 @@ describe("TransactionAnalysisPanel quiet display", () => {
 				},
 			}),
 		];
-		render(<TransactionAnalysisPanel postingId="posting-1" readOnly={false} />);
+		render(
+			<TransactionAnalysisPanel
+				transactionId="transaction-1"
+				readOnly={false}
+			/>,
+		);
 		expect(screen.getByText("Klarna · 6 weeks")).toBeTruthy();
 	});
 
@@ -68,7 +73,10 @@ describe("TransactionAnalysisPanel quiet display", () => {
 			}),
 		];
 		const { container } = render(
-			<TransactionAnalysisPanel postingId="posting-1" readOnly={false} />,
+			<TransactionAnalysisPanel
+				transactionId="transaction-1"
+				readOnly={false}
+			/>,
 		);
 		expect(container.firstChild).toBeNull();
 	});
@@ -76,14 +84,22 @@ describe("TransactionAnalysisPanel quiet display", () => {
 	it("hides a pending question (the queue asks it)", () => {
 		findingsState.findings = [bnplFinding()];
 		const { container } = render(
-			<TransactionAnalysisPanel postingId="posting-1" readOnly={false} />,
+			<TransactionAnalysisPanel
+				transactionId="transaction-1"
+				readOnly={false}
+			/>,
 		);
 		expect(container.firstChild).toBeNull();
 	});
 
 	it("keeps the compact badge line for read-only viewers", () => {
 		findingsState.findings = [bnplFinding()];
-		render(<TransactionAnalysisPanel postingId="posting-1" readOnly={true} />);
+		render(
+			<TransactionAnalysisPanel
+				transactionId="transaction-1"
+				readOnly={true}
+			/>,
+		);
 		expect(screen.getByText("Likely BNPL")).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "No" })).toBeNull();

@@ -99,8 +99,8 @@ export function FinancialIndependenceModal({
 								{diagnostic.relatedAccountIds
 									?.map((id) => ` ${analysis.accountNames[id] ?? id}`)
 									.join(", ")}
-								{diagnostic.relatedPostingIds?.length
-									? ` Transactions: ${diagnostic.relatedPostingIds.join(", ")}`
+								{diagnostic.relatedTransactionIds?.length
+									? ` Transactions: ${diagnostic.relatedTransactionIds.join(", ")}`
 									: ""}
 							</li>
 						))}

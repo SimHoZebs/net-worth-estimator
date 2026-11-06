@@ -87,7 +87,7 @@ func TestSyncAppliesAndMarksDirty(t *testing.T) {
 	st := openIngestStore(t)
 	seedIngestLink(t, st, "bridge-checking", "checking")
 	checkpointAt := time.Date(2026, time.August, 2, 23, 59, 59, 0, time.UTC).Unix()
-	postingAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC).Unix()
+	transactionAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC).Unix()
 	adapter := &fakeAdapter{
 		key:        "fake",
 		snapshot:   fakeSnapshot{bridges: []string{"bridge-checking"}},
@@ -99,11 +99,11 @@ func TestSyncAppliesAndMarksDirty(t *testing.T) {
 			}}
 		},
 		directives: []store.BankDirective{{Upsert: &store.BankUpsert{
-			Posting: types.Posting{
+			Transaction: types.Transaction{
 				Name: "Groceries", Source: store.SourceBankSync,
 				SourceAccountID: strptr("checking"),
-				Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}},
-				PostedTime:      postingAt, TransactionTime: postingAt, Enabled: true,
+				Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}},
+				PostedTime:      transactionAt, TransactionTime: transactionAt, Enabled: true,
 			},
 			Keys: []store.BankKey{{Provider: "fake", AccountID: "bridge-checking", TransactionID: "tx1"}},
 		}}},

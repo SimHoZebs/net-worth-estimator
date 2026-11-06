@@ -41,8 +41,8 @@ func TestPlannedPurchaseHTTPRoundTrip(t *testing.T) {
 		t.Fatalf("list: %d %s", list.Code, list.Body.String())
 	}
 	doc, err := database.LoadModel()
-	if err != nil || len(doc.Postings) != 0 || len(doc.PlannedPurchases) != 1 {
-		t.Fatalf("purchase became a posting: %+v %v", doc, err)
+	if err != nil || len(doc.Transactions) != 0 || len(doc.PlannedPurchases) != 1 {
+		t.Fatalf("purchase became a transaction: %+v %v", doc, err)
 	}
 	for _, change := range []string{`"cost":-1`, `"cost":0`, `"earliestDate":"2026-02-30"`, `"fundingAccountId":"missing"`, `"priority":-1`} {
 		var invalid map[string]any

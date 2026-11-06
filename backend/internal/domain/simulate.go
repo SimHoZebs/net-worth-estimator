@@ -39,7 +39,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	snapshots := []types.SimulationSnapshot{}
 	transactionSequence := 0
 
-	resolved := ExpandProjectionSchedule(request.Model.Schedules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	resolved := ExpandProjectionSchedule(request.Model.Schedules, request.Model.Transactions, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	eventDates := resolved.ByDate
 	for _, date := range candidateDates {
 		if _, exists := eventDates[date]; !exists {
@@ -61,21 +61,21 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	cut := request.HistoryCutInstant
 	for _, date := range dates {
 		occurrences := eventDates[date]
-		sorted := make([]DatedPostingOccurrence, len(occurrences))
+		sorted := make([]DatedTransactionOccurrence, len(occurrences))
 		copy(sorted, occurrences)
 		sortOccurrences(sorted)
 		for _, occurrence := range sorted {
 			if cut > 0 && occurrence.Purchase == nil && EffectiveOccurrenceInstant(occurrence, date) <= cut {
 				continue
 			}
-			transition, err := transitions.ExecutePosting(occurrence, date, false)
+			transition, err := transitions.ExecuteTransaction(occurrence, date, false)
 			if err != nil {
 				return types.SimulationRun{}, err
 			}
 			event := types.TransactionEvent{
 				Date:            date,
 				Sequence:        transactionSequence,
-				Origin:          types.TransactionOrigin{Type: "posting", PostingID: transition.PostingID},
+				Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: transition.TransactionID},
 				RequestedAmount: transition.Result.RequestedAmount,
 				RealizedAmount:  transition.Result.RealizedAmount,
 			}

@@ -15,8 +15,8 @@ func cashAccount(id string) types.Account {
 	return types.Account{ID: id, Name: id, Kind: types.AccountKindCash, Enabled: true}
 }
 
-func expenseAmount(expression string) types.PostingAmountResolution {
-	return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
+func expenseAmount(expression string) types.TransactionAmountResolution {
+	return types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
 }
 
 func observerFixture() *types.FinancialModel {
@@ -27,7 +27,7 @@ func observerFixture() *types.FinancialModel {
 			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 			{AccountID: account, Balance: 900, Source: "banksync", ObservedAt: unixAt(10, 15)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "manual", Name: "Expense", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -83,7 +83,7 @@ func TestExactCutIncludesTodayAfterYesterdayAnchor(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(9, 9)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "manual", Name: "Expense", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -102,7 +102,7 @@ func TestExactCutIncludesTodayAfterYesterdayAnchor(t *testing.T) {
 func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints = model.Checkpoints[:1]
-	model.Postings = nil
+	model.Transactions = nil
 	model.Schedules = []types.Schedule{
 		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
@@ -128,7 +128,7 @@ func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 	}
 	count := 0
 	for _, event := range run.TransactionAttempts {
-		if event.Origin.PostingID == "income" && event.Date == "2026-03-10" {
+		if event.Origin.TransactionID == "income" && event.Date == "2026-03-10" {
 			count++
 		}
 	}
@@ -142,8 +142,8 @@ func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 func TestExactMidnightActualIsTimed(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints = model.Checkpoints[:1]
-	model.Postings[0].TransactionTime = unixAt(10, 0)
-	model.Postings[0].PostedTime = unixAt(10, 0)
+	model.Transactions[0].TransactionTime = unixAt(10, 0)
+	model.Transactions[0].PostedTime = unixAt(10, 0)
 	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
@@ -179,8 +179,8 @@ func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 	}
 }
 
-// An observation at t includes events at t, postings first on the tie.
-func TestTimestampedTiePolicyPostingsFirst(t *testing.T) {
+// An observation at t includes events at t, transactions first on the tie.
+func TestTimestampedTiePolicyTransactionsFirst(t *testing.T) {
 	account := "checking"
 	instant := unixAt(10, 9)
 	model := &types.FinancialModel{
@@ -188,7 +188,7 @@ func TestTimestampedTiePolicyPostingsFirst(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: instant},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "at-tie", Name: "AtTie", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: instant, PostedTime: instant, Enabled: true, Source: "user"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -202,7 +202,7 @@ func TestTimestampedTiePolicyPostingsFirst(t *testing.T) {
 		t.Fatalf("expected one correction, got %+v", corrections)
 	}
 	if corrections[0].ModeledBalance != -100 || corrections[0].Adjustment != 1100 {
-		t.Fatalf("observation at t must include events at t (postings first): %+v", corrections[0])
+		t.Fatalf("observation at t must include events at t (transactions first): %+v", corrections[0])
 	}
 }
 
@@ -239,7 +239,7 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 			{AccountID: b, Balance: 200, Source: "user", ObservedAt: unixAt(10, 9)},
 			{AccountID: a, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 12)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "transfer", Name: "Move", SourceAccountID: &source, Destinations: []string{b}, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -272,7 +272,7 @@ func TestEnabledAloneDecidesExecutionRegardlessOfLifecycle(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "pending-disabled", Name: "PendingOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "banksync", Pending: true},
 			{ID: "pending-enabled", Name: "PendingOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync", Pending: true},
 			{ID: "void-disabled", Name: "VoidOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "banksync", Void: true},
@@ -382,7 +382,7 @@ func TestExactCutProjectionAgreesWithPositionAndAccountList(t *testing.T) {
 	}
 	manualMoves := 0
 	for _, event := range run.TransactionAttempts {
-		if event.Origin.PostingID == "manual" {
+		if event.Origin.TransactionID == "manual" {
 			manualMoves++
 			if event.Date != "2026-03-10" {
 				t.Fatalf("afternoon actual must simulate on the start date, got %s", event.Date)
@@ -401,7 +401,7 @@ func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "morning", Name: "Morning", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 9) + 1800, PostedTime: unixAt(10, 9) + 1800, Enabled: true, Source: "user"},
 			{ID: "afternoon", Name: "Afternoon", SourceAccountID: &account, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
 		},
@@ -433,7 +433,7 @@ func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 	counts := map[string]int{}
 	for _, event := range run.TransactionAttempts {
 		if event.Date == "2026-03-10" {
-			counts[event.Origin.PostingID]++
+			counts[event.Origin.TransactionID]++
 		}
 	}
 	if counts["morning"] != 0 || counts["afternoon"] != 1 {
@@ -460,7 +460,7 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 	drain := account
-	model.Postings = []types.Posting{
+	model.Transactions = []types.Transaction{
 		{ID: "drain", Name: "Drain", SourceAccountID: &drain, Amount: expenseAmount("1500"), TransactionTime: unixAt(10, 10), PostedTime: unixAt(10, 10), Enabled: true, Source: "user"},
 	}
 	replay, err := replayChronologicalHistory(model, "2026-03-10")
@@ -473,7 +473,7 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 	if got := replay.state.Balances[account]; got != -500 {
 		t.Fatalf("recorded actual must ignore the floor while the rule clamps: balance = %v, want -500", got)
 	}
-	if got := replay.state.RealizedPostingAmountsByYear["payout"]["2026"]; got != 0 {
+	if got := replay.state.RealizedTransactionAmountsByYear["payout"]["2026"]; got != 0 {
 		t.Fatalf("clamped rule realized = %v, want 0", got)
 	}
 }
@@ -481,7 +481,7 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 func TestExactCutDoesNotExecuteDayCloseRuleEarly(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints = model.Checkpoints[:1]
-	model.Postings = nil
+	model.Transactions = nil
 	model.Schedules = []types.Schedule{
 		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
@@ -505,7 +505,7 @@ func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "bank-expense", Name: "Groceries", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -538,7 +538,7 @@ func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 			{AccountID: account, Balance: 850, Source: "banksync", ObservedAt: unixAt(10, 15)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "bank-expense", Name: "Groceries", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -569,7 +569,7 @@ func TestBankActualsBeforeAndAfterAnchor(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 10)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "early", Name: "Early", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 9), PostedTime: unixAt(10, 9), Enabled: true, Source: "banksync"},
 			{ID: "late", Name: "Late", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
@@ -596,7 +596,7 @@ func TestImportedTransferLegsAnchorIndependently(t *testing.T) {
 			{AccountID: a, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 			{AccountID: b, Balance: 200, Source: "banksync", ObservedAt: unixAt(10, 12)},
 		},
-		Postings: []types.Posting{
+		Transactions: []types.Transaction{
 			{ID: "transfer", Name: "Move", SourceAccountID: &source, Destinations: []string{b}, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),

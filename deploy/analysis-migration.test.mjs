@@ -14,7 +14,7 @@ after(async () => { for (const directory of owned) await rm(directory, { recursi
 await run("go", ["build", "-o", join(tools, "setupdb"), "./cmd/setupdb"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
-await run("go", ["build", "-o", join(tools, "upgrade-posting-sim-split"), "./scripts/one-time/posting-sim-split"], {
+await run("go", ["build", "-o", join(tools, "upgrade-transaction-sim-split"), "./scripts/one-time/transaction-sim-split"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
 await run("go", ["build", "-o", join(tools, "upgrade-planned-purchases"), "./scripts/one-time/planned-purchases"], {
@@ -49,8 +49,8 @@ async function sourceDatabase() {
   const db = join(directory, "application.db");
   await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "owner"]);
   const owner = await sql(db, "SELECT id FROM users;");
-  await sql(db, `DROP TRIGGER IF EXISTS analysis_posting_lifecycle;
-    DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
+  await sql(db, `DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
+    DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
     DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
     DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
     DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');`);
@@ -61,33 +61,33 @@ async function sourceDatabase() {
 async function seedFinalRows(db, owner) {
   await sql(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES
     ('${owner}',1,0,'checking',100,'user',1773187199);`);
-  await sql(db, `INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES
+  await sql(db, `INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES
     ('${owner}','settled-a','Groceries','checking','null','{}',1773140400,1773129600,'simplefin',0,0),
     ('${owner}','manual-a','Owner','checking','null','{}',1773140400,1773129600,'user',0,0);`);
-  await sql(db, `INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES
+  await sql(db, `INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES
     ('${owner}','settled-a',0,0,1),
     ('${owner}','manual-a',1,0,4);`);
-  await sql(db, `INSERT INTO posting_sync_keys(user_id,provider,bridge_account_id,transaction_id,posting_id) VALUES
+  await sql(db, `INSERT INTO transaction_sync_keys(user_id,provider,bridge_account_id,bank_transaction_id,transaction_id) VALUES
     ('${owner}','simplefin','bridge-checking','tx1','settled-a');`);
 }
-const analysisSnapshot = async (db) => sql(db, `SELECT user_id, posting_id, facts_json FROM transaction_source_facts ORDER BY 1, 2;
+const analysisSnapshot = async (db) => sql(db, `SELECT user_id, transaction_id, facts_json FROM transaction_source_facts ORDER BY 1, 2;
   SELECT user_id, revision FROM analysis_inputs ORDER BY 1;
   SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs ORDER BY 1, 2;
-  SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
+  SELECT user_id, id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
   SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;
   SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY 1, 2;`);
 
 test("Analysis migration completes schema on a verified candidate and repeats without writes", async () => {
   const { directory, db, owner } = await sourceDatabase();
   await seedFinalRows(db, owner);
-  const snapshot = `SELECT id, issuer, subject FROM users; SELECT * FROM model_metadata; SELECT * FROM accounts; SELECT * FROM checkpoints; SELECT * FROM postings;`;
+  const snapshot = `SELECT id, issuer, subject FROM users; SELECT * FROM model_metadata; SELECT * FROM accounts; SELECT * FROM checkpoints; SELECT * FROM transactions;`;
   const before = await sql(db, snapshot);
   await migrate(db);
   assert.equal(await sql(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await sql(db, "PRAGMA foreign_key_check;"), "");
   assert.equal(await sql(db, snapshot), before);
   // Final checkpoints never trigger the legacy bank repair.
-  assert.equal(await sql(db, "SELECT s.enabled, p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.id = 'settled-a';"), "0|1773129600");
+  assert.equal(await sql(db, "SELECT s.enabled, p.transaction_time FROM transactions p JOIN transaction_sim s ON s.user_id=p.user_id AND s.transaction_id=p.id WHERE p.id = 'settled-a';"), "0|1773129600");
   assert.equal(await sql(db, "SELECT count(*) FROM analysis_feedback; SELECT count(*) FROM analysis_findings;"), "0\n0");
   const names = await backups(directory);
   assert.equal(names.length, 1);
@@ -152,15 +152,15 @@ async function seedRetiredPurchase(db, owner, expression = "125.50") {
   await sql(db, `DROP TABLE planned_purchases;
     CREATE TABLE purchase_policies (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      posting_id TEXT NOT NULL, priority INTEGER NOT NULL CHECK(priority>=0),
-      PRIMARY KEY(user_id,posting_id),
-      FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE);
-    INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
+      transaction_id TEXT NOT NULL, priority INTEGER NOT NULL CHECK(priority>=0),
+      PRIMARY KEY(user_id,transaction_id),
+      FOREIGN KEY(user_id,transaction_id) REFERENCES transactions(user_id,id) ON DELETE CASCADE);
+    INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
       VALUES ('${owner}','01900000-0000-7000-8000-000000000099','Desk','checking','null','{"resolver":"expression","config":{"expression":"${expression}"},"inputs":{}}',1769904000,1769904000,'user',0,0);
-    INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order)
+    INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order)
       VALUES ('${owner}','01900000-0000-7000-8000-000000000099',2,1,0);
-    INSERT INTO entity_ids(user_id,id,kind) VALUES ('${owner}','01900000-0000-7000-8000-000000000099','posting');
-    INSERT INTO purchase_policies(user_id,posting_id,priority) VALUES ('${owner}','01900000-0000-7000-8000-000000000099',3);`);
+    INSERT INTO entity_ids(user_id,id,kind) VALUES ('${owner}','01900000-0000-7000-8000-000000000099','transaction');
+    INSERT INTO purchase_policies(user_id,transaction_id,priority) VALUES ('${owner}','01900000-0000-7000-8000-000000000099',3);`);
 }
 
 test("purchase conversion preserves current observations, bank rows, and Analysis on a verified candidate", async () => {
@@ -168,7 +168,7 @@ test("purchase conversion preserves current observations, bank rows, and Analysi
   await seedFinalRows(db, owner);
   await migrate(db);
   await seedRetiredPurchase(db, owner);
-  const preserved = "SELECT * FROM checkpoints; SELECT * FROM postings WHERE source='simplefin'; SELECT * FROM users;";
+  const preserved = "SELECT * FROM checkpoints; SELECT * FROM transactions WHERE source='simplefin'; SELECT * FROM users;";
   const before = await sql(db, preserved);
   const analysis = await analysisSnapshot(db);
   await migrate(db);
@@ -176,7 +176,7 @@ test("purchase conversion preserves current observations, bank rows, and Analysi
   assert.equal(await analysisSnapshot(db), analysis);
   assert.equal(await sql(db, "SELECT name,cost,earliest_date,priority,enabled FROM planned_purchases;"), "Desk|125.5|2026-02-01|3|1");
   assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE name='purchase_policies';"), "0");
-  assert.equal(await sql(db, "SELECT count(*) FROM postings WHERE id='01900000-0000-7000-8000-000000000099';"), "0");
+  assert.equal(await sql(db, "SELECT count(*) FROM transactions WHERE id='01900000-0000-7000-8000-000000000099';"), "0");
   assert.equal(await sql(db, "SELECT kind FROM entity_ids WHERE id='01900000-0000-7000-8000-000000000099';"), "planned-purchase");
   const hash = await sha256File(db);
   await migrate(db);
@@ -232,18 +232,18 @@ export NET_WORTH_ESTIMATOR_DB=/tmp/purchases.db
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer https://fixture.invalid --subject owner >/dev/null
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" <<'SQL'
 DROP TABLE planned_purchases;
-CREATE TABLE purchase_policies(user_id TEXT NOT NULL REFERENCES users(id),posting_id TEXT NOT NULL,priority INTEGER NOT NULL,PRIMARY KEY(user_id,posting_id),FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE);
+CREATE TABLE purchase_policies(user_id TEXT NOT NULL REFERENCES users(id),transaction_id TEXT NOT NULL,priority INTEGER NOT NULL,PRIMARY KEY(user_id,transaction_id),FOREIGN KEY(user_id,transaction_id) REFERENCES transactions(user_id,id) ON DELETE CASCADE);
 INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'cash',0,'Cash','cash',1 FROM users;
-INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
+INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
  SELECT id,'01900000-0000-7000-8000-000000000099','Desk','cash','null','{"resolver":"expression","config":{"expression":"125.50"},"inputs":{}}',1769904000,1769904000,'user',0,0 FROM users;
-INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order)
+INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order)
  SELECT id,'01900000-0000-7000-8000-000000000099',0,1,0 FROM users;
-INSERT INTO entity_ids(user_id,id,kind) SELECT id,'01900000-0000-7000-8000-000000000099','posting' FROM users;
-INSERT INTO purchase_policies(user_id,posting_id,priority) SELECT id,'01900000-0000-7000-8000-000000000099',3 FROM users;
+INSERT INTO entity_ids(user_id,id,kind) SELECT id,'01900000-0000-7000-8000-000000000099','transaction' FROM users;
+INSERT INTO purchase_policies(user_id,transaction_id,priority) SELECT id,'01900000-0000-7000-8000-000000000099',3 FROM users;
 SQL
 /app/migrate.sh >/dev/null
 test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT name,cost,priority FROM planned_purchases;')" = 'Desk|125.5|3'
-test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT count(*) FROM postings;')" = 0
+test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT count(*) FROM transactions;')" = 0
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" >/dev/null
 /app/migrate.sh >/dev/null
 test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
@@ -264,10 +264,10 @@ if /app/migrate.sh 2>/dev/null; then exit 1; fi
 owner="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT id FROM users;')"
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('$owner','checking',0,'Fixture checking','cash',1);
   INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('$owner',1,0,'checking',100,'user',1773187199);
-  INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('$owner','settled-a','Groceries','checking','null','{}',1773140400,1773140400,'simplefin',0,0);
-  INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES ('$owner','settled-a',0,1,1);"
-sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER IF EXISTS analysis_posting_lifecycle;
-  DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
+  INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('$owner','settled-a','Groceries','checking','null','{}',1773140400,1773140400,'simplefin',0,0);
+  INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES ('$owner','settled-a',0,1,1);"
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
+  DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
   DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
   DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
   DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');"
@@ -280,13 +280,13 @@ test 1 -eq "$(find /tmp -maxdepth 1 -name '*.analysis-backup.*' | wc -l)"
 for backup in /tmp/*.analysis-backup.*/before.db; do
   test "$(stat -c %a "$backup")" = 600
 done
-sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO transaction_source_facts(user_id,posting_id,facts_json) VALUES ('$owner','settled-a','{}');
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO transaction_source_facts(user_id,transaction_id,facts_json) VALUES ('$owner','settled-a','{}');
   INSERT INTO analysis_runs(user_id,id,type,version,input_revision,state,started_at,completed_at,lease_until,problem,input_json) VALUES ('$owner','run-1','bnpl','v1',1,'complete',100,200,0,'','{}');
-  INSERT INTO analysis_findings(user_id,id,analysis_type,posting_id,kind,detection_json,run_id,first_detected_at,last_checked_at,status,dismissed,review_json,feedback_revision) VALUES ('$owner','f-1','bnpl','settled-a','bnpl','{}','run-1',100,150,'active',0,'null',0);
+  INSERT INTO analysis_findings(user_id,id,analysis_type,transaction_id,kind,detection_json,run_id,first_detected_at,last_checked_at,status,dismissed,review_json,feedback_revision) VALUES ('$owner','f-1','bnpl','settled-a','bnpl','{}','run-1',100,150,'active',0,'null',0);
   INSERT INTO analysis_feedback(user_id,id,request_id,finding_id,run_id,created_at,payload_json) VALUES ('$owner','fb-1','req-1','f-1','run-1',160,'{}');"
 revision="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" "SELECT revision FROM analysis_inputs WHERE user_id = '$owner';")"
 /app/migrate.sh >/dev/null
-test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT facts_json FROM transaction_source_facts WHERE posting_id = 'settled-a';")" = '{}'
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT facts_json FROM transaction_source_facts WHERE transaction_id = 'settled-a';")" = '{}'
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT payload_json FROM analysis_feedback WHERE id = 'fb-1';")" = '{}'
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT revision FROM analysis_inputs WHERE user_id = '$owner';")" = "$revision"
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
@@ -297,7 +297,7 @@ test "$(sha256sum "$NET_WORTH_ESTIMATOR_DB")" = "$sha_before"
 export SECOND_DB='/tmp/analysis second.db'
 /app/setupdb --db "$SECOND_DB" --issuer https://fixture.invalid --subject owner >/dev/null
 owner2="$(sqlite3 "$SECOND_DB" 'SELECT id FROM users;')"
-sqlite3 "$SECOND_DB" "DROP TRIGGER analysis_posting_lifecycle;
+sqlite3 "$SECOND_DB" "DROP TRIGGER analysis_transaction_lifecycle;
   DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
   DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
   DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');
