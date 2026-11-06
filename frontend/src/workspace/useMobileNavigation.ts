@@ -3,9 +3,8 @@ import { useHorizontalSwipe } from "../state/drawer.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { useAnyModalOpen } from "../state/modalPresence.ts";
 
-// The open flag outlives one layout instance. The boot shell and the loaded
-// workspace each render their own layout, and the swap unmounts the boot one:
-// a hamburger tap while hydration finishes must not lose the open sheet.
+// The open flag outlives one layout instance so a hamburger tap while the
+// workspace is still loading keeps the open sheet when the body swaps.
 let navOpen = false;
 const listeners = new Set<() => void>();
 

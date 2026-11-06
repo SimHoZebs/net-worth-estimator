@@ -46,16 +46,19 @@
 	.waypoint-modal-panel[data-state="closed"] {
 		animation: waypoint-modal-out 120ms ease-out both;
 	}
-	.waypoint-drawer[data-state="open"][data-side="left"] {
+	/* Only modal sheets slide. The persistent desktop sheet is an aside
+	   that never closes, so an entry animation there reads as a twitch on
+	   every mount. */
+	dialog.waypoint-drawer[data-state="open"][data-side="left"] {
 		animation: waypoint-drawer-left-in 200ms ease-out both;
 	}
-	.waypoint-drawer[data-state="closed"][data-side="left"] {
+	dialog.waypoint-drawer[data-state="closed"][data-side="left"] {
 		animation: waypoint-drawer-left-out 120ms ease-out both;
 	}
-	.waypoint-drawer[data-state="open"][data-side="right"] {
+	dialog.waypoint-drawer[data-state="open"][data-side="right"] {
 		animation: waypoint-drawer-right-in 200ms ease-out both;
 	}
-	.waypoint-drawer[data-state="closed"][data-side="right"] {
+	dialog.waypoint-drawer[data-state="closed"][data-side="right"] {
 		animation: waypoint-drawer-right-out 120ms ease-out both;
 	}
 

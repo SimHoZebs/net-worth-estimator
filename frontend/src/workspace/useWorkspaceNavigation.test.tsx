@@ -99,7 +99,7 @@ it("scopes the editor return target to its history entry and clears it in ordina
 	expect(screen.getByTestId("return-to").textContent).toBe("null");
 });
 
-it("updates the title in recovery chrome without the normal page heading", async () => {
+it("updates the title in recovery layout without the normal page heading", async () => {
 	render(<Harness recovery />);
 	expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 	expect(document.title).toBe("Accounts · Waypoint");

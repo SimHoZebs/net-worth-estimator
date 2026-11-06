@@ -1,10 +1,14 @@
-import { useUiStore } from "../state/uiStore.ts";
 import { useUserScope } from "../state/useUserScope.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
 import { useWorkspaceSyncMonitor } from "../state/useWorkspaceSyncMonitor.ts";
-import { WorkspaceShell } from "../WorkspaceShell.tsx";
+import {
+	WorkspaceHeading,
+	WorkspaceTopbar,
+} from "../workspace/WorkspaceHeader.tsx";
+import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
+import { WorkspaceContent } from "../workspace/WorkspaceContent.tsx";
+import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
-import { ServerLoadingShell } from "./ServerLoadingShell.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
 export function ServerApp() {
@@ -16,17 +20,41 @@ export function ServerApp() {
 	const status = useServerStatus({ enabled });
 	useWorkspaceSyncMonitor(enabled);
 	const navigation = useWorkspaceNavigation();
-	const importing = useUiStore((state) => state.importing);
 
-	// Identity is the only gate: until the verified scope exists no request
-	// can carry its resource assertion, so the boot chrome stands in. Once
-	// the scope is ready the shell mounts immediately and the pages
-	// skeletonize their own data slots.
-	if (!enabled || importing) {
-		return <ServerLoadingShell navigation={navigation} />;
-	}
-	// Terminal absence takes the dedicated recovery screen. A pending status
-	// is a shell flag, not a reason to withhold navigation.
-	if (status.data?.hasModel === false) return <ServerWorkspaceRecovery />;
-	return <WorkspaceShell />;
+	// The layout stays mounted once. Only the body switches: recovery when
+	// the server holds no model, otherwise the workspace body. No state
+	// shows a whole-app skeleton; each page and sidebar slot shows its own
+	// skeleton while its own query is pending. A pending status is not a
+	// reason to withhold navigation, and the sidebar, topbar, and heading
+	// keep their identity across loading and workspace states.
+	const recovery = status.data?.hasModel === false;
+	return (
+		<WorkspaceLayout
+			navigation={(close) => (
+				<WorkspaceSidebar
+					page={navigation.page}
+					onClose={close}
+					pending={status.isPending}
+				/>
+			)}
+			header={(open) => (
+				<WorkspaceTopbar
+					page={navigation.currentPage}
+					onOpenNavigation={open}
+				/>
+			)}
+		>
+			{!recovery && (
+				<WorkspaceHeading
+					page={navigation.currentPage}
+					headingRef={navigation.headingRef}
+				/>
+			)}
+			{recovery ? (
+				<ServerWorkspaceRecovery />
+			) : (
+				<WorkspaceContent navigation={navigation} />
+			)}
+		</WorkspaceLayout>
+	);
 }

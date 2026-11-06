@@ -2,7 +2,7 @@ import { Skeleton } from "../components/Skeleton.tsx";
 
 /**
  * Page-level data slot while a route chunk loads or its saved rows hydrate.
- * The shell chrome stays interactive; only the content region waits.
+ * The workspace layout stays interactive; only the content region waits.
  */
 export function WorkspacePageSkeleton({
 	label = "Loading page",

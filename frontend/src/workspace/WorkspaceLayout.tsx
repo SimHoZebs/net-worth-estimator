@@ -7,12 +7,10 @@ export function WorkspaceLayout({
 	navigation,
 	header,
 	children,
-	overlays,
 }: {
 	navigation: (close: () => void) => ReactNode;
 	header: (open: () => void) => ReactNode;
 	children: ReactNode;
-	overlays: ReactNode;
 }) {
 	const { open, mobile, close, show } = useMobileNavigation();
 	return (
@@ -44,7 +42,6 @@ export function WorkspaceLayout({
 					<NotificationCenter />
 				</div>
 			</div>
-			{overlays}
 		</div>
 	);
 }

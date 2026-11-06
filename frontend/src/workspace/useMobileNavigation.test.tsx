@@ -61,7 +61,7 @@ describe("mobile navigation guard", () => {
 		expect(screen.getByTestId("nav-open").textContent).toBe("true");
 	});
 
-	it("keeps the sheet open when the boot layout swaps for the loaded one", () => {
+	it("keeps the sheet open when the layout remounts", () => {
 		const boot = render(<Harness />);
 		fireEvent.click(screen.getByRole("button", { name: "Open nav" }));
 		expect(screen.getByTestId("nav-open").textContent).toBe("true");

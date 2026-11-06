@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
 	act,
 	cleanup,
@@ -74,14 +75,22 @@ async function refetchStatus() {
 vi.mock("../workspace/useWorkspaceNavigation.ts", () => ({
 	useWorkspaceNavigation: vi.fn(() => ({})),
 }));
-vi.mock("./ServerLoadingShell.tsx", () => ({
-	ServerLoadingShell: () => <p>Loading screen</p>,
+// The layout stays mounted across every body state, so state selection is tested
+// through the mocked body and the real layout identity.
+vi.mock("../workspace/WorkspaceLayout.tsx", () => ({
+	WorkspaceLayout: ({ children }: { children: ReactNode }) => (
+		<>{children}</>
+	),
+}));
+vi.mock("../workspace/WorkspaceHeader.tsx", () => ({
+	WorkspaceHeading: () => null,
+	WorkspaceTopbar: () => null,
 }));
 vi.mock("./ServerWorkspaceRecovery.tsx", () => ({
 	ServerWorkspaceRecovery: () => <p>Recovery screen</p>,
 }));
-vi.mock("../WorkspaceShell.tsx", () => ({
-	WorkspaceShell: () => (
+vi.mock("../workspace/WorkspaceContent.tsx", () => ({
+	WorkspaceContent: () => (
 		<>
 			<p>Workspace screen</p>
 			<NotificationCenter />
@@ -116,13 +125,15 @@ it("keeps notification state out of the root's data gate", async () => {
 	expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
 });
 
-it("uses workspace presence and import state to select the screen", async () => {
+it("uses workspace presence to select the screen", async () => {
 	const server = stubTestServer();
 	server.setStatus(status({ hasModel: false }));
 	render(<ServerApp />);
 	await screen.findByText("Recovery screen");
+	// Importing does not replace the body with a whole-app skeleton; only
+	// the slots waiting on a query show their own skeleton.
 	act(() => useUiStore.getState().setImporting(true));
-	expect(screen.getByText("Loading screen")).toBeTruthy();
+	expect(screen.getByText("Recovery screen")).toBeTruthy();
 	act(() => useUiStore.getState().setImporting(false));
 	expect(screen.getByText("Recovery screen")).toBeTruthy();
 	server.setStatus(status());
@@ -132,11 +143,13 @@ it("uses workspace presence and import state to select the screen", async () => 
 	);
 });
 
-it("waits for a ready scope before starting resource queries", async () => {
+it("mounts the workspace body before the scope is ready without starting queries", async () => {
 	const server = stubTestServer();
 	act(() => suspendUserScope());
 	render(<ServerApp />);
-	expect(screen.getByText("Loading screen")).toBeTruthy();
+	// The body mounts at once; its own slots wait on their queries. Only the
+	// resource fetch is gated on a ready scope.
+	expect(screen.getByText("Workspace screen")).toBeTruthy();
 	expect(
 		server.calls.filter((call) => call.url.endsWith("/v1/status")),
 	).toHaveLength(0);
@@ -148,7 +161,7 @@ it("waits for a ready scope before starting resource queries", async () => {
 	expect(
 		server.calls.filter((call) => call.url.endsWith("/v1/status")),
 	).toHaveLength(1);
-	// Presence is a status flag. The shell never reads the model document.
+	// Presence is a status flag. The workspace body never reads the model document.
 	expect(server.modelFetches()).toHaveLength(0);
 });
 

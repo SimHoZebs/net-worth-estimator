@@ -1,5 +1,5 @@
 import { FileUp, LockKeyhole, RotateCcw } from "lucide-react";
-import { type ReactNode, type RefObject, useRef } from "react";
+import { type RefObject, useRef } from "react";
 import type { FinancialModel } from "../api/index.ts";
 import { parseFinancialModel } from "../api/modelImport.ts";
 import { Button } from "../components/Button.tsx";
@@ -14,11 +14,10 @@ import {
 	useServerStatus,
 } from "../state/workspaceResources.ts";
 import { importServerModel } from "../state/workspaceWrites.ts";
-import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
-import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
-import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
-import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
 
+// Recovery body for when the server holds no model. Renders inside the
+// single workspace layout owned by ServerApp, so navigation stays
+// mounted across the recovery boundary.
 export function ServerWorkspaceRecovery() {
 	// Terminal load states subscribe everything they display, including the
 	// model import flow and access control.
@@ -64,16 +63,12 @@ export function ServerWorkspaceRecovery() {
 	};
 	return (
 		<>
-			<ServerRecovery
-				title={
-					missingModel
-						? "No financial model is stored on this server"
-						: "Your workspace needs attention"
-				}
-				onRetry={() => {
-					void retry();
-				}}
-			>
+			<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
+				<h1 className="mb-6">
+					{missingModel
+						? "No financial model is stored on this server."
+						: "Your workspace needs attention."}
+				</h1>
 				{missingModel && <p>Import a reviewed model JSON file to continue.</p>}
 				{missingModel && (
 					<ServerModelImport
@@ -87,7 +82,17 @@ export function ServerWorkspaceRecovery() {
 						}}
 					/>
 				)}
-			</ServerRecovery>
+				<div className="flex flex-wrap gap-3">
+					<Button
+						onClick={() => {
+							void retry();
+						}}
+					>
+						<RotateCcw size={15} />
+						Retry server load
+					</Button>
+				</div>
+			</div>
 			{candidate && (
 				<ModelImportPreview
 					model={candidate}
@@ -160,42 +165,5 @@ function ServerModelImport({
 					: "Maximum 2 MB · explicit review before upload"}
 			</small>
 		</div>
-	);
-}
-
-function ServerRecovery({
-	title,
-	onRetry,
-	children,
-}: {
-	title: string;
-	onRetry: () => void;
-	children?: ReactNode;
-}) {
-	const navigation = useWorkspaceNavigation();
-	return (
-		<WorkspaceLayout
-			navigation={(close) => (
-				<WorkspaceSidebar page={navigation.page} onClose={close} />
-			)}
-			header={(open) => (
-				<WorkspaceTopbar
-					page={navigation.currentPage}
-					onOpenNavigation={open}
-				/>
-			)}
-			overlays={null}
-		>
-			<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
-				<h1 className="mb-6">{title}.</h1>
-				{children}
-				<div className="flex flex-wrap gap-3">
-					<Button onClick={onRetry}>
-						<RotateCcw size={15} />
-						Retry server load
-					</Button>
-				</div>
-			</div>
-		</WorkspaceLayout>
 	);
 }

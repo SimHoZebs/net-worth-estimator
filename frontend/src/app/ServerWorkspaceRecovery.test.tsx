@@ -1,5 +1,4 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import {
@@ -9,30 +8,13 @@ import {
 import { SessionContext } from "../auth/sessionContext.ts";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
-vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
-
 beforeEach(acceptTestResource);
-
-vi.mock("../workspace/WorkspaceLayout.tsx", () => ({
-	WorkspaceLayout: ({
-		navigation,
-		children,
-	}: {
-		navigation: (close: () => void) => ReactNode;
-		children: ReactNode;
-	}) => (
-		<>
-			<aside>{navigation(() => {})}</aside>
-			<main>{children}</main>
-		</>
-	),
-}));
 
 afterEach(() => {
 	cleanup();
 });
 
-it("keeps navigation usable without account controls when saved data is empty", () => {
+it("keeps account controls out of recovery while the model is empty", () => {
 	setServerStatusFixture({
 		readOnly: false,
 		hasModel: false,
@@ -73,13 +55,9 @@ it("keeps navigation usable without account controls when saved data is empty", 
 			.getByRole("button", { name: "Choose server model JSON" })
 			.hasAttribute("disabled"),
 	).toBe(false);
-	// Account controls live in Configs → Account, so the recovery sidebar
-	// stays navigation-only.
-	expect(
-		screen.getByRole("navigation", {
-			name: "Main navigation",
-		}),
-	).toBeTruthy();
+	expect(screen.getByRole("button", { name: "Retry server load" })).toBeTruthy();
+	// Account controls live in Configs → Account, so the recovery body stays
+	// free of session actions; the shared layout owns navigation.
 	expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
 	expect(screen.queryByText("New account owner")).toBeNull();
 	expect(logout).not.toHaveBeenCalled();
