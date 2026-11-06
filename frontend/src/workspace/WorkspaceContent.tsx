@@ -18,8 +18,8 @@ export function WorkspaceContent({
 	const overlays = useWorkspaceOverlays({
 		route: navigation.route,
 		returnTo: navigation.returnTo,
-		pushHash: navigation.pushHash,
-		replaceHash: navigation.replaceHash,
+		pushUrl: navigation.pushUrl,
+		replaceUrl: navigation.replaceUrl,
 	});
 	const safeSpendingDetail = (tab: SafeSpendingDetailTab | null) => {
 		if (tab) overlays.openSafeSpendingDetail(tab);

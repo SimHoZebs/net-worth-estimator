@@ -47,12 +47,12 @@ describe("sidebar sync signals", () => {
 		acceptTestResource();
 		resetServerQueryCache();
 		resetNotifications();
-		window.location.hash = "";
+		window.history.replaceState(null, "", "/outlook");
 	});
 	afterEach(() => {
 		cleanup();
 		resetNotifications();
-		window.location.hash = "";
+		window.history.replaceState(null, "", "/outlook");
 	});
 
 	it("shows the server's last successful sync in browser-local time, including read-only mode", () => {
@@ -139,7 +139,7 @@ describe("sidebar sync signals", () => {
 		expect(toast?.message).toBe("Bank sync is stale.");
 		expect(toast?.action?.label).toBe("Open bank sync");
 		toast?.action?.onAction();
-		expect(window.location.hash).toBe("#sources");
+		expect(window.location.pathname).toBe("/sources");
 	});
 
 	it("flips fresh to stale as the clock passes six hours", () => {
@@ -234,6 +234,6 @@ describe("sidebar user placement", () => {
 		expect(view.queryByRole("button", { name: "Sign in" })).toBeNull();
 		expect(
 			view.getByRole("link", { name: "Configs" }).getAttribute("href"),
-		).toBe("#sources");
+		).toBe("/sources");
 	});
 });

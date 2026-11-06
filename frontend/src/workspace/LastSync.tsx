@@ -1,4 +1,6 @@
 import { TriangleAlert } from "lucide-react";
+import { pageUrl } from "./route.ts";
+import { navigateToUrl } from "./useWorkspaceNavigation.ts";
 import type { ServerStatus } from "../api/index.ts";
 import { notifyError } from "../state/notifications.ts";
 
@@ -50,7 +52,7 @@ export function LastSync({
 						notifyError("sync-stale", staleSyncMessage(), {
 							label: "Open bank sync",
 							onAction: () => {
-								window.location.hash = "sources";
+								navigateToUrl(pageUrl("sources"));
 							},
 						})
 					}

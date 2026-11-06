@@ -62,10 +62,8 @@ server {
     }
 
     location / {
-        try_files $uri $uri/ =404;
+        try_files $uri $uri/ /index.html;
     }
-
-    error_page 404 /404.html;
 }
 
 # Optional browser-facing Casdoor alias. Publish this listener only on loopback

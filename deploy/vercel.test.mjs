@@ -21,7 +21,7 @@ test("Vercel proxies the API, callbacks, probes, and streams before static fallb
   for (const path of ["/", "/assets/app.js", "/settings", "/v10", "/readyz/unexpected"])
     assert.equal(pattern.test(path), false);
   assert.deepEqual(filesystem, { handle: "filesystem" });
-  assert.deepEqual(fallback, { src: "/(.*)", dest: "/404.html", status: 404 });
+  assert.deepEqual(fallback, { src: "/(.*)", dest: "/index.html" });
   assert.equal(config.framework, null);
   assert.equal(config.outputDirectory, "frontend/dist");
   assert.equal(proxy.headers["Cache-Control"], "no-store");

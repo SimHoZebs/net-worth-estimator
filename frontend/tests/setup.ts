@@ -37,12 +37,13 @@ afterEach(() => {
 	// unconditional instead of depending on every file remembering.
 	resetServerQueryCache();
 	if (typeof window !== "undefined" && window.history) {
-		// Route state outlives cleanup(): a hash left by one file becomes
-		// the next file's initial route and poisons title and navigation
-		// assertions. Reset to a blank same-document URL and drop title
-		// elements (assigning document.title would create a spare one),
-		// since jsdom keeps one history and one document per worker.
-		window.history.replaceState(null, "", window.location.pathname);
+		// Route state outlives cleanup(): a page or overlay URL left by
+		// one file becomes the next file's initial route and poisons
+		// title and navigation assertions. Reset to the root same-document
+		// URL and drop title elements (assigning document.title would
+		// create a spare one), since jsdom keeps one history and one
+		// document per worker.
+		window.history.replaceState(null, "", "/");
 		document.head.querySelectorAll("title").forEach((element) => {
 			element.remove();
 		});

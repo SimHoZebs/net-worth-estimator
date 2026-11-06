@@ -40,7 +40,7 @@ export function vercelConfig(env) {
         ],
       },
       { handle: "filesystem" },
-      { src: "/(.*)", dest: "/404.html", status: 404 },
+      { src: "/(.*)", dest: "/index.html" },
     ],
   };
 }

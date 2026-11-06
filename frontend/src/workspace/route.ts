@@ -7,12 +7,14 @@ import {
 } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { pages, type Page } from "./navigation.ts";
 
-// URL-driven overlays. The hash carries the page plus at most one overlay:
-// `#accounts` stays the accounts page, `#accounts/everyday-checking` opens
-// that account's activity, `#transactions/new` opens a blank transaction editor.
-// The hash (not component state) is the source of truth, so the back button,
-// bookmarks, and direct loads all resolve through the same parser. Page-only
-// hashes are unchanged: every overlay form appends segments to them.
+// URL-driven overlays. The pathname carries the page and the search string
+// carries at most one overlay: `/accounts` stays the accounts page,
+// `/accounts?account=everyday-checking` opens that account's activity,
+// `/transactions?edit-transaction=new` opens a blank transaction editor.
+// The URL (not component state) is the source of truth, so the back button,
+// bookmarks, and direct loads all resolve through the same parser. The hash
+// is reserved for in-page anchors (for example the skip link) and never
+// carries routing state.
 
 export const SAFE_SPENDING_TABS = SAFE_SPENDING_DETAIL_TABS.map(
 	(tab) => tab.id,
@@ -33,8 +35,8 @@ export type OverlayRoute =
 			tab: SafeSpendingDetailTab;
 			editTransaction?: string;
 	  }
-	// Well-formed page, unparseable overlay segments. Resolves to unknown so
-	// the URL normalizes back to the page instead of sticking.
+	// Well-formed page, unparseable overlay parameters. Resolves to unknown
+	// so the URL normalizes back to the page instead of sticking.
 	| { type: "invalid" };
 
 export interface WorkspaceRoute {
@@ -65,24 +67,6 @@ export type OverlayResolution =
 	| { state: "unknown" }
 	| { state: "ready"; overlay: ResolvedOverlay };
 
-// Single-segment overlay words, so an account literally named "New" still
-// deep-links (serializers fall back to the explicit `account/<id>` form).
-const RESERVED_SLUGS = new Set([
-	"new",
-	"edit",
-	"position",
-	"shortfall",
-	"safe-spending",
-	"safe-spending-detail",
-	"account",
-	"evaluation",
-	"evaluations",
-	"edit-account",
-	"edit-transaction",
-	"edit-schedule",
-	"edit-evaluation",
-]);
-
 export function slugifyAccount(name: string): string {
 	const slug = name
 		.toLowerCase()
@@ -110,148 +94,142 @@ export function findAccount(
 	);
 }
 
-function decodeSegment(segment: string): string | null {
-	try {
-		return decodeURIComponent(segment);
-	} catch {
-		return null;
-	}
-}
-
-function homeEditor(page: Page): OverlayRoute | { type: "invalid" } {
-	switch (page) {
-		case "accounts":
-			return { type: "accountEdit", key: "new" };
-		case "transactions":
-			return { type: "transactionEdit", key: "new" };
-		case "evaluations":
-			return { type: "evaluationEdit", key: "new" };
-		default:
-			return { type: "invalid" };
-	}
-}
-
-function scopedEditor(page: Page, key: string): OverlayRoute | null {
-	switch (page) {
-		case "accounts":
-			return { type: "accountEdit", key };
-		case "transactions":
-			return { type: "transactionEdit", key };
-		case "evaluations":
-			return { type: "evaluationEdit", key };
-		default:
-			return null;
-	}
-}
-
-function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
-	const [requestedTab, maybeEdit, key, ...extra] = parts;
-	if (extra.length > 0) return { type: "invalid" };
-	if (requestedTab === "edit-transaction") {
-		// `#outlook/safe-spending-detail/edit-transaction/<id>`
-		return maybeEdit
-			? {
-					type: "safeSpendingDetail",
-					tab: "cycle",
-					editTransaction: maybeEdit,
-				}
-			: { type: "invalid" };
-	}
-	if (!isSafeSpendingTab(requestedTab)) return { type: "invalid" };
-	if (maybeEdit === undefined)
-		return { type: "safeSpendingDetail", tab: requestedTab };
-	// `#outlook/safe-spending-detail/<tab>/edit-transaction/<id>`
-	return maybeEdit === "edit-transaction" && key
-		? { type: "safeSpendingDetail", tab: requestedTab, editTransaction: key }
-		: { type: "invalid" };
-}
-
 function isSafeSpendingTab(
-	value: string | undefined,
+	value: string | null | undefined,
 ): value is SafeSpendingDetailTab {
 	return SAFE_SPENDING_TABS.some((tab) => tab === value);
 }
 
-function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
-	if (rest.length === 0) return null;
-	const [first, second] = rest;
-	// Length is checked, so the head always exists; this only satisfies the
-	// type checker for indexed access.
-	if (first === undefined) return null;
-	if (first === "safe-spending-detail") {
-		if (rest.length > 4) return { type: "invalid" };
-		if (second === undefined)
-			return { type: "safeSpendingDetail", tab: "cycle" };
-		return parseSafeSpendingDetail(rest.slice(1));
+const ACCOUNT_PAGES: Page[] = ["accounts", "transactions", "outlook"];
+
+// A single overlay parameter value. Each overlay parameter may appear at
+// most once; duplicates are invalid rather than silently keeping the first.
+function singleParam(
+	params: URLSearchParams,
+	name: string,
+): string | null | undefined {
+	const values = params.getAll(name);
+	if (values.length === 0) return undefined;
+	if (values.length > 1) return null;
+	return values[0] ?? null;
+}
+
+function parseOverlayParams(
+	params: URLSearchParams,
+	page: Page,
+): OverlayRoute | null {
+	const account = singleParam(params, "account");
+	const evidence = singleParam(params, "evidence");
+	const editAccount = singleParam(params, "edit-account");
+	const editTransaction = singleParam(params, "edit-transaction");
+	const editSchedule = singleParam(params, "edit-schedule");
+	const editEvaluation = singleParam(params, "edit-evaluation");
+	const group = singleParam(params, "group");
+	const detail = singleParam(params, "detail");
+	const present = [
+		account,
+		evidence,
+		editAccount,
+		editTransaction,
+		editSchedule,
+		editEvaluation,
+		group,
+		detail,
+	].filter((value) => value !== undefined);
+	// A duplicate or empty value is unparseable. `null` marks a duplicate;
+	// an empty string is never a usable key, evidence kind, or tab.
+	if (present.some((value) => value === null || value === "")) {
+		return { type: "invalid" };
 	}
-	if (rest.length > 2) return { type: "invalid" };
-	if (rest.length === 1) {
-		// Group detail resolves against membership, not financial rows.
-		if (page === "groups") return { type: "group", key: first };
-		switch (first) {
+	if (present.length === 0) return null;
+	// Safe-spending detail is the only overlay that stacks with another
+	// parameter: `detail` plus `edit-transaction` edits a transaction
+	// inside the detail. Every other combination claims two overlays.
+	if (detail !== undefined && editTransaction !== undefined) {
+		const others = present.filter(
+			(value) => value !== detail && value !== editTransaction,
+		);
+		if (others.length > 0) return { type: "invalid" };
+		if (!isSafeSpendingTab(detail)) return { type: "invalid" };
+		return {
+			type: "safeSpendingDetail",
+			tab: detail,
+			editTransaction: editTransaction ?? "",
+		};
+	}
+	if (present.length > 1) return { type: "invalid" };
+	// Exactly one overlay parameter is present.
+	if (detail !== undefined) {
+		if (!isSafeSpendingTab(detail)) return { type: "invalid" };
+		return { type: "safeSpendingDetail", tab: detail };
+	}
+	if (account !== undefined) {
+		if (!ACCOUNT_PAGES.includes(page)) return { type: "invalid" };
+		return { type: "account", key: account ?? "" };
+	}
+	if (evidence !== undefined) {
+		switch (evidence) {
 			case "position":
 				return { type: "position" };
 			case "shortfall":
 				return { type: "shortfall" };
 			case "safe-spending":
 				return { type: "safe-spending" };
-			case "safe-spending-detail":
-				return { type: "safeSpendingDetail", tab: "cycle" };
-			case "new":
-				return homeEditor(page);
 			default:
-				switch (page) {
-					case "accounts":
-					case "transactions":
-						return { type: "account", key: first };
-					case "outlook":
-						return { type: "account", key: first };
-					default:
-						return { type: "invalid" };
-				}
+				return { type: "invalid" };
 		}
 	}
-	switch (first) {
-		case "edit-account":
-			return { type: "accountEdit", key: second ?? "" };
-		case "edit-transaction":
-			return { type: "transactionEdit", key: second ?? "" };
-		case "edit-schedule":
-			return { type: "scheduleEdit", key: second ?? "" };
-		case "edit-evaluation":
-			return { type: "evaluationEdit", key: second ?? "" };
-		case "account":
-			return { type: "account", key: second ?? "" };
-		default:
-			if (second === "edit") {
-				// `new` stays reserved for creation: an account literally
-				// named "New" deep-links through the explicit
-				// `edit-account/<id>` form instead.
-				if (first === "new") return { type: "invalid" };
-				return scopedEditor(page, first) ?? { type: "invalid" };
-			}
-			return { type: "invalid" };
+	if (editAccount !== undefined)
+		return { type: "accountEdit", key: editAccount ?? "" };
+	if (editTransaction !== undefined)
+		return { type: "transactionEdit", key: editTransaction ?? "" };
+	if (editSchedule !== undefined)
+		return { type: "scheduleEdit", key: editSchedule ?? "" };
+	if (editEvaluation !== undefined)
+		return { type: "evaluationEdit", key: editEvaluation ?? "" };
+	// Group detail resolves against membership, not financial rows.
+	if (group !== undefined) {
+		if (page !== "groups") return { type: "invalid" };
+		return { type: "group", key: group ?? "" };
 	}
+	return { type: "invalid" };
 }
 
-export function parseHash(hash: string): WorkspaceRoute {
-	const withoutMark = hash.startsWith("#") ? hash.slice(1) : hash;
-	const body = withoutMark.startsWith("/") ? withoutMark.slice(1) : withoutMark;
-	if (!body) return { page: "outlook", overlay: null };
+/** Parse a path-plus-search URL such as `/accounts?account=checking` into
+ *  its page and overlay. The root path is the outlook landing page. Unknown
+ *  paths fall back to outlook with an invalid overlay so the URL normalizes. */
+export function parseUrl(url: string): WorkspaceRoute {
+	const queryIndex = url.indexOf("?");
+	const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
+	const search = queryIndex === -1 ? "" : url.slice(queryIndex + 1);
 	const segments: string[] = [];
-	for (const part of body.split("/")) {
-		const decoded = decodeSegment(part);
-		if (decoded === null)
+	for (const part of pathname.split("/")) {
+		let decoded: string;
+		try {
+			decoded = decodeURIComponent(part);
+		} catch {
 			return { page: "outlook", overlay: { type: "invalid" } };
+		}
 		if (decoded.length) segments.push(decoded);
 	}
-	if (!segments.length) return { page: "outlook", overlay: null };
-	const [head, ...rest] = segments as [string, ...string[]];
+	if (segments.length === 0) {
+		// The root path is the outlook landing page.
+		return {
+			page: "outlook",
+			overlay: parseOverlayParams(new URLSearchParams(search), "outlook"),
+		};
+	}
+	if (segments.length > 1)
+		return { page: "outlook", overlay: { type: "invalid" } };
+	const [head] = segments as [string];
 	const page: Page | null = pages.some((item) => item.id === head)
 		? (head as Page)
 		: null;
 	if (!page) return { page: "outlook", overlay: { type: "invalid" } };
-	return { page, overlay: parseOverlaySegments(rest, page) };
+	return {
+		page,
+		overlay: parseOverlayParams(new URLSearchParams(search), page),
+	};
 }
 
 function unknown(): OverlayResolution {
@@ -373,81 +351,58 @@ export function resolveOverlayRoute(
 	}
 }
 
-export function pageHash(page: Page): string {
-	return `#${page}`;
+export function pageUrl(page: Page): string {
+	return `/${page}`;
 }
 
-export function groupHash(id: string): string {
-	return `#groups/${encode(id)}`;
+export function groupUrl(id: string): string {
+	return `/groups?group=${encodeURIComponent(id)}`;
 }
 
 const encode = (value: string): string => encodeURIComponent(value);
 
-function accountSlug(account: Account): string | null {
-	const slug = slugifyAccount(account.name);
-	return RESERVED_SLUGS.has(slug) ? null : slug;
-}
-
-export function evidenceHash(
+export function evidenceUrl(
 	page: Page,
 	target: EvidenceTarget,
 	rows: Pick<OverlayRows, "accounts"> | null,
 ): string {
 	switch (target.kind) {
 		case "position":
-			return `#${page}/position`;
+			return `/${page}?evidence=position`;
 		case "failure":
-			return `#${page}/shortfall`;
+			return `/${page}?evidence=shortfall`;
 		case "safe-spending":
-			return `#${page}/safe-spending`;
+			return `/${page}?evidence=safe-spending`;
 		case "account": {
 			const account = rows ? findAccount(rows, target.id) : undefined;
-			const slug = account ? accountSlug(account) : null;
-			if ((page === "accounts" || page === "transactions") && slug)
-				return `#${page}/${encode(slug)}`;
-			return `#${page}/account/${encode(slug ?? target.id)}`;
+			const key = account ? slugifyAccount(account.name) : target.id;
+			return `/${page}?account=${encode(key)}`;
 		}
 	}
 }
 
-export function editorHash(page: Page, target: EditorTarget): string {
+export function editorUrl(page: Page, target: EditorTarget): string {
 	switch (target.kind) {
 		case "account": {
-			if (!target.item)
-				return page === "accounts"
-					? `#${page}/new`
-					: `#${page}/edit-account/new`;
-			const slug = accountSlug(target.item);
-			return page === "accounts" && slug
-				? `#${page}/${encode(slug)}/edit`
-				: `#${page}/edit-account/${encode(slug ?? target.item.id)}`;
+			if (!target.item) return `/${page}?edit-account=new`;
+			return `/${page}?edit-account=${encode(slugifyAccount(target.item.name))}`;
 		}
 		case "transaction":
-			if (!target.item)
-				return page === "transactions"
-					? `#${page}/new`
-					: `#${page}/edit-transaction/new`;
-			return page === "transactions"
-				? `#${page}/${encode(target.item.id)}/edit`
-				: `#${page}/edit-transaction/${encode(target.item.id)}`;
+			if (!target.item) return `/${page}?edit-transaction=new`;
+			return `/${page}?edit-transaction=${encode(target.item.id)}`;
 		case "schedule":
-			return `#${page}/edit-schedule/new`;
+			return `/${page}?edit-schedule=new`;
 		case "evaluation":
-			if (!target.item)
-				return page === "evaluations"
-					? `#${page}/new`
-					: `#${page}/edit-evaluation/new`;
-			return page === "evaluations"
-				? `#${page}/${encode(target.item.id)}/edit`
-				: `#${page}/edit-evaluation/${encode(target.item.id)}`;
+			if (!target.item) return `/${page}?edit-evaluation=new`;
+			return `/${page}?edit-evaluation=${encode(target.item.id)}`;
 	}
 }
 
-export function safeSpendingDetailHash(
+export function safeSpendingDetailUrl(
 	page: Page,
 	tab: SafeSpendingDetailTab,
 	editKey?: string,
 ): string {
-	const base = `#${page}/safe-spending-detail/${tab}`;
-	return editKey ? `${base}/edit-transaction/${encode(editKey)}` : base;
+	const base = `/${page}?detail=${tab}`;
+	return editKey ? `${base}&edit-transaction=${encode(editKey)}` : base;
 }

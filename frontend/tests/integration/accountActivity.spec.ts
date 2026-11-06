@@ -8,7 +8,7 @@ test.beforeEach(async () => {
 });
 
 async function openChecking(page: Page) {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
@@ -101,7 +101,7 @@ test("the transaction actions menu closes on Escape without closing the detail",
 test("account names in the model open incoming transfers with the correct other account", async ({
 	page,
 }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();
@@ -161,7 +161,7 @@ test("account names in the model open incoming transfers with the correct other 
 test("transaction values edit in place with save and discard", async ({
 	page,
 }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();
@@ -303,7 +303,7 @@ test("clicking outside the account panel closes it", async ({ page }) => {
 test("growth-only accounts have an honest empty state and retain account details", async ({
 	page,
 }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
@@ -376,7 +376,7 @@ test("a recurring schedule lists transactions that record its occurrences", asyn
 		{ data: { scheduleId: "spend", occurrenceDate: "2026-03-05" } },
 	);
 	expect(claim.ok()).toBe(true);
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();

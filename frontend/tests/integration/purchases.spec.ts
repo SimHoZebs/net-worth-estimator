@@ -11,7 +11,7 @@ test.beforeEach(async () => {
 });
 
 async function openPurchases(page: Page) {
-	await page.goto("/#purchases");
+	await page.goto("/purchases");
 	await expect(
 		page.getByRole("heading", { level: 1, name: "Planned purchases" }),
 	).toBeVisible();
@@ -30,12 +30,12 @@ async function addPurchase(page: Page, name: string, cost: string) {
 test("planned purchases has a navigation entry, direct route, and browser history", async ({
 	page,
 }) => {
-	await page.goto("/#transactions");
+	await page.goto("/transactions");
 	await expect(page.getByRole("tab", { name: /Wish list/ })).toHaveCount(0);
 	await page
 		.getByRole("link", { name: "Planned purchases", exact: true })
 		.click();
-	await expect(page).toHaveURL(/#purchases$/);
+	await expect(page).toHaveURL(/\/purchases$/);
 	await expect(
 		page.getByRole("link", { name: "Planned purchases", exact: true }),
 	).toHaveAttribute("aria-current", "page");
@@ -44,9 +44,9 @@ test("planned purchases has a navigation entry, direct route, and browser histor
 	).toBeFocused();
 	await expect(page).toHaveTitle("Planned purchases · Waypoint");
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
-	await expect(page).toHaveURL(/#transactions$/);
+	await expect(page).toHaveURL(/\/transactions$/);
 	await page.goBack();
-	await expect(page).toHaveURL(/#purchases$/);
+	await expect(page).toHaveURL(/\/purchases$/);
 	await page.reload();
 	await expect(
 		page.getByRole("button", { name: "Add purchase" }),
@@ -417,7 +417,7 @@ test("unfunded purchases hold lower priorities and the page remains accessible o
 	page,
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
-	await page.goto("/#transactions");
+	await page.goto("/transactions");
 	await page.getByRole("button", { name: "Open navigation" }).click();
 	await page
 		.getByRole("link", { name: "Planned purchases", exact: true })
@@ -425,7 +425,7 @@ test("unfunded purchases hold lower priorities and the page remains accessible o
 	await expect(
 		page.getByRole("dialog", { name: "Workspace navigation" }),
 	).not.toBeVisible();
-	await expect(page).toHaveURL(/#purchases$/);
+	await expect(page).toHaveURL(/\/purchases$/);
 	await addPurchase(page, "Unfunded item", "1000000000");
 	await addPurchase(page, "Small item", "25");
 	await expect(page.getByText("2 not yet dated")).toBeVisible();

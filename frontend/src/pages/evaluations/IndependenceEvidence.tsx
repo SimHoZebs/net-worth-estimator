@@ -9,7 +9,7 @@ import type {
 	IndependenceCandidate,
 } from "@/domain/financialIndependence.ts";
 import { dateLabel, exactMoney, money, percent } from "@/domain/format.ts";
-import { evidenceHash } from "@/workspace/route.ts";
+import { evidenceUrl } from "@/workspace/route.ts";
 import { useWorkspaceNavigation } from "@/workspace/useWorkspaceNavigation.ts";
 import { IndependenceBranchChart } from "./IndependenceBranchChart.tsx";
 
@@ -31,11 +31,9 @@ export function IndependenceEvidence({
 	candidate: IndependenceCandidate;
 	analysis: FinancialIndependenceAnalysis;
 }) {
-	const { pushHash } = useWorkspaceNavigation();
+	const { pushUrl } = useWorkspaceNavigation();
 	const openAccount = (accountId: string) => {
-		pushHash(
-			evidenceHash("accounts", { kind: "account", id: accountId }, null),
-		);
+		pushUrl(evidenceUrl("accounts", { kind: "account", id: accountId }, null));
 	};
 	const outcome = candidate.outcome;
 	const failure = outcome?.attempted ? outcome.firstShortfall : null;

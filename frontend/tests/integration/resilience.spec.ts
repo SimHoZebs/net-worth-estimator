@@ -13,7 +13,7 @@ test("a dropped connection keeps the edit and finishes the save on reconnect", a
 	page,
 	context,
 }) => {
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
 	await page.getByRole("tab", { name: /Recurring/ }).click();
 	await page.getByRole("button", { name: "Monthly investing" }).click();

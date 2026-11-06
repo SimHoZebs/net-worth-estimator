@@ -10,11 +10,11 @@ import {
 } from "../state/savedState.ts";
 import { scheduleToDisplay } from "../domain/transactionRows.ts";
 import {
-	editorHash,
-	evidenceHash,
-	pageHash,
+	editorUrl,
+	evidenceUrl,
+	pageUrl,
 	resolveOverlayRoute,
-	safeSpendingDetailHash,
+	safeSpendingDetailUrl,
 	type OverlayRows,
 	type WorkspaceRoute,
 } from "./route.ts";
@@ -23,13 +23,13 @@ import {
 export function useWorkspaceOverlays({
 	route,
 	returnTo,
-	pushHash,
-	replaceHash,
+	pushUrl,
+	replaceUrl,
 }: {
 	route: WorkspaceRoute;
 	returnTo: EvidenceTarget | null;
-	pushHash: (hash: string, returnTo?: EvidenceTarget | null) => void;
-	replaceHash: (hash: string) => void;
+	pushUrl: (url: string, returnTo?: EvidenceTarget | null) => void;
+	replaceUrl: (url: string) => void;
 }) {
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
@@ -56,8 +56,8 @@ export function useWorkspaceOverlays({
 	const resolution = resolveOverlayRoute(route, rows);
 	const page = route.page;
 	useEffect(() => {
-		if (resolution.state === "unknown") replaceHash(pageHash(page));
-	}, [resolution.state, page, replaceHash]);
+		if (resolution.state === "unknown") replaceUrl(pageUrl(page));
+	}, [resolution.state, page, replaceUrl]);
 	const ready = resolution.state === "ready" ? resolution.overlay : null;
 	const evidence = ready?.kind === "evidence" ? ready.target : null;
 	const safeSpendingDetail =
@@ -69,15 +69,15 @@ export function useWorkspaceOverlays({
 				? ready.edit
 				: null;
 	const openEvidence = (target: EvidenceTarget) => {
-		pushHash(evidenceHash(page, target, rows));
+		pushUrl(evidenceUrl(page, target, rows));
 	};
 	const openEditor = (target: EditorTarget) => {
 		if (
 			target.kind === "transaction" &&
 			route.overlay?.type === "safeSpendingDetail"
 		) {
-			pushHash(
-				safeSpendingDetailHash(
+			pushUrl(
+				safeSpendingDetailUrl(
 					page,
 					route.overlay.tab,
 					target.item?.id ?? "new",
@@ -85,35 +85,35 @@ export function useWorkspaceOverlays({
 			);
 			return;
 		}
-		pushHash(editorHash(page, target));
+		pushUrl(editorUrl(page, target));
 	};
 	const editFromEvidence = (target: EditorTarget) => {
-		pushHash(editorHash(page, target), evidence);
+		pushUrl(editorUrl(page, target), evidence);
 	};
 	const closeEditor = () => {
 		if (
 			route.overlay?.type === "safeSpendingDetail" &&
 			route.overlay.editTransaction !== undefined
 		) {
-			pushHash(safeSpendingDetailHash(page, route.overlay.tab));
+			pushUrl(safeSpendingDetailUrl(page, route.overlay.tab));
 			return;
 		}
 		if (returnTo) {
-			pushHash(evidenceHash(page, returnTo, rows));
+			pushUrl(evidenceUrl(page, returnTo, rows));
 			return;
 		}
-		pushHash(pageHash(page));
+		pushUrl(pageUrl(page));
 	};
-	const closeEvidence = () => pushHash(pageHash(page));
+	const closeEvidence = () => pushUrl(pageUrl(page));
 	const openSafeSpendingDetail = (tab: SafeSpendingDetailTab) =>
-		pushHash(safeSpendingDetailHash(page, tab));
+		pushUrl(safeSpendingDetailUrl(page, tab));
 	const switchSafeSpendingTab = (tab: SafeSpendingDetailTab) => {
 		if (route.overlay?.type === "safeSpendingDetail")
-			replaceHash(
-				safeSpendingDetailHash(page, tab, route.overlay.editTransaction),
+			replaceUrl(
+				safeSpendingDetailUrl(page, tab, route.overlay.editTransaction),
 			);
 	};
-	const closeSafeSpendingDetail = () => pushHash(pageHash(page));
+	const closeSafeSpendingDetail = () => pushUrl(pageUrl(page));
 	return {
 		editor,
 		evidence,

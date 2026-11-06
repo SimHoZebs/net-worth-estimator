@@ -51,7 +51,7 @@ test("compact financial independence cards open an inspector without more calcul
 		if (/\/v1\/projections\/(deterministic|stochastic)$/.test(request.url()))
 			projections++;
 	});
-	await page.goto("/#evaluations");
+	await page.goto("/evaluations");
 	const card = page.getByRole("region", {
 		name: "Financial independence",
 		exact: true,
@@ -192,7 +192,7 @@ test("a complete test that cannot fit the horizon does not appear as financial f
 	request,
 }) => {
 	await addIndependence(request, { evaluationYears: 30 });
-	await page.goto("/#evaluations");
+	await page.goto("/evaluations");
 	const card = page.getByRole("region", {
 		name: "Financial independence",
 		exact: true,
@@ -228,7 +228,7 @@ test("a self-sustaining projection date remains distinct from its spending cover
 		continuingTransactionIds: [],
 		sources: [{ type: "cashflow", transactionId: "salary", included: true }],
 	});
-	await page.goto("/#evaluations");
+	await page.goto("/evaluations");
 	const card = page.getByRole("region", {
 		name: "Financial independence",
 		exact: true,
@@ -258,7 +258,7 @@ test("financial independence configuration updates minimum, duration, and fundin
 	request,
 }) => {
 	const id = await addIndependence(request);
-	await page.goto("/#evaluations");
+	await page.goto("/evaluations");
 	const card = page.getByRole("region", {
 		name: "Financial independence",
 		exact: true,
@@ -326,7 +326,7 @@ for (const theme of ["light", "dark"]) {
 				(theme) => localStorage.setItem("waypoint-theme", theme),
 				theme,
 			);
-			await page.goto("/#evaluations");
+			await page.goto("/evaluations");
 			const card = page.getByRole("region", {
 				name: "Financial independence",
 				exact: true,

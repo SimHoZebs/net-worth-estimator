@@ -125,7 +125,7 @@ test.beforeEach(async () => {
 for (const width of [1440, 390, 320]) {
 	test(`setup is accessible and fits at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });
-		await page.goto("/#sources");
+		await page.goto("/sources");
 		const bankSync = page.getByRole("region", {
 			name: "Bank sync",
 			exact: true,
@@ -192,7 +192,7 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 	page,
 }) => {
 	const provider = await stubSimplefin(page, { holdConnect: true });
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	const simplefin = bankSync.getByRole("region", {
 		name: "SimpleFIN",
@@ -247,7 +247,7 @@ test("links a manual account and retires its duplicate", async ({ page }) => {
 		},
 	});
 	await stubSimplefin(page, { configured: true });
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	const synced = bankSync.getByRole("list", { name: "Synced accounts" });
 	await expect(synced).toContainText("Everyday checking");
@@ -275,7 +275,7 @@ test("explains a rejected token and recovers with a new setup token", async ({
 	page,
 }) => {
 	const provider = await stubSimplefin(page, { rejectFirstToken: true });
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	const form = bankSync.getByRole("form", { name: "Connect SimpleFIN" });
 	await form.getByLabel("Setup token", { exact: true }).fill("invalid-token");
@@ -309,7 +309,7 @@ test("distinguishes a saved credential from unavailable sync and missing account
 		empty: true,
 		syncEnabled: false,
 	});
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	await expect(
 		bankSync.getByText(/the server has not enabled sync for this user/),
@@ -329,7 +329,7 @@ test("explains sync limits without retrying the provider automatically", async (
 		empty: true,
 		throttle: true,
 	});
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	const simplefin = bankSync.getByRole("region", {
 		name: "SimpleFIN",
@@ -351,7 +351,7 @@ test("connected accounts and sync feedback stay accessible in dark mode on mobil
 	await stubSimplefin(page, { configured: true });
 	await page.emulateMedia({ colorScheme: "dark" });
 	await page.setViewportSize({ width: 390, height: 900 });
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	const simplefin = bankSync.getByRole("region", {
 		name: "SimpleFIN",

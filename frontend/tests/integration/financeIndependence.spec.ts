@@ -4,7 +4,7 @@ import { readSavedServerModel, resetFixture } from "./fixture.ts";
 test.beforeEach(async () => resetFixture());
 
 async function openCheckingActivity(page: Page) {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
@@ -19,7 +19,7 @@ test("finance lists, recorded activity, and account details request no forecast"
 		forecasts.push(route.request().url());
 		await route.abort();
 	});
-	await page.goto("/#transactions");
+	await page.goto("/transactions");
 	await expect(
 		page.getByRole("button", {
 			name: "View Household payroll on Jan 29, 2026",
@@ -150,7 +150,7 @@ test("an account without recorded transactions can request projected activity", 
 		if (new URL(request.url()).pathname === "/v1/projections/deterministic")
 			forecasts++;
 	});
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();

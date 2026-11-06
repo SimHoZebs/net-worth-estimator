@@ -13,20 +13,20 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 		if (request.url().endsWith("/v1/projections/stochastic"))
 			scenarioRequests.push(request.url());
 	});
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	await expect(page).toHaveURL(/#accounts\/everyday-checking$/);
+	await expect(page).toHaveURL(/\/accounts\?account=everyday-checking$/);
 	await expect(page.getByRole("dialog")).toContainText("Everyday checking");
 
 	// The back button closes the modal back onto the accounts page.
 	await page.goBack();
-	await expect(page).toHaveURL(/#accounts$/);
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 
 	// Direct loads open the same modal once the account arrives.
-	await page.goto("/#accounts/everyday-checking");
+	await page.goto("/accounts?account=everyday-checking");
 	await expect(page.getByRole("dialog")).toContainText("Everyday checking");
 	await expect(
 		page.getByRole("heading", { name: "Accounts and starting balances" }),
@@ -35,84 +35,86 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 });
 
 test("unknown account slugs normalize back to the page", async ({ page }) => {
-	await page.goto("/#accounts/no-such-account");
-	await expect(page).toHaveURL(/#accounts$/);
+	await page.goto("/accounts?account=no-such-account");
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
 test("history restores an editor's evidence return target without leaking it to a new editor", async ({
 	page,
 }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
-	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await expect(page).toHaveURL(/\/accounts\?account=home-value$/);
 	await page.getByRole("button", { name: "Add a planned transaction" }).click();
-	await expect(page).toHaveURL(/#accounts\/edit-transaction\/new$/);
+	await expect(page).toHaveURL(/\/accounts\?edit-transaction=new$/);
 	await page.goBack();
-	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await expect(page).toHaveURL(/\/accounts\?account=home-value$/);
 	await page.goBack();
-	await expect(page).toHaveURL(/#accounts$/);
+	await expect(page).toHaveURL(/\/accounts$/);
 	await page.goForward();
-	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await expect(page).toHaveURL(/\/accounts\?account=home-value$/);
 	await page.goForward();
-	await expect(page).toHaveURL(/#accounts\/edit-transaction\/new$/);
+	await expect(page).toHaveURL(/\/accounts\?edit-transaction=new$/);
 	await expect(
 		page.getByRole("dialog", { name: "Add planned transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await expect(page).toHaveURL(/\/accounts\?account=home-value$/);
 	await page
 		.getByRole("dialog", { name: "Home value", exact: true })
 		.getByRole("button", { name: "Close dialog" })
 		.click();
-	await expect(page).toHaveURL(/#accounts$/);
+	await expect(page).toHaveURL(/\/accounts$/);
 	await page.getByRole("button", { name: "Add account" }).click();
 	await expect(
 		page.getByRole("dialog", { name: "Add account", exact: true }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/#accounts$/);
+	await expect(page).toHaveURL(/\/accounts$/);
 });
 
 test("editors have URLs and unknown editor ids normalize", async ({ page }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page.getByRole("button", { name: "Add account" }).click();
-	await expect(page).toHaveURL(/#accounts\/new$/);
+	await expect(page).toHaveURL(/\/accounts\?edit-account=new$/);
 	await expect(page.getByRole("dialog")).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/#accounts$/);
+	await expect(page).toHaveURL(/\/accounts$/);
 
-	await page.goto("/#transactions/invest/edit");
+	await page.goto("/transactions?edit-transaction=invest");
 	const editor = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(editor).toBeVisible();
 	await expect(editor.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
 	);
 
-	await page.goto("/#transactions/edit-schedule/new");
+	await page.goto("/transactions?edit-schedule=new");
 	const scheduleDialog = page.getByRole("dialog", { name: "Add schedule" });
 	await expect(scheduleDialog).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/#transactions$/);
+	await expect(page).toHaveURL(/\/transactions$/);
 
-	await page.goto("/#transactions/no-such-transaction/edit");
-	await expect(page).toHaveURL(/#transactions$/);
+	await page.goto("/transactions?edit-transaction=no-such-transaction");
+	await expect(page).toHaveURL(/\/transactions$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
 test("target cards retain editing without an evidence dialog", async ({
 	page,
 }) => {
-	await page.goto("/#evaluations");
+	await page.goto("/evaluations");
 	const target = page.getByRole("region", { name: "Reach $750,000 net worth" });
 	await expect(target.getByRole("progressbar")).toBeVisible();
 	await expect(target.getByRole("button", { name: /Evidence/ })).toHaveCount(0);
 	await target
 		.getByRole("button", { name: "Edit Reach $750,000 net worth" })
 		.click();
-	await expect(page).toHaveURL(/#evaluations\/net-worth-750k\/edit$/);
+	await expect(page).toHaveURL(
+		/\/evaluations\?edit-evaluation=net-worth-750k$/,
+	);
 	await expect(
 		page.getByRole("dialog", { name: "Edit evaluation" }),
 	).toBeVisible();
@@ -120,6 +122,6 @@ test("target cards retain editing without an evidence dialog", async ({
 		"Reach $750,000 net worth",
 	);
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/#evaluations$/);
+	await expect(page).toHaveURL(/\/evaluations$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });

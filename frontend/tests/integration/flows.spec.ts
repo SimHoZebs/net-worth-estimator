@@ -7,7 +7,7 @@ test.beforeEach(async () => {
 });
 
 async function openFlows(page: Page) {
-	await page.goto("/#flows");
+	await page.goto("/flows");
 	// The diagram loads from the real /v1/flows engine over real HTTP and
 	// renders on the shared chart setup.
 	await expect(
@@ -148,7 +148,7 @@ test("touch tap selects a flow through the same inspector", async ({
 	const reportTouchErrors = trackBrowserErrors(context);
 	const page = await context.newPage();
 	try {
-		await page.goto("/#flows");
+		await page.goto("/flows");
 		const diagram = page.getByRole("img", { name: /Money-flow diagram/ });
 		await expect(diagram).toBeVisible();
 		const lines = await diagram.locator("path,line").all();

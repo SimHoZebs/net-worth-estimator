@@ -83,7 +83,7 @@ test("saved target pins control Outlook without an evidence dialog", async ({
 				reply.url().endsWith("/v1/pinned-evaluations") &&
 				reply.request().method() === "PUT",
 		);
-	await page.goto("/#evaluations");
+	await page.goto("/evaluations");
 	await expect(card()).toBeVisible();
 	await page.getByRole("link", { name: "Outlook", exact: true }).click();
 	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(0);
@@ -155,7 +155,7 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 test("a schedule ends by recording one transaction and a transaction can start a schedule", async ({
 	page,
 }) => {
-	await page.goto("/#transactions/invest/edit");
+	await page.goto("/transactions?edit-transaction=invest");
 	const editor = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(editor.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
@@ -181,7 +181,7 @@ test("a schedule ends by recording one transaction and a transaction can start a
 	// A one-time transaction starts a schedule through the subscription
 	// action; the recorded transaction stays a fact and claims the new
 	// schedule's first occurrence.
-	await page.goto(`/#transactions/${recorded!.id}/edit`);
+	await page.goto(`/transactions?edit-transaction=${recorded!.id}`);
 	const again = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(again.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
@@ -214,7 +214,7 @@ test("a schedule ends by recording one transaction and a transaction can start a
 test("account, transaction and evaluation maintenance plus search work", async ({
 	page,
 }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page.getByRole("button", { name: "Add account" }).click();
 	const accountDialog = page.getByRole("dialog", { name: "Add account" });
 	await accountDialog.getByLabel("Account name").fill("Travel savings");
@@ -252,7 +252,7 @@ test("account, transaction and evaluation maintenance plus search work", async (
 });
 
 test("failed saves retain the intended edit", async ({ page }) => {
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	await openInvestingTransactionDetail(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	// The editor saves immediately, so the failure injection must be armed
@@ -297,11 +297,11 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 }) => {
 	for (const path of [
 		"/",
-		"/#accounts",
-		"/#transactions",
-		"/#purchases",
-		"/#evaluations",
-		"/#sources",
+		"/accounts",
+		"/transactions",
+		"/purchases",
+		"/evaluations",
+		"/sources",
 	]) {
 		await page.goto(path);
 		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -332,7 +332,7 @@ for (const width of [1440, 390]) {
 			"evaluations",
 			"sources",
 		]) {
-			await page.goto(`/#${route}`);
+			await page.goto(`/${route}`);
 			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 			await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 			expect(
@@ -344,7 +344,7 @@ for (const width of [1440, 390]) {
 				.analyze();
 			expect(issues(audit.violations), route).toEqual([]);
 		}
-		await page.goto("/#accounts");
+		await page.goto("/accounts");
 		await page.getByRole("button", { name: "Add account" }).click();
 		await expect(page.getByRole("dialog")).toBeVisible();
 		const audit = await new AxeBuilder({ page })
@@ -364,7 +364,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 		{ route: "purchases", label: "Planned purchases" },
 		{ route: "sources", label: "Configs" },
 	]) {
-		await page.goto(`/#${route}`);
+		await page.goto(`/${route}`);
 		const openNavigation = page.getByRole("button", {
 			name: "Open navigation",
 		});
@@ -373,7 +373,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 			page.getByRole("dialog", { name: "Workspace navigation" }),
 		).toBeFocused();
 		await page.getByRole("link", { name: label, exact: true }).click();
-		await expect(page).toHaveURL(new RegExp(`#${route}$`));
+		await expect(page).toHaveURL(new RegExp(`/${route}$`));
 		await expect(
 			page.getByRole("dialog", { name: "Workspace navigation" }),
 		).not.toBeVisible();
@@ -489,7 +489,7 @@ test("scenario failures expose a recovery action without inventing a range", asy
 
 test("read-only models can be explored but not saved", async ({ page }) => {
 	await resetFixture({ readOnly: true });
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	// The saved-model banner is gone; the sync tab's launcher carries the
 	// read-only state now.
 	await expect(
@@ -552,9 +552,9 @@ test("tabs save independently with last write winning", async ({
 test("tabs use arrow-key navigation and all main pages fit narrow screens", async ({
 	page,
 }) => {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await expect(page.getByRole("tab")).toHaveCount(0);
-	await page.goto("/#transactions");
+	await page.goto("/transactions");
 	await expect(page.getByRole("tab")).toHaveCount(2);
 	await page.getByRole("tab", { name: /All transactions/ }).focus();
 	await page.keyboard.press("ArrowRight");
@@ -571,7 +571,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await expect(
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).not.toBeVisible();
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	await expect(page.getByRole("tab", { name: "Bank sync" })).toBeVisible();
 	await expect(page.getByRole("tab", { name: "Amounts" })).toBeVisible();
 	await expect(page.getByRole("tab", { name: "Account" })).toBeVisible();
@@ -585,7 +585,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 			"evaluations",
 			"sources",
 		]) {
-			await page.goto(`/#${route}`);
+			await page.goto(`/${route}`);
 			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 			expect(
 				await page.evaluate(() => document.documentElement.scrollWidth),

@@ -8,7 +8,7 @@ test.beforeEach(async () => {
 
 /** Create a group through the UI and land on its detail page. */
 async function createGroup(page: Page) {
-	await page.goto("/#groups");
+	await page.goto("/groups");
 	await page.getByRole("button", { name: "Create group" }).first().click();
 	const dialog = page.getByRole("dialog", { name: "Create group" });
 	await dialog.getByLabel("Group name").fill("Browser club");
@@ -28,7 +28,7 @@ test("fixture reset clears groups between tests", async ({ page }) => {
 	// clears the client cache so the list reflects the reset server.
 	await resetFixture();
 	await page.reload();
-	await page.goto("/#groups");
+	await page.goto("/groups");
 	await expect(page.getByText("No groups yet")).toBeVisible();
 });
 

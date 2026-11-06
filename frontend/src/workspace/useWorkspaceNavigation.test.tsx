@@ -10,10 +10,10 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { WorkspaceHeading, WorkspaceTopbar } from "./WorkspaceHeader.tsx";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
 
-beforeEach(() => window.history.replaceState(null, "", "#accounts"));
+beforeEach(() => window.history.replaceState(null, "", "/accounts"));
 afterEach(() => {
 	cleanup();
-	window.history.replaceState(null, "", "#accounts");
+	window.history.replaceState(null, "", "/accounts");
 });
 
 function Harness({ recovery = false }: { recovery?: boolean }) {
@@ -30,12 +30,12 @@ function Harness({ recovery = false }: { recovery?: boolean }) {
 					headingRef={navigation.headingRef}
 				/>
 			)}
-			<button onClick={() => navigation.pushHash("#accounts/checking")}>
+			<button onClick={() => navigation.pushUrl("/accounts?account=checking")}>
 				Evidence
 			</button>
 			<button
 				onClick={() =>
-					navigation.pushHash("#accounts/checking/edit", {
+					navigation.pushUrl("/accounts?edit-account=checking", {
 						kind: "account",
 						id: "checking",
 					})
@@ -43,7 +43,7 @@ function Harness({ recovery = false }: { recovery?: boolean }) {
 			>
 				Edit evidence
 			</button>
-			<button onClick={() => navigation.pushHash("#accounts/new")}>
+			<button onClick={() => navigation.pushUrl("/accounts?edit-account=new")}>
 				New account
 			</button>
 			<button onClick={() => navigation.navigate("transactions")}>
@@ -57,13 +57,17 @@ function Harness({ recovery = false }: { recovery?: boolean }) {
 	);
 }
 
+function currentUrl(): string {
+	return `${window.location.pathname}${window.location.search}`;
+}
+
 it("renders one declarative page title and leaves focus alone on overlay navigation", async () => {
 	render(<Harness />);
 	expect(document.title).toBe("Accounts · Waypoint");
 	const evidence = screen.getByRole("button", { name: "Evidence" });
 	evidence.focus();
 	fireEvent.click(evidence);
-	await waitFor(() => expect(window.location.hash).toBe("#accounts/checking"));
+	await waitFor(() => expect(currentUrl()).toBe("/accounts?account=checking"));
 	expect(document.activeElement).toBe(evidence);
 	fireEvent.click(screen.getByRole("button", { name: "Transactions" }));
 	await waitFor(() => expect(document.title).toBe("Transactions · Waypoint"));
@@ -86,15 +90,19 @@ it("scopes the editor return target to its history entry and clears it in ordina
 	expect(screen.getByTestId("return-to").textContent).toBe("null");
 	// Restore the saved entry as the browser does on Back/Forward.
 	act(() => {
-		window.history.replaceState(editorState, "", "#accounts/checking/edit");
-		window.dispatchEvent(new HashChangeEvent("hashchange"));
+		window.history.replaceState(
+			editorState,
+			"",
+			"/accounts?edit-account=checking",
+		);
+		window.dispatchEvent(new PopStateEvent("popstate"));
 	});
 	expect(screen.getByTestId("return-to").textContent).toBe(
 		'{"kind":"account","id":"checking"}',
 	);
 	act(() => {
-		window.history.replaceState(editorState, "", "#transactions");
-		window.dispatchEvent(new HashChangeEvent("hashchange"));
+		window.history.replaceState(editorState, "", "/transactions");
+		window.dispatchEvent(new PopStateEvent("popstate"));
 	});
 	expect(screen.getByTestId("return-to").textContent).toBe("null");
 });

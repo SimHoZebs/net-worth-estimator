@@ -30,7 +30,7 @@ async function openBNPL(page: Page) {
 					.findings.length,
 		)
 		.toBe(1);
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
@@ -151,7 +151,7 @@ test("No dismisses the prompt and records a negative label", async ({
 	expect(audit).toHaveLength(1);
 	expect(audit[0].request.action).toBe("reject");
 	expect(audit[0].review.decision).toBe("rejected");
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
 	await expect(
 		page.getByRole("cell", { name: "Not BNPL", exact: true }),
@@ -200,7 +200,7 @@ test("read-only users can inspect findings on a narrow screen", async ({
 	await expect(
 		detail.getByRole("button", { name: /^(Yes|No|Change)$/ }),
 	).toHaveCount(0);
-	await page.goto("/#sources");
+	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
 	await expect(page.getByText("Likely BNPL", { exact: true })).toBeVisible();
 	await expect(page.getByRole("button", { name: /Dismiss flag/ })).toHaveCount(

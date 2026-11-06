@@ -21,12 +21,12 @@ import {
 	useUpdateMemberRole,
 } from "../state/groups.ts";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
-import { groupHash, pageHash } from "../workspace/route.ts";
+import { groupUrl, pageUrl } from "../workspace/route.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { SharedFeed } from "./groups/SharedFeed.tsx";
 
 export function GroupsPage() {
-	const { route, pushHash } = useWorkspaceNavigation();
+	const { route, pushUrl } = useWorkspaceNavigation();
 	const selected =
 		route.page === "groups" && route.overlay?.type === "group"
 			? route.overlay.key
@@ -74,7 +74,7 @@ export function GroupsPage() {
 			const group = await createGroupMutation.mutateAsync(name.trim());
 			setName("");
 			setShowCreate(false);
-			pushHash(groupHash(group.id));
+			pushUrl(groupUrl(group.id));
 			notifySuccess("groups-notice", "Group created.");
 		} catch {
 			notifyError("groups", "Group could not be created.");
@@ -90,7 +90,7 @@ export function GroupsPage() {
 		try {
 			const group = await joinGroupMutation.mutateAsync(code.trim());
 			setCode("");
-			pushHash(groupHash(group.id));
+			pushUrl(groupUrl(group.id));
 			notifySuccess("groups-notice", "Joined group.");
 		} catch {
 			notifyError("groups", "Invite could not be accepted.");
@@ -102,7 +102,7 @@ export function GroupsPage() {
 	async function onLeave(id: string) {
 		try {
 			await leaveGroupMutation.mutateAsync(id);
-			pushHash(pageHash("groups"));
+			pushUrl(pageUrl("groups"));
 			notifySuccess("groups-notice", "Left group.");
 		} catch {
 			notifyError("groups", "Could not leave group.");
@@ -112,7 +112,7 @@ export function GroupsPage() {
 	async function onDelete(id: string) {
 		try {
 			await deleteGroupMutation.mutateAsync(id);
-			pushHash(pageHash("groups"));
+			pushUrl(pageUrl("groups"));
 			notifySuccess("groups-notice", "Group deleted.");
 		} catch {
 			notifyError("groups", "Could not delete group.");
@@ -170,7 +170,7 @@ export function GroupsPage() {
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={() => pushHash(pageHash("groups"))}
+						onClick={() => pushUrl(pageUrl("groups"))}
 					>
 						<ArrowLeft size={16} aria-hidden="true" />
 						All groups
@@ -181,7 +181,7 @@ export function GroupsPage() {
 					<ErrorNotice
 						message={detailError}
 						action="Back to groups"
-						onAction={() => pushHash(pageHash("groups"))}
+						onAction={() => pushUrl(pageUrl("groups"))}
 					/>
 				) : (
 					<>
@@ -365,7 +365,7 @@ export function GroupsPage() {
 									<Button
 										variant="ghost"
 										size="sm"
-										onClick={() => pushHash(groupHash(group.id))}
+										onClick={() => pushUrl(groupUrl(group.id))}
 									>
 										Open
 									</Button>

@@ -50,7 +50,7 @@ describe("drawer semantics", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		const dialog = view.getByRole("dialog", { name: "Navigation" });
@@ -70,7 +70,7 @@ describe("drawer semantics", () => {
 				onClose={() => {}}
 				behavior={{ modal }}
 			>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>
 		);
 		const view = render(sheet(false));
@@ -110,7 +110,7 @@ describe("drawer semantics", () => {
 				onClose={onClose}
 				behavior={{ modal: false, swipeClose: false }}
 			>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		const navigation = view.getByRole("complementary", {
@@ -234,7 +234,7 @@ describe("animated close", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		const dialog = view.getByRole("dialog", { name: "Navigation" });
@@ -252,7 +252,7 @@ describe("animated close", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		clickBackdrop(view.getByRole("dialog", { name: "Navigation" }));
@@ -264,7 +264,7 @@ describe("animated close", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		const dialog = view.getByRole("dialog", { name: "Navigation" });
@@ -305,7 +305,7 @@ describe("animated close", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		const panel = view.getByRole("dialog", { name: "Navigation" });
@@ -338,7 +338,7 @@ describe("animated close", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
-				<a href="#outlook">Outlook</a>
+				<a href="/outlook">Outlook</a>
 			</Drawer>,
 		);
 		requestCancel(view.getByRole("dialog", { name: "Navigation" }));

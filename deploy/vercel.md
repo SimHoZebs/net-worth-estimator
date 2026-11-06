@@ -28,8 +28,10 @@ their own exact hostname, isolated backend, identity client, database, and secre
 Never give untrusted preview code production access. Register each callback and
 post-logout URL in Casdoor explicitly.
 
-Static files retain normal static-host behavior. Unknown paths return the
-bundled 404 page. Fragment navigation requires no SPA catch-all rewrite.
+Static files retain normal static-host behavior. Pages are real routes
+served through an SPA catch-all rewrite to `index.html`; in-page interactions
+are query parameters on the page URL. Unknown paths serve the app, which
+normalizes them to the outlook landing page.
 
 ## Production deployment
 

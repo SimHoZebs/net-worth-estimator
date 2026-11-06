@@ -2,7 +2,7 @@ export function Brand() {
 	return (
 		<a
 			className="flex items-center gap-2 text-2xl font-bold tracking-tight"
-			href="#outlook"
+			href="/outlook"
 			aria-label="Waypoint home"
 		>
 			<span className="grid size-8 place-items-center rounded-surface bg-primary">

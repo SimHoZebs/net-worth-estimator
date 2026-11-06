@@ -35,7 +35,7 @@ test("settled bank history draws recorded flows with exact totals", async ({
 	page,
 }) => {
 	await resetFixture({ bankTransactions: settledHistory() });
-	await page.goto("/#flows");
+	await page.goto("/flows");
 	// Narrow to the seeded half-year so the window holds only settled
 	// history: no fixture rows, no forecast occurrences.
 	await page.getByLabel("From date", { exact: true }).fill("2025-06-01");
@@ -80,7 +80,7 @@ test("a window with no settled rows shows no money movement", async ({
 	page,
 }) => {
 	await resetFixture({ bankTransactions: settledHistory() });
-	await page.goto("/#flows");
+	await page.goto("/flows");
 	await page.getByLabel("From date", { exact: true }).fill("2024-01-01");
 	await page.getByLabel("Through date", { exact: true }).fill("2024-01-31");
 	await expect(

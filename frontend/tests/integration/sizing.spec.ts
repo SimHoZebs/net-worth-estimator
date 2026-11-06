@@ -39,7 +39,7 @@ test("navigation remains usable after a phone-to-desktop resize", async ({
 		.poll(() => page.evaluate(() => window.scrollY))
 		.toBeGreaterThan(initialScroll);
 	await page.getByRole("link", { name: "Accounts", exact: true }).click();
-	await expect(page).toHaveURL(/#accounts$/);
+	await expect(page).toHaveURL(/\/accounts$/);
 	await page.getByRole("button", { name: "Add account" }).click();
 	await expect(page.getByRole("dialog")).toBeVisible();
 });
@@ -144,7 +144,7 @@ test("account sheet controls remain usable across responsive resizes", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 320, height: 900 });
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
@@ -167,7 +167,7 @@ for (const width of [320, 390, 768, 1440]) {
 		page,
 	}) => {
 		await page.setViewportSize({ width, height: 900 });
-		await page.goto("/#accounts");
+		await page.goto("/accounts");
 		await page.getByRole("button", { name: "Add account" }).click();
 		const dialog = page.getByRole("dialog", { name: "Add account" });
 		await expect(dialog).toBeVisible();
@@ -190,7 +190,7 @@ for (const width of [320, 390, 768, 1440]) {
 				json: { status: 409, detail: "Sizing check holds the save." },
 			});
 		});
-		await page.goto("/#transactions");
+		await page.goto("/transactions");
 		await page.getByRole("tab", { name: /Recurring/ }).click();
 		await page.getByRole("button", { name: "Monthly investing" }).click();
 		await page.getByLabel("Amount (USD)").click();

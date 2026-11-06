@@ -70,7 +70,7 @@ export function WorkspaceSidebar({
 							.map((item) => (
 								<li key={item.id}>
 									<SidebarNavLink
-										href={`#${item.id}`}
+										href={`/${item.id}`}
 										onClose={onClose}
 										active={page === item.id}
 									>
@@ -107,7 +107,7 @@ export function WorkspaceSidebar({
 			</div>
 			<div className="mt-auto pt-12 max-md:pt-8">
 				<SidebarNavLink
-					href="#sources"
+					href="/sources"
 					onClose={onClose}
 					active={page === "sources"}
 				>

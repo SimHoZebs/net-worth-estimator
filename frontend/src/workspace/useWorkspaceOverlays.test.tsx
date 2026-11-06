@@ -33,10 +33,10 @@ vi.mock("../state/savedState.ts", () => ({
 	useSavedEvaluations: () => [],
 }));
 
-beforeEach(() => window.history.replaceState(null, "", "#accounts"));
+beforeEach(() => window.history.replaceState(null, "", "/accounts"));
 afterEach(() => {
 	cleanup();
-	window.history.replaceState(null, "", "#accounts");
+	window.history.replaceState(null, "", "/accounts");
 });
 
 function useHarness() {
@@ -75,7 +75,9 @@ it("returns to the owning evidence after edit and clears context on an ordinary 
 	);
 	act(() => hook.result.current.overlays.closeEditor());
 	expect(hook.result.current.overlays.evidence).toBeNull();
-	expect(window.location.hash).toBe("#accounts");
+	expect(`${window.location.pathname}${window.location.search}`).toBe(
+		"/accounts",
+	);
 });
 
 it("a page navigation cannot leak a previous editor's return target", () => {
@@ -103,5 +105,7 @@ it("a page navigation cannot leak a previous editor's return target", () => {
 	);
 	act(() => hook.result.current.overlays.closeEditor());
 	expect(hook.result.current.overlays.evidence).toBeNull();
-	expect(window.location.hash).toBe("#transactions");
+	expect(`${window.location.pathname}${window.location.search}`).toBe(
+		"/transactions",
+	);
 });

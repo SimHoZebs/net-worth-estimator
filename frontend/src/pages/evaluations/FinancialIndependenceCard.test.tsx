@@ -126,8 +126,10 @@ describe("FinancialIndependenceCard", () => {
 		expect(dialog.getByRole("rowheader", { name: "Cash" })).toBeTruthy();
 		const cashAccount = dialog.getByRole("button", { name: "Cash" });
 		fireEvent.click(cashAccount);
-		expect(window.location.hash).toContain("#accounts/account/cash");
-		window.location.hash = "#evaluations";
+		expect(`${window.location.pathname}${window.location.search}`).toContain(
+			"/accounts?account=cash",
+		);
+		window.history.replaceState(null, "", "/evaluations");
 		fireEvent.click(dialog.getByRole("button", { name: "Close dialog" }));
 		expect(view.queryByRole("dialog")).toBeNull();
 		expect(view.queryByRole("table")).toBeNull();

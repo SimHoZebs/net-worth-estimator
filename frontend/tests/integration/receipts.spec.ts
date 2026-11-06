@@ -30,7 +30,7 @@ async function seedExpense(page: Page) {
 }
 
 async function openExpense(page: Page) {
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
@@ -364,7 +364,7 @@ test("receipt review supports narrow screens, keyboard dismissal, and accessible
 
 test("read-only mode keeps receipt mutations unavailable", async ({ page }) => {
 	await resetFixture({ readOnly: true });
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();

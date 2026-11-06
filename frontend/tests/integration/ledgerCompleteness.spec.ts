@@ -35,7 +35,7 @@ test("ledger diagram table shows every seeded flow with exact sums", async ({
 	page,
 }) => {
 	test.skip(!(await ledgerPresent()), "needs INTEGRATION_PACK=ledger");
-	await page.goto("/#flows");
+	await page.goto("/flows");
 	await expect(
 		page.getByRole("img", { name: /Money-flow diagram/ }),
 	).toBeVisible();
@@ -68,7 +68,7 @@ test("ledger checking history shows seeded rows with amounts and dates", async (
 	page,
 }) => {
 	test.skip(!(await ledgerPresent()), "needs INTEGRATION_PACK=ledger");
-	await page.goto("/#accounts");
+	await page.goto("/accounts");
 	await page
 		.getByRole("button", { name: "Open Checking transactions" })
 		.click();
