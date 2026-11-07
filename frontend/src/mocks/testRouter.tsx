@@ -32,7 +32,6 @@ export function renderWithWorkspaceTestRouter(
 
 const PAGE_PATHS = [
 	"/outlook",
-	"/accounts",
 	"/transactions",
 	"/flows",
 	"/purchases",
@@ -79,10 +78,26 @@ export function createSubjectTestRouter({
 		path: "/$groupId",
 		component: subjectRoute === "/groups/$groupId" ? () => subject : stub,
 	});
+	const accountsRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: "/accounts",
+		component: () => createElement(Outlet),
+	});
+	const accountsIndexRoute = createRoute({
+		getParentRoute: () => accountsRoute,
+		path: "/",
+		component: subjectRoute === "/accounts" ? () => subject : stub,
+	});
+	const accountDetailRoute = createRoute({
+		getParentRoute: () => accountsRoute,
+		path: "/$accountId",
+		component: subjectRoute === "/accounts/$accountId" ? () => subject : stub,
+	});
 	return createRouter({
 		routeTree: rootRoute.addChildren([
 			...children,
 			groupsRoute.addChildren([groupsIndexRoute, groupDetailRoute]),
+			accountsRoute.addChildren([accountsIndexRoute, accountDetailRoute]),
 		]),
 		history: createMemoryHistory({ initialEntries: [initialEntry] }),
 	});

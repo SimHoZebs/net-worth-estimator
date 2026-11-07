@@ -24,7 +24,6 @@ export function Modal({
 	children,
 	onClose,
 	onCloseRequest,
-	wide = false,
 	className = "",
 	headerClassName,
 	bodyClassName,
@@ -40,6 +39,7 @@ export function Modal({
 	onClose: () => void;
 	/** Return false to keep the dialog visible, such as for unsaved-form confirmation. */
 	onCloseRequest?: () => boolean;
+	/** Legacy: centered dialogs share one size regardless of content. */
 	wide?: boolean;
 	className?: string;
 	headerClassName?: string;
@@ -109,8 +109,7 @@ export function Modal({
 		<dialog
 			ref={ref}
 			className={mergeStyles(
-				"max-h-[90dvh] w-full max-w-[calc(100%_-_--spacing(6))] rounded-surface border border-solid border-line-strong bg-surface p-0 text-ink shadow-overlay backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur)",
-				wide ? "w-3xl" : "w-xl",
+				"h-[80dvh] max-h-[80dvh] w-3xl max-w-[calc(100%_-_--spacing(6))] overflow-hidden rounded-surface border border-solid border-line-strong bg-surface p-0 text-ink shadow-overlay backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur)",
 				className,
 			)}
 			aria-labelledby={label ? undefined : id}
@@ -129,11 +128,17 @@ export function Modal({
 			<div
 				ref={panelRef}
 				tabIndex={focusPanelOnOpen ? -1 : undefined}
-				className="waypoint-modal-panel flex flex-col gap-4 focus:outline-none max-sm:min-h-full"
+				className="waypoint-modal-panel flex h-full min-h-0 flex-col gap-4 focus:outline-none max-sm:min-h-full"
 				data-state={closing ? "closed" : "open"}
 				onAnimationEnd={handleAnimationEnd}
 			>
-				<div className={mergeStyles(dialogHeaderStyles, headerClassName)}>
+				<div
+					className={mergeStyles(
+						"flex-none",
+						dialogHeaderStyles,
+						headerClassName,
+					)}
+				>
 					<div className="min-w-0 flex-1">
 						{eyebrow && (
 							<p className="mb-2 text-xs font-bold tracking-widest text-muted">
@@ -159,7 +164,7 @@ export function Modal({
 				<div
 					className={mergeStyles(
 						dialogBodyStyles,
-						"pt-0 max-sm:pt-0",
+						"min-h-0 flex-1 overflow-y-auto pt-0 max-sm:pt-0",
 						bodyClassName,
 					)}
 				>

@@ -52,7 +52,6 @@ import { Checkbox, Input, InputField, Select } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import {
 	transactionControlStyles,
-	detailModalClassName,
 	detailPropertyRowClassName,
 	detailPropertyLabelClassName,
 	detailFooterClassName,
@@ -1311,7 +1310,7 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className={detailModalClassName}
+				className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-xl rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
 				onCloseRequest={edit.requestClose}
 				actions={
 					<>

@@ -1,4 +1,4 @@
-import { ArrowRightLeft, ListFilter } from "lucide-react";
+import { ArrowRightLeft, ListFilter, Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
 	type AccountTransaction,
@@ -104,16 +104,6 @@ export function Transactions({
 		);
 	return (
 		<>
-			{!readOnly && occurrences.length > 0 && (
-				<div className="flex justify-end">
-					<Button
-						type="button"
-						onClick={() => onEdit({ kind: "transaction", item: null })}
-					>
-						Add transaction
-					</Button>
-				</div>
-			)}
 			<TransactionFilters
 				filters={filters}
 				recordedCount={
@@ -123,6 +113,19 @@ export function Transactions({
 				}
 				totalCount={occurrences.length}
 				onChange={update}
+				action={
+					!readOnly && occurrences.length > 0 ? (
+						<Button
+							type="button"
+							variant="primary"
+							size="sm"
+							onClick={() => onEdit({ kind: "transaction", item: null })}
+						>
+							<Plus size={16} />
+							Add transaction
+						</Button>
+					) : undefined
+				}
 			/>
 			{showsProjected && (
 				<div className="h-24 overflow-auto">

@@ -141,12 +141,9 @@ describe("FinancialIndependenceCard", () => {
 		const cashAccount = dialog.getByRole("button", { name: "Cash" });
 		fireEvent.click(cashAccount);
 		await waitFor(() =>
-			expect(view.router.state.location.pathname).toBe("/accounts"),
+			expect(view.router.state.location.pathname).toBe("/accounts/cash"),
 		);
-		expect(view.router.state.location.search).toMatchObject({
-			evidence: "account",
-			id: "cash",
-		});
+		expect(view.router.state.location.search).toEqual({});
 		fireEvent.click(dialog.getByRole("button", { name: "Close dialog" }));
 		expect(view.queryByRole("dialog")).toBeNull();
 		expect(view.queryByRole("table")).toBeNull();

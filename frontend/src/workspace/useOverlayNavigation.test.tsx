@@ -17,10 +17,7 @@ function CrossPageEvidence() {
 			<button
 				type="button"
 				onClick={() =>
-					navigation.open(
-						{ evidence: "account", id: "checking" },
-						{ to: "/accounts" },
-					)
+					navigation.open({ evidence: "position" }, { to: "/accounts" })
 				}
 			>
 				Open account
@@ -47,8 +44,7 @@ it("closing evidence opened from another page undoes the cross-page open", async
 	await user.click(view.getByRole("button", { name: "Open account" }));
 	await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
 	expect(router.state.location.search).toMatchObject({
-		evidence: "account",
-		id: "checking",
+		evidence: "position",
 	});
 	await user.click(view.getByRole("button", { name: "Close overlay" }));
 	await waitFor(() =>

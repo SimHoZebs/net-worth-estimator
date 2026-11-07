@@ -92,7 +92,7 @@ it("consumes a successful callback on Accounts and invalidates inactive caches w
 
 it("reports a failed callback once and preserves invalid dialog input for its error state", async () => {
 	const router = await renderCallback(
-		"/accounts?evidence=account&id=a&id=b&gmail=error",
+		"/accounts?editor=account&id=a&id=b&gmail=error",
 	);
 	expect(await screen.findByRole("alert")).toHaveProperty(
 		"textContent",

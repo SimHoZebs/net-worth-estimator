@@ -8,7 +8,7 @@ async function openCheckingActivity(page: Page) {
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	return page.getByRole("dialog", { name: "Everyday checking" });
+	return page.getByRole("region", { name: "Account details" });
 }
 
 test("finance lists, recorded activity, and account details request no forecast", async ({
@@ -93,7 +93,7 @@ test("account and transaction edits survive a failed forecast", async ({
 		.toBe(250);
 	await page.reload();
 	await expect(
-		page.getByRole("dialog", { name: "Everyday checking" }),
+		page.getByRole("region", { name: "Account details" }),
 	).toBeVisible();
 });
 
@@ -158,7 +158,7 @@ test("an account without recorded transactions can request projected activity", 
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();
-	const account = page.getByRole("dialog", { name: "Investment portfolio" });
+	const account = page.getByRole("region", { name: "Account details" });
 	await expect(
 		account.getByRole("tab", { name: /Transactions/ }),
 	).toHaveAttribute("aria-selected", "true");

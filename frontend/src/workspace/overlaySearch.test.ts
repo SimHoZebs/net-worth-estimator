@@ -45,24 +45,27 @@ describe("validateWorkspaceSearch", () => {
 			validateWorkspaceSearch({
 				editor: "transaction",
 				id: "new",
-				returnEvidence: "account",
-				returnId: "checking",
+				returnEvidence: "position",
 			}),
 		).toEqual({
 			...empty,
 			editor: "transaction",
 			id: "new",
-			returnEvidence: "account",
-			returnId: "checking",
+			returnEvidence: "position",
 		});
 		for (const search of [
 			{ returnEvidence: "position" },
-			{ editor: "account", id: "new", returnEvidence: "account" },
-			{ editor: "account", id: "new", returnId: "checking" },
 			{
 				editor: "account",
 				id: "new",
 				returnEvidence: "position",
+				returnId: "checking",
+			},
+			{ editor: "account", id: "new", returnId: "checking" },
+			{
+				editor: "account",
+				id: "new",
+				returnEvidence: "shortfall",
 				returnId: "checking",
 			},
 		])
@@ -85,9 +88,6 @@ describe("validateWorkspaceSearch", () => {
 			...empty,
 			evidence: "safe-spending",
 		});
-		expect(
-			validateWorkspaceSearch({ evidence: "account", id: "checking" }),
-		).toEqual({ ...empty, evidence: "account", id: "checking" });
 	});
 
 	test("editor variants validate", () => {
@@ -167,11 +167,11 @@ describe("validateWorkspaceSearch", () => {
 
 	test("duplicate params (arrays) drop the overlay and keep gmail", () => {
 		expect(
-			validateWorkspaceSearch({ evidence: "account", id: ["a", "b"] }),
+			validateWorkspaceSearch({ editor: "account", id: ["a", "b"] }),
 		).toEqual(empty);
 		expect(
 			validateWorkspaceSearch({
-				evidence: "account",
+				editor: "account",
 				id: ["a", "b"],
 				gmail: "connected",
 			}),
@@ -180,7 +180,7 @@ describe("validateWorkspaceSearch", () => {
 
 	test("malformed overlays validate to no overlay, never partially", () => {
 		const cases: Record<string, unknown>[] = [
-			{ evidence: "account" },
+			{ evidence: "position", id: "checking" },
 			{ editor: "transaction" },
 			{ id: "checking" },
 			{ tab: "cycle" },
@@ -191,7 +191,7 @@ describe("validateWorkspaceSearch", () => {
 			{ detail: "bogus" },
 			{ detail: "safe-spending", tab: "bogus" },
 			{ detail: "safe-spending", editor: "account", id: "new" },
-			{ evidence: "account", id: 42 },
+			{ editor: "account", id: 42 },
 		];
 		for (const raw of cases) {
 			expect(validateWorkspaceSearch(raw)).toEqual(empty);
@@ -212,7 +212,7 @@ describe("validateWorkspaceSearch", () => {
 	test("parameters must belong to the selected overlay", () => {
 		for (const search of [
 			{ evidence: "position", id: "checking" },
-			{ evidence: "account", id: "checking", tab: "cycle" },
+			{ evidence: "position", tab: "cycle" },
 			{ editor: "account", id: "new", editTransaction: "invest" },
 			{ detail: "safe-spending", id: "checking" },
 			{ editor: "account", id: "" },
@@ -224,7 +224,7 @@ describe("validateWorkspaceSearch", () => {
 	});
 
 	test("query serialization preserves duplicate input for an explicit link error", () => {
-		const raw = "?evidence=account&id=a&id=b&gmail=error";
+		const raw = "?editor=account&id=a&id=b&gmail=error";
 		const parsed = parseWorkspaceSearch(raw);
 		expect(stringifyWorkspaceSearch(parsed)).toBe(raw);
 		expect(hasInvalidOverlaySearch(parsed)).toBe(true);

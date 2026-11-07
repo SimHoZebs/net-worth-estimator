@@ -8,20 +8,23 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { financialModelFixture } from "../mocks/financialModel.ts";
-import { acceptTestResource } from "../mocks/resource.ts";
-import { setServerModelFixture } from "../mocks/workspace.ts";
-import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { AccountDialog } from "./AccountDialog.tsx";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
+import { acceptTestResource } from "../../mocks/resource.ts";
+import { setServerModelFixture } from "../../mocks/workspace.ts";
+import { resetServerQueryCache } from "../../state/serverQuery.ts";
+import { AccountDetailView } from "./AccountDetailPage.tsx";
 
-vi.mock("./analysis/TransactionAnalysis.tsx", async (importOriginal) => ({
-	...(await importOriginal<
-		typeof import("./analysis/TransactionAnalysis.tsx")
-	>()),
-	TransactionAnalysisProvider: ({ children }: { children: ReactNode }) => (
-		<>{children}</>
-	),
-}));
+vi.mock(
+	"../../components/analysis/TransactionAnalysis.tsx",
+	async (importOriginal) => ({
+		...(await importOriginal<
+			typeof import("../../components/analysis/TransactionAnalysis.tsx")
+		>()),
+		TransactionAnalysisProvider: ({ children }: { children: ReactNode }) => (
+			<>{children}</>
+		),
+	}),
+);
 
 const motion = vi.hoisted(() => ({ reorder: (_ids: string[]) => {} }));
 vi.mock("motion/react", async (importOriginal) => ({
@@ -80,7 +83,7 @@ beforeEach(() => {
 	);
 });
 
-function dialogProps() {
+function detailProps() {
 	const account = financialModelFixture.accounts[0]!;
 	return {
 		account,
@@ -96,10 +99,10 @@ function dialogProps() {
 const projectionUrls = () =>
 	forecasts.filter((url) => url.includes("projection"));
 
-describe("finance-first account dialog", () => {
+describe("finance-first account detail", () => {
 	it("opens recorded activity, recurring rules, and details without a forecast", () => {
 		setServerModelFixture(financialModelFixture);
-		render(<AccountDialog {...dialogProps()} />, { wrapper });
+		render(<AccountDetailView {...detailProps()} />, { wrapper });
 		// Recorded history renders by default with literal amounts.
 		expect(
 			screen.getAllByRole("button", { name: /View Household payroll/ }),
@@ -125,7 +128,7 @@ describe("finance-first account dialog", () => {
 
 	it("keeps projected activity errors out of account details", async () => {
 		setServerModelFixture(financialModelFixture);
-		render(<AccountDialog {...dialogProps()} />, { wrapper });
+		render(<AccountDetailView {...detailProps()} />, { wrapper });
 		expect(projectionUrls()).toEqual([]);
 		fireEvent.change(screen.getByLabelText("Transaction source"), {
 			target: { value: "projected" },

@@ -1,42 +1,50 @@
 import { useMemo, useState } from "react";
-import { useAccountAdjustments } from "../state/accountAdjustments.ts";
-import { balanceAdjustmentActivity } from "../domain/balanceAdjustmentActivity.ts";
-import { useAccountEdit } from "./activity/useAccountEdit.ts";
-import { AccountBalanceValue } from "./activity/AccountBalanceValue.tsx";
+import { useRouter } from "@tanstack/react-router";
+import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
+import { balanceAdjustmentActivity } from "../../domain/balanceAdjustmentActivity.ts";
+import { useAccountEdit } from "../../components/activity/useAccountEdit.ts";
+import { AccountBalanceValue } from "../../components/activity/AccountBalanceValue.tsx";
 import {
 	DetailEditActions,
 	DiscardConfirm,
-} from "./activity/DetailEditActions.tsx";
-import {
-	transactionControlStyles,
-	detailModalClassName,
-	detailFooterClassName,
-} from "./activity/transactionDetailStyles.ts";
-import { ErrorNotice } from "./ErrorNotice.tsx";
-import { accountTransactions } from "../domain/accountActivity.ts";
-import { dateLabel } from "../domain/format.ts";
+} from "../../components/activity/DetailEditActions.tsx";
+import { transactionControlStyles } from "../../components/activity/transactionDetailStyles.ts";
+import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
 	isHistoricalTransaction,
 	type Account,
 	type Transaction,
-} from "../domain/model.ts";
-import type { EditorTarget } from "../domain/accountEdits.ts";
-import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useSchedules } from "../state/workspaceResources.ts";
-import { scheduleToDisplay } from "../domain/transactionRows.ts";
-import { AccountIcon } from "./AccountIcon.tsx";
-import { AccountDetails } from "./activity/AccountDetails.tsx";
-import { LoanDetails } from "./activity/LoanDetails.tsx";
+} from "../../domain/model.ts";
+import type { EditorTarget } from "../../domain/accountEdits.ts";
+import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
+import { useSchedules } from "../../state/workspaceResources.ts";
+import { scheduleToDisplay } from "../../domain/transactionRows.ts";
+import { AccountIcon } from "../../components/AccountIcon.tsx";
+import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
+import { LoanDetails } from "../../components/activity/LoanDetails.tsx";
 import {
 	componentIds,
 	toDisplayTransaction,
-} from "../domain/accountDisplay.ts";
-import { RecurringRules } from "./activity/RecurringRules.tsx";
-import { Transactions } from "./activity/Transactions.tsx";
-import { Modal } from "./Modal.tsx";
-import { Tabs } from "./Tabs.tsx";
+} from "../../domain/accountDisplay.ts";
+import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
+import { Transactions } from "../../components/activity/Transactions.tsx";
+import { Tabs } from "../../components/Tabs.tsx";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "../../state/savedState.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
+import { Button } from "../../components/Button.tsx";
+import { ArrowLeft } from "lucide-react";
 
-export function AccountDialog({
+/**
+ * Presentational account detail. Renders the breadcrumb and the
+ * transaction, recurring, and settings tabs in the main window.
+ */
+export function AccountDetailView({
 	account,
 	accounts,
 	transactions,
@@ -67,6 +75,15 @@ export function AccountDialog({
 			return;
 		}
 		onEdit(target);
+	};
+	const requestClose = () => {
+		if (edit.saving) return;
+		setPendingEdit(null);
+		if (edit.activeField !== null) {
+			edit.setConfirmCancel(true);
+			return;
+		}
+		onClose();
 	};
 	// Recorded facts render from saved rows alone. The forecast loads only
 	// after the viewer asks for projected activity.
@@ -142,25 +159,30 @@ export function AccountDialog({
 		[accountRules, transactions, account, startDate],
 	);
 	return (
-		<Modal
-			label={account.name}
-			wide
-			titleSize="plain"
-			headerClassName="border-b-0 pb-0"
-			className={detailModalClassName}
-			focusPanelOnOpen
-			onClose={onClose}
-			onCloseRequest={() => {
-				if (edit.saving) return false;
-				setPendingEdit(null);
-				if (edit.activeField !== null) {
-					edit.setConfirmCancel(true);
-					return false;
-				}
-				return true;
-			}}
-			title={
-				<span className="flex min-w-0 items-center gap-3">
+		<section aria-label="Account details" className="grid gap-6">
+			<nav aria-label="Breadcrumb">
+				<ol className="m-0 flex list-none flex-wrap items-center gap-2 p-0 text-sm">
+					<li>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							onClick={requestClose}
+						>
+							<ArrowLeft size={16} aria-hidden="true" />
+							Accounts
+						</Button>
+					</li>
+					<li aria-hidden="true" className="text-muted">
+						/
+					</li>
+					<li aria-current="page" className="font-medium">
+						{account.name}
+					</li>
+				</ol>
+			</nav>
+			<div className="flex flex-wrap items-start justify-between gap-4">
+				<div className="flex min-w-0 items-center gap-3">
 					<AccountIcon account={account} size="lg" />
 					<input
 						id={`${edit.formId}-name`}
@@ -176,28 +198,18 @@ export function AccountDialog({
 						form={edit.formId}
 						className={transactionControlStyles({ shape: "name" })}
 					/>
-				</span>
-			}
-			actions={
-				edit.activeField !== null ? (
+				</div>
+				{edit.activeField !== null ? (
 					<DetailEditActions
 						formId={edit.formId}
 						onDiscard={edit.reset}
 						disabled={edit.saveBlocked}
 						discardDisabled={edit.saving}
 					/>
-				) : undefined
-			}
-		>
+				) : undefined}
+			</div>
 			<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
 				<AccountBalanceValue edit={edit} readOnly={locked} />
-				<div className="mt-2 text-sm text-muted">
-					<span className="text-xs text-muted">
-						{account.balanceCheck
-							? `Last balance report ${dateLabel(account.observedOn, true)}`
-							: "No balance reported"}
-					</span>
-				</div>
 			</form>
 			<Tabs
 				items={[
@@ -287,7 +299,7 @@ export function AccountDialog({
 				</p>
 			)}
 			{edit.confirmCancel && (
-				<div className={detailFooterClassName}>
+				<div className="sticky bottom-0 z-10 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface py-3">
 					<DiscardConfirm
 						onContinue={() => {
 							setPendingEdit(null);
@@ -302,10 +314,58 @@ export function AccountDialog({
 					/>
 				</div>
 			)}
-		</Modal>
+		</section>
 	);
 }
 
 function useTransactionView() {
 	return useState<"transactions" | "details" | "recurring">("transactions");
+}
+
+/**
+ * Route-level account page. Resolves the account from saved rows and
+ * renders the detail in the main window with a breadcrumb back to
+ * the accounts list. Editors open as overlays above this page.
+ */
+export function AccountDetailPage({ accountId }: { accountId: string }) {
+	const router = useRouter();
+	const overlays = useWorkspaceOverlays();
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
+	const readOnly = useUserReadOnly();
+	if (!accounts || !transactions || !startDate) {
+		return <p role="status">Loading accounts…</p>;
+	}
+	const account = accounts.find(
+		(item) => item.id === accountId && !item.archived,
+	);
+	if (!account) {
+		return (
+			<section aria-label="Account details" className="grid gap-4 p-6">
+				<h2 className="text-2xl">Account not found</h2>
+				<p>
+					This account does not exist or is not available in this workspace.
+				</p>
+				<div>
+					<Button onClick={() => void router.navigate({ to: "/accounts" })}>
+						<ArrowLeft size={16} aria-hidden="true" />
+						Back to accounts
+					</Button>
+				</div>
+			</section>
+		);
+	}
+	return (
+		<AccountDetailView
+			key={account.id}
+			account={account}
+			accounts={accounts}
+			transactions={transactions}
+			startDate={startDate}
+			readOnly={readOnly}
+			onClose={() => void router.navigate({ to: "/accounts" })}
+			onEdit={overlays.openEditor}
+		/>
+	);
 }

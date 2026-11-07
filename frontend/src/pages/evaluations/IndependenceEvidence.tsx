@@ -9,8 +9,7 @@ import type {
 	IndependenceCandidate,
 } from "@/domain/financialIndependence.ts";
 import { dateLabel, exactMoney, money, percent } from "@/domain/format.ts";
-import { useOverlayNavigation } from "@/workspace/useOverlayNavigation.ts";
-import { evidenceSearch } from "@/workspace/overlay.ts";
+import { useRouter } from "@tanstack/react-router";
 import { IndependenceBranchChart } from "./IndependenceBranchChart.tsx";
 
 const amount = (value: number | null) => (value === null ? "—" : money(value));
@@ -31,10 +30,11 @@ export function IndependenceEvidence({
 	candidate: IndependenceCandidate;
 	analysis: FinancialIndependenceAnalysis;
 }) {
-	const navigation = useOverlayNavigation();
+	const router = useRouter();
 	const openAccount = (accountId: string) => {
-		navigation.open(evidenceSearch({ kind: "account", id: accountId }), {
-			to: "/accounts",
+		void router.navigate({
+			to: "/accounts/$accountId",
+			params: { accountId },
 		});
 	};
 	const outcome = candidate.outcome;

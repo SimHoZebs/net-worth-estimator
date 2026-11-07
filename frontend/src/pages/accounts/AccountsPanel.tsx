@@ -68,19 +68,6 @@ export function AccountsPanel({
 					</TableHeader>
 					<TableCell className="tabular-nums max-sm:p-4">
 						<div>{money(account.balance)}</div>
-						{account.availableBalance !== null &&
-							account.availableBalance !== undefined && (
-								<div className="mt-1 text-xs text-muted">
-									{account.kind === "debt"
-										? "Available credit at last check"
-										: "Available at last check"}{" "}
-									{money(
-										account.kind === "debt"
-											? Math.abs(account.availableBalance)
-											: account.availableBalance,
-									)}
-								</div>
-							)}
 					</TableCell>
 					<TableCell className="max-sm:p-4">
 						<div className="flex justify-end gap-1">

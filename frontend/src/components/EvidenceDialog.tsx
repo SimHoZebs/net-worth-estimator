@@ -6,20 +6,17 @@ import {
 	useSavedTransactions,
 } from "../state/savedState.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
-import { AccountDialog } from "./AccountDialog.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { SafeSpendingEvidence } from "./evidence/SafeSpendingEvidence.tsx";
 
 export type EvidenceTarget =
 	| { kind: "position" }
-	| { kind: "account"; id: string }
 	| { kind: "failure" }
 	| { kind: "safe-spending" };
 
 export function EvidenceDialog({
 	target,
 	onClose,
-	onEdit,
 }: {
 	target: Exclude<EvidenceTarget, { kind: "position" }>;
 	onClose: () => void;
@@ -33,9 +30,7 @@ export function EvidenceDialog({
 	const readOnly = useUserReadOnly();
 	const projectionQuery = useRemoteProjection({
 		ranges: false,
-		// The account view loads its forecast only on explicit request
-		// inside AccountDialog; do not prefetch it here.
-		enabled: target.kind !== "account",
+		enabled: true,
 	});
 	const projection =
 		projectionQuery.base instanceof Error ? null : projectionQuery.base;
@@ -43,12 +38,6 @@ export function EvidenceDialog({
 	const projectionError = projectionQuery.baseError;
 	const retryProjection = projectionQuery.retryProjection;
 	if (!accounts || !transactions || !startDate) return null;
-	// The editor replaces the evidence in the URL overlay slot, so the
-	// evidence unmounts on navigation: no separate close is needed, and the
-	// back button returns to this evidence.
-	const edit = (next: EditorTarget) => {
-		onEdit(next);
-	};
 	switch (target.kind) {
 		case "failure":
 		case "safe-spending": {
@@ -87,23 +76,6 @@ export function EvidenceDialog({
 					onClose={onClose}
 				/>
 			);
-		}
-		case "account": {
-			const account = accounts.find(
-				(item) => item.id === target.id && !item.archived,
-			);
-			return account ? (
-				<AccountDialog
-					key={account.id}
-					account={account}
-					accounts={accounts}
-					transactions={transactions}
-					startDate={startDate}
-					readOnly={readOnly}
-					onClose={onClose}
-					onEdit={edit}
-				/>
-			) : null;
 		}
 	}
 }

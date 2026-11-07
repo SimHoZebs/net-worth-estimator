@@ -189,43 +189,69 @@ export function SyncProviderPanel() {
 					{configured ? (
 						<div className="overflow-hidden rounded-surface border border-line bg-surface">
 							<div className="p-5 sm:p-6">
-								<div className="flex items-start gap-3">
-									<span className="inline-grid size-11 shrink-0 place-items-center rounded-control bg-success-bg text-success-text">
-										<Landmark size={22} aria-hidden="true" />
-									</span>
-									<div className="min-w-0">
-										<h3
-											ref={focusConnectedHeading}
-											tabIndex={-1}
-											className="m-0 flex items-center gap-2 text-lg"
+								<div className="flex flex-wrap items-start gap-4">
+									<div className="flex min-w-0 items-start gap-3">
+										<span className="inline-grid size-11 shrink-0 place-items-center rounded-control bg-success-bg text-success-text">
+											<Landmark size={22} aria-hidden="true" />
+										</span>
+										<div className="grid min-w-0 gap-1">
+											<h3
+												ref={focusConnectedHeading}
+												tabIndex={-1}
+												className="m-0 flex items-center gap-2 text-lg"
+											>
+												SimpleFIN
+												<Badge tone="success">
+													<Check size={14} aria-hidden="true" />
+													Connected
+												</Badge>
+											</h3>
+											<p className="m-0 text-sm leading-relaxed text-muted">
+												{since && <>Connected since {since} · </>}
+												{lastSynced ? (
+													<>
+														Last synced{" "}
+														<time dateTime={status.data?.lastSyncAt}>
+															{lastSynced}
+														</time>
+													</>
+												) : (
+													"No successful sync yet"
+												)}
+												{quotaRemaining !== null && quotaLimit !== null && (
+													<>
+														{" "}
+														· {quotaRemaining} out of {quotaLimit} syncs
+														available
+													</>
+												)}
+											</p>
+										</div>
+									</div>
+									<div className="flex flex-wrap gap-3 sm:ml-auto">
+										<Button
+											variant="primary"
+											disabled={readOnly || busy || syncing || syncUnavailable}
+											onClick={() => void handleSyncNow()}
 										>
-											SimpleFIN
-											<Badge tone="success">
-												<Check size={14} aria-hidden="true" />
-												Connected
-											</Badge>
-										</h3>
+											<RefreshCw size={16} aria-hidden="true" />
+											{syncing ? "Syncing…" : "Sync now"}
+										</Button>
+										<a
+											href={simplefinLinks.home}
+											target="_blank"
+											rel="noopener noreferrer"
+											className={mergeStyles(
+												buttonStyles({ variant: "secondary" }),
+												"hover:bg-hover",
+											)}
+										>
+											Open SimpleFIN Bridge{" "}
+											<ExternalLink size={14} aria-hidden="true" />
+											<span className="sr-only"> (opens in a new tab)</span>
+										</a>
 									</div>
 								</div>
-								<p className="mt-4 mb-0 text-sm leading-relaxed text-muted">
-									{since && <>Connected since {since} · </>}
-									{lastSynced ? (
-										<>
-											Last synced{" "}
-											<time dateTime={status.data?.lastSyncAt}>
-												{lastSynced}
-											</time>
-										</>
-									) : (
-										"No successful sync yet"
-									)}
-									{quotaRemaining !== null && quotaLimit !== null && (
-										<>
-											{" "}
-											· {quotaRemaining} out of {quotaLimit} syncs available
-										</>
-									)}
-								</p>
 								{status.isError && (
 									<ErrorNotice
 										message="The sync status could not be loaded."
@@ -253,29 +279,6 @@ export function SyncProviderPanel() {
 										the sync configuration.
 									</p>
 								)}
-								<div className="flex flex-wrap gap-3">
-									<Button
-										variant="primary"
-										disabled={readOnly || busy || syncing || syncUnavailable}
-										onClick={() => void handleSyncNow()}
-									>
-										<RefreshCw size={16} aria-hidden="true" />
-										{syncing ? "Syncing…" : "Sync now"}
-									</Button>
-									<a
-										href={simplefinLinks.home}
-										target="_blank"
-										rel="noopener noreferrer"
-										className={mergeStyles(
-											buttonStyles({ variant: "secondary" }),
-											"hover:bg-hover",
-										)}
-									>
-										Open SimpleFIN Bridge{" "}
-										<ExternalLink size={14} aria-hidden="true" />
-										<span className="sr-only"> (opens in a new tab)</span>
-									</a>
-								</div>
 							</div>
 							<SyncConnectedAccounts
 								onLinked={(linkedMessage) => {

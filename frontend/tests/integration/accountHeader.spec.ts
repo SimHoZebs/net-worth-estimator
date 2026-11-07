@@ -21,11 +21,8 @@ test("editor navigation stays blocked while an account save is in flight", async
 		await route.continue();
 	});
 	try {
-		await page.goto("/accounts?evidence=account&id=checking");
-		const dialog = page.getByRole("dialog", {
-			name: "Everyday checking",
-			exact: true,
-		});
+		await page.goto("/accounts/checking");
+		const dialog = page.getByRole("region", { name: "Account details" });
 		await dialog.getByLabel("Account name").fill("Saved name");
 		await dialog.getByRole("button", { name: "Save changes" }).click();
 		await saving;
@@ -47,9 +44,7 @@ test("editor navigation stays blocked while an account save is in flight", async
 	} finally {
 		release();
 	}
-	await expect(
-		page.getByRole("dialog", { name: "Saved name", exact: true }),
-	).toBeVisible();
+	await expect(page.getByLabel("Account name")).toHaveValue("Saved name");
 });
 
 test("backdated balance edits preserve later observations on all accounts", async ({
@@ -58,11 +53,8 @@ test("backdated balance edits preserve later observations on all accounts", asyn
 	const initial = (
 		await (await page.request.get(`${FIXTURE_API}/v1/financial-model`)).json()
 	).model;
-	await page.goto("/accounts?evidence=account&id=checking");
-	const dialog = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	await page.goto("/accounts/checking");
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByLabel("Balance (USD)").fill("100");
 	await dialog.getByLabel("Adjustment time (UTC)").fill("2026-01-30T12:00:00");
 	await expect(
@@ -91,11 +83,8 @@ for (const recurring of [false, true]) {
 	test(`dirty header confirms navigation to ${recurring ? "recurring" : "transaction"} editor`, async ({
 		page,
 	}) => {
-		await page.goto("/accounts?evidence=account&id=checking");
-		const dialog = page.getByRole("dialog", {
-			name: "Everyday checking",
-			exact: true,
-		});
+		await page.goto("/accounts/checking");
+		const dialog = page.getByRole("region", { name: "Account details" });
 		await dialog.getByLabel("Account name").fill("Unsaved name");
 		if (recurring) await dialog.getByRole("tab", { name: /Recurring/ }).click();
 		const add = dialog.getByRole("button", {
@@ -115,7 +104,7 @@ for (const recurring of [false, true]) {
 		await confirm
 			.getByRole("button", { name: "Discard changes", exact: true })
 			.click();
-		await expect(dialog).toBeHidden();
+		await expect(dialog).toBeVisible();
 		await expect(
 			page.getByRole("dialog", {
 				name: recurring ? "Add schedule" : "Add transaction",
@@ -137,11 +126,8 @@ test("an existing observation can be replaced with its pre-observation balance",
 		balance: number;
 	};
 	expect(original.balance).not.toBe(original.previousBalance);
-	await page.goto("/accounts?evidence=account&id=checking");
-	const dialog = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	await page.goto("/accounts/checking");
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await expect(
 		dialog.getByRole("button", { name: /View balance adjustment/ }),
 	).toBeVisible();
@@ -177,18 +163,15 @@ test("inline header edits save a name and a separate balance adjustment without 
 			forecasts.push(request.url());
 	});
 	const initial = await readSavedServerModel();
-	await page.goto("/accounts?evidence=account&id=checking");
-	let dialog = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	await page.goto("/accounts/checking");
+	let dialog = page.getByRole("region", { name: "Account details" });
 	await expect(dialog).not.toContainText("Account activity · Saved");
 	await expect(
 		dialog.getByRole("button", { name: "Save changes" }),
 	).toHaveCount(0);
 	await dialog.getByLabel("Account name").fill("Daily cash");
 	await dialog.getByRole("button", { name: "Save changes" }).click();
-	dialog = page.getByRole("dialog", { name: "Daily cash", exact: true });
+	dialog = page.getByRole("region", { name: "Account details" });
 	await expect(dialog.getByLabel("Account name")).toHaveValue("Daily cash");
 	await expect(
 		dialog.getByRole("button", { name: "Save changes" }),
@@ -242,13 +225,10 @@ test("inline header edits save a name and a separate balance adjustment without 
 test("header actions and inline close confirmation match transaction details", async ({
 	page,
 }) => {
-	await page.goto("/accounts?evidence=account&id=checking");
-	const dialog = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	await page.goto("/accounts/checking");
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByLabel("Account name").fill("Unsaved name");
-	await dialog.getByRole("button", { name: "Close dialog" }).click();
+	await dialog.getByRole("button", { name: "Accounts" }).click();
 	const confirm = dialog
 		.getByRole("alert")
 		.filter({ hasText: "Discard the changes in this form?" });
@@ -262,7 +242,7 @@ test("header actions and inline close confirmation match transaction details", a
 	);
 	await expect(dialog.getByLabel("Account name")).toBeFocused();
 	await dialog.getByLabel("Balance (USD)").fill("9999");
-	await page.keyboard.press("Escape");
+	await dialog.getByRole("button", { name: "Accounts" }).click();
 	await expect(confirm).toBeVisible();
 	await confirm.getByRole("button", { name: "Continue", exact: true }).click();
 	await expect(dialog.getByLabel("Balance (USD)")).toHaveValue("9999");
@@ -270,7 +250,8 @@ test("header actions and inline close confirmation match transaction details", a
 		.getByRole("button", { name: "Discard changes", exact: true })
 		.click();
 	await expect(dialog.getByLabel("Balance (USD)")).toBeFocused();
-	await dialog.getByRole("button", { name: "Close dialog" }).click();
+	await dialog.getByRole("button", { name: "Accounts" }).click();
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(dialog).not.toBeVisible();
 });
 
@@ -289,11 +270,8 @@ test("failed saves retain inline values and retry creates only one adjustment", 
 			json: { error: "Adjustment save failed" },
 		});
 	});
-	await page.goto("/accounts?evidence=account&id=checking");
-	const dialog = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	await page.goto("/accounts/checking");
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByLabel("Balance (USD)").fill("9876.54");
 	await dialog.getByLabel("Adjustment time (UTC)").fill("2026-02-01T23:59:59");
 	await dialog.getByRole("button", { name: "Save changes" }).click();
@@ -317,14 +295,11 @@ test("failed saves retain inline values and retry creates only one adjustment", 
 	).toHaveLength(1);
 });
 
-test("settings persist across tabs and backdrop close asks before discard", async ({
+test("settings persist across tabs and breadcrumb close asks before discard", async ({
 	page,
 }) => {
-	await page.goto("/accounts?evidence=account&id=checking");
-	const dialog = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	await page.goto("/accounts/checking");
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByRole("tab", { name: "Account details" }).click();
 	await dialog.getByLabel("Protected balance in USD").fill("500");
 	await dialog.getByRole("tab", { name: /Transactions/ }).click();
@@ -332,12 +307,13 @@ test("settings persist across tabs and backdrop close asks before discard", asyn
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
 		"500",
 	);
-	await page.mouse.click(10, 300);
+	await dialog.getByRole("button", { name: "Accounts" }).click();
 	const confirm = dialog
 		.getByRole("alert")
 		.filter({ hasText: "Discard the changes in this form?" });
 	await expect(confirm).toBeVisible();
 	await confirm.getByRole("button", { name: "Discard changes" }).click();
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(dialog).not.toBeVisible();
 	const saved = await page.request
 		.get(`${FIXTURE_API}/v1/financial-model`)

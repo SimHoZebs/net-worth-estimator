@@ -1,5 +1,5 @@
 import { cva } from "class-variance-authority";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import type { ActivityFilters } from "../../domain/accountActivity.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { TransactionSortButton } from "./TransactionSortButton.tsx";
@@ -18,11 +18,13 @@ export function TransactionFilters({
 	recordedCount,
 	totalCount,
 	onChange,
+	action,
 }: {
 	filters: ActivityFilters;
 	recordedCount: number;
 	totalCount: number;
 	onChange: (change: Partial<ActivityFilters>) => void;
+	action?: ReactNode;
 }) {
 	const id = useId();
 	return (
@@ -37,10 +39,13 @@ export function TransactionFilters({
 					value={filters.query}
 					onChange={(event) => onChange({ query: event.target.value })}
 				/>
-				<TransactionSortButton
-					order={filters.order}
-					onChange={(order) => onChange({ order })}
-				/>
+				<div className="flex shrink-0 flex-wrap items-center gap-3">
+					<TransactionSortButton
+						order={filters.order}
+						onChange={(order) => onChange({ order })}
+					/>
+					{action}
+				</div>
 			</div>
 			<div className="m-0 grid grid-cols-[1.2fr_1fr_1fr] gap-3 max-sm:grid-cols-2 max-sm:gap-3">
 				<label

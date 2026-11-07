@@ -20,7 +20,7 @@ for (const invalidLink of [false, true]) {
 		try {
 			await page.goto(
 				invalidLink
-					? "/accounts?evidence=account&id=a&id=b&gmail=connected"
+					? "/accounts?editor=account&id=a&id=b&gmail=connected"
 					: "/accounts?gmail=connected",
 			);
 			await page
@@ -41,7 +41,7 @@ for (const invalidLink of [false, true]) {
 			await page.getByRole("button", { name: "Dismiss notification" }).click();
 			await page.goBack();
 			await expect(page).toHaveURL(
-				invalidLink ? /\/accounts\?evidence=account&id=a&id=b$/ : /\/accounts$/,
+				invalidLink ? /\/accounts\?editor=account&id=a&id=b$/ : /\/accounts$/,
 			);
 			await expect(
 				page.getByText("Gmail connected.", { exact: true }),
@@ -65,18 +65,21 @@ for (const name of ["401", "true"]) {
 		await page
 			.getByRole("button", { name: `Open ${name} transactions`, exact: true })
 			.click();
-		await expect(page).toHaveURL(/\/accounts\?evidence=account&id=checking$/);
-		await expect(page.getByRole("dialog", { name, exact: true })).toBeVisible();
-		await page.goto("/accounts?evidence=account&id=checking");
-		await expect(page.getByRole("dialog", { name, exact: true })).toBeVisible();
+		await expect(page).toHaveURL(/\/accounts\/checking$/);
+		await expect(page.getByLabel("Account name")).toHaveValue(name);
+		await expect(
+			page.getByRole("navigation", { name: "Breadcrumb" }),
+		).toContainText(name);
+		await page.goto("/accounts/checking");
+		await expect(page.getByLabel("Account name")).toHaveValue(name);
 	});
 }
 
 test("malformed links show an explicit error and consume the OAuth result on the current page", async ({
 	page,
 }) => {
-	await page.goto("/accounts?evidence=account&id=a&id=b&gmail=connected");
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=a&id=b$/);
+	await page.goto("/accounts?editor=account&id=a&id=b&gmail=connected");
+	await expect(page).toHaveURL(/\/accounts\?editor=account&id=a&id=b$/);
 	const error = page.getByRole("region", { name: "Invalid workspace link" });
 	await expect(error).toBeVisible();
 	await error.getByRole("button", { name: "Continue on this page" }).click();
@@ -112,7 +115,7 @@ test("unknown pages retain their address and offer navigation while root opens O
 	});
 	await page.goBack();
 	await expect(page).toHaveURL(/\/transactions$/);
-	await page.goto("/accounts/no-such-subpage?evidence=account&id=checking");
+	await page.goto("/accounts/no-such-subpage");
 	await expect(
 		page.getByRole("region", { name: "Page not found" }),
 	).toBeVisible();
@@ -138,12 +141,12 @@ test("page navigation moves focus and preserves the native link target", async (
 	await expect(page).toHaveTitle("Transactions · Waypoint");
 });
 
-test("an editor copied to a fresh page preserves its evidence return destination", async ({
+test("an editor copied to a fresh page preserves its detail destination", async ({
 	page,
 }) => {
-	await page.goto("/accounts?evidence=account&id=home");
+	await page.goto("/accounts/home");
 	await page.getByRole("button", { name: "Add transaction" }).click();
-	await expect(page).toHaveURL(/returnEvidence=account&returnId=home$/);
+	await expect(page).toHaveURL(/\/accounts\/home\?editor=transaction&id=new$/);
 	const copied = page.url();
 	await page.goto("/transactions");
 	await page.goto(copied);
@@ -151,11 +154,12 @@ test("an editor copied to a fresh page preserves its evidence return destination
 		page.getByRole("dialog", { name: "Add transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
-	await expect(
-		page.getByRole("dialog", { name: "Home value", exact: true }),
-	).toBeVisible();
-	await page.keyboard.press("Escape");
+	await expect(page).toHaveURL(/\/accounts\/home$/);
+	await expect(page.getByLabel("Account name")).toHaveValue("Home value");
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	await expect(page).toHaveURL(/\/accounts$/);
 	await page.goBack();
 	await expect(page).toHaveURL(/\/transactions$/);
@@ -174,16 +178,14 @@ test("account links keep their identity after renames and duplicate names", asyn
 			.click();
 		await expect(page.getByRole("dialog")).not.toBeVisible();
 	}
-	await page.goto("/accounts?evidence=account&id=checking");
-	const dialog = page.getByRole("dialog", {
-		name: "Shared account name",
-		exact: true,
-	});
-	await expect(dialog).toBeVisible();
-	await expect(dialog.getByLabel("Balance (USD)")).toHaveValue("4200");
+	await page.goto("/accounts/checking");
+	await expect(page.getByLabel("Account name")).toHaveValue(
+		"Shared account name",
+	);
+	await expect(page.getByLabel("Balance (USD)")).toHaveValue("4200");
 });
 
-test("account modals have URLs, restore on back, and deep-link", async ({
+test("account detail pages have URLs, restore on back, and deep-link", async ({
 	page,
 }) => {
 	const scenarioRequests: string[] = [];
@@ -195,23 +197,25 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=checking$/);
-	await expect(page.getByRole("dialog").getByLabel("Account name")).toHaveValue(
+	await expect(page).toHaveURL(/\/accounts\/checking$/);
+	await expect(page.getByLabel("Account name")).toHaveValue(
 		"Everyday checking",
 	);
+	await expect(
+		page.getByRole("navigation", { name: "Breadcrumb" }),
+	).toContainText("Everyday checking");
 	await page.screenshot({
 		path: "test-results/router-account-evidence.png",
 		fullPage: true,
 	});
 
-	// The back button closes the modal back onto the accounts page.
+	// The back button returns to the accounts list.
 	await page.goBack();
 	await expect(page).toHaveURL(/\/accounts$/);
-	await expect(page.getByRole("dialog")).not.toBeVisible();
 
-	// Direct loads open the same modal once the account arrives.
-	await page.goto("/accounts?evidence=account&id=checking");
-	await expect(page.getByRole("dialog").getByLabel("Account name")).toHaveValue(
+	// Direct loads open the same page once the account arrives.
+	await page.goto("/accounts/checking");
+	await expect(page.getByLabel("Account name")).toHaveValue(
 		"Everyday checking",
 	);
 	await expect(
@@ -220,29 +224,25 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 	expect(scenarioRequests).toEqual([]);
 });
 
-test("unavailable account links retain their address until explicitly dismissed", async ({
+test("unavailable account links show the account-not-found page until navigated back", async ({
 	page,
 }) => {
-	await page.goto("/accounts?evidence=account&id=no-such-account");
-	await expect(page).toHaveURL(
-		/\/accounts\?evidence=account&id=no-such-account$/,
-	);
-	const unavailable = page.getByRole("dialog", {
-		name: "Linked item unavailable",
-	});
-	await expect(unavailable).toContainText(
+	await page.goto("/accounts/no-such-account");
+	await expect(page).toHaveURL(/\/accounts\/no-such-account$/);
+	const notFound = page.getByRole("region", { name: "Account details" });
+	await expect(notFound).toContainText(
 		"does not exist or is not available in this workspace",
 	);
 	await page.screenshot({
 		path: "test-results/workspace-linked-item-unavailable.png",
 		fullPage: true,
 	});
-	await unavailable.getByRole("button", { name: "Close dialog" }).click();
+	await notFound.getByRole("button", { name: "Back to accounts" }).click();
 	await expect(page).toHaveURL(/\/accounts$/);
-	await expect(page.getByRole("dialog")).not.toBeVisible();
+	await expect(page.getByLabel("Account name")).toHaveCount(0);
 });
 
-test("history restores an editor's evidence return target without leaking it to a new editor", async ({
+test("history restores an editor on the account detail without leaking it to a new editor", async ({
 	page,
 }) => {
 	await page.goto("/transactions");
@@ -250,29 +250,25 @@ test("history restores an editor's evidence return target without leaking it to 
 	await page
 		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
+	await expect(page).toHaveURL(/\/accounts\/home$/);
 	await page.getByRole("button", { name: "Add transaction" }).click();
-	await expect(page).toHaveURL(
-		/\/accounts\?editor=transaction&id=new&returnEvidence=account&returnId=home$/,
-	);
+	await expect(page).toHaveURL(/\/accounts\/home\?editor=transaction&id=new$/);
 	await page.goBack();
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
+	await expect(page).toHaveURL(/\/accounts\/home$/);
 	await page.goBack();
 	await expect(page).toHaveURL(/\/accounts$/);
 	await page.goForward();
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
+	await expect(page).toHaveURL(/\/accounts\/home$/);
 	await page.goForward();
-	await expect(page).toHaveURL(
-		/\/accounts\?editor=transaction&id=new&returnEvidence=account&returnId=home$/,
-	);
+	await expect(page).toHaveURL(/\/accounts\/home\?editor=transaction&id=new$/);
 	await expect(
 		page.getByRole("dialog", { name: "Add transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
+	await expect(page).toHaveURL(/\/accounts\/home$/);
 	await page
-		.getByRole("dialog", { name: "Home value", exact: true })
-		.getByRole("button", { name: "Close dialog" })
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
 		.click();
 	await expect(page).toHaveURL(/\/accounts$/);
 	await page.getByRole("button", { name: "Add account" }).click();

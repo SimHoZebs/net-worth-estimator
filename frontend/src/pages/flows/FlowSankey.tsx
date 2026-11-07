@@ -176,7 +176,7 @@ export function FlowSankey({
 						inset: ({ width }) => {
 							const maxSide = Math.max(72, Math.floor((width - 120) / 2));
 							const side = Math.min(labelRoom, maxSide);
-							return { left: side, right: side, top: 10, bottom: 10 };
+							return { left: side, right: side, top: 20, bottom: 20 };
 						},
 						marks: ({ nodes: layoutNodes, links: layoutLinks }) =>
 							[
@@ -268,7 +268,7 @@ export function FlowSankey({
 		<div className="grid gap-2">
 			{/* oxlint-disable jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the diagram. */}
 			<div
-				className="overflow-x-auto"
+				className="overflow-x-auto p-4"
 				role="region"
 				aria-label="Scrollable money-flow diagram"
 				tabIndex={0}

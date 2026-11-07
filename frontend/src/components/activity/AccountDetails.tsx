@@ -7,9 +7,11 @@ import { mergeStyles } from "../mergeStyles.ts";
 import type { AccountEdit } from "./useAccountEdit.ts";
 import {
 	transactionControlStyles,
-	detailPropertyRowClassName,
 	detailPropertyLabelClassName,
 } from "./transactionDetailStyles.ts";
+
+const accountPropertyRowClassName =
+	"flex items-center gap-4 border-t border-line first:border-t-0";
 
 function PropertyRow({
 	label,
@@ -21,7 +23,7 @@ function PropertyRow({
 	children: ReactNode;
 }) {
 	return (
-		<div className={detailPropertyRowClassName}>
+		<div className={accountPropertyRowClassName}>
 			{htmlFor ? (
 				<label htmlFor={htmlFor} className={detailPropertyLabelClassName}>
 					{label}
@@ -45,11 +47,11 @@ function BankDetails({ account }: { account: Account }) {
 		{ label: "Last synced", value: dateLabel(account.observedOn, true) },
 	];
 	return (
-		<dl className="m-0 mt-2 border-t border-line pt-2 text-sm">
+		<dl className="m-0 grid gap-4 border-t border-line pt-4 text-sm">
 			{rows
 				.filter((row) => row.value)
 				.map((row) => (
-					<div key={row.label} className={detailPropertyRowClassName}>
+					<div key={row.label} className={accountPropertyRowClassName}>
 						<dt className={detailPropertyLabelClassName}>{row.label}</dt>
 						<dd className="m-0 min-w-0 flex-1 break-words font-medium text-ink">
 							{row.value}
@@ -72,7 +74,7 @@ export function AccountDetails({
 	const locked = readOnly || edit.saving;
 	const { draft, formId } = edit;
 	return (
-		<section aria-label="Account settings">
+		<section aria-label="Account settings" className="grid gap-4">
 			<PropertyRow label="Account type" htmlFor={`${formId}-kind`}>
 				<select
 					form={formId}

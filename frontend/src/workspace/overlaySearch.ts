@@ -7,15 +7,10 @@ import {
 
 // Every page shares one overlay search shape: the pathname names the page
 // (`/accounts`) and dialogs live in query params instead of pseudo nested
-// paths (`?evidence=account&id=…`). Group detail is the one path segment
-// (`/groups/<id>`). The workspace consumes the post-OAuth `gmail` flag once.
+// paths. Group and account details are path segments (`/groups/<id>`,
+// `/accounts/<id>`). The workspace consumes the post-OAuth `gmail` flag once.
 
-const evidenceKind = z.enum([
-	"position",
-	"shortfall",
-	"safe-spending",
-	"account",
-]);
+const evidenceKind = z.enum(["position", "shortfall", "safe-spending"]);
 const editorKind = z.enum(["account", "transaction", "schedule", "evaluation"]);
 const safeSpendingDetailKind = z.enum(["safe-spending"]);
 const safeSpendingTab = z
@@ -142,12 +137,7 @@ function GmailOnly(gmail: WorkspaceSearch["gmail"]): WorkspaceSearch {
 function isConsistent(value: Exclude<WorkspaceSearch, undefined>): boolean {
 	if (value.returnEvidence !== undefined || value.returnId !== undefined) {
 		if (!value.editor || !value.returnEvidence) return false;
-		if (
-			value.returnEvidence === "account"
-				? !value.returnId
-				: value.returnId !== undefined
-		)
-			return false;
+		if (value.returnId !== undefined) return false;
 	}
 	const kinds = [value.evidence, value.editor, value.detail].filter(
 		(kind) => kind !== undefined,
@@ -156,7 +146,7 @@ function isConsistent(value: Exclude<WorkspaceSearch, undefined>): boolean {
 	if (value.evidence !== undefined) {
 		if (value.tab !== undefined || value.editTransaction !== undefined)
 			return false;
-		if (value.evidence !== "account" && value.id !== undefined) return false;
+		if (value.id !== undefined) return false;
 	}
 	if (
 		value.editor !== undefined &&
@@ -164,7 +154,6 @@ function isConsistent(value: Exclude<WorkspaceSearch, undefined>): boolean {
 	)
 		return false;
 	if (value.detail !== undefined && value.id !== undefined) return false;
-	if (value.evidence === "account" && value.id === undefined) return false;
 	if (value.editor !== undefined && value.id === undefined) return false;
 	if (
 		kinds.length === 0 &&

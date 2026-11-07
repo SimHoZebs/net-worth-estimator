@@ -12,7 +12,7 @@ async function openChecking(page: Page) {
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	return page.getByRole("dialog", { name: "Everyday checking" });
+	return page.getByRole("region", { name: "Account details" });
 }
 
 test("clicking an account opens its recorded history and projected transactions", async ({
@@ -60,12 +60,16 @@ test("clicking an account opens its recorded history and projected transactions"
 	).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(
-		page.getByRole("dialog", { name: "Everyday checking" }),
+		page.getByRole("region", { name: "Account details" }),
 	).toBeVisible();
-	await page.keyboard.press("Escape");
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(
 		page.getByRole("button", { name: "Open Everyday checking transactions" }),
-	).toBeFocused();
+	).toBeVisible();
 });
 
 test("the transaction actions menu closes on Escape without closing the detail", async ({
@@ -105,7 +109,7 @@ test("account names in the model open incoming transfers with the correct other 
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();
-	const dialog = page.getByRole("dialog", { name: "Investment portfolio" });
+	const dialog = page.getByRole("region", { name: "Account details" });
 	// The account dialog defaults to recorded facts; the contribution is a
 	// projected occurrence, so include all transactions first.
 	await dialog.getByLabel("Transaction source").selectOption("all");
@@ -141,7 +145,7 @@ test("account names in the model open incoming transfers with the correct other 
 		.getByRole("button", { name: "Close dialog" })
 		.click();
 	await expect(
-		page.getByRole("dialog", { name: "Investment portfolio" }),
+		page.getByRole("region", { name: "Account details" }),
 	).toBeVisible();
 	await dialog.getByLabel("Transaction direction").selectOption("out");
 	await expect(
@@ -165,7 +169,7 @@ test("transaction values edit in place with save and discard", async ({
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();
-	const dialog = page.getByRole("dialog", { name: "Investment portfolio" });
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByLabel("Transaction source").selectOption("all");
 	await dialog.getByLabel("Transaction dates").selectOption("30-days");
 	await dialog
@@ -238,7 +242,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("3000");
 	await page.getByRole("button", { name: "Save changes" }).click();
-	dialog = page.getByRole("dialog", { name: "Everyday checking" });
+	dialog = page.getByRole("region", { name: "Account details" });
 	await expect(dialog).toBeVisible();
 	await expect(dialog).not.toContainText("Account activity · Saved");
 	// Returning from the editor remounts the list with default filters.
@@ -292,11 +296,14 @@ test("filters reset pagination and keep projected transfers distinct from record
 	await expect(dialog.getByText("−$400.00", { exact: true })).toBeVisible();
 });
 
-test("clicking outside the account panel closes it", async ({ page }) => {
+test("the breadcrumb returns to the accounts list", async ({ page }) => {
 	const dialog = await openChecking(page);
 	await expect(dialog).toBeVisible();
-	// The drawer occupies the right side, so the far left is backdrop film.
-	await page.mouse.click(10, 300);
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(dialog).not.toBeVisible();
 });
 
@@ -307,7 +314,7 @@ test("accounts without transactions show balance history and retain account sett
 	await page
 		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
-	const dialog = page.getByRole("dialog", { name: "Home value" });
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await expect(
 		dialog.getByRole("button", { name: /View balance adjustment/ }),
 	).toBeVisible();
@@ -375,7 +382,7 @@ test("a recurring schedule lists transactions that record its occurrences", asyn
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	const dialog = page.getByRole("dialog", { name: "Everyday checking" });
+	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByRole("tab", { name: /Recurring/ }).click();
 	await dialog.getByRole("button", { name: /View Housing and living/ }).click();
 	const schedule = page.getByRole("dialog", {
@@ -446,7 +453,7 @@ test("account transactions and editor evidence are accessible on desktop and mob
 			});
 		await page.keyboard.press("Escape");
 		await expect(
-			page.getByRole("dialog", { name: "Everyday checking" }),
+			page.getByRole("region", { name: "Account details" }),
 		).toBeVisible();
 		await page.keyboard.press("Escape");
 	}

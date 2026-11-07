@@ -148,17 +148,15 @@ test("account sheet controls remain usable across responsive resizes", async ({
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	const sheet = page.getByRole("dialog", { name: "Everyday checking" });
+	const sheet = page.getByRole("region", { name: "Account details" });
 	await expect(sheet).toBeVisible();
 	for (const width of [320, 768, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
 		await expectWithinViewport(sheet, page);
 		await expect(sheet.getByLabel("Transaction source")).toBeVisible();
-		await expect(
-			sheet.getByRole("button", { name: "Close dialog" }),
-		).toBeVisible();
+		await expect(sheet.getByRole("button", { name: "Accounts" })).toBeVisible();
 	}
-	await sheet.getByRole("button", { name: "Close dialog" }).click();
+	await sheet.getByRole("button", { name: "Accounts" }).click();
 	await expect(sheet).not.toBeVisible();
 });
 

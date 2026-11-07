@@ -34,7 +34,7 @@ async function openExpense(page: Page) {
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	const activity = page.getByRole("dialog", { name: "Everyday checking" });
+	const activity = page.getByRole("region", { name: "Account details" });
 	await activity
 		.getByRole("searchbox", { name: "Search account transactions" })
 		.fill("Receipt purchase");
@@ -417,7 +417,7 @@ test("read-only mode keeps receipt mutations unavailable", async ({ page }) => {
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	const activity = page.getByRole("dialog", { name: "Everyday checking" });
+	const activity = page.getByRole("region", { name: "Account details" });
 	await activity.getByLabel("Transaction source").selectOption("all");
 	await activity
 		.getByRole("searchbox", { name: "Search account transactions" })

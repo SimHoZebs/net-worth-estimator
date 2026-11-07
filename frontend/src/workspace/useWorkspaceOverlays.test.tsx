@@ -95,12 +95,11 @@ it("returns to the owning evidence after edit and clears context on an ordinary 
 	const { router, result } = await useHarness();
 	await act(async () =>
 		result.current.openEvidence({
-			kind: "account",
-			id: account.id,
+			kind: "position",
 		}),
 	);
 	expect(router.state.location.search).toMatchObject({
-		evidence: "account",
+		evidence: "position",
 	});
 	await act(async () =>
 		result.current.editFromEvidence({
@@ -110,15 +109,14 @@ it("returns to the owning evidence after edit and clears context on an ordinary 
 	);
 	expect(result.current.editor?.kind).toBe("account");
 	expect(router.state.location.search).toMatchObject({
-		returnEvidence: "account",
-		returnId: account.id,
+		returnEvidence: "position",
 	});
+	expect(router.state.location.search.returnId).toBeUndefined();
 	await act(async () => result.current.closeEditor());
 	expect(result.current.evidence).toEqual({
-		kind: "account",
-		id: account.id,
+		kind: "position",
 	});
-	expect(router.state.location.search).toMatchObject({ evidence: "account" });
+	expect(router.state.location.search).toMatchObject({ evidence: "position" });
 	await act(async () => result.current.closeEvidence());
 	await act(async () =>
 		result.current.openEditor({ kind: "account", item: null }),
@@ -141,20 +139,19 @@ it("close undoes an in-app open without leaving a duplicate page in history", as
 });
 
 it("a directly loaded editor replaces its entry with the shared return destination", async () => {
-	const account = financialModelFixture.accounts[0]!;
 	const { router, result } = await useHarness(
-		`/accounts?editor=account&id=new&returnEvidence=account&returnId=${account.id}`,
+		"/accounts?editor=account&id=new&returnEvidence=position",
 		"/transactions",
 	);
 	await act(async () => result.current.closeEditor());
-	expect(result.current.evidence).toEqual({ kind: "account", id: account.id });
+	expect(result.current.evidence).toEqual({ kind: "position" });
 	await act(async () => router.history.back());
 	expect(router.state.location.pathname).toBe("/transactions");
 });
 
 it("unknown item links remain available for an explicit error until dismissed", async () => {
 	const { router, result } = await useHarness(
-		"/accounts?evidence=account&id=missing",
+		"/accounts?editor=transaction&id=missing",
 	);
 	expect(result.current.unavailable).toBe(true);
 	expect(router.state.location.search.id).toBe("missing");
@@ -167,8 +164,7 @@ it("a page navigation cannot leak a previous editor's return target", async () =
 	const { router, result } = await useHarness();
 	await act(async () =>
 		result.current.openEvidence({
-			kind: "account",
-			id: account.id,
+			kind: "position",
 		}),
 	);
 	await act(async () =>

@@ -66,18 +66,6 @@ export function resolveOverlay(
 					kind: "evidence",
 					target: { kind: "safe-spending" },
 				});
-			case "account": {
-				if (!rows) return { state: "pending" };
-				if (!search.id) return unknown();
-				if (!rows.accounts) return { state: "pending" };
-				const account = findAccount(rows, search.id);
-				return account
-					? ready({
-							kind: "evidence",
-							target: { kind: "account", id: account.id },
-						})
-					: unknown();
-			}
 		}
 	}
 	if (search.editor !== undefined) {
@@ -175,8 +163,6 @@ export function evidenceSearch(target: EvidenceTarget): WorkspaceSearch {
 			return { evidence: "shortfall" };
 		case "safe-spending":
 			return { evidence: "safe-spending" };
-		case "account":
-			return { evidence: "account", id: target.id };
 	}
 }
 
@@ -207,8 +193,6 @@ export function editorReturnTarget(
 	search: WorkspaceSearch,
 ): EvidenceTarget | null {
 	switch (search.returnEvidence) {
-		case "account":
-			return search.returnId ? { kind: "account", id: search.returnId } : null;
 		case "position":
 			return { kind: "position" };
 		case "shortfall":

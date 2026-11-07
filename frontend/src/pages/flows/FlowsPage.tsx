@@ -128,8 +128,8 @@ export function FlowsPage() {
 		? input.lanes.some((lane) => Math.abs(lane.amount) > 0)
 		: false;
 	const sankeyHeight = input
-		? Math.max(240, input.nodes.length * 44 + 96)
-		: 240;
+		? Math.max(280, input.nodes.length * 44 + 128)
+		: 280;
 	const selected = useMemo<AggregatedEdge | null>(() => {
 		if (!selectedKey || !input) return null;
 		const found = input.lanes.find((lane) => lane.laneId === selectedKey);

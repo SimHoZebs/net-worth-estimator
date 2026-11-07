@@ -103,22 +103,6 @@ describe("findAccount", () => {
 });
 
 describe("resolveOverlay", () => {
-	test("account evidence resolves without transaction or evaluation queries", () => {
-		expect(
-			resolveOverlay(validate({ evidence: "account", id: "checking" }), {
-				accounts: model.accounts,
-				transactions: null,
-				evaluations: null,
-			}),
-		).toMatchObject({
-			state: "ready",
-			overlay: {
-				kind: "evidence",
-				target: { kind: "account", id: "checking" },
-			},
-		});
-	});
-
 	test("transaction edits wait for their rows, not evaluation rows", () => {
 		const search = validate({ editor: "transaction", id: "invest" });
 		expect(
@@ -143,26 +127,8 @@ describe("resolveOverlay", () => {
 
 	test("overlays wait for the model instead of failing", () => {
 		expect(
-			resolveOverlay(validate({ evidence: "account", id: "checking" }), null),
+			resolveOverlay(validate({ editor: "transaction", id: "invest" }), null),
 		).toEqual({ state: "pending" });
-	});
-
-	test("account evidence resolves by stable ID", () => {
-		expect(
-			resolveOverlay(validate({ evidence: "account", id: "checking" }), model),
-		).toEqual({
-			state: "ready",
-			overlay: {
-				kind: "evidence",
-				target: { kind: "account", id: "checking" },
-			},
-		});
-		expect(
-			resolveOverlay(validate({ evidence: "account", id: "nope" }), model),
-		).toEqual({ state: "unknown" });
-		expect(
-			resolveOverlay(validate({ evidence: "account", id: "old" }), model),
-		).toEqual({ state: "unknown" });
 	});
 
 	test("editors resolve existing items and the new form", () => {
@@ -303,8 +269,7 @@ describe("resolveOverlay", () => {
 });
 
 describe("search builders", () => {
-	test("account links survive renames and duplicate names", () => {
-		const search = evidenceSearch({ kind: "account", id: "checking" });
+	test("account editor links survive renames and duplicate names", () => {
 		const renamed = {
 			...model,
 			accounts: [
@@ -312,19 +277,11 @@ describe("search builders", () => {
 				account("checking", "Shared name"),
 			],
 		};
-		expect(resolveOverlay(search, renamed)).toMatchObject({
-			state: "ready",
-			overlay: { target: { id: "checking" } },
-		});
 		expect(
 			editorSearch({ kind: "account", item: renamed.accounts[1]! }),
 		).toEqual({ editor: "account", id: "checking" });
 	});
 	test("evidence search uses stable IDs", () => {
-		expect(evidenceSearch({ kind: "account", id: "checking" })).toEqual({
-			evidence: "account",
-			id: "checking",
-		});
 		expect(evidenceSearch({ kind: "position" })).toEqual({
 			evidence: "position",
 		});
@@ -399,37 +356,39 @@ describe("search builders", () => {
 	});
 
 	test("built search validates and resolves back", () => {
-		const search = evidenceSearch({ kind: "account", id: "checking" });
+		const search = evidenceSearch({ kind: "position" });
 		expect(validate(search)).toEqual({
 			...emptySearch(),
-			evidence: "account",
-			id: "checking",
+			evidence: "position",
 		});
 		expect(resolveOverlay(validate(search), model)).toEqual({
 			state: "ready",
 			overlay: {
 				kind: "evidence",
-				target: { kind: "account", id: "checking" },
+				target: { kind: "position" },
 			},
 		});
 	});
 
-	test("names with special characters survive the round trip", () => {
+	test("account editor names with special characters survive the round trip", () => {
 		const special = {
 			...model,
 			accounts: [account("a1", "Café & Sons!")],
 		};
-		const search = evidenceSearch({ kind: "account", id: "a1" });
+		const search = editorSearch({
+			kind: "account",
+			item: special.accounts[0]!,
+		});
 		expect(validate(search)).toEqual({
 			...emptySearch(),
-			evidence: "account",
+			editor: "account",
 			id: "a1",
 		});
 		expect(resolveOverlay(validate(search), special)).toEqual({
 			state: "ready",
 			overlay: {
-				kind: "evidence",
-				target: { kind: "account", id: "a1" },
+				kind: "editor",
+				target: { kind: "account", item: special.accounts[0] },
 			},
 		});
 	});

@@ -1,8 +1,6 @@
 import { createMemoryHistory } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 import { createWorkspaceRouter } from "./router.ts";
-import { financialModelFixture } from "../mocks/financialModel.ts";
-import { evidenceSearch, resolveOverlay } from "./overlay.ts";
 
 async function load(entry: string) {
 	const router = createWorkspaceRouter(
@@ -14,35 +12,25 @@ async function load(entry: string) {
 
 describe("workspace router", () => {
 	it.each(["401", "0", "true", "false", "null"])(
-		"preserves the account ID %s in direct and generated links",
+		"preserves the account ID %s in the nested detail route",
 		async (name) => {
-			const account = {
-				...financialModelFixture.accounts[0]!,
-				id: name,
-				name: "Account with a stable ID",
-			};
-			const rows = { accounts: [account], transactions: [], evaluations: [] };
-			const router = await load(`/accounts?evidence=account&id=${name}`);
-			const expected = {
-				state: "ready",
-				overlay: {
-					kind: "evidence",
-					target: { kind: "account", id: account.id },
-				},
-			};
-			expect(router.state.location.search.id).toBe(name);
-			expect(resolveOverlay(router.state.location.search, rows)).toEqual(
-				expected,
-			);
+			const router = await load(`/accounts/${encodeURIComponent(name)}`);
+			const match = router.state.matches[router.state.matches.length - 1]!;
+			expect(match.routeId).toBe("/accounts/$accountId");
+			expect(match.params).toMatchObject({ accountId: name });
+			expect(
+				router.state.matches.find((item) => item.staticData.page)?.staticData
+					.page,
+			).toBe("accounts");
 			const link = router.buildLocation({
-				to: "/accounts",
-				search: evidenceSearch({ kind: "account", id: account.id }),
+				to: "/accounts/$accountId",
+				params: { accountId: name },
 			});
 			const reloaded = await load(link.href);
-			expect(reloaded.state.location.search.id).toBe(name);
-			expect(resolveOverlay(reloaded.state.location.search, rows)).toEqual(
-				expected,
-			);
+			const reloadedMatch =
+				reloaded.state.matches[reloaded.state.matches.length - 1]!;
+			expect(reloadedMatch.routeId).toBe("/accounts/$accountId");
+			expect(reloadedMatch.params).toMatchObject({ accountId: name });
 		},
 	);
 	it("matches group parameters through the nested route", async () => {
@@ -67,10 +55,10 @@ describe("workspace router", () => {
 
 	it("retains malformed overlay links for an explicit error", async () => {
 		const router = await load(
-			"/accounts?evidence=account&id=a&id=b&gmail=connected",
+			"/accounts?editor=account&id=a&id=b&gmail=connected",
 		);
 		expect(router.state.location.search).toEqual({
-			evidence: "account",
+			editor: "account",
 			id: ["a", "b"],
 			gmail: "connected",
 		});

@@ -19,6 +19,8 @@ import { Route as OutlookRouteImport } from './routes/outlook'
 import { Route as PurchasesRouteImport } from './routes/purchases'
 import { Route as SourcesRouteImport } from './routes/sources'
 import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as AccountsIndexRouteImport } from './routes/accounts/index'
+import { Route as AccountsAccountIdRouteImport } from './routes/accounts/$accountId'
 import { Route as GroupsIndexRouteImport } from './routes/groups/index'
 import { Route as GroupsGroupIdRouteImport } from './routes/groups/$groupId'
 
@@ -72,6 +74,16 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountsIndexRoute = AccountsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountsRoute,
+} as any)
+const AccountsAccountIdRoute = AccountsAccountIdRouteImport.update({
+  id: '/$accountId',
+  path: '/$accountId',
+  getParentRoute: () => AccountsRoute,
+} as any)
 const GroupsIndexRoute = GroupsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -85,7 +97,7 @@ const GroupsGroupIdRoute = GroupsGroupIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/accounts': typeof AccountsRoute
+  '/accounts': typeof AccountsRouteWithChildren
   '/evaluations': typeof EvaluationsRoute
   '/flows': typeof FlowsRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -94,12 +106,13 @@ export interface FileRoutesByFullPath {
   '/purchases': typeof PurchasesRoute
   '/sources': typeof SourcesRoute
   '/transactions': typeof TransactionsRoute
+  '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
+  '/accounts/': typeof AccountsIndexRoute
   '/groups/': typeof GroupsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/accounts': typeof AccountsRoute
   '/evaluations': typeof EvaluationsRoute
   '/flows': typeof FlowsRoute
   '/inbox': typeof InboxRoute
@@ -107,13 +120,15 @@ export interface FileRoutesByTo {
   '/purchases': typeof PurchasesRoute
   '/sources': typeof SourcesRoute
   '/transactions': typeof TransactionsRoute
+  '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
+  '/accounts': typeof AccountsIndexRoute
   '/groups': typeof GroupsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/accounts': typeof AccountsRoute
+  '/accounts': typeof AccountsRouteWithChildren
   '/evaluations': typeof EvaluationsRoute
   '/flows': typeof FlowsRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -122,7 +137,9 @@ export interface FileRoutesById {
   '/purchases': typeof PurchasesRoute
   '/sources': typeof SourcesRoute
   '/transactions': typeof TransactionsRoute
+  '/accounts/$accountId': typeof AccountsAccountIdRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
+  '/accounts/': typeof AccountsIndexRoute
   '/groups/': typeof GroupsIndexRoute
 }
 export interface FileRouteTypes {
@@ -138,12 +155,13 @@ export interface FileRouteTypes {
     | '/purchases'
     | '/sources'
     | '/transactions'
+    | '/accounts/$accountId'
     | '/groups/$groupId'
+    | '/accounts/'
     | '/groups/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/accounts'
     | '/evaluations'
     | '/flows'
     | '/inbox'
@@ -151,7 +169,9 @@ export interface FileRouteTypes {
     | '/purchases'
     | '/sources'
     | '/transactions'
+    | '/accounts/$accountId'
     | '/groups/$groupId'
+    | '/accounts'
     | '/groups'
   id:
     | '__root__'
@@ -165,13 +185,15 @@ export interface FileRouteTypes {
     | '/purchases'
     | '/sources'
     | '/transactions'
+    | '/accounts/$accountId'
     | '/groups/$groupId'
+    | '/accounts/'
     | '/groups/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AccountsRoute: typeof AccountsRoute
+  AccountsRoute: typeof AccountsRouteWithChildren
   EvaluationsRoute: typeof EvaluationsRoute
   FlowsRoute: typeof FlowsRoute
   GroupsRoute: typeof GroupsRouteWithChildren
@@ -254,6 +276,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accounts/': {
+      id: '/accounts/'
+      path: '/'
+      fullPath: '/accounts/'
+      preLoaderRoute: typeof AccountsIndexRouteImport
+      parentRoute: typeof AccountsRoute
+    }
+    '/accounts/$accountId': {
+      id: '/accounts/$accountId'
+      path: '/$accountId'
+      fullPath: '/accounts/$accountId'
+      preLoaderRoute: typeof AccountsAccountIdRouteImport
+      parentRoute: typeof AccountsRoute
+    }
     '/groups/': {
       id: '/groups/'
       path: '/'
@@ -271,6 +307,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AccountsRouteChildren {
+  AccountsAccountIdRoute: typeof AccountsAccountIdRoute
+  AccountsIndexRoute: typeof AccountsIndexRoute
+}
+
+const AccountsRouteChildren: AccountsRouteChildren = {
+  AccountsAccountIdRoute: AccountsAccountIdRoute,
+  AccountsIndexRoute: AccountsIndexRoute,
+}
+
+const AccountsRouteWithChildren = AccountsRoute._addFileChildren(
+  AccountsRouteChildren,
+)
+
 interface GroupsRouteChildren {
   GroupsGroupIdRoute: typeof GroupsGroupIdRoute
   GroupsIndexRoute: typeof GroupsIndexRoute
@@ -286,7 +336,7 @@ const GroupsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AccountsRoute: AccountsRoute,
+  AccountsRoute: AccountsRouteWithChildren,
   EvaluationsRoute: EvaluationsRoute,
   FlowsRoute: FlowsRoute,
   GroupsRoute: GroupsRouteWithChildren,

@@ -1,18 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AccountsPage } from "../pages/AccountsPage.tsx";
-import { useWorkspaceOverlays } from "../workspace/useWorkspaceOverlays.ts";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/accounts")({
 	staticData: { page: "accounts" },
-	component: AccountsRoute,
+	component: () => <Outlet />,
 });
-
-function AccountsRoute() {
-	const overlays = useWorkspaceOverlays();
-	return (
-		<AccountsPage
-			onEdit={overlays.openEditor}
-			onAccount={(id) => overlays.openEvidence({ kind: "account", id })}
-		/>
-	);
-}
