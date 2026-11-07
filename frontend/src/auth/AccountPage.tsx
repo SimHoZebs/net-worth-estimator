@@ -145,7 +145,6 @@ export function AccountPage() {
 			</div>
 
 			<ErrorNotice
-				reserve
 				message={detailsError}
 				action="Retry"
 				onAction={() => {

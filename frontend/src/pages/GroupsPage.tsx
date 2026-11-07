@@ -257,7 +257,6 @@ export function GroupsPage({
 
 						{canManageInvites && (
 							<ErrorNotice
-								reserve
 								message={
 									invitesQuery.isError ? "Invites could not be loaded." : null
 								}
@@ -329,7 +328,6 @@ export function GroupsPage({
 			</div>
 
 			<ErrorNotice
-				reserve
 				message={groupsQuery.isError ? "Groups could not be loaded." : null}
 				action="Retry"
 				onAction={() => void groupsQuery.refetch()}

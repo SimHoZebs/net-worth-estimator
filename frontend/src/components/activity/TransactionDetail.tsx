@@ -44,7 +44,7 @@ import { AccountIcon } from "../AccountIcon.tsx";
 import { ActionMenu, type ActionMenuItem } from "../ActionMenu.tsx";
 import { Badge } from "../Badge.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 import { TextButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
@@ -1602,11 +1602,8 @@ export function TransactionDetail({
 							onSelect={setHistorySelection}
 						/>
 					)}
-					<ErrorNotice
-						reserve
-						message={[subscription.error, edit.error]
-							.filter(Boolean)
-							.join("\n\n")}
+					<FieldError
+						message={[subscription.error, edit.error].filter(Boolean).join(" ")}
 					/>
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">

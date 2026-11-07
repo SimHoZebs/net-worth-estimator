@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button.tsx";
 import { dialogActionsStyles } from "./dialogStyles.ts";
-import { ErrorNotice } from "./ErrorNotice.tsx";
+import { FieldError } from "./ErrorNotice.tsx";
 import { Modal } from "./Modal.tsx";
 
 export function ConfirmDialog({
@@ -38,7 +38,7 @@ export function ConfirmDialog({
 			onCloseRequest={() => !busy}
 		>
 			{children}
-			<ErrorNotice reserve message={error} />
+			<FieldError message={error} />
 			<div className={dialogActionsStyles}>
 				<Button
 					type="button"

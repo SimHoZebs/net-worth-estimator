@@ -191,7 +191,6 @@ export function SharedFeed({
 			</form>
 
 			<ErrorNotice
-				reserve
 				message={
 					feedQuery.isError ? "Shared transactions could not be loaded." : null
 				}

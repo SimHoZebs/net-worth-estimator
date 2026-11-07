@@ -3,34 +3,14 @@ import { expect, it, vi } from "vitest";
 import { ErrorNotice, FieldError } from "./ErrorNotice.tsx";
 import { runInteractions } from "../mocks/interactions.ts";
 
-it("keeps the reserved container through failure and recovery", () => {
-	const { container, rerender } = render(
-		<ErrorNotice reserve message={null} />,
-	);
-	const slot = container.firstElementChild;
-	expect(slot?.classList.contains("h-24")).toBe(true);
-	expect(slot?.classList.contains("overflow-auto")).toBe(true);
-	expect(screen.queryByRole("alert")).toBeNull();
-	expect(slot?.hasAttribute("tabindex")).toBe(false);
-	rerender(<ErrorNotice reserve message="Save failed" />);
-	expect(container.firstElementChild).toBe(slot);
-	expect(screen.getByRole("alert").textContent).toContain("Save failed");
-	expect(slot?.getAttribute("tabindex")).toBe("0");
-	rerender(<ErrorNotice reserve message={null} />);
-	expect(container.firstElementChild).toBe(slot);
-	expect(screen.queryByRole("alert")).toBeNull();
-});
-
-it("keeps retry actions inside reserved feedback", async () => {
+it("keeps retry actions beside the failure message", async () => {
 	const retry = vi.fn();
-	render(
-		<ErrorNotice
-			reserve
-			message="Save failed"
-			action="Retry save"
-			onAction={retry}
-		/>,
+	const { rerender } = render(<ErrorNotice message={null} />);
+	expect(screen.queryByRole("alert")).toBeNull();
+	rerender(
+		<ErrorNotice message="Save failed" action="Retry save" onAction={retry} />,
 	);
+	expect(screen.getByRole("alert").textContent).toContain("Save failed");
 	await runInteractions([{ click: ["button", "Retry save"] }]);
 	expect(retry).toHaveBeenCalledOnce();
 });

@@ -6,20 +6,13 @@ export function ErrorNotice({
 	message,
 	action,
 	onAction,
-	reserve = false,
 }: {
 	message?: string | null;
 	action?: string;
 	onAction?: () => void;
-	/** Keep controls stationary through failure, retry, and recovery. */
-	reserve?: boolean;
 }) {
 	const notice = message ? (
-		<Notice
-			tone="danger"
-			className={reserve ? "min-h-full p-3 text-sm" : "mb-5 p-5 text-sm"}
-			role="alert"
-		>
+		<Notice tone="danger" className="mb-5 p-5 text-sm" role="alert">
 			<AlertCircle size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
 			<div className="min-w-0 break-words">
 				<p className="my-1 whitespace-pre-line text-danger-text">{message}</p>
@@ -31,18 +24,7 @@ export function ErrorNotice({
 			</div>
 		</Notice>
 	) : null;
-	return reserve ? (
-		<div
-			className="mb-3 h-24 min-w-0 shrink-0 overflow-auto rounded-surface"
-			// Keyboard users must be able to scroll long server errors.
-			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-			tabIndex={message ? 0 : undefined}
-		>
-			{notice}
-		</div>
-	) : (
-		notice
-	);
+	return notice;
 }
 
 /** Field feedback keeps its description target and three lines of space. */

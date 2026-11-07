@@ -4,7 +4,7 @@ import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Notice } from "../Notice.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 
 /**
@@ -76,7 +76,7 @@ export function EditorForm({
 				>
 					{children}
 				</fieldset>
-				<ErrorNotice reserve message={error} />
+				<FieldError message={error} />
 				{confirmCancel ? (
 					<div
 						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"

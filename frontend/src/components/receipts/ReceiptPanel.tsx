@@ -107,12 +107,11 @@ export function ReceiptPanel({
 						Loading receipts…
 					</p>
 				)}
-					<ErrorNotice
-						reserve
-						message={collection.error?.message ?? actions.attach.error?.message}
-						action={collection.error ? "Retry receipts" : undefined}
-						onAction={() => void collection.refetch()}
-					/>
+				<ErrorNotice
+					message={collection.error?.message ?? actions.attach.error?.message}
+					action={collection.error ? "Retry receipts" : undefined}
+					onAction={() => void collection.refetch()}
+				/>
 				{receipts.map((receipt) => (
 					<button
 						key={receipt.id}

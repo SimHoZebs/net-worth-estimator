@@ -55,7 +55,11 @@ export function TransactionAnalysisPanel({
 			className="mt-4 border-t border-line pt-4"
 			aria-label="Transaction analysis"
 		>
-			<ErrorNotice reserve message={query.isError ? "Transaction findings could not be loaded." : null} />
+			<ErrorNotice
+				message={
+					query.isError ? "Transaction findings could not be loaded." : null
+				}
+			/>
 			{visible.map((finding) => (
 				<BNPLConfirmation
 					key={finding.id}

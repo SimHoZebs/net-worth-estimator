@@ -12,7 +12,7 @@ import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
 import { parseDisplayNumber } from "../../components/editors/formValues.ts";
 import { Button } from "../../components/Button.tsx";
 import { dialogActionsStyles } from "../../components/dialogStyles.ts";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { FieldError } from "../../components/ErrorNotice.tsx";
 import { Modal } from "../../components/Modal.tsx";
 import { Notice } from "../../components/Notice.tsx";
 
@@ -189,7 +189,7 @@ export function PlannedPurchaseEditor({
 						Include in purchase queue
 					</label>
 				</fieldset>
-				<ErrorNotice reserve message={error} />
+				<FieldError message={error} />
 				{confirmCancel ? (
 					<div
 						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"

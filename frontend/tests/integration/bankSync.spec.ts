@@ -280,9 +280,7 @@ test("explains a rejected token and recovers with a new setup token", async ({
 	const form = bankSync.getByRole("form", { name: "Connect SimpleFIN" });
 	await form.getByLabel("Setup token", { exact: true }).fill("invalid-token");
 	await form.getByLabel("Setup token", { exact: true }).press("Enter");
-	await expect(form.getByRole("alert")).toContainText(
-		"Copy the entire setup token from SimpleFIN",
-	);
+	await expect(form.getByRole("alert")).toContainText("Connection failed.");
 	await expect(form.getByLabel("Setup token", { exact: true })).toHaveAttribute(
 		"aria-invalid",
 		"true",
@@ -336,9 +334,12 @@ test("explains sync limits without retrying the provider automatically", async (
 		exact: true,
 	});
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
-	await expect(bankSync.getByRole("alert")).toContainText(
-		"wait before you try again",
+	// One event, one channel: the toast carries the server message and the
+	// bank sync panel stays free of a mirrored banner.
+	await expect(page.getByRole("alert")).toContainText(
+		"Sync ran recently. Try again in one hour.",
 	);
+	await expect(bankSync.getByRole("alert")).toHaveCount(0);
 	expect(provider.syncCalls()).toBe(1);
 	await expect(simplefin.getByRole("status")).not.toContainText(
 		"Sync complete",

@@ -172,11 +172,8 @@ function ReceiptEditor({
 				</Notice>
 			)}
 			<ErrorNotice
-				reserve
 				message={
-					conflict
-						? "This receipt changed during your edit. Discard your edits before you use the latest saved details."
-						: mutationError
+					conflict ? "This receipt changed during your edit." : mutationError
 				}
 				action={conflict ? "Discard edits" : "Reload receipt"}
 				onAction={conflict ? () => setEdit(null) : reload}

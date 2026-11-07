@@ -23,7 +23,7 @@ import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
 import { DetailRow } from "../DetailRow.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { ErrorNotice, FieldError } from "../ErrorNotice.tsx";
 import { SelectField } from "../Field.tsx";
 import { Modal } from "../Modal.tsx";
 
@@ -126,13 +126,8 @@ export function NewScheduleDialog({
 					{!plan.creatable && (
 						<p className="m-0 text-sm text-muted">{plan.reason}</p>
 					)}
-					<ErrorNotice
-						reserve
-						message={
-							failed
-								? "The schedule could not be created. The plan above is current; review it and try again."
-								: null
-						}
+					<FieldError
+						message={failed ? "The schedule could not be created." : null}
 					/>
 					<div className="flex gap-2">
 						<Button type="button" variant="secondary" onClick={onClose}>
@@ -267,13 +262,8 @@ export function ExistingScheduleDialog({
 						{!plan.claimable && (
 							<p className="m-0 text-sm text-muted">{plan.reason}</p>
 						)}
-						<ErrorNotice
-							reserve
-							message={
-								failed
-									? "The payments could not be added. The preview above is current; review it and try again."
-									: null
-							}
+						<FieldError
+							message={failed ? "The payments could not be added." : null}
 						/>
 						<div className="flex gap-2">
 							<Button type="button" variant="secondary" onClick={onClose}>
@@ -338,11 +328,10 @@ function PatternCard({
 				{cadenceLabel(pattern.cadence)} · {directionLabel(pattern.anchor.role)}{" "}
 				· {pattern.findings.length} recorded
 			</p>
-			<ErrorNotice
-				reserve
+			<FieldError
 				message={
 					feedback.isError || dismiss.isError
-						? "The answer could not be saved. Try again."
+						? "The answer could not be saved."
 						: null
 				}
 			/>

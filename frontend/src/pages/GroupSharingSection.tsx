@@ -47,7 +47,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	const [saving, setSaving] = useState(false);
 	const [stopping, setStopping] = useState(false);
 	const [confirmStop, setConfirmStop] = useState(false);
-	const [formError, setFormError] = useState<string | null>(null);
 
 	// Editing starts from the stored preference when one exists, otherwise
 	// from the setup-day default: today, open-ended, nothing selected.
@@ -125,7 +124,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	}, [policy, accounts, ownedIds]);
 
 	function toggleAccount(id: string) {
-		setFormError(null);
 		setAccountIds((current) => {
 			const base = current ?? draftAccounts;
 			return base.includes(id)
@@ -136,7 +134,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 	async function save(input: SharingPolicyInput, notice: string) {
 		setSaving(true);
-		setFormError(null);
 		try {
 			await setPolicy.mutateAsync({ groupId, input });
 			setAccountIds(null);
@@ -145,7 +142,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			notifySuccess("groups-notice", notice);
 		} catch (cause) {
 			const message = serverMessage(cause, "Sharing could not be saved.");
-			setFormError(message);
 			notifyError("groups", message);
 		} finally {
 			setSaving(false);
@@ -198,7 +194,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			return;
 		}
 		setStopping(true);
-		setFormError(null);
 		try {
 			await setPolicy.mutateAsync({
 				groupId,
@@ -236,7 +231,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			// server and a retry replays from live rows, never a stale list.
 			void refreshSharingViewsFor(groupId);
 			const message = serverMessage(cause, "Sharing could not be stopped.");
-			setFormError(message);
 			notifyError("groups", message);
 		} finally {
 			setStopping(false);
@@ -282,8 +276,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				</p>
 			</div>
 
-			<ErrorNotice reserve message={formError} />
-
 			<fieldset className="grid gap-2 border-0 p-0">
 				<legend className="px-0 text-sm font-medium">Accounts to share</legend>
 				{accounts === null ? (
@@ -327,7 +319,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					value={draftStart}
 					maxLength={10}
 					onChange={(event) => {
-						setFormError(null);
 						setStartDate(event.target.value);
 					}}
 				/>
@@ -337,7 +328,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					value={draftEnd}
 					maxLength={10}
 					onChange={(event) => {
-						setFormError(null);
 						setEndDate(event.target.value);
 					}}
 				/>

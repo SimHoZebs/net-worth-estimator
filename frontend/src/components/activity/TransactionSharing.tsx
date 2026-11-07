@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Button } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { ErrorNotice, FieldError } from "../ErrorNotice.tsx";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
-import { notifyError, notifySuccess } from "../../state/notifications.ts";
+import { notifySuccess } from "../../state/notifications.ts";
 import { mintShareRequestId } from "../../pages/sharingApi.ts";
 import {
 	useExcludeSharedTransaction,
@@ -72,11 +72,11 @@ export function TransactionSharing({
 	// shares listed beside it are suppressed, never effective. Sharing
 	// stays unavailable until the wildcard exclusion is removed.
 
+	// The drawer blocks toasts. It owns failures inline.
 	function failureMessage(cause: unknown, fallback: string): string {
 		const message =
 			cause instanceof Error && cause.message ? cause.message : fallback;
 		setError(message);
-		notifyError("sharing", message);
 		return message;
 	}
 
@@ -183,7 +183,7 @@ export function TransactionSharing({
 				<h3 className="m-0 text-sm font-medium">Sharing</h3>
 			</div>
 
-			<ErrorNotice reserve message={error} />
+			<FieldError message={error} />
 
 			{intents.length > 0 && (
 				<ul className="grid list-none gap-2 p-0">

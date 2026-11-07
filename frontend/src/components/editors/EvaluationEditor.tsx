@@ -17,7 +17,7 @@ import { parseDisplayNumber } from "./formValues.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 import { balanceRowToDisplay } from "../../api/adapter.ts";
 import { toDisplayAccounts } from "../../domain/accountDisplay.ts";
@@ -194,7 +194,7 @@ export function EvaluationEditor({
 						</SelectField>
 					)}
 				</fieldset>
-				<ErrorNotice reserve message={error} />
+				<FieldError message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

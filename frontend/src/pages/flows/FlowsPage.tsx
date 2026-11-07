@@ -207,7 +207,6 @@ export function FlowsPage() {
 				/>
 			)}
 			<ErrorNotice
-				reserve
 				message={
 					query.isError
 						? (query.error?.message ??

@@ -22,7 +22,6 @@ export function GmailProviderPanel() {
 	const credential = useGmailCredential();
 	const readOnly = useUserReadOnly();
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [lookback, setLookback] = useState<string | null>(null);
@@ -80,11 +79,10 @@ export function GmailProviderPanel() {
 	async function handleConnect() {
 		if (readOnly || busy) return;
 		setBusy(true);
-		setError(null);
+		// Failures reach the toast from the mutation.
 		const started = await startGmailConsent();
 		if (!started) {
 			setBusy(false);
-			setError("Could not start Gmail consent. Try again.");
 		}
 		// On success the browser leaves for Google; no further local state.
 	}
@@ -92,26 +90,25 @@ export function GmailProviderPanel() {
 	async function handleDisconnect() {
 		if (readOnly || busy) return;
 		setBusy(true);
-		setError(null);
+		// Failures reach the toast from the mutation.
 		const ok = await disconnectGmail();
 		setBusy(false);
 		setConfirmingDisconnect(false);
 		if (ok) {
 			setLookback(null);
 			setMessage("Gmail disconnected. Saved tokens are revoked and forgotten.");
-		} else setError("Could not disconnect. Try again.");
+		}
 	}
 
 	async function handleLookbackSave(days: number) {
 		if (readOnly || busy) return;
 		setBusy(true);
-		setError(null);
 		const ok = await setGmailLookbackDays(days);
 		setBusy(false);
 		if (ok) {
 			setLookback(null);
 			setMessage(`Initial scan window set to ${days} days.`);
-		} else setError("Could not save the scan window. Try again.");
+		}
 	}
 
 	return (
@@ -138,7 +135,6 @@ export function GmailProviderPanel() {
 			>
 				{message}
 			</p>
-			<ErrorNotice reserve message={error} />
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{connected ? (

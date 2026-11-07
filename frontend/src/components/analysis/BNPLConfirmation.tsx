@@ -5,7 +5,7 @@ import { findingLabel, providerLabel } from "@/domain/analysisFindings.ts";
 import { useReviewAnalysisFinding } from "@/state/analyses.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { InputField, SelectField } from "../Field.tsx";
 
 // useReviewAnalysisFinding awaits its finding refetch before action completion.
@@ -133,14 +133,13 @@ export function BNPLConfirmation({
 					}}
 				/>
 			)}
-			<ErrorNotice
-				reserve
+			<FieldError
 				message={
 					!feedback.isError
 						? null
 						: "status" in feedback.error && feedback.error.status === 409
-							? "This finding changed. Check your answer and try again."
-							: "Your answer could not be saved. Try again."
+							? "This finding changed."
+							: "Your answer could not be saved."
 				}
 			/>
 		</div>

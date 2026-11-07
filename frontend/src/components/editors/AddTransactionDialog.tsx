@@ -25,7 +25,7 @@ import {
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 
 /**
@@ -266,7 +266,7 @@ export function AddTransactionDialog({
 						Include in projections
 					</label>
 				</fieldset>
-				<ErrorNotice reserve message={error} />
+				<FieldError message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

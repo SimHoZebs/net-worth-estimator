@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { EmailReceipt } from "../../api/generated/model/index.ts";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { ErrorNotice, FieldError } from "../../components/ErrorNotice.tsx";
 import { InputField } from "../../components/Field.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import {
@@ -18,20 +18,16 @@ import {
 export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 	const receipts = useGmailReceipts();
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState("");
 	const [editingId, setEditingId] = useState<string | null>(null);
 
 	async function handleScan() {
 		if (readOnly || busy) return;
 		setBusy(true);
-		setError(null);
+		// Failures reach the toast from the mutation.
 		const summary = await scanGmailReceiptsNow();
 		setBusy(false);
-		if (!summary) {
-			setError("The scan could not start. Try again.");
-			return;
-		}
+		if (!summary) return;
 		const parts = [`${summary.triaged} new`];
 		if (summary.receipts + summary.refunds > 0)
 			parts.push(
@@ -80,7 +76,6 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 				>
 					{message}
 				</p>
-				<ErrorNotice reserve message={error} />
 				{receipts.isPending ? (
 					<div aria-busy="true" className="mt-4">
 						<Skeleton className="h-16 w-full" />
@@ -248,7 +243,7 @@ function CorrectionForm({
 		});
 		setBusy(false);
 		if (updated) onDone();
-		else setError("Could not save the correction. Try again.");
+		// Failures reach the toast from the mutation.
 	}
 
 	return (
@@ -293,7 +288,7 @@ function CorrectionForm({
 				value={reference}
 				onChange={(event) => setReference(event.target.value)}
 			/>
-			<ErrorNotice reserve message={error} />
+			<FieldError message={error} />
 			<div>
 				<Button variant="secondary" type="submit" disabled={disabled || busy}>
 					{busy ? "Saving…" : "Save correction"}

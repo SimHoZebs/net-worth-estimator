@@ -18,7 +18,7 @@ import {
 } from "@/state/analyses.ts";
 import { Badge } from "../Badge.tsx";
 import { Button, TextButton } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { InputField, SelectField } from "../Field.tsx";
 import {
 	ExistingScheduleDialog,
@@ -356,7 +356,7 @@ export function TransactionInsightsPanel({
 						setPhase("details");
 					} else if (active) markHandled(active);
 				},
-				onError: () => setError("Your answer could not be saved. Try again."),
+				onError: () => setError("Your answer could not be saved."),
 			},
 		);
 	};
@@ -567,13 +567,12 @@ export function TransactionInsightsPanel({
 				</div>
 			)}
 
-			<ErrorNotice
-				reserve
+			<FieldError
 				message={
 					error ??
 					voidError ??
 					(review.isError || dismiss.isError
-						? "Your answer could not be saved. Try again."
+						? "Your answer could not be saved."
 						: null)
 				}
 			/>

@@ -42,7 +42,6 @@ export function ReceiptPreview({
 					/>
 				) : image.error ? (
 					<ErrorNotice
-						reserve
 						message={image.error.message}
 						action="Retry image"
 						onAction={() => void image.refetch()}

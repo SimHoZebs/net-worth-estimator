@@ -62,7 +62,6 @@ export function AnalysisFindings() {
 					</p>
 				)}
 				<ErrorNotice
-					reserve
 					message={
 						review.isError
 							? "The finding could not be updated. Try again."
