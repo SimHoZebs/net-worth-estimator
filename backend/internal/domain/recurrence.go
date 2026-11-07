@@ -359,27 +359,6 @@ func RuleCapsByID(model *types.FinancialModel) map[string]float64 {
 	return caps
 }
 
-// TransactionIDExists reports whether an ID names a manual transaction, a rule,
-// or a planned purchase.
-func TransactionIDExists(model *types.FinancialModel, id string) bool {
-	for index := range model.Transactions {
-		if model.Transactions[index].ID == id {
-			return true
-		}
-	}
-	for index := range model.Schedules {
-		if model.Schedules[index].ID == id {
-			return true
-		}
-	}
-	for index := range model.PlannedPurchases {
-		if model.PlannedPurchases[index].ID == id {
-			return true
-		}
-	}
-	return false
-}
-
 // TransactionIDs returns every transaction identity in a model: manual transaction
 // IDs, rule IDs, and planned-purchase IDs.
 func TransactionIDs(model *types.FinancialModel) map[string]bool {

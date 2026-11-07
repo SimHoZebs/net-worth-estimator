@@ -9,8 +9,6 @@ import (
 // Fixed-width, zero-padded dates sort chronologically as strings.
 // Callers must validate user-supplied dates before use.
 
-const msPerDay = 24 * 60 * 60 * 1000
-
 // ParseIsoDate parses a YYYY-MM-DD string as UTC midnight.
 func ParseIsoDate(value string) (time.Time, error) {
 	t, err := time.ParseInLocation("2006-01-02", value, time.UTC)

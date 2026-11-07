@@ -425,10 +425,6 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 	}
 }
 
-func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FIRow, monteCarloSample *types.MonteCarloSample, captureBalanceTrajectory, summaryOnly bool) (*FIRunOutcome, error) {
-	return evaluateCycleWithShared(path, plan, newFICycleShared(path, plan), candidate, monteCarloSample, captureBalanceTrajectory, summaryOnly)
-}
-
 func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, shared *fiCycleShared, candidate *FIRow, monteCarloSample *types.MonteCarloSample, captureBalanceTrajectory, summaryOnly bool) (*FIRunOutcome, error) {
 	if !candidate.IsEligible && !captureBalanceTrajectory {
 		return &FIRunOutcome{

@@ -2,15 +2,15 @@ package domain
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Chronological event ordering for history replay. This file is the single
-// owner of observation/transaction ordering: history replay, current position,
-// and projection preparation all share it, so a second ordering engine
+// Chronological event instants for history replay. This file owns
+// instant definitions (observation and transaction instants) shared by
+// history replay, current position and projection preparation. Ordering
+// of the replay stream lives in prepare.go; a second ordering engine
 // must never be added elsewhere (including the frontend).
 //
 // An observation carries only its exact instant (ObservedAt). There is no
@@ -56,24 +56,6 @@ func IsOwnerAuthored(source string) bool {
 	return !IsSyncCheckpoint(source)
 }
 
-// SortObservations orders observations chronologically for replay. Ties on
-// the same instant apply sync rows before owner rows, so an
-// owner-authored observation wins at the same instant. Other ties keep
-// model order (stable).
-func SortObservations(observations []types.Checkpoint) {
-	sort.SliceStable(observations, func(i, j int) bool {
-		left, right := CheckpointInstant(observations[i]), CheckpointInstant(observations[j])
-		if left != right {
-			return left < right
-		}
-		leftOwner, rightOwner := IsOwnerAuthored(observations[i].Source), IsOwnerAuthored(observations[j].Source)
-		if leftOwner != rightOwner {
-			return !leftOwner && rightOwner
-		}
-		return false
-	})
-}
-
 // EffectiveOccurrenceInstant is the instant an occurrence replays or
 // simulates at: confirmed actuals carry their stored Unix time (including
 // 00:00 — every stored transaction time is timed); rule instances take effect
@@ -92,10 +74,4 @@ func TransactionInstant(transaction *types.Transaction) int64 {
 		return transaction.TransactionTime
 	}
 	return transaction.PostedTime
-}
-
-// ObservationAtOrBefore reports whether an observation instant falls at or
-// before a cut instant.
-func ObservationAtOrBefore(instant, cut int64) bool {
-	return instant <= cut
 }
