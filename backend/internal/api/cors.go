@@ -256,20 +256,19 @@ func normalizeCORSOriginHost(host string) (string, bool) {
 	return normalized, true
 }
 
-// formatCORSOrigin joins a normalized host and port. When stripDefault is
-// true, default ports (80/443) are omitted for allow-list storage; otherwise
-// the port is always filled for same-origin comparison.
-func formatCORSOrigin(host, port, scheme string, stripDefault bool) (string, string) {
-	if stripDefault && ((scheme == "http" && port == "80") || (scheme == "https" && port == "443")) {
+// formatCORSOrigin joins a normalized host and port. Default ports (80/443)
+// are omitted for allow-list storage.
+func formatCORSOrigin(host, port, scheme string) string {
+	if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
 		port = ""
 	}
 	if port != "" {
-		return net.JoinHostPort(host, port), port
+		return net.JoinHostPort(host, port)
 	}
 	if strings.Contains(host, ":") {
-		return "[" + host + "]", port
+		return "[" + host + "]"
 	}
-	return host, port
+	return host
 }
 
 func corsHeadersAllowed(value string) bool {
@@ -307,32 +306,11 @@ func CanonicalOrigin(raw string) (string, error) {
 	if candidate == "" {
 		return "", errors.New("origin entries cannot be empty")
 	}
-	parsed, err := url.Parse(candidate)
-	if err != nil {
-		return "", fmt.Errorf("parse origin %q: %w", candidate, err)
-	}
-	scheme := strings.ToLower(parsed.Scheme)
-	if (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Opaque != "" {
+	host, port, scheme, ok := corsOriginParts(candidate)
+	if !ok {
 		return "", fmt.Errorf("origin %q must contain only an HTTP/S scheme and host", candidate)
 	}
-	if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
-		return "", fmt.Errorf("origin %q cannot contain a path, query, or fragment", candidate)
-	}
-	host, ok := normalizeCORSOriginHost(parsed.Hostname())
-	if !ok {
-		return "", fmt.Errorf("origin %q must contain a valid host", candidate)
-	}
-	port := parsed.Port()
-	if port != "" {
-		normalized, ok := normalizeCORSOriginPort(port)
-		if !ok {
-			return "", fmt.Errorf("origin %q contains an invalid port", candidate)
-		}
-		port = normalized
-	} else if strings.HasSuffix(parsed.Host, ":") {
-		return "", fmt.Errorf("origin %q contains an invalid port", candidate)
-	}
-	joined, _ := formatCORSOrigin(host, port, scheme, true)
+	joined := formatCORSOrigin(host, port, scheme)
 	return scheme + "://" + joined, nil
 }
 
