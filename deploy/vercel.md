@@ -44,6 +44,18 @@ deployments.
 The config pins Bun `1.4.x`. The frontend build runs `typecheck` once before
 `vite build`, which needs Bun 1.4.
 
+Vercel installs dependencies before it evaluates `vercel.mjs`. Set the
+project-level Install Command so that first install also uses `.bun-version`:
+
+```sh
+vercel project update net-worth-estimator --scope simhozebs-projects \
+  --install-command 'npx --yes bun@$(cat .bun-version) install --frozen-lockfile' --yes
+```
+
+The config-level Install Command cannot control that first install. Keep every
+workspace package manifest in the upload. `.vercelignore` retains the auth
+manifest but excludes its source, fixtures, and generated assets.
+
 Set these repository settings in GitHub:
 
 | Name | Kind | Value |
@@ -73,5 +85,6 @@ See [the deployment index](README.md) for the shared runtime and reverse-proxy c
 ## Provider references
 
 - [Vercel programmatic configuration](https://vercel.com/docs/project-configuration/vercel-ts)
+- [Pin the Bun version for builds](https://vercel.com/kb/guide/how-to-pin-a-specific-bun-version-for-vercel-builds)
 - [Vercel external rewrites and secret headers](https://vercel.com/docs/routing/rewrites)
 - [Vercel external-proxy inactivity timeout](https://vercel.com/changelog/cdn-origin-timeout-increased-to-two-minutes)

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { vercelConfig } from "./vercel.mjs";
@@ -10,6 +12,25 @@ const settings = {
   NET_WORTH_ESTIMATOR_PUBLIC_URL: "https://app.example.test/",
   NET_WORTH_ESTIMATOR_PROXY_SECRET: "0123456789abcdef0123456789abcdef",
 };
+
+test("Vercel upload keeps workspace manifests without identity implementation", () => {
+  const directory = mkdtempSync(join(tmpdir(), "waypoint-vercel-ignore-"));
+  try {
+    const init = spawnSync("git", ["init", "--quiet", directory], { encoding: "utf8" });
+    assert.equal(init.status, 0, init.stderr);
+    writeFileSync(join(directory, ".gitignore"), readFileSync(new URL("../.vercelignore", import.meta.url)));
+    const included = ["package.json", "bun.lock", ".bun-version", "frontend/package.json", "extension/package.json", "auth/better-auth/package.json", "deploy/vercel.mjs", "vercel.mjs"];
+    const excluded = ["auth/better-auth/src/server.ts", "auth/better-auth/test-support.ts", "auth/better-auth/public/client.js", "auth/test-e2e.mjs", "backend/main.go", ".env.local"];
+    const result = spawnSync("git", ["-C", directory, "check-ignore", "--no-index", "--stdin"], {
+      input: [...included, ...excluded].join("\n") + "\n",
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split("\n"), excluded);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("Vercel proxies the API, callbacks, probes, and streams before static fallback", () => {
   const config = vercelConfig(settings);
