@@ -5,7 +5,8 @@ import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
 
 /**
  * Posted rows joined to the projection under shared rule identities.
- * Historical bills before the projection start come from the one-time
+ * Posted income attaches to the closest selected income rule when no
+ * explicit claim names it. Historical bills come from the one-time
  * schedule fill until the server exposes historical occurrences.
  */
 export function safeSpendingResults({
@@ -15,6 +16,9 @@ export function safeSpendingResults({
 	billScheduleIds = [],
 	billWindowStart,
 	billWindowEnd,
+	rules = [],
+	incomeAccountIds = [],
+	incomeScheduleIds = [],
 }: {
 	transactions: Transaction[];
 	projectionTransactions: TransactionResult[];
@@ -22,14 +26,58 @@ export function safeSpendingResults({
 	billScheduleIds?: string[];
 	billWindowStart?: string;
 	billWindowEnd?: string;
+	rules?: Transaction[];
+	incomeAccountIds?: string[];
+	incomeScheduleIds?: string[];
 }): TransactionResult[] {
-	const posted: TransactionResult[] = [];
+	const incomeAccounts = new Set(incomeAccountIds);
+	const selectedIncome = new Set(incomeScheduleIds);
+	const incomeRules = rules.filter(
+		(rule) => rule.kind === "schedule" && selectedIncome.has(rule.id),
+	);
+	const expectedIncome = new Map<string, number>();
+	for (const transaction of projectionTransactions) {
+		if (!selectedIncome.has(transaction.transactionId)) continue;
+		if (transaction.requested <= 0) continue;
+		if (!expectedIncome.has(transaction.transactionId)) {
+			expectedIncome.set(transaction.transactionId, transaction.requested);
+		}
+	}
+	const incomeRuleFor = (row: Transaction): string | null => {
+		if (row.amount <= 0 || row.toId === null) return null;
+		if (!incomeAccounts.has(row.toId)) return null;
+		if (row.fromId !== null && incomeAccounts.has(row.fromId)) return null;
+		const candidates = incomeRules.filter((rule) => rule.toId === row.toId);
+		if (candidates.length === 0) return null;
+		const amountOf = (rule: Transaction) =>
+			expectedIncome.get(rule.id) ?? (rule.amount > 0 ? rule.amount : null);
+		const scored = candidates
+			.map((rule) => ({ rule, amount: amountOf(rule) }))
+			.filter(
+				(entry): entry is { rule: Transaction; amount: number } =>
+					entry.amount !== null,
+			);
+		if (scored.length === 0) return null;
+		const closestDistance = Math.min(
+			...scored.map(({ amount }) => Math.abs(row.amount - amount)),
+		);
+		const closest = scored.filter(
+			({ amount }) => Math.abs(row.amount - amount) === closestDistance,
+		);
+		const closestEntry = closest[0];
+		if (!closestEntry || closest.length !== 1) return null;
+		const reference = closestEntry.amount;
+		return Math.abs(row.amount - reference) <= Math.max(100, reference * 0.15)
+			? closestEntry.rule.id
+			: null;
+	};
+	const posted: Array<TransactionResult & { postedId?: string }> = [];
 	const claimedKeys = new Set<string>();
 	for (const row of transactions) {
 		if (row.kind !== "transaction" || !row.enabled || row.void || row.pending)
 			continue;
 		if (!row.startDate) continue;
-		const transactionId = row.claimScheduleId ?? row.id;
+		const transactionId = row.claimScheduleId ?? incomeRuleFor(row) ?? row.id;
 		// The claim names the guessed occurrence the row fulfills; the row
 		// itself happens when it happened.
 		const claimDate = row.claimOccurrenceDate;
@@ -48,6 +96,7 @@ export function safeSpendingResults({
 			accountDeltas: [],
 			posted: true,
 			claimed: row.claimScheduleId !== null,
+			postedId: row.id,
 		});
 	}
 
@@ -65,11 +114,20 @@ export function safeSpendingResults({
 		existing.add(occurrenceKey);
 		combined.push(row);
 	};
-	for (const row of posted) add(row);
+	// Posted deposits are distinct evidence: keep each even when two share
+	// the same attached rule, day, and amount. Track their occurrences
+	// separately so projected fragments for unposted occurrences survive.
+	const postedOccurrences = new Set<string>();
+	for (const row of posted) {
+		combined.push(row);
+		postedOccurrences.add(`${row.transactionId}|${row.date}`);
+	}
 	for (const row of projectionTransactions) {
 		if (claimedKeys.has(`${row.transactionId}|${row.date}`)) continue;
+		if (postedOccurrences.has(`${row.transactionId}|${row.date}`)) continue;
 		add(row);
 	}
+	for (const key of postedOccurrences) existing.add(key);
 	if (billWindowStart !== undefined && billWindowEnd !== undefined && schedules.length > 0 && billScheduleIds.length > 0) {
 		const selected = new Set(billScheduleIds);
 		for (const schedule of schedules) {

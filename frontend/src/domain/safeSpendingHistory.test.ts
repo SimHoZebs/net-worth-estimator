@@ -59,6 +59,58 @@ describe("safeSpendingResults", () => {
 		});
 	});
 
+	it("keeps two distinct deposits attached to the same rule", () => {
+		const salaryRule = {
+			...posted({ id: "salary", kind: "schedule", amount: 7000, toId: "checking" }),
+		} as import("@/domain/model.ts").Transaction;
+		const results = safeSpendingResults({
+			transactions: [
+				posted({ id: "pay-a", name: "Payroll", amount: 7000, toId: "checking", startDate: "2026-10-30" }),
+				posted({ id: "pay-b", name: "Payroll", amount: 7000, toId: "checking", startDate: "2026-10-30" }),
+			],
+			projectionTransactions: [
+				transactionFixture({
+					date: "2026-10-30",
+					transactionId: "salary",
+					requested: 7000,
+					fromId: "gross_pay",
+					toId: "checking",
+				}),
+			],
+			rules: [salaryRule],
+			incomeAccountIds: ["checking"],
+			incomeScheduleIds: ["salary"],
+		});
+		const salaryRows = results.filter((row) => row.transactionId === "salary");
+		expect(salaryRows).toHaveLength(2);
+	});
+
+	it("does not attach when two income rules tie on amount", () => {
+		const ruleA = { ...posted({ id: "rule-a", kind: "schedule", amount: 2000, toId: "checking" }) } as import("@/domain/model.ts").Transaction;
+		const ruleB = { ...posted({ id: "rule-b", kind: "schedule", amount: 2000, toId: "checking" }) } as import("@/domain/model.ts").Transaction;
+		const results = safeSpendingResults({
+			transactions: [
+				posted({ id: "pay-mystery", name: "Pay", amount: 2000, toId: "checking", startDate: "2026-10-30" }),
+			],
+			projectionTransactions: [],
+			rules: [ruleA, ruleB],
+			incomeAccountIds: ["checking"],
+			incomeScheduleIds: ["rule-a", "rule-b"],
+		});
+		expect(results.find((row) => row.date === "2026-10-30")?.transactionId).toBe("pay-mystery");
+	});
+
+	it("keeps same-day projected fragments for one rule", () => {
+		const results = safeSpendingResults({
+			transactions: [],
+			projectionTransactions: [
+				transactionFixture({ date: "2026-11-01", transactionId: "bill-rule", fromId: "checking", requested: 40 }),
+				transactionFixture({ date: "2026-11-01", transactionId: "bill-rule", fromId: "checking", requested: 60 }),
+			],
+		});
+		expect(results.filter((row) => row.transactionId === "bill-rule")).toHaveLength(2);
+	});
+
 	it("joins a posted row only on an explicit claimScheduleId", () => {
 		const results = safeSpendingResults({
 			transactions: [

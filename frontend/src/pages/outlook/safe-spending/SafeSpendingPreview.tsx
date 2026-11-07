@@ -214,8 +214,11 @@ export function SafeSpendingPreview({
 				billScheduleIds: trackedBillIds,
 				billWindowStart: closedCycle.start,
 				billWindowEnd: nextMonthRange(cycle.cycleEnd).end,
+				rules,
+				incomeAccountIds: incomeIds,
+				incomeScheduleIds: settings.incomeScheduleIds,
 			}),
-		[transactions, projectionTransactions, savedRules, trackedBillIds, closedCycle.start, cycle.cycleEnd],
+		[transactions, projectionTransactions, savedRules, trackedBillIds, closedCycle.start, cycle.cycleEnd, rules, incomeIds, settings.incomeScheduleIds],
 	);
 	const obligationTransactions = useMemo(
 		() =>
