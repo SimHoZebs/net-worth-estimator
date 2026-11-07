@@ -2,6 +2,7 @@ package simplefin
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/ingest"
@@ -62,16 +63,34 @@ func (a bridgeAdapter) Provisions(native any) []store.SyncProvision {
 		return nil
 	}
 	exclusions := set.Exclusions()
+	// One connection is one login link to an institution. Map each
+	// connection to the bank organization name the bridge reported,
+	// falling back to the connection login name when no organization
+	// name is present.
+	institutions := make(map[string]string, len(set.Connections))
+	for _, connection := range set.Connections {
+		name := strings.TrimSpace(connection.OrgName)
+		if name == "" {
+			name = strings.TrimSpace(connection.Name)
+		}
+		if name == "" || connection.ConnID == "" {
+			continue
+		}
+		if _, seen := institutions[connection.ConnID]; !seen {
+			institutions[connection.ConnID] = name
+		}
+	}
 	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
 		if exclusions.Excluded(account.ConnID, account.ID) {
 			continue
 		}
 		provisions = append(provisions, store.SyncProvision{
-			BridgeID: AccountKey(account.ConnID, account.ID),
-			Name:     account.Name,
-			Currency: account.Currency,
-			Kind:     types.AccountKind(provisionKind(account)),
+			BridgeID:    AccountKey(account.ConnID, account.ID),
+			Name:        account.Name,
+			Institution: institutions[account.ConnID],
+			Currency:    account.Currency,
+			Kind:        types.AccountKind(provisionKind(account)),
 		})
 	}
 	return provisions

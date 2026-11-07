@@ -283,6 +283,50 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	}
 }
 
+func TestProvisionStoresInstitutionOnLink(t *testing.T) {
+	store := openTestStore(t)
+	_, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
+		{BridgeID: "bridge-chase", Name: "Checking 8472", Institution: "Chase", Currency: "USD", Kind: types.AccountKind("cash")},
+	})
+	if err != nil {
+		t.Fatalf("provision: %v", err)
+	}
+	links, err := store.ListAccountLinks()
+	if err != nil || len(links) != 1 {
+		t.Fatalf("links = %+v, err %v", links, err)
+	}
+	if links[0].Institution != "Chase" || links[0].BridgeName != "Checking 8472" {
+		t.Fatalf("link = %+v, want institution Chase and bridge name", links[0])
+	}
+	// A later sync that reports no institution keeps the stored bank
+	// name instead of wiping it.
+	if _, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
+		{BridgeID: "bridge-chase", Name: "Checking 8472", Currency: "USD", Kind: types.AccountKind("cash")},
+	}); err != nil {
+		t.Fatalf("re-provision: %v", err)
+	}
+	links, err = store.ListAccountLinks()
+	if err != nil {
+		t.Fatalf("links: %v", err)
+	}
+	if links[0].Institution != "Chase" {
+		t.Fatalf("institution wiped by empty sync: %+v", links[0])
+	}
+	// A moved bank name does update on a later sync.
+	if _, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
+		{BridgeID: "bridge-chase", Name: "Checking 8472", Institution: "JPMorgan Chase", Currency: "USD", Kind: types.AccountKind("cash")},
+	}); err != nil {
+		t.Fatalf("re-provision renamed: %v", err)
+	}
+	links, err = store.ListAccountLinks()
+	if err != nil {
+		t.Fatalf("links: %v", err)
+	}
+	if links[0].Institution != "JPMorgan Chase" {
+		t.Fatalf("institution not refreshed: %+v", links[0])
+	}
+}
+
 func TestProvisionReportsStaleLinks(t *testing.T) {
 	store := openTestStore(t)
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {

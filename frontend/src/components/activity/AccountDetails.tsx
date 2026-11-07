@@ -1,7 +1,7 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { updateAccount } from "@/api/generated/endpoints.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
-import { money } from "../../domain/format.ts";
+import { dateLabel, money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
 import { accountUpdateBody } from "../editors/accountFields.ts";
@@ -341,10 +341,45 @@ export function AccountDetails({
 					</div>
 				</fieldset>
 				<div className="col-span-full flex flex-col gap-2 text-sm font-semibold text-muted max-sm:text-xs">
-					<span id="account-source-label">Source</span>
-					<div className="flex" aria-labelledby="account-source-label">
-						<Badge tone="outline">{account.source}</Badge>
-					</div>
+					{account.institution ? (
+						<>
+							<span id="account-source-label">Bank</span>
+							<div className="flex" aria-labelledby="account-source-label">
+								<Badge tone="outline">{account.institution}</Badge>
+							</div>
+							<dl className="mt-1 flex flex-col gap-1 text-sm text-muted">
+								{account.syncedName ? (
+									<div className="flex justify-between gap-4">
+										<dt>Synced as</dt>
+										<dd className="m-0 text-right font-medium text-ink">
+											{account.syncedName}
+										</dd>
+									</div>
+								) : null}
+								{account.currency ? (
+									<div className="flex justify-between gap-4">
+										<dt>Currency</dt>
+										<dd className="m-0 text-right font-medium text-ink">
+											{account.currency}
+										</dd>
+									</div>
+								) : null}
+								<div className="flex justify-between gap-4">
+									<dt>Last synced</dt>
+									<dd className="m-0 text-right font-medium text-ink">
+										{dateLabel(account.observedOn, true)}
+									</dd>
+								</div>
+							</dl>
+						</>
+					) : (
+						<>
+							<span id="account-source-label">Source</span>
+							<div className="flex" aria-labelledby="account-source-label">
+								<Badge tone="outline">{account.source}</Badge>
+							</div>
+						</>
+					)}
 				</div>
 			</fieldset>
 			<ErrorNotice reserve message={error} />

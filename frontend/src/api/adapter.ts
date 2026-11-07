@@ -44,6 +44,15 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 				? "Balance check"
 				: "No balance check",
 		readOnly: row.readOnly,
+		...(row.institution
+			? { institution: row.institution }
+			: {}),
+		...(row.syncedName
+			? { syncedName: row.syncedName }
+			: {}),
+		...(row.currency
+			? { currency: row.currency }
+			: {}),
 	};
 }
 

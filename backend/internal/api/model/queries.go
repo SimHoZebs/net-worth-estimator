@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -50,6 +51,15 @@ type accountBalanceRow struct {
 	HasCheckpoint bool              `json:"hasCheckpoint"`
 	SyncOwned     bool              `json:"syncOwned"`
 	ReadOnly      bool              `json:"readOnly"`
+	// Institution is the bank organization name for the linked bridge
+	// account, empty for manual accounts or when the bridge reported
+	// none. It identifies where a synced account came from.
+	Institution *string `json:"institution,omitempty"`
+	// SyncedName is the bridge account name snapshot from the sync
+	// link; it can differ from the owner's account name after a rename.
+	SyncedName *string `json:"syncedName,omitempty"`
+	// Currency is the bridge account currency from the sync link.
+	Currency *string `json:"currency,omitempty"`
 	// ObservedBalance is the latest observation at or before AsOf,
 	// separate from the adjusted modeled Balance. Nil when unobserved.
 	ObservedBalance *float64 `json:"observedBalance,omitempty"`
@@ -123,6 +133,16 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 	for _, account := range position.Accounts {
 		byAccount[account.AccountID] = account
 	}
+	// Bridge identity travels on the sync link, keyed by model account.
+	// One model account links to at most one bridge account.
+	links, linksErr := s.store.ListAccountLinks()
+	if linksErr != nil {
+		return nil, huma.Error500InternalServerError(linksErr.Error())
+	}
+	byModelAccount := make(map[string]store.AccountLink, len(links))
+	for _, link := range links {
+		byModelAccount[link.ModelAccountID] = link
+	}
 	rows := []accountBalanceRow{}
 	if model != nil {
 		for _, account := range model.Accounts {
@@ -141,6 +161,18 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 					}
 				}
 			}
+			var institution, syncedName, currency *string
+			if link, ok := byModelAccount[account.ID]; ok {
+				if strings.TrimSpace(link.Institution) != "" {
+					institution = &link.Institution
+				}
+				if strings.TrimSpace(link.BridgeName) != "" {
+					syncedName = &link.BridgeName
+				}
+				if strings.TrimSpace(link.Currency) != "" {
+					currency = &link.Currency
+				}
+			}
 			row := accountBalanceRow{
 				ID:               account.ID,
 				Name:             account.Name,
@@ -155,6 +187,9 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				HasCheckpoint:    hasCheckpoint,
 				SyncOwned:        syncOwned,
 				ReadOnly:         s.readOnly || syncOwned,
+				Institution:      institution,
+				SyncedName:       syncedName,
+				Currency:         currency,
 				ObservedBalance:  adjusted.ObservedBalance,
 				ObservedAt:       adjusted.ObservedAt,
 				AvailableBalance: adjusted.AvailableBalance,

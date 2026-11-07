@@ -13,6 +13,7 @@
 #   4. The additive unified projection tables and columns are provisioned
 #      when absent; a partial group fails closed.
 #   5. The completed transaction-ID migration audit table is removed.
+#   6. The account_links institution column is provisioned when absent.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -291,6 +292,8 @@ fi
 projection=$(projection_state "$db") || fail "Cannot inspect unified projection schema; refusing to guess."
 transaction_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='transaction_id_migrations';") \
   || fail "Cannot inspect transaction-ID audit table."
+institution_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';") \
+  || fail "Cannot inspect account_links institution column."
 transactions_split=0
 if [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_sim';")" = 1 ] && \
    [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'destination_account_ids';")" = 1 ]; then
@@ -334,7 +337,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
   exit 0
 fi
 
@@ -1031,6 +1034,22 @@ DDL
   check_projection "$candidate" || fail "Candidate unified projection schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 
+# Provision the account_links institution column additively on the
+# candidate. Fresh databases already carry it from setupdb; existing
+# deployments gain it here with an empty default, filled by next sync.
+institution_count=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';") \
+  || fail "Cannot inspect account_links institution column. Original unchanged; backup retained at $backup. Keep the API stopped."
+case "$institution_count" in
+  0)
+    sqlite3 "$candidate" "ALTER TABLE account_links ADD COLUMN institution TEXT NOT NULL DEFAULT '';" \
+      || fail "Cannot add account_links institution column. Original unchanged; backup retained at $backup. Keep the API stopped."
+    ;;
+  1) ;;
+  *) fail "Unexpected account_links institution count. Original unchanged; backup retained at $backup. Keep the API stopped." ;;
+esac
+test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
+  || fail "Candidate account_links institution column is missing. Original unchanged; backup retained at $backup. Keep the API stopped."
+
 # Setup validates the final shape only. A digest of the logical database also
 # proves that the validator did not rewrite any candidate rows or schema.
 validation_before=$(sqlite3 "$candidate" .dump | sha256sum)
@@ -1048,10 +1067,12 @@ sqlite3 "$candidate" ".backup main '$(esc "$db")'" \
   || fail "Publication failed. Original may need recovery from the verified backup at $backup. Keep the API stopped."
 check_target "$db" || fail "Published database failed Analysis verification. Recover from the verified backup at $backup. Keep the API stopped."
 check_projection "$db" || fail "Published database failed unified projection verification. Recover from the verified backup at $backup. Keep the API stopped."
+test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
+  || fail "Published database is missing the account_links institution column. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
 if [ "$mode" = convert ]; then
-  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, and provisioned Analysis and unified projection schema from $backup."
+  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, and provisioned Analysis, unified projection, and account institution schema from $backup."
 else
-  info "Completed current application and unified projection schema on final checkpoints from $backup."
+  info "Completed current application, unified projection, and account institution schema on final checkpoints from $backup."
 fi

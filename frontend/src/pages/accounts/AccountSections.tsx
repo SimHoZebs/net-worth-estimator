@@ -11,13 +11,12 @@ import {
 	sortTransactionsByDate,
 	type TransactionOrder,
 } from "../../domain/transactionSort.ts";
-import { NO_CEILING_SENTINEL, NO_FLOOR_SENTINEL } from "../../api/contracts.ts";
+import { balanceRowToDisplay } from "../../api/adapter.ts";
 import {
 	type Account,
 	visibleAccounts,
 	visibleTransactions,
 } from "../../domain/model.ts";
-import { parseUnion } from "../../domain/guards.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
@@ -75,40 +74,7 @@ function AccountsView({
 	const visible = useMemo(
 		() =>
 			visibleAccounts(
-				(balances.data?.accounts ?? []).map((row): Account => ({
-					id: row.id,
-					name: row.name,
-					kind:
-						parseUnion(row.kind, [
-							"cash",
-							"investment",
-							"debt",
-							"property",
-						] as const) ?? "cash",
-					enabled: row.enabled,
-					archived: row.archived,
-					balance: row.balance,
-					minBalance:
-						row.minBalance === null ||
-						row.minBalance === NO_FLOOR_SENTINEL ||
-						row.minBalance < 0
-							? 0
-							: row.minBalance,
-					maxBalance:
-						row.maxBalance === null ||
-						row.maxBalance === NO_CEILING_SENTINEL ||
-						row.maxBalance < 0
-							? null
-							: row.maxBalance,
-					color: row.color ?? null,
-					observedOn: row.observedOn,
-					balanceCheck: row.hasCheckpoint,
-					source: row.syncOwned ? "Synced account" : "Manual entry",
-					readOnly: row.readOnly,
-					observedBalance: row.observedBalance ?? null,
-					observedAt: row.observedAt ?? null,
-					availableBalance: row.availableBalance ?? null,
-				})),
+				(balances.data?.accounts ?? []).map(balanceRowToDisplay),
 			),
 		[balances.data],
 	);

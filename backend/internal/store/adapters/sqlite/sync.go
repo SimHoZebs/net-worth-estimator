@@ -321,13 +321,13 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 				stale = append(stale, item.BridgeID)
 				continue
 			}
-			if err := TouchAccountLink(tx, item.BridgeID, item.Name, item.Currency); err != nil {
+			if err := TouchAccountLink(tx, item.BridgeID, item.Name, item.Institution, item.Currency); err != nil {
 				return nil, 0, nil, err
 			}
 			resolved[item.BridgeID] = modelAccountID
 			continue
 		}
-		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Currency, item.Kind)
+		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Institution, item.Currency, item.Kind)
 		if err != nil {
 			return nil, 0, nil, err
 		}

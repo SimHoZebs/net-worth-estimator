@@ -50,9 +50,13 @@ type AccountLink struct {
 	BridgeAccountID string `json:"bridgeAccountId"`
 	ModelAccountID  string `json:"modelAccountId"`
 	BridgeName      string `json:"bridgeName"`
-	Currency        string `json:"currency"`
-	Origin          string `json:"origin"`
-	LastSeenAt      string `json:"lastSeenAt"`
+	// Institution is the bank organization name reported by the bridge
+	// (SimpleFIN org_name, falling back to the connection name). Empty
+	// means unknown, never a label such as "Synced account".
+	Institution string `json:"institution,omitempty"`
+	Currency    string `json:"currency"`
+	Origin      string `json:"origin"`
+	LastSeenAt  string `json:"lastSeenAt"`
 }
 
 // EvaluationUpdate is one generic evaluation row for create/update.
@@ -164,8 +168,11 @@ type SyncApplySummary struct {
 type SyncProvision struct {
 	BridgeID string
 	Name     string
-	Currency string
-	Kind     types.AccountKind
+	// Institution is the bank organization name for the bridge
+	// connection, empty when the bridge reported none.
+	Institution string
+	Currency    string
+	Kind        types.AccountKind
 }
 
 // GeneratedTransaction is one engine-output transaction for a slice. Generated

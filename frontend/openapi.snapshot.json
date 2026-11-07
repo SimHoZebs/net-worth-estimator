@@ -56,6 +56,9 @@
 					"color": {
 						"type": "string"
 					},
+					"currency": {
+						"type": "string"
+					},
 					"enabled": {
 						"type": "boolean"
 					},
@@ -63,6 +66,9 @@
 						"type": "boolean"
 					},
 					"id": {
+						"type": "string"
+					},
+					"institution": {
 						"type": "string"
 					},
 					"kind": {
@@ -95,6 +101,9 @@
 					},
 					"syncOwned": {
 						"type": "boolean"
+					},
+					"syncedName": {
+						"type": "string"
 					}
 				},
 				"required": [
@@ -213,6 +222,9 @@
 						"type": "string"
 					},
 					"currency": {
+						"type": "string"
+					},
+					"institution": {
 						"type": "string"
 					},
 					"lastSeenAt": {
@@ -621,9 +633,6 @@
 					"kind": {
 						"type": "string"
 					},
-					"transactionId": {
-						"type": "string"
-					},
 					"product": {
 						"type": "string"
 					},
@@ -634,6 +643,9 @@
 						"type": "string"
 					},
 					"strength": {
+						"type": "string"
+					},
+					"transactionId": {
 						"type": "string"
 					}
 				},
@@ -671,14 +683,14 @@
 					"code": {
 						"type": "string"
 					},
+					"reason": {
+						"type": "string"
+					},
 					"transactionIds": {
 						"items": {
 							"type": "string"
 						},
 						"type": ["array", "null"]
-					},
-					"reason": {
-						"type": "string"
 					}
 				},
 				"required": ["code", "reason", "transactionIds"],
@@ -713,9 +725,6 @@
 						"format": "int64",
 						"type": "integer"
 					},
-					"transactionId": {
-						"type": "string"
-					},
 					"prediction": {
 						"$ref": "#/components/schemas/AnalysisDetection"
 					},
@@ -730,6 +739,9 @@
 						"type": "integer"
 					},
 					"runId": {
+						"type": "string"
+					},
+					"transactionId": {
 						"type": "string"
 					}
 				},
@@ -828,9 +840,6 @@
 						"format": "int64",
 						"type": "integer"
 					},
-					"transactionId": {
-						"type": "string"
-					},
 					"product": {
 						"type": "string"
 					},
@@ -853,6 +862,9 @@
 						"type": "string"
 					},
 					"strength": {
+						"type": "string"
+					},
+					"transactionId": {
 						"type": "string"
 					}
 				},
@@ -1699,12 +1711,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"transactions": {
-						"items": {
-							"$ref": "#/components/schemas/Transaction"
-						},
-						"type": ["array", "null"]
-					},
 					"schedules": {
 						"items": {
 							"$ref": "#/components/schemas/Schedule"
@@ -1713,6 +1719,12 @@
 					},
 					"sourcePath": {
 						"type": "string"
+					},
+					"transactions": {
+						"items": {
+							"$ref": "#/components/schemas/Transaction"
+						},
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -1986,9 +1998,6 @@
 					"date": {
 						"type": "string"
 					},
-					"transactionId": {
-						"type": "string"
-					},
 					"realizedAmount": {
 						"format": "double",
 						"type": "number"
@@ -2000,6 +2009,9 @@
 					"sequence": {
 						"format": "int64",
 						"type": "integer"
+					},
+					"transactionId": {
+						"type": "string"
 					}
 				},
 				"required": [
@@ -2038,9 +2050,6 @@
 					"date": {
 						"type": "string"
 					},
-					"transactionId": {
-						"type": "string"
-					},
 					"realizedAmount": {
 						"format": "double",
 						"type": "number"
@@ -2048,6 +2057,9 @@
 					"sequence": {
 						"format": "int64",
 						"type": "integer"
+					},
+					"transactionId": {
+						"type": "string"
 					}
 				},
 				"required": ["transactionId", "date", "sequence", "realizedAmount"],
@@ -2522,15 +2534,15 @@
 						},
 						"type": ["array", "null"]
 					},
-					"addedTransactions": {
-						"items": {
-							"$ref": "#/components/schemas/Transaction"
-						},
-						"type": ["array", "null"]
-					},
 					"addedSchedules": {
 						"items": {
 							"$ref": "#/components/schemas/Schedule"
+						},
+						"type": ["array", "null"]
+					},
+					"addedTransactions": {
+						"items": {
+							"$ref": "#/components/schemas/Transaction"
 						},
 						"type": ["array", "null"]
 					},
@@ -2540,13 +2552,13 @@
 						},
 						"type": ["array", "null"]
 					},
-					"disabledTransactionIds": {
+					"disabledScheduleIds": {
 						"items": {
 							"type": "string"
 						},
 						"type": ["array", "null"]
 					},
-					"disabledScheduleIds": {
+					"disabledTransactionIds": {
 						"items": {
 							"type": "string"
 						},
@@ -3071,100 +3083,6 @@
 				"required": ["asOfDate"],
 				"type": "object"
 			},
-			"Transaction": {
-				"additionalProperties": false,
-				"properties": {
-					"amount": {
-						"$ref": "#/components/schemas/TransactionAmountResolution"
-					},
-					"claim": {
-						"$ref": "#/components/schemas/TransactionClaim"
-					},
-					"destinations": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"enabled": {
-						"type": "boolean"
-					},
-					"executionOrder": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"id": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					},
-					"pending": {
-						"type": "boolean"
-					},
-					"postedTime": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"source": {
-						"type": "string"
-					},
-					"sourceAccountId": {
-						"type": ["string", "null"]
-					},
-					"transactionTime": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"void": {
-						"type": "boolean"
-					}
-				},
-				"required": [
-					"id",
-					"name",
-					"sourceAccountId",
-					"destinations",
-					"amount",
-					"postedTime",
-					"transactionTime",
-					"enabled"
-				],
-				"type": "object"
-			},
-			"TransactionAmountResolution": {
-				"additionalProperties": false,
-				"properties": {
-					"config": {
-						"additionalProperties": {},
-						"type": "object"
-					},
-					"inputs": {
-						"additionalProperties": {
-							"$ref": "#/components/schemas/AmountInputBinding"
-						},
-						"type": "object"
-					},
-					"resolver": {
-						"type": "string"
-					}
-				},
-				"required": ["resolver", "config", "inputs"],
-				"type": "object"
-			},
-			"TransactionClaim": {
-				"additionalProperties": false,
-				"properties": {
-					"occurrenceDate": {
-						"type": "string"
-					},
-					"scheduleId": {
-						"type": "string"
-					}
-				},
-				"required": ["scheduleId", "occurrenceDate"],
-				"type": "object"
-			},
 			"PresetListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -3611,12 +3529,6 @@
 					"mediaType": {
 						"type": "string"
 					},
-					"transactionFingerprint": {
-						"type": "string"
-					},
-					"transactionId": {
-						"type": "string"
-					},
 					"problem": {
 						"$ref": "#/components/schemas/ReceiptProblem"
 					},
@@ -3632,6 +3544,12 @@
 						"type": "boolean"
 					},
 					"status": {
+						"type": "string"
+					},
+					"transactionFingerprint": {
+						"type": "string"
+					},
+					"transactionId": {
 						"type": "string"
 					}
 				},
@@ -4622,11 +4540,11 @@
 					"name": {
 						"type": "string"
 					},
-					"transactionId": {
-						"type": "string"
-					},
 					"recommended": {
 						"type": "boolean"
+					},
+					"transactionId": {
+						"type": "string"
 					}
 				},
 				"required": [
@@ -4659,10 +4577,10 @@
 						},
 						"type": ["array", "null"]
 					},
-					"transactionId": {
+					"revision": {
 						"type": "string"
 					},
-					"revision": {
+					"transactionId": {
 						"type": "string"
 					}
 				},
@@ -5035,6 +4953,67 @@
 				"required": ["accountId", "minimumFixed", "dueDay"],
 				"type": "object"
 			},
+			"Transaction": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"$ref": "#/components/schemas/TransactionAmountResolution"
+					},
+					"claim": {
+						"$ref": "#/components/schemas/TransactionClaim"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"executionOrder": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"pending": {
+						"type": "boolean"
+					},
+					"postedTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"source": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"transactionTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"void": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"sourceAccountId",
+					"destinations",
+					"amount",
+					"postedTime",
+					"transactionTime",
+					"enabled"
+				],
+				"type": "object"
+			},
 			"TransactionAmendBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -5117,6 +5096,26 @@
 				},
 				"type": "object"
 			},
+			"TransactionAmountResolution": {
+				"additionalProperties": false,
+				"properties": {
+					"config": {
+						"additionalProperties": {},
+						"type": "object"
+					},
+					"inputs": {
+						"additionalProperties": {
+							"$ref": "#/components/schemas/AmountInputBinding"
+						},
+						"type": "object"
+					},
+					"resolver": {
+						"type": "string"
+					}
+				},
+				"required": ["resolver", "config", "inputs"],
+				"type": "object"
+			},
 			"TransactionCatalogOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -5185,6 +5184,19 @@
 					}
 				},
 				"required": ["transactionId"],
+				"type": "object"
+			},
+			"TransactionClaim": {
+				"additionalProperties": false,
+				"properties": {
+					"occurrenceDate": {
+						"type": "string"
+					},
+					"scheduleId": {
+						"type": "string"
+					}
+				},
+				"required": ["scheduleId", "occurrenceDate"],
 				"type": "object"
 			},
 			"TransactionClaimBody": {
@@ -5651,37 +5663,6 @@
 				"required": ["value", "issues", "saved", "revision"],
 				"type": "object"
 			},
-			"WriteResultTransaction": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/WriteResultTransaction.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					},
-					"saved": {
-						"type": "boolean"
-					},
-					"value": {
-						"$ref": "#/components/schemas/Transaction"
-					}
-				},
-				"required": ["value", "issues", "saved", "revision"],
-				"type": "object"
-			},
 			"WriteResultSchedule": {
 				"additionalProperties": false,
 				"properties": {
@@ -5708,6 +5689,37 @@
 					},
 					"value": {
 						"$ref": "#/components/schemas/Schedule"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultTransaction": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/WriteResultTransaction.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/Transaction"
 					}
 				},
 				"required": ["value", "issues", "saved", "revision"],

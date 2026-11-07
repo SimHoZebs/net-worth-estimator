@@ -760,7 +760,7 @@ func (s *sqliteStore) DeletePaymentTerms(accountID string) error {
 
 // ListAccountLinks returns all bridge-to-model bindings.
 func (s *sqliteStore) ListAccountLinks() ([]AccountLink, error) {
-	rows, err := s.db.Query(`SELECT bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at FROM account_links WHERE user_id = :user_id ORDER BY bridge_account_id`)
+	rows, err := s.db.Query(`SELECT bridge_account_id, model_account_id, bridge_name, institution, currency, origin, last_seen_at FROM account_links WHERE user_id = :user_id ORDER BY bridge_account_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +768,7 @@ func (s *sqliteStore) ListAccountLinks() ([]AccountLink, error) {
 	links := []AccountLink{}
 	for rows.Next() {
 		var link AccountLink
-		if err := rows.Scan(&link.BridgeAccountID, &link.ModelAccountID, &link.BridgeName, &link.Currency, &link.Origin, &link.LastSeenAt); err != nil {
+		if err := rows.Scan(&link.BridgeAccountID, &link.ModelAccountID, &link.BridgeName, &link.Institution, &link.Currency, &link.Origin, &link.LastSeenAt); err != nil {
 			return nil, err
 		}
 		links = append(links, link)
@@ -801,10 +801,10 @@ func (s *sqliteStore) SaveAccountLink(link AccountLink) (AccountLink, error) {
 			return AccountMissing(link.ModelAccountID)
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at, user_id) VALUES (?,?,?,?,?,?, :user_id)
+			`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, institution, currency, origin, last_seen_at, user_id) VALUES (?,?,?,?,?,?,?, :user_id)
 			 ON CONFLICT(user_id, bridge_account_id) DO UPDATE SET model_account_id = excluded.model_account_id, bridge_name = excluded.bridge_name,
-			 currency = excluded.currency, origin = excluded.origin, last_seen_at = excluded.last_seen_at`,
-			link.BridgeAccountID, link.ModelAccountID, link.BridgeName, link.Currency, link.Origin, link.LastSeenAt,
+			 institution = excluded.institution, currency = excluded.currency, origin = excluded.origin, last_seen_at = excluded.last_seen_at`,
+			link.BridgeAccountID, link.ModelAccountID, link.BridgeName, link.Institution, link.Currency, link.Origin, link.LastSeenAt,
 		); err != nil {
 			if isUniqueViolation(err) {
 				return IDConflict(link.ModelAccountID)
@@ -841,12 +841,12 @@ func (s *sqliteStore) DeleteAccountLink(bridgeAccountID string) error {
 // EnsureLinkedAccount resolves a bridge account to a model account,
 // provisioning both the account and an auto link when unknown. It runs
 // inside the caller's sync transaction so errors roll everything back.
-func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, currency string, kind types.AccountKind) (string, bool, error) {
+func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, institution, currency string, kind types.AccountKind) (string, bool, error) {
 	var modelAccountID string
 	if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ? AND user_id = :user_id`, bridgeAccountID).Scan(&modelAccountID); err == nil {
 		if _, err := tx.Exec(
-			`UPDATE account_links SET bridge_name = ?, currency = ?, last_seen_at = ? WHERE bridge_account_id = ? AND user_id = :user_id`,
-			bridgeName, currency, utcToday(), bridgeAccountID,
+			`UPDATE account_links SET bridge_name = ?, institution = CASE WHEN ? = '' THEN institution ELSE ? END, currency = ?, last_seen_at = ? WHERE bridge_account_id = ? AND user_id = :user_id`,
+			bridgeName, institution, institution, currency, utcToday(), bridgeAccountID,
 		); err != nil {
 			return "", false, fmt.Errorf("touch account link %s: %w", bridgeAccountID, err)
 		}
@@ -876,8 +876,8 @@ func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, currency strin
 		return "", false, fmt.Errorf("provision account for %s: %w", bridgeAccountID, err)
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at, user_id) VALUES (?,?,?,?,?,?, :user_id)`,
-		bridgeAccountID, id, bridgeName, currency, LinkOriginAuto, utcToday(),
+		`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, institution, currency, origin, last_seen_at, user_id) VALUES (?,?,?,?,?,?,?, :user_id)`,
+		bridgeAccountID, id, bridgeName, institution, currency, LinkOriginAuto, utcToday(),
 	); err != nil {
 		return "", false, fmt.Errorf("link provisioned account %s: %w", bridgeAccountID, err)
 	}
@@ -885,10 +885,10 @@ func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, currency strin
 }
 
 // TouchAccountLink refreshes the snapshot and last-seen date.
-func TouchAccountLink(tx *userTx, bridgeAccountID, bridgeName, currency string) error {
+func TouchAccountLink(tx *userTx, bridgeAccountID, bridgeName, institution, currency string) error {
 	if _, err := tx.Exec(
-		`UPDATE account_links SET bridge_name = ?, currency = ?, last_seen_at = ? WHERE bridge_account_id = ? AND user_id = :user_id`,
-		bridgeName, currency, utcToday(), bridgeAccountID,
+		`UPDATE account_links SET bridge_name = ?, institution = CASE WHEN ? = '' THEN institution ELSE ? END, currency = ?, last_seen_at = ? WHERE bridge_account_id = ? AND user_id = :user_id`,
+		bridgeName, institution, institution, currency, utcToday(), bridgeAccountID,
 	); err != nil {
 		return fmt.Errorf("touch account link %s: %w", bridgeAccountID, err)
 	}

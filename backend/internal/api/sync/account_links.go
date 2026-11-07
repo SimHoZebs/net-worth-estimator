@@ -55,6 +55,7 @@ func (s *handler) saveAccountLink(_ context.Context, input *linkPutInput) (*link
 	for _, stored := range existing {
 		if stored.BridgeAccountID == link.BridgeAccountID {
 			link.BridgeName = stored.BridgeName
+			link.Institution = stored.Institution
 			link.Currency = stored.Currency
 			link.LastSeenAt = stored.LastSeenAt
 		}

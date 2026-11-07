@@ -68,6 +68,14 @@ export function SyncConnectedAccounts({
 										) : (
 											link.bridgeName || link.modelAccountId
 										)}
+										{link.institution ? (
+											<small className="mt-1 block text-xs text-muted">
+												{link.institution}
+													{link.bridgeName
+														? ` · ${link.bridgeName}`
+														: ""}
+											</small>
+										) : null}
 									</div>
 									<ActionMenu
 										label={

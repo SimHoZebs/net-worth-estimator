@@ -89,6 +89,28 @@ it("preserves edits across unrelated refreshes and rejects same-field conflicts"
 	expect(input("Account name").value).toBe("Another name");
 });
 
+it("shows the linked bank identity for synced accounts", () => {
+	render(
+		<AccountDetails
+			account={{
+				...home,
+				name: "Checking 8472",
+				institution: "Chase",
+				syncedName: "Chase Checking 8472",
+				currency: "USD",
+				readOnly: true,
+			}}
+		/>,
+	);
+	expect(screen.getByText("Bank")).toBeTruthy();
+	expect(screen.getByText("Chase")).toBeTruthy();
+	expect(screen.getByText("Synced as")).toBeTruthy();
+	expect(screen.getByText("Chase Checking 8472")).toBeTruthy();
+	expect(screen.getByText("USD")).toBeTruthy();
+	expect(screen.getByText("Last synced")).toBeTruthy();
+	expect(screen.queryByText("Source")).toBeNull();
+});
+
 it("edits inline with source display-only and a grouped balance range", async () => {
 	const server = stubTestServer();
 	render(<AccountDetails account={home} />);

@@ -130,7 +130,7 @@ export function toAccountCard({
 	return {
 		id: account.id,
 		name: account.name,
-		institution: account.source,
+		institution: account.institution ?? "",
 		last4: "",
 		kind,
 		roles,

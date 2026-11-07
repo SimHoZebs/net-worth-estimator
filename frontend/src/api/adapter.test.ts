@@ -123,6 +123,27 @@ describe("balance rows to display accounts", () => {
 		).toMatchObject({ minBalance: 0, maxBalance: null });
 	});
 
+	it("carries bridge identity for synced accounts", () => {
+		expect(
+			balanceRowToDisplay(
+				balanceRow({
+					syncOwned: true,
+					institution: "Chase",
+					syncedName: "Chase Checking 8472",
+					currency: "USD",
+				}),
+			),
+		).toMatchObject({
+			institution: "Chase",
+			syncedName: "Chase Checking 8472",
+			currency: "USD",
+		});
+		const manual = balanceRowToDisplay(balanceRow());
+		expect(manual.institution).toBeUndefined();
+		expect(manual.syncedName).toBeUndefined();
+		expect(manual.currency).toBeUndefined();
+	});
+
 	it("carries colors and falls back to the row id for a blank name", () => {
 		expect(balanceRowToDisplay(balanceRow({ color: "#4287f5" })).color).toBe(
 			"#4287f5",

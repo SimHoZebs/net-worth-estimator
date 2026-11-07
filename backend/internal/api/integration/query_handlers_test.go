@@ -169,6 +169,64 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	}
 }
 
+func TestAccountBalancesExposeLinkedInstitution(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
+		`{"name":"Checking 8472","kind":"cash","enabled":true}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
+	}
+	var payload struct {
+		Result struct {
+			ID string `json:"id"`
+		} `json:"value"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode account: %v", err)
+	}
+	if _, err := database.SaveAccountLink(store.AccountLink{
+		BridgeAccountID: "sf2.test.checking",
+		ModelAccountID:  payload.Result.ID,
+		BridgeName:      "Chase Checking 8472",
+		Institution:     "Chase",
+		Currency:        "USD",
+		Origin:          store.LinkOriginAuto,
+	}); err != nil {
+		t.Fatalf("save link: %v", err)
+	}
+	response := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("balances status = %d, body %s", response.Code, response.Body.String())
+	}
+	var balancesPayload map[string]json.RawMessage
+	if err := json.Unmarshal(response.Body.Bytes(), &balancesPayload); err != nil {
+		t.Fatalf("decode balances: %v", err)
+	}
+	rows := decodeQueryBody(t, balancesPayload, "accounts")
+	if len(rows) != 1 {
+		t.Fatalf("accounts = %d, want 1", len(rows))
+	}
+	var row struct {
+		ID          string  `json:"id"`
+		Institution *string `json:"institution"`
+		SyncedName  *string `json:"syncedName"`
+		Currency    *string `json:"currency"`
+	}
+	if err := json.Unmarshal(rows[0], &row); err != nil {
+		t.Fatalf("decode balance row: %v", err)
+	}
+	if row.Institution == nil || *row.Institution != "Chase" {
+		t.Errorf("institution = %+v, want Chase", row.Institution)
+	}
+	if row.SyncedName == nil || *row.SyncedName != "Chase Checking 8472" {
+		t.Errorf("syncedName = %+v, want bridge name", row.SyncedName)
+	}
+	if row.Currency == nil || *row.Currency != "USD" {
+		t.Errorf("currency = %+v, want USD", row.Currency)
+	}
+}
+
 func TestListTransactionsReportsVoid(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
