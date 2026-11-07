@@ -35,6 +35,8 @@
 		--danger-border: var(--color-red-200);
 		--danger-solid: var(--color-red-700);
 		--on-danger: var(--color-white);
+		--guest: var(--color-orange-700);
+		--on-guest: var(--color-white);
 		--chart-band: var(--color-emerald-200);
 		--chart-median: var(--color-stone-500);
 		--chart-series-1: var(--color-emerald-600);
@@ -94,6 +96,8 @@
 	--color-danger-border: var(--danger-border);
 	--color-danger-solid: var(--danger-solid);
 	--color-on-danger: var(--on-danger);
+	--color-guest: var(--guest);
+	--color-on-guest: var(--on-guest);
 	--color-chart-band: var(--chart-band);
 	--color-chart-median: var(--chart-median);
 	--color-chart-series-1: var(--chart-series-1);

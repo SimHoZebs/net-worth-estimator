@@ -26,6 +26,8 @@
 		--danger-bg: var(--color-red-950);
 		--danger-text: var(--color-red-300);
 		--danger-border: var(--color-red-800);
+		--guest: var(--color-orange-400);
+		--on-guest: var(--color-orange-950);
 		--chart-band: var(--color-emerald-900);
 		--chart-median: var(--color-stone-500);
 		--chart-series-1: var(--color-emerald-400);

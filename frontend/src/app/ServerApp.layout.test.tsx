@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { SessionContext } from "../auth/sessionContext.ts";
+import type { ReactNode } from "react";
+import { SessionContext, type Session } from "../auth/sessionContext.ts";
 import { suspendUserScope } from "../auth/resourceScope.ts";
 import { resetNotifications } from "../state/notifications.ts";
 import {
@@ -55,6 +56,18 @@ function status(overrides: Partial<ServerStatus> = {}): ServerStatus {
 	};
 }
 
+// A guest session carries the provisioned identity and only differs in
+// `authenticated`, which is the sign-in status the frame reads.
+function guestSession(allowed: boolean): Session {
+	return {
+		enabled: true,
+		authenticated: false,
+		allowed,
+		resource: { id: `users/${"a".repeat(64)}`, permissions: [] },
+		user: { subject: "guest", name: "Guest" },
+	};
+}
+
 async function refetchStatus() {
 	await act(async () => {
 		await serverQueryClient().refetchQueries({
@@ -89,6 +102,47 @@ it("keeps the same sidebar node across workspace and recovery bodies", async () 
 	expect(
 		screen.getByRole("complementary", { name: "Workspace navigation" }),
 	).toBe(sidebar);
+});
+
+function sessionWrapper(session: Session | null, phase: "ready") {
+	return function SessionWrapper({ children }: { children: ReactNode }) {
+		return (
+			<SessionContext
+				value={{
+					session,
+					phase,
+					error: "",
+					refresh: vi.fn(async () => {}),
+					logout: vi.fn(async () => {}),
+					logoutPending: false,
+				}}
+			>
+				{children}
+			</SessionContext>
+		);
+	};
+}
+
+it("frames a guest session with a guest view badge", async () => {
+	stubTestServer();
+	await renderServerAppShell(
+		<p>Workspace body</p>,
+		"/outlook",
+		sessionWrapper(guestSession(true), "ready"),
+	);
+	expect(await screen.findByText("guest view")).toBeTruthy();
+	expect(screen.getByText("Workspace body")).toBeTruthy();
+});
+
+it("leaves an authenticated session unframed", async () => {
+	stubTestServer();
+	await renderServerAppShell(
+		<p>Workspace body</p>,
+		"/outlook",
+		sessionWrapper({ ...guestSession(true), authenticated: true }, "ready"),
+	);
+	expect(await screen.findByText("Workspace body")).toBeTruthy();
+	expect(screen.queryByText("guest view")).toBeNull();
 });
 
 it("shows an unavailable error in the layout body without replacing the shell", async () => {

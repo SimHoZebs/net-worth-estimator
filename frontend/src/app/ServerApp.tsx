@@ -19,6 +19,7 @@ import {
 	WorkspaceEvidence,
 	WorkspaceInvalidLink,
 } from "../workspace/WorkspaceDialogs.tsx";
+import { GuestFrame } from "./GuestFrame.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
 export function ServerApp({ invalidLink = false }: { invalidLink?: boolean }) {
@@ -75,46 +76,52 @@ export function ServerApp({ invalidLink = false }: { invalidLink?: boolean }) {
 	const blocked =
 		!session?.allowed && (phase === "denied" || phase === "unavailable");
 	const recovery = !blocked && status.data?.hasModel === false;
+	// `authenticated` is the sign-in status, so its false value names the
+	// guest session. Data access comes from the resource grants, not this.
+	const guest = session !== null && !session.authenticated;
 	return (
-		<WorkspaceLayout
-			navigation={(close) => (
-				<WorkspaceSidebar
-					page={page}
-					onClose={close}
-					pending={status.isPending}
-				/>
-			)}
-			header={(open) => (
-				<WorkspaceTopbar page={currentPage} onOpenNavigation={open} />
-			)}
-		>
-			{!recovery && !blocked && (
-				<WorkspaceHeading page={currentPage} headingRef={headingRef} />
-			)}
-			{blocked ? (
-				<SessionErrorBody
-					session={session}
-					error={sessionError}
-					logoutPending={logoutPending}
-					onRetry={() => {
-						void refresh();
-					}}
-					onLogout={() => {
-						void logout();
-					}}
-				/>
-			) : recovery ? (
-				<ServerWorkspaceRecovery />
-			) : invalidLink ? (
-				<WorkspaceInvalidLink onClose={overlays.closeUnavailable} />
-			) : (
-				<>
-					<Outlet />
-					{page && <WorkspaceEvidence overlays={overlays} />}
-					{page && <WorkspaceDialogs overlays={overlays} />}
-				</>
-			)}
-		</WorkspaceLayout>
+		<>
+			{guest && <GuestFrame />}
+			<WorkspaceLayout
+				navigation={(close) => (
+					<WorkspaceSidebar
+						page={page}
+						onClose={close}
+						pending={status.isPending}
+					/>
+				)}
+				header={(open) => (
+					<WorkspaceTopbar page={currentPage} onOpenNavigation={open} />
+				)}
+			>
+				{!recovery && !blocked && (
+					<WorkspaceHeading page={currentPage} headingRef={headingRef} />
+				)}
+				{blocked ? (
+					<SessionErrorBody
+						session={session}
+						error={sessionError}
+						logoutPending={logoutPending}
+						onRetry={() => {
+							void refresh();
+						}}
+						onLogout={() => {
+							void logout();
+						}}
+					/>
+				) : recovery ? (
+					<ServerWorkspaceRecovery />
+				) : invalidLink ? (
+					<WorkspaceInvalidLink onClose={overlays.closeUnavailable} />
+				) : (
+					<>
+						<Outlet />
+						{page && <WorkspaceEvidence overlays={overlays} />}
+						{page && <WorkspaceDialogs overlays={overlays} />}
+					</>
+				)}
+			</WorkspaceLayout>
+		</>
 	);
 }
 
