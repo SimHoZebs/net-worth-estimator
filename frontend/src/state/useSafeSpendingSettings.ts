@@ -8,6 +8,10 @@ import {
 	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
+import {
+	DEFAULT_CYCLE_STATEMENT_DAY,
+	DEFAULT_PROTECTED_RESERVE,
+} from "@/domain/safeSpending.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
@@ -17,8 +21,8 @@ import { useUserScope } from "@/state/useUserScope.ts";
 export type TotalCycleSettings = SafeSpendingSettings;
 
 export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
-	statementDay: 1,
-	reserve: 0,
+	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
+	reserve: DEFAULT_PROTECTED_RESERVE,
 	accountIds: null,
 	spendingAccountIds: null,
 	incomeAccountIds: null,
@@ -38,7 +42,7 @@ function stringIds(value: unknown): string[] | null {
 export function clampStatementDay(value: unknown): number {
 	return Math.min(
 		28,
-		Math.max(1, Math.floor(Number(value) || 1)),
+		Math.max(1, Math.floor(Number(value) || DEFAULT_CYCLE_STATEMENT_DAY)),
 	);
 }
 
@@ -69,7 +73,9 @@ export function sanitizeSafeSpendingSettings(
 		statementDaySet: record.statementDaySet === true,
 		reserve: Math.max(
 			0,
-			Number.isFinite(Number(record.reserve)) ? Number(record.reserve) : 0,
+			Number.isFinite(Number(record.reserve))
+				? Number(record.reserve)
+				: DEFAULT_PROTECTED_RESERVE,
 		),
 		accountIds: stringIds(record.accountIds),
 		spendingAccountIds: stringIds(record.spendingAccountIds),

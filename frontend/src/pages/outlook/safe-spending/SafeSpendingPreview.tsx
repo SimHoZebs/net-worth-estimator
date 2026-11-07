@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/Skeleton.tsx";
 import { Card } from "@/components/Card.tsx";
 import {
+	checkingAccountId,
 	mandatoryTransactions,
 	spendingBalance,
 	nextMonthRange,
@@ -130,15 +131,19 @@ export function SafeSpendingPreview({
 	});
 	const staleData = displayToday > (startDate ?? displayToday).slice(0, 10);
 
-	const trackedIds = useMemo(
-		() =>
-			resolveEffectiveIds(
-				settings.accountIds,
-				cards.map((card) => card.id),
-				[],
-			),
-		[settings.accountIds, cards],
-	);
+	const trackedIds = useMemo(() => {
+		// Spending cards are debt accounts by convention (`*_card`); loans
+		// and other debt fall back to the full set when no card is present.
+		const cardLike = cards
+			.map((card) => card.id)
+			.filter((id) => id.endsWith("_card"));
+		const fallback = cardLike.length ? cardLike : cards.map((card) => card.id);
+		return resolveEffectiveIds(
+			settings.accountIds,
+			cards.map((card) => card.id),
+			fallback,
+		);
+	}, [settings.accountIds, cards]);
 
 	const { cycle, closedCycle, perAccount, chargeCycles } = useCardCycleActivity(
 		{
@@ -164,12 +169,18 @@ export function SafeSpendingPreview({
 	);
 	const spendingIds = useMemo(() => {
 		const knownIds = spendableAccounts.map((account) => account.id);
-		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, []);
-	}, [settings.spendingAccountIds, spendableAccounts]);
+		const fallbackId = checkingAccountId(accounts ?? []);
+		const fallback =
+			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
+		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
+	}, [settings.spendingAccountIds, spendableAccounts, accounts]);
 	const incomeIds = useMemo(() => {
 		const knownIds = spendableAccounts.map((account) => account.id);
-		return resolveEffectiveIds(settings.incomeAccountIds, knownIds, []);
-	}, [settings.incomeAccountIds, spendableAccounts]);
+		const fallbackId = checkingAccountId(accounts ?? []);
+		const fallback =
+			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
+		return resolveEffectiveIds(settings.incomeAccountIds, knownIds, fallback);
+	}, [settings.incomeAccountIds, spendableAccounts, accounts]);
 	const spendingDerived = useMemo(
 		() => spendingBalance(accounts ?? [], spendingIds),
 		[accounts, spendingIds],
@@ -472,7 +483,11 @@ export function SafeSpendingPreview({
 	const inlineView = cycleViewTab === "cycle" ? currentView : lastView;
 
 	const toggleAccount = (accountId: string) => {
-		const explicit = settings.accountIds ?? [];
+		const cardLike = cards
+			.map((card) => card.id)
+			.filter((id) => id.endsWith("_card"));
+		const fallback = cardLike.length ? cardLike : cards.map((card) => card.id);
+		const explicit = settings.accountIds ?? fallback;
 		const next = explicit.includes(accountId)
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];
@@ -494,7 +509,10 @@ export function SafeSpendingPreview({
 	};
 
 	const toggleSpendingAccount = (accountId: string) => {
-		const explicit = settings.spendingAccountIds ?? [];
+		const known = new Set(spendableAccounts.map((account) => account.id));
+		const fallbackId = checkingAccountId(accounts ?? []);
+		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
+		const explicit = settings.spendingAccountIds ?? fallback;
 		const next = explicit.includes(accountId)
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];
@@ -502,7 +520,10 @@ export function SafeSpendingPreview({
 	};
 
 	const toggleIncomeAccount = (accountId: string) => {
-		const explicit = settings.incomeAccountIds ?? [];
+		const known = new Set(spendableAccounts.map((account) => account.id));
+		const fallbackId = checkingAccountId(accounts ?? []);
+		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
+		const explicit = settings.incomeAccountIds ?? fallback;
 		const next = explicit.includes(accountId)
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];

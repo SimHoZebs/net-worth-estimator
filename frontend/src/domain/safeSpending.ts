@@ -13,6 +13,9 @@ import type { TransactionResult } from "./result.ts";
 // Server ownership: every amount summed here originates server-side.
 // Only the windows stay client-side; do not add new windowed sums here.
 
+export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
+export const DEFAULT_PROTECTED_RESERVE = 725;
+
 /** Last calendar day of the month containing `todayIso`. */
 export function monthEndIso(todayIso: string): string {
 	const today = utcDate(todayIso);
@@ -35,6 +38,18 @@ export function nextMonthRange(todayIso: string): {
 		Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0, 12, 0, 0),
 	);
 	return { start: isoDate(start), end: isoDate(end) };
+}
+
+export function checkingAccountId(accounts: Account[]): string | null {
+	const visible = accounts.filter((account) => !account.archived);
+	const byId = visible.find((account) => account.id === "checking");
+	if (byId) return byId.id;
+	const cash = visible.find(
+		(account) => account.kind === "cash" && account.enabled,
+	);
+	if (cash) return cash.id;
+	const anyCash = visible.find((account) => account.kind === "cash");
+	return anyCash?.id ?? null;
 }
 
 /**
