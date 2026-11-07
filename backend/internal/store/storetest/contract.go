@@ -541,7 +541,8 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 		t.Fatalf("owner transaction metadata = %+v, err %v", created, err)
 	}
 
-	// Sync-owned (void) rows refuse owner updates and deletes.
+	// Bank rows are owner-editable including void rows, so the owner can
+	// edit, un-void, or remove them.
 	stored, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load model: %v", err)
@@ -552,8 +553,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 			synced = transaction
 		}
 	}
-	// Update refusal is checked on a void sync row (void rows stay
-	// sync-owned for updates).
+	// Void rows are owner-editable too. Clearing void restores the row.
 	voided := synced
 	if _, err := st.ApplySync(nil, []store.BankDirective{{Void: synced.ID}}); err != nil {
 		t.Fatalf("void sync transaction: %v", err)
@@ -568,12 +568,18 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 		}
 	}
 	voided.Name = "Edited"
-	if _, err := st.UpdateTransaction(voided); !store.IsSyncOwned(err) {
-		t.Fatalf("update sync transaction err = %v, want sync-owned", err)
+	if updated, err := st.UpdateTransaction(voided); err != nil {
+		t.Fatalf("update void sync transaction err = %v, want editable", err)
+	} else if updated.Name != "Edited" || updated.Void != true {
+		t.Fatalf("void edit lost lifecycle: %+v", updated)
 	}
-	// Pending and settled bank rows are owner-editable (including delete)
-	// now; only void rows stay sync-owned, and those are tested above for
-	// updates. No delete-refusal assertion remains for bank rows.
+	restored := voided
+	restored.Void = false
+	restored.Enabled = true
+	if cleared, err := st.UpdateTransaction(restored); err != nil || cleared.Void {
+		t.Fatalf("un-void err = %v, row = %+v", err, cleared)
+	}
+	// Pending and settled bank rows are owner-editable (including delete).
 
 	// A checkpoint save with a forged source flag still stores owner rows.
 	correction := types.Checkpoint{ObservedAt: 1782950399, AccountID: "checking", Balance: 500, Source: store.SourceBankSync}

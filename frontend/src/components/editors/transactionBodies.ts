@@ -23,6 +23,8 @@ export interface TransactionFormValues {
 	claimScheduleId: string | null;
 	claimOccurrenceDate: string | null;
 	transactionTime?: number | null;
+	pending?: boolean;
+	void?: boolean;
 }
 
 /** A schedule owns recurrence: cadence, growth, and the end date. */
@@ -49,6 +51,8 @@ export interface TransactionDraftValues {
 	enabled: boolean;
 	claimScheduleId: string;
 	claimOccurrenceDate: string;
+	pending?: boolean;
+	void?: boolean;
 }
 
 export interface ScheduleDraftValues {
@@ -166,6 +170,10 @@ export function transactionUpdate({
 	if ((values.postedDate ?? null) !== baseline.postedDate)
 		patch.postedDate = values.postedDate ?? null;
 	if (values.enabled !== baseline.enabled) patch.enabled = values.enabled;
+	if (typeof values.pending === "boolean" && values.pending !== (baseline.pending === true))
+		patch.pending = values.pending;
+	if (typeof values.void === "boolean" && values.void !== (baseline.void === true))
+		patch.void = values.void;
 	return patch;
 }
 
@@ -299,6 +307,8 @@ export function detailTransactionValues({
 			draft.claimScheduleId && draft.claimOccurrenceDate
 				? draft.claimOccurrenceDate
 				: null,
+		pending: typeof draft.pending === "boolean" ? draft.pending : item.pending,
+		void: typeof draft.void === "boolean" ? draft.void : item.void,
 	};
 }
 

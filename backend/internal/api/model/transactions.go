@@ -118,6 +118,8 @@ type transactionAmendBody struct {
 	Time            nullableOptional[string]        `json:"time,omitempty"`
 	PostedDate      nullableOptional[types.IsoDate] `json:"postedDate,omitempty"`
 	Enabled         optional[bool]                  `json:"enabled,omitempty"`
+	Pending         optional[bool]                  `json:"pending,omitempty"`
+	Void            optional[bool]                  `json:"void,omitempty"`
 }
 
 func (b transactionAmendBody) apply(stored types.Transaction) (types.Transaction, error) {
@@ -179,6 +181,12 @@ func (b transactionAmendBody) apply(stored types.Transaction) (types.Transaction
 	}
 	if b.Enabled.Set {
 		out.Enabled = b.Enabled.Value
+	}
+	if b.Pending.Set {
+		out.Pending = b.Pending.Value
+	}
+	if b.Void.Set {
+		out.Void = b.Void.Value
 	}
 	return out, nil
 }

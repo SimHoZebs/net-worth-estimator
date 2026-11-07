@@ -4,6 +4,7 @@ import {
 	ArrowDownLeft,
 	ArrowRightLeft,
 	ArrowUpRight,
+	CalendarDays,
 	Check,
 	Clock3,
 	Eye,
@@ -50,6 +51,7 @@ import { TextButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
 import { Checkbox, Input, InputField, Select } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
+import { TransactionDateModal } from "./TransactionDateModal.tsx";
 import {
 	transactionControlStyles,
 	detailPropertyRowClassName,
@@ -205,10 +207,10 @@ function MoreOptions({
 	return (
 		<section
 			aria-label="Transaction options"
-			className="mt-4 border-t border-line pt-4"
+			className="mt-4 border-t border-line"
 		>
 			<div className="flex flex-col">
-				{!schedule && !savedTransaction.void && (
+				{!schedule && (
 					<TransactionCategory
 						transactionId={savedTransaction.id}
 						category={savedTransaction.category}
@@ -275,60 +277,106 @@ function MoreOptions({
 				{!schedule && (
 					<>
 						<div className={detailPropertyRowClassName}>
-							<label htmlFor={claimScheduleId} className={rowLabel}>
-								Records an occurrence of
-							</label>
-							<Select
-								id={claimScheduleId}
-								name="claimScheduleId"
-								disabled={!claimEditable}
-								value={draft.claimScheduleId}
-								onChange={(event) =>
-									updateDraft(
-										{ claimScheduleId: event.target.value },
-										"schedule",
-									)
-								}
-								className="min-w-0 flex-1"
-							>
-								<option value="">No link — standalone record</option>
-								{claimSchedules.map((rule) => (
-									<option key={rule.id} value={rule.id}>
-										{rule.name}
+							<span className={rowLabel}>Records an occurrence of</span>
+							<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+								<Select
+									id={claimScheduleId}
+									aria-label="Records an occurrence of"
+									name="claimScheduleId"
+									disabled={!claimEditable}
+									value={draft.claimScheduleId}
+									onChange={(event) =>
+										updateDraft(
+											{ claimScheduleId: event.target.value },
+											"schedule",
+										)
+									}
+									className="min-w-0 flex-1"
+								>
+									<option value="">No link — standalone record</option>
+									{claimSchedules.map((rule) => (
+										<option key={rule.id} value={rule.id}>
+											{rule.name}
+										</option>
+									))}
+								</Select>
+								<span
+									className="text-xs font-semibold text-muted"
+									aria-hidden="true"
+								>
+									on
+								</span>
+								<Select
+									id={claimOccurrenceId}
+									aria-label="Replaces occurrence on"
+									name="claimOccurrenceDate"
+									disabled={!claimEditable || !draft.claimScheduleId}
+									value={draft.claimOccurrenceDate}
+									onChange={(event) =>
+										updateDraft(
+											{ claimOccurrenceDate: event.target.value },
+											"schedule",
+										)
+									}
+									className="min-w-0 flex-1"
+								>
+									<option value="">
+										{!draft.claimScheduleId
+											? "Choose a schedule first"
+											: occurrenceOptions.length === 0
+												? "No claimable occurrences"
+												: "Choose the occurrence"}
 									</option>
-								))}
-							</Select>
+									{occurrenceOptions.map((date) => (
+										<option key={date} value={date}>
+											{dateLabel(date, true)}
+										</option>
+									))}
+								</Select>
+							</div>
 						</div>
 						<div className={detailPropertyRowClassName}>
-							<label htmlFor={claimOccurrenceId} className={rowLabel}>
-								Replaces occurrence on
-							</label>
-							<Select
-								id={claimOccurrenceId}
-								name="claimOccurrenceDate"
-								disabled={!claimEditable || !draft.claimScheduleId}
-								value={draft.claimOccurrenceDate}
-								onChange={(event) =>
-									updateDraft(
-										{ claimOccurrenceDate: event.target.value },
-										"schedule",
-									)
-								}
-								className="min-w-0 flex-1"
-							>
-								<option value="">
-									{!draft.claimScheduleId
-										? "Choose a schedule first"
-										: occurrenceOptions.length === 0
-											? "No claimable occurrences"
-											: "Choose the occurrence"}
-								</option>
-								{occurrenceOptions.map((date) => (
-									<option key={date} value={date}>
-										{dateLabel(date, true)}
-									</option>
-								))}
-							</Select>
+							<span className={rowLabel}>Bank state</span>
+							<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:gap-4">
+								<label htmlFor={`${id}-pending`} className="inline-flex items-center gap-2 text-sm">
+									<Checkbox
+										id={`${id}-pending`}
+										checked={draft.pending}
+										disabled={locked || !savedTransaction.pending}
+										onChange={(event) =>
+											updateDraft(
+												{
+													pending: event.target.checked,
+													enabled: event.target.checked
+														? draft.enabled
+														: true,
+												},
+												"schedule",
+											)
+										}
+									/>
+									Pending
+								</label>
+								<label htmlFor={`${id}-void`} className="inline-flex items-center gap-2 text-sm">
+									<Checkbox
+										id={`${id}-void`}
+										checked={draft.void}
+										disabled={locked || !savedTransaction.void}
+										onChange={(event) =>
+											updateDraft(
+												{
+													void: event.target.checked,
+													enabled: event.target.checked
+														? draft.enabled
+														: true,
+												},
+												"schedule",
+											)
+										}
+									/>
+									Void (did not post)
+								</label>
+							</div>
 						</div>
 					</>
 				)}
@@ -505,14 +553,14 @@ function ReadOnlyNotice({
 	savedTransaction: Transaction;
 	appReadOnly?: boolean;
 }) {
-	// Void holds are the only read-only rows with an action attached: the
-	// picker and remove flow below. Other locked rows stay unexplained,
-	// matching the read-only treatment elsewhere in the modal.
-	if (!savedTransaction.readOnly || !savedTransaction.void) return null;
+	// Void holds carry a notice because the hold vanished without a posted
+	// charge. The row is editable and can be restored.
+	if (!savedTransaction.void) return null;
 	return (
 		<Notice className="my-4">
 			<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
-			This hold vanished without a posted charge, so there is nothing to edit.
+			This hold vanished without a posted charge. You can edit it or
+			restore it as a settled record.
 			{!appReadOnly &&
 				" If it posted after all, pick the posted charge below and remove this record."}
 		</Notice>
@@ -551,6 +599,8 @@ type TransactionDraft = {
 	claimOccurrenceDate: string;
 	postedDate: string;
 	transactionTime: string;
+	pending: boolean;
+	void: boolean;
 };
 
 function draftFromTransaction(
@@ -572,12 +622,14 @@ function draftFromTransaction(
 		claimOccurrenceDate: savedTransaction.claimOccurrenceDate ?? "",
 		postedDate: savedTransaction.postedDate ?? "",
 		transactionTime: timeOfDay(savedTransaction.transactionTime),
+		pending: savedTransaction.pending === true,
+		void: savedTransaction.void === true,
 	};
 }
 
 /**
- * Pending bank rows stay locked, but the occurrence claim lives outside the
- * synced columns and the pending-to-posted convert keeps the same row id,
+ * Pending bank rows are owner-editable and the occurrence claim lives outside
+ * the synced columns. The pending-to-posted convert keeps the same row id,
  * so claiming while pending survives refreshes and settlement. Derived from
  * the row itself at each use site; no exception flag is passed.
  */
@@ -620,9 +672,8 @@ function useTransactionEdit({
 	useBeforeUnload(activeField !== null && touched && !saving);
 	const updateDraft = (patch: Partial<TransactionDraft>, field: EditField) => {
 		if (readOnlyReason) {
-			// Pending bank rows refresh in place, so only the occurrence
-			// claim may change while locked. Any other schedule patch
-			// (dates, frequency) stays blocked.
+			// Locked rows are read-only except for the occurrence claim on
+			// pending bank rows. Any other schedule patch stays blocked.
 			if (!claimEditable || field !== "schedule") return;
 			const keys = Object.keys(patch);
 			if (
@@ -775,7 +826,7 @@ function useTransactionEdit({
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
-	// Pending claimable rows save schedule-claim edits while locked.
+	// Locked claimable rows save schedule-claim edits while locked.
 	const saveBlocked =
 		saving ||
 		(savedTransaction.kind === "schedule" &&
@@ -966,11 +1017,11 @@ export function TransactionDetail({
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const once = savedTransaction.kind === "transaction";
 	const canEdit = !edit.readOnlyReason;
-	// Settled bank rows are editable and removable through the UI: removing
-	// one suppresses its bank ids, so the feed will not re-import it.
-	// Live pending holds stay locked: each feed refreshes them in place,
-	// so an edit could not survive the next refresh.
-	const canDelete = canEdit && !savedTransaction.pending;
+	// Settled and pending bank rows are editable and removable through the
+	// UI: removing one suppresses its bank ids, so the feed will not
+	// re-import it.
+	const canDelete = canEdit;
+	const [datesOpen, setDatesOpen] = useState(false);
 	const subscription = useMarkAsSubscription({
 		savedTransaction,
 		locked: !canEdit,
@@ -1417,64 +1468,36 @@ export function TransactionDetail({
 						{(once || transaction.pending || postedDiffers) && (
 							<div className="flex min-w-0 flex-col items-start gap-2">
 								{once && (
-									<label className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
-										Occurred
-										<input
-											className={transactionControlStyles({ shape: "date" })}
-											id={`${edit.formId}-date`}
-											type="date"
-											name="startDate"
-											required
-											value={edit.draft.startDate}
-											onChange={(event) =>
-												edit.updateDraft(
-													{ startDate: event.target.value },
-													"schedule",
-												)
-											}
-											readOnly={!canEdit}
-										/>
-										<input
-											className={transactionControlStyles({ shape: "date" })}
-											id={`${edit.formId}-time`}
-											type="time"
-											step="1"
-											name="transactionTime"
-											aria-label="Occurred at time (UTC)"
-											value={edit.draft.transactionTime}
-											onChange={(event) =>
-												edit.updateDraft(
-													{ transactionTime: event.target.value },
-													"schedule",
-												)
-											}
-											readOnly={!canEdit}
-										/>
-									</label>
+									<div className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
+										<span>Occurred</span>
+										{canEdit ? (
+											<button
+												type="button"
+												id={`${edit.formId}-date`}
+												className="inline-flex items-center gap-1.5 rounded-control border border-transparent px-1 py-0.5 text-sm font-medium text-ink hover:border-line-strong focus-visible:bg-input-bg"
+												onClick={() => setDatesOpen(true)}
+											>
+												<CalendarDays size={14} aria-hidden="true" />
+												{dateLabel(edit.draft.startDate, true)}
+											</button>
+										) : (
+											<span className="text-sm font-medium text-ink">
+												{dateLabel(edit.draft.startDate, true)}
+											</span>
+										)}
+									</div>
 								)}
 								{(transaction.pending || postedDiffers) && (
-									<label className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
-										Posted
+									<div className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
+										<span>Posted</span>
 										{transaction.pending ? (
 											<span>Not yet posted</span>
 										) : (
-											<input
-												className={transactionControlStyles({ shape: "date" })}
-												id={`${edit.formId}-posted`}
-												type="date"
-												name="postedDate"
-												required
-												value={edit.draft.postedDate}
-												onChange={(event) =>
-													edit.updateDraft(
-														{ postedDate: event.target.value },
-														"posted",
-													)
-												}
-												readOnly={!canEdit}
-											/>
+											<span className="text-sm font-medium text-ink">
+												{dateLabel(edit.draft.postedDate, true)}
+											</span>
 										)}
-									</label>
+									</div>
 								)}
 							</div>
 						)}
@@ -1732,6 +1755,22 @@ export function TransactionDetail({
 					transactions={allTransactions}
 					readOnly={readOnly}
 					onClose={() => setHistorySelection(null)}
+				/>
+			)}
+			{datesOpen && (
+				<TransactionDateModal
+					occurred={edit.draft.startDate}
+					posted={edit.draft.postedDate}
+					pending={edit.draft.pending}
+					postedLocked={!canEdit}
+					onClose={() => setDatesOpen(false)}
+					onApply={(occurredDate, postedDate) => {
+						edit.updateDraft(
+							{ startDate: occurredDate, postedDate },
+							"schedule",
+						);
+						setDatesOpen(false);
+					}}
 				/>
 			)}
 			{confirmingDelete && (

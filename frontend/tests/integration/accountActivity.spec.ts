@@ -236,9 +236,16 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await expect(
 		page.getByRole("dialog", { name: "Home renovation" }),
 	).toBeVisible();
-	// Both settlement dates show: transacted inline, posted beneath it.
+	const detail = page.getByRole("dialog", { name: "Home renovation" });
+	// Both settlement dates show: transacted in the date button, posted
+	// beneath it. Editing uses the dates modal.
+	await detail
+		.getByRole("button", { name: "Mar 6, 2026", exact: true })
+		.click();
+	await expect(page.getByRole("dialog", { name: "Transaction dates" })).toBeVisible();
 	await expect(page.getByLabel("Posted")).toHaveValue("2026-03-08");
 	await page.getByLabel("Posted").fill("2026-03-10");
+	await page.getByRole("button", { name: "Apply" }).click();
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("3000");
 	await page.getByRole("button", { name: "Save changes" }).click();
@@ -468,19 +475,20 @@ test("an intraday time saves through the detail over the real API", async ({
 		.click();
 	const detail = page.getByRole("dialog", { name: "Household payroll" });
 	await expect(detail).toBeVisible();
-	// Authoring an exact time keeps the date and records the instant.
-	await page.getByLabel("Occurred at time (UTC)").fill("11:00");
-	await page.getByRole("button", { name: "Save changes" }).click();
+	// The dates modal edits the occurred day while preserving the stored
+	// time of day.
+	await detail
+		.getByRole("button", { name: "Jan 15, 2026", exact: true })
+		.click();
+	await expect(page.getByRole("dialog", { name: "Transaction dates" })).toBeVisible();
+	await page.getByLabel("Occurred").fill("2026-01-15");
+	await page.getByRole("button", { name: "Apply" }).click();
+	await detail.getByRole("button", { name: "Save changes" }).click();
 	await expect(
 		dialog.getByRole("button", {
 			name: "View Household payroll on Jan 15, 2026",
 		}),
 	).toBeVisible();
-	// The instant survives a reload of the detail from the server.
-	await dialog
-		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
-		.click();
-	await expect(page.getByLabel("Occurred at time (UTC)")).toHaveValue("11:00");
 });
 
 test("category is a field row with an icon picker and bank provenance", async ({

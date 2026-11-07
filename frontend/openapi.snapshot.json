@@ -5281,6 +5281,9 @@
 					"name": {
 						"type": "string"
 					},
+					"pending": {
+						"type": "boolean"
+					},
 					"postedDate": {
 						"type": ["string", "null"]
 					},
@@ -5289,6 +5292,9 @@
 					},
 					"time": {
 						"type": ["string", "null"]
+					},
+					"void": {
+						"type": "boolean"
 					}
 				},
 				"type": "object"

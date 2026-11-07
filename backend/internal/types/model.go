@@ -218,20 +218,19 @@ type Transaction struct {
 	Claim           *TransactionClaim           `json:"claim,omitempty"`
 	Enabled         bool                        `json:"enabled"`
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
-	// Owner writes cannot set it.
+	// The sync sets it on arrival; the owner may clear it to settle the hold.
 	Pending bool `json:"pending,omitempty"`
 	// Source names the row author: "user" for owner-authored rows,
 	// "banksync" for bank-reported rows. Authorship never changes after
-	// creation. Owner writes may touch settled bank rows but never live
-	// pending or void rows; the sync may touch pending and void rows but
-	// never settled ones.
+	// creation. The sync may touch pending and void rows but never settled
+	// ones. Owner writes may touch any row including pending and void rows.
 	Source string `json:"source,omitempty"`
 	// ExecutionOrder breaks equal-time ties independently of identity and display
 	// position. The store assigns it on create and preserves it on owner updates.
 	ExecutionOrder int64 `json:"executionOrder,omitempty"`
 	// Void marks a bank authorization that vanished without settling. Only
-	// the sync sets it, through void-marking; owner and CSV writes never
-	// create void rows.
+	// the sync sets it through void-marking; CSV writes never create void
+	// rows. The owner may clear it to restore the hold as settled.
 	Void bool `json:"void,omitempty"`
 }
 

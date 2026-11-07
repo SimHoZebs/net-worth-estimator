@@ -314,12 +314,9 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				transactions.push({
 					...transaction,
 					syncOwned,
-					// Only lifecycle bank rows stay sync-owned: pending
-					// seeds refresh in place and voids convert. Settled
-					// bank rows are write-stable after import.
-					readOnly:
-						syncOwned &&
-						(transaction.pending === true || transaction.void === true),
+					// Bank rows are owner-editable including pending and
+					// void.
+					readOnly: false,
 				});
 			}
 			return ok({ transactions, revision: narrowRevision });

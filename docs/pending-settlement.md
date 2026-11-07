@@ -58,9 +58,28 @@ an occurrence of** and **Replaces occurrence on**. The claim names the
 occurrence the schedule guessed; it never re-dates the row. The occurrence
 happened when the transaction happened: recorded rows display and sort by
 their own day, and the claim only suppresses the guessed occurrence in
-projections. Pending rows accept claims while their other values stay
-locked: the claim lives outside the synced columns, and the pending-to-posted
+projections. Pending rows accept claims and owner edits while their other values stay editable: the claim lives outside the synced columns, and the pending-to-posted
 convert keeps the same row id.
+The owner may also clear pending or void directly to settle or restore a hold.
+Clear-only is enforced: the owner cannot set pending or void, and a settled
+row never becomes pending or void by an owner write. Clearing pending or void
+promotes the row to settled enabled with the bank transaction instant as the
+posted instant when missing. Owner clearing without a claim is ephemeral
+while the bank still reports the same pending key; the next sync refresh
+restores bank truth.
+
+Owner lifecycle transition matrix (bank rows only):
+
+| From | Owner action | Result |
+| --- | --- | --- |
+| Settled | Clear pending/void (already false) | No-op |
+| Settled | Set pending/void true | Ignored, remains settled |
+| Pending | Clear pending | Settled enabled |
+| Pending | Set void true | Ignored |
+| Void | Clear void | Settled enabled |
+| Void | Set pending true | Ignored |
+
+Void rows are editable and may be restored the same way by clearing void.
 
 Claiming clears pending, enables the row so it participates, and promotes
 the posted time from the bank's transaction instant. Pending seeds carry no

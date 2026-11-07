@@ -315,17 +315,11 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 			t.Fatalf("owner row %s void = true, want false", transaction.ID)
 		}
 	}
-	// Only lifecycle bank rows stay read-only: pending holds and vanished
-	// holds refresh or convert in place, while settled bank rows are
-	// owner-editable like manual actuals.
+	// Every bank row is owner-editable: pending and settled rows participate
+	// like manual actuals and void rows may be edited or restored.
 	for _, row := range payload.Transactions {
-		switch {
-		case !row.SyncOwned && row.ReadOnly:
-			t.Fatalf("owner row %s readOnly = true, want editable", row.ID)
-		case row.SyncOwned && row.Void && !row.ReadOnly:
-			t.Fatalf("void bank row %s readOnly = false, want sync-owned", row.ID)
-		case row.SyncOwned && !row.Void && row.ReadOnly:
-			t.Fatalf("settled bank row %s readOnly = true, want owner-editable", row.ID)
+		if row.ReadOnly {
+			t.Fatalf("row %s readOnly = true, want owner-editable", row.ID)
 		}
 	}
 }

@@ -240,7 +240,7 @@ it("marks holds that did not post instead of posted", () => {
 		endDate: null,
 		annualIncrease: 0,
 		enabled: false,
-		readOnly: true,
+		readOnly: false,
 		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
@@ -285,7 +285,7 @@ it("marks holds that did not post instead of posted", () => {
 			.queryAllByText("Posted")
 			.filter((node) => !node.className.includes("uppercase")),
 	).toHaveLength(0);
-	expect(screen.queryByText("Pending")).toBeNull();
+	// Bank-state checkboxes are editable controls, not the Pending badge.
 	expect(screen.queryByText("Excluded")).toBeNull();
 });
 
@@ -303,7 +303,7 @@ it("marks a live hold as not yet posted", () => {
 		endDate: null,
 		annualIncrease: 0,
 		enabled: false,
-		readOnly: true,
+		readOnly: false,
 		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
@@ -338,12 +338,12 @@ it("marks a live hold as not yet posted", () => {
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.getByText("Pending")).toBeTruthy();
+	expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
 	expect(screen.getByText("Not yet posted")).toBeTruthy();
 	expect(screen.queryByText("Excluded")).toBeNull();
 });
 
-it("lets a pending bank row record an occurrence while staying locked", async () => {
+it("lets a pending bank row record an occurrence while editable", async () => {
 	stubTestServer();
 	const savedTransaction = {
 		...financialModelFixture.transactions[0]!,
@@ -358,7 +358,7 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 		endDate: null,
 		annualIncrease: 0,
 		enabled: false,
-		readOnly: true,
+		readOnly: false,
 		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
@@ -377,10 +377,10 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 			onClose={() => {}}
 		/>,
 	);
-	// The row stays locked: the amount is not editable.
+	// The row is editable: the amount is not read-only.
 	expect(
 		(screen.getByLabelText("Amount (USD)") as HTMLInputElement).readOnly,
-	).toBe(true);
+	).toBe(false);
 	// But the occurrence claim is editable, with rules from the saved query.
 	const claim = screen.getByLabelText(
 		"Records an occurrence of",
@@ -1095,7 +1095,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 	);
 	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
 	cleanup();
-	const voided = { ...transaction, id: "vanished", void: true };
+	const voided = { ...transaction, id: "vanished", void: true, readOnly: false };
 	render(
 		<TransactionDetail
 			transaction={occurrence(voided)}
@@ -1105,7 +1105,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
+	expect(screen.getByRole("button", { name: /Category/ })).toBeTruthy();
 });
 
 it("keeps category edits enabled on a pending bank row", () => {
@@ -1117,7 +1117,7 @@ it("keeps category edits enabled on a pending bank row", () => {
 		...transaction,
 		id: "pending-charge",
 		pending: true,
-		readOnly: true,
+		readOnly: false,
 	};
 	render(
 		<TransactionDetail
@@ -1349,6 +1349,84 @@ it("says when a schedule has no recorded transactions", () => {
 			"No transactions record an occurrence of this schedule yet.",
 		),
 	).toBeTruthy();
+});
+
+it("opens a small modal from the occurred date to edit both dates", async () => {
+	const savedTransaction = {
+		...financialModelFixture.transactions.find(
+			(item) => item.id === "renovation",
+		)!,
+		id: "date-modal-check",
+		kind: "transaction" as const,
+		startDate: "2026-10-20",
+		postedDate: "2026-10-21",
+		readOnly: false,
+		pending: false,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={[savedTransaction]}
+			onClose={() => {}}
+		/>,
+	);
+	// Time is gone from the detail; the occurred date opens the modal.
+	expect(screen.queryByLabelText("Occurred at time (UTC)")).toBeNull();
+	fireEvent.click(screen.getByRole("button", { name: /Oct 20, 2026/ }));
+	const dialog = await screen.findByRole("dialog", {
+		name: "Transaction dates",
+	});
+	expect(within(dialog).getByLabelText("Occurred")).toBeTruthy();
+	expect(within(dialog).getByLabelText("Posted")).toBeTruthy();
+	fireEvent.change(within(dialog).getByLabelText("Occurred"), {
+		target: { value: "2026-11-01" },
+	});
+	fireEvent.change(within(dialog).getByLabelText("Posted"), {
+		target: { value: "2026-11-02" },
+	});
+	fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+	await waitFor(() =>
+		expect(screen.queryByRole("button", { name: "Apply" })).toBeNull(),
+	);
+	await waitFor(() =>
+		expect(
+			screen.getByRole("button", { name: "Save changes" }),
+		).toBeTruthy(),
+	);
+	expect(screen.getByRole("button", { name: /Nov 1, 2026/ })).toBeTruthy();
+});
+
+it("keeps the posted date disabled in the modal while pending", async () => {
+	const savedTransaction = {
+		...financialModelFixture.transactions.find(
+			(item) => item.id === "renovation",
+		)!,
+		id: "date-modal-pending",
+		kind: "transaction" as const,
+		startDate: "2026-10-20",
+		postedDate: null,
+		readOnly: false,
+		pending: true,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={[savedTransaction]}
+			onClose={() => {}}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: /Oct 20, 2026/ }));
+	const dialog = await screen.findByRole("dialog", {
+		name: "Transaction dates",
+	});
+	expect(
+		(within(dialog).getByLabelText("Posted") as HTMLInputElement).disabled,
+	).toBe(true);
+	expect(within(dialog).getByText(/Not yet posted/)).toBeTruthy();
 });
 
 it("ends a schedule by recording one transaction", async () => {

@@ -361,7 +361,7 @@ Each row write validates the resulting state at its finance or evaluation bounda
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
-3. Transaction IDs are canonical UUIDs. Incoming `source`, `pending`, and `void` values are ignored and recomputed. Stored lifecycle protects live pending and void bank rows from owner updates and deletes; settled bank rows accept them. ID prefixes carry no policy or lifecycle meaning.
+3. Transaction IDs are canonical UUIDs. Incoming `source`, `pending`, and `void` values are ignored and recomputed. Stored lifecycle treats every bank row as owner-editable; the owner may clear pending or void to settle or restore it, and the sync may set pending or void on arrival. ID prefixes carry no policy or lifecycle meaning.
 4. Owner checkpoints win same-instant key collisions (several observations per account/day survive); a later synchronization skips the owner-owned instant until owner data is removed, retains backdated instants as their own rows, and replaces a same-instant sync row idempotently. Databases that predate the required instant fail schema validation; the server never migrates them.
 5. Deleting an account keeps its bridge links; the link is the memory of the mapping, so recreating the account resumes sync flow. A link whose model account is gone resolves to nothing and is counted as `linked-account-missing` until relinked.
 

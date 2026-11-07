@@ -31,7 +31,6 @@ import {
 	type KeyboardEvent,
 } from "react";
 import { categorizeTransaction } from "@/api/generated/endpoints.ts";
-import { FieldError } from "../ErrorNotice.tsx";
 import {
 	transactionCategoryLabel,
 	transactionCategoryOptions,
@@ -132,7 +131,6 @@ export function TransactionCategory({
 	const [open, setOpen] = useState(false);
 	const [draft, setDraft] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	// Follow the saved rows after a save so the control reflects the server
 	// result without copying props into state through an effect.
 	const saved = useSavedTransactions()?.find((row) => row.id === transactionId);
@@ -212,19 +210,13 @@ export function TransactionCategory({
 	const save = async (next: string | null) => {
 		if (saving) return;
 		setSaving(true);
-		setError(null);
-		const ok = await performSave({
+		await performSave({
 			call: () => categorizeTransaction(transactionId, { category: next }),
 			refresh: refreshTransactions,
 			failureMessage: "The category could not be saved.",
 		});
 		setSaving(false);
 		setDraft(null);
-		if (!ok) {
-			setError(
-				"The category could not be saved. Review the workspace notice and try again.",
-			);
-		}
 	};
 
 	const choose = (next: string | null) => {
@@ -263,11 +255,10 @@ export function TransactionCategory({
 	};
 
 	return (
-		<>
-			<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-				<label id={labelId} htmlFor={triggerId} className={labelClassName}>
-					Category
-				</label>
+		<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+			<label id={labelId} htmlFor={triggerId} className={labelClassName}>
+				Category
+			</label>
 				<div className="relative min-w-0 flex-1">
 					<button
 						ref={triggerRef}
@@ -371,8 +362,6 @@ export function TransactionCategory({
 						</div>
 					)}
 				</div>
-			</div>
-			<FieldError message={error} />
-		</>
+	</div>
 	);
 }

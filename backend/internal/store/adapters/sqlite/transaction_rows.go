@@ -16,11 +16,10 @@ type transactionLifecycle struct {
 }
 
 // ownerEditable reports whether an owner write may touch the row. Owner
-// rows are always editable. Bank rows are owner-editable, including while
-// pending; only live void rows stay sync-owned so the sync never fights
-// the owner.
+// rows are always editable. Bank rows are owner-editable including while
+// pending or void, so the owner can edit, un-pend, or un-void them.
 func (l transactionLifecycle) ownerEditable() bool {
-	return l.source == SourceUser || !l.void
+	return true
 }
 
 func transactionLifecycleOf(tx *userTx, id string) (transactionLifecycle, error) {
@@ -89,24 +88,38 @@ func (s *sqliteStore) UpdateTransaction(transaction types.Transaction) (types.Tr
 		var storedClaim int
 		_ = tx.QueryRow(`SELECT 1 FROM transaction_claims WHERE transaction_id = ? AND user_id = :user_id`, transaction.ID).Scan(&storedClaim)
 		claiming := lifecycle.source != SourceUser && lifecycle.pending && transaction.Claim != nil && storedClaim == 0
-		// Owner writes change values only. Source and void stay as stored so
-		// bank rows keep their provenance and lifecycle. Pending is preserved
-		// for ordinary edits and cleared only when claiming. A claimed
-		// pending charge now records its occurrence, so it must participate
-		// in projections: claiming enables it.
-		transaction.Source, transaction.Void = lifecycle.source, lifecycle.void
+		// Owner writes change values only. Source is preserved as stored so
+		// bank rows keep their provenance. Pending and void are owner-clearable
+		// lifecycle flags: the sync sets them on arrival and the owner may
+		// clear them to settle or restore the row. Clearing pending or void
+		// promotes the row to a settled enabled state so it participates.
+		// Owner clearing is ephemeral while the bank still reports the same
+		// pending key; the next sync refresh restores bank truth unless the
+		// row is claimed as an occurrence.
+		transaction.Source = lifecycle.source
 		if lifecycle.source == SourceUser {
 			transaction.Pending = false
-		} else if claiming {
-			transaction.Pending, transaction.Enabled = false, true
-			// Pending seeds carry no posted time. A recorded occurrence
-			// needs one, so the promotion takes the bank's transaction
-			// instant, matching the subscription claim body.
-			if transaction.PostedTime <= 0 {
-				transaction.PostedTime = transaction.TransactionTime
-			}
+			transaction.Void = false
 		} else {
-			transaction.Pending = lifecycle.pending
+			// Clear-only: never set pending or void from an owner write.
+			// Setting them is the sync's job; preserving the stored value
+			// keeps Enabled consistent with execution.
+			if !lifecycle.pending {
+				transaction.Pending = false
+			}
+			if !lifecycle.void {
+				transaction.Void = false
+			}
+			clearingPending := lifecycle.pending && !transaction.Pending
+			clearingVoid := lifecycle.void && !transaction.Void
+			if claiming || clearingPending || clearingVoid {
+				transaction.Pending = false
+				transaction.Void = false
+				transaction.Enabled = true
+				if transaction.PostedTime <= 0 {
+					transaction.PostedTime = transaction.TransactionTime
+				}
+			}
 		}
 		if err := tx.QueryRow(`SELECT execution_order FROM transaction_sim WHERE transaction_id = ? AND user_id = :user_id`, transaction.ID).Scan(&transaction.ExecutionOrder); err != nil {
 			return err
@@ -119,8 +132,8 @@ func (s *sqliteStore) UpdateTransaction(transaction types.Transaction) (types.Tr
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE transactions SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ? WHERE id = ? AND user_id = :user_id`,
-			transaction.Name, nullable(transaction.SourceAccountID), string(destinations), string(amount), transaction.PostedTime, transaction.TransactionTime, boolToInt(transaction.Pending), transaction.ID); err != nil {
+		if _, err := tx.Exec(`UPDATE transactions SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND user_id = :user_id`,
+			transaction.Name, nullable(transaction.SourceAccountID), string(destinations), string(amount), transaction.PostedTime, transaction.TransactionTime, boolToInt(transaction.Pending), boolToInt(transaction.Void), transaction.ID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE transaction_sim SET enabled = ? WHERE transaction_id = ? AND user_id = :user_id`,
@@ -158,14 +171,10 @@ func (s *sqliteStore) DeleteTransaction(id string) error {
 		if err != nil {
 			return err
 		}
-		// Owner rows are always removable. A void bank-owned row is removable
-		// too: it moves nothing in the replay, and its bridge key is already
-		// gone from the feed (vanished rows are reconciled from absence), so
-		// there is nothing for a later sync to rejoin. Settled and pending
-		// rows are removable as well: their bank ids move to the do-not-import
-		// list first, so later feeds skip them.
-		voidBankRow := lifecycle.source != SourceUser && lifecycle.source != "" && !lifecycle.pending && lifecycle.void
-		if !lifecycle.ownerEditable() && !voidBankRow {
+		// Every row is owner-removable. Bank ids move to the do-not-import
+		// list first, so later feeds skip them. Void rows suppress nothing:
+		// their keys already left the feed.
+		if !lifecycle.ownerEditable() {
 			return SyncOwned(id)
 		}
 		// Copy the row's bank ids onto the do-not-import list before the
