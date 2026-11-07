@@ -27,7 +27,7 @@ export function ErrorNotice({
 	return notice;
 }
 
-/** Field feedback keeps its description target and three lines of space. */
+/** Field feedback renders only while a message exists. */
 export function FieldError({
 	message,
 	id,
@@ -35,16 +35,17 @@ export function FieldError({
 	message?: string | null;
 	id?: string;
 }) {
+	if (!message) return null;
 	return (
 		<p
 			id={id}
-			role={message ? "alert" : undefined}
+			role="alert"
 			aria-live="assertive"
 			aria-atomic="true"
 			// Keyboard users must be able to scroll wrapped field feedback.
 			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-			tabIndex={message ? 0 : undefined}
-			className="m-0 h-[3lh] shrink-0 overflow-auto text-sm leading-relaxed text-danger-text"
+			tabIndex={0}
+			className="m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text"
 		>
 			{message}
 		</p>

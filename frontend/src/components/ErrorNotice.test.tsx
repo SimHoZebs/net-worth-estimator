@@ -15,13 +15,12 @@ it("keeps retry actions beside the failure message", async () => {
 	expect(retry).toHaveBeenCalledOnce();
 });
 
-it("keeps a stable field description target without premature error text", () => {
-	const { rerender } = render(<FieldError id="token-error" />);
-	const description = document.getElementById("token-error")!;
-	expect(description.textContent).toBe("");
-	expect(description.classList.contains("h-[3lh]")).toBe(true);
-	expect(description.classList.contains("overflow-auto")).toBe(true);
+it("renders field errors only while a message exists", () => {
+	const { rerender, container } = render(<FieldError id="token-error" />);
+	expect(container.firstElementChild).toBeNull();
+	expect(screen.queryByRole("alert")).toBeNull();
 	rerender(<FieldError id="token-error" message="Paste the entire token." />);
+	const description = document.getElementById("token-error")!;
 	expect(screen.getByRole("alert")).toBe(description);
 	expect(description.textContent).toContain("Paste the entire token.");
 });

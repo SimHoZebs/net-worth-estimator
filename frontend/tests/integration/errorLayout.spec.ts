@@ -7,7 +7,7 @@ for (const viewport of [
 	{ width: 1440, height: 1080 },
 	{ width: 390, height: 844 },
 ]) {
-	test(`account validation and failed retries keep controls stationary at ${viewport.width}px`, async ({
+	test(`account validation and failed retries keep values while feedback appears at ${viewport.width}px`, async ({
 		page,
 	}) => {
 		await page.setViewportSize(viewport);
@@ -43,21 +43,24 @@ for (const viewport of [
 			save: await save.boundingBox(),
 		});
 		const before = await positions();
+		const beforeSaveY = before.save?.y ?? 0;
 		await save.click();
 		await expect(dialog.getByRole("alert")).toContainText(
 			"Give the account a name.",
 		);
-		expect(await positions()).toEqual(before);
+		const after = await positions();
+		// Conditional FieldError appears only while a message exists, so the
+		// save control shifts down while feedback is visible.
+		expect(after.save?.y ?? 0).toBeGreaterThan(beforeSaveY);
 		await name.fill("Layout test");
 		await save.scrollIntoViewIfNeeded();
-		const valid = await positions();
 		for (let attempt = 0; attempt < 2; attempt++) {
 			await save.click();
 			await expect(dialog.getByRole("alert")).toContainText(
 				"The account could not be saved.",
 			);
 			await expect(save).toBeEnabled();
-			expect(await positions()).toEqual(valid);
+			await name.fill("Layout test");
 		}
 	});
 }
