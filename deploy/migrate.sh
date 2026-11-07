@@ -770,7 +770,9 @@ fi
 # Convert SimpleFIN bridge identity from bare v1 account IDs to
 # connection-scoped v2 keys. The tool is a no-op when no SimpleFIN rows
 # exist. A live mapping supplied through the private environment is required
-# only when rows exist; the conversion itself is offline and transactional.
+# only when bare keys exist; when every key is already current the tool
+# records the marker without a mapping. The conversion itself is offline
+# and transactional.
 if ! simplefin-v2-keys --db "$candidate" --mapping "${SIMPLEFIN_V2_MAPPING:-}" > "$backup/simplefin-v2-keys.log" 2>&1; then
   printf 'migrate: SimpleFIN v2 key conversion failed: %s\n' "$(cat "$backup/simplefin-v2-keys.log")" >&2
   fail "Candidate SimpleFIN v2 key conversion failed. Original unchanged; backup retained at $backup."

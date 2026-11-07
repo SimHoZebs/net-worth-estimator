@@ -44,6 +44,25 @@ func seedLegacyKeys(t *testing.T, database *sqlite.Database, userID string) {
 	}
 }
 
+func seedCurrentKeys(t *testing.T, database *sqlite.Database, userID, connID, accountID string) string {
+	t.Helper()
+	key := simplefin.AccountKey(connID, accountID)
+	if _, err := database.SQL().Exec(`PRAGMA foreign_keys = OFF`); err != nil {
+		t.Fatal(err)
+	}
+	statements := []string{
+		`INSERT INTO account_links(user_id, bridge_account_id, model_account_id, origin) VALUES (?, ?, 'checking', 'manual')`,
+		`INSERT INTO transaction_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, transaction_id) VALUES (?, 'simplefin', ?, 'tx1', 'transaction-1')`,
+		`INSERT INTO suppressed_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at) VALUES (?, 'simplefin', ?, 'tx2', 1)`,
+	}
+	for _, statement := range statements {
+		if _, err := database.SQL().Exec(statement, userID, key); err != nil {
+			t.Fatalf("seed %q: %v", statement, err)
+		}
+	}
+	return key
+}
+
 func writeMapping(t *testing.T, userID, connID string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "mapping.json")
@@ -88,6 +107,78 @@ func TestUpgradeRewritesAllKeyTables(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "0 converted") {
 		t.Fatalf("rerun output = %q", out.String())
+	}
+}
+
+func TestUpgradeSkipsMappingWhenKeysAlreadyCurrent(t *testing.T) {
+	path, userID, database := testDB(t)
+	key := seedCurrentKeys(t, database, userID, "CON-9", "bridge-checking")
+
+	var out strings.Builder
+	if code := run([]string{"--db", path}, &out, &out); code != 0 {
+		t.Fatalf("run without mapping = %d: %s", code, out.String())
+	}
+	var got string
+	if err := database.SQL().QueryRow(`SELECT bridge_account_id FROM account_links WHERE user_id = ?`, userID).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != key {
+		t.Fatalf("key = %q, want %q", got, key)
+	}
+	var marker int
+	if err := database.SQL().QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, migrationMarker).Scan(&marker); err != nil || marker != 1 {
+		t.Fatalf("marker = %d, err %v", marker, err)
+	}
+	if !strings.Contains(out.String(), "0 converted") {
+		t.Fatalf("output = %q", out.String())
+	}
+
+	out.Reset()
+	if code := run([]string{"--db", path}, &out, &out); code != 0 {
+		t.Fatalf("rerun without mapping = %d: %s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "0 converted") {
+		t.Fatalf("rerun output = %q", out.String())
+	}
+}
+
+func TestUpgradeDryRunLeavesCurrentUnmarked(t *testing.T) {
+	path, userID, database := testDB(t)
+	seedCurrentKeys(t, database, userID, "CON-9", "bridge-checking")
+
+	var out strings.Builder
+	if code := run([]string{"--db", path, "--dry-run"}, &out, &out); code != 0 {
+		t.Fatalf("dry run without mapping = %d: %s", code, out.String())
+	}
+	var marker int
+	if err := database.SQL().QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, migrationMarker).Scan(&marker); err != nil {
+		t.Fatal(err)
+	}
+	if marker != 0 {
+		t.Fatalf("marker = %d, want 0 after dry run", marker)
+	}
+	if !strings.Contains(out.String(), "0 converted") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestUpgradeRequiresMappingWhenBareKeysExist(t *testing.T) {
+	path, userID, database := testDB(t)
+	seedLegacyKeys(t, database, userID)
+
+	var out strings.Builder
+	if code := run([]string{"--db", path}, &out, &out); code == 0 {
+		t.Fatalf("run without mapping succeeded: %s", out.String())
+	}
+	if !strings.Contains(out.String(), "mapping is required because bare SimpleFIN keys exist") {
+		t.Fatalf("output = %q", out.String())
+	}
+	var marker int
+	if err := database.SQL().QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, migrationMarker).Scan(&marker); err != nil {
+		t.Fatal(err)
+	}
+	if marker != 0 {
+		t.Fatalf("marker = %d, want 0", marker)
 	}
 }
 

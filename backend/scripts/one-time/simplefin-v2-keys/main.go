@@ -1,11 +1,12 @@
 // Command simplefin-v2-keys migrates stored SimpleFIN account keys from the
-// v1 bare account ID to the connection-scoped v2 key. It also builds the
-// private account-to-connection map from a live Bridge read.
-//
-// The map step is the only provider read. The upgrade step is offline and
-// transactional: it rewrites account_links, transaction_sync_keys, and
-// suppressed_sync_keys, verifies row counts, and records the migration
-// marker. Neither the server nor setupdb calls this tool.
+// v1 bare account ID to the connection-scoped v2 key. When every stored key
+// already uses the v2 form the tool records the migration marker without a
+// live mapping. Otherwise it builds the private account-to-connection map
+// from a live Bridge read for the conversion. The map step is the only
+// provider read. The upgrade step is offline and transactional: it rewrites
+// account_links, transaction_sync_keys, and suppressed_sync_keys, verifies
+// row counts, and records the migration marker. Neither the server nor
+// setupdb calls this tool.
 package main
 
 import (
@@ -194,15 +195,70 @@ func upgrade(dbPath, mappingPath string, dryRun bool) (counts, error) {
 	if len(users) == 0 {
 		return result, nil
 	}
-	if strings.TrimSpace(mappingPath) == "" {
-		return result, fmt.Errorf("mapping is required because SimpleFIN rows exist")
-	}
 
 	db, err := openDatabase(dbPath, false)
 	if err != nil {
 		return result, err
 	}
 	defer db.Close()
+
+	marker, err := markerPresent(db)
+	if err != nil {
+		return result, err
+	}
+	legacyByUser := make(map[string][]string, len(users))
+	anyLegacy := false
+	for _, userID := range users {
+		legacy, err := legacyKeys(db, userID)
+		if err != nil {
+			return result, err
+		}
+		legacyByUser[userID] = legacy
+		if len(legacy) > 0 {
+			anyLegacy = true
+		}
+	}
+	if !anyLegacy {
+		// Stored keys already use the connection-scoped form, so no live
+		// mapping is needed. Record the marker once so repeats stay
+		// mapping-free as well.
+		for _, userID := range users {
+			before, err := tableCounts(db, userID)
+			if err != nil {
+				return result, err
+			}
+			result.Links += before.Links
+			result.TransactionKeys += before.TransactionKeys
+			result.SuppressedKeys += before.SuppressedKeys
+		}
+		if marker {
+			return result, nil
+		}
+		if err := beginImmediate(db); err != nil {
+			return result, err
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_, _ = db.Exec("ROLLBACK")
+			}
+		}()
+		if _, err := db.Exec(`INSERT OR IGNORE INTO schema_migrations(name) VALUES (?)`, migrationMarker); err != nil {
+			return result, fmt.Errorf("record migration marker: %w", err)
+		}
+		if dryRun {
+			_, _ = db.Exec("ROLLBACK")
+			return result, nil
+		}
+		if _, err := db.Exec("COMMIT"); err != nil {
+			return result, fmt.Errorf("commit conversion: %w", err)
+		}
+		committed = true
+		return result, nil
+	}
+	if strings.TrimSpace(mappingPath) == "" {
+		return result, fmt.Errorf("mapping is required because bare SimpleFIN keys exist")
+	}
 
 	rawMapping, err := os.ReadFile(mappingPath)
 	if err != nil {
@@ -216,19 +272,11 @@ func upgrade(dbPath, mappingPath string, dryRun bool) (counts, error) {
 		return result, fmt.Errorf("unsupported mapping version %d", mapping.Version)
 	}
 
-	marker, err := markerPresent(db)
-	if err != nil {
-		return result, err
-	}
 	if marker && !dryRun {
-		// A marked database repeats read-only verification. Any bare key is
-		// a partial or foreign mutation and must fail closed.
+		// A marked database repeats verification. Any bare key is a
+		// partial or foreign mutation and must fail closed.
 		for _, userID := range users {
-			legacy, err := legacyKeys(db, userID)
-			if err != nil {
-				return result, err
-			}
-			if len(legacy) > 0 {
+			if len(legacyByUser[userID]) > 0 {
 				return result, fmt.Errorf("user %s still has bare SimpleFIN keys after the migration marker", userID)
 			}
 		}
@@ -254,10 +302,7 @@ func upgrade(dbPath, mappingPath string, dryRun bool) (counts, error) {
 		if err != nil {
 			return result, err
 		}
-		legacy, err := legacyKeys(db, userID)
-		if err != nil {
-			return result, err
-		}
+		legacy := legacyByUser[userID]
 		result.Links += before.Links
 		result.TransactionKeys += before.TransactionKeys
 		result.SuppressedKeys += before.SuppressedKeys

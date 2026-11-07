@@ -69,11 +69,13 @@ The SimpleFIN v2 key conversion is one additional offline step in the same
 candidate. `simplefin-v2-keys` rewrites `account_links`,
 `transaction_sync_keys`, and `suppressed_sync_keys` from bare account IDs to
 connection-scoped keys, verifies row counts, and records
-`simplefin-v2-keys`. It is a no-op when no SimpleFIN rows exist. When rows
-exist, the deployment supplies `SIMPLEFIN_V2_MAPPING` as a private runtime
-setting: a mode-0600 JSON map produced by `simplefin-v2-keys
+`simplefin-v2-keys`. It is a no-op when no SimpleFIN rows exist. When bare
+keys exist, the deployment supplies `SIMPLEFIN_V2_MAPPING` as a private
+runtime setting: a mode-0600 JSON map produced by `simplefin-v2-keys
 --write-mapping` before the window. The map tool performs the only provider
-read. A missing, ambiguous, or colliding mapping fails before publication.
+read. When every key already uses the connection-scoped form the tool
+records the marker without a mapping. A missing, ambiguous, or colliding
+mapping fails before publication when bare keys need it.
 A marked database repeats read-only verification and refuses bare keys.
 
 The old import default and pre-upgrade API-set exclusions share the same
