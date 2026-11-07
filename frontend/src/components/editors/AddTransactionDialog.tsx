@@ -154,7 +154,7 @@ export function AddTransactionDialog({
 	};
 
 	return (
-		<Modal title="Add planned transaction" onClose={onClose}>
+		<Modal title="Add transaction" onClose={onClose}>
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}

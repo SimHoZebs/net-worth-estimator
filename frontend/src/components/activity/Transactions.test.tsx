@@ -131,7 +131,7 @@ describe("finance-first transaction activity", () => {
 			/>,
 		);
 		expect(
-			screen.getByRole("button", { name: "Add a planned transaction" }),
+			screen.getByRole("button", { name: "Add transaction" }),
 		).toBeTruthy();
 		fireEvent.change(sourceSelect(), { target: { value: "projected" } });
 		expect(onSourceChange).toHaveBeenCalledWith("projected");
@@ -141,7 +141,7 @@ describe("finance-first transaction activity", () => {
 		const props = recordedProps();
 		render(<Transactions {...props} occurrences={[]} />);
 		expect(
-			screen.getByRole("button", { name: "Add a planned transaction" }),
+			screen.getByRole("button", { name: "Add transaction" }),
 		).toBeTruthy();
 		expect(screen.queryByLabelText("Transaction source")).toBeNull();
 		expect(screen.queryByRole("searchbox")).toBeNull();

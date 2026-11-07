@@ -45,7 +45,7 @@ export const pages: PageDefinition[] = [
 		id: "transactions",
 		label: "Transactions",
 		icon: ArrowRightLeft,
-		title: "Planned transactions",
+		title: "Transactions",
 	},
 	{
 		id: "flows",

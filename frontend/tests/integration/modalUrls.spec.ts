@@ -133,7 +133,7 @@ test("page navigation moves focus and preserves the native link target", async (
 	await expect(transactions).toHaveAttribute("href", "/transactions");
 	await transactions.click();
 	await expect(
-		page.getByRole("heading", { name: "Planned transactions", exact: true }),
+		page.getByRole("heading", { name: "Transactions", exact: true }),
 	).toBeFocused();
 	await expect(page).toHaveTitle("Transactions · Waypoint");
 });
@@ -142,13 +142,13 @@ test("an editor copied to a fresh page preserves its evidence return destination
 	page,
 }) => {
 	await page.goto("/accounts?evidence=account&id=home");
-	await page.getByRole("button", { name: "Add a planned transaction" }).click();
+	await page.getByRole("button", { name: "Add transaction" }).click();
 	await expect(page).toHaveURL(/returnEvidence=account&returnId=home$/);
 	const copied = page.url();
 	await page.goto("/transactions");
 	await page.goto(copied);
 	await expect(
-		page.getByRole("dialog", { name: "Add planned transaction" }),
+		page.getByRole("dialog", { name: "Add transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
@@ -247,7 +247,7 @@ test("history restores an editor's evidence return target without leaking it to 
 		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
 	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);
-	await page.getByRole("button", { name: "Add a planned transaction" }).click();
+	await page.getByRole("button", { name: "Add transaction" }).click();
 	await expect(page).toHaveURL(
 		/\/accounts\?editor=transaction&id=new&returnEvidence=account&returnId=home$/,
 	);
@@ -262,7 +262,7 @@ test("history restores an editor's evidence return target without leaking it to 
 		/\/accounts\?editor=transaction&id=new&returnEvidence=account&returnId=home$/,
 	);
 	await expect(
-		page.getByRole("dialog", { name: "Add planned transaction" }),
+		page.getByRole("dialog", { name: "Add transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=home$/);

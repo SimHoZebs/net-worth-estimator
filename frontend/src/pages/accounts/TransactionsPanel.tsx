@@ -56,7 +56,7 @@ export function TransactionsPanel({
 	return (
 		<>
 			<TransactionTable
-				caption="Planned transactions with dates and amounts."
+				caption="Transactions with dates and amounts."
 				showHeaders={showHeaders}
 			>
 				{transactions.map((transaction) => {

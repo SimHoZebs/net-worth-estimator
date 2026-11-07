@@ -314,7 +314,7 @@ test("growth-only accounts have an honest empty state and retain account details
 		}),
 	).toBeVisible();
 	await expect(
-		dialog.getByRole("button", { name: "Add a planned transaction" }),
+		dialog.getByRole("button", { name: "Add transaction" }),
 	).toBeVisible();
 	await expect(dialog.getByRole("tab")).toHaveCount(3);
 	await expect(

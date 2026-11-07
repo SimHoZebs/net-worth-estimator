@@ -96,7 +96,7 @@ export function Transactions({
 			<EmptyState
 				icon={ArrowRightLeft}
 				title="No transactions for this account yet"
-				action="Add a planned transaction"
+				action="Add transaction"
 				onAction={() => onEdit({ kind: "transaction", item: null })}
 			/>
 		);
@@ -186,7 +186,7 @@ export function Transactions({
 				<EmptyState
 					icon={ArrowRightLeft}
 					title="No transactions for this account yet"
-					action="Add a planned transaction"
+					action="Add transaction"
 					onAction={() => onEdit({ kind: "transaction", item: null })}
 				/>
 			) : (
