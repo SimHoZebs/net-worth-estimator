@@ -82,17 +82,20 @@ type Connection struct {
 	SfinURL string `json:"sfin_url"`
 }
 
-// Account mirrors the SimpleFIN protocol account object.
+// Account mirrors the SimpleFIN protocol account object. Extra preserves
+// the bridge's optional free-form object so account-type hints survive
+// decoding instead of being dropped as an unknown field.
 type Account struct {
-	ID               string        `json:"id"`
-	ConnID           string        `json:"conn_id"`
-	Name             string        `json:"name"`
-	Currency         string        `json:"currency"`
-	Balance          string        `json:"balance"`
-	AvailableBalance *string       `json:"available-balance"`
-	BalanceDate      int64         `json:"balance-date"`
-	Holdings         []any         `json:"holdings"`
-	Transactions     []Transaction `json:"transactions"`
+	ID               string                     `json:"id"`
+	ConnID           string                     `json:"conn_id"`
+	Name             string                     `json:"name"`
+	Currency         string                     `json:"currency"`
+	Balance          string                     `json:"balance"`
+	AvailableBalance *string                    `json:"available-balance"`
+	BalanceDate      int64                      `json:"balance-date"`
+	Holdings         []any                      `json:"holdings"`
+	Transactions     []Transaction              `json:"transactions"`
+	Extra            map[string]json.RawMessage `json:"extra"`
 }
 
 // AccountSet mirrors the top-level GET /accounts response. errlist and

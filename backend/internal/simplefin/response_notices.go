@@ -3,6 +3,7 @@ package simplefin
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"time"
 )
 
@@ -22,9 +23,22 @@ func (e ProtocolError) isRangeNotice() bool {
 
 func logAccountSet(ctx context.Context, host string, start, end time.Time, set *AccountSet) {
 	transactions := 0
+	accountsWithExtra := 0
+	extraKeys := map[string]struct{}{}
 	for _, account := range set.Accounts {
 		transactions += len(account.Transactions)
+		if len(account.Extra) > 0 {
+			accountsWithExtra++
+			for key := range account.Extra {
+				extraKeys[key] = struct{}{}
+			}
+		}
 	}
+	keys := make([]string, 0, len(extraKeys))
+	for key := range extraKeys {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
 	codes := make([]string, 0, len(set.ErrList))
 	for _, entry := range set.ErrList {
 		codes = append(codes, entry.Code)
@@ -32,5 +46,6 @@ func logAccountSet(ctx context.Context, host string, start, end time.Time, set *
 	slog.InfoContext(ctx, "simplefin response",
 		"host", host, "start", start.UTC(), "end", end.UTC(),
 		"connections", len(set.Connections), "accounts", len(set.Accounts),
-		"transactions", transactions, "notices", len(set.ErrList), "codes", codes)
+		"transactions", transactions, "notices", len(set.ErrList), "codes", codes,
+		"accounts_with_extra", accountsWithExtra, "account_extra_keys", keys)
 }

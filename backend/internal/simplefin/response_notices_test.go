@@ -76,6 +76,42 @@ func TestSyncAppliesDataWithRangeNotices(t *testing.T) {
 	}
 }
 
+func TestAccountExtraKeysLoggedWithoutValues(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	body, err := json.Marshal(map[string]any{
+		"errlist":     []any{},
+		"connections": []map[string]any{{"conn_id": "CON-1"}},
+		"accounts": []map[string]any{
+			{"id": "checking", "conn_id": "CON-1", "name": "Private account", "currency": "USD", "balance": "1234.56", "balance-date": 1793984400, "transactions": []map[string]any{}},
+			{"id": "card", "conn_id": "CON-1", "name": "Private card", "currency": "USD", "balance": "-987.65", "balance-date": 1793984400, "extra": map[string]string{"type": "credit_card-secret-value", "account_id": "private-account-id"}, "transactions": []map[string]any{}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := v2Bridge(t, string(body), http.StatusOK)
+	set, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(set.Accounts[1].Extra) != 2 {
+		t.Fatalf("account extra not preserved: %+v", set.Accounts[1].Extra)
+	}
+	for _, want := range []string{`"accounts_with_extra":1`, `"account_id"`, `"type"`} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("missing probe field %s: %s", want, logs.String())
+		}
+	}
+	for _, secret := range []string{"credit_card-secret-value", "private-account-id", "Private account", "Private card", "1234.56", "-987.65", client.AccessURL} {
+		if strings.Contains(logs.String(), secret) {
+			t.Errorf("sensitive value logged: %q", secret)
+		}
+	}
+}
+
 func TestRangeNoticeDoesNotHideOtherGeneralErrors(t *testing.T) {
 	client := v2Bridge(t, rangeNoticeBody(t, []ProtocolError{
 		{Code: "gen.api", Msg: "Requested date range exceeds limit of 90 days and was capped."},

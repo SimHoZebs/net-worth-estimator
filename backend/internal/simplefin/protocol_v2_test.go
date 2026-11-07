@@ -45,6 +45,25 @@ func TestFetchParsesV2ConnectionsAndConnID(t *testing.T) {
 	}
 }
 
+func TestFetchPreservesAccountExtra(t *testing.T) {
+	client := v2Bridge(t, `{
+		"errlist": [],
+		"connections": [{"conn_id": "CON-1", "name": "My Bank - James", "org_id": "ORG-1"}],
+		"accounts": [{"id": "card", "conn_id": "CON-1", "name": "Card", "currency": "USD", "balance": "-5", "balance-date": 10, "extra": {"type": "credit_card"}, "transactions": []}]
+	}`, http.StatusOK)
+	set, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(set.Accounts) != 1 {
+		t.Fatalf("accounts = %+v", set.Accounts)
+	}
+	var kind string
+	if err := json.Unmarshal(set.Accounts[0].Extra["type"], &kind); err != nil || kind != "credit_card" {
+		t.Fatalf("account extra type = %q, err %v", kind, err)
+	}
+}
+
 func TestFetchRejectsInvalidShape(t *testing.T) {
 	client := v2Bridge(t, `{"errors": [], "accounts": []}`, http.StatusOK)
 	_, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
