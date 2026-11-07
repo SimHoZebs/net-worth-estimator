@@ -207,27 +207,25 @@ export function SyncProviderPanel() {
 										</h3>
 									</div>
 								</div>
-								<div className="my-5 rounded-control border border-line bg-surface-2 p-4">
-									<p className="m-0 text-sm leading-relaxed text-muted">
-										{since && <>Connected since {since}, </>}
-										{lastSynced ? (
-											<>
-												Last synced{" "}
-												<time dateTime={status.data?.lastSyncAt}>
-													{lastSynced}
-												</time>
-											</>
-										) : (
-											"No successful sync yet"
-										)}
-										{quotaRemaining !== null && quotaLimit !== null && (
-											<>
-												, {quotaRemaining} out of {quotaLimit} syncs available
-											</>
-										)}
-										.
-									</p>
-								</div>
+								<p className="mt-4 mb-0 text-sm leading-relaxed text-muted">
+									{since && <>Connected since {since} · </>}
+									{lastSynced ? (
+										<>
+											Last synced{" "}
+											<time dateTime={status.data?.lastSyncAt}>
+												{lastSynced}
+											</time>
+										</>
+									) : (
+										"No successful sync yet"
+									)}
+									{quotaRemaining !== null && quotaLimit !== null && (
+										<>
+											{" "}
+											· {quotaRemaining} out of {quotaLimit} syncs available
+										</>
+									)}
+								</p>
 								{status.isError && (
 									<ErrorNotice
 										message="The sync status could not be loaded."
