@@ -225,9 +225,6 @@ func supersedeDeleteTransactions(tx *userTx, transactionIDs []string) error {
 		return nil
 	}
 	now := time.Now().Unix()
-	if err := ensureSuppressionSchema(tx); err != nil {
-		return err
-	}
 	for _, id := range transactionIDs {
 		if err := deleteSharingForTransaction(tx, id); err != nil {
 			return err

@@ -4,20 +4,6 @@ import (
 	"database/sql"
 )
 
-// ensureAvailableBalanceSchema creates the additive available-balance
-// sidecar on demand. The checkpoint table keeps its exact deployed shape.
-func ensureAvailableBalanceSchema(tx *userTx) error {
-	var count int
-	if err := tx.Tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'checkpoint_available_balances'`).Scan(&count); err != nil {
-		return err
-	}
-	if count == 1 {
-		return nil
-	}
-	_, err := tx.Tx.Exec(checkpointAvailableBalancesDDL)
-	return err
-}
-
 // upsertAvailableBalanceTx writes the bank-reported available figure for one
 // checkpoint. A nil value deletes the sidecar row, so an owner replacement or
 // a later report without the field never leaves stale evidence behind.

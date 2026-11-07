@@ -423,6 +423,69 @@ test("partial account displays schema fails closed with the original unchanged",
   assert.deepEqual(await backups(directory), []);
 });
 
+test("pre-sidecar database gains empty suppression and available-balance tables with data preserved", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sidecars-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  // Model a deployed database from before the required sidecars existed.
+  await sqlite(db, `DROP TABLE checkpoint_available_balances;
+    DROP TABLE suppressed_sync_keys;`);
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+  const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+
+  assert.equal(await rows(db, "SELECT user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at FROM suppressed_sync_keys LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT user_id, model_account_id, observed_at, available_balance FROM checkpoint_available_balances LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM suppressed_sync_keys;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM checkpoint_available_balances;"), "0");
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal((await backups(directory)).length, 1);
+
+  // The provisioned target now repeats read-only.
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("existing sidecar rows survive migration byte-identical", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sidecar-rows-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id, id, position, model_account_id, balance, source, observed_at) VALUES ('${owner}', 1, 0, 'checking', 100, 'banksync', 1773187199);`);
+  await sqlite(db, `INSERT INTO checkpoint_available_balances(user_id, model_account_id, observed_at, available_balance) VALUES ('${owner}', 'checking', 1773187199, 90);`);
+  await sqlite(db, `INSERT INTO suppressed_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at) VALUES ('${owner}', 'banksync', 'bridge-checking', 'tx-1', 123);`);
+  const suppressedBefore = await rows(db, "SELECT user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at FROM suppressed_sync_keys ORDER BY 1, 2, 3, 4;");
+  const availableBefore = await rows(db, "SELECT user_id, model_account_id, observed_at, available_balance FROM checkpoint_available_balances ORDER BY 1, 2, 3;");
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "SELECT user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at FROM suppressed_sync_keys ORDER BY 1, 2, 3, 4;"), suppressedBefore);
+  assert.equal(await rows(db, "SELECT user_id, model_account_id, observed_at, available_balance FROM checkpoint_available_balances ORDER BY 1, 2, 3;"), availableBefore);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("partial sidecar schemas fail closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sidecar-shape-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE checkpoint_available_balances;
+    CREATE TABLE checkpoint_available_balances(user_id TEXT, model_account_id TEXT, observed_at INTEGER, available_balance REAL, PRIMARY KEY(user_id, model_account_id, observed_at));`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /Incomplete available-balance schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
 test("account displays with columns but without constraints fail closed", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displayconstraints-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

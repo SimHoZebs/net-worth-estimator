@@ -44,6 +44,8 @@ func TestDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 		{"missing-sharing-audit", `DROP TABLE sharing_audit`, ErrSetupRequired},
 		{"missing-sharing-requests", `DROP TABLE sharing_requests`, ErrSetupRequired},
 		{"missing-financial", `DROP TABLE account_links`, ErrSetupRequired},
+		{"missing-suppressed-sync-keys", `DROP TABLE suppressed_sync_keys`, ErrSetupRequired},
+		{"missing-checkpoint-available-balances", `DROP TABLE checkpoint_available_balances`, ErrSetupRequired},
 		{"missing-purchases", `DROP TABLE planned_purchases`, ErrSetupRequired},
 		{"missing-column", `ALTER TABLE sessions DROP COLUMN data`, ErrSetupRequired},
 		{"missing-transaction-sim", `DROP TABLE transaction_sim`, ErrSetupRequired},

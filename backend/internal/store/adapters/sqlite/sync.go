@@ -46,9 +46,6 @@ type syncedCheckpoint struct {
 }
 
 func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []syncedCheckpoint, startPosition int) (int, error) {
-	if err := ensureAvailableBalanceSchema(tx); err != nil {
-		return 0, fmt.Errorf("ensure available balances: %w", err)
-	}
 	incomingKeys := make(map[string]struct{}, len(incoming))
 	for _, checkpoint := range incoming {
 		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)] = struct{}{}
@@ -149,18 +146,10 @@ func loadSyncedCheckpoints(tx *userTx) ([]syncedCheckpoint, error) {
 	// and the provider column names the supplying bridge, so metrics and
 	// debugging can tell bank-data origins apart; the lifecycle treats
 	// them uniformly.
-	query := `SELECT c.model_account_id, c.balance, c.source, c.provider, c.observed_at, NULL
-		FROM checkpoints c WHERE c.source != ? AND c.user_id = :user_id ORDER BY c.position`
-	var availableTables int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'checkpoint_available_balances'`).Scan(&availableTables); err != nil {
-		return nil, err
-	}
-	if availableTables == 1 {
-		query = `SELECT c.model_account_id, c.balance, c.source, c.provider, c.observed_at, a.available_balance
-			FROM checkpoints c LEFT JOIN checkpoint_available_balances a
-			ON a.user_id = c.user_id AND a.model_account_id = c.model_account_id AND a.observed_at = c.observed_at
-			WHERE c.source != ? AND c.user_id = :user_id ORDER BY c.position`
-	}
+	query := `SELECT c.model_account_id, c.balance, c.source, c.provider, c.observed_at, a.available_balance
+		FROM checkpoints c LEFT JOIN checkpoint_available_balances a
+		ON a.user_id = c.user_id AND a.model_account_id = c.model_account_id AND a.observed_at = c.observed_at
+		WHERE c.source != ? AND c.user_id = :user_id ORDER BY c.position`
 	rows, err := tx.Query(query, SourceUser)
 	if err != nil {
 		return nil, err
@@ -359,9 +348,6 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 	}
 	defer tx.Rollback()
 
-	if err := ensureAvailableBalanceSchema(tx); err != nil {
-		return summary, fmt.Errorf("ensure available balances: %w", err)
-	}
 	nextPosition, err := nextTablePosition(tx, "checkpoints")
 	if err != nil {
 		return summary, err
@@ -412,9 +398,6 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 		summary.CheckpointsSkipped++
 	}
 
-	if err := ensureSuppressionSchema(tx); err != nil {
-		return summary, err
-	}
 	suppressed, err := loadSuppressedKeys(tx)
 	if err != nil {
 		return summary, err

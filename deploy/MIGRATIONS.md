@@ -46,10 +46,12 @@ provisions the Analysis evidence, findings, and feedback schema from frozen SQL
 in `analysis-schema.sql`. It then runs the independent
 `/app/upgrade-planned-purchases` tool to convert retired purchase policies.
 Conversion and repair run inside a candidate copy of a verified backup;
-`setupdb` only validates the complete current schema on that candidate. A logical
-database digest proves that validation changes no schema or rows. Only the verified
-candidate is published over the original database, so the original file is
-never mutated before publication. It accepts current `shared-accounts-v1`
+`setupdb` only validates the complete current schema on that candidate. It
+also provisions the suppression-key and checkpoint available-balance
+sidecars when absent. A logical database digest proves that validation
+changes no schema or rows. Only the verified candidate is published over
+the original database, so the original file is never mutated before
+publication. It accepts current `shared-accounts-v1`
 storage with date-only or final checkpoints, zero or all Analysis tables, and
 either the retired or standalone purchase shape. Complete targets repeat read-only.
 Mixed purchase shapes and partial application or
@@ -84,6 +86,13 @@ candidate. Complete repeats read-only. A partial display schema fails
 before mutation. Existing displays verify byte-identical below, and the
 body never infers loan relationships. Operators link existing loan pairs
 explicitly with the one-time account-displays upgrade.
+
+The suppression-key and available-balance sidecars are also
+provision-if-missing in the same candidate. Absent creates each table
+empty; complete repeats read-only. A partial sidecar schema fails before
+mutation. Existing available-balance rows verify byte-identical below.
+For preexisting suppression rows, the SimpleFIN v2 rewrite below may
+change only bridge keys to its connection-scoped form.
 
 The old import default and pre-upgrade API-set exclusions share the same
 disabled flag. The conversion enables all legacy settled bank rows once,

@@ -37,25 +37,6 @@ func insertTransactionSyncKey(tx *userTx, key transactionSyncKey) error {
 	return err
 }
 
-// ensureSuppressionSchema creates the do-not-import list on demand so
-// databases provisioned before it existed keep working untouched.
-func ensureSuppressionSchema(tx *userTx) error {
-	_, err := tx.Exec(suppressedSyncKeysDDL)
-	return err
-}
-
-func ensureSuppressionSchemaDB(db *userDB) error {
-	var count int
-	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'suppressed_sync_keys'`).Scan(&count); err != nil {
-		return err
-	}
-	if count == 1 {
-		return nil
-	}
-	_, err := db.DB.Exec(suppressedSyncKeysDDL)
-	return err
-}
-
 // suppressTransactionKeys copies a row's bank ids onto the do-not-import list.
 // Keyless owner rows suppress nothing. All placeholders stay positional:
 // mixing ? with named arguments misbinds on this driver.

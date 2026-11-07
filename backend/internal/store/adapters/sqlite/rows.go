@@ -250,9 +250,6 @@ func updateAccountTx(tx *userTx, account *types.Account) error {
 // upsertCheckpointTx writes one owner checkpoint by account/instant.
 // An owner write wins over a sync-owned row on the same instant key.
 func upsertCheckpointTx(tx *userTx, checkpoint types.Checkpoint) error {
-	if err := ensureAvailableBalanceSchema(tx); err != nil {
-		return fmt.Errorf("ensure available balances: %w", err)
-	}
 	position, err := nextTablePosition(tx, "checkpoints")
 	if err != nil {
 		return err

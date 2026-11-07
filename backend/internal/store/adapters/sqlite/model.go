@@ -558,17 +558,10 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, err
 	}
 
-	checkpointQuery := `SELECT c.model_account_id, c.balance, c.source, c.observed_at, NULL FROM checkpoints c WHERE c.user_id = :user_id ORDER BY c.position`
-	var availableTables int
-	if err := q.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'checkpoint_available_balances'`).Scan(&availableTables); err != nil {
-		return nil, err
-	}
-	if availableTables == 1 {
-		checkpointQuery = `SELECT c.model_account_id, c.balance, c.source, c.observed_at, a.available_balance
-			FROM checkpoints c LEFT JOIN checkpoint_available_balances a
-			ON a.user_id = c.user_id AND a.model_account_id = c.model_account_id AND a.observed_at = c.observed_at
-			WHERE c.user_id = :user_id ORDER BY c.position`
-	}
+	checkpointQuery := `SELECT c.model_account_id, c.balance, c.source, c.observed_at, a.available_balance
+		FROM checkpoints c LEFT JOIN checkpoint_available_balances a
+		ON a.user_id = c.user_id AND a.model_account_id = c.model_account_id AND a.observed_at = c.observed_at
+		WHERE c.user_id = :user_id ORDER BY c.position`
 	checkpointRows, err := q.Query(checkpointQuery)
 	if err != nil {
 		return nil, err

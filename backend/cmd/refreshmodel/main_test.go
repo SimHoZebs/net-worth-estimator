@@ -142,7 +142,7 @@ func query(t *testing.T, path, sql string, args ...any) string {
 	return value
 }
 
-func TestRefreshToleratesMissingSuppressionTable(t *testing.T) {
+func TestRefreshRequiresSuppressionTable(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
@@ -179,52 +179,11 @@ func TestRefreshToleratesMissingSuppressionTable(t *testing.T) {
 	if got := count(target, "owner"); got != "1" {
 		t.Fatalf("suppressions carried = %s, want 1", got)
 	}
-	// A snapshot predating the do-not-import list still refreshes.
+	// A snapshot lacking the do-not-import list is no longer accepted:
+	// migrate it to the current schema before refresh.
 	exec(source, `DROP TABLE suppressed_sync_keys`)
-	if err := refresh(target, source, "other", "owner", false); err != nil {
-		t.Fatalf("refresh from pre-table snapshot: %v", err)
-	}
-	// So does a destination predating it.
-	exec(target, `DROP TABLE suppressed_sync_keys`)
-	if err := refresh(target, source, "other", "owner", false); err != nil {
-		t.Fatalf("refresh to pre-table target: %v", err)
-	}
-}
-
-func TestRefreshCreatesSuppressionTableOnTarget(t *testing.T) {
-	dir := t.TempDir()
-	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
-	seed(t, source)
-	seed(t, target)
-	exec := func(path, sql string) {
-		t.Helper()
-		db, err := sqlite.OpenDatabase(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer db.Close()
-		if _, err := db.SQL().Exec(sql); err != nil {
-			t.Fatal(err)
-		}
-	}
-	exec(source, `INSERT INTO suppressed_sync_keys(provider, bridge_account_id, bank_transaction_id, suppressed_at, user_id) VALUES ('simplefin','bridge-prime','post9',1,'other')`)
-	// A destination predating the do-not-import list gains the table on
-	// the way in instead of dropping the incoming suppressions.
-	exec(target, `DROP TABLE suppressed_sync_keys`)
-	if err := refresh(target, source, "other", "owner", false); err != nil {
-		t.Fatalf("refresh = %v", err)
-	}
-	db, err := sqlite.OpenDatabase(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	var n string
-	if err := db.SQL().QueryRow(`SELECT COUNT(*) FROM suppressed_sync_keys WHERE user_id='owner'`).Scan(&n); err != nil {
-		t.Fatalf("suppressions missing on target: %v", err)
-	}
-	if n != "1" {
-		t.Fatalf("suppressions carried = %s, want 1", n)
+	if err := refresh(target, source, "other", "owner", false); err == nil {
+		t.Fatal("refresh from pre-table snapshot succeeded without the do-not-import list")
 	}
 }
 

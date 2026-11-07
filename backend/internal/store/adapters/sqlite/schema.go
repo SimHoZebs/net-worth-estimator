@@ -53,9 +53,8 @@ func seedUserTables(tx *userTx) error {
 }
 
 // suppressedSyncKeysDDL is the do-not-import list: bank ids the owner
-// removed stay removed. Fresh databases get it from schemaStatements;
-// existing databases self-heal through ensureSuppressionSchema at first
-// use, so no operator migration is needed.
+// removed stay removed. Fresh and migrated databases receive it from
+// schemaStatements; unmigrated databases fail current-schema validation.
 const suppressedSyncKeysDDL = `CREATE TABLE IF NOT EXISTS suppressed_sync_keys (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	provider TEXT NOT NULL,
@@ -81,10 +80,10 @@ const transactionCategoriesDDL = `CREATE TABLE IF NOT EXISTS transaction_categor
 )`
 
 // checkpointAvailableBalancesDDL is bank evidence tied to one checkpoint.
-// It is additive metadata: fresh databases get it from schemaStatements,
-// and existing databases self-heal at first model read or sync write. The
-// posted balance stays the financial authority; this table only records the
-// Bridge's separate available figure.
+// It is additive metadata: fresh and migrated databases receive it from
+// schemaStatements; unmigrated databases fail current-schema validation.
+// The posted balance stays the financial authority; this table only records
+// the Bridge's separate available figure.
 const checkpointAvailableBalancesDDL = `CREATE TABLE IF NOT EXISTS checkpoint_available_balances (
 	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	model_account_id TEXT NOT NULL,
@@ -740,10 +739,12 @@ var requiredSchemaColumns = map[string]string{
 	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
 	"account_displays":                "user_id, account_id, display_json",
 	"checkpoints":                     "user_id, id, position, model_account_id, balance, source, provider, observed_at",
+	"checkpoint_available_balances":   "user_id, model_account_id, observed_at, available_balance",
 	"transactions":                    "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome",
 	"transaction_sim":                 "user_id, transaction_id, position, enabled, execution_order",
 	"transaction_claims":              "user_id, transaction_id, fulfills_rule_id, fulfills_occurrence_date",
 	"transaction_sync_keys":           "user_id, provider, bridge_account_id, bank_transaction_id, transaction_id",
+	"suppressed_sync_keys":            "user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at",
 	"schema_migrations":               "name",
 	"planned_purchases":               "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
 	"recurrence_rules":                "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
@@ -837,6 +838,7 @@ func expectedSchemaTables() []string {
 		"transaction_sim",
 		"transaction_claims",
 		"transaction_sync_keys",
+		"suppressed_sync_keys",
 		"transaction_categories",
 		"schema_migrations",
 		"planned_purchases",

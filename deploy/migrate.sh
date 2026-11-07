@@ -15,6 +15,8 @@
 #   5. The completed transaction-ID migration audit table is removed.
 #   6. The account_links institution column is provisioned when absent.
 #   7. The account_displays table is provisioned when absent.
+#   8. The suppression-key and checkpoint available-balance sidecars are
+#      provisioned when absent.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -247,6 +249,70 @@ account_displays_state() {
   test "$cascade" = 0 || fail "Incomplete account displays schema. Refusing automatic repair."
   echo 1
 }
+# Suppression keys and checkpoint available balances are required current
+# sidecars. Absent is the pre-sidecar source state handled by provisioning;
+# present requires the exact constrained table shape.
+suppressed_state() {
+  count=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='suppressed_sync_keys';") \
+    || fail "Cannot inspect suppression-key schema; refusing to guess."
+  case "$count" in
+    0) echo 0; return 0 ;;
+    1) ;;
+    *) fail "Partial suppression-key schema. Refusing automatic repair." ;;
+  esac
+  sqlite3 -readonly "$1" 'SELECT user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at FROM suppressed_sync_keys LIMIT 0;' \
+    || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  notnull=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('suppressed_sync_keys') WHERE name IN ('user_id','provider','bridge_account_id','bank_transaction_id','suppressed_at') AND \"notnull\" != 1;") \
+    || fail "Cannot inspect suppression-key column constraints; refusing to guess."
+  test "$notnull" = 0 || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  pk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_index_list('suppressed_sync_keys') i WHERE i.origin = 'pk' AND (SELECT COUNT(*) FROM pragma_index_info(i.name)) = 4 AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 0) = 'user_id' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 1) = 'provider' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 2) = 'bridge_account_id' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 3) = 'bank_transaction_id';") \
+    || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  test "$pk" = 1 || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  fk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('suppressed_sync_keys');") \
+    || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  test "$fk" = 1 || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  matched=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('suppressed_sync_keys') WHERE (\"table\", \"from\", \"to\") = ('users', 'user_id', 'id');") \
+    || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  test "$matched" = 1 || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  grouped=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM (SELECT id FROM pragma_foreign_key_list('suppressed_sync_keys') WHERE \"table\" = 'users' GROUP BY id HAVING COUNT(*) = 1);") \
+    || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  test "$grouped" = 1 || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  cascade=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('suppressed_sync_keys') WHERE on_delete != 'CASCADE';") \
+    || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  test "$cascade" = 0 || fail "Incomplete suppression-key schema. Refusing automatic repair."
+  echo 1
+}
+
+available_state() {
+  count=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='checkpoint_available_balances';") \
+    || fail "Cannot inspect available-balance schema; refusing to guess."
+  case "$count" in
+    0) echo 0; return 0 ;;
+    1) ;;
+    *) fail "Partial available-balance schema. Refusing automatic repair." ;;
+  esac
+  sqlite3 -readonly "$1" 'SELECT user_id, model_account_id, observed_at, available_balance FROM checkpoint_available_balances LIMIT 0;' \
+    || fail "Incomplete available-balance schema. Refusing automatic repair."
+  notnull=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('checkpoint_available_balances') WHERE name IN ('user_id','model_account_id','observed_at','available_balance') AND \"notnull\" != 1;") \
+    || fail "Cannot inspect available-balance column constraints; refusing to guess."
+  test "$notnull" = 0 || fail "Incomplete available-balance schema. Refusing automatic repair."
+  pk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_index_list('checkpoint_available_balances') i WHERE i.origin = 'pk' AND (SELECT COUNT(*) FROM pragma_index_info(i.name)) = 3 AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 0) = 'user_id' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 1) = 'model_account_id' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 2) = 'observed_at';") \
+    || fail "Incomplete available-balance schema. Refusing automatic repair."
+  test "$pk" = 1 || fail "Incomplete available-balance schema. Refusing automatic repair."
+  fk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('checkpoint_available_balances');") \
+    || fail "Incomplete available-balance schema. Refusing automatic repair."
+  test "$fk" = 1 || fail "Incomplete available-balance schema. Refusing automatic repair."
+  matched=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('checkpoint_available_balances') WHERE (\"table\", \"from\", \"to\") = ('users', 'user_id', 'id');") \
+    || fail "Incomplete available-balance schema. Refusing automatic repair."
+  test "$matched" = 1 || fail "Incomplete available-balance schema. Refusing automatic repair."
+  grouped=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM (SELECT id FROM pragma_foreign_key_list('checkpoint_available_balances') WHERE \"table\" = 'users' GROUP BY id HAVING COUNT(*) = 1);") \
+    || fail "Incomplete available-balance schema. Refusing automatic repair."
+  test "$grouped" = 1 || fail "Incomplete available-balance schema. Refusing automatic repair."
+  cascade=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('checkpoint_available_balances') WHERE on_delete != 'CASCADE';") \
+    || fail "Incomplete available-balance schema. Refusing automatic repair."
+  test "$cascade" = 0 || fail "Incomplete available-balance schema. Refusing automatic repair."
+  echo 1
+}
 
 cp_cols() {
   sqlite3 -readonly "$1" "SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('checkpoints') ORDER BY cid LIMIT -1);"
@@ -309,6 +375,8 @@ case "$analysis" in
 esac
 friendships=$(friendships_state "$db") || fail "Cannot inspect friendships schema; refusing to guess."
 displays=$(account_displays_state "$db") || fail "Cannot inspect account displays schema; refusing to guess."
+suppressed=$(suppressed_state "$db") || fail "Cannot inspect suppression-key schema; refusing to guess."
+available=$(available_state "$db") || fail "Cannot inspect available-balance schema; refusing to guess."
 if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
 fi
@@ -371,7 +439,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
   exit 0
 fi
 
@@ -519,6 +587,36 @@ DDL
     fail "Candidate account displays upgrade failed. Original unchanged; backup retained at $backup."
   fi
 fi
+
+# Provision required suppression-key and available-balance sidecars on
+# pre-sidecar candidates. Provisioned tables stay empty; preexisting rows
+# verify byte-identical (or through the SimpleFIN v2 key rewrite) below.
+if [ "$suppressed" = 0 ] || [ "$available" = 0 ]; then
+  sidecars_sql="$backup/sidecars.sql"
+  cat > "$sidecars_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS suppressed_sync_keys (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  bridge_account_id TEXT NOT NULL,
+  bank_transaction_id TEXT NOT NULL,
+  suppressed_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, provider, bridge_account_id, bank_transaction_id)
+);
+CREATE TABLE IF NOT EXISTS checkpoint_available_balances (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  model_account_id TEXT NOT NULL,
+  observed_at INTEGER NOT NULL,
+  available_balance REAL NOT NULL,
+  PRIMARY KEY (user_id, model_account_id, observed_at)
+);
+DDL
+  if ! sqlite3 "$candidate" < "$sidecars_sql" > "$backup/sidecars.log" 2>&1; then
+    fail "Candidate sidecar upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+suppressed_state "$candidate" || fail "Candidate suppression-key schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
+available_state "$candidate" || fail "Candidate available-balance schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
+
 
 # Provision the sharing tracks on pre-sharing candidates. The DDL mirrors
 # the application schema exactly; rows are never touched, so preexisting
@@ -709,14 +807,18 @@ verify_simplefin_keys() {
       OR EXISTS(SELECT 1 FROM main.transaction_sync_keys WHERE provider = 'simplefin' AND bridge_account_id NOT LIKE 'sf2.%');" || return 1
   has_before=$(sqlite3 -readonly "$before" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='suppressed_sync_keys';") || return 1
   has_main=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='suppressed_sync_keys';") || return 1
-  test "$has_before" = "$has_main" || return 1
-  if [ "$has_main" = 1 ]; then
+  if [ "$has_before" = 0 ]; then
+    test "$has_main" = 1 || return 1
+    test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM suppressed_sync_keys;")" = 0 || return 1
+  elif [ "$has_main" = 1 ]; then
     sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
       SELECT (SELECT COUNT(*) FROM main.suppressed_sync_keys) != (SELECT COUNT(*) FROM before.suppressed_sync_keys)
         OR EXISTS(SELECT 1 FROM before.suppressed_sync_keys o WHERE NOT EXISTS (
           SELECT 1 FROM main.suppressed_sync_keys n WHERE n.user_id = o.user_id AND n.provider = o.provider
             AND n.bank_transaction_id = o.bank_transaction_id AND n.suppressed_at = o.suppressed_at))
         OR EXISTS(SELECT 1 FROM main.suppressed_sync_keys WHERE provider = 'simplefin' AND bridge_account_id NOT LIKE 'sf2.%');" || return 1
+  else
+    return 1
   fi
 }
 
@@ -794,6 +896,14 @@ fi
 markers_kept=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (SELECT name FROM before.schema_migrations EXCEPT SELECT name FROM main.schema_migrations);") \
   || fail "Cannot verify schema markers; refusing to publish."
 test "$markers_kept" = 0 || fail "Candidate dropped schema markers. Original unchanged; backup retained at $backup. Keep the API stopped."
+if [ "$suppressed" = 0 ]; then
+  test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM suppressed_sync_keys;")" = 0 \
+    || fail "Provisioned suppression keys are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+if [ "$available" = 0 ]; then
+  test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM checkpoint_available_balances;")" = 0 \
+    || fail "Provisioned available balances are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
 
 # Verify purchase conversion separately against the already-verified timestamp
 # candidate. The original database still has no writes at this point.
@@ -1123,6 +1233,8 @@ sqlite3 "$candidate" ".backup main '$(esc "$db")'" \
   || fail "Publication failed. Original may need recovery from the verified backup at $backup. Keep the API stopped."
 check_target "$db" || fail "Published database failed Analysis verification. Recover from the verified backup at $backup. Keep the API stopped."
 check_projection "$db" || fail "Published database failed unified projection verification. Recover from the verified backup at $backup. Keep the API stopped."
+suppressed_state "$db" || fail "Published database failed suppression-key verification. Recover from the verified backup at $backup. Keep the API stopped."
+available_state "$db" || fail "Published database failed available-balance verification. Recover from the verified backup at $backup. Keep the API stopped."
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
   || fail "Published database is missing the account_links institution column. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."

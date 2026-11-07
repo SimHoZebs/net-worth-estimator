@@ -73,17 +73,20 @@ create a missing database. Normal SQLite WAL/SHM journaling remains
 part of database operation.
 
 Additive sidecar tables and sharing indexes self-heal on first use
-after a schema upgrade, with no row conversion: `suppressed_sync_keys`
-(do-not-import list), `transaction_categories`,
-`checkpoint_available_balances`, `gmail_credentials`, and `email_receipts`,
+after a schema upgrade, with no row conversion: `transaction_categories`,
+`gmail_credentials`, and `email_receipts`,
 plus sharing indexes such as `sharing_grants_grantee`,
 `sharing_copies_source`, `sharing_visibility_group`,
 `sharing_audit_owner`, and `sharing_policies_group`. Fresh databases
 create them from the shared schema; pre-existing databases gain a
 missing sidecar or sharing index through its `ensure*` helper or
 `CREATE INDEX IF NOT EXISTS` when the feature is first read or
-written. A missing core table or column beyond that allowlist still
-fails closed and requires the offline upgrade path above.
+written. `suppressed_sync_keys` and `checkpoint_available_balances` are
+required current-schema tables instead: fresh databases create them from
+the shared schema, and the offline deployment migration provisions them
+before the API starts. A missing required sidecar fails current-schema
+validation until that migration runs. A missing core table or column
+beyond that allowlist still fails closed and requires the offline upgrade path above.
 
 With the authenticated Compose configuration selected, initial container setup is:
 

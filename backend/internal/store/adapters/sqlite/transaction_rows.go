@@ -173,9 +173,6 @@ func (s *sqliteStore) DeleteTransaction(id string) error {
 		// Void holds suppress nothing: their keys already left the feed, and
 		// keeping the auth key usable preserves same-key settlement.
 		if !lifecycle.void {
-			if err := ensureSuppressionSchema(tx); err != nil {
-				return err
-			}
 			if err := suppressTransactionKeys(tx, id, time.Now().Unix()); err != nil {
 				return fmt.Errorf("suppress transaction %s: %w", id, err)
 			}

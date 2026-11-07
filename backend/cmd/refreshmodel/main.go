@@ -92,11 +92,6 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		return err
 	}
 	defer db.Close()
-	// The do-not-import list postdates some snapshots: create it on the
-	// target so its suppressions copy over instead of dropping silently.
-	if err := db.EnsureSuppressionSchema(); err != nil {
-		return fmt.Errorf("ensure suppression schema: %w", err)
-	}
 	absSource, err := filepath.Abs(source)
 	if err != nil {
 		return err
@@ -230,12 +225,11 @@ var identityTables = map[string]bool{
 	"friendships":   true,
 }
 
-// lazyTables are allowlisted tables that may be absent from either side:
-// the store creates them on first use, so pre-existing snapshots and
-// databases keep working without a migration. Unknown scoped tables still
-// fail closed.
+// lazyTables are allowlisted tables that may be absent from either side
+// because their stores still create them on first use. All other tables,
+// including the suppression-key sidecar, must be present on both sides so
+// pre-existing snapshots fail closed instead of silently leaving stale rows.
 var lazyTables = map[string]bool{
-	"suppressed_sync_keys":   true,
 	"email_receipts":         true,
 	"transaction_categories": true,
 }
@@ -291,11 +285,9 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 		if schema == "main" {
 			result = shapes
 		} else {
-			// Lazy tables may be absent from either side: the store
-			// creates them on first use, so a pre-existing snapshot
-			// without the do-not-import list still refreshes instead of
-			// failing the schema check. Every other table must match
-			// exactly, and copies run only for tables present on both
+			// Lazy tables may be absent from either side because their
+			// stores still create them on first use. Every other table must
+			// match exactly, and copies run only for tables present on both
 			// sides. Unknown tables already failed closed above.
 			previous := map[string]tableShape{}
 			for _, shape := range result {
