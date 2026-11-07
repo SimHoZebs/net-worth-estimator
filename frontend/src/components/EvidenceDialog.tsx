@@ -18,12 +18,10 @@ export type EvidenceTarget =
 
 export function EvidenceDialog({
 	target,
-	temporary = false,
 	onClose,
 	onEdit,
 }: {
 	target: Exclude<EvidenceTarget, { kind: "position" }>;
-	temporary?: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
@@ -102,7 +100,6 @@ export function EvidenceDialog({
 					transactions={transactions}
 					startDate={startDate}
 					readOnly={readOnly}
-					temporary={temporary}
 					onClose={onClose}
 					onEdit={edit}
 				/>

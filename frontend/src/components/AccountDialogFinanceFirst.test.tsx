@@ -88,7 +88,6 @@ function dialogProps() {
 		transactions: financialModelFixture.transactions,
 		startDate: financialModelFixture.startDate,
 		readOnly: false as const,
-		temporary: false as const,
 		onClose: () => {},
 		onEdit: () => {},
 	};
@@ -105,17 +104,20 @@ describe("finance-first account dialog", () => {
 		expect(
 			screen.getAllByRole("button", { name: /View Household payroll/ }),
 		).toHaveLength(3);
-		expect(screen.getByText("$18,250")).toBeTruthy();
+		expect(
+			(screen.getByLabelText("Balance (USD)") as HTMLInputElement).value,
+		).toBe("18250");
 		// Recurring rules need no forecast.
 		fireEvent.click(screen.getByRole("tab", { name: /Recurring/ }));
 		expect(screen.getByText("Household take-home pay")).toBeTruthy();
 		expect(projectionUrls()).toEqual([]);
 		// Ordinary account details never auto-request a forecast.
 		fireEvent.click(screen.getByRole("tab", { name: "Account details" }));
-		const nameInput = screen.getByLabelText("Account name");
-		if (!(nameInput instanceof HTMLInputElement))
-			throw new Error("Expected the account name input");
-		expect(nameInput.value).toBe("Everyday checking");
+		expect(
+			(screen.getByLabelText("Account name") as HTMLInputElement).value,
+		).toBe("Everyday checking");
+		expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+		expect(screen.queryByText("Account activity · Saved")).toBeNull();
 		expect(screen.queryByRole("button", { name: "Load forecast" })).toBeNull();
 		expect(screen.queryByText("Projection at horizon")).toBeNull();
 		expect(projectionUrls()).toEqual([]);

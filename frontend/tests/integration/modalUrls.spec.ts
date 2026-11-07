@@ -180,7 +180,7 @@ test("account links keep their identity after renames and duplicate names", asyn
 		exact: true,
 	});
 	await expect(dialog).toBeVisible();
-	await expect(dialog.getByText("$4,200", { exact: true })).toBeVisible();
+	await expect(dialog.getByLabel("Balance (USD)")).toHaveValue("4200");
 });
 
 test("account modals have URLs, restore on back, and deep-link", async ({
@@ -196,7 +196,9 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
 	await expect(page).toHaveURL(/\/accounts\?evidence=account&id=checking$/);
-	await expect(page.getByRole("dialog")).toContainText("Everyday checking");
+	await expect(page.getByRole("dialog").getByLabel("Account name")).toHaveValue(
+		"Everyday checking",
+	);
 	await page.screenshot({
 		path: "test-results/router-account-evidence.png",
 		fullPage: true,
@@ -209,7 +211,9 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 
 	// Direct loads open the same modal once the account arrives.
 	await page.goto("/accounts?evidence=account&id=checking");
-	await expect(page.getByRole("dialog")).toContainText("Everyday checking");
+	await expect(page.getByRole("dialog").getByLabel("Account name")).toHaveValue(
+		"Everyday checking",
+	);
 	await expect(
 		page.getByRole("heading", { name: "Accounts and starting balances" }),
 	).toBeVisible();

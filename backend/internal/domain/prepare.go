@@ -38,6 +38,7 @@ type historicalReplay struct {
 	snapshots              []types.HistoricalObservationSnapshot
 	includeStartDateEvents bool
 	latestObserved         map[string]types.Checkpoint
+	adjustments            []types.BalanceAdjustment
 }
 
 // replayChronologicalHistory replays through the end of projectionStartDate.
@@ -203,6 +204,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 	}, projectionStartDate, nil)
 
 	latestObserved := map[string]types.Checkpoint{}
+	adjustments := []types.BalanceAdjustment{}
 	historicalSnapshots := []types.HistoricalObservationSnapshot{}
 	executeOccurrence := func(occurrence DatedTransactionOccurrence, date string, historicalActual bool) error {
 		_, execErr := transitions.ExecuteTransaction(occurrence, date, historicalActual)
@@ -254,6 +256,14 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		if event.isObservation {
 			observation := event.checkpoint
 			modeledBalance := transitions.State.Balances[observation.AccountID]
+			adjustments = append(adjustments, types.BalanceAdjustment{
+				AccountID:       observation.AccountID,
+				ObservedAt:      observation.ObservedAt,
+				PreviousBalance: roundCurrency(modeledBalance),
+				Balance:         roundCurrency(observation.Balance),
+				Adjustment:      roundCurrency(observation.Balance - modeledBalance),
+				Source:          observation.Source,
+			})
 			transitions.State.Balances[observation.AccountID] = observation.Balance
 			checkpointCorrections = append(checkpointCorrections, types.CheckpointCorrection{
 				AccountID:       observation.AccountID,
@@ -276,6 +286,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		snapshots:              historicalSnapshots,
 		includeStartDateEvents: true,
 		latestObserved:         latestObserved,
+		adjustments:            adjustments,
 	}, nil
 }
 
@@ -299,6 +310,19 @@ func preparePositionAt(model *types.FinancialModel, startDate string, cutInstant
 // (current position, account balances) using pure finance validation, so
 // no evaluation-owned check can block history.
 func prepareFinancePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
+	// Historical finance reads ignore later observations. Projection preparation
+	// retains its future-checkpoint validation. Copy before filtering so a read
+	// cannot alter the caller's model or its checkpoint backing array.
+	if model != nil {
+		cutModel := *model
+		cutModel.Checkpoints = make([]types.Checkpoint, 0, len(model.Checkpoints))
+		for _, checkpoint := range model.Checkpoints {
+			if CheckpointInstant(checkpoint) <= cutInstant {
+				cutModel.Checkpoints = append(cutModel.Checkpoints, checkpoint)
+			}
+		}
+		model = &cutModel
+	}
 	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinanceModel)
 }
 

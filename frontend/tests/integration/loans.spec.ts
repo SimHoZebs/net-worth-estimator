@@ -117,6 +117,38 @@ test("one loan form creates one visible account and preserves terms on edit", as
 			(r: { id: string }) => r.id === primary.display.paymentScheduleId,
 		).destinations,
 	).toEqual([primary.display.components[1].accountId, primary.id]);
+	const adjustmentRequests: string[] = [];
+	page.on("request", (request) => {
+		if (request.url().includes("/balance-adjustments"))
+			adjustmentRequests.push(request.url());
+	});
+	await page
+		.getByRole("button", {
+			name: "Open Education loan transactions",
+			exact: true,
+		})
+		.click();
+	const details = page.getByRole("dialog", {
+		name: "Education loan",
+		exact: true,
+	});
+	await expect(details.getByLabel("Account name")).toHaveAttribute(
+		"readonly",
+		"",
+	);
+	await expect(details.getByLabel("Balance (USD)")).toHaveAttribute(
+		"readonly",
+		"",
+	);
+	await expect(details.getByText("Loading balance adjustments…")).toHaveCount(
+		0,
+	);
+	await details.getByRole("tab", { name: "Account details" }).click();
+	await expect(
+		details.getByRole("button", { name: "Edit loan and payment terms" }),
+	).toBeEnabled();
+	expect(adjustmentRequests).toEqual([]);
+	await page.keyboard.press("Escape");
 	await page
 		.getByRole("button", { name: "Edit Education loan", exact: true })
 		.click();
@@ -138,10 +170,6 @@ test("one loan form creates one visible account and preserves terms on edit", as
 			exact: true,
 		})
 		.click();
-	const details = page.getByRole("dialog", {
-		name: "Education loan",
-		exact: true,
-	});
 	await details.getByRole("tab", { name: "Account details" }).click();
 	await expect(
 		details.getByText("$12,000.00", { exact: true }).first(),

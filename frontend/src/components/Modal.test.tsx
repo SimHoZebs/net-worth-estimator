@@ -48,6 +48,44 @@ function ModalHarness({
 }
 
 describe("modal close requests", () => {
+	it("keeps its accessible name stable when the title contains an editable value", () => {
+		const view = render(
+			<Modal
+				label="Saved account"
+				title={
+					<input
+						aria-label="Account name"
+						value="Draft name"
+						onChange={() => {}}
+					/>
+				}
+				onClose={() => {}}
+			>
+				Account content
+			</Modal>,
+		);
+		expect(screen.getByRole("dialog", { name: "Saved account" })).toBeTruthy();
+		view.rerender(
+			<Modal
+				label="Saved account"
+				title={
+					<input
+						aria-label="Account name"
+						value="Another draft"
+						onChange={() => {}}
+					/>
+				}
+				onClose={() => {}}
+			>
+				Account content
+			</Modal>,
+		);
+		expect(screen.getByRole("dialog", { name: "Saved account" })).toBeTruthy();
+		expect(
+			(screen.getByLabelText("Account name") as HTMLInputElement).value,
+		).toBe("Another draft");
+	});
+
 	it("closes through the header control", async () => {
 		const onClosed = vi.fn();
 		render(<ModalHarness onClosed={onClosed} />);

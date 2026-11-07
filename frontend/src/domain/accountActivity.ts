@@ -1,5 +1,6 @@
 import { shiftDate } from "./format.ts";
 import { displayAccountId } from "./accountDisplay.ts";
+import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
 import {
 	isHistoricalTransaction,
 	isPendingTransaction,
@@ -18,10 +19,13 @@ export interface AccountTransaction {
 	id: string;
 	transactionId: string;
 	date: string;
+	/** Exact ISO instant for chronology when the activity supplies one. */
+	sortDate?: string;
 	name: string;
 	source: "historical" | "projected";
 	direction: "in" | "out";
-	flow: "income" | "expense" | "transfer";
+	flow: "income" | "expense" | "transfer" | "adjustment";
+	adjustment?: BalanceAdjustment;
 	counterparty: string;
 	from: string;
 	to: string;
@@ -368,8 +372,8 @@ export function filterTransactions({
 		})
 		.sort((a, b) =>
 			compareTransactionDates({
-				aDate: a.date,
-				bDate: b.date,
+				aDate: a.sortDate ?? a.date,
+				bDate: b.sortDate ?? b.date,
 				aId: a.id,
 				bId: b.id,
 				order: filters.order,

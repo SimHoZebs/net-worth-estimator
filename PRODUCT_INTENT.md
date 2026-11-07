@@ -14,6 +14,8 @@ Simulation adds a further question: if we continue with the saved model, where d
 
 Accounts, recorded transactions, balance checks, and ordinary edits have their own lifecycle. They remain available when a forecast is absent, pending, or failed. Only components that need future outcomes depend on simulation. Evidence Analysis runs independently from both bank sync and simulation.
 
+Account names and balances edit at their displayed location in the account header. Account details use the same modal shell, inline controls, property rows, header Save and Discard actions, and discard confirmation as transaction details. Settings contain no duplicate name or balance fields. A balance edit records a dated balance observation. Its historical replay adjustment appears in the account's Transactions tab with the previous balance, new balance, and signed difference. It reconciles the balance and never counts as income or spending. The calculation uses recorded history without a forecast.
+
 The product turns financial records and assumptions into a defensible decision. It should help the user move from description to understanding to action without requiring the user to operate the calculation machinery or manage a spreadsheet.
 
 A useful answer can establish:

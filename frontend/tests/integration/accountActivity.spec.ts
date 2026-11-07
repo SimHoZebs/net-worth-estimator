@@ -34,12 +34,12 @@ test("clicking an account opens its recorded history and projected transactions"
 	).toBeVisible();
 	await dialog.getByLabel("Transaction source").selectOption("historical");
 	await expect(dialog.getByRole("status")).toHaveText(
-		"Showing 1–3 of 3 transactions",
+		"Showing 1–4 of 4 transactions",
 	);
 	// Historical activity is listed newest first by default, and the control
 	// toggles rather than sets.
 	await expect(dialog.locator("tbody tr").first()).toContainText(
-		"Jan 29, 2026",
+		"Jan 31, 2026",
 	);
 	await dialog.getByRole("button", { name: "Newest first" }).click();
 	await expect(
@@ -50,7 +50,7 @@ test("clicking an account opens its recorded history and projected transactions"
 	);
 	await dialog.getByRole("button", { name: "Oldest first" }).click();
 	await expect(dialog.locator("tbody tr").first()).toContainText(
-		"Jan 29, 2026",
+		"Jan 31, 2026",
 	);
 	await dialog
 		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
@@ -240,7 +240,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await page.getByRole("button", { name: "Save changes" }).click();
 	dialog = page.getByRole("dialog", { name: "Everyday checking" });
 	await expect(dialog).toBeVisible();
-	await expect(dialog).toContainText("Account activity · Saved");
+	await expect(dialog).not.toContainText("Account activity · Saved");
 	// Returning from the editor remounts the list with default filters.
 	await dialog.getByLabel("Transaction source").selectOption("all");
 	await dialog
@@ -251,7 +251,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 	// The editor saves immediately: the dialog shows the edited −$3,000.00
 	// with no Shortfall (asserted above) and the saved model carries it too.
 	// Find the saved renovation by name.
-	await expect(dialog).toContainText("Account activity · Saved");
+	await expect(dialog).not.toContainText("Account activity · Saved");
 	const saved = await readSavedServerModel();
 	const savedExpression = saved.transactions.find(
 		(transaction) => transaction.name === "Home renovation",
@@ -300,7 +300,7 @@ test("clicking outside the account panel closes it", async ({ page }) => {
 	await expect(dialog).not.toBeVisible();
 });
 
-test("growth-only accounts have an honest empty state and retain account details", async ({
+test("accounts without transactions show balance history and retain account settings", async ({
 	page,
 }) => {
 	await page.goto("/accounts");
@@ -309,17 +309,12 @@ test("growth-only accounts have an honest empty state and retain account details
 		.click();
 	const dialog = page.getByRole("dialog", { name: "Home value" });
 	await expect(
-		dialog.getByRole("heading", {
-			name: "No transactions for this account yet",
-		}),
-	).toBeVisible();
-	await expect(
-		dialog.getByRole("button", { name: "Add transaction" }),
+		dialog.getByRole("button", { name: /View balance adjustment/ }),
 	).toBeVisible();
 	await expect(dialog.getByRole("tab")).toHaveCount(3);
 	await expect(
 		dialog.getByRole("searchbox", { name: "Search account transactions" }),
-	).toHaveCount(0);
+	).toBeVisible();
 	await dialog.getByRole("tab", { name: /Transactions/ }).focus();
 	await page.keyboard.press("ArrowRight");
 	await expect(dialog.getByRole("tab", { name: "Recurring" })).toBeFocused();
@@ -328,19 +323,18 @@ test("growth-only accounts have an honest empty state and retain account details
 		dialog.getByRole("tab", { name: "Account details" }),
 	).toBeFocused();
 	await dialog.getByRole("tab", { name: "Account details" }).click();
-	// Details edit inline: no second modal, source is display-only, and
-	// the protected/ceiling pair shares one range visual.
+	// Name and balance live in the header. Settings contain only settings.
 	await expect(dialog.getByLabel("Account name")).toHaveValue("Home value");
-	await expect(dialog.getByText("Source")).toBeVisible();
+	await expect(dialog.getByText("Source")).toHaveCount(0);
 	await expect(dialog.getByRole("textbox", { name: "Source" })).toHaveCount(0);
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue("0");
-	await expect(dialog.getByLabel("Maximum balance in USD")).toBeDisabled();
+	await expect(dialog.getByLabel("Maximum balance in USD")).toHaveCount(0);
 	await expect(
 		dialog.getByRole("checkbox", { name: "No ceiling" }),
 	).toBeChecked();
 	await expect(
 		dialog.getByRole("button", { name: "Save changes" }),
-	).toBeDisabled();
+	).toHaveCount(0);
 	await expect(
 		dialog.getByRole("button", { name: "Edit account", exact: true }),
 	).toHaveCount(0);
@@ -353,9 +347,10 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
 		"5000",
 	);
-	// The save runs async after staging; the eyebrow flipping back to
-	// Saved means it reached the server.
-	await expect(dialog).toContainText("Account activity · Saved");
+	await expect(
+		dialog.getByRole("button", { name: "Save changes" }),
+	).toHaveCount(0);
+	await expect(dialog).not.toContainText("Account activity · Saved");
 	// The inline edit reached the server: the saved model carries the new
 	// floor while the dialog shows the same 5000.
 	const savedModel = await page.request

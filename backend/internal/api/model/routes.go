@@ -29,6 +29,7 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 		Summary:     "Load the canonical financial model with diagnostics",
 	}, s.getModel)
 	huma.Register(api, huma.Operation{OperationID: "list-account-balances", Method: "GET", Path: "/accounts/balances", Summary: "List accounts with balances as of a date"}, s.listAccountBalances)
+	huma.Register(api, huma.Operation{OperationID: "list-balance-adjustments", Method: "GET", Path: "/accounts/{id}/balance-adjustments", Summary: "List dated balance adjustments without a forecast"}, s.listBalanceAdjustments)
 	huma.Register(api, huma.Operation{OperationID: "create-account", Method: "POST", Path: "/accounts", Summary: "Create one account"}, s.createAccount)
 	huma.Register(api, huma.Operation{OperationID: "update-account", Method: "PATCH", Path: "/accounts/{id}", Summary: "Replace one account"}, s.updateAccount)
 	huma.Register(api, huma.Operation{OperationID: "delete-account", Method: "DELETE", Path: "/accounts/{id}", Summary: "Delete one account"}, s.deleteAccount)

@@ -1,6 +1,20 @@
 import { useMemo, useState } from "react";
+import { useAccountAdjustments } from "../state/accountAdjustments.ts";
+import { balanceAdjustmentActivity } from "../domain/balanceAdjustmentActivity.ts";
+import { useAccountEdit } from "./activity/useAccountEdit.ts";
+import { AccountBalanceValue } from "./activity/AccountBalanceValue.tsx";
+import {
+	DetailEditActions,
+	DiscardConfirm,
+} from "./activity/DetailEditActions.tsx";
+import {
+	transactionControlStyles,
+	detailModalClassName,
+	detailFooterClassName,
+} from "./activity/transactionDetailStyles.ts";
+import { ErrorNotice } from "./ErrorNotice.tsx";
 import { accountTransactions } from "../domain/accountActivity.ts";
-import { dateLabel, money } from "../domain/format.ts";
+import { dateLabel } from "../domain/format.ts";
 import {
 	isHistoricalTransaction,
 	type Account,
@@ -19,7 +33,7 @@ import {
 } from "../domain/accountDisplay.ts";
 import { RecurringRules } from "./activity/RecurringRules.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
-import { Drawer } from "./Drawer.tsx";
+import { Modal } from "./Modal.tsx";
 import { Tabs } from "./Tabs.tsx";
 
 export function AccountDialog({
@@ -28,7 +42,6 @@ export function AccountDialog({
 	transactions,
 	startDate,
 	readOnly,
-	temporary,
 	onClose,
 	onEdit,
 }: {
@@ -37,11 +50,24 @@ export function AccountDialog({
 	transactions: Transaction[];
 	startDate: string;
 	readOnly: boolean;
-	temporary: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const [view, setView] = useTransactionView();
+	// Display accounts keep their atomic loan editor and component balances.
+	const locked = readOnly || account.readOnly || Boolean(account.display);
+	const adjustments = useAccountAdjustments(account.id, !account.display);
+	const edit = useAccountEdit(account, locked, adjustments.data ?? []);
+	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
+	const requestEdit = (target: EditorTarget) => {
+		if (edit.saving) return;
+		if (edit.activeField !== null) {
+			setPendingEdit(target);
+			edit.setConfirmCancel(true);
+			return;
+		}
+		onEdit(target);
+	};
 	// Recorded facts render from saved rows alone. The forecast loads only
 	// after the viewer asks for projected activity.
 	const [forecastRequested, setForecastRequested] = useState(false);
@@ -54,15 +80,24 @@ export function AccountDialog({
 			? null
 			: forecast.base;
 	const occurrences = useMemo(
-		() =>
-			accountTransactions({
+		() => [
+			...accountTransactions({
 				accountId: account.id,
 				accounts,
 				transactions,
 				startDate,
 				projection,
 			}),
-		[account.id, accounts, transactions, startDate, projection],
+			...balanceAdjustmentActivity(adjustments.data ?? []),
+		],
+		[
+			account.id,
+			accounts,
+			transactions,
+			startDate,
+			projection,
+			adjustments.data,
+		],
 	);
 	const rulesQuery = useSchedules();
 	const rules = rulesQuery.data?.schedules ?? null;
@@ -107,32 +142,63 @@ export function AccountDialog({
 		[accountRules, transactions, account, startDate],
 	);
 	return (
-		<Drawer
-			side="right"
-			open
-			onClose={onClose}
+		<Modal
 			label={account.name}
-			appearance={{
-				title: account.name,
-				eyebrow: `Account activity · ${temporary ? "Changes" : "Saved"}`,
-				coverage: "full",
+			wide
+			titleSize="plain"
+			headerClassName="border-b-0 pb-0"
+			className={detailModalClassName}
+			focusPanelOnOpen
+			onClose={onClose}
+			onCloseRequest={() => {
+				if (edit.saving) return false;
+				setPendingEdit(null);
+				if (edit.activeField !== null) {
+					edit.setConfirmCancel(true);
+					return false;
+				}
+				return true;
 			}}
+			title={
+				<span className="flex min-w-0 items-center gap-3">
+					<AccountIcon account={account} size="lg" />
+					<input
+						id={`${edit.formId}-name`}
+						aria-label="Account name"
+						name="name"
+						required
+						maxLength={100}
+						value={edit.draft.name}
+						onChange={(event) =>
+							edit.update({ name: event.target.value }, "name")
+						}
+						readOnly={locked || edit.saving}
+						form={edit.formId}
+						className={transactionControlStyles({ shape: "name" })}
+					/>
+				</span>
+			}
+			actions={
+				edit.activeField !== null ? (
+					<DetailEditActions
+						formId={edit.formId}
+						onDiscard={edit.reset}
+						disabled={edit.saveBlocked}
+						discardDisabled={edit.saving}
+					/>
+				) : undefined
+			}
 		>
-			<div className="flex items-center gap-4 pb-2 max-sm:flex-wrap max-sm:gap-3">
-				<AccountIcon account={account} size="lg" className="max-sm:size-10" />
-				<div className="flex flex-col gap-1">
-					{/* Starting balance owns the saved adjusted balance from /balances (same chronological replay as the projection baseline, so it coincides with the projection start when the model is unchanged). It never waits for a forecast. */}
-					<span className="text-xs text-muted">Starting balance</span>
-					<strong className="type-value text-3xl leading-[1.3] font-medium tracking-tight">
-						{money(!account.enabled ? 0 : account.balance)}
-					</strong>
-				</div>
-				<div className="ml-auto flex flex-col items-end gap-2 max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:gap-2 max-sm:pt-1">
+			<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
+				<AccountBalanceValue edit={edit} readOnly={locked} />
+				<div className="mt-2 text-sm text-muted">
 					<span className="text-xs text-muted">
-						As of {dateLabel(account.observedOn, true)}
+						{account.balanceCheck
+							? `Last balance report ${dateLabel(account.observedOn, true)}`
+							: "No balance reported"}
 					</span>
 				</div>
-			</div>
+			</form>
 			<Tabs
 				items={[
 					{
@@ -146,28 +212,44 @@ export function AccountDialog({
 				value={view}
 				onChange={setView}
 				label="Account view"
-				className="my-4"
+				className="my-4 max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-0"
 				panelClassName="flex flex-col gap-4"
 			>
 				{view === "transactions" ? (
-					<Transactions
-						occurrences={occurrences}
-						rows={savedState}
-						accounts={accounts}
-						startDate={startDate}
-						readOnly={readOnly}
-						onEdit={onEdit}
-						onSourceChange={(source) => {
-							if (source !== "historical") setForecastRequested(true);
-						}}
-						canRequestForecast={canRequestForecast}
-						projected={{
-							loading: forecastRequested && forecast.loading,
-							error: forecastRequested ? (forecast.baseError ?? null) : null,
-							requested: forecastRequested,
-							retry: forecast.retryProjection,
-						}}
-					/>
+					<>
+						{!account.display && adjustments.isPending && (
+							<p role="status">Loading balance adjustments…</p>
+						)}
+						{adjustments.isError && (
+							<p role="alert">
+								Balance adjustments could not be loaded.{" "}
+								<button
+									type="button"
+									onClick={() => void adjustments.refetch()}
+								>
+									Retry adjustments
+								</button>
+							</p>
+						)}
+						<Transactions
+							occurrences={occurrences}
+							rows={savedState}
+							accounts={accounts}
+							startDate={startDate}
+							readOnly={readOnly}
+							onEdit={requestEdit}
+							onSourceChange={(source) => {
+								if (source !== "historical") setForecastRequested(true);
+							}}
+							canRequestForecast={canRequestForecast}
+							projected={{
+								loading: forecastRequested && forecast.loading,
+								error: forecastRequested ? (forecast.baseError ?? null) : null,
+								requested: forecastRequested,
+								retry: forecast.retryProjection,
+							}}
+						/>
+					</>
 				) : view === "recurring" ? (
 					rulesQuery.isPending ? (
 						<p role="status">Loading recurring transactions…</p>
@@ -180,20 +262,47 @@ export function AccountDialog({
 							rules={accountRules}
 							startDate={startDate}
 							readOnly={readOnly}
-							onEdit={onEdit}
+							onEdit={requestEdit}
 						/>
 					)
 				) : account.display ? (
-					<LoanDetails account={account} readOnly={readOnly} onEdit={onEdit} />
+					<LoanDetails
+						account={account}
+						readOnly={readOnly}
+						onEdit={requestEdit}
+					/>
 				) : (
 					<AccountDetails
 						key={account.id}
 						account={account}
-						readOnly={readOnly}
+						edit={edit}
+						readOnly={locked}
 					/>
 				)}
 			</Tabs>
-		</Drawer>
+			<ErrorNotice message={edit.error} />
+			{edit.saving && (
+				<p role="status" className="text-xs text-muted">
+					Saving…
+				</p>
+			)}
+			{edit.confirmCancel && (
+				<div className={detailFooterClassName}>
+					<DiscardConfirm
+						onContinue={() => {
+							setPendingEdit(null);
+							edit.setConfirmCancel(false);
+						}}
+						onDiscard={() => {
+							edit.reset();
+							setPendingEdit(null);
+							if (pendingEdit) onEdit(pendingEdit);
+							else onClose();
+						}}
+					/>
+				</div>
+			)}
+		</Modal>
 	);
 }
 

@@ -11,8 +11,6 @@ import {
 	Link2,
 	LockKeyhole,
 	Repeat,
-	RotateCcw,
-	Save,
 	Trash2,
 	TriangleAlert,
 	UsersRound,
@@ -48,11 +46,18 @@ import { Badge } from "../Badge.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
-import { Button, IconButton, TextButton } from "../Button.tsx";
+import { TextButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
 import { Checkbox, Input, InputField, Select } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
-import { transactionControlStyles } from "./transactionDetailStyles.ts";
+import {
+	transactionControlStyles,
+	detailModalClassName,
+	detailPropertyRowClassName,
+	detailPropertyLabelClassName,
+	detailFooterClassName,
+} from "./transactionDetailStyles.ts";
+import { DetailEditActions, DiscardConfirm } from "./DetailEditActions.tsx";
 import {
 	amendSchedule,
 	amendTransaction,
@@ -196,7 +201,7 @@ function MoreOptions({
 	const annualIncreaseId = `${id}-annual-increase`;
 	const claimScheduleId = `${id}-claim-rule`;
 	const claimOccurrenceId = `${id}-claim-occurrence`;
-	const rowLabel = "w-36 flex-none text-sm font-semibold text-muted";
+	const rowLabel = detailPropertyLabelClassName;
 	const schedule = savedTransaction.kind === "schedule";
 	return (
 		<section
@@ -215,7 +220,7 @@ function MoreOptions({
 				)}
 				{schedule && (
 					<>
-						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+						<div className={detailPropertyRowClassName}>
 							<label htmlFor={frequencyId} className={rowLabel}>
 								Frequency
 							</label>
@@ -243,7 +248,7 @@ function MoreOptions({
 								<option value="annual">Yearly</option>
 							</Select>
 						</div>
-						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+						<div className={detailPropertyRowClassName}>
 							<label htmlFor={annualIncreaseId} className={rowLabel}>
 								Annual amount increase (%)
 							</label>
@@ -270,7 +275,7 @@ function MoreOptions({
 				)}
 				{!schedule && (
 					<>
-						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+						<div className={detailPropertyRowClassName}>
 							<label htmlFor={claimScheduleId} className={rowLabel}>
 								Records an occurrence of
 							</label>
@@ -295,7 +300,7 @@ function MoreOptions({
 								))}
 							</Select>
 						</div>
-						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+						<div className={detailPropertyRowClassName}>
 							<label htmlFor={claimOccurrenceId} className={rowLabel}>
 								Replaces occurrence on
 							</label>
@@ -779,20 +784,11 @@ function useTransactionEdit({
 		(Boolean(readOnlyReason) && !(claimEditable && activeField === "schedule"));
 	const actions =
 		activeField === null ? undefined : (
-			<>
-				<IconButton
-					icon={RotateCcw}
-					label="Discard changes"
-					onClick={exitEdit}
-				/>
-				<IconButton
-					icon={Save}
-					label="Save changes"
-					type="submit"
-					form={formId}
-					disabled={saveBlocked}
-				/>
-			</>
+			<DetailEditActions
+				formId={formId}
+				onDiscard={exitEdit}
+				disabled={saveBlocked}
+			/>
 		);
 	return {
 		activeField,
@@ -893,30 +889,6 @@ function useMarkAsSubscription({
 			);
 	};
 	return { available, marking: saving, error, mark };
-}
-
-function DiscardConfirm({
-	onContinue,
-	onDiscard,
-}: {
-	onContinue: () => void;
-	onDiscard: () => void;
-}) {
-	return (
-		<Notice tone="danger" className="block w-full" role="alert">
-			<p className="mb-3 text-sm text-danger-text">
-				Discard the changes in this form?
-			</p>
-			<div className="flex flex-wrap gap-2">
-				<Button type="button" variant="secondary" onClick={onContinue}>
-					Continue
-				</Button>
-				<Button type="button" variant="danger" onClick={onDiscard}>
-					Discard changes
-				</Button>
-			</div>
-		</Notice>
-	);
 }
 
 function fromAccountOptions(accounts: Account[]): Account[] {
@@ -1339,7 +1311,7 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className="scroll-smooth max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
+				className={detailModalClassName}
 				onCloseRequest={edit.requestClose}
 				actions={
 					<>
@@ -1661,7 +1633,7 @@ export function TransactionDetail({
 						/>
 					</div>
 				)}
-				<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5">
+				<div className={detailFooterClassName}>
 					{edit.confirmCancel ? (
 						<DiscardConfirm
 							onContinue={() => edit.setConfirmCancel(false)}

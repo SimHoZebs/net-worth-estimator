@@ -1,5 +1,14 @@
 import { cva } from "class-variance-authority";
 
+export const detailModalClassName =
+	"scroll-smooth max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0";
+export const detailPropertyRowClassName =
+	"flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0";
+export const detailPropertyLabelClassName =
+	"w-36 flex-none text-sm font-semibold text-muted";
+export const detailFooterClassName =
+	"sticky bottom-0 z-10 -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5";
+
 /** Inline controls keep their read layout and own their native interaction states. */
 export const transactionControlStyles = cva(
 	"m-0 max-w-full rounded-control border border-transparent bg-transparent px-px py-0 enabled:hover:border-line-strong focus-visible:bg-input-bg focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-0",

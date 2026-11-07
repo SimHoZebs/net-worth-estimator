@@ -19,6 +19,7 @@ const MODAL_CLOSE_DURATION = 120;
 
 export function Modal({
 	title,
+	label,
 	eyebrow,
 	children,
 	onClose,
@@ -32,6 +33,8 @@ export function Modal({
 	focusPanelOnOpen = false,
 }: {
 	title: ReactNode;
+	/** Stable accessible name for titles that contain editable controls. */
+	label?: string;
 	eyebrow?: string;
 	children: ReactNode;
 	onClose: () => void;
@@ -110,7 +113,8 @@ export function Modal({
 				wide ? "w-3xl" : "w-xl",
 				className,
 			)}
-			aria-labelledby={id}
+			aria-labelledby={label ? undefined : id}
+			aria-label={label}
 			onCancel={(event) => {
 				event.preventDefault();
 				// React also bubbles cancel events through portal ancestry. Only

@@ -15,6 +15,8 @@ import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
+import { BalanceAdjustmentRow } from "./BalanceAdjustmentRow.tsx";
+import { Button } from "../Button.tsx";
 import { TransactionAnalysisProvider } from "../analysis/TransactionAnalysis.tsx";
 
 const PAGE_SIZE = 10;
@@ -102,6 +104,16 @@ export function Transactions({
 		);
 	return (
 		<>
+			{!readOnly && occurrences.length > 0 && (
+				<div className="flex justify-end">
+					<Button
+						type="button"
+						onClick={() => onEdit({ kind: "transaction", item: null })}
+					>
+						Add transaction
+					</Button>
+				</div>
+			)}
 			<TransactionFilters
 				filters={filters}
 				recordedCount={
@@ -130,30 +142,37 @@ export function Transactions({
 			{filtered.length ? (
 				<>
 					<TransactionAnalysisProvider
-						transactionIds={pageRows.map(
-							(transaction) => transaction.transactionId,
-						)}
+						transactionIds={pageRows
+							.filter((transaction) => !transaction.adjustment)
+							.map((transaction) => transaction.transactionId)}
 					>
 						<TransactionTable
 							caption="Transactions involving this account, separated into recorded facts and projected transactions."
 							showHeaders={showHeaders}
 							scrollId={`${id}-table`}
 						>
-							{pageRows.map((transaction) => (
-								<TransactionRow
-									key={transaction.id}
-									transaction={transaction}
-									savedTransaction={
-										savedState.get(transaction.transactionId) ?? null
-									}
-									onEdit={() => {
-										const savedTransaction = savedState.get(
-											transaction.transactionId,
-										);
-										if (savedTransaction) inspect(transaction);
-									}}
-								/>
-							))}
+							{pageRows.map((transaction) =>
+								transaction.adjustment ? (
+									<BalanceAdjustmentRow
+										key={transaction.id}
+										adjustment={transaction.adjustment}
+									/>
+								) : (
+									<TransactionRow
+										key={transaction.id}
+										transaction={transaction}
+										savedTransaction={
+											savedState.get(transaction.transactionId) ?? null
+										}
+										onEdit={() => {
+											const savedTransaction = savedState.get(
+												transaction.transactionId,
+											);
+											if (savedTransaction) inspect(transaction);
+										}}
+									/>
+								),
+							)}
 						</TransactionTable>
 					</TransactionAnalysisProvider>
 					<TablePagination

@@ -1052,6 +1052,67 @@
 				"required": ["type", "version", "state", "currentRevision"],
 				"type": "object"
 			},
+			"BalanceAdjustment": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"adjustment": {
+						"format": "double",
+						"type": "number"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"observedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"previousBalance": {
+						"format": "double",
+						"type": "number"
+					},
+					"source": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"accountId",
+					"observedAt",
+					"previousBalance",
+					"balance",
+					"adjustment",
+					"source"
+				],
+				"type": "object"
+			},
+			"BalanceAdjustmentsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/BalanceAdjustmentsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"adjustments": {
+						"items": {
+							"$ref": "#/components/schemas/BalanceAdjustment"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["adjustments", "revision"],
+				"type": "object"
+			},
 			"Checkpoint": {
 				"additionalProperties": false,
 				"properties": {
@@ -6096,6 +6157,44 @@
 					}
 				},
 				"summary": "Replace one account"
+			}
+		},
+		"/v1/accounts/{id}/balance-adjustments": {
+			"get": {
+				"operationId": "list-balance-adjustments",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/BalanceAdjustmentsOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List dated balance adjustments without a forecast"
 			}
 		},
 		"/v1/amount-presets": {
