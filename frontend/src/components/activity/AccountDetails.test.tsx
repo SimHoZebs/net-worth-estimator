@@ -102,6 +102,7 @@ it("shows the linked bank identity for synced accounts", () => {
 			}}
 		/>,
 	);
+	expect(screen.getByText("Bank account")).toBeTruthy();
 	expect(screen.getByText("Bank")).toBeTruthy();
 	expect(screen.getByText("Chase")).toBeTruthy();
 	expect(screen.getByText("Synced as")).toBeTruthy();
