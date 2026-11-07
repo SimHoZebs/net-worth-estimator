@@ -200,9 +200,6 @@ export function AccountDetails({
 				disabled={readOnly || saving}
 				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
 			>
-				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 max-sm:mt-2 max-sm:pt-3">
-					Account
-				</h3>
 				<InputField
 					label="Account name"
 					wide
@@ -242,9 +239,6 @@ export function AccountDetails({
 					/>
 					Include in net worth and projections
 				</label>
-				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 max-sm:mt-2 max-sm:pt-3">
-					Balance & limits
-				</h3>
 				<InputField
 					label="Balance (USD)"
 					type="number"
@@ -343,7 +337,6 @@ export function AccountDetails({
 				<div className="col-span-full flex flex-col gap-2 text-sm font-semibold text-muted max-sm:text-xs">
 					{account.institution ? (
 						<>
-							<span id="account-source-label">Bank account</span>
 							<dl className="mt-1 flex flex-col gap-1 text-sm text-muted">
 								<div className="flex justify-between gap-4">
 									<dt>Bank</dt>
