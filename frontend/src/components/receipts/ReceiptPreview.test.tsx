@@ -26,14 +26,14 @@ beforeEach(() => {
 	vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
 });
 
-it("contains long image errors in reserved feedback and retains retry", async () => {
+it("contains long image errors without a reserved box and retains retry", async () => {
 	image.error = new Error("A long receipt failure. ".repeat(100));
 	image.isError = true;
 	render(<ReceiptPreview id="receipt" digest="one" filename="shop.png" />);
 	const alert = screen.getByRole("alert");
 	expect(alert.textContent).toContain(image.error.message);
-	expect(alert.parentElement?.classList.contains("h-24")).toBe(true);
-	expect(alert.parentElement?.classList.contains("overflow-auto")).toBe(true);
+	expect(alert.parentElement?.classList.contains("h-24")).toBe(false);
+	expect(alert.parentElement?.classList.contains("overflow-auto")).toBe(false);
 	await runInteractions([{ click: ["button", "Retry image"] }]);
 	expect(image.refetch).toHaveBeenCalledOnce();
 });
