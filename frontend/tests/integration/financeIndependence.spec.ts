@@ -42,6 +42,10 @@ test("finance lists, recorded activity, and account details request no forecast"
 	await expect(account.getByLabel("Account name")).toHaveValue(
 		"Everyday checking",
 	);
+	await expect(
+		account.getByRole("button", { name: "Load forecast" }),
+	).toHaveCount(0);
+	await expect(account.getByText("Projection at horizon")).toHaveCount(0);
 	expect(forecasts).toEqual([]);
 });
 

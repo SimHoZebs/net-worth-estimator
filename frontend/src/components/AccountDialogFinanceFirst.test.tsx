@@ -116,21 +116,28 @@ describe("finance-first account dialog", () => {
 		if (!(nameInput instanceof HTMLInputElement))
 			throw new Error("Expected the account name input");
 		expect(nameInput.value).toBe("Everyday checking");
-		expect(screen.getByRole("button", { name: "Load forecast" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Load forecast" })).toBeNull();
+		expect(screen.queryByText("Projection at horizon")).toBeNull();
 		expect(projectionUrls()).toEqual([]);
 	});
 
-	it("loads the forecast only on explicit request and recovers with retry", async () => {
+	it("keeps projected activity errors out of account details", async () => {
 		setServerModelFixture(financialModelFixture);
 		render(<AccountDialog {...dialogProps()} />, { wrapper });
-		fireEvent.click(screen.getByRole("tab", { name: "Account details" }));
 		expect(projectionUrls()).toEqual([]);
-		fireEvent.click(screen.getByRole("button", { name: "Load forecast" }));
+		fireEvent.change(screen.getByLabelText("Transaction source"), {
+			target: { value: "projected" },
+		});
 		await waitFor(() =>
 			expect(
 				screen.getByRole("button", { name: "Retry forecast" }),
 			).toBeTruthy(),
 		);
 		expect(projectionUrls().length).toBeGreaterThan(0);
+		fireEvent.click(screen.getByRole("tab", { name: "Account details" }));
+		expect(screen.queryByRole("button", { name: "Load forecast" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Retry forecast" })).toBeNull();
+		expect(screen.queryByText("Projection at horizon")).toBeNull();
+		expect(screen.getByLabelText("Account name")).toBeTruthy();
 	});
 });

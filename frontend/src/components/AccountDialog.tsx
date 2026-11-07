@@ -38,7 +38,7 @@ export function AccountDialog({
 }) {
 	const [view, setView] = useTransactionView();
 	// Recorded facts render from saved rows alone. The forecast loads only
-	// after the viewer asks for projected activity or the projected metric.
+	// after the viewer asks for projected activity.
 	const [forecastRequested, setForecastRequested] = useState(false);
 	const forecast = useRemoteProjection({
 		ranges: false,
@@ -95,15 +95,6 @@ export function AccountDialog({
 			),
 		[accountRules, transactions, account.id, startDate],
 	);
-	const last = projection?.points.at(-1);
-	// Finance-first: null means not requested. Once a forecast resolves,
-	// a missing account falls back to 0 (the pre-split `?? 0` behavior)
-	// instead of a no-op Load button.
-	const projectedEnding = !forecastRequested
-		? null
-		: projection == null
-			? null
-			: (last?.balances[account.id] ?? 0);
 	return (
 		<Drawer
 			side="right"
@@ -185,14 +176,6 @@ export function AccountDialog({
 					<AccountDetails
 						key={account.id}
 						account={account}
-						endingBalance={projectedEnding}
-						projected={{
-							loading: forecastRequested && forecast.loading,
-							error: forecastRequested ? (forecast.baseError ?? null) : null,
-							requested: forecastRequested,
-							request: () => setForecastRequested(true),
-							retry: forecast.retryProjection,
-						}}
 						readOnly={readOnly}
 					/>
 				)}

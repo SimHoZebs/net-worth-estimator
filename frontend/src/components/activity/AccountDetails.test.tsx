@@ -38,7 +38,7 @@ function input(name: string): HTMLInputElement {
 }
 
 it("refreshes untouched fields without creating a local edit", () => {
-	const props = { account: home, endingBalance: 480000 };
+	const props = { account: home };
 	const view = render(<AccountDetails {...props} />);
 	view.rerender(
 		<AccountDetails {...props} account={{ ...home, name: "Current home" }} />,
@@ -55,7 +55,7 @@ it("refreshes untouched fields without creating a local edit", () => {
 
 it("preserves edits across unrelated refreshes and rejects same-field conflicts", async () => {
 	const server = stubTestServer();
-	const props = { account: home, endingBalance: 480000 };
+	const props = { account: home };
 	const view = render(<AccountDetails {...props} />);
 	fireEvent.change(input("Account name"), { target: { value: "My home" } });
 	view.rerender(
@@ -91,7 +91,7 @@ it("preserves edits across unrelated refreshes and rejects same-field conflicts"
 
 it("edits inline with source display-only and a grouped balance range", async () => {
 	const server = stubTestServer();
-	render(<AccountDetails account={home} endingBalance={480000} />);
+	render(<AccountDetails account={home} />);
 	// No second modal: there is no edit button, fields are live inputs.
 	expect(screen.queryByRole("button", { name: "Edit account" })).toBeNull();
 	expect(input("Account name").value).toBe("Home value");
@@ -134,7 +134,7 @@ it("edits inline with source display-only and a grouped balance range", async ()
 
 it("unchecking the ceiling enables the maximum input", async () => {
 	const server = stubTestServer();
-	render(<AccountDetails account={home} endingBalance={480000} />);
+	render(<AccountDetails account={home} />);
 	fireEvent.click(input("No ceiling"));
 	const ceiling = input("Maximum balance in USD");
 	expect(ceiling.disabled).toBe(false);
@@ -162,7 +162,7 @@ it("preserves raw null floors and sentinel ceilings on a name-only save", async 
 	const server = stubTestServer(undefined, model);
 	acceptTestResource();
 	setServerModelFixture(financialModelFixture, { model });
-	render(<AccountDetails account={home} endingBalance={480000} />);
+	render(<AccountDetails account={home} />);
 	fireEvent.change(input("Account name"), {
 		target: { value: "Home value revised" },
 	});
@@ -195,7 +195,7 @@ it("keeps a raw negative floor verbatim on a name-only save", async () => {
 	const server = stubTestServer(undefined, model);
 	acceptTestResource();
 	setServerModelFixture(financialModelFixture, { model });
-	render(<AccountDetails account={home} endingBalance={480000} />);
+	render(<AccountDetails account={home} />);
 	fireEvent.change(input("Account name"), {
 		target: { value: "Home value revised" },
 	});
@@ -217,9 +217,7 @@ it("keeps a raw negative floor verbatim on a name-only save", async () => {
 it("rejects blank and invalid numerics without saving", async () => {
 	const server = stubTestServer();
 	acceptTestResource();
-	const { container } = render(
-		<AccountDetails account={home} endingBalance={480000} />,
-	);
+	const { container } = render(<AccountDetails account={home} />);
 	// fireEvent.submit bypasses native required validation, exercising the
 	// form's own rejection the same way a programmatic submit would.
 	const form = container.querySelector("form")!;
@@ -257,10 +255,7 @@ it("rejects blank and invalid numerics without saving", async () => {
 
 it("locks every field for read-only source records", () => {
 	const { container } = render(
-		<AccountDetails
-			account={{ ...home, readOnly: true }}
-			endingBalance={480000}
-		/>,
+		<AccountDetails account={{ ...home, readOnly: true }} />,
 	);
 	// jsdom does not cascade fieldset[disabled] to the disabled IDL, so
 	// assert the attribute on the group itself: real browsers lock all
@@ -268,40 +263,4 @@ it("locks every field for read-only source records", () => {
 	expect(container.querySelector("fieldset[disabled]")).toBeTruthy();
 	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 	expect(screen.queryByText(/refreshed copy/)).toBeNull();
-});
-
-it("shows zero instead of a no-op loader when a resolved forecast omits the account", () => {
-	render(
-		<AccountDetails
-			account={home}
-			endingBalance={null}
-			projected={{
-				loading: false,
-				error: null,
-				requested: true,
-				request: () => {},
-				retry: () => {},
-			}}
-		/>,
-	);
-	// Resolved-but-absent keeps the pre-split ?? 0 behavior.
-	expect(screen.queryByRole("button", { name: "Load forecast" })).toBeNull();
-	expect(screen.getByText("$0")).toBeTruthy();
-});
-
-it("offers Load forecast only before an explicit request", () => {
-	render(
-		<AccountDetails
-			account={home}
-			endingBalance={null}
-			projected={{
-				loading: false,
-				error: null,
-				requested: false,
-				request: () => {},
-				retry: () => {},
-			}}
-		/>,
-	);
-	expect(screen.getByRole("button", { name: "Load forecast" })).toBeTruthy();
 });

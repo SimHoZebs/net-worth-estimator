@@ -9,7 +9,6 @@ import { Checkbox, Input, InputField, SelectField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { mergeStyles } from "../mergeStyles.ts";
-import { DetailList, DetailRow } from "../DetailRow.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
@@ -33,20 +32,9 @@ function toAmountInput(value: number | null): string {
  */
 export function AccountDetails({
 	account,
-	endingBalance,
-	projected,
 	readOnly: readOnlyProp,
 }: {
 	account: Account;
-	endingBalance: number | null;
-	/** Explicit forecast state for the horizon metric; never auto-requests. */
-	projected?: {
-		loading: boolean;
-		error: string | null;
-		requested: boolean;
-		request: () => void;
-		retry: () => void;
-	};
 	readOnly?: boolean;
 }) {
 	const id = useId();
@@ -359,33 +347,6 @@ export function AccountDetails({
 					</div>
 				</div>
 			</fieldset>
-			<DetailList className="m-0">
-				<DetailRow label="Projection at horizon">
-					<div className="h-24 overflow-auto font-normal">
-						{endingBalance !== null ? (
-							money(endingBalance)
-						) : projected?.loading ? (
-							<span role="status">Loading forecast…</span>
-						) : projected?.error ? (
-							<span role="alert">
-								{projected.error}{" "}
-								<button type="button" onClick={projected.retry}>
-									Retry forecast
-								</button>
-							</span>
-						) : projected?.requested ? (
-							// Forecast resolved but the account is absent from its balances (e.g. disabled): pre-split `?? 0` behavior, never a no-op Load button.
-							money(0)
-						) : projected?.request ? (
-							<button type="button" onClick={projected.request}>
-								Load forecast
-							</button>
-						) : (
-							<span role="status">Forecast unavailable.</span>
-						)}
-					</div>
-				</DetailRow>
-			</DetailList>
 			<ErrorNotice reserve message={error} />
 			{!readOnly && (
 				<div className={mergeStyles(dialogActionsStyles, "mt-0")}>
