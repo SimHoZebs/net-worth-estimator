@@ -39,7 +39,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	snapshots := []types.SimulationSnapshot{}
 	transactionSequence := 0
 
-	resolved := ExpandProjectionSchedule(request.Model.Schedules, request.Model.Transactions, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	resolved := ResolveOccurrences(request.Model.Schedules, request.Model.Transactions, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	eventDates := resolved.ByDate
 	for _, date := range candidateDates {
 		if _, exists := eventDates[date]; !exists {
@@ -54,10 +54,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	}
 	sort.Slice(dates, func(i, j int) bool { return CompareIsoDates(dates[i], dates[j]) < 0 })
 
-	// The history cut splits one timestamp stream: occurrences at or
-	// before it already replayed and must not simulate again. Purchases
-	// are future-planned inputs the replay never executes, so they are
-	// exempt from the filter.
+	// The history cut skips already-replayed occurrences; purchases are exempt.
 	cut := request.HistoryCutInstant
 	for _, date := range dates {
 		occurrences := eventDates[date]

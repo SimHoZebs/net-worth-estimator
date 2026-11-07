@@ -162,10 +162,10 @@ func TestApplyHandlesImpossibleStates(t *testing.T) {
 	}
 }
 
-// The preprocessor owns schedule expansion: window filtering, disabled
-// rules, claim suppression, and end-date clamping happen before the engine
-// ever sees an occurrence.
-func TestExpandProjectionSchedule(t *testing.T) {
+// Schedule expansion resolves occurrences before the engine sees them:
+// window filtering, disabled rules, claim suppression, and end-date
+// clamping happen at resolution time.
+func TestResolveOccurrences(t *testing.T) {
 	rule := func(id, start, end string, enabled bool) types.Schedule {
 		r := types.Schedule{ID: id, Name: id, Frequency: types.FrequencyMonthly, StartDate: types.IsoDate(start), Priority: 1, Enabled: enabled}
 		if end != "" {
@@ -183,7 +183,7 @@ func TestExpandProjectionSchedule(t *testing.T) {
 		rule("old", "2025-01-01", "2025-06-01", true),
 		rule("off", "2026-01-01", "", false),
 	}
-	resolved := ExpandProjectionSchedule(rules, []types.Transaction{claimed}, "2026-01-01", "2026-04-01", true)
+	resolved := ResolveOccurrences(rules, []types.Transaction{claimed}, "2026-01-01", "2026-04-01", true)
 	seen := map[string][]string{}
 	for date, occurrences := range resolved.ByDate {
 		for _, occurrence := range occurrences {

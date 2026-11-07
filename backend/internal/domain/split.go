@@ -10,52 +10,6 @@ import (
 // The algorithm is UI-independent: SOC-04B (persistence) and SOC-04C (UI)
 // consume it without re-deriving shares.
 
-// zeroDecimalCurrencies use 0 minor digits (ISO 4217).
-var zeroDecimalCurrencies = map[string]bool{
-	"BIF": true, "CLP": true, "DJF": true, "GNF": true, "ISK": true,
-	"JPY": true, "KMF": true, "KRW": true, "PYG": true, "RWF": true,
-	"UGX": true, "UYI": true, "VND": true, "VUV": true, "XAF": true,
-	"XOF": true, "XPF": true,
-}
-
-// threeDecimalCurrencies use 3 minor digits (ISO 4217).
-var threeDecimalCurrencies = map[string]bool{
-	"BHD": true, "IQD": true, "JOD": true, "KWD": true,
-	"LYD": true, "OMR": true, "TND": true,
-}
-
-// CurrencyMinorDigits reports the minor-unit precision for an ISO 4217
-// currency code. Codes are case-insensitive. Any other syntactically valid
-// 3-letter code defaults to 2 minor digits.
-func CurrencyMinorDigits(currency string) (int, error) {
-	code, err := normalizeCurrency(currency)
-	if err != nil {
-		return 0, err
-	}
-	switch {
-	case zeroDecimalCurrencies[code]:
-		return 0, nil
-	case threeDecimalCurrencies[code]:
-		return 3, nil
-	default:
-		return 2, nil
-	}
-}
-
-// MinorUnitsPerMajor reports how many minor units make one major unit
-// (100 for USD/EUR, 1 for JPY, 1000 for KWD).
-func MinorUnitsPerMajor(currency string) (int64, error) {
-	digits, err := CurrencyMinorDigits(currency)
-	if err != nil {
-		return 0, err
-	}
-	units := int64(1)
-	for i := 0; i < digits; i++ {
-		units *= 10
-	}
-	return units, nil
-}
-
 func normalizeCurrency(currency string) (string, error) {
 	code := strings.ToUpper(strings.TrimSpace(currency))
 	if len(code) != 3 {
@@ -69,96 +23,14 @@ func normalizeCurrency(currency string) (string, error) {
 	return code, nil
 }
 
-// MajorToMinor parses an exact decimal major-unit amount (for example
-// "10.25") into integer minor units using the currency precision. It never
-// touches float64, so decimal input stays exact. Excess fraction digits
-// round half up. Negative amounts are rejected: splits allocate what is
-// owed, never negative shares.
-func MajorToMinor(major string, currency string) (int64, error) {
-	digits, err := CurrencyMinorDigits(currency)
-	if err != nil {
-		return 0, err
-	}
-	text := strings.TrimSpace(major)
-	if text == "" {
-		return 0, errors.New("invalid amount: empty")
-	}
-	if strings.HasPrefix(text, "-") {
-		return 0, fmt.Errorf("invalid amount %q: negative amounts are rejected", major)
-	}
-	text = strings.TrimPrefix(text, "+")
-	if strings.HasPrefix(text, "-") {
-		return 0, fmt.Errorf("invalid amount %q: negative amounts are rejected", major)
-	}
-	intPart, fracPart := text, ""
-	if dot := strings.IndexByte(text, '.'); dot >= 0 {
-		if strings.Count(text, ".") > 1 {
-			return 0, fmt.Errorf("invalid amount %q: want digits with one optional decimal point", major)
-		}
-		intPart, fracPart = text[:dot], text[dot+1:]
-		if fracPart == "" {
-			return 0, fmt.Errorf("invalid amount %q: malformed decimal", major)
-		}
-	}
-	if intPart == "" {
-		intPart = "0"
-	}
-	for _, part := range []string{intPart, fracPart} {
-		for i := 0; i < len(part); i++ {
-			if part[i] < '0' || part[i] > '9' {
-				return 0, fmt.Errorf("invalid amount %q: want digits with one optional decimal point", major)
-			}
-		}
-	}
-	units := int64(1)
-	for i := 0; i < digits; i++ {
-		units *= 10
-	}
-	var whole int64
-	for i := 0; i < len(intPart); i++ {
-		digit := int64(intPart[i] - '0')
-		if whole > (1<<62-digit)/10 {
-			return 0, fmt.Errorf("invalid amount %q: out of range", major)
-		}
-		whole = whole*10 + digit
-	}
-	frac := make([]byte, 0, len(fracPart)+1)
-	frac = append(frac, fracPart...)
-	for len(frac) < digits {
-		frac = append(frac, '0')
-	}
-	var minor int64
-	for i := 0; i < digits; i++ {
-		minor = minor*10 + int64(frac[i]-'0')
-	}
-	roundUp := false
-	if len(fracPart) > digits && frac[digits] >= '5' {
-		roundUp = true
-	}
-	const maxInt64 = int64(1<<63 - 1)
-	if whole > (maxInt64-minor)/units {
-		return 0, fmt.Errorf("invalid amount %q: out of range", major)
-	}
-	total := whole*units + minor
-	if roundUp {
-		if total == maxInt64 {
-			return 0, fmt.Errorf("invalid amount %q: out of range", major)
-		}
-		total++
-	}
-	return total, nil
-}
-
 // SplitShare is one participant's allocation in integer minor units.
 type SplitShare struct {
 	ParticipantID string
 	AmountMinor   int64
 }
 
-// SplitInput describes one allocation request. ParticipantIDs lists the
-// initiator plus invitees in a stable order; shares return in that order.
-// Overrides, when non-empty, replaces the equal default: it must name an
-// amount for every participant and sum exactly to TotalMinor.
+// SplitInput describes one allocation request; shares return in ParticipantIDs order.
+// Overrides replace the equal default and must sum exactly to TotalMinor.
 type SplitInput struct {
 	TotalMinor     int64
 	Currency       string

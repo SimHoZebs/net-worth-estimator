@@ -306,13 +306,54 @@ func (p *parser) primary() (func(map[string]float64) float64, error) {
 	return nil, &ParseError{Message: "Expected number, identifier, or '('", Offset: p.peek().offset}
 }
 
-var exprCache = sync.Map{}
+// exprCacheLimit bounds compiled-expression memoization.
+const exprCacheLimit = 1024
 
-// ParseArithmetic compiles an arithmetic expression. Compiled expressions are
-// memoized; expressions are immutable so sharing is safe across goroutines.
+type exprCacheEntry struct {
+	expr ParsedArithmetic
+}
+
+// exprCache is a bounded FIFO memo: oldest evicts at the cap.
+// Expressions are immutable, so sharing across goroutines is safe.
+type exprCacheT struct {
+	mu     sync.Mutex
+	order  []string
+	values map[string]exprCacheEntry
+}
+
+var exprCache = &exprCacheT{
+	values: map[string]exprCacheEntry{},
+}
+
+func (c *exprCacheT) load(input string) (ParsedArithmetic, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.values[input]
+	if !ok {
+		return ParsedArithmetic{}, false
+	}
+	return entry.expr, true
+}
+
+func (c *exprCacheT) store(input string, parsed ParsedArithmetic) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.values[input]; ok {
+		return
+	}
+	if len(c.order) >= exprCacheLimit {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.values, oldest)
+	}
+	c.order = append(c.order, input)
+	c.values[input] = exprCacheEntry{expr: parsed}
+}
+
+// ParseArithmetic compiles an arithmetic expression with bounded memoization.
 func ParseArithmetic(input string) (ParsedArithmetic, error) {
-	if cached, ok := exprCache.Load(input); ok {
-		return cached.(ParsedArithmetic), nil
+	if cached, ok := exprCache.load(input); ok {
+		return cached, nil
 	}
 	lexer := &lexer{input: input}
 	var tokens []token
@@ -340,7 +381,7 @@ func ParseArithmetic(input string) (ParsedArithmetic, error) {
 	}
 	sortStrings(reqs)
 	parsed := ParsedArithmetic{evaluate: expr, requirements: reqs}
-	exprCache.Store(input, parsed)
+	exprCache.store(input, parsed)
 	return parsed, nil
 }
 

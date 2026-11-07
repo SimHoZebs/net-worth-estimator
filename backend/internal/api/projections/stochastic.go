@@ -23,24 +23,7 @@ type stochasticRequest struct {
 	Config    types.StochasticConfig          `json:"config"`
 }
 
-// stochasticSSE streams StochasticProgress events plus optional partial
-// results over SSE.
-//
-// Seeded requests share one in-process computation per identical request:
-// a caller that drops its stream re-POSTs the same body and attaches to
-// the still-running computation, immediately receiving the latest partial.
-// Result durability across restarts arrives with slice persistence; until
-// then post-restart reconnects recompute. Unseeded runs are quick checks
-// only: they cancel on disconnect and are never shared. Use a seed when
-// you lock your phone or lose Wi-Fi.
-//
-// Recovery contract: seeded computations run once per identical request in
-// the shared-run registry in runs.go. A caller that drops its stream
-// re-POSTs the same body and attaches to the still-running computation: it
-// immediately receives the latest partial, then the remaining stream.
-// Unseeded runs bypass the registry because fresh random draws cannot be
-// shared. A `retry` hint plus `: heartbeat` comments keep proxied streams
-// alive.
+// stochasticSSE streams StochasticProgress events over SSE.
 const (
 	sseRetryMs           = 3000
 	sseHeartbeatInterval = 15 * time.Second
@@ -96,9 +79,7 @@ func startSSEHeartbeat(w io.Writer, flusher http.Flusher, writeMu *sync.Mutex, d
 }
 
 // stochasticStream commits source headers only after request preparation.
-// Huma's sse.Register commits 200 before its callback, so use StreamResponse
-// here to retain pre-stream errors and computed/shared/stored source headers.
-func stochasticStream(source string, serve func(context.Context, sseEventWriter)) *huma.StreamResponse {
+func stochasticStream(source string, heartbeat bool, serve func(context.Context, sseEventWriter)) *huma.StreamResponse {
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
 		writer := ctx.BodyWriter()
 		flusher, ok := writer.(http.Flusher)
@@ -118,9 +99,11 @@ func stochasticStream(source string, serve func(context.Context, sseEventWriter)
 		}
 
 		var writeMu sync.Mutex
-		heartbeatDone := make(chan struct{})
-		defer close(heartbeatDone)
-		startSSEHeartbeat(writer, flusher, &writeMu, heartbeatDone)
+		if heartbeat {
+			heartbeatDone := make(chan struct{})
+			defer close(heartbeatDone)
+			startSSEHeartbeat(writer, flusher, &writeMu, heartbeatDone)
+		}
 		serve(ctx.Context(), newSSEEventWriter(writer, flusher, &writeMu))
 	}}
 }
@@ -166,14 +149,14 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 	// Unseeded results are fresh random draws: they cancel on disconnect
 	// and are never shared or stored.
 	if body.Config.Seed == nil {
-		return stochasticStream(projectionSourceComputed, func(ctx context.Context, writeEvent sseEventWriter) {
+		return stochasticStream(projectionSourceComputed, true, func(ctx context.Context, writeEvent sseEventWriter) {
 			s.serveStochasticInline(ctx, writeEvent, model, body.Settings, body.Overrides, body.Config)
 		}), nil
 	}
 	if result, served, err := s.readStochastic(model, &body.Settings, body.Config); err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	} else if served {
-		return stochasticStream(projectionSourceComputed, func(_ context.Context, writeEvent sseEventWriter) {
+		return stochasticStream(projectionSourceComputed, false, func(_ context.Context, writeEvent sseEventWriter) {
 			if err := writeEvent("done", "result", map[string]any{"result": result}); err != nil {
 				log.Printf("stochastic sse: stored result write failed: %v", err)
 			}
@@ -194,7 +177,7 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 		source = projectionSourceComputed
 	}
 
-	return stochasticStream(source, func(ctx context.Context, writeEvent sseEventWriter) {
+	return stochasticStream(source, true, func(ctx context.Context, writeEvent sseEventWriter) {
 		if owner {
 			// The computation is detached from the request context: this
 			// stream dropping must never cancel the shared run.

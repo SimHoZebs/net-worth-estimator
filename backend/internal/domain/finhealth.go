@@ -8,18 +8,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Reusable financial-health evaluation metrics (FIN-03). This layer answers
-// descriptive questions about recorded state: balances at the as-of cut
-// plus realized one-time flows inside a lookback window. It never runs a
-// projection and never touches the projection-goal evaluation registry: a
-// health check describes what is saved, while a goal evaluation asks what
-// a simulated future reaches. Shared measurements are reused directly:
-// ComputeNetWorth, counterparty classification (IsExternalInflow /
-// IsExternalOutflow), payment-terms minimums, and account bound sentinels.
-//
-// Every verdict is relative to the supplied FinancialHealthStandards. The
-// defaults are adjustable guidelines, echoed back in each result, and must
-// never be presented as universal requirements.
+// Reusable financial-health evaluation metrics (FIN-03): descriptive checks over saved state.
+// Verdicts are relative to supplied standards, never universal requirements.
 
 const finHealthWindowMonthsDivisor = 30.4375
 
@@ -95,37 +85,12 @@ type finHealthInputs struct {
 	windowStart  string
 }
 
-// finHealthResolvableAmount reports whether a descriptor resolves
-// deterministically from its own literals. Live-balance and history
-// providers (model-value, account-balance, terms-minimum, late-fee,
-// balance-fee) read replay-time state the descriptive layer does not
-// reconstruct, so those transactions are excluded evidence instead of silently
-// misresolved against as-of balances. occurrence-rate and growth-factor are
-// deterministic for one-time transactions (divisor 1, factor 1, base rate).
+// finHealthResolvableAmount reports whether a descriptor resolves from its own literals.
 func finHealthResolvableAmount(amount types.TransactionAmountResolution) bool {
-	for _, binding := range amount.Inputs {
-		if binding.Source == "literal" {
-			continue
-		}
-		if binding.Source != "provider" {
-			return false
-		}
-		switch binding.Provider {
-		case "occurrence-rate", "growth-factor":
-		default:
-			return false
-		}
-	}
-	return true
+	return !AmountRequiresReplayState(amount)
 }
 
-// collectFinHealthFlows extracts realized one-time flows dated inside
-// [windowStart, asOfDay]. Internal transfers are out of scope for
-// income/spending checks; pending, void, and disabled rows never moved
-// balances and stay out. Amounts resolve through the same descriptor path
-// as history replay, but only for stateless descriptors: stateful or
-// otherwise unresolvable amounts are counted as excluded evidence instead
-// of silently dropped or misresolved.
+// collectFinHealthFlows extracts realized one-time flows inside the window.
 func collectFinHealthFlows(model *types.FinancialModel, balances map[string]float64, windowStart, asOfDay string) finHealthInputs {
 	inputs := finHealthInputs{
 		model:       model,
@@ -226,10 +191,7 @@ func finHealthInsufficient(checkID, summary string) types.FinancialHealthCheckRe
 	}
 }
 
-// EvaluateFinancialHealth computes the seven descriptive checks from the
-// saved model and the current position at its as-of cut. It never simulates
-// the future; FIN-04 (presentation) and FIN-05 (explainability) consume this
-// report.
+// EvaluateFinancialHealth computes the seven descriptive checks from saved state.
 func EvaluateFinancialHealth(model *types.FinancialModel, position *types.CurrentPosition, standards types.FinancialHealthStandards) types.FinancialHealthReport {
 	standards = NormalizeFinancialHealthStandards(standards)
 	asOf := ""
@@ -454,10 +416,7 @@ func evaluateDebtBurden(inputs *finHealthInputs, standards types.FinancialHealth
 	}
 }
 
-// evaluateHighInterestDebt flags carried revolving balances. The model
-// carries no rate data, so this is an explicitly labeled proxy: carried
-// balances on enabled debt accounts stand in for interest-bearing debt
-// until a rate field exists.
+// evaluateHighInterestDebt flags carried revolving balances as an interest-debt proxy.
 func evaluateHighInterestDebt(inputs *finHealthInputs, standards types.FinancialHealthStandards) types.FinancialHealthCheckResult {
 	const checkID = types.FinancialHealthCheckHighInterestDebt
 	terms := PaymentTermsByAccount(inputs.model)
@@ -549,10 +508,7 @@ func evaluateSavingsRate(inputs *finHealthInputs, standards types.FinancialHealt
 	}
 }
 
-// evaluateUtilization measures the limit-weighted drawn ratio: credit
-// limits from debt-account floors (-minBalance) and caps from finite
-// positive ceilings, reusing the bound sentinels behind withdrawable and
-// headroom math.
+// evaluateUtilization measures the limit-weighted drawn ratio.
 func evaluateUtilization(inputs *finHealthInputs, standards types.FinancialHealthStandards) types.FinancialHealthCheckResult {
 	const checkID = types.FinancialHealthCheckUtilization
 	weighted, limitTotal := 0.0, 0.0

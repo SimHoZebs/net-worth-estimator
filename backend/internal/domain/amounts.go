@@ -34,10 +34,8 @@ type AmountProviderContext struct {
 	// RuleStartDate is the owning rule's start date, or "" for manual
 	// transactions. It anchors the growth-factor provider.
 	RuleStartDate string
-	// SampledAnnualRate is the pre-sampled annual rate for this transaction
-	// in this projection year, or nil when the transaction is not sampled
-	// (deterministic runs and non-volatile amounts). Sampling stays
-	// coordinator-owned; providers only look the value up.
+	// SampledAnnualRate is the pre-sampled annual rate for this year, or nil when unsampled.
+	// Sampling stays coordinator-owned; providers only look it up.
 	SampledAnnualRate *float64
 }
 
@@ -56,11 +54,12 @@ type providerDefinition struct {
 	resolve                 func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error)
 	validateReferences      func(args map[string]types.JsonValue, refs *AmountReferenceContext) error
 	transactionDependencies func(args map[string]types.JsonValue) []string
-	// volatileParams reports stochastic sampling parameters when the
-	// provider carries rate behavior. Nil means never volatile.
-	// occurrence-rate is the only built-in volatile provider; custom
-	// plugins opt in by setting this hook.
+	// volatileParams reports sampling parameters when the provider carries rate behavior.
+	// Nil means never volatile.
 	volatileParams func(args map[string]types.JsonValue) (annualRate, volatility float64, volatile bool)
+	// stateless reports that resolve needs no replay-time state.
+	// Custom plugins set it only for literal or deterministic inputs.
+	stateless bool
 }
 
 func argString(args map[string]types.JsonValue, key string) (string, bool) {
@@ -160,17 +159,7 @@ type AmountProviderInfo struct {
 	ArgFields   []AmountFieldSpec `json:"argFields,omitempty"`
 }
 
-// Design: accounts stay dumb, transactions carry behavior. Accounts expose
-// only floor/ceiling/withdrawable/headroom (see accounts.go). Fees and
-// minimums live in PaymentTerms plus the providers below, and a transaction or
-// rule reads them to move money. Terms declare what is owed; an enabled
-// transaction behind them moves it.
-//
-// Live model uses: model-value, account-balance, occurrence-rate and
-// growth-factor with the expression resolver. Payroll modeling (tested,
-// seeded): chained expression rules with the progressive-bracket resolver
-// for tax. Debt feature (tested, unused in seed CSVs): terms-minimum,
-// late-fee, balance-fee. There are no other generic resolvers.
+// Design: terms declare what is owed; an enabled transaction moves it.
 var amountProviders = map[string]providerDefinition{
 	"model-value": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
@@ -216,11 +205,7 @@ var amountProviders = map[string]providerDefinition{
 		},
 	},
 	"occurrence-rate": {
-		// occurrence-rate carries a transaction's rate behavior: the annual
-		// rate plus the volatility sampled per projection year. The
-		// divisor comes from context (rule frequency, 1 for manuals) and
-		// the sampled annual rate arrives pre-sampled from the stochastic
-		// coordinator; providers never draw RNG themselves.
+		// occurrence-rate carries rate behavior; sampled rate arrives pre-sampled from the coordinator.
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			annualRate, volatility, err := validateRateArgs(args)
 			if err != nil {
@@ -247,12 +232,12 @@ var amountProviders = map[string]providerDefinition{
 			}
 			return annualRate, volatility, true
 		},
+		// Stateless descriptively: without a sampled rate, resolve
+		// returns the base annual rate divided by the frequency divisor
+		// (1 for one-time transactions), so no replay state is read.
+		stateless: true,
 	},
-	// growth-factor resolves the compounding factor for a transaction's
-	// annual growth rate over the days from the rule start date to the
-	// occurrence date. Expressions multiply it explicitly, so one-time
-	// and recurring transactions resolve through the same path. Manual
-	// transactions have no start date and resolve 1.
+	// growth-factor resolves the compounding factor from rule start to occurrence date.
 	"growth-factor": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			annualGrowthRate, err := argFloat(args, "annualGrowthRate", true, 0)
@@ -272,11 +257,11 @@ var amountProviders = map[string]providerDefinition{
 			_, err := argFloat(args, "annualGrowthRate", true, 0)
 			return err
 		},
+		// Stateless descriptively: for one-time transactions RuleStartDate
+		// is empty and resolve returns 1, so no replay state is read.
+		stateless: true,
 	},
-	// terms-minimum resolves a payment-terms minimum for one account: the
-	// fixed minimum, or the percent share of the balance magnitude when set,
-	// whichever is larger. Terms stay the single source for minimums; the
-	// payment transaction carries schedule and destinations only.
+	// terms-minimum resolves a payment-terms minimum: fixed or percent share, whichever is larger.
 	"terms-minimum": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			id, err := validateIDArgument(args)
@@ -300,11 +285,7 @@ var amountProviders = map[string]providerDefinition{
 			return nil
 		},
 	},
-	// late-fee resolves a flat fee when the referenced payment transaction fell
-	// short of its terms minimum in the fee's calendar month, and zero
-	// otherwise. The same-month guard keeps pre-history occurrences and
-	// disabled shells from charging stale shortfalls: no payment execution
-	// this month means no fee. Monthly dues assumed.
+	// late-fee charges a flat fee when the payment fell short in the same calendar month.
 	"late-fee": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			paymentID, ok := args["payment"].(string)
@@ -361,11 +342,7 @@ var amountProviders = map[string]providerDefinition{
 			return nil
 		},
 	},
-	// balance-fee resolves a flat fee when an account's live balance sits
-	// below a threshold at the occurrence date, and zero otherwise. The
-	// balance read is live, so unlike ledger conditions there is no
-	// staleness guard to maintain: each monthly assessment sees the current
-	// balance. At exactly the threshold no fee applies.
+	// balance-fee charges a flat fee when the live balance sits below a threshold.
 	"balance-fee": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			accountID, ok := args["account"].(string)
@@ -418,10 +395,7 @@ func termsMinimum(terms types.PaymentTerms, balance float64) float64 {
 	return minimum
 }
 
-// VolatileRateParams is one transaction's stochastic sampling configuration:
-// the annual rate and volatility reported by its single volatile provider
-// input. Transactions carry at most one volatile input; every volatile input
-// in a transaction shares the transaction's one pre-sampled annual rate.
+// VolatileRateParams is one transaction's stochastic sampling configuration.
 type VolatileRateParams struct {
 	AnnualRate float64
 	Volatility float64
@@ -429,10 +403,7 @@ type VolatileRateParams struct {
 	Provider string
 }
 
-// VolatileRateInputOf scans an amount descriptor for volatile provider
-// inputs in sorted input-name order and returns the sampling parameters.
-// Providers opt in via volatileParams; malformed arguments report
-// found=false here while ValidateAmountDescriptor reports them.
+// VolatileRateInputOf returns sampling parameters for volatile provider inputs.
 func VolatileRateInputOf(amount types.TransactionAmountResolution) (params VolatileRateParams, found bool) {
 	names := make([]string, 0, len(amount.Inputs))
 	for name := range amount.Inputs {
@@ -481,6 +452,23 @@ func CountVolatileRateInputs(amount types.TransactionAmountResolution) int {
 		}
 	}
 	return count
+}
+
+// AmountRequiresReplayState reports whether a descriptor reads replay-time state.
+func AmountRequiresReplayState(amount types.TransactionAmountResolution) bool {
+	for _, binding := range amount.Inputs {
+		if binding.Source == "literal" {
+			continue
+		}
+		if binding.Source != "provider" {
+			return true
+		}
+		def, ok := amountProviders[binding.Provider]
+		if !ok || !def.stateless {
+			return true
+		}
+	}
+	return false
 }
 
 type resolverDefinition struct {
@@ -603,10 +591,7 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 	return nil
 }
 
-// ValidateAmountDescriptor validates an amount descriptor and returns transaction
-// dependencies for cycle detection. Resolvers and providers come from the
-// registry; RegisterAmountResolver/RegisterAmountProvider extend it without
-// touching this function.
+// ValidateAmountDescriptor validates a descriptor and returns dependencies.
 func ValidateAmountDescriptor(amount types.TransactionAmountResolution, references *AmountReferenceContext) ([]string, error) {
 	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {

@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"time"
@@ -18,16 +17,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Unified build and read orchestration. One canonical state per user owns
-// yearly slices, generated rows, statistics, and evaluation outputs.
-// Builds compute the full window directly and rewrite only the invalid
-// suffix. Readers assemble responses from stored rows without recomputing.
-//
-// Slice validity is revision-scoped: rows are valid when their built
-// revision equals the state revision. The dirty date scopes the rewrite:
-// prefix slices are adopted onto the new revision, suffix slices rebuild.
-// Deterministic builds never touch statistics; stochastic builds rewrite
-// statistics wholesale because bands are only valid as a complete set.
+// Unified build and read orchestration: one canonical state per user.
+// Slice validity is revision-scoped; the dirty date scopes the rewrite.
 
 const unifiedEngineVersion = "v1"
 
@@ -183,18 +174,13 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 		}
 		return s.persistEvaluationFingerprint(state, evalJSON)
 	}
-	preprocessed := domain.RecurrencePreprocessor(model)
-	path, base, err := domain.BaselineEngine(model, settings, types.ModelOverrides{})
+	path, base, err := domain.ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		return err
 	}
 	result := *base
 	result.Evaluations = domain.EvaluateProjectionPath(path, settings, nil)
-	log.Printf("deterministic build rules=%d stochastic=%d", len(preprocessed.Deterministic), len(preprocessed.Stochastic))
-	// The computation above can take seconds while a model write is free to
-	// land on another connection. Writing that stale result would publish
-	// rows and outputs for a revision nobody asked for, so re-check the
-	// state right before persisting and let the request fall back instead.
+	// Re-check the state before persisting: a concurrent model write wins.
 	currentState, err := s.store.GetProjectionState()
 	if err != nil {
 		return err
@@ -257,10 +243,7 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 	return err
 }
 
-// persistEvaluationFingerprint records the evaluated revision only while it
-// is still the stored revision. A newer model write wins: the build reports
-// an error and its caller falls back to direct computation, and the next
-// request rebuilds against the current inputs.
+// persistEvaluationFingerprint records the revision only while it is still stored.
 func (s *handler) persistEvaluationFingerprint(state types.ProjectionState, evalJSON string) error {
 	ok, err := s.store.SaveDeterministicEvaluations(state.ID, state.Revision, evalJSON)
 	if err != nil {
@@ -285,9 +268,7 @@ func currentRevision(slices []types.ProjectionSlice, revision int64) bool {
 	return true
 }
 
-// outputsSatisfy reports whether stored outputs cover the requested tables
-// at the revision. It delegates to the assembler so the check and the read
-// load the tables once instead of twice.
+// outputsSatisfy reports whether stored outputs cover the tables at the revision.
 func (s *handler) outputsSatisfy(stateID, kind string, tables *types.EvaluationTables, revision int64) (bool, error) {
 	_, served, err := s.assembleEvaluations(stateID, kind, tables, revision)
 	return served, err
@@ -511,6 +492,16 @@ func baseFromEnvelope(stateID, kind string, envelope types.EvaluationResultEnvel
 	}, nil
 }
 
+// assignReachedDate copies a deterministic reached flag plus optional first date.
+func assignReachedDate(reached **bool, firstDate **string, detReached bool, detFirstDate *string) {
+	reachedCopy := detReached
+	*reached = &reachedCopy
+	if detFirstDate != nil {
+		date := *detFirstDate
+		*firstDate = &date
+	}
+}
+
 func (s *handler) writeThresholdOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
 	outputs := make([]types.NetWorthThresholdOutput, 0, len(rows))
 	for i, envelope := range rows {
@@ -524,12 +515,7 @@ func (s *handler) writeThresholdOutputs(stateID, kind string, rows []types.Evalu
 			if err != nil {
 				return err
 			}
-			reached := det.Reached
-			output.Reached = &reached
-			if det.FirstReachedDate != nil {
-				date := *det.FirstReachedDate
-				output.FirstReachedDate = &date
-			}
+			assignReachedDate(&output.Reached, &output.FirstReachedDate, det.Reached, det.FirstReachedDate)
 		}
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[domain.NetWorthThresholdProbabilisticResult](envelope.Probabilistic)
@@ -559,12 +545,7 @@ func (s *handler) writeBalanceOutputs(stateID, kind string, rows []types.Evaluat
 			if err != nil {
 				return err
 			}
-			reached := det.Reached
-			output.Reached = &reached
-			if det.FirstReachedDate != nil {
-				date := *det.FirstReachedDate
-				output.FirstReachedDate = &date
-			}
+			assignReachedDate(&output.Reached, &output.FirstReachedDate, det.Reached, det.FirstReachedDate)
 		}
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[domain.AccountBalanceProbabilisticResult](envelope.Probabilistic)
@@ -839,9 +820,6 @@ func (s *handler) writeWhatIfOutputs(stateID, kind string, rows []types.Evaluati
 }
 
 // assembleEvaluations rebuilds result tables from stored typed rows.
-// Every map matches its ToJSON shape key for key so served bytes equal
-// computed bytes. Verbatim JSON carries variable-length evidence through
-// byte-identical.
 func (s *handler) assembleEvaluations(stateID, kind string, tables *types.EvaluationTables, revision int64) (types.EvaluationResultTables, bool, error) {
 	empty := types.EvaluationResultTables{
 		FinancialIndependence:  []types.EvaluationResultEnvelope{},
@@ -1280,8 +1258,6 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 }
 
 // writeNetWorthStatistics persists portfolio bands per projected date.
-// History dates replay live in the reader, so only dates at or after the
-// projection start persist.
 func (s *handler) writeNetWorthStatistics(slices []types.ProjectionSlice, samples map[string][]float64, runCount int, projectionStart string) error {
 	if len(slices) == 0 {
 		return fmt.Errorf("no slices for statistics")

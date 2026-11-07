@@ -7,30 +7,26 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestRecurrencePreprocessor(t *testing.T) {
-	model := &types.FinancialModel{
-		Schedules: []types.Schedule{
-			{ID: "fixed", Amount: types.TransactionAmountResolution{Inputs: map[string]types.AmountInputBinding{}}},
-			{ID: "volatile", Amount: types.TransactionAmountResolution{Inputs: map[string]types.AmountInputBinding{
-				"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07, "volatility": 0.12}},
-			}}},
-			{ID: "flat-rate", Amount: types.TransactionAmountResolution{Inputs: map[string]types.AmountInputBinding{
-				"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07}},
-			}}},
-		},
+func TestVolatileRateInputOf(t *testing.T) {
+	fixed := types.TransactionAmountResolution{Inputs: map[string]types.AmountInputBinding{}}
+	if _, found := VolatileRateInputOf(fixed); found {
+		t.Fatalf("fixed amount should not be volatile")
 	}
-	got := RecurrencePreprocessor(model)
-	if got.ByRule["volatile"] != RuleBehaviorStochastic {
-		t.Fatalf("volatile rule should be stochastic, got %s", got.ByRule["volatile"])
+	volatile := types.TransactionAmountResolution{Inputs: map[string]types.AmountInputBinding{
+		"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07, "volatility": 0.12}},
+	}}
+	params, found := VolatileRateInputOf(volatile)
+	if !found {
+		t.Fatalf("volatile amount should be found")
 	}
-	if got.ByRule["fixed"] != RuleBehaviorDeterministic {
-		t.Fatalf("fixed rule should be deterministic, got %s", got.ByRule["fixed"])
+	if params.Volatility != 0.12 || params.AnnualRate != 0.07 {
+		t.Fatalf("volatile params mismatch: %+v", params)
 	}
-	if got.ByRule["flat-rate"] != RuleBehaviorDeterministic {
-		t.Fatalf("flat rate without volatility should be deterministic, got %s", got.ByRule["flat-rate"])
-	}
-	if len(got.Stochastic) != 1 || got.Stochastic[0] != "volatile" {
-		t.Fatalf("stochastic list mismatch: %v", got.Stochastic)
+	flatRate := types.TransactionAmountResolution{Inputs: map[string]types.AmountInputBinding{
+		"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07}},
+	}}
+	if _, found := VolatileRateInputOf(flatRate); found {
+		t.Fatalf("flat rate without volatility should not be volatile")
 	}
 }
 

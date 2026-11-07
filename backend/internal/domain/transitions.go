@@ -133,10 +133,7 @@ func (t *TransitionRuntime) observeTransaction(transactionID string, realizedAmo
 	byYear[year] += realizedAmount
 }
 
-// observeLossTransaction records a loss realization for dependent amount
-// resolution without touching the annual-cap ledger. Losses are balance
-// adjustments: they must neither consume nor inflate cap headroom, so only
-// the latest realized amount carries the (negative) value.
+// observeLossTransaction records a loss realization without touching the cap ledger.
 func (t *TransitionRuntime) observeLossTransaction(transactionID string, realizedAmount float64) {
 	t.State.LatestRealizedTransactionAmounts[transactionID] = realizedAmount
 }
@@ -151,21 +148,10 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResul
 }
 
 // ExecuteTransaction executes one occurrence through the shared transitions.
-// Amount work and simulation work are separate phases: PrepareTransactionExecution
-// calculates the request from snapshots without touching runtime state, and
-// ApplyPreparedExecution resolves it against constraints, applies it, and
-// records the outcome. The historicalActual policy is explicit, not a second
-// codepath: confirmed historical actuals move their recorded amount without
-// hypothetical funding clamps (history describes what moved), while modeled
-// rules and all forecast requests retain funding constraints. Annual caps
-// still apply to rule instances; one-time actuals carry no cap.
 func (t *TransitionRuntime) ExecuteTransaction(occurrence DatedTransactionOccurrence, date string, historicalActual bool) (TransactionExecutionTransition, error) {
 	transaction := occurrence.Transaction
 	var sampledRate *float64
-	// Sampling is coordinator-owned: volatile amounts look up their
-	// transaction's pre-sampled annual rate for this projection year.
-	// Providers never draw RNG; a missing entry for a volatile transaction
-	// is a preparation defect, not a fresh draw.
+	// Sampling is coordinator-owned; a missing entry is a preparation defect.
 	if _, volatile := VolatileRateInputOf(transaction.Amount); volatile && t.monteCarloSample != nil {
 		yearIndex := ProjectionYearIndex(t.projectionStart, date)
 		rates, ok := t.monteCarloSample.AnnualRatesByTransactionID[transaction.ID]
@@ -196,6 +182,3 @@ func (t *TransitionRuntime) ExecuteGeneratedTransaction(action AccountTransactio
 	})
 	return transition, nil
 }
-
-// AccountByID exposes the bound account index to evaluations.
-func (t *TransitionRuntime) AccountByID() map[string]types.Account { return t.accountByID }

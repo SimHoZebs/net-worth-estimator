@@ -8,11 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Time-bounded financial flow graph (VIS-01). Pure aggregation over dated
-// transaction events plus balance-check corrections: no simulation, no
-// transfer matching, no thresholds. Transfer matching stays with VIS-03;
-// this builder counts structurally-declared transfers once from their
-// transaction routes.
+// Time-bounded financial flow graph (VIS-01): pure aggregation over dated events.
 
 // flowEdgeKey groups one directed movement class.
 type flowEdgeKey struct {
@@ -22,25 +18,9 @@ type flowEdgeKey struct {
 	movement string
 }
 
-// settledHistoryEvents replays in-window settled transactions as actual
-// movements. The projection emits transaction events only for occurrences
-// after its start date, so settled history would otherwise never reach
-// the graph: the replay moves balances but records no events. Each
-// settled transaction becomes one synthetic event carrying its resolved
-// amount with no account deltas, so the classification below routes it
-// through the same structural paths as event-driven actuals (external to
-// first destination for inflows, source to external for outflows, source
-// to first destination for transfers: one listing per transaction however
-// many accounts it names).
-//
-// Membership mirrors execution: enabled rows only. An enabled pending row
-// counts like a posted one; the Pending flag itself is never a filter.
-// Void rows are excluded, deleted rows are absent from the model, and
-// zero or unresolvable amounts are skipped. Transactions that already
-// produced an in-window event (dated after the projection start) are
-// skipped by (transaction, date) so they count exactly once. Rule templates
-// in the resolved listing stay event-driven: only manual transactions
-// synthesize.
+// settledHistoryEvents replays in-window settled transactions as actual movements.
+// The projection emits no events for settled history, so each becomes one synthetic event.
+// Only manual transactions synthesize; rule templates stay event-driven.
 func settledHistoryEvents(model *types.FinancialModel, transactions []types.Transaction, ruleIDs map[string]bool, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) []types.TransactionEvent {
 	covered := make(map[string]bool, len(events))
 	nextSequence := 0
@@ -106,19 +86,7 @@ func settledHistoryEvents(model *types.FinancialModel, transactions []types.Tran
 	return synthesized
 }
 
-// BuildFlowGraph aggregates in-window transaction events plus settled
-// transactions replayed as actual movements (see settledHistoryEvents) into
-// directed account/counterparty edges. events and rows must already be
-// clipped to [startDate, endDate]; the builder trusts that clip and
-// reports the window it was given. model is the effective model the
-// events were simulated from: routes, account names, and checkpoints all
-// come from it.
-//
-// Unmatched events (origin unknown to the model) leave the edge set and
-// land in Unmatched. Corrections on the given rows land in Unobserved.
-// Totals reconcile edge sums against event sums; Reconciled is false when
-// any class disagrees, and the disagreement stays visible instead of
-// being absorbed.
+// BuildFlowGraph aggregates windowed events into directed edges.
 func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) (*types.FlowGraph, error) {
 	if !IsValidIsoDate(startDate) || !IsValidIsoDate(endDate) {
 		return nil, fmt.Errorf("flow window dates must be YYYY-MM-DD")
@@ -181,8 +149,7 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 			fromNode.Outflow = roundCurrency(fromNode.Outflow + amount)
 			toNode.Inflow = roundCurrency(toNode.Inflow + amount)
 		} else {
-			// Signed amounts keep their structural route: a negative flow
-			// reduces both ends instead of flipping direction.
+			// Negative flows keep their route instead of flipping direction.
 			fromNode.Inflow = roundCurrency(fromNode.Inflow - amount)
 			toNode.Outflow = roundCurrency(toNode.Outflow - amount)
 		}
@@ -266,9 +233,7 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 				}
 			}
 		default:
-			// A transaction with neither source nor destinations moves no
-			// money. Validation rejects it, so reaching here means the
-			// model changed under the events: report, never absorb.
+			// A transaction with neither source nor destinations moves no money.
 			reconciliation.UnmatchedEvents++
 			totals.Unmatched = roundCurrency(totals.Unmatched + realized)
 			graph.Unmatched = append(graph.Unmatched, types.FlowUnmatchedEvent{
@@ -353,9 +318,7 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 		graph.Unobserved = []types.FlowUnobservedCorrection{}
 	}
 
-	// Coverage: an enabled account is observed when a checkpoint exists at
-	// or before the window end. Anything else starts the window with
-	// unobserved state, so its flow is partial.
+	// Coverage: an enabled account is observed when a checkpoint exists at or before window end.
 	windowEndInstant := dayCloseUnix(endDate)
 	observedByAccount := map[string]bool{}
 	for _, checkpoint := range model.Checkpoints {
