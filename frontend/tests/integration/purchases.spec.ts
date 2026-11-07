@@ -53,6 +53,68 @@ test("planned purchases has a navigation entry, direct route, and browser histor
 	).toBeVisible();
 });
 
+test("purchase dates load in place and cached dates survive navigation", async ({
+	page,
+}) => {
+	await openPurchases(page);
+	await addPurchase(page, "Desk", "400");
+	await expect(page.getByText("Calculating date", { exact: true })).toHaveCount(
+		0,
+	);
+	let release = () => {};
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let calculations = 0;
+	await page.route("**/v1/projections/deterministic", async (route) => {
+		calculations++;
+		await gate;
+		await route.continue();
+	});
+	await page.reload();
+	const planner = page.getByRole("region", {
+		name: "Planned purchases",
+		exact: true,
+	});
+	await expect(
+		planner.getByRole("heading", { name: "Planned purchases" }),
+	).toHaveCount(0);
+	await expect(
+		planner.getByText("Calculating date", { exact: true }),
+	).toBeVisible();
+	await expect(planner.getByText(/not yet dated/)).toHaveCount(0);
+	await expect(page.getByText(/Updating projection/)).toHaveCount(0);
+	const add = page.getByRole("button", { name: "Add purchase", exact: true });
+	const before = await add.boundingBox();
+	await page.getByRole("tab", { name: "Schedule", exact: true }).click();
+	await expect(
+		planner.getByRole("heading", { name: "Calculating dates…" }),
+	).toBeVisible();
+	await expect(planner.getByText("Not yet dated", { exact: true })).toHaveCount(
+		0,
+	);
+	release();
+	await expect(
+		planner.getByText("Calculating date", { exact: true }),
+	).toHaveCount(0);
+	await expect(
+		planner.getByRole("heading", { name: "Calculating dates…" }),
+	).toHaveCount(0);
+	await expect(planner.getByText(/\d+ dated/)).toBeVisible();
+	expect((await add.boundingBox())?.y).toBe(before?.y);
+	const completed = calculations;
+	await page.getByRole("link", { name: "Transactions", exact: true }).click();
+	await expect(page).toHaveURL(/\/transactions$/);
+	await page
+		.getByRole("link", { name: "Planned purchases", exact: true })
+		.click();
+	await expect(planner.getByText(/\d+ dated/)).toBeVisible();
+	await expect(
+		planner.getByText("Calculating date", { exact: true }),
+	).toHaveCount(0);
+	expect(calculations).toBe(completed);
+});
+
 for (const reducedMotion of ["reduce", "no-preference"] as const) {
 	test(`a dirty purchase form stays visible until discard is confirmed (${reducedMotion})`, async ({
 		page,

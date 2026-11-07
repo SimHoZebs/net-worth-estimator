@@ -40,6 +40,7 @@ export function PurchaseScheduleView({
 	const groups: DateGroup[] = [...dates]
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([date, entries]) => ({ date, items: entries }));
+	const pending = waiting.some((item) => item.outcome.kind === "pending");
 	return (
 		<section aria-label="Purchase schedule" className="space-y-4">
 			<p className="text-xs text-muted">
@@ -90,11 +91,13 @@ export function PurchaseScheduleView({
 						<Clock3 size={14} />
 					</div>
 					<div className="min-w-0">
-						<h3 className="text-sm font-semibold text-ink">Not yet dated</h3>
+						<h3 className="text-sm font-semibold text-ink">
+							{pending ? "Calculating dates…" : "Not yet dated"}
+						</h3>
 						<p className="mt-1 text-xs text-muted">
-							No calculated date before {dateLabel(forecastEnd, true)}, or
-							evaluation is pending. This does not mean the purchase is
-							impossible.
+							{pending
+								? "Finding the earliest financially safe dates for your purchases."
+								: `No calculated date before ${dateLabel(forecastEnd, true)}. This does not mean the purchase is impossible.`}
 						</p>
 						<ol
 							className="m-0 mt-2 list-none rounded-surface border border-line bg-surface px-2"

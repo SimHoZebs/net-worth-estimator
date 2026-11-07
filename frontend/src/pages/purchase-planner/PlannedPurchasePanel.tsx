@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
-import { ProjectionUpdating } from "../../components/ProjectionUpdating.tsx";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
 import {
@@ -46,10 +45,7 @@ export function PlannedPurchasePanel() {
 	const [removing, setRemoving] = useState(false);
 	const [removeError, setRemoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
-	// Saved rows hydrate after the header. Render the header with a
-	// loading slot instead of hiding the whole planner behind a
-	// skeleton. Empty arrays while loading would read as a false
-	// empty state, so pass loading through.
+	// Keep saved rows visible while their dates are calculated.
 	const savedPending = !accounts || !purchases || !startDate;
 	const items = toPurchaseViewItems({
 		purchases: purchases ?? [],
@@ -86,7 +82,6 @@ export function PlannedPurchasePanel() {
 
 	return (
 		<>
-			{projection.loading && base && <ProjectionUpdating />}
 			<PurchasePlanner
 				items={items}
 				forecastEnd={end}

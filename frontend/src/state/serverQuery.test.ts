@@ -8,6 +8,7 @@ import {
 	clearResourceQueryCache,
 	cancelResourceQueries,
 	deterministicQueryKey,
+	evalOverlayQueryKey,
 	resetServerQueryCache,
 	serverQueryClient,
 	sessionQueryKey,
@@ -40,6 +41,7 @@ describe("resource-scoped projection cache", () => {
 		owner("users/a");
 		const keys = [
 			deterministicQueryKey("doc", 10),
+			evalOverlayQueryKey("doc", "purchases", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
 			currentPositionQueryKey("doc", "2026-01-01"),
 		];
@@ -50,6 +52,7 @@ describe("resource-scoped projection cache", () => {
 		owner("users/b");
 		for (const queryKey of [
 			deterministicQueryKey("doc", 10),
+			evalOverlayQueryKey("doc", "purchases", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
 			currentPositionQueryKey("doc", "2026-01-01"),
 		])
@@ -60,6 +63,7 @@ describe("resource-scoped projection cache", () => {
 		const client = serverQueryClient();
 		for (const queryKey of [
 			deterministicQueryKey("doc", 10),
+			evalOverlayQueryKey("doc", "purchases", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
 			currentPositionQueryKey("doc", "2026-01-01"),
 		]) {

@@ -115,6 +115,20 @@ afterEach(() => {
 });
 
 describe("PlannedPurchasePanel", () => {
+	it("shows saved rows and date-local loading without a duplicate heading", () => {
+		renderPanel();
+		expect(
+			screen.queryByRole("heading", { name: "Planned purchases" }),
+		).toBeNull();
+		expect(
+			screen.getByRole("button", { name: "Inspect laptop, priority 1" }),
+		).toBeTruthy();
+		expect(screen.getAllByText("Calculating date")).toHaveLength(2);
+		expect(screen.getByText("Calculating dates…")).toBeTruthy();
+		expect(screen.queryByText(/not yet dated/)).toBeNull();
+		expect(screen.queryByText(/Updating projection/)).toBeNull();
+	});
+
 	it("moves a row and announces the persisted priority", async () => {
 		mockedMove.mockResolvedValue({
 			ok: true,

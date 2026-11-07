@@ -2,6 +2,7 @@ import { Plus, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/Button.tsx";
 import { EmptyState } from "../../components/EmptyState.tsx";
+import { Skeleton } from "../../components/Skeleton.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
 import { money } from "../../domain/format.ts";
 import type {
@@ -31,6 +32,7 @@ export function PurchasePlanner({
 		items.find((item) => item.purchase.id === selectedId) ?? null;
 	const included = items.filter((item) => item.purchase.enabled);
 	const dated = included.filter((item) => item.outcome.kind === "scheduled");
+	const pending = included.some((item) => item.outcome.kind === "pending");
 	const total = included.reduce((sum, item) => sum + item.purchase.amount, 0);
 	const inspect = (purchase: PurchaseViewItem["purchase"]) =>
 		setSelectedId(purchase.id);
@@ -50,12 +52,7 @@ export function PurchasePlanner({
 			aria-label="Planned purchases"
 			className="@container/wish-list w-full max-w-3xl"
 		>
-			<div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-				<div>
-					<h2 className="my-2 text-2xl tracking-tight text-ink">
-						Planned purchases
-					</h2>
-				</div>
+			<div className="mb-5 flex justify-end">
 				{actions.onAdd && (
 					<Button
 						variant="primary"
@@ -68,7 +65,15 @@ export function PurchasePlanner({
 				)}
 			</div>
 			{loading ? (
-				<p role="status">Loading planned purchases…</p>
+				<div
+					className="space-y-5"
+					aria-label="Loading planned purchases"
+					aria-busy="true"
+				>
+					<Skeleton className="h-16" label="Loading purchase totals" />
+					<Skeleton className="h-10 w-48" label="Loading purchase views" />
+					<Skeleton className="h-24" label="Loading purchases" />
+				</div>
 			) : items.length === 0 ? (
 				<EmptyState
 					icon={ShoppingBag}
@@ -82,10 +87,14 @@ export function PurchasePlanner({
 							{money(total)}
 						</strong>
 						<span className="text-muted">{included.length} included</span>
-						<span className="text-success-text">{dated.length} dated</span>
-						<span className="text-muted">
-							{included.length - dated.length} not yet dated
+						<span className="text-success-text">
+							{pending ? "Calculating dates…" : `${dated.length} dated`}
 						</span>
+						{!pending && (
+							<span className="text-muted">
+								{included.length - dated.length} not yet dated
+							</span>
+						)}
 					</div>
 					<Tabs<View>
 						items={[

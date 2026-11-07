@@ -83,6 +83,7 @@ export function currentPositionQueryKey(
 
 const FINANCIAL_QUERY_KINDS = [
 	"deterministic-projection",
+	"deterministic-eval-overlay",
 	"stochastic-projection",
 	"current-position",
 	"settle-candidates",
