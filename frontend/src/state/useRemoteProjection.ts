@@ -630,7 +630,6 @@ function useProjectionSource(enabled: boolean): {
 		};
 	}, [
 		active,
-		scope,
 		status.error,
 		status.data,
 		rowError,

@@ -209,7 +209,9 @@ export function workspaceIsBusy() {
  * Explicit refreshes retain Query's last good data. A save completes before a
  * refresh starts. `waitForWrites: false` is for a refresh already running
  * inside the guarded write, whose own mutation would otherwise deadlock it.
- * Returns whether the scoped status fetch succeeded.
+ * Returns whether the status and projection rows fetched. Only presets
+ * and catalog stay best-effort: the projection reads the six rows, so
+ * a failed row must leave the stamp unapplied for retry.
  */
 export async function reloadWorkspace(
 	options: { waitForWrites?: boolean } = {},
@@ -242,7 +244,10 @@ export async function reloadWorkspace(
 		cache.fetchQuery(checkpointsOptions(scope)),
 		cache.fetchQuery(purchasesOptions(scope)),
 	]);
-	const allOk = results.every((result) => result.status === "fulfilled");
+	const requiredIdx = [0, 2, 4, 5, 6, 7, 8] as const;
+	const requiredOk = requiredIdx.every(
+		(index) => results[index]?.status === "fulfilled",
+	);
 	const statusOk = results[0]?.status === "fulfilled";
 	if (scope === getUserScope() && statusOk) {
 		// A successful explicit reload resets a temporary permission guard.
@@ -256,7 +261,7 @@ export async function reloadWorkspace(
 			)
 				cache.getMutationCache().remove(mutation);
 	}
-	return allOk && scope === getUserScope();
+	return requiredOk && scope === getUserScope();
 }
 
 export interface AccountBalances {

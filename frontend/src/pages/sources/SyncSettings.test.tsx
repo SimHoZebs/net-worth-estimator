@@ -322,6 +322,7 @@ function stubApi(state: {
 			);
 		}
 		if (path === "/v1/status") {
+			record();
 			await state.holdStatus;
 			return new Response(
 				JSON.stringify(
@@ -395,6 +396,20 @@ function stubApi(state: {
 				record();
 				return new Response(
 					JSON.stringify({ checkpoints: [], revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+			if (path.startsWith("/v1/schedules")) {
+				record();
+				return new Response(
+					JSON.stringify({ schedules: [], revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+			if (path.startsWith("/v1/planned-purchases")) {
+				record();
+				return new Response(
+					JSON.stringify({ plannedPurchases: [], revision: "test" }),
 					{ headers: jsonHeaders() },
 				);
 			}
@@ -1032,7 +1047,7 @@ it("reports a throttled sync through the toast", async () => {
 	expect(screen.queryByText(/Could not sync now/)).toBeNull();
 	// A failed trigger refreshes nothing.
 	expect(
-		requests.some((request) => request.path === "/v1/financial-model"),
+		requests.some((request) => request.path === "/v1/checkpoints"),
 	).toBe(false);
 });
 
@@ -1059,7 +1074,7 @@ it("refreshes the workspace after a successful manual sync", async () => {
 	// scheduled monitor to notice the already-refreshed status.
 	await waitFor(() => {
 		expect(
-			requests.some((request) => request.path === "/v1/financial-model"),
+			requests.some((request) => request.path === "/v1/checkpoints"),
 		).toBe(true);
 	});
 });
@@ -1080,7 +1095,7 @@ it("awaits the manual status refresh before applying its sync stamp", async () =
 		configured: true,
 		lastSyncAt: "before",
 	};
-	const requests = stubApi(state);
+	stubApi(state);
 	render(<SyncSettings />);
 	await screen.findByText(/19 out of 24 syncs available/);
 	let finishStatus!: () => void;
@@ -1094,9 +1109,7 @@ it("awaits the manual status refresh before applying its sync stamp", async () =
 			serverQueryClient().isFetching({ queryKey: userResourceKey("status") }),
 		).toBe(1),
 	);
-	expect(
-		requests.some((request) => request.path === "/v1/financial-model"),
-	).toBe(false);
+	expect(getAppliedSyncStamp(getUserScope())).not.toBe("after");
 	finishStatus();
 	await waitFor(() =>
 		expect(screen.getByRole("status").textContent).toMatch(/Sync complete/),

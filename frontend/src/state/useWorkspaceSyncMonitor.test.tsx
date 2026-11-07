@@ -31,6 +31,14 @@ function stubSync(lastSyncAt = "after") {
 	const fetcher = vi.fn(async (url: unknown, _init?: RequestInit) => {
 		const path = String(url);
 		if (path.endsWith("/v1/status")) return ok({ ...status, lastSyncAt });
+		if (path.includes("/accounts/balances")) return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
+		if (path.startsWith("/v1/checkpoints")) return ok({ checkpoints: [], revision: "r1" });
+		if (path.startsWith("/v1/schedules")) return ok({ schedules: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions/catalog")) return ok({ items: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions")) return ok({ transactions: [], revision: "r1" });
+		if (path.includes("/evaluations/summary")) return ok({ evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], transactionFulfillment: [], cycleFulfillment: [], plannedPurchases: [] }, revision: "r1" });
+		if (path.includes("/amount-presets")) return ok({ presets: [] });
+		if (path.includes("/planned-purchases")) return ok({ plannedPurchases: [], revision: "r1" });
 		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -40,12 +48,6 @@ function stubSync(lastSyncAt = "after") {
 function statusFetches(fetcher: ReturnType<typeof vi.fn>) {
 	return fetcher.mock.calls.filter(([url]) =>
 		String(url).endsWith("/v1/status"),
-	);
-}
-
-function modelFetches(fetcher: ReturnType<typeof vi.fn>) {
-	return fetcher.mock.calls.filter(([url]) =>
-		String(url).endsWith("/v1/financial-model"),
 	);
 }
 
@@ -64,7 +66,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-it("refreshes the model and invalidates only the current resource's financial calculations", async () => {
+it("refreshes the workspace rows and invalidates only the current resource's financial calculations", async () => {
 	const fetcher = stubSync();
 	const key = deterministicQueryKey("model", 10);
 	serverQueryClient().setQueryData(key, "result");
@@ -73,7 +75,14 @@ it("refreshes the model and invalidates only the current resource's financial ca
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	await waitFor(() => expect(modelFetches(fetcher)).toHaveLength(1));
+	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(1));
+	await waitFor(() =>
+		expect(
+			fetcher.mock.calls.filter(([url]) =>
+				String(url).startsWith("/v1/checkpoints"),
+			),
+		).toHaveLength(1),
+	);
 	expect(serverQueryClient().getQueryState(key)?.isInvalidated).toBe(true);
 	expect(serverQueryClient().getQueryState(["unrelated"])?.isInvalidated).toBe(
 		false,
@@ -97,25 +106,36 @@ it("does not reload after an explicit sync refresh already applied the stamp", a
 		window.dispatchEvent(new Event("online"));
 	});
 	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(2));
-	expect(modelFetches(fetcher)).toHaveLength(0);
+	expect(
+		fetcher.mock.calls.filter(([url]) =>
+			String(url).startsWith("/v1/checkpoints"),
+		),
+	).toHaveLength(0);
 	expect(serverQueryClient().getQueryState(key)?.isInvalidated).toBe(false);
 	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
 });
 
-it("retries a sync whose model reload failed", async () => {
-	let modelCalls = 0;
+it("retries a sync whose workspace reload failed", async () => {
+	let checkpointCalls = 0;
 	const fetcher = vi.fn(async (url: unknown) => {
 		const path = String(url);
-		if (path.endsWith("/v1/status"))
-			return ok({ ...status, lastSyncAt: "after" });
-		if (path.endsWith("/v1/financial-model")) {
-			modelCalls += 1;
-			if (modelCalls === 1)
+		if (path.endsWith("/v1/status")) return ok({ ...status, lastSyncAt: "after" });
+		if (path.includes("/accounts/balances")) return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
+		if (path.startsWith("/v1/checkpoints")) {
+			checkpointCalls += 1;
+			if (checkpointCalls === 1)
 				return new Response(JSON.stringify({ detail: "boom" }), {
 					status: 500,
 					headers: { "content-type": "application/json" },
 				});
+			return ok({ checkpoints: [], revision: "r1" });
 		}
+		if (path.startsWith("/v1/schedules")) return ok({ schedules: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions/catalog")) return ok({ items: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions")) return ok({ transactions: [], revision: "r1" });
+		if (path.includes("/evaluations/summary")) return ok({ evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], transactionFulfillment: [], cycleFulfillment: [], plannedPurchases: [] }, revision: "r1" });
+		if (path.includes("/amount-presets")) return ok({ presets: [] });
+		if (path.includes("/planned-purchases")) return ok({ plannedPurchases: [], revision: "r1" });
 		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -125,16 +145,16 @@ it("retries a sync whose model reload failed", async () => {
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	// The status moved but the model reload failed: the stamp stays unapplied
-	// and the financial calculation is left alone for the retry.
-	await waitFor(() => expect(modelCalls).toBe(1));
+	// Status succeeded; the required checkpoints row failed during reload.
+	// The stamp stays unapplied and the calculation is left alone for retry.
+	await waitFor(() => expect(checkpointCalls).toBe(1));
 	await waitFor(() => expect(serverQueryClient().isFetching()).toBe(0));
 	expect(getAppliedSyncStamp(getUserScope())).toBe("before");
 	expect(serverQueryClient().getQueryState(key)?.isInvalidated).toBe(false);
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	await waitFor(() => expect(modelCalls).toBe(2));
+	await waitFor(() => expect(checkpointCalls).toBe(2));
 	await waitFor(() =>
 		expect(getAppliedSyncStamp(getUserScope())).toBe("after"),
 	);
@@ -154,6 +174,14 @@ it("retains a detected sync while the workspace is busy", async () => {
 			if (statusCalls === 1) return statusGate;
 			return ok({ ...status, lastSyncAt: "after" });
 		}
+		if (path.includes("/accounts/balances")) return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
+		if (path.startsWith("/v1/checkpoints")) return ok({ checkpoints: [], revision: "r1" });
+		if (path.startsWith("/v1/schedules")) return ok({ schedules: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions/catalog")) return ok({ items: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions")) return ok({ transactions: [], revision: "r1" });
+		if (path.includes("/evaluations/summary")) return ok({ evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], transactionFulfillment: [], cycleFulfillment: [], plannedPurchases: [] }, revision: "r1" });
+		if (path.includes("/amount-presets")) return ok({ presets: [] });
+		if (path.includes("/planned-purchases")) return ok({ plannedPurchases: [], revision: "r1" });
 		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -186,13 +214,24 @@ it("retains a detected sync while the workspace is busy", async () => {
 		).toBe("after"),
 	);
 	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(1));
-	expect(modelFetches(fetcher)).toHaveLength(0);
+	expect(
+		fetcher.mock.calls.filter(([url]) =>
+			String(url).startsWith("/v1/checkpoints"),
+		),
+	).toHaveLength(0);
 	finish();
 	await pending;
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	await waitFor(() => expect(modelFetches(fetcher)).toHaveLength(1));
+	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(2));
+	await waitFor(() =>
+		expect(
+			fetcher.mock.calls.filter(([url]) =>
+				String(url).startsWith("/v1/checkpoints"),
+			),
+		).toHaveLength(1),
+	);
 });
 
 it("follows a user switch without a caller rerender", async () => {
@@ -259,14 +298,18 @@ it("re-arms the poll after a user switch", async () => {
 	rendered.unmount();
 });
 
-it("does not reload an unchanged model", async () => {
+it("does not reload an unchanged workspace", async () => {
 	const fetcher = stubSync("before");
 	renderHook(() => useWorkspaceSyncMonitor(true));
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
 	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(1));
-	expect(modelFetches(fetcher)).toHaveLength(0);
+	expect(
+		fetcher.mock.calls.filter(([url]) =>
+			String(url).startsWith("/v1/checkpoints"),
+		),
+	).toHaveLength(0);
 });
 
 it("does not poll while Query owns a pending model mutation", async () => {

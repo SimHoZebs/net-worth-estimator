@@ -162,9 +162,7 @@ export async function refreshPurchases(): Promise<void> {
 	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// A reload failure propagates: performSave reports "saved but not
 	// reloaded" instead of claiming success on stale data.
-	await Promise.all([
-		cache.fetchQuery(purchasesOptions(scope)),
-	]);
+	await cache.fetchQuery(purchasesOptions(scope));
 }
 
 /**
