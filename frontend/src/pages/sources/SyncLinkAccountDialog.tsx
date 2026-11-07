@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AccountToggle } from "../../components/AccountToggle.tsx";
 import { Button } from "../../components/Button.tsx";
 import { dialogActionsStyles } from "../../components/dialogStyles.ts";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { FieldError } from "../../components/ErrorNotice.tsx";
 import { Modal } from "../../components/Modal.tsx";
 import { Notice } from "../../components/Notice.tsx";
 import type { Account } from "../../domain/model.ts";
@@ -49,11 +49,7 @@ export function SyncLinkAccountDialog({
 			if (ok) onLinked(selected);
 		} catch (cause) {
 			setBusy(false);
-			setError(
-				cause instanceof Error
-					? cause.message
-					: "The accounts could not be linked. Try again.",
-			);
+			setError(cause instanceof Error ? cause.message : "Linking failed.");
 		}
 	}
 
@@ -106,7 +102,7 @@ export function SyncLinkAccountDialog({
 					synced account, including its imported bank history.
 				</p>
 			</Notice>
-			<ErrorNotice reserve message={error} />
+			<FieldError message={error} />
 			<div className={dialogActionsStyles}>
 				<Button
 					type="button"

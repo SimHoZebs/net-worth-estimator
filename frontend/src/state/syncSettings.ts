@@ -49,26 +49,13 @@ function credentialOptions(scope = getUserScope()) {
 		queryKey: syncCredentialKey(scope),
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
-			try {
-				const data: SyncCredentialBody = (await getSyncCredential({ signal }))
-					.data;
-				current(scope, signal);
-				dismissKey("sync-credential");
-				return data;
-			} catch (error) {
-				if (scope === getUserScope() && !signal.aborted)
-					notifyError(
-						"sync-credential",
-						error instanceof Error
-							? error.message
-							: "The sync connection could not be loaded.",
-						{
-							label: "Reload sync",
-							onAction: () => void refreshSyncSettings(true),
-						},
-					);
-				throw error;
-			}
+			// The bank sync panel owns load failures inline. The query stays
+			// silent so one failure keeps one place to find.
+			const data: SyncCredentialBody = (await getSyncCredential({ signal }))
+				.data;
+			current(scope, signal);
+			dismissKey("sync-credential");
+			return data;
 		},
 	};
 }
@@ -78,25 +65,10 @@ function linksOptions(scope = getUserScope()) {
 		queryKey: syncLinksKey(scope),
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
-			try {
-				const data = (await listAccountLinks({ signal })).data;
-				current(scope, signal);
-				dismissKey("sync-links");
-				return (data.links ?? []) as AccountLink[];
-			} catch (error) {
-				if (scope === getUserScope() && !signal.aborted)
-					notifyError(
-						"sync-links",
-						error instanceof Error
-							? error.message
-							: "The linked accounts could not be loaded.",
-						{
-							label: "Reload links",
-							onAction: () => void refreshSyncSettings(true),
-						},
-					);
-				throw error;
-			}
+			const data = (await listAccountLinks({ signal })).data;
+			current(scope, signal);
+			dismissKey("sync-links");
+			return (data.links ?? []) as AccountLink[];
 		},
 	};
 }
@@ -152,7 +124,7 @@ export async function refreshSyncSettings(force = false): Promise<void> {
 async function runMutation<T>(
 	key: readonly unknown[],
 	mutationFn: () => Promise<T>,
-	notice: string,
+	notice: string | null,
 ): Promise<T | null> {
 	const scope = getUserScope();
 	if (scope.status === "pending") return null;
@@ -171,7 +143,7 @@ async function runMutation<T>(
 		if (scope !== getUserScope()) return null;
 		return result as T;
 	} catch (error) {
-		if (scope === getUserScope())
+		if (notice && scope === getUserScope())
 			notifyError(
 				notice,
 				error instanceof Error ? error.message : "The sync request failed.",
@@ -194,10 +166,11 @@ export async function connectSyncKey(input: {
 	accessUrl?: string;
 }): Promise<boolean> {
 	const scope = getUserScope();
+	// A null notice keeps connect failures in the token field error.
 	const updated = await runMutation<SyncCredentialBody>(
 		syncCredentialKey(scope),
 		async () => (await connectSyncCredential(input)).data,
-		"sync-credential",
+		null,
 	);
 	if (!updated) return false;
 	await settleMutation(syncCredentialKey(scope), updated);
@@ -223,7 +196,7 @@ export async function disconnectSyncKey(): Promise<boolean> {
 // triggerSyncNow runs one manual Bridge sync. Server guards apply: a recent
 // trigger or post-429 blackout returns 429, a concurrent run returns 409,
 // and a missing credential returns 503. Failures surface the server message
-// through the shared error notice; success explicitly refreshes links,
+// through the toast. success explicitly refreshes links,
 // status, the workspace, and this scope's financial queries before completing.
 // The workspace refresh is explicit because the status refresh lands the new
 // lastSyncAt in the shared cache before the scheduled monitor polls, so the
@@ -271,6 +244,8 @@ export async function supersedeSyncedAccount(
 			await refreshSyncSettings(true);
 		},
 		failureMessage: "The accounts could not be linked.",
+		// The native dialog blocks toasts. It owns failures inline.
+		suppressToast: true,
 		onRejected,
 	});
 }

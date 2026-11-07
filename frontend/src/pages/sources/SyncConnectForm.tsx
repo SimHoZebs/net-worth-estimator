@@ -35,9 +35,7 @@ export function SyncConnectForm({
 			setToken("");
 			onConnected();
 		} else {
-			setError(
-				"Could not connect. Copy the entire setup token from SimpleFIN and try again. If the problem continues, create a new app connection in SimpleFIN.",
-			);
+			setError("Connection failed.");
 		}
 	}
 
@@ -97,7 +95,9 @@ export function SyncConnectForm({
 				</Button>
 			</div>
 			<p className="mt-3 mb-0 min-h-[2lh] text-xs leading-relaxed text-muted">
-				{busy ? "Keep this page open while Waypoint connects to SimpleFIN." : null}
+				{busy
+					? "Keep this page open while Waypoint connects to SimpleFIN."
+					: null}
 			</p>
 		</form>
 	);

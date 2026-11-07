@@ -6,8 +6,10 @@ Error feedback must not insert a banner above existing controls.
 
 | Surface | Presentation | Reason |
 | --- | --- | --- |
-| Editors, confirmation dialogs, sharing forms, receipt review, analysis actions, source connections | Always-mounted reserved `ErrorNotice` | The error stays near the failed action. Native modal dialogs make workspace toasts inert. |
-| Setup token, transaction category, independence configuration, session recovery | Always-mounted `FieldError` | Compact feedback preserves control positions and field description targets. |
+| Editors, confirmation dialogs, sharing forms, receipt review, analysis actions | Always-mounted reserved `ErrorNotice` | The error stays near the failed action. Native modal dialogs make workspace toasts inert. |
+| Setup token, transaction category, independence configuration, session recovery, link account dialog | Always-mounted `FieldError` | Compact feedback preserves control positions and field description targets. |
+| Bank sync page actions (sync now, disconnect) | Workspace error toast only | One event keeps one place to find. The toast floats and needs no reserved box. Inline banners duplicated the toast with guessed text. |
+| Bank sync loads (credential, status, linked accounts) | Local replacement state | The affected content cannot render. Keep its error and retry local, rather than hide a blocking failure in a toast. Do not also toast the same failure. |
 | Evaluation removal and purchase reordering | Existing workspace error toast only | `performSave` already reports failures. A second banner adds duplicate feedback and shifts the page. |
 | Additive load failures in groups, shared feed, flows, account details, sync status, receipts, and analysis | Reserved feedback | Refetch failure must not push existing content down. |
 | Receipt image failure | Error replaces the image placeholder | A separate banner below the image shifts the image actions. |

@@ -42,7 +42,6 @@ export function SyncProviderPanel() {
 	const readOnly = useUserReadOnly();
 	const [busy, setBusy] = useState(false);
 	const [syncing, setSyncing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [reconnecting, setReconnecting] = useState(false);
@@ -129,35 +128,31 @@ export function SyncProviderPanel() {
 
 	async function handleSyncNow() {
 		setSyncing(true);
-		setError(null);
 		setMessage("");
 		const ok = await triggerSyncNow();
 		setSyncing(false);
+		// Failures reach the toast from the sync mutation. The panel never
+		// mirrors them inline so one event keeps one place to find.
 		if (ok) setMessage("Sync complete.");
-		else
-			setError(
-				"Could not sync now. Check the connection in SimpleFIN. If you recently synced or reached a request limit, wait before you try again.",
-			);
 	}
 
 	async function handleDisconnect() {
 		setBusy(true);
-		setError(null);
 		setMessage("");
 		const ok = await disconnectSyncKey();
 		setBusy(false);
 		setConfirmingDisconnect(false);
+		// Failures reach the toast from the sync mutation.
 		if (ok) {
 			claimSyncFocus("connect");
 			setMessage(
 				"SimpleFIN disconnected. Your accounts and imported history are kept.",
 			);
-		} else setError("Could not disconnect. Try again.");
+		}
 	}
 
 	function handleReconnected() {
 		setReconnecting(false);
-		setError(null);
 		setMessage("SimpleFIN reconnected.");
 	}
 
@@ -189,7 +184,6 @@ export function SyncProviderPanel() {
 			>
 				{message}
 			</p>
-			<ErrorNotice reserve message={error} />
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{configured ? (
@@ -234,16 +228,13 @@ export function SyncProviderPanel() {
 										.
 									</p>
 								</div>
-								<ErrorNotice
-									reserve
-									message={
-										status.isError
-											? "The sync status could not be loaded."
-											: null
-									}
-									action="Reload status"
-									onAction={() => void status.refetch()}
-								/>
+								{status.isError && (
+									<ErrorNotice
+										message="The sync status could not be loaded."
+										action="Reload status"
+										onAction={() => void status.refetch()}
+									/>
+								)}
 								{status.data?.syncError && (
 									<Notice tone="warning" className="mb-4">
 										<p className="m-0 text-sm leading-relaxed">
@@ -290,7 +281,6 @@ export function SyncProviderPanel() {
 							</div>
 							<SyncConnectedAccounts
 								onLinked={(linkedMessage) => {
-									setError(null);
 									setMessage(linkedMessage);
 								}}
 							/>

@@ -20,6 +20,10 @@ import {
 	resetSyncSettingsClient,
 } from "../../state/syncSettings.ts";
 import {
+	resetNotifications,
+	useNotifications,
+} from "../../state/notifications.ts";
+import {
 	getAppliedSyncStamp,
 	resetSyncWorkspaceRefresh,
 } from "../../state/syncWorkspaceRefresh.ts";
@@ -420,11 +424,13 @@ function stubApi(state: {
 beforeEach(() => {
 	setupQueryScope();
 	resetSyncWorkspaceRefresh();
+	resetNotifications();
 });
 
 afterEach(() => {
 	teardownQueryScope();
 	resetSyncSettingsClient();
+	resetNotifications();
 	resetSyncWorkspaceRefresh();
 	vi.restoreAllMocks();
 });
@@ -881,9 +887,7 @@ it("shows an error when the token is rejected", async () => {
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	expect(await screen.findByRole("alert")).toBeTruthy();
-	expect(screen.getByRole("alert").textContent).toMatch(
-		/Copy the entire setup token from SimpleFIN/,
-	);
+	expect(screen.getByRole("alert").textContent).toMatch(/Connection failed\./);
 	expect(
 		screen.getByLabelText("Setup token").getAttribute("aria-invalid"),
 	).toBe("true");
@@ -1013,13 +1017,19 @@ it("syncs now through the Sync now button", async () => {
 	expect(screen.getByRole("button", { name: "Sync now" })).toBeTruthy();
 });
 
-it("shows an inline error when sync is throttled", async () => {
+it("reports a throttled sync through the toast", async () => {
 	const requests = stubApi({ configured: true, links: [], throttled: true });
 	render(<SyncSettings />);
 	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
-	expect(
-		await screen.findByText(/Could not sync now\. Check the connection/),
-	).toBeTruthy();
+	await waitFor(() =>
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.message.includes("sync ran recently")),
+		).toBe(true),
+	);
+	// One event, one channel: no inline banner mirrors the toast.
+	expect(screen.queryByText(/Could not sync now/)).toBeNull();
 	// A failed trigger refreshes nothing.
 	expect(
 		requests.some((request) => request.path === "/v1/financial-model"),

@@ -92,6 +92,11 @@ export async function performSave(options: {
 	 * false, so an open dialog can show it inline.
 	 */
 	onRejected?: (message: string) => void;
+	/**
+	 * Skips the toast for write failures. An open native dialog owns those
+	 * errors inline because the dialog blocks toasts.
+	 */
+	suppressToast?: boolean;
 }): Promise<boolean> {
 	const scope = getUserScope();
 	if (workspaceIsBusy()) {
@@ -117,7 +122,7 @@ export async function performSave(options: {
 				if (scope === getUserScope()) {
 					await (options.recover ?? options.refresh)().catch(() => {});
 					if (scope === getUserScope()) {
-						notifyError("workspace", message);
+						if (!options.suppressToast) notifyError("workspace", message);
 						options.onRejected?.(message);
 					}
 				}
@@ -130,7 +135,7 @@ export async function performSave(options: {
 			if (rejection) {
 				await (options.recover ?? options.refresh)().catch(() => {});
 				if (scope === getUserScope()) {
-					notifyError("workspace", rejection);
+					if (!options.suppressToast) notifyError("workspace", rejection);
 					options.onRejected?.(rejection);
 				}
 				throw new Error(rejection);
