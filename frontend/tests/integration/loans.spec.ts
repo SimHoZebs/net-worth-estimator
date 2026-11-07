@@ -128,10 +128,7 @@ test("one loan form creates one visible account and preserves terms on edit", as
 			exact: true,
 		})
 		.click();
-	const details = page.getByRole("dialog", {
-		name: "Education loan",
-		exact: true,
-	});
+	const details = page.getByRole("region", { name: "Account details" });
 	await expect(details.getByLabel("Account name")).toHaveAttribute(
 		"readonly",
 		"",
@@ -148,10 +145,7 @@ test("one loan form creates one visible account and preserves terms on edit", as
 		details.getByRole("button", { name: "Edit loan and payment terms" }),
 	).toBeEnabled();
 	expect(adjustmentRequests).toEqual([]);
-	await page.keyboard.press("Escape");
-	await page
-		.getByRole("button", { name: "Edit Education loan", exact: true })
-		.click();
+	await details.getByRole("button", { name: "Edit loan and payment terms" }).click();
 	const edit = page.getByRole("dialog", {
 		name: "Edit Education loan",
 		exact: true,
@@ -164,12 +158,6 @@ test("one loan form creates one visible account and preserves terms on edit", as
 		await (await request.get(`${FIXTURE_API}/v1/financial-model`)).json()
 	).model;
 	expect(after.checkpoints).toEqual(saved.checkpoints);
-	await page
-		.getByRole("button", {
-			name: "Open Education loan transactions",
-			exact: true,
-		})
-		.click();
 	await details.getByRole("tab", { name: "Account details" }).click();
 	await expect(
 		details.getByText("$12,000.00", { exact: true }).first(),
@@ -177,7 +165,10 @@ test("one loan form creates one visible account and preserves terms on edit", as
 	await expect(
 		details.getByText("$237.54", { exact: true }).first(),
 	).toBeVisible();
-	await page.keyboard.press("Escape");
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	await page
 		.getByRole("button", { name: "Remove Education loan", exact: true })
 		.click();

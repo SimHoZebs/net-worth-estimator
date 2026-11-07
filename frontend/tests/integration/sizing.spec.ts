@@ -140,7 +140,7 @@ test("outlook summary keeps full width on a narrow phone", async ({ page }) => {
 	}
 });
 
-test("account sheet controls remain usable across responsive resizes", async ({
+test("account detail controls remain usable across responsive resizes", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 320, height: 900 });
@@ -152,11 +152,17 @@ test("account sheet controls remain usable across responsive resizes", async ({
 	await expect(sheet).toBeVisible();
 	for (const width of [320, 768, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
-		await expectWithinViewport(sheet, page);
+		const box = (await sheet.boundingBox())!;
+		const viewport = page.viewportSize()!;
+		// The detail is a scrollable page, not a viewport-height sheet, so
+		// only horizontal containment applies here.
+		expect(box.x).toBeGreaterThanOrEqual(0);
+		expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
 		await expect(sheet.getByLabel("Transaction source")).toBeVisible();
 		await expect(sheet.getByRole("button", { name: "Accounts" })).toBeVisible();
 	}
 	await sheet.getByRole("button", { name: "Accounts" }).click();
+	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(sheet).not.toBeVisible();
 });
 

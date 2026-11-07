@@ -34,10 +34,7 @@ async function openBNPL(page: Page) {
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
-	const activity = page.getByRole("dialog", {
-		name: "Everyday checking",
-		exact: true,
-	});
+	const activity = page.getByRole("region", { name: "Account details" });
 	await activity
 		.getByRole("searchbox", { name: "Search account transactions" })
 		.fill("Klarna");

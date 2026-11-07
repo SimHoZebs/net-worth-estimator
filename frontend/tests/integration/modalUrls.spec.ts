@@ -115,7 +115,7 @@ test("unknown pages retain their address and offer navigation while root opens O
 	});
 	await page.goBack();
 	await expect(page).toHaveURL(/\/transactions$/);
-	await page.goto("/accounts/no-such-subpage");
+	await page.goto("/accounts/no-such-subpage/extra");
 	await expect(
 		page.getByRole("region", { name: "Page not found" }),
 	).toBeVisible();
@@ -162,7 +162,7 @@ test("an editor copied to a fresh page preserves its detail destination", async 
 		.click();
 	await expect(page).toHaveURL(/\/accounts$/);
 	await page.goBack();
-	await expect(page).toHaveURL(/\/transactions$/);
+	await expect(page).toHaveURL(/\/accounts\/home$/);
 });
 
 test("account links keep their identity after renames and duplicate names", async ({
@@ -278,7 +278,7 @@ test("history restores an editor on the account detail without leaking it to a n
 	await page.keyboard.press("Escape");
 	await expect(page).toHaveURL(/\/accounts$/);
 	await page.goBack();
-	await expect(page).toHaveURL(/\/transactions$/);
+	await expect(page).toHaveURL(/\/accounts\/home$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 

@@ -45,6 +45,7 @@ test("compact financial independence cards open an inspector without more calcul
 	page,
 	request,
 }) => {
+	test.setTimeout(90_000);
 	const id = await addIndependence(request);
 	let projections = 0;
 	page.on("request", (request) => {

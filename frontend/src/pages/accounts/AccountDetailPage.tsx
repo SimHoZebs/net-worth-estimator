@@ -159,7 +159,10 @@ export function AccountDetailView({
 		[accountRules, transactions, account, startDate],
 	);
 	return (
-		<section aria-label="Account details" className="grid gap-6">
+		<section
+			aria-label="Account details"
+			className="grid min-w-0 gap-6 [&>*]:min-w-0"
+		>
 			<nav aria-label="Breadcrumb">
 				<ol className="m-0 flex list-none flex-wrap items-center gap-2 p-0 text-sm">
 					<li>
@@ -225,7 +228,7 @@ export function AccountDetailView({
 				onChange={setView}
 				label="Account view"
 				className="my-4 max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-0"
-				panelClassName="flex flex-col gap-4"
+				panelClassName="flex min-w-0 flex-col gap-4"
 			>
 				{view === "transactions" ? (
 					<>
