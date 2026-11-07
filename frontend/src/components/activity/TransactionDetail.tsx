@@ -335,49 +335,6 @@ function MoreOptions({
 								</Select>
 							</div>
 						</div>
-						<div className={detailPropertyRowClassName}>
-							<span className={rowLabel}>Bank state</span>
-							<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:gap-4">
-								<label htmlFor={`${id}-pending`} className="inline-flex items-center gap-2 text-sm">
-									<Checkbox
-										id={`${id}-pending`}
-										checked={draft.pending}
-										disabled={locked || !savedTransaction.pending}
-										onChange={(event) =>
-											updateDraft(
-												{
-													pending: event.target.checked,
-													enabled: event.target.checked
-														? draft.enabled
-														: true,
-												},
-												"schedule",
-											)
-										}
-									/>
-									Pending
-								</label>
-								<label htmlFor={`${id}-void`} className="inline-flex items-center gap-2 text-sm">
-									<Checkbox
-										id={`${id}-void`}
-										checked={draft.void}
-										disabled={locked || !savedTransaction.void}
-										onChange={(event) =>
-											updateDraft(
-												{
-													void: event.target.checked,
-													enabled: event.target.checked
-														? draft.enabled
-														: true,
-												},
-												"schedule",
-											)
-										}
-									/>
-									Void (did not post)
-								</label>
-							</div>
-						</div>
 					</>
 				)}
 			</div>
@@ -1773,8 +1730,16 @@ export function TransactionDetail({
 					postedLocked={!canEdit}
 					onClose={() => setDatesOpen(false)}
 					onApply={(occurredDate, postedDate) => {
+						const wasLifecycle = edit.draft.pending || edit.draft.void;
+						const settles = wasLifecycle && postedDate.trim() !== "";
 						edit.updateDraft(
-							{ startDate: occurredDate, postedDate },
+							{
+								startDate: occurredDate,
+								postedDate,
+								pending: settles ? false : edit.draft.pending,
+								void: settles ? false : edit.draft.void,
+								enabled: settles ? true : edit.draft.enabled,
+							},
 							"schedule",
 						);
 						setDatesOpen(false);

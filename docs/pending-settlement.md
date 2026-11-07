@@ -60,26 +60,22 @@ happened when the transaction happened: recorded rows display and sort by
 their own day, and the claim only suppresses the guessed occurrence in
 projections. Pending rows accept claims and owner edits while their other values stay editable: the claim lives outside the synced columns, and the pending-to-posted
 convert keeps the same row id.
-The owner may also clear pending or void directly to settle or restore a hold.
-Clear-only is enforced: the owner cannot set pending or void, and a settled
-row never becomes pending or void by an owner write. Clearing pending or void
-promotes the row to settled enabled with the bank transaction instant as the
-posted instant when missing. Owner clearing without a claim is ephemeral
-while the bank still reports the same pending key; the next sync refresh
+The owner may also settle or restore a hold by setting a posted date in the dates modal, which promotes the row to settled enabled with that posted instant. There is no manual void; void is a sync-only concept. Clear-only is enforced from the sync side: the owner cannot set pending or void, and a settled
+row never becomes pending or void by an owner write. Not having a posted date is the only indicator of not being posted. Setting a posted date while the bank still reports the same pending key is ephemeral; the next sync refresh
 restores bank truth.
 
 Owner lifecycle transition matrix (bank rows only):
 
 | From | Owner action | Result |
 | --- | --- | --- |
-| Settled | Clear pending/void (already false) | No-op |
 | Settled | Set pending/void true | Ignored, remains settled |
-| Pending | Clear pending | Settled enabled |
+| Settled | Change dates | Enabled stays as stored |
+| Pending | Set a posted date | Settled enabled with that posted date |
 | Pending | Set void true | Ignored |
-| Void | Clear void | Settled enabled |
+| Void | Set a posted date | Settled enabled with that posted date |
 | Void | Set pending true | Ignored |
 
-Void rows are editable and may be restored the same way by clearing void.
+Void rows are editable and may be restored the same way by setting a posted date.
 
 Claiming clears pending, enables the row so it participates, and promotes
 the posted time from the bank's transaction instant. Pending seeds carry no

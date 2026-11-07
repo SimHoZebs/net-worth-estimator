@@ -1398,7 +1398,9 @@ it("opens a small modal from the occurred date to edit both dates", async () => 
 	expect(screen.getByRole("button", { name: /Nov 1, 2026/ })).toBeTruthy();
 });
 
-it("keeps the posted date disabled in the modal while pending", async () => {
+it("lets the posted date settle a pending row", async () => {
+	const server = stubTestServer();
+	setServerModelFixture(financialModelFixture);
 	const savedTransaction = {
 		...financialModelFixture.transactions.find(
 			(item) => item.id === "renovation",
@@ -1408,6 +1410,7 @@ it("keeps the posted date disabled in the modal while pending", async () => {
 		startDate: "2026-10-20",
 		postedDate: null,
 		readOnly: false,
+		enabled: false,
 		pending: true,
 	};
 	render(
@@ -1425,8 +1428,37 @@ it("keeps the posted date disabled in the modal while pending", async () => {
 	});
 	expect(
 		(within(dialog).getByLabelText("Posted") as HTMLInputElement).disabled,
-	).toBe(true);
+	).toBe(false);
 	expect(within(dialog).getByText(/Not yet posted/)).toBeTruthy();
+	fireEvent.change(within(dialog).getByLabelText("Posted"), {
+		target: { value: "2026-10-21" },
+	});
+	fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+	await waitFor(() =>
+		expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy(),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "POST" &&
+					call.url === "/v1/transactions/date-modal-pending/amend",
+			),
+		).toBe(true),
+	);
+	const body = server.calls.find(
+		(call) =>
+			call.method === "POST" &&
+			call.url === "/v1/transactions/date-modal-pending/amend",
+	)?.body as Record<string, unknown>;
+	expect(body).toEqual(
+		expect.objectContaining({
+			postedDate: "2026-10-21",
+			pending: false,
+			enabled: true,
+		}),
+	);
 });
 
 it("ends a schedule by recording one transaction", async () => {

@@ -33,18 +33,16 @@ export function TransactionDateModal({
 	const [postedDate, setPostedDate] = useState(posted);
 	const [error, setError] = useState<string | null>(null);
 	const locked = postedLocked;
-	const valid =
-		occurredDate.trim() !== "" && (pending || postedDate.trim() !== "");
 	const apply = () => {
-		if (!valid) {
-			setError(
-				pending
-					? "Choose the occurred date."
-					: "Choose both the occurred date and the posted date.",
-			);
+		if (occurredDate.trim() === "") {
+			setError("Choose the occurred date.");
 			return;
 		}
-		onApply(occurredDate, pending ? "" : postedDate);
+		if (!pending && postedDate.trim() === "") {
+			setError("Choose the posted date.");
+			return;
+		}
+		onApply(occurredDate, postedDate);
 	};
 	return (
 		<Modal
@@ -73,13 +71,13 @@ export function TransactionDateModal({
 					label="Posted"
 					hint={
 						pending
-							? "Not yet posted — posts later."
+							? "Not yet posted — set a date to mark as posted."
 							: "The day the bank posted the transaction."
 					}
 					type="date"
-					required={!pending}
+					required={false}
 					value={postedDate}
-					disabled={locked || pending}
+					disabled={locked}
 					onChange={(event) => {
 						setPostedDate(event.target.value);
 						setError(null);
