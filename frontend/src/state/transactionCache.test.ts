@@ -3,22 +3,64 @@ import { acceptTestResource } from "../mocks/resource.ts";
 import { setServerModelOnly } from "../mocks/workspace.ts";
 import { resetServerQueryCache, serverQueryClient } from "./serverQuery.ts";
 import { transactionRemovalNeedsProjectionRefresh } from "./transactionCache.ts";
-import { type ServerModel, userResourceKey } from "./workspaceResources.ts";
+import {
+	type EvaluationSummary,
+	userResourceKey,
+} from "./workspaceResources.ts";
 
 beforeEach(() => {
 	acceptTestResource();
 	resetServerQueryCache();
 });
 
-function editCachedModel(
-	edit: (model: NonNullable<ServerModel["model"]>) => void,
+function editCachedEvaluations(
+	edit: (evaluations: EvaluationSummary["evaluations"]) => void,
 ) {
-	const key = userResourceKey("model");
-	const cached = serverQueryClient().getQueryData<ServerModel>(key);
-	if (!cached?.model) throw new Error("The test model is missing.");
-	const model = structuredClone(cached.model);
-	edit(model);
-	serverQueryClient().setQueryData(key, { ...cached, model });
+	const key = userResourceKey("eval-summary");
+	const cached = serverQueryClient().getQueryData<EvaluationSummary>(key);
+	if (!cached) throw new Error("The test summary is missing.");
+	const evaluations = structuredClone(cached.evaluations);
+	edit(evaluations);
+	serverQueryClient().setQueryData(key, { ...cached, evaluations });
+}
+
+function editCachedRows(edit: (rows: {
+	checkpoints: { AccountId: string; Balance: number; observedAt: number }[];
+	schedules: { id: string }[];
+	transactions: { id: string }[];
+}) => void) {
+	const checkpointsKey = [...userResourceKey("checkpoints"), "", "", ""];
+	const schedulesKey = [...userResourceKey("rules"), ""];
+	const transactionsKey = [...userResourceKey("transactions"), ""];
+	const cachedCheckpoints = serverQueryClient().getQueryData<{
+		checkpoints: { AccountId: string; Balance: number; observedAt: number }[];
+	}>(checkpointsKey);
+	const cachedSchedules = serverQueryClient().getQueryData<{
+		schedules: { id: string }[];
+	}>(schedulesKey);
+	const cachedTransactions = serverQueryClient().getQueryData<{
+		transactions: { id: string }[];
+	}>(transactionsKey);
+	if (!cachedCheckpoints || !cachedSchedules || !cachedTransactions)
+		throw new Error("The test rows are missing.");
+	const copy = structuredClone({
+		checkpoints: cachedCheckpoints.checkpoints,
+		schedules: cachedSchedules.schedules,
+		transactions: cachedTransactions.transactions,
+	});
+	edit(copy);
+	serverQueryClient().setQueryData(checkpointsKey, {
+		...cachedCheckpoints,
+		checkpoints: copy.checkpoints,
+	});
+	serverQueryClient().setQueryData(schedulesKey, {
+		...cachedSchedules,
+		schedules: copy.schedules,
+	});
+	serverQueryClient().setQueryData(transactionsKey, {
+		...cachedTransactions,
+		transactions: copy.transactions,
+	});
 }
 
 it("leaves projections alone when no consumer names the transaction", () => {
@@ -28,8 +70,8 @@ it("leaves projections alone when no consumer names the transaction", () => {
 
 it("refreshes projections when a fulfillment evaluation names the transaction", () => {
 	setServerModelOnly();
-	editCachedModel((model) => {
-		model.evaluations.transactionFulfillment = [
+	editCachedEvaluations((evaluations) => {
+		evaluations.transactionFulfillment = [
 			{
 				instanceId: "fulfillment",
 				name: "Fulfillment",
@@ -43,8 +85,8 @@ it("refreshes projections when a fulfillment evaluation names the transaction", 
 
 it("refreshes projections when a financial independence source names the transaction", () => {
 	setServerModelOnly();
-	editCachedModel((model) => {
-		model.evaluations.financialIndependence = [
+	editCachedEvaluations((evaluations) => {
+		evaluations.financialIndependence = [
 			{
 				instanceId: "independence",
 				name: "Independence",
@@ -67,8 +109,8 @@ it("refreshes projections when a financial independence source names the transac
 
 it("refreshes projections when a what-if scenario names the transaction", () => {
 	setServerModelOnly();
-	editCachedModel((model) => {
-		model.evaluations.whatIf = [
+	editCachedEvaluations((evaluations) => {
+		evaluations.whatIf = [
 			{
 				instanceId: "scenario",
 				name: "Scenario",
@@ -82,8 +124,8 @@ it("refreshes projections when a what-if scenario names the transaction", () => 
 
 it("refreshes projections when continuing transactions name the transaction", () => {
 	setServerModelOnly();
-	editCachedModel((model) => {
-		model.evaluations.financialIndependence = [
+	editCachedEvaluations((evaluations) => {
+		evaluations.financialIndependence = [
 			{
 				instanceId: "independence",
 				name: "Independence",
@@ -100,8 +142,8 @@ it("refreshes projections when continuing transactions name the transaction", ()
 
 it("refreshes projections when a what-if addition names the transaction", () => {
 	setServerModelOnly();
-	editCachedModel((model) => {
-		model.evaluations.whatIf = [
+	editCachedEvaluations((evaluations) => {
+		evaluations.whatIf = [
 			{
 				instanceId: "scenario",
 				name: "Scenario",
@@ -118,10 +160,10 @@ it("refreshes projections when a what-if addition names the transaction", () => 
 
 it("refreshes projections when the transaction supplies the start date", () => {
 	setServerModelOnly();
-	editCachedModel((model) => {
-		model.checkpoints = [];
-		model.schedules = [];
-		model.transactions = [{ ...model.transactions[0]!, id: "vanished-hold" }];
+	editCachedRows((rows) => {
+		rows.checkpoints = [];
+		rows.schedules = [];
+		rows.transactions = [{ ...rows.transactions[0]!, id: "vanished-hold" }];
 	});
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);
 });

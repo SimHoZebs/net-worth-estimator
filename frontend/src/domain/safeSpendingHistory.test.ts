@@ -32,27 +32,8 @@ const posted = (overrides: Partial<Transaction>): Transaction => ({
 	...overrides,
 });
 
-const schedule = (overrides: Partial<Schedule>): Schedule => ({
-	id: "salary",
-	name: "Salary",
-	sourceAccountId: "gross_pay",
-	destinations: ["checking"],
-	amount: {
-		resolver: "expression",
-		config: { expression: "7000" },
-		inputs: {},
-	},
-	frequency: "monthly",
-	startDate: "2026-01-01",
-	endDate: null,
-	annualCap: null,
-	priority: 1,
-	enabled: true,
-	...overrides,
-});
-
 describe("safeSpendingResults", () => {
-	it("maps a posted paycheck to the selected income source", () => {
+	it("keeps a posted paycheck under its own id without an explicit claim", () => {
 		const results = safeSpendingResults({
 			transactions: [
 				posted({
@@ -62,22 +43,6 @@ describe("safeSpendingResults", () => {
 					toId: "checking",
 				}),
 			],
-			rules: [
-				{
-					...posted({}),
-					kind: "schedule",
-					id: "salary",
-					amount: 0,
-					fromId: "gross_pay",
-					toId: "checking",
-				},
-			],
-			schedules: [schedule({})],
-			incomeAccountIds: ["checking"],
-			incomeScheduleIds: ["salary"],
-			billScheduleIds: [],
-			billWindowStart: "2026-10-19",
-			billWindowEnd: "2026-11-30",
 			projectionTransactions: [
 				transactionFixture({
 					date: "2026-11-29",
@@ -89,8 +54,39 @@ describe("safeSpendingResults", () => {
 			],
 		});
 		expect(results.find((row) => row.date === "2026-10-30")).toMatchObject({
-			transactionId: "salary",
+			transactionId: "pay-oct",
 			requested: 7000,
+		});
+	});
+
+	it("joins a posted row only on an explicit claimScheduleId", () => {
+		const results = safeSpendingResults({
+			transactions: [
+				posted({
+					id: "pay-oct",
+					name: "Payroll",
+					amount: 7000,
+					toId: "checking",
+					claimScheduleId: "salary",
+					claimOccurrenceDate: "2026-10-30",
+				}),
+			],
+			projectionTransactions: [
+				transactionFixture({
+					date: "2026-10-30",
+					transactionId: "salary",
+					requested: 7000,
+					fromId: "gross_pay",
+					toId: "checking",
+				}),
+			],
+		});
+		const salary = results.filter((row) => row.transactionId === "salary");
+		expect(salary).toHaveLength(1);
+		expect(salary[0]).toMatchObject({
+			date: "2026-10-30",
+			requested: 7000,
+			claimed: true,
 		});
 	});
 
@@ -107,25 +103,6 @@ describe("safeSpendingResults", () => {
 					claimOccurrenceDate: "2026-11-01",
 				}),
 			],
-			rules: [],
-			schedules: [
-				schedule({
-					id: "housing",
-					name: "Housing",
-					sourceAccountId: "checking",
-					destinations: null,
-					amount: {
-						resolver: "expression",
-						config: { expression: "3200" },
-						inputs: {},
-					},
-				}),
-			],
-			incomeAccountIds: ["checking"],
-			incomeScheduleIds: [],
-			billScheduleIds: ["housing"],
-			billWindowStart: "2026-10-19",
-			billWindowEnd: "2026-11-30",
 			projectionTransactions: [
 				transactionFixture({
 					date: "2026-11-01",
@@ -164,13 +141,6 @@ describe("safeSpendingResults", () => {
 					startDate: "2026-03-06",
 				}),
 			],
-			rules: [],
-			schedules: [],
-			incomeAccountIds: ["checking"],
-			incomeScheduleIds: [],
-			billScheduleIds: [],
-			billWindowStart: "2026-03-01",
-			billWindowEnd: "2026-03-31",
 			projectionTransactions: [transactionFixture(duplicate)],
 		});
 		expect(
@@ -178,38 +148,45 @@ describe("safeSpendingResults", () => {
 		).toHaveLength(1);
 	});
 
-	it("fills a selected bill occurrence missing from posted and projected rows", () => {
+	it("does not synthesize bill occurrences the server did not project", () => {
 		const results = safeSpendingResults({
 			transactions: [],
-			rules: [],
-			schedules: [
-				schedule({
-					id: "phone",
-					name: "Phone",
-					sourceAccountId: "checking",
-					destinations: null,
-					amount: {
-						resolver: "expression",
-						config: { expression: "50" },
-						inputs: {},
-					},
-				}),
-			],
-			incomeAccountIds: ["checking"],
-			incomeScheduleIds: [],
-			billScheduleIds: ["phone"],
-			billWindowStart: "2026-10-19",
-			billWindowEnd: "2026-11-30",
 			projectionTransactions: [],
 		});
-		expect(
-			results.find(
-				(row) => row.transactionId === "phone" && row.date === "2026-11-01",
-			),
-		).toMatchObject({ requested: 50, fromId: "checking" });
+		expect(results).toEqual([]);
 	});
 
-	it("keeps unclaimed posted outflows out of bills when a projected bill represents them", () => {
+	it("synthesizes a selected bill before the projection start when server has none", () => {
+		const scheduleFixture = {
+			id: "rent",
+			name: "Rent",
+			sourceAccountId: "checking",
+			destinations: [],
+			amount: {
+				resolver: "expression",
+				config: { expression: "1500" },
+				inputs: {},
+			},
+			frequency: "monthly",
+			startDate: "2026-01-01",
+			endDate: null,
+			annualCap: null,
+			priority: 1,
+			enabled: true,
+		} as unknown as Schedule;
+		const results = safeSpendingResults({
+			transactions: [],
+			projectionTransactions: [],
+			schedules: [scheduleFixture],
+			billScheduleIds: ["rent"],
+			billWindowStart: "2026-10-01",
+			billWindowEnd: "2026-10-31",
+		});
+		expect(results.map((row) => row.date)).toContain("2026-10-01");
+		expect(results[0]?.transactionId).toBe("rent");
+	});
+
+	it("keeps every posted outflow without near-match dedupe", () => {
 		const unclaimed = transactionFixture({
 			date: "2026-11-01",
 			transactionId: "unclaimed",
@@ -241,10 +218,11 @@ describe("safeSpendingResults", () => {
 			claimed: false,
 		});
 		expect(
-			selectObligationResults([unclaimed, distinct, claimed, projected], null, [
-				"bill-rule",
-			]).map((row) => row.transactionId),
-		).toEqual(["distinct", "claimed", "bill-rule"]);
+			selectObligationResults(
+				[unclaimed, distinct, claimed, projected],
+				null,
+			).map((row) => row.transactionId),
+		).toEqual(["unclaimed", "distinct", "claimed", "bill-rule"]);
 		expect(
 			selectObligationResults(
 				[unclaimed, claimed, projected],
@@ -263,7 +241,7 @@ describe("safeSpendingResults", () => {
 			claimed: false,
 		});
 		expect(
-			selectObligationResults([actual], null, ["housing"]).map(
+			selectObligationResults([actual], null).map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["renovation"]);

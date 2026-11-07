@@ -3,7 +3,6 @@ import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture } from "../mocks/projection.ts";
 import {
 	cashCushion,
-	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
 	groupMandatorySpending,
@@ -30,12 +29,6 @@ describe("month helpers", () => {
 			start: "2027-01-01",
 			end: "2027-01-31",
 		});
-	});
-});
-
-describe("checking", () => {
-	it("prefers the checking account id", () => {
-		expect(checkingAccountId(financialModelFixture.accounts)).toBe("checking");
 	});
 });
 

@@ -3,7 +3,7 @@ import type {
 	FinancialIndependenceAnalysis,
 	FinancialIndependenceRange,
 } from "./financialIndependence.ts";
-import { clampMonth } from "./format.ts";
+import { clampMonth, utcDate } from "./format.ts";
 import type { Evaluation } from "./model.ts";
 
 export interface Point {
@@ -139,15 +139,10 @@ export function horizonDate({
 	start: string;
 	years: number;
 }) {
-	const value = new Date(`${start}T12:00:00Z`);
+	const value = utcDate(start);
 	return monthDate({
 		year: value.getUTCFullYear() + years,
 		month: value.getUTCMonth(),
 		day: value.getUTCDate(),
 	});
-}
-
-// The engine supplies current net worth.
-export function currentNetWorth(projection: Projection): number {
-	return projection.currentNetWorth;
 }

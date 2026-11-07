@@ -3,7 +3,7 @@ import { listBalanceAdjustments } from "@/api/generated/endpoints.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { useUserScope } from "./useUserScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { modelOptions, refreshAccounts } from "./workspaceResources.ts";
+import { balancesOptions, refreshAccounts } from "./workspaceResources.ts";
 
 export function accountAdjustmentsOptions(
 	accountId: string,
@@ -23,11 +23,12 @@ export function accountAdjustmentsOptions(
 
 export function useAccountAdjustments(accountId: string, enabled = true) {
 	const scope = useUserScope();
+	// The cached balances revision invalidates this query without fetching.
 	const revision = useQuery(
 		{
-			...modelOptions(scope),
+			...balancesOptions(scope),
 			enabled: false,
-			select: (model) => model.revision,
+			select: (row) => row.revision,
 		},
 		serverQueryClient(),
 	).data;

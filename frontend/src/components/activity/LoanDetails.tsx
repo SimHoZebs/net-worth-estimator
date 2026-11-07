@@ -1,6 +1,10 @@
 import type { Account } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { dateLabel, exactMoney } from "../../domain/format.ts";
+import {
+	dateLabel,
+	exactMoney,
+	isoDateFromEpochSeconds,
+} from "../../domain/format.ts";
 import { Button } from "../Button.tsx";
 
 export function LoanDetails({
@@ -33,10 +37,7 @@ export function LoanDetails({
 						{c.observedAt !== null && c.observedBalance !== null && (
 							<dd className="m-0 mt-2 text-xs text-muted">
 								Recorded {exactMoney(Math.abs(c.observedBalance))} on{" "}
-								{dateLabel(
-									new Date(c.observedAt * 1000).toISOString().slice(0, 10),
-									true,
-								)}
+								{dateLabel(isoDateFromEpochSeconds(c.observedAt), true)}
 							</dd>
 						)}
 					</div>

@@ -3,11 +3,11 @@ import { acceptTestResource } from "../mocks/resource.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
 import {
 	checkpointsOptions,
+	getAccountBalances,
 	getCheckpoints,
-	getServerModel,
-	modelOptions,
 	reloadWorkspace,
 	resolversOptions,
+	statusOptions,
 	userResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
@@ -53,27 +53,27 @@ describe("direct Query ownership", () => {
 		const server = stubTestServer();
 		server.setRevision("current");
 		const fetcher = server.fetcher;
-		const options = modelOptions();
+		const options = statusOptions();
 		await Promise.all([
 			serverQueryClient().fetchQuery(options),
 			serverQueryClient().fetchQuery(options),
 		]);
 		expect(
 			fetcher.mock.calls.filter(([url]) =>
-				String(url).endsWith("/v1/financial-model"),
+				String(url).endsWith("/v1/status"),
 			),
 		).toHaveLength(1);
-		expect(getServerModel()?.revision).toBe("current");
-		expect(getServerModel()).not.toHaveProperty("conversion");
-		expect(typeof getServerModel()?.fingerprint).toBe("string");
+		expect(serverQueryClient().getQueryData(userResourceKey("status"))).toMatchObject({
+			hasModel: true,
+		});
 	});
 	it("removes server data from the Query cache", () => {
 		setServerModelFixture();
 		serverQueryClient().removeQueries({
-			queryKey: userResourceKey("model"),
-			exact: true,
+			queryKey: userResourceKey("balances"),
+			exact: false,
 		});
-		expect(getServerModel()).toBeUndefined();
+		expect(getAccountBalances()).toBeUndefined();
 	});
 	it("lists checkpoints through the narrow query with account filters", async () => {
 		const server = stubTestServer();
@@ -103,24 +103,45 @@ describe("direct Query ownership", () => {
 		const pending = new Promise<Response>((resolve) => {
 			finish = resolve;
 		});
-		const server = stubTestServer();
-		server.setRevision("current");
-		server.holdModel(pending);
-		const options = modelOptions();
+		const headers = new Headers({ "content-type": "application/json" });
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown) => {
+				if (String(url).endsWith("/v1/status")) return pending;
+				return new Response(JSON.stringify({}), { headers });
+			}),
+		);
+		const options = statusOptions();
 		const old = serverQueryClient()
 			.fetchQuery(options)
 			.catch((error: unknown) => error);
 		await serverQueryClient().cancelQueries({ queryKey: options.queryKey });
 		expect(await old).toBeInstanceOf(Error);
+		vi.unstubAllGlobals();
+		const server = stubTestServer();
+		server.setRevision("current");
 		await serverQueryClient().fetchQuery(options);
-		finish(server.ok({ model: null, issues: [], revision: "retired" }));
+		finish(
+			new Response(
+				JSON.stringify({
+					readOnly: false,
+					hasModel: true,
+					syncConfigured: false,
+					syncQuotaUsed: 0,
+					syncQuotaLimit: 0,
+				}),
+				{ headers },
+			),
+		);
 		await Promise.resolve();
-		expect(getServerModel()?.revision).toBe("current");
+		expect(serverQueryClient().getQueryData(userResourceKey("status"))).toMatchObject({
+			hasModel: true,
+		});
 	});
-	it("reports whether the scoped model fetch succeeded", async () => {
+	it("reports whether the scoped status fetch succeeded", async () => {
 		const server = stubTestServer();
 		expect(await reloadWorkspace()).toBe(true);
-		server.failModelOnce(new Error("boom"));
+		server.failStatusOnce(new Error("boom"));
 		expect(await reloadWorkspace()).toBe(false);
 	});
 });

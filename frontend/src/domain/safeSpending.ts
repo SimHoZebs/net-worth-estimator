@@ -11,18 +11,7 @@ import {
 import type { TransactionResult } from "./result.ts";
 
 // Server ownership: every amount summed here originates server-side.
-// `transactions` are adapted `ProjectionResult.transactionEvents` (requested and
-// realized per event); `spendingBalance` reads saved account balances surfaced
-// as `ProjectionAccountSummary.startingBalance`. The Gap check
-// (`requested - realized`) is the same gap the transaction-fulfillment Goal
-// check aggregates. Income source selection lives in safeSpendingIncome.ts.
-// Only the windows stay client-side:
-// they follow user-selected accounts, bills, statement day, and reserve,
-// which have no server contract (see PRODUCT_INTENT open decisions on
-// household safe spending). Do not add new windowed sums here; derive from these.
-
-export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
-export const DEFAULT_PROTECTED_RESERVE = 725;
+// Only the windows stay client-side; do not add new windowed sums here.
 
 /** Last calendar day of the month containing `todayIso`. */
 export function monthEndIso(todayIso: string): string {
@@ -46,18 +35,6 @@ export function nextMonthRange(todayIso: string): {
 		Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0, 12, 0, 0),
 	);
 	return { start: isoDate(start), end: isoDate(end) };
-}
-
-export function checkingAccountId(accounts: Account[]): string | null {
-	const visible = accounts.filter((account) => !account.archived);
-	const byId = visible.find((account) => account.id === "checking");
-	if (byId) return byId.id;
-	const cash = visible.find(
-		(account) => account.kind === "cash" && account.enabled,
-	);
-	if (cash) return cash.id;
-	const anyCash = visible.find((account) => account.kind === "cash");
-	return anyCash?.id ?? null;
 }
 
 /**

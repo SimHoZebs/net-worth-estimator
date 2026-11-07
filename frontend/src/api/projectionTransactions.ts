@@ -1,4 +1,5 @@
 import { finite, isRecord, stringValue } from "../domain/guards.ts";
+import { isoDateFromEpochSeconds } from "../domain/format.ts";
 import type { TransactionResult } from "../domain/result.ts";
 import type { ProjectionResult } from "./contracts.ts";
 
@@ -90,12 +91,10 @@ export function projectionTransactions(
 	const start = result.milestones.projectionStartDate;
 	const startCheckpoint =
 		options?.startCheckpoint ??
-		model?.checkpoints?.some((checkpoint) => {
-			const day = new Date(checkpoint.observedAt * 1000)
-				.toISOString()
-				.slice(0, 10);
-			return day === start;
-		}) ??
+		model?.checkpoints?.some(
+			(checkpoint) =>
+				isoDateFromEpochSeconds(checkpoint.observedAt) === start,
+		) ??
 		false;
 	const sources = transactionSourceIndex(model);
 	return (result.transactionEvents ?? [])

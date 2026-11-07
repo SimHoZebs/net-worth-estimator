@@ -22,8 +22,7 @@ function isEvaluationTables(value: unknown): boolean {
 	);
 }
 
-// Import preview checks only the envelope and displayed records. The server
-// remains responsible for authoritative cross-field validation before activation.
+// Import preview checks only the envelope; the server validates cross-field rules.
 export function isFinancialModel(value: unknown): value is FinancialModel {
 	if (
 		!isRecord(value) ||

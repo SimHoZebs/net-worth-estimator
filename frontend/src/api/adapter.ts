@@ -1,5 +1,5 @@
 import type { AccountBalanceRow } from "./generated/model/accountBalanceRow.ts";
-import type { BackendPlannedPurchase, FinancialModel } from "./contracts.ts";
+import type { BackendPlannedPurchase } from "./contracts.ts";
 import { NO_CEILING_SENTINEL, NO_FLOOR_SENTINEL } from "./contracts.ts";
 import type { Account, PlannedPurchase } from "../domain/model.ts";
 
@@ -57,19 +57,6 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 			? { currency: row.currency }
 			: {}),
 	};
-}
-
-/**
- * Read standalone saved purchases. Priority orders the queue; model
- * order breaks ties. Purchases never enter the transaction stream.
- */
-export function savedPurchasesToDisplay(
-	model: FinancialModel | null | undefined,
-): PlannedPurchase[] {
-	if (!model) return [];
-	return [...(model.plannedPurchases ?? [])]
-		.sort((left, right) => left.priority - right.priority)
-		.map(plannedPurchaseRowToDisplay);
 }
 
 /**

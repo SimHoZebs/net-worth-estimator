@@ -2,10 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { FlowGraph } from "../api/flows.ts";
 import { requestFlowGraph } from "../api/flows.ts";
-import { projectionModelKey } from "./projectionKeys.ts";
-import { projectionStartDate } from "./projectionStartDate.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { useServerModel } from "./workspaceResources.ts";
+import { projectionStartDateFromRows } from "./projectionSource.ts";
+import {
+	balancesOptions,
+	checkpointsOptions,
+	evalSummaryOptions,
+	schedulesOptions,
+	transactionsOptions,
+} from "./workspaceResources.ts";
+import { normalizedEvaluations } from "./projectionSource.ts";
 import { useUserScope } from "./useUserScope.ts";
 
 export interface FlowWindow {
@@ -38,10 +44,34 @@ function flowGraphQueryKey(
  * backend queries: callers pass committed window state. */
 export function useFlowGraph(window: FlowWindow | null) {
 	const scope = useUserScope();
-	const storeModel =
-		useServerModel({ enabled: scope.status === "ready" }).data?.model ?? null;
-	const baseModel = scope.status === "ready" ? storeModel : null;
-	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
+	const active = scope.status === "ready";
+	const client = serverQueryClient();
+	const balances = useQuery({ ...balancesOptions(scope), enabled: active }, client);
+	const checkpoints = useQuery({ ...checkpointsOptions(scope), enabled: active }, client);
+	const schedules = useQuery({ ...schedulesOptions(scope), enabled: active }, client);
+	const transactions = useQuery({ ...transactionsOptions(scope), enabled: active }, client);
+	const summary = useQuery({ ...evalSummaryOptions(scope), enabled: active }, client);
+	const rowsReady =
+		active &&
+		balances.data !== undefined &&
+		checkpoints.data !== undefined &&
+		schedules.data !== undefined &&
+		transactions.data !== undefined &&
+		summary.data !== undefined;
+	const baseKey = useMemo(() => {
+		if (!rowsReady) return "pending";
+		const parts: string[] = [];
+		const take = (revision: string | null | undefined, content: unknown, name: string) => {
+			if (revision) parts.push(`${name}:${revision}`);
+			else parts.push(`${name}:${JSON.stringify(content)}`);
+		};
+		take(balances.data!.revision, balances.data!.accounts, "balances");
+		take(checkpoints.data!.revision, checkpoints.data!.checkpoints, "checkpoints");
+		take(schedules.data!.revision, schedules.data!.schedules, "schedules");
+		take(transactions.data!.revision, transactions.data!.transactions, "transactions");
+		take(summary.data!.revision, summary.data!.evaluations, "evaluations");
+		return parts.join("|");
+	}, [rowsReady, balances.data, checkpoints.data, schedules.data, transactions.data, summary.data]);
 	const startDate = window?.startDate;
 	const endDate = window?.endDate;
 	return useQuery<FlowGraph, Error>(
@@ -51,26 +81,28 @@ export function useFlowGraph(window: FlowWindow | null) {
 				endDate: endDate ?? "",
 			}),
 			enabled:
-				scope.status === "ready" &&
-				baseModel !== null &&
+				rowsReady &&
 				startDate !== undefined &&
 				endDate !== undefined &&
 				startDate !== "" &&
 				endDate !== "" &&
 				startDate <= endDate,
 			queryFn: async ({ signal }) => {
-				const model = baseModel;
-				if (!model)
+				if (!rowsReady)
 					throw new Error(
 						"No server financial model is available for money flows. Load or replace a model before calculating.",
 					);
-				const start = projectionStartDate(model);
+				const start = projectionStartDateFromRows({
+					checkpoints: checkpoints.data!.checkpoints,
+					schedules: schedules.data!.schedules,
+					transactions: transactions.data!.transactions,
+				});
 				return requestFlowGraph(
 					{
 						settings: {
 							fallbackProjectionStartDate: start,
 							horizonYears: flowHorizonYears(start, endDate!),
-							evaluations: model.evaluations,
+							evaluations: normalizedEvaluations(summary.data!.evaluations),
 						},
 						range: { startDate, endDate },
 					},

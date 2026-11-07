@@ -16,11 +16,10 @@ import { getUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import {
-	getServerModel,
 	getServerStatus,
-	modelOptions,
 	presetsOptions,
 	reloadWorkspace,
+	statusOptions,
 	workspaceIsBusy,
 	userResourceKey,
 } from "@/state/workspaceResources.ts";
@@ -231,7 +230,7 @@ export async function importServerModel(
 	model: FinancialModel,
 ): Promise<boolean> {
 	const scope = getUserScope();
-	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
+	if (serverQueryClient().isFetching({ queryKey: userResourceKey("status") })) {
 		notifyError(
 			"workspace",
 			"Wait for the current server load to finish before importing.",
@@ -240,7 +239,7 @@ export async function importServerModel(
 	}
 	return (
 		(await write("model", async () => {
-			if (getServerModel()?.model)
+			if (getServerStatus()?.hasModel)
 				throw new Error(
 					"A server model is already loaded. Use the reviewed import action in Configs.",
 				);
@@ -260,11 +259,11 @@ export async function importServerModel(
 				);
 			const cache = serverQueryClient();
 			await cache.invalidateQueries({
-				queryKey: userResourceKey("model", scope),
+				queryKey: userResourceKey("status", scope),
 				refetchType: "none",
 			});
-			const response = await cache.fetchQuery(modelOptions(scope));
-			return scope === getUserScope() && Boolean(response.model);
+			const status = await cache.fetchQuery(statusOptions(scope));
+			return scope === getUserScope() && status.hasModel === true;
 		})) === true
 	);
 }

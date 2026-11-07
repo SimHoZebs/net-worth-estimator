@@ -1,11 +1,9 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getUserScope, type UserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
-import { serverModelFingerprint } from "@/state/remoteStorage.ts";
 import { notifyError } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import {
-	getFinancialModel,
 	getAmountResolvers,
 	getServerStatus as fetchServerStatus,
 	listAccountBalances,
@@ -22,22 +20,25 @@ import type { Checkpoint } from "@/api/generated/model/checkpoint.ts";
 import type { ListCheckpointsParams } from "@/api/generated/model/listCheckpointsParams.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
+import type { AmountPreset as GeneratedAmountPreset } from "@/api/generated/model/amountPreset.ts";
+import type { EvaluationInstanceInterface } from "@/api/generated/model/evaluationInstanceInterface.ts";
+import type { PlannedPurchase as GeneratedPlannedPurchase } from "@/api/generated/model/plannedPurchase.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import {
 	type AmountPreset,
 	type BackendPlannedPurchase,
+	type EvaluationConfig,
+	type EvaluationInstance,
 	type EvaluationTables,
 	type FinancialModelResponse,
 	type ServerStatus,
 } from "@/api/index.ts";
 
-export interface ServerModel extends FinancialModelResponse {
-	fingerprint: string | null;
-}
+/** @deprecated Row queries own the workspace; this alias remains for fixture types. */
+export type ServerModel = FinancialModelResponse;
 
 export function userResourceKey(
 	kind:
-		| "model"
 		| "status"
 		| "presets"
 		| "resolvers"
@@ -76,40 +77,44 @@ export function statusOptions(scope = getUserScope()) {
 	});
 }
 
-export function modelOptions(scope = getUserScope()) {
-	return queryOptions({
-		...defaults,
-		queryKey: userResourceKey("model", scope),
-		queryFn: async ({ signal }): Promise<ServerModel> => {
-			try {
-				const result = (
-					await getFinancialModel({
-						signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-					})
-				).data as unknown as FinancialModelResponse;
-				current(scope, signal);
-				return {
-					...result,
-					fingerprint: result.model
-						? serverModelFingerprint(result.model)
-						: null,
-				};
-			} catch (error) {
-				if (scope === getUserScope() && !signal.aborted)
-					notifyError(
-						"workspace",
-						error instanceof Error
-							? error.message
-							: "The server model could not be loaded.",
-						{
-							label: "Retry server request",
-							onAction: () => void reloadWorkspace(),
-						},
-					);
-				throw error;
-			}
-		},
-	});
+/** Single normalization for a generated preset row into the display shape. */
+function normalizePreset(row: GeneratedAmountPreset): AmountPreset {
+	return {
+		id: row.id,
+		name: row.name,
+		label: row.label,
+		summary: row.summary ?? null,
+		whenUse: row.whenUse ?? null,
+		amount: row.amount as AmountPreset["amount"],
+		enabled: row.enabled,
+	};
+}
+
+/** Single normalization for a generated evaluation instance into the display shape. */
+function normalizeEvaluationInstance(
+	row: EvaluationInstanceInterface,
+): EvaluationInstance {
+	return {
+		instanceId: row.instanceId,
+		name: row.name,
+		enabled: row.enabled,
+		config: row.config as EvaluationConfig,
+	};
+}
+
+/** Single normalization for a generated planned-purchase row. */
+function normalizePurchase(
+	row: GeneratedPlannedPurchase,
+): BackendPlannedPurchase {
+	return {
+		id: row.id,
+		name: row.name,
+		fundingAccountId: row.fundingAccountId ?? null,
+		cost: row.cost,
+		earliestDate: row.earliestDate,
+		enabled: row.enabled,
+		priority: row.priority,
+	};
 }
 
 export function presetsOptions(scope = getUserScope()) {
@@ -120,7 +125,7 @@ export function presetsOptions(scope = getUserScope()) {
 			try {
 				const result = (await listAmountPresets({ signal })).data;
 				current(scope, signal);
-				return (result.presets ?? []) as unknown as AmountPreset[];
+				return (result.presets ?? []).map(normalizePreset);
 			} catch (error) {
 				if (scope === getUserScope() && !signal.aborted)
 					notifyError(
@@ -159,13 +164,6 @@ export function useAmountResolvers() {
 	);
 }
 
-export function getServerModel(scope = getUserScope()) {
-	return scope.status === "ready"
-		? serverQueryClient().getQueryData<ServerModel>(
-				userResourceKey("model", scope),
-			)
-		: undefined;
-}
 export function getServerStatus(scope = getUserScope()) {
 	return scope.status === "ready"
 		? serverQueryClient().getQueryData<ServerStatus>(
@@ -173,21 +171,7 @@ export function getServerStatus(scope = getUserScope()) {
 			)
 		: undefined;
 }
-// Startup activation, not subscription: readers omit `enabled` and observe
-// the cache without fetching. The activating caller derives `enabled` from
-// the verified scope, and scopedRequest still rejects an identity-less or
-// retired request at the network boundary.
-export function useServerModel(options: { enabled?: boolean } = {}) {
-	const scope = useUserScope();
-	return useQuery(
-		{
-			...modelOptions(scope),
-			refetchOnMount: "always",
-			enabled: options.enabled ?? false,
-		},
-		serverQueryClient(),
-	);
-}
+// Startup activation: readers observe cache without fetching.
 export function useServerStatus(options: { enabled?: boolean } = {}) {
 	const scope = useUserScope();
 	return useQuery(
@@ -214,7 +198,7 @@ export function useAmountPresets(options: { enabled?: boolean } = {}) {
 export function workspaceIsBusy() {
 	const cache = serverQueryClient();
 	return (
-		cache.isFetching({ queryKey: userResourceKey("model") }) > 0 ||
+		cache.isFetching({ queryKey: userResourceKey("status") }) > 0 ||
 		cache.isMutating({
 			mutationKey: ["workspace-write", getUserScope().key, "model"],
 		}) > 0
@@ -225,7 +209,7 @@ export function workspaceIsBusy() {
  * Explicit refreshes retain Query's last good data. A save completes before a
  * refresh starts. `waitForWrites: false` is for a refresh already running
  * inside the guarded write, whose own mutation would otherwise deadlock it.
- * Returns whether the scoped model fetch succeeded.
+ * Returns whether the scoped status fetch succeeded.
  */
 export async function reloadWorkspace(
 	options: { waitForWrites?: boolean } = {},
@@ -249,16 +233,20 @@ export async function reloadWorkspace(
 	});
 	const results = await Promise.allSettled([
 		cache.fetchQuery(statusOptions(scope)),
-		cache.fetchQuery(modelOptions(scope)),
 		cache.fetchQuery(presetsOptions(scope)),
 		cache.fetchQuery(balancesOptions(scope)),
 		cache.fetchQuery(catalogOptions(scope)),
 		cache.fetchQuery(evalSummaryOptions(scope)),
 		cache.fetchQuery(transactionsOptions(scope)),
+		cache.fetchQuery(schedulesOptions(scope)),
+		cache.fetchQuery(checkpointsOptions(scope)),
+		cache.fetchQuery(purchasesOptions(scope)),
 	]);
-	const modelOk = results[1]?.status === "fulfilled";
-	if (scope === getUserScope() && modelOk) {
-		// A successful explicit reload resets a temporary permission guard. Other save failures stay visible.
+	const allOk = results.every((result) => result.status === "fulfilled");
+	const statusOk = results[0]?.status === "fulfilled";
+	if (scope === getUserScope() && statusOk) {
+		// A successful explicit reload resets a temporary permission guard.
+		// Each failed row keeps its last good data; callers stay retryable.
 		for (const mutation of cache
 			.getMutationCache()
 			.findAll({ mutationKey, status: "error" }))
@@ -268,7 +256,7 @@ export async function reloadWorkspace(
 			)
 				cache.getMutationCache().remove(mutation);
 	}
-	return modelOk && scope === getUserScope();
+	return allOk && scope === getUserScope();
 }
 
 export interface AccountBalances {
@@ -314,11 +302,7 @@ export function balancesOptions(scope = getUserScope(), asOf?: string) {
 		queryFn: async ({ signal }): Promise<AccountBalances> => {
 			const result = (
 				await listAccountBalances(asOf ? { asOf } : undefined, { signal })
-			).data as unknown as {
-				accounts?: AccountBalanceRow[] | null;
-				asOf?: string;
-				revision?: string;
-			};
+			).data;
 			current(scope, signal);
 			return {
 				accounts: result.accounts ?? [],
@@ -342,10 +326,7 @@ export function transactionsOptions(
 				await listTransactions(accountId ? { accountId } : {}, {
 					signal,
 				})
-			).data as unknown as {
-				transactions?: TransactionRow[] | null;
-				revision?: string;
-			};
+			).data;
 			current(scope, signal);
 			return {
 				transactions: result.transactions ?? [],
@@ -366,10 +347,7 @@ export function schedulesOptions(
 		queryFn: async ({ signal }): Promise<ScheduleList> => {
 			const result = (
 				await listSchedules(accountId ? { accountId } : {}, { signal })
-			).data as unknown as {
-				schedules?: Schedule[] | null;
-				revision?: string;
-			};
+			).data;
 			current(scope, signal);
 			return {
 				schedules: result.schedules ?? [],
@@ -384,14 +362,12 @@ export function purchasesOptions(scope = getUserScope()) {
 		...defaults,
 		queryKey: userResourceKey("purchases", scope),
 		queryFn: async ({ signal }): Promise<PurchaseList> => {
-			const result = (await listPlannedPurchases({ signal }))
-				.data as unknown as {
-				plannedPurchases?: BackendPlannedPurchase[] | null;
-				revision?: string;
-			};
+			const result = (await listPlannedPurchases({ signal })).data;
 			current(scope, signal);
 			return {
-				plannedPurchases: result.plannedPurchases ?? [],
+				plannedPurchases: (result.plannedPurchases ?? []).map(
+					normalizePurchase,
+				),
 				revision: result.revision ?? null,
 			};
 		},
@@ -403,11 +379,7 @@ export function catalogOptions(scope = getUserScope()) {
 		...defaults,
 		queryKey: userResourceKey("catalog", scope),
 		queryFn: async ({ signal }): Promise<TransactionCatalog> => {
-			const result = (await listTransactionCatalog({ signal }))
-				.data as unknown as {
-				items?: { id: string; kind: string; name: string }[] | null;
-				revision?: string;
-			};
+			const result = (await listTransactionCatalog({ signal })).data;
 			current(scope, signal);
 			return {
 				items: result.items ?? [],
@@ -440,9 +412,8 @@ export function getAccountBalances(scope = getUserScope()) {
 
 /**
  * Refresh the accounts view after a save: balances and checkpoints
- * refetch, and so does the model, which feeds the saved-row hooks and
- * every projection. Marking the model stale is not enough: nothing
- * refetches it until the next remount.
+ * refetch. Marking the rows stale is not enough: nothing
+ * refetches them until the next remount.
  */
 export async function refreshAccounts(): Promise<void> {
 	const scope = getUserScope();
@@ -453,18 +424,10 @@ export async function refreshAccounts(): Promise<void> {
 	await cache.invalidateQueries({
 		queryKey: userResourceKey("checkpoints", scope),
 	});
-	await cache.invalidateQueries({
-		queryKey: userResourceKey("model", scope),
-		refetchType: "none",
-	});
 	if (scope !== getUserScope() || scope.status !== "ready") return;
-	// Refetch the list so the new row is visible immediately; mounted
-	// observers would refetch anyway, but a save should not have to wait.
-	// Both refetches run so one failure cannot hide the other; the first
-	// failure throws so a save refresh reports it instead of swallowing it.
+	// Refetch so new rows are visible immediately without waiting for remount.
 	const settled = await Promise.allSettled([
 		cache.fetchQuery(balancesOptions(scope)),
-		cache.fetchQuery(modelOptions(scope)),
 	]);
 	for (const result of settled)
 		if (result.status === "rejected") throw result.reason;
@@ -520,9 +483,8 @@ export function useTransactionCatalog() {
 
 /**
  * Refresh the transactions view after a save: transactions and the catalog
- * refetch, and so does the model, which feeds the saved-row hooks and
- * every projection. Marking the model stale is not enough: nothing
- * refetches it until the next remount.
+ * refetch. Marking the rows stale is not enough: nothing
+ * refetches them until the next remount.
  */
 export async function refreshTransactions(): Promise<void> {
 	const scope = getUserScope();
@@ -536,19 +498,11 @@ export async function refreshTransactions(): Promise<void> {
 	await cache.invalidateQueries({
 		queryKey: userResourceKey("catalog", scope),
 	});
-	await cache.invalidateQueries({
-		queryKey: userResourceKey("model", scope),
-		refetchType: "none",
-	});
 	if (scope !== getUserScope() || scope.status !== "ready") return;
-	// Refetch the lists so new rows are visible immediately; mounted
-	// observers would refetch anyway, but a save should not have to wait.
-	// Every refetch runs so one failure cannot hide the others; the first
-	// failure throws so a save refresh reports it instead of swallowing it.
+	// Refetch so new rows are visible immediately; failures throw instead of hiding.
 	const settled = await Promise.allSettled([
 		cache.fetchQuery(transactionsOptions(scope)),
 		cache.fetchQuery(schedulesOptions(scope)),
-		cache.fetchQuery(modelOptions(scope)),
 	]);
 	for (const result of settled)
 		if (result.status === "rejected") throw result.reason;
@@ -577,10 +531,7 @@ export function checkpointsOptions(
 					},
 					{ signal },
 				)
-			).data as unknown as {
-				checkpoints?: Checkpoint[] | null;
-				revision?: string;
-			};
+			).data;
 			current(scope, signal);
 			return {
 				checkpoints: result.checkpoints ?? [],
@@ -595,29 +546,20 @@ export function evalSummaryOptions(scope = getUserScope()) {
 		...defaults,
 		queryKey: userResourceKey("eval-summary", scope),
 		queryFn: async ({ signal }): Promise<EvaluationSummary> => {
-			const result = (await listEvaluationSummary({ signal }))
-				.data as unknown as {
-				evaluations?: {
-					financialIndependence?:
-						| EvaluationTables["financialIndependence"]
-						| null;
-					netWorthThreshold?: EvaluationTables["netWorthThreshold"] | null;
-					accountBalance?: EvaluationTables["accountBalance"] | null;
-					transactionFulfillment?:
-						| EvaluationTables["transactionFulfillment"]
-						| null;
-					cycleFulfillment?: EvaluationTables["cycleFulfillment"] | null;
-				} | null;
-				revision?: string;
-			};
+			const result = (await listEvaluationSummary({ signal })).data;
 			current(scope, signal);
-			const tables = result.evaluations ?? {};
+			const tables = result.evaluations;
+			const normalize = (
+				rows: EvaluationInstanceInterface[] | null | undefined,
+			): EvaluationInstance[] => (rows ?? []).map(normalizeEvaluationInstance);
 			return {
 				evaluations: {
-					financialIndependence: tables.financialIndependence ?? [],
-					netWorthThreshold: tables.netWorthThreshold ?? [],
-					accountBalance: tables.accountBalance ?? [],
-					transactionFulfillment: tables.transactionFulfillment ?? [],
+					financialIndependence: normalize(tables.financialIndependence),
+					netWorthThreshold: normalize(tables.netWorthThreshold),
+					accountBalance: normalize(tables.accountBalance),
+					transactionFulfillment: normalize(tables.transactionFulfillment),
+					cycleFulfillment: normalize(tables.cycleFulfillment),
+					plannedPurchases: normalize(tables.plannedPurchases),
 				},
 				revision: result.revision ?? null,
 			};
@@ -674,8 +616,7 @@ export function getEvaluationSummary(scope = getUserScope()) {
 
 /**
  * Refresh the evaluations view after a save: the summary refetches for the
- * grids, and so does the model, which feeds the saved-row hooks and every
- * projection. Marking the model stale is not enough: nothing refetches it
+ * grids. Marking the row stale is not enough: nothing refetches it
  * until the next remount.
  */
 export async function refreshEvaluations(): Promise<void> {
@@ -684,19 +625,29 @@ export async function refreshEvaluations(): Promise<void> {
 	await cache.invalidateQueries({
 		queryKey: userResourceKey("eval-summary", scope),
 	});
-	await cache.invalidateQueries({
-		queryKey: userResourceKey("model", scope),
-		refetchType: "none",
-	});
 	if (scope !== getUserScope() || scope.status !== "ready") return;
-	// Refetch the summary so the new row is visible immediately; mounted
-	// observers would refetch anyway, but a save should not have to wait.
-	// Both refetches run so one failure cannot hide the other; the first
-	// failure throws so a save refresh reports it instead of swallowing it.
+	// Refetch so the new row is visible immediately.
 	const settled = await Promise.allSettled([
 		cache.fetchQuery(evalSummaryOptions(scope)),
-		cache.fetchQuery(modelOptions(scope)),
 	]);
 	for (const result of settled)
 		if (result.status === "rejected") throw result.reason;
+}
+
+export function getScheduleList(scope = getUserScope()) {
+	return scope.status === "ready"
+		? serverQueryClient().getQueryData<ScheduleList>([
+				...userResourceKey("rules", scope),
+				"",
+			])
+		: undefined;
+}
+
+export function getTransactionList(scope = getUserScope()) {
+	return scope.status === "ready"
+		? serverQueryClient().getQueryData<TransactionList>([
+				...userResourceKey("transactions", scope),
+				"",
+			])
+		: undefined;
 }

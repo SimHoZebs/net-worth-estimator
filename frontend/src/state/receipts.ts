@@ -95,14 +95,10 @@ function useReceiptWrite<T>(
 				await cache.invalidateQueries({
 					queryKey: receiptCollectionKey(transactionId, scope),
 				});
-				// Row badges read receiptIds from the transaction list. The
-				// model envelope also carries the reverse lookup for any
-				// remaining reader, so refresh both.
+				// Row badges read receiptIds from the transaction list, so
+				// refresh it after a receipt write.
 				await cache.invalidateQueries({
 					queryKey: userResourceKey("transactions", scope),
-				});
-				await cache.invalidateQueries({
-					queryKey: userResourceKey("model", scope),
 				});
 			},
 		},

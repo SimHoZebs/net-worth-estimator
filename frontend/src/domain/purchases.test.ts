@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlannedPurchase } from "./model.ts";
 import { plannedPurchaseSchema, transactionSchema } from "./modelSchemas.ts";
-import { movePurchase, purchaseQueue } from "./purchases.ts";
+import { movePurchase } from "./purchases.ts";
 
 function wish(
 	id: string,
@@ -20,16 +20,6 @@ function wish(
 }
 
 describe("purchase queue", () => {
-	it("keeps array order as the queue priority", () => {
-		const purchases = [wish("laptop"), wish("chair")];
-		expect(purchaseQueue(purchases).map((item) => item.id)).toEqual([
-			"laptop",
-			"chair",
-		]);
-		// A copy, so callers cannot reorder the saved rows by accident.
-		expect(purchaseQueue(purchases)).not.toBe(purchases);
-	});
-
 	it("moves a row up and down the queue", () => {
 		const purchases = [wish("laptop"), wish("chair"), wish("desk")];
 		expect(movePurchase(purchases, "chair", -1).map((item) => item.id)).toEqual(

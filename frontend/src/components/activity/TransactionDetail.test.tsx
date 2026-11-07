@@ -721,11 +721,11 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 	await waitFor(() =>
 		expect(
 			serverQueryClient().isFetching({
-				queryKey: userResourceKey("model", getUserScope()),
+				queryKey: userResourceKey("status", getUserScope()),
 			}),
 		).toBe(0),
 	);
-	const modelFetchesBeforeMerge = server.modelFetches().length;
+	const modelFetchesBeforeMerge = server.statusFetches().length;
 	fireEvent.click(trigger);
 	const sheet = screen.getByRole("dialog", { name: "Suggestions" });
 	expect(within(sheet).getByText(/Did this hold post/)).toBeTruthy();
@@ -744,7 +744,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		).toBe(true),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-	expect(server.modelFetches()).toHaveLength(modelFetchesBeforeMerge);
+	expect(server.statusFetches()).toHaveLength(modelFetchesBeforeMerge);
 });
 
 it("moves a recorded occurrence when merging a vanished hold", async () => {

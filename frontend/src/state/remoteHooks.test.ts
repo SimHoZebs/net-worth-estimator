@@ -6,7 +6,7 @@ import {
 	renderHook as renderHookRTL,
 	waitFor,
 } from "@testing-library/react";
-import { createElement, Fragment, type ReactNode, StrictMode } from "react";
+import { createElement, Fragment, useMemo, type ReactNode, StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	acceptUserScope,
@@ -19,12 +19,10 @@ import {
 	ApiHttpError,
 	type ApiRequestOptions,
 	type FinancialModel,
-	type FinancialModelResponse,
 	type ProjectionResult,
 	type StochasticProjectionResult,
 	type StochasticProjectionRequest,
 } from "../api/index.ts";
-import { serverModelFingerprint } from "./remoteStorage.ts";
 import { fixtureModel } from "../mocks/model.ts";
 import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "../mocks/resource.ts";
 import {
@@ -43,11 +41,9 @@ import { useUserScope } from "./useUserScope.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 import { useSavedAccounts } from "./savedState.ts";
 import {
-	useServerModel,
 	useServerStatus,
 	useAmountPresets,
-	getServerModel,
-	modelOptions,
+	getAccountBalances,
 	presetsOptions,
 	statusOptions,
 	reloadWorkspace,
@@ -66,7 +62,6 @@ import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
 // same verified-scope gate without mounting the whole workspace.
 function useWorkspaceQueries(): void {
 	const enabled = useUserScope().status === "ready";
-	useServerModel({ enabled });
 	useServerStatus({ enabled });
 	useWorkspaceSyncMonitor(enabled);
 }
@@ -77,17 +72,22 @@ function useWorkspaceQueries(): void {
 function useRemoteWorkspace() {
 	useWorkspaceQueries();
 	const enabled = useUserScope().status === "ready";
-	const query = useServerModel();
 	const status = useServerStatus();
 	const presets = useAmountPresets({ enabled });
 	const mutationError = useWorkspaceWriteError();
 	const saving = useWorkspaceSaving();
 	const savedAccounts = useSavedAccounts();
-	const model = query.data?.model ?? null;
+	const model = useMemo(
+		() =>
+			status.data?.hasModel
+				? { accounts: savedAccounts ?? [] }
+				: null,
+		[status.data?.hasModel, savedAccounts],
+	);
 	const error =
 		(mutationError instanceof Error ? mutationError.message : null) ??
-		query.error?.message ??
-		(query.data && !query.data.model
+		status.error?.message ??
+		(status.data && !status.data.hasModel
 			? "The server has no financial model to display."
 			: null);
 	return {
@@ -97,7 +97,7 @@ function useRemoteWorkspace() {
 		presetError: presets.error?.message ?? null,
 		status: status.data ?? null,
 		error,
-		loading: query.isFetching,
+		loading: status.isFetching,
 		saving,
 		readOnly: Boolean(
 			status.data?.readOnly ||
@@ -168,7 +168,7 @@ function renderHookWith<T>(
 			await waitFor(() =>
 				expect(
 					serverQueryClient().isFetching({
-						queryKey: userResourceKey("model"),
+						queryKey: userResourceKey("status"),
 					}),
 				).toBe(0),
 			);
@@ -456,10 +456,10 @@ describe("remote workspace state", () => {
 		await waitFor(() => expect(view.result().loading).toBe(false));
 		const previous = view.result().serverModel;
 		expect(previous).not.toBeNull();
-		server.failModelOnce(new Error("offline"));
+		server.failStatusOnce(new Error("offline"));
 		await act(async () => reloadWorkspace());
 		await view.settle();
-		expect(view.result().serverModel).toBe(previous);
+		expect(view.result().serverModel).toEqual(previous);
 		expect(view.result().error).not.toBeNull();
 		// A later reload recovers without losing the saved model.
 		await act(async () => reloadWorkspace());
@@ -469,40 +469,36 @@ describe("remote workspace state", () => {
 		view.unmount();
 	});
 
-	// Regression: the mount effect used to abort its in-flight load on cleanup.
-	// React's development double-mount tears that effect down immediately, and
-	// the remount reused the same in-flight promise, so hydration never
-	// completed and the app stayed on "Connecting to your Waypoint server".
+	// Regression: mount aborted in-flight hydration on strict-mode remount.
 	it("completes hydration across a strict-mode remount", async () => {
 		const server = stubTestServer(() => ({
 			model: modelFixture(),
 			issues: [],
 		}));
-		let resolveModel!: (value: Response) => void;
-		server.holdModel(
+		let resolveStatus!: (value: Response) => void;
+		server.holdStatus(
 			new Promise<Response>((resolve) => {
-				resolveModel = resolve;
+				resolveStatus = resolve;
 			}),
 		);
 		const rendered = renderHookWith(() => useRemoteWorkspace(), {
 			strictMode: true,
 		});
 		await waitFor(() =>
-			expect(
-				server.calls.filter((call) => call.url.endsWith("/v1/status")),
-			).not.toHaveLength(0),
+			expect(server.statusFetches()).not.toHaveLength(0),
 		);
-		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
 		await waitFor(() =>
 			expect(
 				server.calls.filter((call) => call.url.endsWith("/v1/amount-presets")),
 			).not.toHaveLength(0),
 		);
-		resolveModel(
+		resolveStatus(
 			server.ok({
-				model: modelFixture(),
-				issues: [],
-				revision: '"sha256-test"',
+				readOnly: false,
+				hasModel: true,
+				syncConfigured: true,
+				syncQuotaUsed: 0,
+				syncQuotaLimit: 24,
 			}),
 		);
 		await rendered.settle();
@@ -515,31 +511,33 @@ describe("remote workspace state", () => {
 
 	it("lets Query cancel the initial load on its last observer's unmount", async () => {
 		const server = stubTestServer();
-		let resolveModel!: (value: Response) => void;
-		server.holdModel(
+		let resolveStatus!: (value: Response) => void;
+		server.holdStatus(
 			new Promise<Response>((resolve) => {
-				resolveModel = resolve;
+				resolveStatus = resolve;
 			}),
 		);
 		const rendered = renderHookRTL(() => useWorkspaceQueries());
-		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
+		await waitFor(() => expect(server.statusFetches()).not.toHaveLength(0));
 		const signal = (
 			server.fetcher.mock.calls.find(([url]) =>
-				String(url).endsWith("/v1/financial-model"),
+				String(url).endsWith("/v1/status"),
 			)?.[1] as RequestInit | undefined
 		)?.signal as AbortSignal | undefined;
 		rendered.unmount();
 		expect(signal?.aborted).toBe(true);
 		await act(async () => {
-			resolveModel(
+			resolveStatus(
 				server.ok({
-					model: modelFixture(),
-					issues: [],
-					revision: '"sha256-test"',
+					readOnly: false,
+					hasModel: true,
+					syncConfigured: true,
+					syncQuotaUsed: 0,
+					syncQuotaLimit: 24,
 				}),
 			);
 		});
-		expect(getServerModel()).toBeUndefined();
+		expect(getAccountBalances()).toBeUndefined();
 	});
 
 	it("keeps session credentials out of workspace and UI state", async () => {
@@ -548,7 +546,7 @@ describe("remote workspace state", () => {
 		await waitFor(() =>
 			expect(
 				serverQueryClient().isFetching({
-					queryKey: userResourceKey("model"),
+					queryKey: userResourceKey("status"),
 				}),
 			).toBe(0),
 		);
@@ -572,49 +570,55 @@ describe("remote workspace state", () => {
 	it("uses a replacement client on an explicit Query refresh", async () => {
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceQueries());
-		await waitFor(() => expect(getServerModel()?.model).toBeDefined());
-		expect(server.modelFetches()).toHaveLength(1);
+		await waitFor(() =>
+			expect(serverQueryClient().getQueryData(userResourceKey("status"))).toBeDefined(),
+		);
+		expect(server.statusFetches()).toHaveLength(1);
 		(server.model as FinancialModel).accounts[0]!.name = "Replacement cash";
 		await act(async () => reloadWorkspace());
-		expect(server.modelFetches()).toHaveLength(2);
-		expect(getServerModel()?.model?.accounts[0]?.name).toBe("Replacement cash");
+		expect(server.statusFetches()).toHaveLength(2);
+		expect(getAccountBalances()?.accounts[0]?.name).toBe("Replacement cash");
 		rendered.unmount();
 	});
 
 	it("reuses a pending load on client change and uses the new binding on retry", async () => {
 		const server = stubTestServer();
-		let resolveModel!: (value: Response) => void;
-		server.holdModel(
+		let resolveStatus!: (value: Response) => void;
+		server.holdStatus(
 			new Promise<Response>((resolve) => {
-				resolveModel = resolve;
+				resolveStatus = resolve;
 			}),
 		);
 		const rendered = renderHookRTL(() => useWorkspaceQueries());
-		const pending = serverQueryClient().fetchQuery(modelOptions());
-		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
+		const pending = serverQueryClient().fetchQuery(statusOptions());
+		await waitFor(() => expect(server.statusFetches()).not.toHaveLength(0));
 		const signal = (
 			server.fetcher.mock.calls.find(([url]) =>
-				String(url).endsWith("/v1/financial-model"),
+				String(url).endsWith("/v1/status"),
 			)?.[1] as RequestInit | undefined
 		)?.signal as AbortSignal | undefined;
 		rendered.rerender();
 		expect(
-			serverQueryClient().getQueryState(userResourceKey("model"))?.fetchStatus,
+			serverQueryClient().getQueryState(userResourceKey("status"))?.fetchStatus,
 		).toBe("fetching");
 		expect(signal?.aborted).toBe(false);
 		await act(async () => {
-			resolveModel(
+			resolveStatus(
 				server.ok({
-					model: modelFixture(),
-					issues: [],
-					revision: '"sha256-test"',
+					readOnly: false,
+					hasModel: true,
+					syncConfigured: true,
+					syncQuotaUsed: 0,
+					syncQuotaLimit: 24,
 				}),
 			);
 			await pending;
 		});
-		expect(getServerModel()?.model).not.toBeNull();
+		expect(serverQueryClient().getQueryData(userResourceKey("status"))).toMatchObject({
+			hasModel: true,
+		});
 		await act(async () => reloadWorkspace());
-		expect(server.modelFetches().length).toBeGreaterThanOrEqual(2);
+		expect(server.statusFetches().length).toBeGreaterThanOrEqual(2);
 		rendered.unmount();
 	});
 
@@ -634,7 +638,7 @@ describe("remote workspace state", () => {
 	});
 
 	it("saves an account row and projects the refreshed saved model", async () => {
-		stubTestServer();
+		const server = stubTestServer();
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
 		const ok = await performSave({
@@ -651,7 +655,7 @@ describe("remote workspace state", () => {
 		});
 		expect(ok).toBe(true);
 		await view.settle();
-		const model = view.result().serverModel!;
+		const model = server.model;
 		expect(model.accounts.map((account) => account.name)).toContain(
 			"Travel savings",
 		);
@@ -717,7 +721,10 @@ describe("remote workspace state", () => {
 		await view.settle();
 		// The rejection refreshes authoritative state first, and the saved
 		// rows are untouched.
-		expect(server.modelFetches().length).toBeGreaterThanOrEqual(2);
+		expect(
+			server.calls.filter((call) => call.url.includes("/v1/accounts/balances"))
+				.length,
+		).toBeGreaterThanOrEqual(2);
 		expect(view.result().serverModel?.accounts).toHaveLength(2);
 		const items = useNotifications.getState().items;
 		expect(
@@ -760,7 +767,7 @@ describe("remote workspace state", () => {
 		view.unmount();
 		release(undefined);
 		expect(await saving).toBe(false);
-		expect(getServerModel()).toBeUndefined();
+		expect(getAccountBalances()).toBeUndefined();
 		expect(
 			useNotifications.getState().items.some((item) => item.kind === "success"),
 		).toBe(false);
@@ -768,10 +775,13 @@ describe("remote workspace state", () => {
 
 	it("creates rows when importing into an empty server", async () => {
 		const server = stubTestServer();
-		server.failModelOnce({
-			model: null,
-			issues: [],
-		} as unknown as FinancialModelResponse);
+		server.setStatus({
+			readOnly: false,
+			hasModel: false,
+			syncConfigured: false,
+			syncQuotaUsed: 0,
+			syncQuotaLimit: 0,
+		});
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().serverModel).toBeNull();
@@ -792,11 +802,13 @@ describe("remote workspace state", () => {
 		const server = stubTestServer(() => {
 			throw new ApiHttpError({ message: "already exists", status: 409 });
 		});
-		server.failModelOnce({
-			model: null,
-			issues: [],
-		} as unknown as FinancialModelResponse);
-		server.failModelOnce(new Error("authoritative load failed"));
+		server.setStatus({
+			readOnly: false,
+			hasModel: false,
+			syncConfigured: false,
+			syncQuotaUsed: 0,
+			syncQuotaLimit: 0,
+		});
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(await rendered.result().importServerModel(modelFixture())).toBe(
@@ -816,10 +828,10 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("refuses an import while the initial model query is pending", async () => {
+	it("refuses an import while the initial status query is pending", async () => {
 		const server = stubTestServer();
 		let finish!: (value: Response) => void;
-		server.holdModel(
+		server.holdStatus(
 			new Promise<Response>((resolve) => {
 				finish = resolve;
 			}),
@@ -837,7 +849,15 @@ describe("remote workspace state", () => {
 				.items.some((item) => item.message.includes("before importing")),
 		).toBe(true);
 		await act(async () =>
-			finish(server.ok({ model: null, issues: [], revision: '"sha256-test"' })),
+			finish(
+			server.ok({
+				readOnly: false,
+				hasModel: true,
+				syncConfigured: true,
+				syncQuotaUsed: 0,
+				syncQuotaLimit: 24,
+			}),
+		),
 		);
 		await rendered.settle();
 		rendered.unmount();
@@ -1992,7 +2012,7 @@ describe("saved-state resource scope", () => {
 			"B cash",
 		);
 		expect(
-			serverQueryClient().getQueryData(userResourceKey("model", first.scope)),
+			serverQueryClient().getQueryData([...userResourceKey("balances", first.scope), "latest"]),
 		).toBeUndefined();
 		second.rendered.unmount();
 		const sample = await mount(GUEST_USER_ID, "Cash");
@@ -2002,30 +2022,4 @@ describe("saved-state resource scope", () => {
 		sample.rendered.unmount();
 	});
 
-	it("uses a stable semantic server fingerprint", () => {
-		const model = modelFixture();
-		const reordered = {
-			transactions: model.transactions,
-			schedules: model.schedules,
-			evaluations: model.evaluations,
-			checkpoints: model.checkpoints,
-			accounts: model.accounts,
-			sourcePath: model.sourcePath,
-		};
-		const changed = modelFixture();
-		changed.schedules[0] = {
-			...changed.schedules[0]!,
-			amount: {
-				resolver: "expression",
-				config: { expression: "200" },
-				inputs: {},
-			},
-		};
-		expect(serverModelFingerprint(reordered)).toBe(
-			serverModelFingerprint(model),
-		);
-		expect(serverModelFingerprint(changed)).not.toBe(
-			serverModelFingerprint(model),
-		);
-	});
 });

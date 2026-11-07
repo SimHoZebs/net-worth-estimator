@@ -89,19 +89,29 @@ export function orderedFundingGaps(gaps: FundingGap[]): FundingGap[] {
 	return [...gaps].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function kindFor(name: string, category: string): FundingTransactionKind {
-	if (category === "transfer") return "transfer";
-	const text = name.toLowerCase();
-	if (/(payroll|salary|paycheck|interest|dividend|income)/.test(text))
-		return "income";
-	if (/(rent|mortgage|housing|home)/.test(text)) return "housing";
-	if (/(electric|water|gas|utility|utilities|internet|phone)/.test(text))
-		return "utilities";
-	if (/(grocery|groceries|market)/.test(text)) return "groceries";
-	if (/(insurance)/.test(text)) return "insurance";
-	if (/(repair|maintenance)/.test(text)) return "repair";
-	if (/(tax)/.test(text)) return "tax";
-	if (/(tuition|school|education|college)/.test(text)) return "education";
+function kindFor(
+	category: string | null | undefined,
+	flow: string,
+): FundingTransactionKind {
+	switch (category) {
+		case "INCOME":
+			return "income";
+		case "TRANSFER_IN":
+		case "TRANSFER_OUT":
+			return "transfer";
+		case "RENT_AND_UTILITIES":
+			return "housing";
+		case "FOOD_AND_DRINK":
+			return "groceries";
+		case "HOME_IMPROVEMENT":
+			return "repair";
+		case "GOVERNMENT_AND_NON_PROFIT":
+			return "tax";
+		default:
+			break;
+	}
+	if (flow === "transfer") return "transfer";
+	if (flow === "income") return "income";
 	return "other";
 }
 
@@ -139,6 +149,12 @@ export function deriveFundingGaps({
 	// Shared indexes built once: accounts by id, projection position by
 	// (transactionId, date), and failure positions in execution order.
 	const accountById = new Map(accounts.map((account) => [account.id, account]));
+	const categoryById = new Map(
+		transactions.map((transaction) => [
+			transaction.id,
+			transaction.category ?? null,
+		]),
+	);
 	const projectionIndex = new Map<string, number>();
 	current.transactions.forEach((transaction, index) => {
 		const key = `${transaction.transactionId}\u0000${transaction.date}`;
@@ -152,10 +168,7 @@ export function deriveFundingGaps({
 			failureIndexByObject.set(transaction, index);
 		}
 	});
-	// Points snapshot end-of-day balances; the opening is the latest array
-	// element strictly before the window month (same-month points already
-	// include that month's transactions). Scan once per distinct month
-	// instead of copying and reversing the array per failure.
+	// Opening is the latest point strictly before the window month; scan is cached per month.
 	const points = current.points;
 	const priorPointByWindow = new Map<
 		string,
@@ -214,10 +227,7 @@ export function deriveFundingGaps({
 		const account = accountById.get(accountId);
 		const accountName = account?.name ?? "Unknown account";
 		const windowStart = monthStart(failure.date);
-		// Opening is the balance before the window opens: the latest point
-		// strictly before the window month. Points snapshot end-of-day
-		// balances, so a same-month point already includes that month's
-		// transactions and reusing it would double-count the ledger below.
+		// Opening uses the latest point strictly before the window month to avoid double-counting.
 		const opening =
 			priorPoint(windowStart)?.balances[accountId] ?? account?.balance ?? 0;
 		// Only successfully executed transactions affecting this account before
@@ -255,7 +265,10 @@ export function deriveFundingGaps({
 					transaction.direction === "in"
 						? Math.abs(transaction.amount)
 						: -Math.abs(transaction.amount),
-				kind: kindFor(transaction.name, transaction.flow),
+				kind: kindFor(
+					categoryById.get(transaction.transactionId) ?? null,
+					transaction.flow,
+				),
 				...(transaction.counterparty &&
 				transaction.counterparty !== "External income" &&
 				transaction.counterparty !== "External spending"
@@ -265,10 +278,7 @@ export function deriveFundingGaps({
 		const required = failure.requested;
 		return [
 			{
-				// Fragments may share a rule and date (destination limits split
-				// an occurrence). The per-key count keeps every gap distinct
-				// without renumbering unrelated gaps when an earlier failure
-				// appears.
+				// Fragments may share a rule and date; the per-key count keeps gap keys distinct.
 				id: `${failure.transactionId}-${failure.date}-${occurrence}`,
 				date: failure.date,
 				name: failure.name,

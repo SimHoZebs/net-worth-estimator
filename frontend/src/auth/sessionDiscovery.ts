@@ -70,6 +70,7 @@ async function readSession(
 	const next: unknown = response.data;
 	if (!isRecord(next) || next.enabled !== true)
 		throw new Error("Invalid authentication status.");
+	// Go's CanonicalOrigin is the authority; JS mirrors it here.
 	if (baseUrl && new URL(baseUrl, location.href).origin !== location.origin)
 		throw new Error(
 			"Session login requires the frontend and API on the same origin.",

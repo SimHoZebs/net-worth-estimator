@@ -1,6 +1,6 @@
 import type { BackendCheckpoint } from "../../api/contracts.ts";
 import type { ReactNode } from "react";
-import { dateLabel, money } from "../../domain/format.ts";
+import { dateLabel, isoDateFromEpochSeconds, money } from "../../domain/format.ts";
 import { netWorthChangeSinceFirstSync } from "../../domain/netWorthChange.ts";
 import type { Projection } from "../../domain/result.ts";
 
@@ -21,9 +21,7 @@ export function NetWorthSummary({
 }) {
 	const change = netWorthChangeSinceFirstSync(projection, checkpoints);
 	const asOf = checkpoints
-		.map((checkpoint) =>
-			new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
-		)
+		.map((checkpoint) => isoDateFromEpochSeconds(checkpoint.observedAt))
 		.reduce<string | null>(
 			(latest, day) => (latest === null || day > latest ? day : latest),
 			null,

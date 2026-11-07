@@ -11,13 +11,10 @@ import {
 import {
 	balanceRowToDisplay,
 	plannedPurchaseRowToDisplay,
-	savedPurchasesToDisplay,
 } from "./adapter.ts";
 import type { AccountBalanceRow } from "./generated/model/accountBalanceRow.ts";
 import {
 	type BackendPlannedPurchase,
-	type BackendTransaction,
-	type FinancialModel,
 	NO_CEILING_SENTINEL,
 	NO_FLOOR_SENTINEL,
 } from "./contracts.ts";
@@ -184,93 +181,6 @@ describe("planned purchase rows to display purchases", () => {
 		expect(
 			plannedPurchaseRowToDisplay(purchaseRow({ cost: -20, name: "" })),
 		).toMatchObject({ amount: 0, name: "laptop" });
-	});
-});
-
-function purchaseModel(
-	transactions: BackendTransaction[] = [],
-	plannedPurchases: BackendPlannedPurchase[] = [],
-): FinancialModel {
-	return {
-		sourcePath: "models/household.json",
-		accounts: [],
-		checkpoints: [],
-		evaluations: {
-			financialIndependence: [],
-			netWorthThreshold: [],
-			accountBalance: [],
-			transactionFulfillment: [],
-			cycleFulfillment: [],
-		},
-		transactions,
-		schedules: [],
-		plannedPurchases,
-	};
-}
-
-describe("saved standalone purchases", () => {
-	it("reads cost, date, and priority from standalone rows", () => {
-		expect(
-			savedPurchasesToDisplay(
-				purchaseModel([], [purchaseRow({ priority: 2 })]),
-			),
-		).toEqual([
-			{
-				id: "laptop",
-				name: "Laptop",
-				amount: 500,
-				fromId: "cash",
-				startDate: "2026-03-01",
-				enabled: true,
-				readOnly: false,
-			},
-		]);
-	});
-
-	it("orders by priority without changing model order", () => {
-		const purchases = [
-			purchaseRow({ id: "second", priority: 1 }),
-			purchaseRow({ id: "first", cost: 25, priority: 0 }),
-			purchaseRow({ id: "third", priority: 1 }),
-		];
-		const rows = savedPurchasesToDisplay(purchaseModel([], purchases));
-		expect(rows.map((row) => row.id)).toEqual(["first", "second", "third"]);
-		expect(rows[0]).toMatchObject({ amount: 25, fromId: "cash" });
-		expect(purchases.map((row) => row.id)).toEqual([
-			"second",
-			"first",
-			"third",
-		]);
-	});
-
-	it("does not treat transactions as purchases", () => {
-		const rows = savedPurchasesToDisplay(
-			purchaseModel(
-				[
-					{
-						id: "real",
-						name: "Real payment",
-						sourceAccountId: "cash",
-						destinations: null,
-						amount: {
-							resolver: "expression",
-							config: { expression: "999" },
-							inputs: {},
-						},
-						postedTime: 1769904000,
-						transactionTime: 1769904000,
-						enabled: true,
-					},
-				],
-				[purchaseRow({ priority: 0 })],
-			),
-		);
-		expect(rows.map((row) => row.id)).toEqual(["laptop"]);
-	});
-
-	it("returns an empty queue for a missing model", () => {
-		expect(savedPurchasesToDisplay(null)).toEqual([]);
-		expect(savedPurchasesToDisplay(undefined)).toEqual([]);
 	});
 });
 

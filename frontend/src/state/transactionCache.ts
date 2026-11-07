@@ -3,7 +3,10 @@ import { serverQueryClient } from "./serverQuery.ts";
 import {
 	type TransactionCatalog,
 	type TransactionList,
-	getServerModel,
+	getCheckpoints,
+	getEvaluationSummary,
+	getScheduleList,
+	getTransactionList,
 	userResourceKey,
 } from "./workspaceResources.ts";
 import { isRecord } from "../domain/guards.ts";
@@ -16,15 +19,20 @@ import { isRecord } from "../domain/guards.ts";
  * supplies a date.
  */
 export function transactionRemovalNeedsProjectionRefresh(id: string): boolean {
-	const model = getServerModel()?.model;
-	if (!model) return true;
-	for (const evaluation of model.evaluations.transactionFulfillment) {
+	const summary = getEvaluationSummary();
+	const checkpoints = getCheckpoints()?.checkpoints ?? null;
+	const schedules = getScheduleList()?.schedules ?? null;
+	const transactions = getTransactionList()?.transactions ?? null;
+	if (!summary || checkpoints === null || schedules === null || transactions === null)
+		return true;
+	const evaluations = summary.evaluations;
+	for (const evaluation of evaluations.transactionFulfillment) {
 		if (!isRecord(evaluation.config)) continue;
 		const transactionIds = evaluation.config.transactionIds;
 		if (Array.isArray(transactionIds) && transactionIds.includes(id))
 			return true;
 	}
-	for (const evaluation of model.evaluations.financialIndependence) {
+	for (const evaluation of evaluations.financialIndependence) {
 		if (!isRecord(evaluation.config)) continue;
 		const sources = evaluation.config.sources;
 		if (
@@ -35,7 +43,7 @@ export function transactionRemovalNeedsProjectionRefresh(id: string): boolean {
 		const continuing = evaluation.config.continuingTransactionIds;
 		if (Array.isArray(continuing) && continuing.includes(id)) return true;
 	}
-	for (const evaluation of model.evaluations.whatIf ?? []) {
+	for (const evaluation of evaluations.whatIf ?? []) {
 		if (!isRecord(evaluation.config)) continue;
 		const disabled = evaluation.config.disabledTransactionIds;
 		if (Array.isArray(disabled) && disabled.includes(id)) return true;
@@ -48,17 +56,16 @@ export function transactionRemovalNeedsProjectionRefresh(id: string): boolean {
 		)
 			return true;
 	}
-	if (model.checkpoints.length > 0 || (model.schedules ?? []).length > 0)
-		return false;
-	return model.transactions[0]?.id === id;
+	if (checkpoints.length > 0 || schedules.length > 0) return false;
+	return transactions[0]?.id === id;
 }
 
 /**
  * Drop one deleted transaction from every cached transaction list and from
- * the catalog without refetching the financial model. Use this only after
+ * the catalog without refetching row queries. Use this only after
  * `transactionRemovalNeedsProjectionRefresh` returns false: the removed row
- * then feeds no balance, evaluation, or projection input. The model cache can
- * keep the inert row until its next authoritative refresh.
+ * then feeds no balance, evaluation, or projection input. Row caches can
+ * keep the inert row until their next authoritative refresh.
  */
 export async function removeDeletedTransactionFromCache(
 	id: string,

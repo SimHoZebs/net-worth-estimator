@@ -1,11 +1,7 @@
 import type { ServerStatus } from "../api/index.ts";
+import type { FinancialModel } from "../api/contracts.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
-import {
-	getServerModel,
-	userResourceKey,
-	type ServerModel,
-} from "../state/workspaceResources.ts";
-import { serverModelFingerprint } from "../state/remoteStorage.ts";
+import { getAccountBalances, userResourceKey } from "../state/workspaceResources.ts";
 import {
 	financialModelFixture,
 	type FinancialModelFixture,
@@ -15,47 +11,101 @@ import { fixtureAmount, fixtureModel } from "./model.ts";
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
 }
+
 /**
- * Model resource only. Leaves narrow row caches untouched so a test can
- * supply its own local rows through props.
+ * Row caches for the delete-guard. Production reads row queries instead of
+ * the model document; this primes the four caches the guard needs.
  */
 export function setServerModelOnly(
 	data: FinancialModelFixture = financialModelFixture,
 ) {
-	const model = fixtureModel(data);
-	const response: ServerModel = {
-		model,
-		issues: [],
-		revision: '"test-revision"',
-		fingerprint: serverModelFingerprint(model),
-	};
-	serverQueryClient().setQueryData(userResourceKey("model"), response);
+	setServerModelFixture(data);
 }
+
+export interface ServerModelFixtureOverrides {
+	revision?: string;
+	model?: FinancialModel | null;
+	hasModel?: boolean;
+}
+
 export function setServerModelFixture(
 	data: FinancialModelFixture = financialModelFixture,
-	overrides: Partial<ServerModel> = {},
+	overrides: ServerModelFixtureOverrides = {},
 ) {
-	const model = fixtureModel(data);
-	const response: ServerModel = {
-		model,
-		issues: [],
-		revision: '"test-revision"',
-		fingerprint: serverModelFingerprint(model),
-		...overrides,
-	};
-	serverQueryClient().setQueryData(userResourceKey("model"), response);
+	const revision = overrides.revision ?? '"test-revision"';
+	const effectiveModel =
+		overrides.model !== undefined ? overrides.model : fixtureModel(data);
+	const hasModel = overrides.hasModel ?? effectiveModel !== null;
+	// Empty server: no rows, presence flag false.
+	if (!hasModel || !effectiveModel) {
+		serverQueryClient().setQueryData(userResourceKey("status"), {
+			readOnly: false,
+			hasModel: false,
+			syncConfigured: false,
+			syncQuotaUsed: 0,
+			syncQuotaLimit: 0,
+		});
+		serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
+			accounts: [],
+			asOf: data.startDate,
+			revision,
+		});
+		serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {
+			schedules: [],
+			revision,
+		});
+		serverQueryClient().setQueryData([...userResourceKey("transactions"), ""], {
+			transactions: [],
+			revision,
+		});
+		serverQueryClient().setQueryData(userResourceKey("eval-summary"), {
+			evaluations: effectiveModel?.evaluations ?? {
+				financialIndependence: [],
+				netWorthThreshold: [],
+				accountBalance: [],
+				transactionFulfillment: [],
+				cycleFulfillment: [],
+			},
+			revision,
+		});
+		serverQueryClient().setQueryData(
+			[...userResourceKey("checkpoints"), "", "", ""],
+			{ checkpoints: [], revision },
+		);
+		serverQueryClient().setQueryData(userResourceKey("purchases"), {
+			plannedPurchases: [],
+			revision,
+		});
+		return revision;
+	}
+	const model = effectiveModel;
+	// Balances derive from the model accounts so raw bounds (sentinels) survive.
+	const checkpointByAccount = new Map(
+		model.checkpoints.map((checkpoint) => [checkpoint.AccountId, checkpoint]),
+	);
 	serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
-		accounts: data.accounts.map((account) => ({
-			...account,
-			hasCheckpoint: account.balanceCheck,
-			syncOwned: account.readOnly,
-		})),
+		accounts: model.accounts.map((account) => {
+			const checkpoint = checkpointByAccount.get(account.id);
+			// Preserve display-fixture balance-check flags when data supplied them.
+			const displayAccount = data.accounts.find((row) => row.id === account.id);
+			return {
+				...account,
+				balance: checkpoint ? checkpoint.Balance : (displayAccount?.balance ?? 0),
+				observedOn: data.startDate,
+				hasCheckpoint: displayAccount?.balanceCheck ?? checkpoint !== undefined,
+				archived: displayAccount?.archived ?? false,
+				syncOwned: displayAccount?.readOnly ?? false,
+				readOnly: displayAccount?.readOnly ?? false,
+				observedBalance: checkpoint ? checkpoint.Balance : null,
+				observedAt: checkpoint ? checkpoint.observedAt : null,
+			};
+		}),
 		asOf: data.startDate,
-		revision: response.revision,
+		revision,
 	});
 	serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {
 		schedules: model.schedules,
-		revision: response.revision,
+		revision,
 	});
 	serverQueryClient().setQueryData([...userResourceKey("transactions"), ""], {
 		transactions: data.transactions
@@ -81,19 +131,19 @@ export function setServerModelFixture(
 					Date.parse(`${row.startDate}T00:00:00Z`) / 1000,
 				),
 			})),
-		revision: response.revision,
+		revision,
 	});
 	serverQueryClient().setQueryData(userResourceKey("eval-summary"), {
 		evaluations: model.evaluations,
-		revision: response.revision,
+		revision,
 	});
 	serverQueryClient().setQueryData(
 		[...userResourceKey("checkpoints"), "", "", ""],
-		{ checkpoints: model.checkpoints, revision: response.revision },
+		{ checkpoints: model.checkpoints, revision },
 	);
 	serverQueryClient().setQueryData(userResourceKey("purchases"), {
 		plannedPurchases: model.plannedPurchases ?? [],
-		revision: response.revision,
+		revision,
 	});
 	// Presence is a status flag. Keep an explicit fixture when a test has
 	// already set one (for example, a read-only workspace).
@@ -105,14 +155,14 @@ export function setServerModelFixture(
 			syncQuotaUsed: 0,
 			syncQuotaLimit: 0,
 		});
-	return response;
+	return revision;
 }
 export function setServerRevisionFixture(revision: string) {
-	const model = getServerModel();
-	if (model)
-		serverQueryClient().setQueryData(userResourceKey("model"), {
-			...model,
+	const cached = getAccountBalances();
+	if (cached) {
+		serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
+			...cached,
 			revision,
 		});
-	else setServerModelFixture(financialModelFixture, { revision });
+	} else setServerModelFixture(financialModelFixture, { revision });
 }

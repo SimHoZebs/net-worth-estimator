@@ -1,4 +1,5 @@
 import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
+import { isoDateFromEpochSeconds } from "./format.ts";
 import type { AccountTransaction } from "./accountActivity.ts";
 
 export function balanceAdjustmentActivity(
@@ -7,7 +8,7 @@ export function balanceAdjustmentActivity(
 	return adjustments.map((adjustment) => ({
 		id: `balance-adjustment:${adjustment.accountId}:${adjustment.observedAt}`,
 		transactionId: "",
-		date: new Date(adjustment.observedAt * 1000).toISOString().slice(0, 10),
+		date: isoDateFromEpochSeconds(adjustment.observedAt),
 		sortDate: new Date(adjustment.observedAt * 1000).toISOString(),
 		name: "Balance adjustment",
 		source: "historical",

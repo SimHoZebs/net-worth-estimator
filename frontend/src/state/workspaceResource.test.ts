@@ -6,8 +6,8 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
-	getServerModel,
-	modelOptions,
+	getAccountBalances,
+	statusOptions,
 	userResourceKey,
 } from "./workspaceResources.ts";
 import {
@@ -42,17 +42,19 @@ afterEach(() => {
 });
 
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
-	const model = setServerModelFixture();
+	const revision = setServerModelFixture();
 	const scope = getUserScope();
 	suspendUserScope();
 	await cancelResourceQueries();
-	expect(getServerModel()).toBeUndefined();
+	expect(getAccountBalances()).toBeUndefined();
 	expect(
-		serverQueryClient().getQueryData(userResourceKey("model", scope)),
-	).toEqual(model);
+		serverQueryClient().getQueryData<{
+			revision: string | null;
+		}>([...userResourceKey("balances", scope), "latest"]),
+	).toMatchObject({ revision });
 });
 
-it("does not publish a retired user's late model result", async () => {
+it("does not publish a retired user's late status result", async () => {
 	let finish!: (value: Response) => void;
 	const pending = new Promise<Response>((resolve) => {
 		finish = resolve;
@@ -67,27 +69,23 @@ it("does not publish a retired user's late model result", async () => {
 		"fetch",
 		vi.fn(async (url: unknown) => {
 			const path = String(url);
-			if (path.endsWith("/v1/status"))
-				return new Response(JSON.stringify({ readOnly: false }), {
-					headers: headers(),
-				});
-			if (path.endsWith("/v1/financial-model")) return pending;
-			return new Response(JSON.stringify({ model: null, issues: [] }), {
+			if (path.endsWith("/v1/status")) return pending;
+			return new Response(JSON.stringify({}), {
 				headers: headers(),
 			});
 		}),
 	);
 	const old = serverQueryClient()
-		.fetchQuery(modelOptions())
+		.fetchQuery(statusOptions())
 		.catch(() => {});
 	owner("users/b");
-	const current = setServerModelFixture(undefined, { revision: "b" });
+	const revision = setServerModelFixture(undefined, { revision: "b" });
 	finish(
 		new Response(
-			JSON.stringify({ model: null, revision: "private-a", issues: [] }),
+			JSON.stringify({ readOnly: false, hasModel: true }),
 			{ headers: headers() },
 		),
 	);
 	await old;
-	expect(getServerModel()).toEqual(current);
+	expect(getAccountBalances()?.revision).toBe(revision);
 });

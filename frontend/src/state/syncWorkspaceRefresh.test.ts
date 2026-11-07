@@ -40,7 +40,7 @@ it("refreshes the workspace and marks the stamp applied", async () => {
 	const key = deterministicQueryKey("model", 10);
 	serverQueryClient().setQueryData(key, "result");
 	expect(await refreshWorkspaceAfterSync()).toBe(true);
-	expect(server.modelFetches()).toHaveLength(1);
+	expect(server.statusFetches()).toHaveLength(1);
 	expect(serverQueryClient().getQueryState(key)?.isInvalidated).toBe(true);
 	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
 });
@@ -53,19 +53,19 @@ it("applies the refresh even when the status cache already moved", async () => {
 	setServerStatusFixture({ ...status, lastSyncAt: "after" });
 	markSyncApplied(getUserScope(), "before");
 	expect(await refreshWorkspaceAfterSync()).toBe(true);
-	expect(server.modelFetches()).toHaveLength(1);
+	expect(server.statusFetches()).toHaveLength(1);
 	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
 });
 
-it("leaves the stamp unapplied when the model reload fails", async () => {
+it("leaves the stamp unapplied when the workspace reload fails", async () => {
 	const server = stubTestServer();
 	server.setStatus({ ...status, lastSyncAt: "after" });
 	markSyncApplied(getUserScope(), "before");
 	const key = deterministicQueryKey("model", 10);
 	serverQueryClient().setQueryData(key, "result");
-	server.failModelOnce(new Error("boom"));
+	server.failStatusOnce(new Error("boom"));
 	expect(await refreshWorkspaceAfterSync()).toBe(false);
-	expect(server.modelFetches()).toHaveLength(1);
+	expect(server.statusFetches()).toHaveLength(1);
 	expect(getAppliedSyncStamp(getUserScope())).toBe("before");
 	expect(serverQueryClient().getQueryState(key)?.isInvalidated).toBe(false);
 });

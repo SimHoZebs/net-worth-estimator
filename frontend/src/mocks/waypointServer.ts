@@ -97,6 +97,8 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	let revisionValue = '"sha256-test"';
 	const settleCandidates = new Map<string, unknown[]>();
 	let modelHold: Promise<Response> | null = null;
+	let statusHold: Promise<Response> | null = null;
+	let purchasesHold: Promise<Response> | null = null;
 	const writeOverrides: Array<{
 		match: (method: string, path: string) => boolean;
 		response: Error | Record<string, unknown>;
@@ -195,6 +197,11 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			});
 		}
 		if (path === "/v1/status") {
+			if (statusHold) {
+				const held = statusHold;
+				statusHold = null;
+				return held;
+			}
 			const next = statusQueue.shift();
 			if (next) {
 				if (next instanceof Error) fail(next);
@@ -256,10 +263,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						latestInstant = instant;
 					}
 				}
-				// The mock has no replay engine: with fixture data the
-				// adjusted balance equals the latest observation, so the
-				// row mirrors the server contract shape (adjusted balance
-				// plus separate observation).
+				// With fixture data the adjusted balance equals the latest observation.
 				const balance = latest ? (latest.Balance as number) : 0;
 				const syncOwned = checkpoints.some(
 					(row) =>
@@ -478,6 +482,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			return write(() => {
 				for (const key of Object.keys(current)) delete current[key];
 				Object.assign(current, document);
+				statusValue = { ...statusValue, hasModel: true };
 			}, document);
 		}
 		const categoryMatch = path.match(
@@ -600,11 +605,17 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				) as typeof current.transactions;
 			}, body);
 		}
-		if (path === "/v1/planned-purchases" && method === "GET")
+		if (path === "/v1/planned-purchases" && method === "GET") {
+			if (purchasesHold) {
+				const held = purchasesHold;
+				purchasesHold = null;
+				return held;
+			}
 			return ok({
 				plannedPurchases: structuredClone(current.plannedPurchases ?? []),
 				revision: revisionValue,
 			});
+		}
 		if (path === "/v1/planned-purchases" && method === "POST")
 			return write(() => {
 				const rows = (current.plannedPurchases ??= []);
@@ -834,12 +845,15 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	vi.stubGlobal("fetch", fetcher);
 	const modelFetches = () =>
 		calls.filter((call) => call.url.endsWith("/v1/financial-model"));
+	const statusFetches = () =>
+		calls.filter((call) => call.url.endsWith("/v1/status"));
 	return {
 		ok,
 		calls,
 		fetcher,
 		model: current as FinancialModel,
 		modelFetches,
+		statusFetches,
 		failModelOnce: (error: Error | FinancialModelResponse) => {
 			modelQueue.push(error);
 		},
@@ -872,6 +886,12 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		},
 		holdModel: (pending: Promise<Response>) => {
 			modelHold = pending;
+		},
+		holdStatus: (pending: Promise<Response>) => {
+			statusHold = pending;
+		},
+		holdPurchases: (pending: Promise<Response>) => {
+			purchasesHold = pending;
 		},
 		holdNextWrite: (
 			match: (method: string, path: string) => boolean,

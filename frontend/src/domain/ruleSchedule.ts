@@ -1,4 +1,4 @@
-import { isIsoDate } from "./format.ts";
+import { isIsoDate, shiftDate, utcDate } from "./format.ts";
 
 /**
  * Scheduled occurrence dates of a schedule from its start date
@@ -6,6 +6,9 @@ import { isIsoDate } from "./format.ts";
  * The window to today is the claimable range: a transaction exists in the
  * past or today, so only occurrences scheduled by then are offered.
  * An open-ended schedule stops at `through`.
+ * Note: the server (RuleScheduleDates) is the validation authority for
+ * claims. This expansion is retained only for the claim-option UI, which
+ * has no server occurrences endpoint to read from.
  */
 export function scheduleOccurrenceDates({
 	startDate,
@@ -45,13 +48,13 @@ export function claimOccurrenceCandidates({
 	postedRef: string;
 	claimed: ReadonlySet<string>;
 }): string[] {
-	const anchor = Date.parse(`${postedRef}T00:00:00Z`);
+	const anchor = utcDate(postedRef).getTime();
 	return scheduleOccurrenceDates({ ...schedule, through })
 		.filter((date) => !claimed.has(date))
 		.sort((a, b) => {
 			const distance =
-				Math.abs(Date.parse(`${a}T00:00:00Z`) - anchor) -
-				Math.abs(Date.parse(`${b}T00:00:00Z`) - anchor);
+				Math.abs(utcDate(a).getTime() - anchor) -
+				Math.abs(utcDate(b).getTime() - anchor);
 			if (distance !== 0) return distance;
 			return a < b ? -1 : a > b ? 1 : 0;
 		});
@@ -94,6 +97,5 @@ function advanceOccurrence(
 }
 
 function addDays(date: string, days: number): string {
-	const stamp = Date.parse(`${date}T00:00:00Z`);
-	return new Date(stamp + days * 86400000).toISOString().slice(0, 10);
+	return shiftDate({ date, days });
 }

@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { useQuery } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,14 +9,15 @@ import {
 } from "@/state/serverQuery.ts";
 import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
 import {
-	getServerModel,
-	useServerModel,
+	balancesOptions,
+	getAccountBalances,
 	userResourceKey,
 } from "@/state/workspaceResources.ts";
 import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
 import { getUserScope, suspendUserScope } from "@/auth/resourceScope.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import { ok } from "@/mocks/fetch.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { clearPersistedMemory } from "@/state/persisted.ts";
@@ -86,7 +88,11 @@ function route(input: RequestInfo | URL, init?: RequestInit) {
 
 function WorkspaceProbe() {
 	const account = useSession();
-	const revision = useServerModel().data?.revision;
+	const scope = useUserScope();
+	const revision = useQuery(
+		{ ...balancesOptions(scope), enabled: false },
+		serverQueryClient(),
+	).data?.revision;
 	return (
 		<p data-testid="active-workspace">
 			{account?.session?.resource?.id}:{revision ?? "empty"}
@@ -421,7 +427,7 @@ describe("authentication resource isolation", () => {
 				`${A}:private-a-revision`,
 			),
 		);
-		expect(getServerModel()?.revision).toBe("private-a-revision");
+		expect(getAccountBalances()?.revision).toBe("private-a-revision");
 		expect(
 			serverQueryClient().getQueryData(userResourceKey("presets")),
 		).toEqual([{ id: "private-a-recipe" }]);
@@ -451,7 +457,7 @@ describe("authentication resource isolation", () => {
 			// retry toast instead of wiping the UI.
 			expect(screen.getByTestId("active-workspace")).toBeTruthy();
 			expect(getUserScope().status).toBe("ready");
-			expect(getServerModel()?.revision).toBe("private-a-revision");
+			expect(getAccountBalances()?.revision).toBe("private-a-revision");
 			expect(
 				serverQueryClient().getQueryData(userResourceKey("presets")),
 			).toEqual([{ id: "private-a-recipe" }]);
@@ -459,7 +465,7 @@ describe("authentication resource isolation", () => {
 			act(() => window.dispatchEvent(new Event("focus")));
 			await screen.findByTestId("active-workspace");
 			expect(getUserScope().resource?.id).toBe(nextId);
-			expect(getServerModel()?.revision).toBe(
+			expect(getAccountBalances()?.revision).toBe(
 				nextId === A ? "private-a-revision" : undefined,
 			);
 			expect(
@@ -515,7 +521,7 @@ describe("authentication resource isolation", () => {
 			),
 		);
 		expect(getUserScope().apiBaseUrl).toBe(canonicalApiBaseUrl("/second-api"));
-		expect(getServerModel()).toBeUndefined();
+		expect(getAccountBalances()).toBeUndefined();
 		expect(
 			serverQueryClient().getQueryData(userResourceKey("presets")),
 		).toBeUndefined();

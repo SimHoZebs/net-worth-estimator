@@ -7,10 +7,6 @@ import {
 	subscribeUserScope,
 	type UserScope,
 } from "@/auth/resourceScope.ts";
-import {
-	DEFAULT_CYCLE_STATEMENT_DAY,
-	DEFAULT_PROTECTED_RESERVE,
-} from "@/domain/safeSpending.ts";
 import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
@@ -21,8 +17,8 @@ import { useUserScope } from "@/state/useUserScope.ts";
 export type TotalCycleSettings = SafeSpendingSettings;
 
 export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
-	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
-	reserve: DEFAULT_PROTECTED_RESERVE,
+	statementDay: 1,
+	reserve: 0,
 	accountIds: null,
 	spendingAccountIds: null,
 	incomeAccountIds: null,
@@ -42,7 +38,7 @@ function stringIds(value: unknown): string[] | null {
 export function clampStatementDay(value: unknown): number {
 	return Math.min(
 		28,
-		Math.max(1, Math.floor(Number(value) || DEFAULT_CYCLE_STATEMENT_DAY)),
+		Math.max(1, Math.floor(Number(value) || 1)),
 	);
 }
 
@@ -73,9 +69,7 @@ export function sanitizeSafeSpendingSettings(
 		statementDaySet: record.statementDaySet === true,
 		reserve: Math.max(
 			0,
-			Number.isFinite(Number(record.reserve))
-				? Number(record.reserve)
-				: DEFAULT_PROTECTED_RESERVE,
+			Number.isFinite(Number(record.reserve)) ? Number(record.reserve) : 0,
 		),
 		accountIds: stringIds(record.accountIds),
 		spendingAccountIds: stringIds(record.spendingAccountIds),
@@ -215,11 +209,7 @@ export function useSafeSpendingSettings(): SafeSpendingSettingsState {
 		{ ...settingsOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
 	);
-	// The optimistic write must be visible in the same event, before Query
-	// batches its observer notification. Read the cache directly and bump a
-	// local counter after the write; useQuery still owns fetching and the
-	// pending state. A second QueryCache subscription would announce the
-	// same transition twice and can update this component while it renders.
+	// The optimistic write reads cache directly so it shows in the same event.
 	const [, bump] = useReducer((version: number) => version + 1, 0);
 	const settings = getSafeSpendingSettings(scope);
 	return {

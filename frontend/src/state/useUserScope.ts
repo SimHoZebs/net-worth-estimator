@@ -5,10 +5,7 @@ import {
 	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { ApiHttpError } from "../api/index.ts";
-import {
-	useServerModel as useModel,
-	useServerStatus,
-} from "./workspaceResources.ts";
+import { useServerStatus } from "./workspaceResources.ts";
 import { useWorkspaceWriteError } from "./workspaceWrites.ts";
 
 /** Verified user scope for the mounted session. */
@@ -35,8 +32,8 @@ export function useUserPending(): boolean {
  * this only answers "is user data available yet?".
  */
 export function useUserModelAvailable(): boolean {
-	const model = useModel();
-	return model.data?.model != null;
+	const status = useServerStatus();
+	return status.data?.hasModel === true;
 }
 
 /** Read-only state from server policy and the latest write denial. */

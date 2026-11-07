@@ -1,16 +1,6 @@
 import type { PlannedPurchase } from "./model.ts";
 
 /**
- * The purchase queue is the saved `plannedPurchases` slice in order.
- * Array order is the priority: earlier buys first, a blocked item holds
- * the rest of the queue. The backend derives the same priority from row
- * position.
- */
-export function purchaseQueue(planned: PlannedPurchase[]): PlannedPurchase[] {
-	return [...planned];
-}
-
-/**
  * Reorder one wishlist row, returning the new queue order. The input is
  * never mutated. Returns the input unchanged when the move is a no-op
  * (edges of the queue, unknown id).

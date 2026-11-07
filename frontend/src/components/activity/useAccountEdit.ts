@@ -10,7 +10,7 @@ import { getUserScope } from "@/auth/resourceScope.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
 import { accountUpdateBody } from "../editors/accountFields.ts";
-import { getServerModel } from "../../state/workspaceResources.ts";
+import { getAccountBalances } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshAccountAdjustments } from "../../state/accountAdjustments.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
@@ -151,13 +151,24 @@ export function useAccountEdit(
 		setSaving(true);
 		setError(null);
 		const ok = await performSave({
-			call: () =>
-				updateAccount(account.id, {
+			call: () => {
+				const row = getAccountBalances()?.accounts.find(
+					(row) => row.id === account.id,
+				);
+				return updateAccount(account.id, {
 					...accountUpdateBody({
 						baseline: account,
-						raw: getServerModel()?.model?.accounts.find(
-							(row) => row.id === account.id,
-						),
+						raw: row
+							? ({
+									id: row.id,
+									name: row.name || row.id,
+									kind: row.kind as "cash" | "investment" | "debt" | "property",
+									minBalance: row.minBalance,
+									maxBalance: row.maxBalance,
+									color: row.color ?? null,
+									enabled: row.enabled,
+								} as Parameters<typeof accountUpdateBody>[0]["raw"])
+							: undefined,
 						values: {
 							name,
 							balance,
@@ -169,7 +180,8 @@ export function useAccountEdit(
 						},
 					}),
 					...(moved ? { balance, observedAt: Math.floor(instant / 1000) } : {}),
-				}),
+				});
+			},
 			refresh: refreshAccountAdjustments,
 			failureMessage: "The account could not be saved.",
 			onRejected: setError,

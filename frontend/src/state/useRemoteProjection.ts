@@ -25,6 +25,7 @@ import {
 import { financialIndependenceRange } from "../api/financialIndependence.ts";
 import { UserScopeError } from "../api/scopedRequest.ts";
 import { finite } from "../domain/guards.ts";
+import { isoDateFromEpochSeconds } from "../domain/format.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { horizonDate } from "../domain/result.ts";
 import {
@@ -36,10 +37,10 @@ import {
 import { dismissKey, notifyError } from "./notifications.ts";
 import { useUiStore } from "./uiStore.ts";
 import { projectionEvaluationKey } from "./projectionKeys.ts";
-import { projectionStartDate } from "./projectionStartDate.ts";
 import {
 	normalizedEvaluations,
 	projectionSourceFromModel,
+	projectionStartDate,
 	projectionStartDateFromRows,
 	type ProjectionSource,
 } from "./projectionSource.ts";
@@ -53,7 +54,7 @@ import {
 	transactionsOptions,
 } from "./workspaceResources.ts";
 import { useUserScope } from "./useUserScope.ts";
-export { projectionStartDate } from "./projectionStartDate.ts";
+export { projectionStartDate } from "./projectionSource.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
 import { stochasticProjectionOptions } from "./stochasticProjectionQuery.ts";
 
@@ -103,6 +104,12 @@ function projectionKeyOf(input: ProjectionInput): string {
 
 export interface UseRemoteProjectionOptions {
 	model?: FinancialModel | null;
+	/**
+	 * Server revision for the model override (fixture path). When present it
+	 * keys the projection; when absent the hook falls back to content
+	 * identity. Production row sources carry their own joined revision.
+	 */
+	revision?: string;
 	years?: number;
 	ranges?: boolean;
 	// Request-local evaluation scope. It participates in model/cache identity.
@@ -126,10 +133,7 @@ async function fetchDeterministicResult(
 ): Promise<ProjectionResult> {
 	const request: DeterministicProjectionRequest = {
 		...projectionRequest(input, years),
-		// A request-local overlay must describe the same model the UI
-		// rendered. Without a pinned model, a concurrent row write can
-		// answer with a different queue and stale dates. Row sources have no
-		// document to pin, so they rely on the server snapshot.
+		// Without a pinned model a concurrent write can answer with a different queue.
 		...(pinModel ? { model: pinModel } : {}),
 		range,
 	};
@@ -160,12 +164,7 @@ export function projectionRequest(
 	};
 }
 
-// The default timeline slice keeps the full span this hook has always
-// fetched: everything through the horizon end, which matches the backend
-// clamped end date exactly. Callers narrow it with dateRange; the server
-// requires a range on every request and guesses nothing. Total: a malformed
-// start date still sends a request (with an empty range the server rejects
-// as data) instead of throwing during render.
+// The default slice keeps the full span through the horizon end.
 export function resolveProjectionRange(
 	model: ProjectionInput,
 	years: number,
@@ -279,12 +278,11 @@ export function projectionResultToLocal(
 			];
 	const projectionStartDate = result.milestones.projectionStartDate;
 	const startCheckpoint =
-		model?.checkpoints.some((checkpoint) => {
-			const day = new Date(checkpoint.observedAt * 1000)
-				.toISOString()
-				.slice(0, 10);
-			return day === projectionStartDate;
-		}) ?? false;
+		model?.checkpoints.some(
+			(checkpoint) =>
+				isoDateFromEpochSeconds(checkpoint.observedAt) ===
+				projectionStartDate,
+		) ?? false;
 	const transactions = projectionTransactions(result, model, {
 		startCheckpoint,
 	});
@@ -570,6 +568,79 @@ function useProjectionSource(enabled: boolean): {
 		{ ...evalSummaryOptions(scope), enabled: active },
 		client,
 	);
+	const rows = [
+		balances,
+		transactions,
+		schedules,
+		purchases,
+		checkpoints,
+		summary,
+	];
+	const rowError = rows.find((row) => row.error)?.error ?? null;
+	// Memoized on the six row-query data values and the scope: the source
+	// object keeps its identity across renders until the server rows change,
+	// so downstream projection keys and mapped results stay stable.
+	const memoizedSource = useMemo<ProjectionSource | null>(() => {
+		if (!active) return null;
+		if (status.error) return null;
+		if (status.data?.hasModel !== true) return null;
+		if (rowError) return null;
+		const balancesData = balances.data;
+		const transactionsData = transactions.data;
+		const schedulesData = schedules.data;
+		const purchasesData = purchases.data;
+		const checkpointsData = checkpoints.data;
+		const summaryData = summary.data;
+		if (
+			balancesData === undefined ||
+			transactionsData === undefined ||
+			schedulesData === undefined ||
+			purchasesData === undefined ||
+			checkpointsData === undefined ||
+			summaryData === undefined
+		)
+			return null;
+		const transactionRows = transactionsData.transactions;
+		const scheduleRows = schedulesData.schedules;
+		const checkpointRows = checkpointsData.checkpoints;
+		const revisions = [
+			balancesData.revision,
+			transactionsData.revision,
+			schedulesData.revision,
+			purchasesData.revision,
+			checkpointsData.revision,
+			summaryData.revision,
+		].filter((revision): revision is string => Boolean(revision));
+		return {
+			revision: [...new Set(revisions)].sort().join("|"),
+			startDate: projectionStartDateFromRows({
+				checkpoints: checkpointRows,
+				schedules: scheduleRows,
+				transactions: transactionRows,
+			}),
+			accounts: balancesData.accounts.map((account) => ({
+				id: account.id,
+				name: account.name,
+			})),
+			transactions: transactionRows,
+			schedules: scheduleRows,
+			plannedPurchases: purchasesData.plannedPurchases,
+			checkpoints: checkpointRows,
+			evaluations: normalizedEvaluations(summaryData.evaluations),
+		};
+	}, [
+		active,
+		scope,
+		status.error,
+		status.data,
+		rowError,
+		balances.data,
+		transactions.data,
+		schedules.data,
+		purchases.data,
+		checkpoints.data,
+		summary.data,
+	]);
 	if (!active)
 		return { source: null, hasModel: false, pending: false, error: null };
 	if (status.error)
@@ -586,15 +657,6 @@ function useProjectionSource(enabled: boolean): {
 			pending: status.isPending,
 			error: null,
 		};
-	const rows = [
-		balances,
-		transactions,
-		schedules,
-		purchases,
-		checkpoints,
-		summary,
-	];
-	const rowError = rows.find((row) => row.error)?.error;
 	if (rowError)
 		return {
 			source: null,
@@ -602,37 +664,10 @@ function useProjectionSource(enabled: boolean): {
 			pending: false,
 			error: rowError.message,
 		};
-	if (rows.some((row) => row.data === undefined))
+	if (!memoizedSource)
 		return { source: null, hasModel: true, pending: true, error: null };
-	const transactionRows = transactions.data!.transactions;
-	const scheduleRows = schedules.data!.schedules;
-	const checkpointRows = checkpoints.data!.checkpoints;
-	const revisions = [
-		balances.data!.revision,
-		transactions.data!.revision,
-		schedules.data!.revision,
-		purchases.data!.revision,
-		checkpoints.data!.revision,
-		summary.data!.revision,
-	].filter((revision): revision is string => Boolean(revision));
 	return {
-		source: {
-			revision: [...new Set(revisions)].sort().join("|"),
-			startDate: projectionStartDateFromRows({
-				checkpoints: checkpointRows,
-				schedules: scheduleRows,
-				transactions: transactionRows,
-			}),
-			accounts: balances.data!.accounts.map((account) => ({
-				id: account.id,
-				name: account.name,
-			})),
-			transactions: transactionRows,
-			schedules: scheduleRows,
-			plannedPurchases: purchases.data!.plannedPurchases,
-			checkpoints: checkpointRows,
-			evaluations: normalizedEvaluations(summary.data!.evaluations),
-		},
+		source: memoizedSource,
 		hasModel: true,
 		pending: false,
 		error: null,
@@ -641,6 +676,7 @@ function useProjectionSource(enabled: boolean): {
 
 export function useRemoteProjection({
 	model: modelOverride,
+	revision: revisionOverride,
 	years: yearsOverride,
 	ranges: rangesOverride,
 	evaluations: evaluationsOverride,
@@ -651,7 +687,7 @@ export function useRemoteProjection({
 	const rowSource = useProjectionSource(enabled && modelOverride === undefined);
 	const source =
 		modelOverride !== undefined
-			? projectionSourceFromModel(modelOverride)
+			? projectionSourceFromModel(modelOverride, revisionOverride)
 			: rowSource.source;
 	const hasModel =
 		modelOverride !== undefined ? modelOverride !== null : rowSource.hasModel;

@@ -95,10 +95,10 @@ it("adds one wishlist row at the end of the queue", async () => {
 		name: "desk",
 		priority: 2,
 	});
-	// The authoritative model refetches after the persisted write.
+	// The authoritative purchase queue refetches after the persisted write.
 	expect(
 		server.calls.some(
-			(call) => call.method === "GET" && call.url === "/v1/financial-model",
+			(call) => call.method === "GET" && call.url === "/v1/planned-purchases",
 		),
 	).toBe(true);
 });
@@ -179,7 +179,7 @@ it("refreshes authoritative state after a rejected write", async () => {
 	expect(await saveNewPurchase(wish("desk"), 2)).toBe(false);
 	expect(
 		server.calls.some(
-			(call) => call.method === "GET" && call.url === "/v1/financial-model",
+			(call) => call.method === "GET" && call.url === "/v1/planned-purchases",
 		),
 	).toBe(true);
 });
@@ -219,8 +219,12 @@ it("fails a pending save on resource switch without a stale refresh", async () =
 	release(undefined);
 	await expect(pending).resolves.toBe(false);
 	// The shared lifecycle reports the switch before refreshing, so the new
-	// resource sees no model fetch and no success for the old save.
-	expect(server.modelFetches()).toEqual([]);
+	// resource sees no purchase fetch and no success for the old save.
+	expect(
+		server.calls.filter(
+			(call) => call.method === "GET" && call.url === "/v1/planned-purchases",
+		),
+	).toEqual([]);
 	expect(
 		useNotifications.getState().items.some((item) => item.kind === "success"),
 	).toBe(false);
@@ -274,24 +278,27 @@ it("serializes concurrent saves: the second save returns false", async () => {
 
 it("fails on resource switch during the refresh, not just the request", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
-	let releaseModel!: (response: Response) => void;
-	const modelGate = new Promise<Response>((resolve) => {
-		releaseModel = resolve;
+	let releasePurchases!: (response: Response) => void;
+	const purchasesGate = new Promise<Response>((resolve) => {
+		releasePurchases = resolve;
 	});
-	server.holdModel(modelGate);
+	server.holdPurchases(purchasesGate);
 	const pending = saveNewPurchase(wish("desk"), 2);
 	await vi.waitFor(() => {
 		expect(
 			server.calls.some(
-				(call) => call.method === "GET" && call.url === "/v1/financial-model",
+				(call) => call.method === "GET" && call.url === "/v1/planned-purchases",
 			),
 		).toBe(true);
 	});
 	// The write persisted, but the authoritative reload now belongs to a
 	// resource that is no longer current: no success, no stale notice.
 	acceptOwnerResource("users/b");
-	releaseModel(
-		ok({ model: seedPurchases(), issues: [], revision: '"sha256-test"' }),
+	releasePurchases(
+		ok({
+			plannedPurchases: seedPurchases().plannedPurchases ?? [],
+			revision: '"sha256-test"',
+		}),
 	);
 	await expect(pending).resolves.toBe(false);
 	expect(
