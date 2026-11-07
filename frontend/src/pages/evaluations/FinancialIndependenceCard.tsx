@@ -96,7 +96,7 @@ export function FinancialIndependenceCard({
 						aria-haspopup="dialog"
 						aria-label={`Inspect independence for ${item.name}`}
 						onClick={() => setInspector(true)}
-						className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+						className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0"
 					/>
 				)}
 				<div className="relative flex items-start justify-between gap-3">

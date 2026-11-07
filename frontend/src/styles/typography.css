@@ -34,6 +34,16 @@
 	.type-value {
 		font-variant-numeric: tabular-nums;
 	}
+	/* Large standalone amounts and outcomes share one size stack so cards do
+	   not repeat arbitrary font-size or line-height literals. Components keep
+	   layout, spacing, and overflow handling; this owns family, numerals, and
+	   display size. */
+	.type-value-display {
+		@apply text-3xl leading-[1.2] font-medium tracking-tight;
+		font-family: var(--font-ui);
+		font-variant-numeric: tabular-nums;
+		overflow-wrap: anywhere;
+	}
 	body {
 		@apply min-w-xs text-sm leading-relaxed;
 	}

@@ -1,3 +1,5 @@
+import { pressToggleStyles } from "../../../components/AccountToggle.tsx";
+import { mergeStyles } from "../../../components/mergeStyles.ts";
 import { exactMoney } from "../../../domain/format.ts";
 
 /**
@@ -35,7 +37,7 @@ export function TogglePill({
 			type="button"
 			aria-pressed={checked}
 			onClick={onToggle}
-			className="group cursor-pointer rounded-control border border-line-strong bg-surface px-3 py-2 text-left text-xs transition-[border-color,background] duration-150 hover:bg-hover aria-pressed:border-primary aria-pressed:bg-success-bg motion-reduce:transition-none"
+			className={mergeStyles(pressToggleStyles, "pl-3")}
 		>
 			<TogglePillLabel name={name} detail={detail} />
 		</button>

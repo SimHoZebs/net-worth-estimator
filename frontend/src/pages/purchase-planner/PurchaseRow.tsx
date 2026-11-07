@@ -38,7 +38,7 @@ export function PurchaseRow({
 				<button
 					type="button"
 					onClick={() => onInspect(item.purchase)}
-					className="rounded-control border-0 bg-transparent px-0 py-0.5 text-left text-inherit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+					className="rounded-control border-0 bg-transparent px-0 py-0.5 text-left text-inherit"
 					aria-label={`Inspect ${item.purchase.name}, priority ${item.priority}`}
 				>
 					<strong className="text-sm group-data-[excluded=true]/purchase:text-muted group-data-[excluded=true]/purchase:line-through">

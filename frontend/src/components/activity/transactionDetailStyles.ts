@@ -11,7 +11,7 @@ export const detailFooterClassName =
 
 /** Inline controls keep their read layout and own their native interaction states. */
 export const transactionControlStyles = cva(
-	"m-0 max-w-full rounded-control border border-transparent bg-transparent px-px py-0 enabled:hover:border-line-strong focus-visible:bg-input-bg focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-0",
+	"m-0 max-w-full rounded-control border border-transparent bg-transparent px-px py-0 enabled:hover:border-line-strong focus-visible:bg-input-bg",
 	{
 		variants: {
 			element: {

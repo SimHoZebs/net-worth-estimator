@@ -97,6 +97,9 @@ export function AddTransactionDialog({
 	const [saving, setSaving] = useState(false);
 	const [transactionTime, setTransactionTime] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const timeInvalid =
+		transactionTime !== "" &&
+		!Number.isFinite(combineDayTime(startDate, transactionTime));
 	const enabledId = useId();
 
 	const dirty =
@@ -114,6 +117,10 @@ export function AddTransactionDialog({
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving) return;
+		if (timeInvalid) {
+			setError("Choose a valid time.");
+			return;
+		}
 		const parsedAmount = parseDisplayNumber(amount);
 		if (parsedAmount === null) {
 			setError("Enter an amount of zero or more.");
@@ -219,7 +226,7 @@ export function AddTransactionDialog({
 						label="Time (UTC, optional)"
 						type="time"
 						step="1"
-						hint="Blank means midnight UTC. Every stored time is an exact instant."
+						hint={timeInvalid ? "Choose a valid time." : undefined}
 						value={transactionTime}
 						onChange={(event) => setTransactionTime(event.target.value)}
 					/>

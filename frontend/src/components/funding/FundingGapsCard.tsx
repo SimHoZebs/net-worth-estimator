@@ -156,7 +156,7 @@ export function FundingGapsCard({
 							</p>
 							<div className="flex items-start justify-between gap-3">
 								<div>
-									<span className="type-value block text-3xl leading-[1.2] font-medium tracking-tight text-danger-text tabular-nums [overflow-wrap:anywhere]">
+									<span className="type-value-display block text-danger-text">
 										{money(summary.shortfall)} short
 									</span>
 									<span className="mt-2 block text-xs leading-relaxed text-muted">
@@ -238,7 +238,7 @@ export function FundingGapsCard({
 					</>
 				) : (
 					<div>
-						<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-tight [overflow-wrap:anywhere]">
+						<div className="type-value-display mt-0 mr-0 mb-1 ml-0">
 							{statusTitle}
 						</div>
 						{statusDescription && (

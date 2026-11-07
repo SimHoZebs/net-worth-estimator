@@ -111,7 +111,7 @@ export function ActionMenu({
 										item.onSelect();
 									}}
 									className={mergeStyles(
-										"flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover disabled:opacity-60",
+										"flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover pointer-coarse:min-h-12 disabled:opacity-60",
 										item.tone === "danger" ? "text-danger-text" : undefined,
 									)}
 								>

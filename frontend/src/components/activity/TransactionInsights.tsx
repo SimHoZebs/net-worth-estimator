@@ -20,6 +20,8 @@ import { Badge } from "../Badge.tsx";
 import { Button, TextButton } from "../Button.tsx";
 import { FieldError } from "../ErrorNotice.tsx";
 import { InputField, SelectField } from "../Field.tsx";
+import { mergeStyles } from "../mergeStyles.ts";
+import { detailFooterClassName } from "./transactionDetailStyles.ts";
 import {
 	ExistingScheduleDialog,
 	NewScheduleDialog,
@@ -204,11 +206,7 @@ export function TransactionInsightsPanel({
 	const active = open[0] ?? null;
 	const activeKey = active ? suggestionKey(active) : null;
 
-	// A fresh queue entry starts at its question; a confirmed plan still
-	// missing its length starts at the duration step. A snapshot-held
-	// repeating pattern keeps its detail step across refetches. The sync
-	// below is a render-phase adjustment, so a refetched queue never
-	// strands the user on the wrong step.
+	// A render-phase sync resets the step when the queue changes.
 	const [syncedKey, setSyncedKey] = useState<string | null>(null);
 	if (activeKey !== syncedKey && !recurringSnapshot) {
 		setSyncedKey(activeKey);
@@ -262,12 +260,9 @@ export function TransactionInsightsPanel({
 				<span className="mb-5 grid size-12 place-items-center rounded-full bg-success-bg text-success-text">
 					<Check size={24} aria-hidden="true" />
 				</span>
-				<h3 className="m-0 text-lg font-semibold tracking-tight">
+				<h3 className="m-0 mb-6 text-lg font-semibold tracking-tight">
 					All caught up
 				</h3>
-				<p className="mt-2 mb-6 text-xs leading-relaxed text-muted">
-					There are no more suggestions to review.
-				</p>
 				<Button type="button" variant="primary" onClick={onDone}>
 					Done
 				</Button>
@@ -436,13 +431,13 @@ export function TransactionInsightsPanel({
 			<div className="mb-5 grid size-11 place-items-center rounded-surface bg-success-bg text-success-text">
 				<Icon size={21} aria-hidden="true" />
 			</div>
-			<p className="mb-2 text-[10px] font-extrabold tracking-widest text-muted uppercase">
+			<p className="mb-2 text-xs font-extrabold tracking-widest text-muted uppercase">
 				{kicker}
 			</p>
-			<h3 className="m-0 mb-3 text-[22px] leading-snug font-bold tracking-tight">
+			<h3 className="m-0 mb-3 text-xl leading-snug font-bold tracking-tight">
 				{question}
 			</h3>
-			<p className="mt-0 mb-6 flex items-start gap-2 rounded-surface bg-surface-2 p-3 text-[11px] leading-relaxed text-muted">
+			<p className="mt-0 mb-6 flex items-start gap-2 rounded-surface bg-surface-2 p-3 text-xs leading-relaxed text-muted">
 				<Info size={15} aria-hidden="true" className="mt-px flex-none" />
 				<span>{suggestionEvidence(shown)}</span>
 			</p>
@@ -468,7 +463,7 @@ export function TransactionInsightsPanel({
 						</SelectField>
 					)}
 					{movesVoidClaim && shown.voidRow.claimScheduleId && (
-						<p className="m-0 text-[11px] leading-relaxed text-muted">
+						<p className="m-0 text-xs leading-relaxed text-muted">
 							The posted charge records the occurrence of{" "}
 							{names.get(shown.voidRow.claimScheduleId) ?? "its rule"} on{" "}
 							{dateLabel(shown.voidRow.claimOccurrenceDate ?? "", true)}.
@@ -477,12 +472,12 @@ export function TransactionInsightsPanel({
 					{!movesVoidClaim &&
 						shown.voidRow.claimScheduleId &&
 						selectedVoid?.claimScheduleId && (
-							<p className="m-0 text-[11px] leading-relaxed text-muted">
+							<p className="m-0 text-xs leading-relaxed text-muted">
 								The posted charge already records an occurrence. Its claim
 								stays; this hold's claim is cleared with the hold.
 							</p>
 						)}
-					<p className="m-0 text-[11px] leading-relaxed text-muted">
+					<p className="m-0 text-xs leading-relaxed text-muted">
 						The posted charge keeps its amount and date. This clears the
 						vanished hold record.
 					</p>
@@ -533,7 +528,7 @@ export function TransactionInsightsPanel({
 							<option value="months">Months</option>
 						</SelectField>
 					</div>
-					<p className="m-0 text-[11px] leading-relaxed text-muted">
+					<p className="m-0 text-xs leading-relaxed text-muted">
 						Enter the full plan length. The bank charge alone does not establish
 						the total, count, or due dates.
 					</p>
@@ -577,7 +572,7 @@ export function TransactionInsightsPanel({
 				}
 			/>
 
-			<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-8 flex items-center justify-between gap-3 border-t border-line bg-surface px-8 pt-4 pb-1 max-sm:-mx-5 max-sm:-mb-5 max-sm:px-5">
+			<div className={mergeStyles(detailFooterClassName, "mt-8 max-sm:sticky max-sm:mx-0 max-sm:px-5")}>
 				{shown.kind === "void" ? (
 					<>
 						<Button
@@ -610,13 +605,13 @@ export function TransactionInsightsPanel({
 						>
 							Not now
 						</Button>
-						<span className="text-[10px] font-semibold text-muted">
+						<span className="text-xs font-semibold text-muted">
 							{open.length} to review
 						</span>
 					</>
 				) : isBnpl ? (
 					<>
-						<span className="text-[10px] font-semibold text-muted">
+						<span className="text-xs font-semibold text-muted">
 							{open.length} to review
 						</span>
 						<Button
@@ -650,7 +645,7 @@ export function TransactionInsightsPanel({
 						>
 							Continue
 						</Button>
-						<span className="text-[10px] font-semibold text-muted">
+						<span className="text-xs font-semibold text-muted">
 							{open.length} to review
 						</span>
 					</>

@@ -91,7 +91,7 @@ export function EvaluationCard({
 				</div>
 			</div>
 			<div>
-				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-tight [overflow-wrap:anywhere]">
+				<div className="type-value-display mt-0 mr-0 mb-1 ml-0">
 					{!evaluation.enabled ? (
 						"Paused"
 					) : outcomePending ? (

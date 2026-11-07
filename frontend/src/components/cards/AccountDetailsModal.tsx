@@ -1,4 +1,3 @@
-import { cva } from "class-variance-authority";
 import { Repeat2, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
@@ -16,6 +15,7 @@ import { TablePagination } from "../DataTable.tsx";
 import { EmptyState } from "../EmptyState.tsx";
 import { Modal } from "../Modal.tsx";
 import { Progress } from "../Progress.tsx";
+import { SegmentedControl } from "../SegmentedControl.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 import { transactionSelectionKey, useSelectedId } from "../entrySelection.ts";
 
@@ -23,19 +23,6 @@ type StatusFilter = "all" | "pending" | "posted";
 
 /** Rows per transaction page. */
 const PAGE_SIZE = 20;
-
-const transactionFilter = cva(
-	"rounded-control border-0 px-2 py-1 text-xs whitespace-nowrap capitalize",
-	{
-		variants: {
-			selected: {
-				true: "bg-surface font-bold text-ink shadow-xs",
-				false: "bg-transparent text-muted",
-			},
-		},
-		defaultVariants: { selected: false },
-	},
-);
 
 /**
  * Account detail dialog in the host Modal. Reuses TransactionRow and
@@ -190,26 +177,19 @@ export function AccountDetailsModal({
 					}}
 					placeholder="Search transactions…"
 				/>
-				<div
-					className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
-					role="group"
-					aria-label="Filter by transaction status"
-				>
-					{(["all", "pending", "posted"] as const).map((key) => (
-						<button
-							key={key}
-							type="button"
-							className={transactionFilter({ selected: filter === key })}
-							aria-pressed={filter === key}
-							onClick={() => {
-								setFilter(key);
-								setPage(0);
-							}}
-						>
-							{key}
-						</button>
-					))}
-				</div>
+				<SegmentedControl<StatusFilter>
+					ariaLabel="Filter by transaction status"
+					items={[
+						{ value: "all", label: "All", ariaLabel: "all" },
+						{ value: "pending", label: "Pending", ariaLabel: "pending" },
+						{ value: "posted", label: "Posted", ariaLabel: "posted" },
+					]}
+					value={filter}
+					onChange={(value) => {
+						setFilter(value);
+						setPage(0);
+					}}
+				/>
 			</div>
 			{shown.length ? (
 				<>

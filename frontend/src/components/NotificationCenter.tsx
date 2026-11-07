@@ -37,7 +37,7 @@ function ToastCard({ toast }: { toast: Toast }) {
 				label="Dismiss notification"
 				className={
 					toast.kind === "success"
-						? "shrink-0 text-on-primary enabled:hover:bg-black/15 enabled:hover:text-on-primary"
+						? "shrink-0 text-on-primary enabled:hover:bg-primary-hover enabled:hover:text-on-primary"
 						: "shrink-0"
 				}
 				onClick={() => {
