@@ -78,6 +78,13 @@ records the marker without a mapping. A missing, ambiguous, or colliding
 mapping fails before publication when bare keys need it.
 A marked database repeats read-only verification and refuses bare keys.
 
+The account displays table is provision-if-missing in the same candidate.
+Absent creates an empty `account_displays` table on the verified backup
+candidate. Complete repeats read-only. A partial display schema fails
+before mutation. Existing displays verify byte-identical below, and the
+body never infers loan relationships. Operators link existing loan pairs
+explicitly with the one-time account-displays upgrade.
+
 The old import default and pre-upgrade API-set exclusions share the same
 disabled flag. The conversion enables all legacy settled bank rows once,
 including those API exclusions. Later exclusions remain intact on retries.

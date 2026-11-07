@@ -14,6 +14,7 @@
 #      when absent; a partial group fails closed.
 #   5. The completed transaction-ID migration audit table is removed.
 #   6. The account_links institution column is provisioned when absent.
+#   7. The account_displays table is provisioned when absent.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -215,6 +216,38 @@ friendships_state() {
   echo 1
 }
 
+# Account displays are provision-if-missing like friendships: absent is
+# expected on pre-display databases, present requires the exact current
+# shape, and anything partial fails closed. Existing loan relationships are
+# never inferred here; operators link them explicitly with upgrade.py.
+account_displays_state() {
+  count=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='account_displays';") \
+    || fail "Cannot inspect account displays schema; refusing to guess."
+  case "$count" in
+    0) echo 0; return 0 ;;
+    1) ;;
+    *) fail "Partial account displays schema. Refusing automatic repair." ;;
+  esac
+  sqlite3 -readonly "$1" 'SELECT user_id, account_id, display_json FROM account_displays LIMIT 0;' \
+    || fail "Incomplete account displays schema. Refusing automatic repair."
+  pk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_index_list('account_displays') i WHERE i.origin = 'pk' AND (SELECT COUNT(*) FROM pragma_index_info(i.name)) = 2 AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 0) = 'user_id' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 1) = 'account_id';") \
+    || fail "Incomplete account displays schema. Refusing automatic repair."
+  test "$pk" = 1 || fail "Incomplete account displays schema. Refusing automatic repair."
+  fk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('account_displays');") \
+    || fail "Incomplete account displays schema. Refusing automatic repair."
+  test "$fk" = 3 || fail "Incomplete account displays schema. Refusing automatic repair."
+  matched=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('account_displays') WHERE (\"table\", \"from\", \"to\") IN (('users', 'user_id', 'id'), ('accounts', 'user_id', 'user_id'), ('accounts', 'account_id', 'id'));") \
+    || fail "Incomplete account displays schema. Refusing automatic repair."
+  test "$matched" = 3 || fail "Incomplete account displays schema. Refusing automatic repair."
+  grouped=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM (SELECT id FROM pragma_foreign_key_list('account_displays') WHERE \"table\" = 'accounts' GROUP BY id HAVING COUNT(*) = 2);") \
+    || fail "Incomplete account displays schema. Refusing automatic repair."
+  test "$grouped" = 1 || fail "Incomplete account displays schema. Refusing automatic repair."
+  cascade=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('account_displays') WHERE on_delete != 'CASCADE';") \
+    || fail "Incomplete account displays schema. Refusing automatic repair."
+  test "$cascade" = 0 || fail "Incomplete account displays schema. Refusing automatic repair."
+  echo 1
+}
+
 cp_cols() {
   sqlite3 -readonly "$1" "SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('checkpoints') ORDER BY cid LIMIT -1);"
 }
@@ -275,6 +308,7 @@ case "$analysis" in
   *) fail "Partial Analysis schema. Refusing automatic repair." ;;
 esac
 friendships=$(friendships_state "$db") || fail "Cannot inspect friendships schema; refusing to guess."
+displays=$(account_displays_state "$db") || fail "Cannot inspect account displays schema; refusing to guess."
 if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
 fi
@@ -337,7 +371,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
   exit 0
 fi
 
@@ -463,6 +497,26 @@ CREATE INDEX IF NOT EXISTS friendships_account ON friendships(friend_user_id, us
 DDL
   if ! sqlite3 "$candidate" < "$friendships_sql" > "$backup/friendships.log" 2>&1; then
     fail "Candidate friendships upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+
+# Provision the account displays table on pre-display candidates. The DDL
+# mirrors the application schema exactly; the provisioned table stays empty
+# so production never infers loan relationships, and preexisting displays
+# verify byte-identical below.
+if [ "$displays" = 0 ]; then
+  displays_sql="$backup/displays.sql"
+  cat > "$displays_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS account_displays (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL,
+  display_json TEXT NOT NULL,
+  PRIMARY KEY(user_id, account_id),
+  FOREIGN KEY(user_id, account_id) REFERENCES accounts(user_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+DDL
+  if ! sqlite3 "$candidate" < "$displays_sql" > "$backup/displays.log" 2>&1; then
+    fail "Candidate account displays upgrade failed. Original unchanged; backup retained at $backup."
   fi
 fi
 

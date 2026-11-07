@@ -367,6 +367,96 @@ test("existing friendships survive migration byte-identical", async (t) => {
   assert.deepEqual(await backups(directory), []);
 });
 
+test("pre-display database gains an empty account displays table with data preserved", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displays-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  // Model a deployed database from before account displays existed.
+  await sqlite(db, `DROP TABLE account_displays;`);
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+  const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+
+  assert.equal(await rows(db, "SELECT user_id, account_id, display_json FROM account_displays LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM account_displays;"), "0");
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal((await backups(directory)).length, 1);
+
+  // The provisioned target now repeats read-only.
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("existing account displays survive migration byte-identical", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displayrows-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','principal',0,'Principal','debt',1), ('${owner}','interest',1,'Interest','debt',1);`);
+  await sqlite(db, `INSERT INTO account_displays(user_id, account_id, display_json) VALUES
+    ('${owner}', 'principal', '{"name":"Loan","components":[{"accountId":"principal","role":"principal"},{"accountId":"interest","role":"interest"}],"interestScheduleId":"charge","paymentScheduleId":"pay"}');`);
+  const displaysBefore = await rows(db, "SELECT user_id, account_id, display_json FROM account_displays ORDER BY 1, 2;");
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "SELECT user_id, account_id, display_json FROM account_displays ORDER BY 1, 2;"), displaysBefore);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("partial account displays schema fails closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displayshape-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE account_displays;
+    CREATE TABLE account_displays(user_id TEXT NOT NULL, account_id TEXT NOT NULL);`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  await migrateFails(db);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("account displays with columns but without constraints fail closed", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displayconstraints-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE account_displays;
+    CREATE TABLE account_displays(user_id TEXT NOT NULL, account_id TEXT NOT NULL, display_json TEXT NOT NULL);`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /Incomplete account displays schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("account displays with wrong delete action fail closed", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displaycascade-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE account_displays;
+    CREATE TABLE account_displays (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL,
+      display_json TEXT NOT NULL,
+      PRIMARY KEY(user_id, account_id),
+      FOREIGN KEY(user_id, account_id) REFERENCES accounts(user_id, id)
+    );`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /Incomplete account displays schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
 test("pre-sharing database gains empty sharing tracks, validates, and serves sharing flows", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sharing-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
