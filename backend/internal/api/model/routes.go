@@ -17,6 +17,9 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	s := &handler{store: st, receipts: receiptService, readOnly: readOnly}
 	api = huma.NewGroup(api, "/v1")
 	s.registerPlannedPurchaseRoutes(api)
+	huma.Register(api, huma.Operation{OperationID: "create-loan", Method: "POST", Path: "/loans", Summary: "Create one visible principal and interest loan atomically"}, s.createLoan)
+	huma.Register(api, huma.Operation{OperationID: "update-loan", Method: "PUT", Path: "/loans/{id}", Summary: "Update a loan and its managed rules atomically"}, s.updateLoan)
+	huma.Register(api, huma.Operation{OperationID: "delete-loan", Method: "DELETE", Path: "/loans/{id}", Summary: "Delete a loan and its managed rules atomically"}, s.deleteLoan)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/safe-spending-settings", Summary: "Load safe card spending settings"}, s.getSafeSpendingSettings)
 	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/safe-spending-settings", Summary: "Save safe card spending settings"}, s.setSafeSpendingSettings)
 	huma.Register(api, huma.Operation{

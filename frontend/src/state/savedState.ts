@@ -1,5 +1,9 @@
 import { useMemo } from "react";
 import {
+	toDisplayAccounts,
+	toDisplayTransaction,
+} from "../domain/accountDisplay.ts";
+import {
 	balanceRowToDisplay,
 	plannedPurchaseRowToDisplay,
 } from "../api/adapter.ts";
@@ -38,7 +42,10 @@ import {
 export function useSavedAccounts(): Account[] | null {
 	const balances = useAccountBalances().data;
 	return useMemo(
-		() => (balances ? balances.accounts.map(balanceRowToDisplay) : null),
+		() =>
+			balances
+				? toDisplayAccounts(balances.accounts.map(balanceRowToDisplay))
+				: null,
 		[balances],
 	);
 }
@@ -46,10 +53,15 @@ export function useSavedAccounts(): Account[] | null {
 /** Saved transaction query rows as display transactions. */
 export function useSavedTransactions(): Transaction[] | null {
 	const list = useTransactions().data;
+	const accounts = useSavedAccounts();
 	return useMemo(
 		() =>
-			list ? list.transactions.map((row) => transactionToDisplay(row)) : null,
-		[list],
+			list
+				? list.transactions.map((row) =>
+						toDisplayTransaction(transactionToDisplay(row), accounts ?? []),
+					)
+				: null,
+		[list, accounts],
 	);
 }
 

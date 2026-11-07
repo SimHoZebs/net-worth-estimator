@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -210,6 +211,7 @@ func (s *handler) recordTransaction(_ context.Context, input *transactionInput) 
 		transaction.ID = id.String()
 	}
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+		transaction.Destinations = displayDestinations(model, transaction.Destinations)
 		model.Transactions = replaceByID(model.Transactions, transaction.ID, transactionID, transaction)
 	}, func() (types.Transaction, error) {
 		return s.store.CreateTransaction(transaction)
@@ -240,6 +242,12 @@ func (s *handler) storedTransaction(id string) (types.Transaction, error) {
 
 func (s *handler) saveTransaction(transaction types.Transaction) (*transactionOutput, error) {
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+		for _, existing := range model.Transactions {
+			if existing.ID == transaction.ID && !slices.Equal(existing.Destinations, transaction.Destinations) {
+				transaction.Destinations = displayDestinations(model, transaction.Destinations)
+				break
+			}
+		}
 		model.Transactions = replaceByID(model.Transactions, transaction.ID, transactionID, transaction)
 	}, func() (types.Transaction, error) {
 		return s.store.UpdateTransaction(transaction)

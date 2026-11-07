@@ -46,6 +46,10 @@ func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), pe
 // Success-path issues carry finance-only warnings; forecast diagnostics
 // stay on the whole-model read.
 func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
+	return runFinanceRowWriteGuarded(s, nil, mutate, persist)
+}
+
+func runFinanceRowWriteGuarded[T any](s *handler, guard func(*types.FinancialModel) error, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
 	var baseline []types.ModelValidationIssue
 	return runRowWriteWithValidator(s.store, func(model *types.FinancialModel) {
 		// Capture references before helpers compact shared backing arrays.
@@ -53,7 +57,7 @@ func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialMod
 		mutate(model)
 	}, persist, func(candidate *types.FinancialModel) []types.ModelValidationIssue {
 		return domain.ValidateFinanceWriteChange(baseline, candidate)
-	}, domain.ValidateFinanceModel)
+	}, domain.ValidateFinanceModel, guard)
 }
 
 // PersistFinanceSchedule validates and persists one generated recurrence rule
@@ -89,7 +93,7 @@ func runFinanceRowWriteWithStore[T any](st store.Store, mutate func(model *types
 	}, domain.ValidateFinanceModel)
 }
 
-func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue) (T, []types.ModelValidationIssue, bool, string, error) {
+func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue, guards ...func(*types.FinancialModel) error) (T, []types.ModelValidationIssue, bool, string, error) {
 	var zero T
 	model, err := st.LoadModel()
 	if err != nil {
@@ -97,6 +101,13 @@ func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.Fi
 	}
 	if model == nil {
 		model = &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
+	}
+	for _, guard := range guards {
+		if guard != nil {
+			if err := guard(model); err != nil {
+				return zero, nil, false, "", err
+			}
+		}
 	}
 	mutate(model)
 	issues := validateCandidate(model)

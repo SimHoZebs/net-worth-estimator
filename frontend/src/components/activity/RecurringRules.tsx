@@ -11,6 +11,7 @@ import {
 import { Reorder, useDragControls } from "motion/react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
+import { toDisplayTransaction } from "../../domain/accountDisplay.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
 import { scheduleToDisplay } from "../../domain/transactionRows.ts";
@@ -120,7 +121,13 @@ export function RecurringRules({
 	const [editing, setEditing] = useState(false);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
-	const rows = useMemo(() => rules.map(scheduleToDisplay), [rules]);
+	const rows = useMemo(
+		() =>
+			rules.map((rule) =>
+				toDisplayTransaction(scheduleToDisplay(rule), accounts),
+			),
+		[rules, accounts],
+	);
 	// Local identity only: the rule is resolved from current rows each
 	// render, so updates stay current while a removed rule renders as no
 	// selection and closes the detail.

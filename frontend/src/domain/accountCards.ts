@@ -1,4 +1,5 @@
 import { dateLabel, money } from "./format.ts";
+import { displayBalance } from "./accountDisplay.ts";
 import type { Account } from "./model.ts";
 import type { Projection } from "./result.ts";
 
@@ -89,7 +90,9 @@ export function toAccountCard({
 	const roles = rolesFor(account);
 	const magnitude = Math.abs(account.balance);
 	const last = projection?.points.at(-1);
-	const ending = last?.balances[account.id] ?? account.balance;
+	const ending = last
+		? displayBalance(account, last.balances)
+		: account.balance;
 	const metrics: CardMetric[] = [
 		{ label: "Protected balance", value: money(account.minBalance) },
 		{ label: "Projected ending", value: money(Math.abs(ending)) },

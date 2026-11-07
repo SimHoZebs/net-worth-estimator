@@ -15,6 +15,27 @@ const id = z.string().min(1).max(100);
 const name = z.string().trim().min(1).max(100);
 
 export const accountSchema = z.object({
+	display: z
+		.object({
+			name: z.string(),
+			interestScheduleId: z.string(),
+			paymentScheduleId: z.string(),
+			components: z.array(
+				z.object({ accountId: z.string(), role: z.string() }),
+			),
+		})
+		.optional(),
+	components: z
+		.array(
+			z.object({
+				accountId: z.string(),
+				role: z.string(),
+				balance: z.number(),
+				observedBalance: z.number().nullable(),
+				observedAt: z.number().nullable(),
+			}),
+		)
+		.optional(),
 	id,
 	name,
 	kind: accountKindSchema,

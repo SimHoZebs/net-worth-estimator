@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"slices"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -158,7 +159,13 @@ func (s *handler) storedSchedule(id string) (types.Schedule, error) {
 }
 
 func (s *handler) saveSchedule(schedule types.Schedule) (*scheduleOutput, error) {
-	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWriteGuarded(s, func(model *types.FinancialModel) error { return requireOrdinarySchedule(model, schedule.ID) }, func(model *types.FinancialModel) {
+		for _, existing := range model.Schedules {
+			if existing.ID == schedule.ID && !slices.Equal(existing.Destinations, schedule.Destinations) {
+				schedule.Destinations = displayDestinations(model, schedule.Destinations)
+				break
+			}
+		}
 		model.Schedules = replaceByID(model.Schedules, schedule.ID, scheduleID, schedule)
 	}, func() (types.Schedule, error) {
 		return s.store.UpdateSchedule(schedule)
@@ -191,6 +198,7 @@ func (s *handler) createSchedule(_ context.Context, input *scheduleInput) (*sche
 			}
 			schedule.Priority = maximum + 1
 		}
+		schedule.Destinations = displayDestinations(model, schedule.Destinations)
 		model.Schedules = replaceByID(model.Schedules, schedule.ID, scheduleID, schedule)
 	}, func() (types.Schedule, error) {
 		return s.store.CreateSchedule(schedule)

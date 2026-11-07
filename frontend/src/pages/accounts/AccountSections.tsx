@@ -13,6 +13,10 @@ import {
 } from "../../domain/transactionSort.ts";
 import { balanceRowToDisplay } from "../../api/adapter.ts";
 import {
+	toDisplayAccounts,
+	toDisplayTransaction,
+} from "../../domain/accountDisplay.ts";
+import {
 	type Account,
 	visibleAccounts,
 	visibleTransactions,
@@ -30,7 +34,7 @@ import {
 	transactionToDisplay,
 } from "../../domain/transactionRows.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
-import { deleteAccount } from "@/api/generated/endpoints.ts";
+import { deleteAccount, deleteLoan } from "@/api/generated/endpoints.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
@@ -74,7 +78,9 @@ function AccountsView({
 	const visible = useMemo(
 		() =>
 			visibleAccounts(
-				(balances.data?.accounts ?? []).map(balanceRowToDisplay),
+				toDisplayAccounts(
+					(balances.data?.accounts ?? []).map(balanceRowToDisplay),
+				),
 			),
 		[balances.data],
 	);
@@ -92,7 +98,8 @@ function AccountsView({
 		setRemoving(true);
 		setRemoveError(null);
 		const ok = await performSave({
-			call: () => deleteAccount(remove.id),
+			call: () =>
+				remove.display ? deleteLoan(remove.id) : deleteAccount(remove.id),
 			refresh: refreshAccounts,
 			failureMessage: "The account could not be removed.",
 		});
@@ -193,9 +200,9 @@ function TransactionsView({
 	const rows = useMemo(
 		() =>
 			(transactionsQuery.data?.transactions ?? []).map((row) =>
-				transactionToDisplay(row),
+				toDisplayTransaction(transactionToDisplay(row), accounts ?? []),
 			),
-		[transactionsQuery.data],
+		[transactionsQuery.data, accounts],
 	);
 	// Rules are their own rows from their own endpoint. The table renders
 	// them through the same display shape the shared editor uses.
@@ -203,7 +210,13 @@ function TransactionsView({
 		() => rulesQuery.data?.schedules ?? [],
 		[rulesQuery.data],
 	);
-	const ruleRows = useMemo(() => rules.map(scheduleToDisplay), [rules]);
+	const ruleRows = useMemo(
+		() =>
+			rules.map((rule) =>
+				toDisplayTransaction(scheduleToDisplay(rule), accounts ?? []),
+			),
+		[rules, accounts],
+	);
 	const ruleCadence = useMemo(
 		() =>
 			new Map(rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)])),

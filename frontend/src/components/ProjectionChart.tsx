@@ -56,6 +56,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 				.map((account) => ({
 					id: account.id,
 					name: account.name,
+					display: account.display,
 				})),
 		[savedAccounts],
 	);

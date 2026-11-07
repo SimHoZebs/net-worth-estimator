@@ -70,7 +70,9 @@ export function EvaluationsPage({
 	const archivedIds = useMemo(
 		() =>
 			new Set(
-				(balances.data?.accounts ?? [])
+				toDisplayAccounts(
+					(balances.data?.accounts ?? []).map(balanceRowToDisplay),
+				)
 					.filter((account) => account.archived)
 					.map((account) => account.id),
 			),
@@ -146,3 +148,5 @@ export function EvaluationsPage({
 		</>
 	);
 }
+import { balanceRowToDisplay } from "../api/adapter.ts";
+import { toDisplayAccounts } from "../domain/accountDisplay.ts";

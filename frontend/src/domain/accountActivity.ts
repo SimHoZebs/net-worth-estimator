@@ -1,4 +1,5 @@
 import { shiftDate } from "./format.ts";
+import { displayAccountId } from "./accountDisplay.ts";
 import {
 	isHistoricalTransaction,
 	isPendingTransaction,
@@ -81,6 +82,35 @@ export function accountTransactions({
 	startDate: string;
 	projection?: Projection | null;
 }): AccountTransaction[] {
+	if (accounts.some((a) => a.display)) {
+		const resolve = (id: string | null) =>
+			id ? displayAccountId(accounts, id) : null;
+		transactions = transactions.map((t) => ({
+			...t,
+			fromId: resolve(t.fromId),
+			toId: resolve(t.toId),
+		}));
+		if (projection)
+			projection = {
+				...projection,
+				transactions: projection.transactions.map((t) => {
+					const deltas = new Map<string, number>();
+					for (const d of t.accountDeltas) {
+						const id = displayAccountId(accounts, d.accountId);
+						deltas.set(id, (deltas.get(id) ?? 0) + d.delta);
+					}
+					return {
+						...t,
+						fromId: resolve(t.fromId),
+						toId: resolve(t.toId),
+						accountDeltas: [...deltas].map(([accountId, delta]) => ({
+							accountId,
+							delta,
+						})),
+					};
+				}),
+			};
+	}
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	const archived = new Map(
 		accounts.map((account) => [account.id, account.archived]),

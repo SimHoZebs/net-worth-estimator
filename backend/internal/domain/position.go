@@ -32,8 +32,9 @@ func ResolveCurrentPosition(model *types.FinancialModel, asOfDate string, overri
 	}
 	for _, account := range position.model.Accounts {
 		row := types.PositionAccount{
-			AccountID: account.ID,
-			Balance:   roundCurrency(position.state.Balances[account.ID]),
+			UnroundedBalance: position.state.Balances[account.ID],
+			AccountID:        account.ID,
+			Balance:          roundCurrency(position.state.Balances[account.ID]),
 		}
 		if observed, ok := position.replay.latestObserved[account.ID]; ok {
 			observedBalance := observed.Balance

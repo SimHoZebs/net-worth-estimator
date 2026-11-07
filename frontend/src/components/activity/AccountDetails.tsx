@@ -226,7 +226,7 @@ export function AccountDetails({
 					<option value="cash">Cash & savings</option>
 					<option value="investment">Investments</option>
 					<option value="property">Property</option>
-					<option value="debt">Debt</option>
+					{account.kind === "debt" && <option value="debt">Debt</option>}
 				</SelectField>
 				<label
 					htmlFor={`${id}-enabled`}

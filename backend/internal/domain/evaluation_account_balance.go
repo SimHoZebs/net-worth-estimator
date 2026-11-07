@@ -42,6 +42,9 @@ func EvaluateAccountBalance(path *types.ProjectionPath, accountID string, target
 	accountIndex := -1
 	for index, account := range path.EffectiveModel.Accounts {
 		if account.ID == accountID {
+			if account.Display != nil {
+				return evaluateDisplayAccountBalance(path, account.Display, target)
+			}
 			accountIndex = index
 			break
 		}

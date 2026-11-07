@@ -38,19 +38,21 @@ func isArchivedDebt(account types.Account, observedBalance *float64) bool {
 }
 
 type accountBalanceRow struct {
-	ID            string            `json:"id"`
-	Name          string            `json:"name"`
-	Kind          types.AccountKind `json:"kind"`
-	Enabled       bool              `json:"enabled"`
-	Archived      bool              `json:"archived"`
-	Color         *string           `json:"color,omitempty"`
-	MinBalance    *float64          `json:"minBalance"`
-	MaxBalance    *float64          `json:"maxBalance"`
-	Balance       float64           `json:"balance"`
-	ObservedOn    types.IsoDate     `json:"observedOn"`
-	HasCheckpoint bool              `json:"hasCheckpoint"`
-	SyncOwned     bool              `json:"syncOwned"`
-	ReadOnly      bool              `json:"readOnly"`
+	ComponentBalance *float64              `json:"componentBalance,omitempty" doc:"Unrounded modeled balance for a component of one visible account"`
+	Display          *types.AccountDisplay `json:"display,omitempty"`
+	ID               string                `json:"id"`
+	Name             string                `json:"name"`
+	Kind             types.AccountKind     `json:"kind"`
+	Enabled          bool                  `json:"enabled"`
+	Archived         bool                  `json:"archived"`
+	Color            *string               `json:"color,omitempty"`
+	MinBalance       *float64              `json:"minBalance"`
+	MaxBalance       *float64              `json:"maxBalance"`
+	Balance          float64               `json:"balance"`
+	ObservedOn       types.IsoDate         `json:"observedOn"`
+	HasCheckpoint    bool                  `json:"hasCheckpoint"`
+	SyncOwned        bool                  `json:"syncOwned"`
+	ReadOnly         bool                  `json:"readOnly"`
 	// Institution is the bank organization name for the linked bridge
 	// account, empty for manual accounts or when the bridge reported
 	// none. It identifies where a synced account came from.
@@ -145,6 +147,14 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 	}
 	rows := []accountBalanceRow{}
 	if model != nil {
+		components := map[string]bool{}
+		for _, a := range model.Accounts {
+			if a.Display != nil {
+				for _, c := range a.Display.Components {
+					components[c.AccountID] = true
+				}
+			}
+		}
 		for _, account := range model.Accounts {
 			adjusted := byAccount[account.ID]
 			observedOn := cutDay
@@ -174,6 +184,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				}
 			}
 			row := accountBalanceRow{
+				Display:          account.Display,
 				ID:               account.ID,
 				Name:             account.Name,
 				Kind:             account.Kind,
@@ -193,6 +204,10 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				ObservedBalance:  adjusted.ObservedBalance,
 				ObservedAt:       adjusted.ObservedAt,
 				AvailableBalance: adjusted.AvailableBalance,
+			}
+			if components[account.ID] {
+				value := adjusted.UnroundedBalance
+				row.ComponentBalance = &value
 			}
 			rows = append(rows, row)
 		}

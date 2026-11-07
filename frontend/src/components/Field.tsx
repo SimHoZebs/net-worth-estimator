@@ -1,5 +1,10 @@
 import { Search } from "lucide-react";
-import { type ComponentProps, type ReactNode, useId } from "react";
+import {
+	createElement,
+	type ComponentProps,
+	type ReactNode,
+	useId,
+} from "react";
 import { mergeStyles } from "./mergeStyles.ts";
 import { checkboxStyles, controlStyles, fieldStyles } from "./fieldStyles.ts";
 
@@ -49,12 +54,27 @@ export function Input({ className, ...input }: ComponentProps<"input">) {
 	);
 }
 
-export function Select({ className, ...select }: ComponentProps<"select">) {
+export function Select({
+	className,
+	rich = false,
+	children,
+	...select
+}: ComponentProps<"select"> & { rich?: boolean }) {
 	return (
 		<select
 			{...select}
-			className={mergeStyles(controlStyles({ kind: "select" }), className)}
-		/>
+			className={mergeStyles(
+				controlStyles({ kind: "select", rich }),
+				className,
+			)}
+		>
+			{rich && (
+				<button type="button" className="min-w-0">
+					{createElement("selectedcontent")}
+				</button>
+			)}
+			{children}
+		</select>
 	);
 }
 
@@ -114,7 +134,7 @@ export function SelectField({
 	id,
 	"aria-describedby": describedBy,
 	...select
-}: FieldProps & ComponentProps<"select">) {
+}: FieldProps & ComponentProps<"select"> & { rich?: boolean }) {
 	return (
 		<Field
 			label={label}

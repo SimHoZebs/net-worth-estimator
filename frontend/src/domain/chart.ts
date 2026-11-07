@@ -137,7 +137,11 @@ export function accountTrendRows({
 	accounts,
 }: {
 	points: ReadonlyArray<Projection["points"][number]>;
-	accounts: ReadonlyArray<{ id: string; name: string }>;
+	accounts: ReadonlyArray<{
+		id: string;
+		name: string;
+		display?: import("./model.ts").Account["display"];
+	}>;
 }): { rows: AccountTrendPoint[]; series: AccountTrendSeries[] } {
 	const present = new Set<string>();
 	for (const point of points) {
@@ -145,7 +149,9 @@ export function accountTrendRows({
 			if (balance !== 0) present.add(accountId);
 		}
 	}
-	const ordered = accounts.filter((account) => present.has(account.id));
+	const ordered = accounts.filter((account) =>
+		componentIds(account).some((id) => present.has(id)),
+	);
 	const names = new Map(ordered.map((account) => [account.id, account.name]));
 	const index = new Map(
 		accounts.map((account, position) => [account.id, position]),
@@ -157,7 +163,7 @@ export function accountTrendRows({
 			rows.push({
 				date,
 				account: names.get(account.id) ?? account.id,
-				balance: point.balances[account.id] ?? 0,
+				balance: displayBalance(account, point.balances),
 			});
 		}
 	}
@@ -165,8 +171,9 @@ export function accountTrendRows({
 	const series = ordered.map((account) => ({
 		id: account.id,
 		name: names.get(account.id) ?? account.id,
-		endBalance: last?.balances[account.id] ?? 0,
+		endBalance: last ? displayBalance(account, last.balances) : 0,
 		colorIndex: index.get(account.id) ?? 0,
 	}));
 	return { rows, series };
 }
+import { componentIds, displayBalance } from "./accountDisplay.ts";

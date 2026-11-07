@@ -49,7 +49,11 @@ export function AccountLinesPlot({
 	height,
 }: {
 	points: Projection["points"];
-	accounts: ReadonlyArray<{ id: string; name: string }>;
+	accounts: ReadonlyArray<{
+		id: string;
+		name: string;
+		display?: import("../../domain/model.ts").Account["display"];
+	}>;
 	height?: number;
 }) {
 	const { rows, series } = useMemo(

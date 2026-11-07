@@ -14,8 +14,11 @@ type CurrentPosition struct {
 }
 
 type PositionAccount struct {
-	AccountID string  `json:"accountId"`
-	Balance   float64 `json:"balance"`
+	// UnroundedBalance retains replay precision for composite-account editors.
+	// Existing position output keeps its whole-dollar presentation contract.
+	UnroundedBalance float64 `json:"-"`
+	AccountID        string  `json:"accountId"`
+	Balance          float64 `json:"balance"`
 	// ObservedBalance is the latest observation at or before the cut.
 	// Nil when the account has no observation in range.
 	ObservedBalance *float64 `json:"observedBalance,omitempty"`

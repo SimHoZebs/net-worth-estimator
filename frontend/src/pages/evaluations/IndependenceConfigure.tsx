@@ -127,7 +127,9 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 	);
 	const accounts = useMemo(
 		() =>
-			(balances.data?.accounts ?? []).map((account) => ({
+			toDisplayAccounts(
+				(balances.data?.accounts ?? []).map(balanceRowToDisplay),
+			).map((account) => ({
 				id: account.id,
 				name: account.name,
 				kind:
@@ -362,3 +364,5 @@ function IndependenceForm({
 		</div>
 	);
 }
+import { balanceRowToDisplay } from "../../api/adapter.ts";
+import { toDisplayAccounts } from "../../domain/accountDisplay.ts";

@@ -38,6 +38,8 @@ type Store interface {
 	InitializeModel() error
 	ImportModel(doc *types.FinancialModel) (*types.FinancialModel, error)
 	CreateAccount(account types.Account) (types.Account, error)
+	SaveLoan(bundle types.LoanBundle, create bool) (types.Account, error)
+	DeleteLoan(id string) error
 	UpdateAccount(account types.Account) (types.Account, error)
 	DeleteAccount(id string) error
 	MoveAccount(id, beforeID string) error

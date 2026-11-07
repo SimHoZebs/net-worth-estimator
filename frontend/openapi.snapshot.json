@@ -7,6 +7,9 @@
 					"color": {
 						"type": ["string", "null"]
 					},
+					"display": {
+						"$ref": "#/components/schemas/AccountDisplay"
+					},
 					"enabled": {
 						"type": "boolean"
 					},
@@ -56,8 +59,16 @@
 					"color": {
 						"type": "string"
 					},
+					"componentBalance": {
+						"description": "Unrounded modeled balance for a component of one visible account",
+						"format": "double",
+						"type": "number"
+					},
 					"currency": {
 						"type": "string"
+					},
+					"display": {
+						"$ref": "#/components/schemas/AccountDisplay"
 					},
 					"enabled": {
 						"type": "boolean"
@@ -198,6 +209,19 @@
 				"required": ["name", "kind", "enabled"],
 				"type": "object"
 			},
+			"AccountComponent": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"role": {
+						"type": "string"
+					}
+				},
+				"required": ["accountId", "role"],
+				"type": "object"
+			},
 			"AccountDelta": {
 				"additionalProperties": false,
 				"properties": {
@@ -210,6 +234,33 @@
 					}
 				},
 				"required": ["transactionId", "delta"],
+				"type": "object"
+			},
+			"AccountDisplay": {
+				"additionalProperties": false,
+				"properties": {
+					"components": {
+						"items": {
+							"$ref": "#/components/schemas/AccountComponent"
+						},
+						"type": ["array", "null"]
+					},
+					"interestScheduleId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"paymentScheduleId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"name",
+					"components",
+					"interestScheduleId",
+					"paymentScheduleId"
+				],
 				"type": "object"
 			},
 			"AccountLink": {
@@ -2506,6 +2557,91 @@
 					}
 				},
 				"required": ["receipts", "extractionAvailable"],
+				"type": "object"
+			},
+			"LoanTerms": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/LoanTerms.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accruedInterest": {
+						"format": "double",
+						"maximum": 10000000000,
+						"minimum": 0,
+						"type": "number"
+					},
+					"annualRate": {
+						"format": "double",
+						"maximum": 1,
+						"minimum": 0,
+						"type": "number"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"fundingAccountId": {
+						"minLength": 1,
+						"type": "string"
+					},
+					"interestFrequency": {
+						"type": "string"
+					},
+					"interestStartDate": {
+						"type": "string"
+					},
+					"name": {
+						"maxLength": 100,
+						"minLength": 1,
+						"type": "string"
+					},
+					"observedAt": {
+						"format": "int64",
+						"minimum": 1,
+						"type": "integer"
+					},
+					"payment": {
+						"format": "double",
+						"maximum": 10000000000,
+						"minimum": 0,
+						"type": "number"
+					},
+					"paymentFrequency": {
+						"type": "string"
+					},
+					"paymentStartDate": {
+						"type": "string"
+					},
+					"principal": {
+						"format": "double",
+						"maximum": 10000000000,
+						"minimum": 0,
+						"type": "number"
+					},
+					"recordBalances": {
+						"description": "On update, record principal and interest observations at observedAt only when true",
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"name",
+					"principal",
+					"accruedInterest",
+					"observedAt",
+					"recordBalances",
+					"annualRate",
+					"interestFrequency",
+					"interestStartDate",
+					"payment",
+					"paymentFrequency",
+					"paymentStartDate",
+					"fundingAccountId",
+					"enabled"
+				],
 				"type": "object"
 			},
 			"LogoutResponse": {
@@ -5694,6 +5830,35 @@
 				"required": ["value", "issues", "saved", "revision"],
 				"type": "object"
 			},
+			"WriteResultString": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/WriteResultString.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"type": "string"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
 			"WriteResultTransaction": {
 				"additionalProperties": false,
 				"properties": {
@@ -7482,6 +7647,128 @@
 					}
 				},
 				"summary": "Scan Gmail for purchase and refund receipts"
+			}
+		},
+		"/v1/loans": {
+			"post": {
+				"operationId": "create-loan",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LoanTerms"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultAccount"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one visible principal and interest loan atomically"
+			}
+		},
+		"/v1/loans/{id}": {
+			"delete": {
+				"operationId": "delete-loan",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultString"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete a loan and its managed rules atomically"
+			},
+			"put": {
+				"operationId": "update-loan",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LoanTerms"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultAccount"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Update a loan and its managed rules atomically"
 			}
 		},
 		"/v1/model/import": {

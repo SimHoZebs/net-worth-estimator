@@ -205,6 +205,11 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		}
 		position++
 	}
+	for _, account := range accounts {
+		if err := saveAccountDisplay(tx, account); err != nil {
+			return err
+		}
+	}
 	if _, err := remergeCheckpoints(tx, model.Checkpoints, syncedCheckpoints, 0); err != nil {
 		return err
 	}
@@ -548,6 +553,9 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 	}
 	if err := accountRows.Close(); err != nil {
 		return nil, fmt.Errorf("close accounts: %w", err)
+	}
+	if err := loadAccountDisplays(q, model.Accounts); err != nil {
+		return nil, err
 	}
 
 	checkpointQuery := `SELECT c.model_account_id, c.balance, c.source, c.observed_at, NULL FROM checkpoints c WHERE c.user_id = :user_id ORDER BY c.position`

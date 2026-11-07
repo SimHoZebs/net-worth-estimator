@@ -138,6 +138,16 @@ func supersedeFindAccount(model *types.FinancialModel, id string) (types.Account
 }
 
 func supersedeCheckPreconditions(tx *userTx, model *types.FinancialModel, manual, synced types.Account, bridgeID string) error {
+	for _, account := range model.Accounts {
+		if account.Display == nil {
+			continue
+		}
+		for _, component := range account.Display.Components {
+			if component.AccountID == manual.ID || component.AccountID == synced.ID {
+				return fmt.Errorf("%w: loan components cannot be merged with bank accounts", store.ErrAccountSupersedeInvalid)
+			}
+		}
+	}
 	// Only owner-authored rows are retired. Empty and provider sources both
 	// belong to bank sync and must fail closed rather than lose bank facts.
 	for _, checkpoint := range model.Checkpoints {

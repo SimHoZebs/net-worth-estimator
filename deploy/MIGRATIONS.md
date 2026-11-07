@@ -1,5 +1,15 @@
 # Migration SOP for every deployment
 
+## Account display relationships
+
+Before this release serves an existing application database, run the explicit
+[account-display upgrade](../docs/account-displays.md#existing-databases).
+It adds `account_displays` without changing existing financial rows. Optional
+linking requires reviewed IDs for one user, two accounts, and two schedules.
+Runtime reads require the current table and never convert old account pairs.
+Retain the operator tool until canonical Compose, dev, and Northflank each
+verify this upgrade. All existing targets remain unverified for this feature.
+
 ## Better Auth and Casbin cutover
 
 The identity replacement uses the separate

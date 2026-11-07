@@ -22,6 +22,7 @@ import (
 // Keep identity and ownership tables outside this allowlist. Unknown scoped
 // tables fail closed so a schema extension cannot silently leave stale rows.
 var financialTables = []string{
+	"account_displays",
 	"accounts", "checkpoints", "checkpoint_available_balances", "transactions", "transaction_sim", "transaction_claims", "transaction_sync_keys", "suppressed_sync_keys", "transaction_categories",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"model_metadata", "payment_terms", "entity_ids",

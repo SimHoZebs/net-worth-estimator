@@ -32,7 +32,10 @@ export function SyncConnectedAccounts({
 	const manualAccounts = useMemo(
 		() =>
 			(savedAccounts ?? []).filter(
-				(account) => !account.readOnly && !linkedAccountIDs.has(account.id),
+				(account) =>
+					!account.display &&
+					!account.readOnly &&
+					!linkedAccountIDs.has(account.id),
 			),
 		[linkedAccountIDs, savedAccounts],
 	);
@@ -71,9 +74,7 @@ export function SyncConnectedAccounts({
 										{link.institution ? (
 											<small className="mt-1 block text-xs text-muted">
 												{link.institution}
-													{link.bridgeName
-														? ` · ${link.bridgeName}`
-														: ""}
+												{link.bridgeName ? ` · ${link.bridgeName}` : ""}
 											</small>
 										) : null}
 									</div>

@@ -36,7 +36,11 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 // stable validation order. It covers finance records plus forecast
 // evaluation configuration: simulation and evaluation writes use it.
 func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidationIssue {
-	return validateModel(model, true)
+	issues := validateModel(model, true)
+	if model != nil {
+		validateAccountDisplays(&issues, model)
+	}
+	return issues
 }
 
 // ValidateFinanceModel runs the pure finance subset used by ordinary
@@ -46,7 +50,11 @@ func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidation
 // work. Finance writes use ValidateFinanceWriteChange instead, which
 // adds back the reference guard for newly introduced orphans.
 func ValidateFinanceModel(model *types.FinancialModel) []types.ModelValidationIssue {
-	return validateModel(model, false)
+	issues := validateModel(model, false)
+	if model != nil {
+		validateAccountDisplays(&issues, model)
+	}
+	return issues
 }
 
 // EvaluationReferenceIssues reports dangling evaluation account

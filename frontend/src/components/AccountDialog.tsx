@@ -12,6 +12,11 @@ import { useSchedules } from "../state/workspaceResources.ts";
 import { scheduleToDisplay } from "../domain/transactionRows.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";
+import { LoanDetails } from "./activity/LoanDetails.tsx";
+import {
+	componentIds,
+	toDisplayTransaction,
+} from "../domain/accountDisplay.ts";
 import { RecurringRules } from "./activity/RecurringRules.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
 import { Drawer } from "./Drawer.tsx";
@@ -63,16 +68,21 @@ export function AccountDialog({
 	const rules = rulesQuery.data?.schedules ?? null;
 	const accountRules = useMemo(
 		() =>
-			(rules ?? []).filter(
-				(rule) =>
-					rule.sourceAccountId === account.id ||
-					(rule.destinations ?? []).includes(account.id),
+			(rules ?? []).filter((rule) =>
+				componentIds(account).some(
+					(id) =>
+						rule.sourceAccountId === id ||
+						(rule.destinations ?? []).includes(id),
+				),
 			),
-		[rules, account.id],
+		[rules, account],
 	);
 	const recurring = useMemo(
-		() => accountRules.map(scheduleToDisplay),
-		[accountRules],
+		() =>
+			accountRules.map((rule) =>
+				toDisplayTransaction(scheduleToDisplay(rule), accounts),
+			),
+		[accountRules, accounts],
 	);
 	// The activity tab maps projected occurrences back to their saved
 	// definition, and both transactions and rules own occurrences.
@@ -90,10 +100,11 @@ export function AccountDialog({
 			transactions.some(
 				(transaction) =>
 					!isHistoricalTransaction(transaction, startDate) &&
-					(transaction.fromId === account.id ||
-						transaction.toId === account.id),
+					componentIds(account).some(
+						(id) => transaction.fromId === id || transaction.toId === id,
+					),
 			),
-		[accountRules, transactions, account.id, startDate],
+		[accountRules, transactions, account, startDate],
 	);
 	return (
 		<Drawer
@@ -172,6 +183,8 @@ export function AccountDialog({
 							onEdit={onEdit}
 						/>
 					)
+				) : account.display ? (
+					<LoanDetails account={account} readOnly={readOnly} onEdit={onEdit} />
 				) : (
 					<AccountDetails
 						key={account.id}

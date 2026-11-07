@@ -95,6 +95,7 @@ const checkpointAvailableBalancesDDL = `CREATE TABLE IF NOT EXISTS checkpoint_av
 
 func schemaStatements() []string {
 	statements := []string{
+		accountDisplaysDDL,
 		`CREATE TABLE IF NOT EXISTS sessions (
 			token TEXT PRIMARY KEY,
 			data BLOB NOT NULL,
@@ -737,6 +738,7 @@ var requiredSchemaColumns = map[string]string{
 	"split_settlement_requests":       "actor_id, request_id, settlement_id, input_hash, created_at",
 	"friendships":                     "user_id, friend_user_id, display_name, created_at",
 	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
+	"account_displays":                "user_id, account_id, display_json",
 	"checkpoints":                     "user_id, id, position, model_account_id, balance, source, provider, observed_at",
 	"transactions":                    "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome",
 	"transaction_sim":                 "user_id, transaction_id, position, enabled, execution_order",

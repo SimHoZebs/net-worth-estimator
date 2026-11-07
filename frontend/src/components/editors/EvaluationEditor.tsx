@@ -19,6 +19,8 @@ import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
+import { balanceRowToDisplay } from "../../api/adapter.ts";
+import { toDisplayAccounts } from "../../domain/accountDisplay.ts";
 
 /** Display kind to backend evaluation table type. */
 function evaluationBackendType(kind: "net-worth" | "reserve"): string {
@@ -59,9 +61,9 @@ export function EvaluationEditor({
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const balances = useAccountBalances();
-	const accounts = (balances.data?.accounts ?? []).filter(
-		(account) => !account.archived,
-	);
+	const accounts = toDisplayAccounts(
+		(balances.data?.accounts ?? []).map(balanceRowToDisplay),
+	).filter((account) => !account.archived);
 
 	const dirty =
 		name !== (item?.name ?? "") ||

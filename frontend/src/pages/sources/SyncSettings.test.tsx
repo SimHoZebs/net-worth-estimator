@@ -51,6 +51,7 @@ const accounts = [
 
 function stubApi(state: {
 	configured: boolean;
+	loan?: boolean;
 	links?: { modelAccountId: string; bridgeName: string }[];
 	failConnect?: boolean;
 	failLinks?: boolean;
@@ -90,7 +91,19 @@ function stubApi(state: {
 		accounts.map((account) => ({
 			id: account.id,
 			name: account.name,
-			kind: account.kind,
+			kind: state.loan && account.id === "home" ? "debt" : account.kind,
+			display:
+				state.loan && account.id === "prime_card"
+					? {
+							name: "Manual loan",
+							interestScheduleId: "charge",
+							paymentScheduleId: "payment",
+							components: [
+								{ accountId: "prime_card", role: "principal" },
+								{ accountId: "home", role: "interest" },
+							],
+						}
+					: undefined,
 			enabled: true,
 			archived: false,
 			balance: 100,
@@ -669,6 +682,30 @@ it("lists every synced account", async () => {
 	expect(screen.queryByRole("button", { name: "Checking" })).toBeNull();
 	expect(screen.queryByRole("button", { name: "Prime Card" })).toBeNull();
 	expect(screen.queryByRole("button", { name: /Save cards/ })).toBeNull();
+});
+
+it("excludes visible loans from bank-link candidates", async () => {
+	stubApi({
+		configured: true,
+		loan: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Checking" }],
+	});
+	render(<SyncSettings />);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "More options for Checking" }),
+	);
+	fireEvent.click(
+		await screen.findByRole("menuitem", { name: "Link existing account" }),
+	);
+	const dialog = await screen.findByRole("dialog", {
+		name: "Link a manual account",
+	});
+	expect(
+		within(dialog).queryByRole("button", { name: /Manual loan/ }),
+	).toBeNull();
+	expect(
+		within(dialog).getByRole("button", { name: /Brokerage/ }),
+	).toBeTruthy();
 });
 
 it("links a manual account to a synced account", async () => {

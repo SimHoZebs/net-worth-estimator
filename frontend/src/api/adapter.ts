@@ -20,12 +20,15 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 	const floor = row.minBalance;
 	const ceiling = row.maxBalance;
 	return {
+		display: row.display
+			? { ...row.display, components: row.display.components ?? [] }
+			: undefined,
 		id: row.id,
 		name: row.name || row.id,
 		kind: accountKindOf(row.kind),
 		enabled: row.enabled,
 		archived: row.archived,
-		balance: row.balance,
+		balance: row.componentBalance ?? row.balance,
 		minBalance:
 			floor === null || floor === NO_FLOOR_SENTINEL || floor < 0 ? 0 : floor,
 		maxBalance:

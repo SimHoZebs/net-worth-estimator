@@ -75,13 +75,14 @@ func (k AccountKind) Valid() bool {
 }
 
 type Account struct {
-	ID         string      `json:"id"`
-	Name       string      `json:"name"`
-	Kind       AccountKind `json:"kind"`
-	MinBalance *float64    `json:"minBalance"` // nil = NoFloor sentinel on the wire
-	MaxBalance *float64    `json:"maxBalance"` // nil = NoCeiling sentinel on the wire
-	Color      *string     `json:"color"`
-	Enabled    bool        `json:"enabled"`
+	Display    *AccountDisplay `json:"display,omitempty"`
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	Kind       AccountKind     `json:"kind"`
+	MinBalance *float64        `json:"minBalance"` // nil = NoFloor sentinel on the wire
+	MaxBalance *float64        `json:"maxBalance"` // nil = NoCeiling sentinel on the wire
+	Color      *string         `json:"color"`
+	Enabled    bool            `json:"enabled"`
 }
 
 func (a *Account) MinBalanceValue() float64 {

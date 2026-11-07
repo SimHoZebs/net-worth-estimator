@@ -10,6 +10,7 @@ import {
 	useSavedEvaluations,
 } from "../state/savedState.ts";
 import { scheduleToDisplay } from "../domain/transactionRows.ts";
+import { toDisplayTransaction } from "../domain/accountDisplay.ts";
 import {
 	editorSearch,
 	editorReturnSearch,
@@ -33,8 +34,11 @@ export function useWorkspaceOverlays() {
 	const transactions = useSavedTransactions();
 	const savedRules = useSavedSchedules();
 	const ruleRows = useMemo(
-		() => (savedRules ?? []).map(scheduleToDisplay),
-		[savedRules],
+		() =>
+			(savedRules ?? []).map((rule) =>
+				toDisplayTransaction(scheduleToDisplay(rule), accounts ?? []),
+			),
+		[savedRules, accounts],
 	);
 	// Deep links resolve against every saved row. Wait for both row
 	// sources so a rule link never reports unavailable before it arrives.
