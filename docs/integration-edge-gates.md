@@ -155,7 +155,7 @@ journeys; duo/full/group journeys run in the Go suite.
 ## Uncovered by automation (never faked green)
 
 - Real identity-provider login, passkey, restart, revocation, refresh, and
-  administrator recovery: the Casdoor test guide and
+  administrator recovery: the Better Auth test guide and
   `auth/test-integration.mjs` (manual, credential-gated).
 - Physical passkeys and phone recovery: the manual checklist above.
 - Live bank sync and real mail OAuth exchange: manual direct checks; the

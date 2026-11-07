@@ -504,7 +504,7 @@ curl -fsS "$BASE_URL/v1/financial-model" \
 Expected baseline:
 
 - `/healthz` returns `ok`;
-- `/v1/status` reports the process configuration;
+- `/v1/status` reports `readOnly`, `hasModel`, `syncConfigured`, `syncHost`, `syncQuotaUsed`, `syncQuotaLimit`, `lastSyncAt` (when present), and `syncError` (when present); see `backend/internal/api/status.go` and the OpenAPI snapshot for the full field set;
 - the model response returns 200;
 - `issues` is an array;
 - warning-severity model issues may be present, but a projection must not run with error-severity issues.
@@ -552,7 +552,7 @@ curl -fsS -D /tmp/deterministic-headers \
 grep -i '^Projection-Source:' /tmp/deterministic-headers
 ```
 
-Run the same request again. The second response should normally report `Projection-Source: stored` when result storage is available. A newly executed simulation reports `Projection-Source: computed`.
+Run the same request again. The second response should report `Projection-Source: computed` for a deterministic request, as every deterministic projection computes directly.
 
 Seeded stochastic request:
 
@@ -570,7 +570,7 @@ grep -i '^Projection-Source:' /tmp/stochastic-headers
 grep '^event:' /tmp/stochastic-events.sse
 ```
 
-A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. Repeating the same request should produce `Projection-Source: stored` and one `result` event. A new run reports `computed`; attachment to an existing shared run reports `shared`. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not store a result.
+A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. A request that owns its seeded run reports `computed`; attachment to an existing shared run reports `shared`. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not store a result.
 
 ## Session and Read-Only Matrix
 
@@ -669,7 +669,10 @@ backend/scripts/verify.sh ./internal/api/...
 
 ## Smoke Script
 
-`scripts/smoke-backend.sh` performs health, model-summary, and sync-trigger requests and requires all three to return 200:
+`scripts/smoke-backend.sh` performs health and model-summary requests and
+checks the SimpleFIN credential endpoint. It skips `POST /v1/sync/simplefin`
+because a trigger needs a connected key, so the check stays unconfigured until
+a key is connected through `POST /v1/sync/simplefin/credential`:
 
 ```bash
 BASE_URL=http://127.0.0.1:8787 scripts/smoke-backend.sh

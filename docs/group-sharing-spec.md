@@ -1,11 +1,13 @@
 # Group transaction sharing — engineering specification (GRP-00)
 
-**Status:** DRAFT — not ratified. Do not implement GRP-02 or GRP-05 until this
-spec is reviewed and accepted. Final acceptance is an explicit human review
-gate (see §13).
+**Status:** Superseded — GRP-02, GRP-03, and GRP-05 are shipped. This file
+retains the pre-ship decision history (Q1–Q6) and must not gate new work.
+Current behavior is owned by [authorization](authorization.md). The
+acceptance gate in §13 is closed; see `docs/authorization.md` for shipped
+automatic-policy, feed, and authorization-path contracts.
 
-**Sources:** `GROUP_SHARING_DECISIONS.md` product decisions 1–11 (2026-11-01),
-`ARCHITECTURE_VALIDATION.md`, `PRODUCT_INTENT.md`, `TECHNICAL_OVERVIEW.md`,
+**Sources:** `docs/group-sharing-decisions.md` product decisions 1–11 (2026-11-01),
+`docs/architecture-validation.md` (now superseded, see below), `PRODUCT_INTENT.md`, `TECHNICAL_OVERVIEW.md`,
 `docs/authorization.md`, `docs/shared-database.md`, tasks GRP-00/GRP-02/GRP-05,
 FND-02, PERF-01 (export-only proposal).
 
@@ -84,15 +86,15 @@ Late-import rule: any row created by bank sync, CSV import, or model
 publication whose canonical date falls in range and whose accounts match
 qualifies without extra review, exactly like a pre-existing row.
 
-## 4. Void / deleted / disabled lifecycle (DECIDED Q4)
+## 4. Void / deleted / disabled lifecycle (DECIDED Q4, as shipped)
 
-> **Q4 — lifecycle eligibility. DECIDED, with deliberate deviation from the
-> earlier atomic-drop proposal.** Voided and deleted rows RETAIN their sharing
-> references until cleanup, rather than dropping them atomically. Storage
-> cleanup is therefore lazy. The compensating guarantee is explicit: every
-> shared read re-checks at read time that the row still exists and is not
-> void, so a retained reference can never serve a withdrawn row (see §7 for
-> both halves of the guarantee). New transactions follow the existing
+> **Q4 — lifecycle eligibility. DECIDED, as shipped.** Voided rows retain
+> their sharing references while the live gate denies them; deleted rows
+> drop theirs. The compensating guarantee is explicit: every shared read
+> re-checks at read time that the row still exists and is not void, so a
+> retained reference can never serve a withdrawn row. Current behavior is
+> owned by [authorization](authorization.md) (`CheckSharedTransactionAccess`
+> and `sharing_visibility` index). New transactions follow the existing
 > non-void enabled rule; pending transactions are treated like posted ones.
 > Account deletion or account-ID reuse must re-validate selected-account
 > ownership; dangling references match nothing.
@@ -131,10 +133,11 @@ qualifies without extra review, exactly like a pre-existing row.
 ## 7. Revocation, concurrency, audit
 
 - Revocation has two halves that hold together. First half, lazy storage
-  cleanup: voided and deleted rows keep their sharing references until
-  cleanup (see §4), and policy changes (disable, narrowing, account
-  deselection, grant revocation, exclusion added, membership removal) bump
-  the policy version number so stale references are fenced. Second half,
+  cleanup: voided rows keep their sharing references until cleanup and
+  deleted rows drop theirs (see §4), and policy changes (disable,
+  narrowing, account deselection, grant revocation, exclusion added,
+  membership removal) bump the policy version number so stale references
+  are fenced. Second half,
   fail-closed read-time checks: every shared read re-checks at read time
   that the row still exists, is not void, and the reference belongs to the
   current policy version — so after commit, no new unauthorized read may
@@ -170,7 +173,7 @@ the same write:
 | Changed data | Sharing-lookup obligation |
 |---|---|
 | Purchase create/edit/delete | recompute automatic references for the owner's policies in the same write |
-| Bank sync (pending-to-posted, late inserts, void marking) | same; voided/deleted rows keep references until cleanup and reads re-check (see §4, §7) |
+| Bank sync (pending-to-posted, late inserts, void marking) | same; voided rows keep references while reads re-check, deleted rows drop theirs (see §4, §7) |
 | Purchase-to-repeating-schedule conversion and back | the purchase side gains/loses references; repeating schedules themselves are not shared rows |
 | Repeating-schedule create/edit/delete | no direct lookup change (see above) |
 | Model import / full reset | full rebuild under a new policy version (under-share until done) |
@@ -192,11 +195,12 @@ the same write:
   durable grant or payload copy.
 - D11/D12 applied: §10, no broker; benchmark-first via PERF-01.
 - D4–D10: RFC text not available in-repo. Reconstructed working assumptions
-  needing RFC confirmation: single-writer SQLite tx gonna govern atomicity;
-  Casdoor remains the identity/permission root with no app-side positive
-  auth cache; existing transaction JSON shape frozen; group/invite subsystem
-  reused not duplicated; recipient copies are independent rows. If the RFC
-  contradicts any of these, this spec must be revised before GRP-02/GRP-05.
+  needing RFC confirmation: single-writer SQLite tx governs atomicity;
+  Better Auth is the identity provider and embedded Casbin the permission
+  evaluator with no app-side positive auth cache; existing transaction
+  JSON shape frozen; group/invite subsystem reused not duplicated;
+  recipient copies are independent rows. Current shipped behavior is owned
+  by [authorization](authorization.md); this spec is superseded.
 
 ## 12. Pagination and testing
 
@@ -211,11 +215,10 @@ the same write:
   purchases (deferred to the server build); interrupted-backfill resume
   (under-share, never over-share).
 
-## 13. Acceptance gate
+## 13. Acceptance gate (closed)
 
-Q1–Q6 are now decided. The architecture-gaps section (§11, missing RFC
-decisions D4–D10 with reconstructed assumptions) stays flagged as
-provisional and returns for correction if the RFC contradicts it.
-Acceptance unblocks GRP-02 (preferences) and GRP-05 (authorization), which
-stay **blocked** until then. GRP-01/GRP-03/GRP-04 depend on the same answers
-and must not bake in contradictory assumptions meanwhile.
+Q1–Q6 are decided and shipped: GRP-02 (preferences), GRP-03 (group feed),
+and GRP-05 (authorization) are implemented. This spec is superseded;
+[authorization](authorization.md) owns current behavior. The §11
+architecture-gaps note remains as historical context for the RFC
+reconstruction and does not block shipped work.

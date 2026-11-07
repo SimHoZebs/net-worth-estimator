@@ -78,6 +78,10 @@ jobs:
               paths=(frontend package.json bun.lock extension/package.json)
               ;;
             auth)
+              # Auth reuse paths derive from auth/better-auth/Dockerfile COPY
+              # sources. Dockerfile is the single source; if a COPY source
+              # changes, update this list. deploy/images.test.mjs parses the
+              # Dockerfile and verifies this list covers every COPY source.
               paths=(auth/better-auth .dockerignore package.json bun.lock frontend/package.json extension/package.json frontend/src/styles frontend/src/components/brandStyles.ts frontend/src/components/buttonStyles.ts frontend/src/components/fieldStyles.ts)
               ;;
             *)

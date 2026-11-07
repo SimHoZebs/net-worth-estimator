@@ -1,5 +1,10 @@
 # Group transaction sharing — ratified product requirements and open engineering decisions
 
+**Status:** Superseded. Q1–Q6 are decided in
+[`docs/group-sharing-spec.md`](group-sharing-spec.md) and shipped; current
+behavior is owned by [authorization](authorization.md). Retained as the
+pre-decision product record.
+
 **Source of truth:** [Notion product specification / architecture RFC](https://app.notion.com/p/40bee37bd02881639c15e9cf5076577e).  **Date:** 2026-11-01.
 
 ## Approved / decided behavior
@@ -20,17 +25,29 @@
 
 - **ADR-D11:** Transaction change events or subscriber hooks were investigated for multiple derived consumers. No Kafka/NATS/broker selection, and no mandate to construct a generic event framework. Do not reinvent a durable messaging service.
 - **ADR-D12:** Existing projections and evaluations use input-identity cache keys and request-driven computation; this is a promising baseline, not a measured performance winner. Separate base path, reader evaluations and simulator evaluations; reuse one simulation where appropriate. Background Analysis currently has a separate evidence revision worker.
-- **Validation required:** Benchmark full-model hashing, persisted revisions, event-driven invalidation and hybrid revision+hash fast path. See `ARCHITECTURE_VALIDATION.md` and export-only proposed `PERF-01`.
+- **Validation required:** Benchmark full-model hashing, persisted revisions, event-driven invalidation and hybrid revision+hash fast path. See `docs/architecture-validation.md` (superseded; unified slice persistence is shipped) and export-only proposed `PERF-01`.
 - **Security exception:** Visibility-index revocation is permission-critical and must be atomic with source/policy mutation or guaranteed by a current fail-closed permission check. Forecast computation may remain lazy; access control may not.
 
-## Still open (do not silently decide)
+## Open items (resolved; see spec for decisions)
 
-- Canonical current transaction date field (e.g. `transaction_time` vs `posted_time`), fallback, timezone conversion and inclusive interval semantics.
-- Exact initial historical-sharing preview behavior, warnings and boundary details.
-- Voided/deleted transaction lifecycle and account-reference integrity corner cases.
-- Indexed-read SQL schema/query plans, incremental sync/update coverage, interrupted backfill handling and performance gates.
-- Choice of write hooks, transaction-scoped events, revision keys or broker; benchmark first.
-- Delegated editing of someone else's *original* transaction is deferred, not approved for current implementation.
+The items below are resolved by Q1–Q6 in
+[`docs/group-sharing-spec.md`](group-sharing-spec.md) and by shipped
+contracts in [authorization](authorization.md). They are retained here as
+the pre-decision open-item list so the log stays in one place.
+
+- Canonical date, timezone, and interval semantics — DECIDED Q1–Q2 in
+  `docs/group-sharing-spec.md`.
+- History preview content and warnings — DECIDED Q3 in
+  `docs/group-sharing-spec.md`.
+- Voided/deleted lifecycle and account-reference integrity — DECIDED Q4 in
+  `docs/group-sharing-spec.md` (void retains, deleted drops; reads re-check).
+- Indexed-read schema, sync coverage, backfill handling — DECIDED Q5 in
+  `docs/group-sharing-spec.md`; shipped as `sharing_visibility` with
+  `CheckSharedTransactionAccess` per `docs/authorization.md`.
+- Write-hook versus broker choice — DECIDED Q6 in
+  `docs/group-sharing-spec.md` (same-write maintenance, no broker).
+- Delegated editing of someone else's *original* transaction is deferred,
+  not approved for current implementation.
 
 ## Acceptance and security checks
 

@@ -15,10 +15,10 @@ then save directly to Waypoint. No Gemini Nano dependency.
 7. Grant access to that host, then select **Connect**.
 8. Approve the displayed device code on the identity-provider page.
 
-Device sign-in must be enabled in the deployed Casdoor application. Existing
-instances may need the manual grant-type step in
-[the device sign-in guide](../docs/authentication.md#device-clients). This extension
-does not modify the identity issuer or deployment routes.
+Device sign-in must be enabled in the deployed Better Auth application.
+Application provisioning already includes the device grant type
+(`auth/better-auth/src/provision.ts`). This extension does not modify
+the identity issuer or deployment routes.
 
 The side panel stays alongside the merchant page. A separate extension window is
 the fallback when side-panel activation is unavailable. Page access is temporary:

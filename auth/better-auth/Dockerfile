@@ -1,5 +1,8 @@
 FROM oven/bun:1.4.4 AS build
 WORKDIR /app
+# Keep in sync with .github/workflows/images.yml reuse paths for the auth
+# component. deploy/images.test.mjs parses these COPY sources and verifies
+# the workflow list covers each one (Dockerfile is the single source).
 COPY package.json bun.lock ./
 COPY frontend/package.json frontend/package.json
 COPY extension/package.json extension/package.json

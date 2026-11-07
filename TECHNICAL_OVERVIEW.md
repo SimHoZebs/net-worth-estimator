@@ -133,7 +133,7 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 
 ### Status
 
-`GET /v1/status` returns `readOnly`, `hasModel`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed). `hasModel` is a cheap presence check, not a model read. Session and resource discovery use `/v1/auth/session`.
+`GET /v1/status` returns `readOnly`, `hasModel`, `syncConfigured`, `syncHost` (when sync is configured), `syncQuotaUsed`, `syncQuotaLimit`, `lastSyncAt` (omitted when no sync completed), and `syncError` (omitted when no sync error). `hasModel` is a cheap presence check, not a model read. Session and resource discovery use `/v1/auth/session`. Full field set is defined by the OpenAPI snapshot (`frontend/openapi.snapshot.json`); `syncHost`, `syncQuotaUsed`, `syncQuotaLimit`, and `syncError` are defined in `backend/internal/api/status.go`.
 
 The frontend displays these provider-neutral sync signals. Provider setup and raw account-link management remain server concerns. Sync execution also stays server-side. The only user-facing mapping action retires one manual account in favor of the synced account already linked to a bridge account. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
 
@@ -378,7 +378,16 @@ lives in `transaction_sync_keys`, separate from local transaction IDs (see
 
 ### Result durability
 
-No simulation results persist. Canonical edits are durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits on replacement. Slice persistence restores result durability without content hashes.
+Slices, generated rows, statistics, and evaluation outputs persist in
+`projection_states`, `projection_slices`, `projection_rows`,
+`monte_carlo_statistics`, and the typed output tables (see
+`backend/internal/types/projection_unified.go` and
+`backend/internal/store/adapters/sqlite/schema.go`). Canonical edits are
+durable only when the SQLite file is durable. A container or service without
+persistent storage for its database loses canonical edits on replacement.
+The `Projection-Source` header stays `computed` or `shared`; it does not
+carry a stored marker. See [unified projection](docs/unified-projection.md)
+for slice lifecycle, revision validity, and canonical bypass rules.
 
 ### Split settlements
 
@@ -433,7 +442,7 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
 - Committed mutations append one `sharing_audit` row carrying actor,
   action, target identities, link, outcome status, request ID, and time.
   Replays and heals append none. Owners read their transaction's trace at
-  `GET /v1/shared/audit`; there is no audience-side read. Audit payloads
+  `GET /v1/shared/audit`; see [authorization](docs/authorization.md#social-operation-audit-and-idempotency) for the full audit contract. Audit payloads
   never carry transaction evidence (no amounts, names, accounts, memos,
   or transaction content). Replays return the recorded result to its own
   actor only; the accept replay is the recipient's own copy, never a
@@ -446,7 +455,15 @@ endpoints plus share/revoke ordering at the store boundary.
 
 ## 4. Result Identity
 
-No stored result identity exists. Every projection request prepares, simulates, and evaluates directly from the resolved model plus request overrides plus projection settings plus run configuration. Repeat requests recompute; identical inputs produce identical outputs because the kernels are deterministic for a fixed seed.
+Slices, generated rows, statistics, and evaluation outputs persist and are
+assembled when the stored state is clean and the request matches the built
+state (run count, frozen seed, evaluation tables). Every cache-miss canonical
+build computes the full window, persists the invalid suffix, and assembles
+from stored rows; non-canonical inputs bypass stored rows and compute
+directly. Repeat identical inputs produce identical outputs because the
+kernels are deterministic for a fixed seed. The `Projection-Source` header
+stays `computed` or `shared` and does not carry a stored marker. See
+[unified projection](docs/unified-projection.md).
 
 Consequences:
 
@@ -517,7 +534,7 @@ Current general resolvers:
 
 `expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring transactions resolve through the same path. Transaction references (`model-value`) may name transaction or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary transactions.
 
-Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a transaction or rule, so simulation never reads presets. The wire shape is unchanged; presets only author it.
+Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Amount presets are owned by the Amount presets section above; applying a preset copies its amount descriptor into a transaction or rule, so simulation never reads presets.
 
 ### Constraints and transaction records
 

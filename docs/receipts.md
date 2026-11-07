@@ -23,7 +23,7 @@ receipt metadata, image bytes, and stored transaction receipt links without a ba
 
 Manual attachments and review need no extraction service. The ordinary deployment
 default is `NET_WORTH_ESTIMATOR_RECEIPT_SOURCE=disabled`. The dev Compose stack and
-isolated browser harness explicitly select `mock`. Keep normal Casdoor settings
+isolated browser harness explicitly select `mock`. Keep normal Better Auth settings
 and user permissions. No live OCR, LLM, cloud credentials, or external extraction
 requests are part of this release.
 
@@ -110,7 +110,7 @@ The mock proves workflow contracts, not OCR accuracy or provider reliability.
 
 | Endpoint | Behavior |
 | --- | --- |
-| `GET /v1/financial-model` | Financial model, issues, revision, and stored `receiptLinks` (transaction ID to receipt IDs). |
+| `GET /v1/financial-model` | Canonical model, issues, revision: see [technical overview](../TECHNICAL_OVERVIEW.md#canonical-model). This document adds `receiptLinks`. |
 | `GET /v1/transactions/{id}/receipts` | Metadata and extraction availability. |
 | `POST /v1/receipts` | Multipart `transactionId` string and `image` file. No automatic extraction. |
 | `GET /v1/receipts/{id}` | Extraction, drafts, confirmed values, provenance, diagnostics, revision. |

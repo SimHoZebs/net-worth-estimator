@@ -1,7 +1,7 @@
 # Authentication and authorization
 
 Waypoint uses Better Auth on Bun for authentication and embedded Go Casbin for
-authorization. No Casdoor runtime, SDK, permission endpoint, or admin UI remains.
+authorization.
 
 Better Auth owns passwords, passkeys, OAuth grants, and provider sessions. The Go
 API verifies OIDC and maintains durable application sessions. Casbin evaluates

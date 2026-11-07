@@ -62,7 +62,7 @@ Use **evaluation**. The three roles below are distinct and stay distinct:
 
 Use **Funding gaps** for the default transaction-funding evaluation and its outlook summary. Use **Funding gap** for one inspector item and **No projected funding gaps** for a clear result. Keep custom evaluation names. `transactionFulfillment` remains the engine's storage and API identifier; the stored default name "Transaction fulfillment" displays as "Funding gaps" without a data rewrite.
 
-`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the evaluation tables: financial independence, net-worth threshold, account balance, transaction fulfillment, cycle fulfillment, planned purchases, what-if. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
+`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the evaluation tables: financial independence, net-worth threshold, account balance, transaction fulfillment, cycle fulfillment, planned purchases, what-if. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; cycle fulfillment is shipped (`cycleFulfillmentDefinition` in `backend/internal/domain/evaluation_cycle.go`).
 
 ## F. Income evidence
 

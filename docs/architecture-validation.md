@@ -1,6 +1,8 @@
 # Computation invalidation and caching — validation spike
 
-**Status:** Proposed; measurements not run; no architecture winner selected.  **Sources:** [NWE architecture RFC](https://app.notion.com/p/40bee37bd02881639c15e9cf5076577e), [current code](https://github.com/SimHoZebs/net-worth-estimator).
+**Status:** Superseded. Unified projection (slice persistence, revision-scoped
+suffix rebuild) is shipped; see [unified projection](unified-projection.md).
+Retained here as the pre-decision validation record.  **Sources:** [NWE architecture RFC](https://app.notion.com/p/40bee37bd02881639c15e9cf5076577e), [current code](https://github.com/SimHoZebs/net-worth-estimator).
 
 ## Question
 
