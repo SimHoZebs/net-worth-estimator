@@ -10,6 +10,9 @@ const cardTones = {
 
 export type CardTone = keyof typeof cardTones;
 
+export const cardHeadingStyles =
+	"m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]";
+
 /** Shared card container so every card renders at the same size. */
 export function Card({
 	tone = "default",

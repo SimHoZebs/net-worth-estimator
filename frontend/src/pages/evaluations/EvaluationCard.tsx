@@ -1,7 +1,7 @@
 import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
 import { IconButton } from "@/components/Button.tsx";
-import { Card } from "@/components/Card.tsx";
+import { Card, cardHeadingStyles } from "@/components/Card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
 import { Progress } from "@/components/Progress.tsx";
 import { Skeleton } from "@/components/Skeleton.tsx";
@@ -44,7 +44,7 @@ export function EvaluationCard({
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
 				<h2
 					id={headingId}
-					className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]"
+					className={cardHeadingStyles}
 				>
 					<StateIcon
 						size={16}

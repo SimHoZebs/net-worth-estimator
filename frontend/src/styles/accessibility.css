@@ -33,5 +33,6 @@ dialog::backdrop {
 @media print {
 	body {
 		background: white;
+		color-scheme: light;
 	}
 }

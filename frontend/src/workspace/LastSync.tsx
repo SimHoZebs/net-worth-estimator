@@ -56,7 +56,7 @@ export function LastSync({
 							},
 						})
 					}
-					className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-xs leading-relaxed whitespace-nowrap text-muted hover:text-ink hover:underline hover:underline-offset-4"
+					className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-xs leading-relaxed whitespace-nowrap text-muted hover:text-ink hover:underline hover:underline-offset-4 pointer-coarse:min-h-12"
 				>
 					<TriangleAlert
 						size={16}

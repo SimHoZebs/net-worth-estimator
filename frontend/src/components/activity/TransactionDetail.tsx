@@ -116,6 +116,9 @@ type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
 const EMPTY_SETTLE_CANDIDATES: SettleCandidateRow[] = [];
 
+const detailSheetBaseStyles =
+	"m-0 ml-auto h-dvh max-h-dvh w-full rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t";
+
 /**
  * The detail opens above drawers that portal to document.body. Rendering the
  * native dialog as a sibling keeps React's cancel path flat: the browser
@@ -1324,7 +1327,7 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-xl rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
+				className={`${detailSheetBaseStyles} max-w-xl`}
 				onCloseRequest={edit.requestClose}
 				actions={
 					<>
@@ -1679,9 +1682,9 @@ export function TransactionDetail({
 				<Modal
 					title="Suggestions"
 					onClose={() => setInsightsOpen(false)}
-					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
+					className={`${detailSheetBaseStyles} max-w-md`}
 				>
-					<p className="mt-0 mb-6 text-[11px] text-muted">
+					<p className="mt-0 mb-6 text-xs text-muted">
 						Small checks to improve future estimates
 					</p>
 					<TransactionInsightsPanel
@@ -1697,7 +1700,7 @@ export function TransactionDetail({
 				<Modal
 					title="Sharing"
 					onClose={() => setSharingOpen(false)}
-					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
+					className={`${detailSheetBaseStyles} max-w-md`}
 				>
 					<TransactionSharing
 						transactionId={savedTransaction.id}

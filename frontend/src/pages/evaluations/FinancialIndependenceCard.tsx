@@ -2,7 +2,7 @@ import { Check, Flag, Pin, TriangleAlert } from "lucide-react";
 import { lazy, Suspense, useId } from "react";
 import { Badge } from "@/components/Badge.tsx";
 import { IconButton } from "@/components/Button.tsx";
-import { Card } from "@/components/Card.tsx";
+import { Card, cardHeadingStyles } from "@/components/Card.tsx";
 import { useSelectedEntry } from "@/components/entrySelection.ts";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
 import { Progress } from "@/components/Progress.tsx";
@@ -102,7 +102,7 @@ export function FinancialIndependenceCard({
 				<div className="relative flex items-start justify-between gap-3">
 					<h2
 						id={headingId}
-						className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold [overflow-wrap:anywhere]"
+						className={cardHeadingStyles}
 					>
 						<StateIcon
 							size={16}

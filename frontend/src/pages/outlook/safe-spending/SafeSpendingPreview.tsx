@@ -17,7 +17,7 @@ import {
 	todayIso,
 } from "@/domain/format.ts";
 import { Skeleton } from "@/components/Skeleton.tsx";
-import { Card } from "@/components/Card.tsx";
+import { Card, cardHeadingStyles } from "@/components/Card.tsx";
 import {
 	checkingAccountId,
 	mandatoryTransactions,
@@ -466,7 +466,7 @@ export function SafeSpendingPreview({
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
-					<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
+					<h2 className={cardHeadingStyles}>
 						<CalendarDays
 							size={16}
 							className="shrink-0 text-muted"
@@ -540,7 +540,7 @@ export function SafeSpendingPreview({
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
-					<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
+					<h2 className={cardHeadingStyles}>
 						<CalendarDays
 							size={16}
 							className="shrink-0 text-muted"
@@ -565,7 +565,7 @@ export function SafeSpendingPreview({
 	return (
 		<Card aria-label="Safe card spending" className="relative">
 			<div className="flex items-center justify-between gap-4">
-				<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
+				<h2 className={cardHeadingStyles}>
 					<CalendarDays
 						size={16}
 						className="shrink-0 text-muted"

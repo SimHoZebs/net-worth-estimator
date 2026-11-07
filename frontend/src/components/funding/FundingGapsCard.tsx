@@ -27,7 +27,7 @@ import {
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
 import { IconButton } from "@/components/Button.tsx";
 import { Badge } from "@/components/Badge.tsx";
-import { Card } from "@/components/Card.tsx";
+import { Card, cardHeadingStyles } from "@/components/Card.tsx";
 import { mergeStyles } from "@/components/mergeStyles.ts";
 import { useSelectedId } from "@/components/entrySelection.ts";
 
@@ -120,10 +120,7 @@ export function FundingGapsCard({
 				<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
 					<h2
 						id={headingId}
-						className={mergeStyles(
-							"m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]",
-							stateTitle,
-						)}
+						className={mergeStyles(cardHeadingStyles, stateTitle)}
 					>
 						<StateIcon size={16} aria-hidden="true" className="shrink-0" />
 						<span className="[overflow-wrap:anywhere]">{item.name}</span>

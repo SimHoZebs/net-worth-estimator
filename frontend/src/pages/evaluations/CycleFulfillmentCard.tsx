@@ -2,7 +2,7 @@ import { Check, Flag, Pin } from "lucide-react";
 import { useId } from "react";
 import { Badge } from "@/components/Badge.tsx";
 import { IconButton } from "@/components/Button.tsx";
-import { Card } from "@/components/Card.tsx";
+import { Card, cardHeadingStyles } from "@/components/Card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
 import { Progress } from "@/components/Progress.tsx";
 import type { OtherEvaluation } from "@/domain/result.ts";
@@ -36,7 +36,7 @@ export function CycleFulfillmentCard({
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
 				<h2
 					id={headingId}
-					className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]"
+					className={cardHeadingStyles}
 				>
 					<StateIcon
 						size={16}

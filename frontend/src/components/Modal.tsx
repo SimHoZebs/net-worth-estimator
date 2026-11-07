@@ -11,7 +11,13 @@ import {
 } from "react";
 import { IconButton } from "./Button.tsx";
 import { useModalRegistration } from "../state/modalPresence.ts";
-import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
+import {
+	dialogBodyStyles,
+	dialogEyebrowStyles,
+	dialogHeaderStyles,
+	dialogTitleDisplayStyles,
+	dialogTitlePlainStyles,
+} from "./dialogStyles.ts";
 import { mergeStyles } from "./mergeStyles.ts";
 import { usePrefersReducedMotion } from "../state/useMediaQuery.ts";
 
@@ -141,16 +147,14 @@ export function Modal({
 				>
 					<div className="min-w-0 flex-1">
 						{eyebrow && (
-							<p className="mb-2 text-xs font-bold tracking-widest text-muted">
-								{eyebrow}
-							</p>
+							<p className={dialogEyebrowStyles}>{eyebrow}</p>
 						)}
 						<h2
 							id={id}
 							className={
 								titleSize === "plain"
-									? "text-sm leading-snug font-semibold tracking-normal"
-									: "type-display text-3xl leading-tight font-normal tracking-tight"
+									? dialogTitlePlainStyles
+									: dialogTitleDisplayStyles
 							}
 						>
 							{title}

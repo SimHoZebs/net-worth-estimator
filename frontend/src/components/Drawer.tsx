@@ -20,7 +20,12 @@ import {
 } from "../state/drawer.ts";
 import { usePrefersReducedMotion } from "../state/useMediaQuery.ts";
 import { IconButton } from "./Button.tsx";
-import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
+import {
+	dialogBodyStyles,
+	dialogEyebrowStyles,
+	dialogHeaderStyles,
+	dialogTitleDisplayStyles,
+} from "./dialogStyles.ts";
 
 // The single drawer component: the left navigation sheet and the right
 // context sheet are the same backdrop, slide, border, focus, and gesture
@@ -193,14 +198,9 @@ function DrawerSession({
 					<div className={mergeStyles(dialogHeaderStyles, headerClassName)}>
 						<div className="min-w-0 flex-1">
 							{eyebrow && (
-								<p className="mb-2 text-xs font-bold tracking-widest text-muted">
-									{eyebrow}
-								</p>
+								<p className={dialogEyebrowStyles}>{eyebrow}</p>
 							)}
-							<h2
-								id={titleId}
-								className="type-display text-3xl leading-tight font-normal tracking-tight"
-							>
+							<h2 id={titleId} className={dialogTitleDisplayStyles}>
 								{title}
 							</h2>
 						</div>

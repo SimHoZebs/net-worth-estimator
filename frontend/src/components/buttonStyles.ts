@@ -23,7 +23,7 @@ export const buttonStyles = cva(
 );
 
 export const textButtonStyles = cva(
-	"inline-flex items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-xs font-semibold enabled:hover:underline enabled:hover:underline-offset-4",
+	"inline-flex items-center gap-2 border-0 bg-transparent px-0 py-0.5 text-xs font-semibold enabled:hover:underline enabled:hover:underline-offset-4 pointer-coarse:min-h-12",
 	{
 		variants: {
 			tone: {

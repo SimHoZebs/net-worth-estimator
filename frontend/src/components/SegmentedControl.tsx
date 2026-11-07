@@ -14,6 +14,9 @@ type SegmentedControlProps<T extends string> = {
 	className?: string;
 };
 
+export const segmentedPillStyles =
+	"rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted pointer-coarse:min-h-12 aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs";
+
 export function SegmentedControl<T extends string>({
 	items,
 	value,
@@ -36,7 +39,7 @@ export function SegmentedControl<T extends string>({
 						aria-pressed={pressed}
 						aria-label={item.ariaLabel}
 						onClick={() => onChange(item.value)}
-						className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted pointer-coarse:min-h-12 aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs"
+						className={segmentedPillStyles}
 					>
 						{item.label}
 					</button>

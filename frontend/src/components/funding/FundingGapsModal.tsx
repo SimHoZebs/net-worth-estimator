@@ -1,5 +1,6 @@
 import { AlertCircle, CalendarDays, TriangleAlert } from "lucide-react";
 import { SegmentedBar } from "../SegmentedBar.tsx";
+import { segmentedPillStyles } from "../SegmentedControl.tsx";
 import { Badge } from "../Badge.tsx";
 import { Modal } from "../Modal.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
@@ -42,7 +43,7 @@ export function FundingGapsModal({
 			>
 				{sorted.map((item) => (
 					<button
-						className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs"
+						className={segmentedPillStyles}
 						key={item.id}
 						type="button"
 						aria-pressed={item.id === gap.id}
