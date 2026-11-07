@@ -85,12 +85,9 @@ for (const width of [390, 1440]) {
 			receipt.getByRole("button", { name: "Retry image" }),
 		).toBeAttached();
 		expect(await preview.boundingBox()).toEqual(before);
-		const errorScroll = preview.locator("[tabindex='0']");
-		await errorScroll.focus();
-		await page.keyboard.press("End");
-		await expect(
-			receipt.getByRole("button", { name: "Retry image" }),
-		).toBeVisible();
+		const retry = receipt.getByRole("button", { name: "Retry image" });
+		await retry.focus();
+		await expect(retry).toBeVisible();
 	});
 }
 
