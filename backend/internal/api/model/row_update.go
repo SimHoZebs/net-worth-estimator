@@ -56,10 +56,8 @@ func (o nullableOptional[T]) Schema(r huma.Registry) *huma.Schema {
 	return s
 }
 
-// amountInput authors an amount as a literal with optional yearly growth, or
-// replays a stored resolution descriptor verbatim during model import. The
-// editor never builds resolver input, so the simple form is the documented
-// path; the descriptor form keeps imports byte-faithful.
+// amountInput accepts a literal with optional yearly growth or a resolution
+// descriptor from guided recipes and imports. The engine validates descriptors.
 type amountInput struct {
 	Value          *float64
 	AnnualIncrease *float64

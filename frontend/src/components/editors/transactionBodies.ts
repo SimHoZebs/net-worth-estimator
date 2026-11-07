@@ -85,9 +85,7 @@ export function combineDayTime(day: string, time: string): number {
 		: midnightOfDay(day);
 }
 
-/** Authored amount in the API's semantic form: a literal value and, for
- * schedules, an optional yearly growth percent. The server compiles the
- * stored resolution descriptor, so the client never authors resolver input. */
+/** Literal amounts and yearly increases use the server's semantic input form. */
 function authoredAmount(amount: number, annualIncrease: number) {
 	return annualIncrease ? { value: amount, annualIncrease } : { value: amount };
 }
@@ -128,8 +126,21 @@ export function transactionBody(
  */
 export function scheduleBody(values: ScheduleFormValues): ScheduleCreateBody {
 	return {
-		name: values.name,
+		...scheduleTermsBody(values),
 		amount: authoredAmount(values.amount, values.annualIncrease),
+	};
+}
+
+export type ScheduleTerms = Omit<
+	ScheduleFormValues,
+	"amount" | "annualIncrease"
+>;
+
+export function scheduleTermsBody(
+	values: ScheduleTerms,
+): Omit<ScheduleCreateBody, "amount"> {
+	return {
+		name: values.name,
 		enabled: values.enabled,
 		frequency: values.frequency,
 		startDate: values.startDate,
@@ -244,22 +255,30 @@ export function validateTransactionValues(
 export function validateScheduleValues(
 	values: ScheduleFormValues,
 ): string | null {
-	if (!values.name.trim()) return "Give the schedule a name.";
+	const termsError = validateScheduleTerms(values);
+	if (termsError) return termsError;
 	if (
 		!Number.isFinite(values.amount) ||
 		values.amount < 0 ||
 		values.amount > 1e10
 	)
 		return "Enter an amount of zero or more.";
-	if (!values.fromId && !values.toId)
-		return "Choose a source or destination account.";
-	if (!values.startDate) return "Choose a date.";
-	if (values.endDate && values.endDate < values.startDate)
-		return "The last occurrence cannot come before the first one.";
 	if (!Number.isFinite(values.annualIncrease))
 		return "Enter a yearly increase between -50 and 50 percent.";
 	if (values.annualIncrease < -50 || values.annualIncrease > 50)
 		return "Enter a yearly increase between -50 and 50 percent.";
+	return null;
+}
+
+export function validateScheduleTerms(values: ScheduleTerms): string | null {
+	if (!values.name.trim()) return "Give the schedule a name.";
+	if (!values.fromId && !values.toId)
+		return "Choose a source or destination account.";
+	if (values.fromId && values.fromId === values.toId)
+		return "Choose different source and destination accounts.";
+	if (!values.startDate) return "Choose a date.";
+	if (values.endDate && values.endDate < values.startDate)
+		return "The last occurrence cannot come before the first one.";
 	return null;
 }
 

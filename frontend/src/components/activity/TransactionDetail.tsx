@@ -258,7 +258,7 @@ function MoreOptions({
 								name="annualIncrease"
 								type="number"
 								required
-								disabled={locked}
+								disabled={locked || savedTransaction.amountKnown === false}
 								min="-50"
 								max="50"
 								step="0.1"
@@ -567,7 +567,8 @@ function ReadOnlyNotice({
 	);
 }
 function readOnlyReasonFor(savedTransaction: Transaction): string | undefined {
-	return savedTransaction.amountKnown === false
+	return savedTransaction.amountKnown === false &&
+		savedTransaction.kind !== "schedule"
 		? "This amount is calculated each time. See the transaction list for the resolved amounts."
 		: savedTransaction.readOnly
 			? "Read-only."
@@ -671,6 +672,11 @@ function useTransactionEdit({
 	const claimEditable = canClaimOccurrence(savedTransaction);
 	useBeforeUnload(activeField !== null && touched && !saving);
 	const updateDraft = (patch: Partial<TransactionDraft>, field: EditField) => {
+		if (
+			savedTransaction.amountKnown === false &&
+			(field === "amount" || "annualIncrease" in patch)
+		)
+			return;
 		if (readOnlyReason) {
 			// Locked rows are read-only except for the occurrence claim on
 			// pending bank rows. Any other schedule patch stays blocked.
@@ -1412,7 +1418,9 @@ export function TransactionDetail({
 										onChange={(event) =>
 											edit.updateDraft({ amount: event.target.value }, "amount")
 										}
-										readOnly={!canEdit}
+										readOnly={
+											!canEdit || savedTransaction.amountKnown === false
+										}
 										className={transactionControlStyles({
 											shape: "amount",
 											positive: transaction.direction === "in",
