@@ -9,7 +9,7 @@ import { InputField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Notice } from "../Notice.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { Badge } from "../Badge.tsx";
 
 /** Row-first account editor. Saves straight to the server; no draft involved. */
@@ -176,7 +176,7 @@ export function OrdinaryAccountEditor({
 						</div>
 					</div>
 				</fieldset>
-				<ErrorNotice reserve message={error} />
+				<FieldError message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel
