@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useReducer } from "react";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import {
@@ -215,9 +214,7 @@ export function useSafeSpendingSettings(): SafeSpendingSettingsState {
 		{ ...settingsOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
 	);
-	// The optimistic write reads cache directly so it shows in the same event.
-	const [, bump] = useReducer((version: number) => version + 1, 0);
-	const settings = getSafeSpendingSettings(scope);
+	const settings = query.data ?? defaults;
 	return {
 		...settings,
 		pending: query.isPending,
@@ -227,7 +224,6 @@ export function useSafeSpendingSettings(): SafeSpendingSettingsState {
 		},
 		updateSettings: (next) => {
 			updateSettingsForScope(scope)(next);
-			bump();
 		},
 	};
 }

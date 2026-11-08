@@ -78,21 +78,12 @@ export function useCurrentPosition({
 		schedules.data,
 		transactions.data,
 	]);
-	const rowContentKey = useMemo(() => {
-		if (!rowActive || !rowDataReady) return "";
-		return JSON.stringify([
-			balances.data?.accounts ?? null,
-			checkpoints.data?.checkpoints ?? null,
-			schedules.data?.schedules ?? null,
-			transactions.data?.transactions ?? null,
-		]);
-	}, [rowActive, rowDataReady, balances.data, checkpoints.data, schedules.data, transactions.data]);
 	const baseKey = useMemo(
 		() =>
 			hasOverride
 				? projectionModelKey(baseModel)
-				: rowRevision || (rowContentKey ? `content:${rowContentKey}` : "pending"),
-		[hasOverride, baseModel, rowRevision, rowContentKey],
+				: rowRevision || "pending",
+		[hasOverride, baseModel, rowRevision],
 	);
 	const asOfDate = useMemo(() => {
 		if (hasOverride) return baseModel ? projectionStartDate(baseModel) : "";

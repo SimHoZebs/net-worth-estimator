@@ -346,78 +346,138 @@ export function SafeSpendingPreview({
 	const lastChecking = lastComplete
 		? sum(spendingIds.map((id) => lastAtClose.get(id)?.Balance ?? 0))
 		: spendingDerived;
-	const currentCardTransactions = perAccount.flatMap((item) => item.inCycle);
-	const lastCardTransactions = perAccount.flatMap((item) => item.lastCycle);
-	const currentCardByCard = perAccount.map((item) => ({
-		id: item.accountId,
-		name: item.name,
-		amount: sum(item.inCycle.map((transaction) => transaction.amount)),
-	}));
-	const currentCardSpent = sum(currentCardByCard.map((card) => card.amount));
-	const currentView = cycleView({
-		cycle: { start: cycle.cycleStart, end: cycle.cycleEnd },
-		referenceDay: displayToday,
-		checking: spendingDerived,
-		spentSince: (startDate ?? displayToday).slice(0, 10),
-		spentThrough: displayToday,
-		spendingIds,
-		results: historyResults,
-		obligationResults: obligationTransactions,
-		directResults: directBaseTransactions,
-		billResults: billBaseTransactions,
-		billWindowStart: billsStart,
-		incomeScheduleIds: settings.incomeScheduleIds,
-		cardTransactions: currentCardTransactions,
-		cardSpent: currentCardSpent,
-		cardSpentByCard: currentCardByCard,
-		funding: {
-			paycheck: currentFunding?.amount ?? 0,
-			date: currentFunding?.date ?? null,
-			endDate: currentFunding?.endDate ?? null,
-			fixedBills: 0,
-		},
-		reserve: settings.reserve,
-		accounts: accounts ?? [],
-		savedTransactions: transactions ?? [],
-		transactionOrder,
-		closedCycle,
-		fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
-	});
-	const lastView = cycleView({
-		cycle: { start: closedCycle.start, end: closedCycle.end },
-		referenceDay: closedCycle.end,
-		checking: lastChecking,
-		spentSince: closedCycle.end,
-		spentThrough: closedCycle.end,
-		spendingIds,
-		results: historyResults,
-		obligationResults: obligationTransactions,
-		directResults: directBaseTransactions,
-		billResults: billBaseTransactions,
-		billWindowStart: closedCycle.start,
-		incomeScheduleIds: settings.incomeScheduleIds,
-		cardTransactions: lastCardTransactions,
-		cardSpent: closedCycle.total,
-		cardSpentByCard: closedCycle.cards.map((card) => ({
-			id: card.id,
-			name: card.name,
-			amount: card.amount,
-		})),
-		funding: {
-			paycheck: closedFunding?.amount ?? 0,
-			date: closedFunding?.date ?? null,
-			endDate: closedFunding?.endDate ?? null,
-			fixedBills: 0,
-		},
-		reserve: settings.reserve,
-		accounts: accounts ?? [],
-		savedTransactions: transactions ?? [],
-		transactionOrder,
-		closedCycle,
-		provisional: !lastComplete,
-		fullDaysLeft: daysBetweenInclusive(closedCycle.start, closedCycle.end),
-		closed: true,
-	});
+	const currentCardTransactions = useMemo(
+		() => perAccount.flatMap((item) => item.inCycle),
+		[perAccount],
+	);
+	const lastCardTransactions = useMemo(
+		() => perAccount.flatMap((item) => item.lastCycle),
+		[perAccount],
+	);
+	const currentCardByCard = useMemo(
+		() =>
+			perAccount.map((item) => ({
+				id: item.accountId,
+				name: item.name,
+				amount: sum(item.inCycle.map((transaction) => transaction.amount)),
+			})),
+		[perAccount],
+	);
+	const currentCardSpent = useMemo(
+		() => sum(currentCardByCard.map((card) => card.amount)),
+		[currentCardByCard],
+	);
+	const currentView = useMemo(
+		() =>
+			cycleView({
+				cycle: { start: cycle.cycleStart, end: cycle.cycleEnd },
+				referenceDay: displayToday,
+				checking: spendingDerived,
+				spentSince: (startDate ?? displayToday).slice(0, 10),
+				spentThrough: displayToday,
+				spendingIds,
+				results: historyResults,
+				obligationResults: obligationTransactions,
+				directResults: directBaseTransactions,
+				billResults: billBaseTransactions,
+				billWindowStart: billsStart,
+				incomeScheduleIds: settings.incomeScheduleIds,
+				cardTransactions: currentCardTransactions,
+				cardSpent: currentCardSpent,
+				cardSpentByCard: currentCardByCard,
+				funding: {
+					paycheck: currentFunding?.amount ?? 0,
+					date: currentFunding?.date ?? null,
+					endDate: currentFunding?.endDate ?? null,
+					fixedBills: 0,
+				},
+				reserve: settings.reserve,
+				accounts: accounts ?? [],
+				savedTransactions: transactions ?? [],
+				transactionOrder,
+				closedCycle,
+				fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
+			}),
+		[
+			cycle.cycleStart,
+			cycle.cycleEnd,
+			cycle.daysLeft,
+			displayToday,
+			spendingDerived,
+			startDate,
+			spendingIds,
+			historyResults,
+			obligationTransactions,
+			directBaseTransactions,
+			billBaseTransactions,
+			billsStart,
+			settings.incomeScheduleIds,
+			currentCardTransactions,
+			currentCardSpent,
+			currentCardByCard,
+			currentFunding,
+			settings.reserve,
+			accounts,
+			transactions,
+			transactionOrder,
+			closedCycle,
+		],
+	);
+	const lastView = useMemo(
+		() =>
+			cycleView({
+				cycle: { start: closedCycle.start, end: closedCycle.end },
+				referenceDay: closedCycle.end,
+				checking: lastChecking,
+				spentSince: closedCycle.end,
+				spentThrough: closedCycle.end,
+				spendingIds,
+				results: historyResults,
+				obligationResults: obligationTransactions,
+				directResults: directBaseTransactions,
+				billResults: billBaseTransactions,
+				billWindowStart: closedCycle.start,
+				incomeScheduleIds: settings.incomeScheduleIds,
+				cardTransactions: lastCardTransactions,
+				cardSpent: closedCycle.total,
+				cardSpentByCard: closedCycle.cards.map((card) => ({
+					id: card.id,
+					name: card.name,
+					amount: card.amount,
+				})),
+				funding: {
+					paycheck: closedFunding?.amount ?? 0,
+					date: closedFunding?.date ?? null,
+					endDate: closedFunding?.endDate ?? null,
+					fixedBills: 0,
+				},
+				reserve: settings.reserve,
+				accounts: accounts ?? [],
+				savedTransactions: transactions ?? [],
+				transactionOrder,
+				closedCycle,
+				provisional: !lastComplete,
+				fullDaysLeft: daysBetweenInclusive(closedCycle.start, closedCycle.end),
+				closed: true,
+			}),
+		[
+			closedCycle,
+			lastChecking,
+			spendingIds,
+			historyResults,
+			obligationTransactions,
+			directBaseTransactions,
+			billBaseTransactions,
+			settings.incomeScheduleIds,
+			lastCardTransactions,
+			closedFunding,
+			settings.reserve,
+			accounts,
+			transactions,
+			transactionOrder,
+			lastComplete,
+		],
+	);
 
 	const tabChargeCycles = useMemo<
 		Record<SafeSpendingCycleTab, SafeSpendingChargeCycle>
@@ -448,7 +508,7 @@ export function SafeSpendingPreview({
 				},
 			},
 		};
-	}, [chargeCycles, directTransactions, transactionOrder, currentView.trend]);
+	}, [chargeCycles, directTransactions, transactionOrder, currentView]);
 	// Saved rows hydrate after the card header. The header renders
 	// immediately; only the computed body waits for rows, settings,
 	// and the forecast.

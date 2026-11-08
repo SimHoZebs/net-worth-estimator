@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
+import { useUserScope } from "./useUserScope.ts";
 import {
 	acceptInvite,
 	createGroup,
@@ -35,17 +35,13 @@ export const groupDetailKey = (groupId: string, scope = getUserScope()) =>
 export const groupInvitesKey = (groupId: string, scope = getUserScope()) =>
 	["user-resources", scope.key, "group-invites", groupId] as const;
 
-function useGroupScope() {
-	return useSyncExternalStore(subscribeUserScope, getUserScope);
-}
-
 function currentScope(scope: ReturnType<typeof getUserScope>) {
 	if (scope !== getUserScope() || scope.status !== "ready")
 		throw new UserScopeError();
 }
 
 export function useGroups() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: groupsKey(scope),
@@ -61,7 +57,7 @@ export function useGroups() {
 }
 
 export function useGroupDetail(groupId: string | null) {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: groupDetailKey(groupId ?? "none", scope),
@@ -81,7 +77,7 @@ export function useGroupInvites(
 	groupId: string | null,
 	role: GroupRole | null,
 ) {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const canManage = role === "owner" || role === "admin";
 	return useQuery(
 		{
@@ -124,7 +120,7 @@ function invalidateInvites(
 }
 
 export function useCreateGroup() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -145,7 +141,7 @@ export function useCreateGroup() {
 }
 
 export function useJoinGroup() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -167,7 +163,7 @@ export function useJoinGroup() {
 }
 
 export function useLeaveGroup() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -193,7 +189,7 @@ export function useLeaveGroup() {
 }
 
 export function useDeleteGroup() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -219,7 +215,7 @@ export function useDeleteGroup() {
 }
 
 export function useUpdateMemberRole() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -250,7 +246,7 @@ export function useUpdateMemberRole() {
 }
 
 export function useRemoveMember() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -279,7 +275,7 @@ export function useRemoveMember() {
 }
 
 export function useCreateInvite() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -300,7 +296,7 @@ export function useCreateInvite() {
 }
 
 export function useRevokeInvite() {
-	const scope = useGroupScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{

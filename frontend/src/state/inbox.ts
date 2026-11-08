@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
+import { useUserScope } from "./useUserScope.ts";
 import {
 	acceptInboxShare,
 	declineInboxShare,
@@ -31,17 +31,13 @@ export const inboxKey = (
 export const inboxUnreadKey = (scope = getUserScope()) =>
 	["user-resources", scope.key, "inbox", "unread-count"] as const;
 
-function useInboxScope() {
-	return useSyncExternalStore(subscribeUserScope, getUserScope);
-}
-
 function currentScope(scope: ReturnType<typeof getUserScope>) {
 	if (scope !== getUserScope() || scope.status !== "ready")
 		throw new UserScopeError();
 }
 
 export function useInbox(status: InboxFilter, showDismissed = false) {
-	const scope = useInboxScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: inboxKey(status, showDismissed, scope),
@@ -58,7 +54,7 @@ export function useInbox(status: InboxFilter, showDismissed = false) {
 
 /** Unread badge count across every status; dismissed items never badge. */
 export function useInboxUnreadCount() {
-	const scope = useInboxScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: inboxUnreadKey(scope),
@@ -90,7 +86,7 @@ function useInboxMutation(
 	name: string,
 	mutationFn: (target: InboxShareTarget) => Promise<unknown>,
 ) {
-	const scope = useInboxScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{

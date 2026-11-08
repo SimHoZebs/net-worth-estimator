@@ -5,9 +5,10 @@ import {
 	ArrowUpRight,
 	Users,
 } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import { Badge } from "../../components/Badge.tsx";
 import { Button } from "../../components/Button.tsx";
 import { EmptyState } from "../../components/EmptyState.tsx";
@@ -48,7 +49,7 @@ const DIRECTION_LABELS: Record<FeedDirection, string> = {
 };
 
 function useFeedScope() {
-	return useSyncExternalStore(subscribeUserScope, getUserScope);
+	return useUserScope();
 }
 
 function currentScope(scope: ReturnType<typeof getUserScope>) {

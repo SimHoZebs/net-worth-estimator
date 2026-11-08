@@ -684,10 +684,13 @@ export function useRemoteProjection({
 }: UseRemoteProjectionOptions = {}) {
 	const scope = useUserScope();
 	const rowSource = useProjectionSource(enabled && modelOverride === undefined);
-	const source =
-		modelOverride !== undefined
-			? projectionSourceFromModel(modelOverride, revisionOverride)
-			: rowSource.source;
+	const source = useMemo(
+		() =>
+			modelOverride !== undefined
+				? projectionSourceFromModel(modelOverride, revisionOverride)
+				: rowSource.source,
+		[modelOverride, revisionOverride, rowSource.source],
+	);
 	const hasModel =
 		modelOverride !== undefined ? modelOverride !== null : rowSource.hasModel;
 	const baseSource = scope.status === "ready" ? source : null;

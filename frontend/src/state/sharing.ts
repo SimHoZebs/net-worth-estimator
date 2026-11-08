@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
+import { useUserScope } from "./useUserScope.ts";
 import {
 	excludeSharedTransaction,
 	getSharingPolicy,
@@ -28,17 +28,13 @@ export const sharingPolicyKey = (groupId: string, scope = getUserScope()) =>
 export const sharingGrantsKey = (scope = getUserScope()) =>
 	["user-resources", scope.key, "sharing-grants"] as const;
 
-function useSharingScope() {
-	return useSyncExternalStore(subscribeUserScope, getUserScope);
-}
-
 function currentScope(scope: ReturnType<typeof getUserScope>) {
 	if (scope !== getUserScope() || scope.status !== "ready")
 		throw new UserScopeError();
 }
 
 export function useSharingPolicy(groupId: string | null) {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: sharingPolicyKey(groupId ?? "none", scope),
@@ -57,7 +53,7 @@ export function useSharingPreview(
 	groupId: string | null,
 	input: Omit<SharingPolicyInput, "enabled"> | null,
 ) {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: [
@@ -89,7 +85,7 @@ export function useSharingPreview(
 }
 
 export function useSharingGrants() {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: sharingGrantsKey(scope),
@@ -169,7 +165,7 @@ export function refreshSharingViewsFor(groupId?: string) {
 }
 
 export function useSetSharingPolicy() {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -196,7 +192,7 @@ export function useSetSharingPolicy() {
 }
 
 export function useGrantSharedTransaction() {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -230,7 +226,7 @@ export function useGrantSharedTransaction() {
 }
 
 export function useRevokeSharedTransaction() {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -265,7 +261,7 @@ export function useRevokeSharedTransaction() {
 }
 
 export function useExcludeSharedTransaction() {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -301,7 +297,7 @@ export function useExcludeSharedTransaction() {
 }
 
 export function useRemoveSharedExclusion() {
-	const scope = useSharingScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
