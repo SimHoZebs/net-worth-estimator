@@ -18,6 +18,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/evaluationworker"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
@@ -101,6 +102,12 @@ func main() {
 	}
 	stopAnalyses := analysisRunner.Start(context.Background(), 15*time.Second, func(error) { slog.Warn("background analysis temporarily unavailable") })
 	defer stopAnalyses()
+	evaluationRunner, err := evaluationworker.NewRunner(database)
+	if err != nil {
+		bootFatalf("configure evaluation worker", err)
+	}
+	stopEvaluations := evaluationRunner.Start(context.Background(), 15*time.Second, func(error) { slog.Warn("background evaluation reader temporarily unavailable") })
+	defer stopEvaluations()
 	categoryWorker, err := categorization.NewWorker(database, categorization.KeywordClassifier{})
 	if err != nil {
 		bootFatalf("configure categorization", err)

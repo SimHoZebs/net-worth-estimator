@@ -31,6 +31,7 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("PlannedPurchases", func(t *testing.T) { testPlannedPurchases(t, newStore) })
 	t.Run("ReceiptEvidence", func(t *testing.T) { testReceiptConformance(t, newStore) })
 	t.Run("AnalysisEvidence", func(t *testing.T) { testAnalysisConformance(t, newStore) })
+	t.Run("EvaluationWorker", func(t *testing.T) { testEvaluationWorkerConformance(t, newStore) })
 	t.Run("InitializeModel", func(t *testing.T) {
 		testInitializeModel(t, newStore)
 	})

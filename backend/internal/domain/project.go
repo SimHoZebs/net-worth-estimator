@@ -46,10 +46,49 @@ func ProjectWithPath(model *types.FinancialModel, settings *types.ProjectionRunt
 	return path, &result, nil
 }
 
+// EvaluateProjectionPathOptional runs evaluations with an optional path.
+// When path is nil, evaluators that need a projection emit a
+// projection-unavailable diagnostic and stay indeterminate, while
+// projection-free evaluators run with the supplied model alone.
+func EvaluateProjectionPathOptional(path *types.ProjectionPath, model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, monteCarloSample *types.MonteCarloSample) types.EvaluationResultTables {
+	effectiveModel := model
+	if path != nil {
+		// Prefer path-carried model; fall back to explicit model when nil.
+		if effectiveModel == nil {
+			effectiveModel = &path.EffectiveModel
+		}
+	}
+	if effectiveModel == nil {
+		empty := types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
+		effectiveModel = &empty
+	}
+	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
+	readers, simulators := set.PartitionByKind()
+	readers.EvaluateDeterministic(&EvaluationContext{
+		Path:        path,
+		Model:       effectiveModel,
+		DetailLevel: "detailed",
+	})
+	readerCollection := readers.Result()
+	simulators.EvaluateDeterministic(&EvaluationContext{
+		Path:             path,
+		Model:            effectiveModel,
+		MonteCarloSample: monteCarloSample,
+		DetailLevel:      "detailed",
+	})
+	simulatorCollection := simulators.Result()
+	collection := MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
+	return collection.Evaluations
+}
+
 // EvaluateProjectionPath runs reader and simulator evaluations against a
 // built path. The projection entry points share it so stored and computed
 // results attach identical evaluation tables.
 func EvaluateProjectionPath(path *types.ProjectionPath, settings *types.ProjectionRuntimeSettings, monteCarloSample *types.MonteCarloSample) types.EvaluationResultTables {
+	if path == nil {
+		return EvaluateProjectionPathOptional(nil, nil, settings, monteCarloSample)
+	}
+	// Preserve existing fast path: model comes from path.
 	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
 	readers, simulators := set.PartitionByKind()
 	readers.EvaluateDeterministic(&EvaluationContext{

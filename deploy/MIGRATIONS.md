@@ -87,6 +87,12 @@ before mutation. Existing displays verify byte-identical below, and the
 body never infers loan relationships. Operators link existing loan pairs
 explicitly with the one-time account-displays upgrade.
 
+The evaluation-reader worker table is provision-if-missing in the same
+candidate. Absent creates an empty `evaluation_worker_runs` table on the
+verified backup candidate. Complete repeats read-only via idempotent
+`CREATE TABLE IF NOT EXISTS`. Discovery derives from `projection_states`;
+no additional trigger is required.
+
 The suppression-key and available-balance sidecars are also
 provision-if-missing in the same candidate. Absent creates each table
 empty; complete repeats read-only. A partial sidecar schema fails before

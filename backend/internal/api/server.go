@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/analyses"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/evaluations"
 	gmailhttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/gmail"
 	integrationshttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/model"
@@ -69,6 +70,7 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	receiptService := receipts.NewService(st, serverConfig.ReceiptSource, serverConfig.ResourceID)
 	receipthttp.Register(api, receiptService, st)
 	analyses.Register(api, st, serverConfig.CanWrite, serverConfig.Actor)
+	evaluations.Register(api, st)
 	model.Register(api, st, receiptService, serverConfig.ReadOnly)
 	synchttp.Register(api, st, serverConfig.SyncRunner)
 	gmailhttp.Register(api, st, serverConfig.GmailService, serverConfig.ReadOnly)

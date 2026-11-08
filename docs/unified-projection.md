@@ -190,8 +190,10 @@ Rules:
 
 ## 5. Evaluation Plugins
 
-Evaluation Reader reads published slices without side effects. Reader evaluations compute from stored rows plus live history at read time through the shared result renderer, so stored and computed responses agree bit-for-bit. Evaluation Simulator runs branch simulations on demand. What-if uses Isolated what-if inputs against a copy of the pipeline. What-if never mutates stored rows. Promote replays the set as row writes. Discard drops the copy.
+Evaluation Reader runs asynchronously through an independent evaluation worker (mirroring background analysis workers: durable discovery from `projection_states`, 60s leases, 30s failure backoff, superseded runs when inputs change). The worker is non-blocking and passive; reads never start work. Projection data is an optional input: readers that need a projection emit `projection-unavailable` and stay indeterminate when the path is missing, while projection-free evaluators run with the financial model alone. The shared result renderer keeps stored and computed responses bit-for-bit identical. Evaluation Simulator runs branch simulations on demand. What-if uses Isolated what-if inputs against a copy of the pipeline. What-if never mutates stored rows. Promote replays the set as row writes. Discard drops the copy.
 
 ## 6. Unified Read API
 
 ProjectionReader serves deterministic reads from stored rows plus live history. It serves seeded canonical stochastic reads from stored statistics plus live history. Non-canonical requests (request model, overrides, as-of cut, different settings, run count, or seed) compute directly through the existing kernels. Position plus balances keep their live replay and never touch slices. Route shapes stay unchanged; the reader owns every projection response behind them.
+
+`GET /v1/evaluations/status` is the passive execution-status read (`private, no-store`). It reports `idle|queued|running|failed|succeeded` with the current projection revision, published revision, dirty marker, fingerprint, and `projectionAvailable`; it never starts work.

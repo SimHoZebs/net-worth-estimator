@@ -30,6 +30,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/evaluationworker"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
@@ -252,6 +253,12 @@ func main() {
 	}
 	stopAnalyses := analysisRunner.Start(context.Background(), time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
 	defer stopAnalyses()
+	evaluationRunner, err := evaluationworker.NewRunner(application)
+	if err != nil {
+		log.Fatalf("configure evaluation worker: %v", err)
+	}
+	stopEvaluations := evaluationRunner.Start(context.Background(), time.Second, func(error) { log.Print("background evaluation reader temporarily unavailable") })
+	defer stopEvaluations()
 	categoryWorker, err := categorization.NewWorker(application, categorization.KeywordClassifier{})
 	if err != nil {
 		log.Fatalf("configure categorization: %v", err)

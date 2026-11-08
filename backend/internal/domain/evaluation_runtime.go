@@ -101,6 +101,12 @@ type EvaluationDefinition struct {
 	Kind            EvaluationKind
 	AllowSimulation bool
 
+	// RequiresProjectionPath declares whether the evaluator needs a
+	// non-nil ctx.Path. Nil means required (zero-value safe, preserves
+	// behavior for all existing definitions). Future projection-free
+	// evaluations opt out explicitly; existing evaluators stay required.
+	RequiresProjectionPath *bool
+
 	ValidateConfig func(config any) error
 	ParseConfig    func(config any) (any, error)
 
@@ -129,6 +135,15 @@ func (d *EvaluationDefinition) KindOrDefault() EvaluationKind {
 // IsSimulator reports explicit simulator opt-in: Kind simulator plus the flag.
 func (d *EvaluationDefinition) IsSimulator() bool {
 	return d != nil && d.Kind == EvaluationKindSimulator && d.AllowSimulation
+}
+
+// NeedsProjectionPath reports whether the evaluator requires a non-nil path.
+// Nil or unspecified means required (preserves behavior for all existing evaluators).
+func (d *EvaluationDefinition) NeedsProjectionPath() bool {
+	if d == nil || d.RequiresProjectionPath == nil {
+		return true
+	}
+	return *d.RequiresProjectionPath
 }
 
 // EvaluationRegistry holds registered definitions keyed by type.
@@ -336,6 +351,14 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 	if r.definition == nil || r.hasErrors() {
 		return
 	}
+	if r.definition.NeedsProjectionPath() && (ctx == nil || ctx.Path == nil) {
+		r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
+			Code:     "projection-unavailable",
+			Severity: "info",
+			Message:  "Projection data is unavailable for this evaluation.",
+		})
+		return
+	}
 	if r.definition.DiagnoseConfig != nil {
 		r.diagnostics = append(r.diagnostics, r.definition.DiagnoseConfig(ctx, r.configuredRaw)...)
 	}
@@ -351,6 +374,9 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 
 func (r *instanceRuntime) prepareStochasticWork(ctx *EvaluationContext) {
 	if r.definition == nil || r.hasErrors() {
+		return
+	}
+	if r.definition.NeedsProjectionPath() && (ctx == nil || ctx.Path == nil) {
 		return
 	}
 	if r.definition.DescribeStochasticWork == nil {
@@ -374,6 +400,9 @@ func (r *instanceRuntime) startStochastic(configuredConfig any) {
 
 func (r *instanceRuntime) consume(ctx *EvaluationContext) {
 	if r.definition == nil || r.accumulator == nil || r.stochasticFailed {
+		return
+	}
+	if r.definition.NeedsProjectionPath() && (ctx == nil || ctx.Path == nil) {
 		return
 	}
 	pathResult, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {

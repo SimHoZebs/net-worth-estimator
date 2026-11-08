@@ -588,6 +588,26 @@ DDL
   fi
 fi
 
+# Provision the evaluation-reader worker table on pre-worker candidates.
+# The DDL mirrors the application schema exactly; the provisioned table stays
+# empty and discovery derives from projection_states.
+evaluation_worker_sql="$backup/evaluation-worker.sql"
+cat > "$evaluation_worker_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS evaluation_worker_runs (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id TEXT NOT NULL, type TEXT NOT NULL, version TEXT NOT NULL,
+  input_revision INTEGER NOT NULL, fingerprint TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL,
+  started_at INTEGER NOT NULL, completed_at INTEGER NOT NULL DEFAULT 0,
+  lease_until INTEGER NOT NULL, problem TEXT NOT NULL DEFAULT '', input_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY(user_id, id)
+);
+CREATE INDEX IF NOT EXISTS evaluation_worker_runs_latest ON evaluation_worker_runs(user_id, started_at DESC, id DESC);
+DDL
+if ! sqlite3 "$candidate" < "$evaluation_worker_sql" > "$backup/evaluation-worker.log" 2>&1; then
+  fail "Candidate evaluation worker upgrade failed. Original unchanged; backup retained at $backup."
+fi
+
 # Provision required suppression-key and available-balance sidecars on
 # pre-sidecar candidates. Provisioned tables stay empty; preexisting rows
 # verify byte-identical (or through the SimpleFIN v2 key rewrite) below.
