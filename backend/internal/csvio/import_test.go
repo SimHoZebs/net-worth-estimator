@@ -50,6 +50,29 @@ func TestImportModelPreservesCanonicalTransactionIDs(t *testing.T) {
 	}
 }
 
+func TestImportModelRejectsMalformedAnnualCap(t *testing.T) {
+	const amount = `{"resolver":"expression","config":{"expression":"100"},"inputs":{}}`
+	files := map[string][][]string{
+		AccountsFile: {
+			{"id", "name", "enabled"},
+			{"checking", "Checking", "true"},
+		},
+		CheckpointsFile: {{"AccountId", "Balance", "ObservedAt"}},
+		TransactionsFile: {{"id", "name", "amount", "postedTime", "enabled"}},
+		RulesFile: {
+			{"id", "name", "amount", "frequency", "startDate", "enabled", "annualCap"},
+			{"rent", "Rent", amount, "monthly", "2026-01-01", "true", "not-a-number"},
+		},
+		FIFile:             {{"instanceId"}},
+		ThresholdFile:      {{"instanceId"}},
+		AccountBalanceFile: {{"instanceId"}},
+		FulfillmentFile:    {{"instanceId"}},
+	}
+	if _, err := ImportModel(writeCSVDir(t, files)); err == nil {
+		t.Fatal("ImportModel accepted a malformed annualCap")
+	}
+}
+
 func writeCSVDir(t *testing.T, files map[string][][]string) string {
 	t.Helper()
 	path := t.TempDir()

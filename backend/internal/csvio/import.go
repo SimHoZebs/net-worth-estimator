@@ -85,15 +85,15 @@ func parseBound(value string) (*float64, error) {
 	return &parsed, nil
 }
 
-func parseOptionalFloat(value string) *float64 {
+func parseOptionalFloat(value string) (*float64, error) {
 	if value == "" || value == "null" {
-		return nil
+		return nil, nil
 	}
 	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("invalid number %q", value)
 	}
-	return &parsed
+	return &parsed, nil
 }
 
 func parseOptionalDate(value string) *types.IsoDate {
@@ -124,12 +124,6 @@ func parseUnixTime(value string) (int64, error) {
 		return 0, fmt.Errorf("invalid Unix time %q", value)
 	}
 	return parsed, nil
-}
-
-// ParseNumberValue converts a JSON-decoded number to float64.
-func ParseNumberValue(value any) float64 {
-	number, _ := value.(float64)
-	return number
 }
 
 // ImportModel reads the model CSV tables from a directory into a model.
@@ -273,7 +267,11 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 				return nil, fmt.Errorf("rule %s amount: %w", rule.ID, err)
 			}
 			rule.Amount = amount
-			rule.AnnualCap = parseOptionalFloat(field(record, index, "annualCap"))
+			annualCap, err := parseOptionalFloat(field(record, index, "annualCap"))
+			if err != nil {
+				return nil, fmt.Errorf("rule %s annualCap: %w", rule.ID, err)
+			}
+			rule.AnnualCap = annualCap
 			model.Schedules = append(model.Schedules, rule)
 		}
 	}
