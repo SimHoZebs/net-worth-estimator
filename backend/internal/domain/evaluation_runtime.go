@@ -62,6 +62,11 @@ type EvaluationContext struct {
 	// dirtied (empty = clean / unknown). Evaluators with declared
 	// Dependents may skip when their window excludes the dirty suffix.
 	DirtyFrom string
+	// ChangedAccountIDs / ChangedTransactionIDs name the rows touched by the
+	// edit that dirtied the projection. Evaluators whose Dependents.AccountIDs
+	// do not intersect this set may skip.
+	ChangedAccountIDs     []string
+	ChangedTransactionIDs []string
 }
 
 // GetTimeline returns a source-agnostic timeline for deterministic readers.
@@ -78,12 +83,14 @@ func (c *EvaluationContext) GetTimeline() *types.EvaluationTimeline {
 }
 
 // EvaluationDependents declares the evaluator's dependency window. FromDate
-// is the earliest date inspected; AccountIDs narrows to specific accounts.
-// Nil means depends on nothing (default). Shipped evaluators declare
-// DependsOnEverything() explicitly so reruns are never silently skipped.
+// is the earliest date inspected; AccountIDs and TransactionIDs narrow to
+// specific accounts/transactions. Nil means depends on nothing (default).
+// Shipped evaluators declare DependsOnEverything() explicitly so reruns are
+// never silently skipped.
 type EvaluationDependents struct {
-	AccountIDs []string
-	FromDate   types.IsoDate
+	AccountIDs     []string
+	TransactionIDs []string
+	FromDate       types.IsoDate
 }
 
 func DependsOnEverything() *EvaluationDependents { return &EvaluationDependents{} }
@@ -431,6 +438,48 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 					Code:     "evaluation-skipped",
 					Severity: "info",
 					Message:  "Skipped; dependents window excludes dirty suffix.",
+				})
+				return
+			}
+		}
+		if len(deps.AccountIDs) > 0 && len(ctx.ChangedAccountIDs) > 0 {
+			intersects := false
+			changed := map[string]bool{}
+			for _, id := range ctx.ChangedAccountIDs {
+				changed[id] = true
+			}
+			for _, id := range deps.AccountIDs {
+				if changed[id] {
+					intersects = true
+					break
+				}
+			}
+			if !intersects {
+				r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
+					Code:     "evaluation-skipped",
+					Severity: "info",
+					Message:  "Skipped; dependents accounts exclude changed accounts.",
+				})
+				return
+			}
+		}
+		if len(deps.TransactionIDs) > 0 && len(ctx.ChangedTransactionIDs) > 0 {
+			intersects := false
+			changed := map[string]bool{}
+			for _, id := range ctx.ChangedTransactionIDs {
+				changed[id] = true
+			}
+			for _, id := range deps.TransactionIDs {
+				if changed[id] {
+					intersects = true
+					break
+				}
+			}
+			if !intersects {
+				r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
+					Code:     "evaluation-skipped",
+					Severity: "info",
+					Message:  "Skipped; dependents transactions exclude changed transactions.",
 				})
 				return
 			}
