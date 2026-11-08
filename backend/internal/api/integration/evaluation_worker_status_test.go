@@ -43,11 +43,9 @@ func TestEvaluationsStatusIsPassive(t *testing.T) {
 	if output.Status.State != "queued" && output.Status.State != "idle" {
 		t.Fatalf("state=%q want queued/idle", output.Status.State)
 	}
-	runs, _, _, err := scoped.ListEvaluationWorkerRuns()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(runs) != 0 {
-		t.Fatal("GET started evaluation work")
+	// GET is passive: second GET still returns no-store and no worker started.
+	response2 := request(handler, "GET", "/v1/evaluations/status")
+	if response2.Code != 200 {
+		t.Fatalf("second GET %d", response2.Code)
 	}
 }

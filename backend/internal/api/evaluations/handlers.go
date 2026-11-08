@@ -1,9 +1,13 @@
 // Package evaluations exposes evaluation-reader execution status.
-// The read is passive: it never starts work.
+// The read is passive: it derives state from the existing projection
+// manifest (revision / published / dirty) and never starts work.
 package evaluations
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -38,39 +42,20 @@ func (s *handler) listStatus(_ context.Context, _ *struct{}) (*struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError("Evaluation status is temporarily unavailable")
 	}
-	runs, revision, fingerprint, err := s.store.ListEvaluationWorkerRuns()
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Evaluation status is temporarily unavailable")
-	}
+	sum := sha256.Sum256([]byte(state.DetEvaluationsJSON))
+	fingerprint := fmt.Sprintf("%d:%s", state.Revision, hex.EncodeToString(sum[:8]))
 	status := evaluationStatus{
 		State:               "idle",
-		CurrentRevision:     revision,
+		CurrentRevision:     state.Revision,
 		PublishedRevision:   state.PublishedRevision,
 		DirtyFrom:           state.DirtyFrom,
 		Fingerprint:         fingerprint,
 		ProjectionAvailable: state.PublishedRevision > 0 && state.DirtyFrom == 0,
 	}
-	if len(runs) > 0 {
-		latest := runs[0]
-		if latest.State == "running" {
-			status.State = "running"
-		} else if latest.State == "failed" {
-			status.State = "failed"
-		} else if latest.Fingerprint != fingerprint {
-			status.State = "queued"
-		} else {
-			status.State = "succeeded"
-		}
-		if latest.State == "running" {
-			status.State = "running"
-		}
-	}
-	if len(runs) == 0 && fingerprint != "" {
-		// No run yet for this fingerprint but model exists → queued.
-		// Idle only when no model/projection has ever been initialized.
-		if status.CurrentRevision > 0 || state.ProjectionStart != "" {
-			status.State = "queued"
-		}
+	if state.DirtyFrom != 0 {
+		status.State = "queued"
+	} else if state.PublishedRevision == state.Revision && state.Revision > 0 {
+		status.State = "succeeded"
 	}
 
 	output := &struct {

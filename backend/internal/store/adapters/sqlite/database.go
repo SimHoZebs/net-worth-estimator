@@ -103,11 +103,6 @@ func (d *Database) setupSchema() error {
 			return fmt.Errorf("setup analysis: %w", err)
 		}
 	}
-	for _, statement := range evaluationWorkerSchemaStatements() {
-		if _, err := tx.Exec(statement); err != nil {
-			return fmt.Errorf("setup evaluation worker: %w", err)
-		}
-	}
 	for _, statement := range analysisFeedbackSchemaStatements {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("setup analysis feedback: %w", err)

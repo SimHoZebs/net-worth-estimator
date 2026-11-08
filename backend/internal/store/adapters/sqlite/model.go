@@ -110,9 +110,6 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM projection_states WHERE user_id = :user_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM evaluation_worker_runs WHERE user_id = :user_id`); err != nil {
-		return err
-	}
 	if _, err := tx.Exec(`DELETE FROM provider_connections WHERE user_id = :user_id`); err != nil {
 		return err
 	}

@@ -1,0 +1,60 @@
+flowchart TB
+    subgraph IN["Inputs (unchanged)"]
+        MODEL["FinancialModel"]
+        CFG["Evaluation Tables
+        + ProjectionRuntimeSettings"]
+    end
+
+    subgraph PIPE["Shared Projection Pipeline"]
+        PREP["PrepareSimulationRequest"]
+        SIM["Simulate"]
+        PATH["BuildProjectionPath
+        *ProjectionPath"]
+    end
+
+    subgraph RUNTIME["Evaluation Runtime"]
+        SET["NewEvaluationRuntimeSet"]
+        PART["PartitionByKind
+        Readers vs Simulators"]
+        EVAL["EvaluatePath
+        per Reader definition"]
+        MERGE["MergeEvaluationResultCollections"]
+        TABLES["EvaluationResultTables
+        envelopes + diagnostics"]
+    end
+
+    subgraph OUT["Renderer and Persistence (unchanged)"]
+        RENDER["Shared result renderer
+        deterministic + stochastic SSE"]
+        OUTPUTS[("7 outputs
+        built_revision")]
+    end
+
+    UI["Frontend"]
+
+    MODEL --> PREP
+    CFG --> SET
+    PREP --> SIM
+    SIM --> PATH
+    PATH --> SET
+    SET --> PART
+    PART --> EVAL
+    EVAL --> MERGE
+    MERGE --> TABLES
+    TABLES --> RENDER
+    RENDER --> OUTPUTS
+    RENDER --> UI
+
+    style MODEL fill:#1d3a24,stroke:#4caf50
+    style CFG fill:#1d3a24,stroke:#4caf50
+    style PREP fill:#4a3800,stroke:#ffb300
+    style SIM fill:#4a3800,stroke:#ffb300
+    style PATH fill:#4a3800,stroke:#ffb300
+    style SET fill:#4a3800,stroke:#ffb300
+    style PART fill:#4a3800,stroke:#ffb300
+    style EVAL fill:#4a3800,stroke:#ffb300
+    style MERGE fill:#4a3800,stroke:#ffb300
+    style TABLES fill:#4a3800,stroke:#ffb300
+    style RENDER fill:#4a3800,stroke:#ffb300
+    style OUTPUTS fill:#4a3800,stroke:#ffb300
+    style UI fill:#1d3a24,stroke:#4caf50
