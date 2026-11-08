@@ -35,22 +35,29 @@ type AccountBalanceProbabilisticResult struct {
 // skipped rather than treated as zero, so a disabled or removed account cannot
 // report a spurious first crossing.
 func EvaluateAccountBalance(path *types.ProjectionPath, accountID string, target float64) AccountBalancePathResult {
+	return EvaluateAccountBalanceTimeline(types.TimelineFromPath(path), accountID, target)
+}
+
+func EvaluateAccountBalanceTimeline(timeline *types.EvaluationTimeline, accountID string, target float64) AccountBalancePathResult {
 	firstReachedDate := (*string)(nil)
+	if timeline == nil {
+		return AccountBalancePathResult{Reached: false}
+	}
 	// Snapshots are built in effective-model account order, so resolve the
 	// expected position once and probe it per row (O(R+A)) instead of scanning
 	// every row (O(R*A)). Fall back to a scan when shapes diverge.
 	accountIndex := -1
-	for index, account := range path.EffectiveModel.Accounts {
+	for index, account := range timeline.EffectiveModel.Accounts {
 		if account.ID == accountID {
 			if account.Display != nil {
-				return evaluateDisplayAccountBalance(path, account.Display, target)
+				return evaluateDisplayAccountBalanceTimeline(timeline, account.Display, target)
 			}
 			accountIndex = index
 			break
 		}
 	}
-	for index := range path.Rows {
-		row := &path.Rows[index]
+	for index := range timeline.Rows {
+		row := &timeline.Rows[index]
 		if row.IsHistorical {
 			continue
 		}
@@ -99,7 +106,7 @@ var accountBalanceDefinition = NewReachedDateReader(
 	},
 	func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.AccountBalanceConfig)
-		result := EvaluateAccountBalance(ctx.Path, typed.AccountID, typed.Target)
+		result := EvaluateAccountBalanceTimeline(ctx.GetTimeline(), typed.AccountID, typed.Target)
 		return &result, nil
 	},
 	func(deterministic PathResult) bool {

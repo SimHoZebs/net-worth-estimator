@@ -71,16 +71,23 @@ func ClassifyTransactionConstraints(input transactionConstraintInput) []accountT
 
 // ReconstructBalancesBeforeEvents rebuilds pre-event balances by sequence.
 func ReconstructBalancesBeforeEvents(path *types.ProjectionPath) map[int]map[string]float64 {
+	return ReconstructBalancesBeforeEventsTimeline(types.TimelineFromPath(path))
+}
+
+func ReconstructBalancesBeforeEventsTimeline(timeline *types.EvaluationTimeline) map[int]map[string]float64 {
+	if timeline == nil {
+		return map[int]map[string]float64{}
+	}
 	projectedRowsByDate := map[string]*types.ProjectionRow{}
-	for index := range path.Rows {
-		row := &path.Rows[index]
+	for index := range timeline.Rows {
+		row := &timeline.Rows[index]
 		if !row.IsHistorical {
 			projectedRowsByDate[row.Date] = row
 		}
 	}
 	eventsByDate := map[string][]*types.TransactionEvent{}
-	for index := range path.TransactionEvents {
-		event := &path.TransactionEvents[index]
+	for index := range timeline.TransactionEvents {
+		event := &timeline.TransactionEvents[index]
 		eventsByDate[event.Date] = append(eventsByDate[event.Date], event)
 	}
 	balancesBeforeBySequence := map[int]map[string]float64{}

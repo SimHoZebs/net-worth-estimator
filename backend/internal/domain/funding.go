@@ -73,28 +73,35 @@ func availableAmountFromLimits(transaction *types.Transaction, balancesBefore ma
 // remaining cap, and display-ready available amount together. Display callers
 // format from this result without re-deriving balances, sort order, or caps.
 func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactionEvent {
-	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
+	return evaluateTransactionEventsTimeline(types.TimelineFromPath(path))
+}
+
+func evaluateTransactionEventsTimeline(timeline *types.EvaluationTimeline) []evaluatedTransactionEvent {
+	if timeline == nil {
+		return nil
+	}
+	balancesBeforeBySequence := ReconstructBalancesBeforeEventsTimeline(timeline)
 	accountsByID := map[string]types.Account{}
-	for _, account := range path.EffectiveModel.Accounts {
+	for _, account := range timeline.EffectiveModel.Accounts {
 		accountsByID[account.ID] = account
 	}
 	transactionsByID := map[string]*types.Transaction{}
-	transactions := ResolvedTransactionTransactions(&path.EffectiveModel)
+	transactions := ResolvedTransactionTransactions(&timeline.EffectiveModel)
 	for index := range transactions {
 		transaction := &transactions[index]
 		transactionsByID[transaction.ID] = transaction
 	}
-	capsByID := RuleCapsByID(&path.EffectiveModel)
+	capsByID := RuleCapsByID(&timeline.EffectiveModel)
 	realizedByTransactionAndYear := map[string]float64{}
-	for transactionID, byYear := range path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear {
+	for transactionID, byYear := range timeline.ProjectionStartTransactionState.RealizedTransactionAmountsByYear {
 		for year, amount := range byYear {
 			realizedByTransactionAndYear[transactionID+":"+year] = amount
 		}
 	}
 
-	sorted := make([]*types.TransactionEvent, len(path.TransactionEvents))
-	for index := range path.TransactionEvents {
-		sorted[index] = &path.TransactionEvents[index]
+	sorted := make([]*types.TransactionEvent, len(timeline.TransactionEvents))
+	for index := range timeline.TransactionEvents {
+		sorted[index] = &timeline.TransactionEvents[index]
 	}
 	sort.SliceStable(sorted, func(i, j int) bool {
 		if sorted[i].Date != sorted[j].Date {

@@ -17,9 +17,10 @@ flowchart TB
         PART["PartitionByKind
         Readers vs Simulators"]
         GUARD["NeedsProjectionPath guard
-        nil path → projection-unavailable"]
+        nil Timeline → projection-unavailable"]
         EVAL["EvaluatePath
-        per Reader definition (optional path)"]
+        per Reader definition over Timeline
+        (source-agnostic, stochastic exempt)"]
         MERGE["MergeEvaluationResultCollections"]
         TABLES["EvaluationResultTables
         envelopes + diagnostics"]

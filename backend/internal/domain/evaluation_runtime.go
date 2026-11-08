@@ -56,7 +56,21 @@ type EvaluationContext struct {
 	Path             *types.ProjectionPath
 	Model            *types.FinancialModel
 	MonteCarloSample *types.MonteCarloSample
+	Timeline         *types.EvaluationTimeline
 	DetailLevel      string // "detailed" | "summary"
+}
+
+// GetTimeline returns a source-agnostic timeline for deterministic readers.
+// Callers may supply Timeline directly (projected or historical); otherwise
+// it is derived from Path. Stochastic hooks keep using Path/MonteCarloSample.
+func (c *EvaluationContext) GetTimeline() *types.EvaluationTimeline {
+	if c == nil {
+		return nil
+	}
+	if c.Timeline != nil {
+		return c.Timeline
+	}
+	return types.TimelineFromPath(c.Path)
 }
 
 // EvaluationFinalizeContext is passed to stochastic finalization.
@@ -351,7 +365,7 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 	if r.definition == nil || r.hasErrors() {
 		return
 	}
-	if r.definition.NeedsProjectionPath() && (ctx == nil || ctx.Path == nil) {
+	if r.definition.NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
 			Code:     "projection-unavailable",
 			Severity: "info",
@@ -376,7 +390,7 @@ func (r *instanceRuntime) prepareStochasticWork(ctx *EvaluationContext) {
 	if r.definition == nil || r.hasErrors() {
 		return
 	}
-	if r.definition.NeedsProjectionPath() && (ctx == nil || ctx.Path == nil) {
+	if r.definition.NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		return
 	}
 	if r.definition.DescribeStochasticWork == nil {
@@ -402,7 +416,7 @@ func (r *instanceRuntime) consume(ctx *EvaluationContext) {
 	if r.definition == nil || r.accumulator == nil || r.stochasticFailed {
 		return
 	}
-	if r.definition.NeedsProjectionPath() && (ctx == nil || ctx.Path == nil) {
+	if r.definition.NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		return
 	}
 	pathResult, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {

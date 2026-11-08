@@ -123,6 +123,48 @@ type ProjectionPath struct {
 	HistoryCutInstant int64 `json:"-"`
 }
 
+// TimelineSource records which data backs an EvaluationTimeline. Deterministic
+// readers do not need to know the source; only stochastic paths diverge.
+type TimelineSource string
+
+const (
+	TimelineProjected  TimelineSource = "projected"
+	TimelineHistorical TimelineSource = "historical"
+)
+
+// EvaluationTimeline is a source-agnostic view over rows for deterministic
+// readers. ProjectionPath can be viewed as a Timeline with Source=projected;
+// a historical timeline can be built from checkpoints without a projection.
+type EvaluationTimeline struct {
+	Source                          TimelineSource     `json:"source"`
+	Rows                            []ProjectionRow    `json:"rows"`
+	TransactionEvents               []TransactionEvent `json:"transactionEvents"`
+	EffectiveModel                  FinancialModel     `json:"effectiveModel"`
+	ProjectionStartTransactionState struct {
+		LatestRealizedTransactionAmounts map[string]float64            `json:"latestRealizedTransactionAmounts"`
+		LatestRealizedTransactionDates   map[string]string             `json:"latestRealizedTransactionDates,omitempty"`
+		RealizedTransactionAmountsByYear map[string]map[string]float64 `json:"realizedTransactionAmountsByYear"`
+	} `json:"projectionStartTransactionState"`
+	StartDate IsoDate `json:"startDate"`
+	EndDate   IsoDate `json:"endDate"`
+}
+
+// TimelineFromPath views a projected path as a source-agnostic timeline.
+func TimelineFromPath(p *ProjectionPath) *EvaluationTimeline {
+	if p == nil {
+		return nil
+	}
+	return &EvaluationTimeline{
+		Source:                          TimelineProjected,
+		Rows:                            p.Rows,
+		TransactionEvents:               p.TransactionEvents,
+		EffectiveModel:                  p.EffectiveModel,
+		ProjectionStartTransactionState: p.ProjectionStartTransactionState,
+		StartDate:                       p.ProjectionStartDate,
+		EndDate:                         p.ProjectionEndDate,
+	}
+}
+
 type StochasticProjectionResult struct {
 	Config     StochasticConfig    `json:"config"`
 	Bands      []StochasticBandRow `json:"bands"`

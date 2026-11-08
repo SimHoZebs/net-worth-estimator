@@ -160,9 +160,16 @@ func finalizeReachedDates(acc *thresholdAccumulator) types.JsonValue {
 
 // EvaluateNetWorthThreshold finds the first projected date at/above target.
 func EvaluateNetWorthThreshold(path *types.ProjectionPath, target float64) NetWorthThresholdPathResult {
+	return EvaluateNetWorthThresholdTimeline(types.TimelineFromPath(path), target)
+}
+
+func EvaluateNetWorthThresholdTimeline(timeline *types.EvaluationTimeline, target float64) NetWorthThresholdPathResult {
 	firstReachedDate := (*string)(nil)
-	for index := range path.Rows {
-		row := &path.Rows[index]
+	if timeline == nil {
+		return NetWorthThresholdPathResult{Reached: false}
+	}
+	for index := range timeline.Rows {
+		row := &timeline.Rows[index]
 		if !row.IsHistorical && row.NetWorth >= target {
 			date := row.Date
 			firstReachedDate = &date
@@ -199,7 +206,7 @@ var netWorthThresholdDefinition = NewReachedDateReader(
 	},
 	func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.NetWorthThresholdConfig)
-		result := EvaluateNetWorthThreshold(ctx.Path, typed.Target)
+		result := EvaluateNetWorthThresholdTimeline(ctx.GetTimeline(), typed.Target)
 		return &result, nil
 	},
 	func(deterministic PathResult) bool {

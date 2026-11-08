@@ -17,7 +17,8 @@ flowchart TB
         PART["PartitionByKind
         Readers vs Simulators"]
         EVAL["EvaluatePath
-        per Reader definition"]
+        per Reader definition
+        over Timeline (source-agnostic)"]
         MERGE["MergeEvaluationResultCollections"]
         TABLES["EvaluationResultTables
         envelopes + diagnostics"]

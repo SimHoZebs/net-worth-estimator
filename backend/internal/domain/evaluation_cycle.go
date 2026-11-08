@@ -103,7 +103,14 @@ func cycleOutflow(event *types.TransactionEvent, accountIDs map[string]bool) flo
 // in [windowStart, cycleEnd). Recurring history is checkpoint truth baked
 // into starting balances, not attributable spend, so it stays out.
 func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulfillmentConfig) *CycleFulfillmentPathResult {
-	projectionStart := string(path.ProjectionStartDate)
+	return EvaluateCycleFulfillmentTimeline(types.TimelineFromPath(path), config)
+}
+
+func EvaluateCycleFulfillmentTimeline(timeline *types.EvaluationTimeline, config types.CycleFulfillmentConfig) *CycleFulfillmentPathResult {
+	if timeline == nil {
+		return &CycleFulfillmentPathResult{}
+	}
+	projectionStart := string(timeline.StartDate)
 	cycleStart, cycleEndExclusive := resolveStatementCycle(projectionStart, config.StatementDay)
 	windowStart := cycleStart
 	if CompareIsoDates(windowStart, projectionStart) < 0 {
@@ -116,15 +123,15 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		accountSet[id] = true
 	}
 	startDateEvents := map[string]bool{}
-	for index := range path.TransactionEvents {
-		event := &path.TransactionEvents[index]
+	for index := range timeline.TransactionEvents {
+		event := &timeline.TransactionEvents[index]
 		if event.Date == projectionStart {
 			startDateEvents[event.Origin.TransactionID] = true
 		}
 	}
 	recorded := 0.0
-	for index := range path.EffectiveModel.Transactions {
-		transaction := &path.EffectiveModel.Transactions[index]
+	for index := range timeline.EffectiveModel.Transactions {
+		transaction := &timeline.EffectiveModel.Transactions[index]
 		if !transaction.Enabled {
 			continue
 		}
@@ -142,13 +149,13 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		if day == projectionStart && startDateEvents[transaction.ID] {
 			continue
 		}
-		if byYear, ok := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear[transaction.ID]; ok {
+		if byYear, ok := timeline.ProjectionStartTransactionState.RealizedTransactionAmountsByYear[transaction.ID]; ok {
 			recorded += maxFloat(0, byYear[day[:4]])
 		}
 	}
 	scheduled := 0.0
-	for index := range path.TransactionEvents {
-		event := &path.TransactionEvents[index]
+	for index := range timeline.TransactionEvents {
+		event := &timeline.TransactionEvents[index]
 		if CompareIsoDates(event.Date, windowStart) < 0 || CompareIsoDates(event.Date, cycleEndExclusive) >= 0 {
 			continue
 		}
@@ -188,9 +195,16 @@ func maxInt(a, b int) int {
 }
 
 func diagnoseCycleConfig(path *types.ProjectionPath, config types.CycleFulfillmentConfig) []types.EvaluationDiagnostic {
+	return diagnoseCycleConfigTimeline(types.TimelineFromPath(path), config)
+}
+
+func diagnoseCycleConfigTimeline(timeline *types.EvaluationTimeline, config types.CycleFulfillmentConfig) []types.EvaluationDiagnostic {
 	diagnostics := []types.EvaluationDiagnostic{}
+	if timeline == nil {
+		return diagnostics
+	}
 	byID := map[string]types.Account{}
-	for _, account := range path.EffectiveModel.Accounts {
+	for _, account := range timeline.EffectiveModel.Accounts {
 		byID[account.ID] = account
 	}
 	for _, accountID := range config.AccountIDs {
@@ -240,10 +254,10 @@ var cycleFulfillmentDefinition = &EvaluationDefinition{
 
 	EvaluatePath: func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.CycleFulfillmentConfig)
-		return EvaluateCycleFulfillment(ctx.Path, typed), nil
+		return EvaluateCycleFulfillmentTimeline(ctx.GetTimeline(), typed), nil
 	},
 	DiagnoseConfig: func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic {
-		return diagnoseCycleConfig(ctx.Path, config.(types.CycleFulfillmentConfig))
+		return diagnoseCycleConfigTimeline(ctx.GetTimeline(), config.(types.CycleFulfillmentConfig))
 	},
 
 	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {

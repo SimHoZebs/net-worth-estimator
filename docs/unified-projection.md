@@ -190,7 +190,7 @@ Rules:
 
 ## 5. Evaluation Plugins
 
-Evaluation Reader runs synchronously through the shared evaluation runtime (no worker). Projection data is optional input: readers that need a projection emit `projection-unavailable` and stay indeterminate when the path is missing, while projection-free evaluators run with the financial model alone. The shared result renderer keeps stored and computed responses bit-for-bit identical. Evaluation Simulator runs branch simulations on demand. What-if uses Isolated what-if inputs against a copy of the pipeline. What-if never mutates stored rows. Promote replays the set as row writes. Discard drops the copy.
+Evaluation Reader runs synchronously through the shared evaluation runtime (no worker). Deterministic readers see a source-agnostic `EvaluationTimeline` (`Rows`, `TransactionEvents`, `EffectiveModel`, `StartDate`, `EndDate`): projected (`TimelineProjected`) or historical (`TimelineHistorical`) is carried as data, not branching logic. Only stochastic evaluators (`financialIndependence`, `plannedPurchases`, `whatIf`) need a projection / `MonteCarloSample`. When no timeline is available, needs-timeline evaluators emit `projection-unavailable` and stay indeterminate; projection-free evaluators run on the model alone. The shared result renderer keeps stored and computed responses bit-for-bit identical. Evaluation Simulator runs branch simulations on demand. What-if uses Isolated what-if inputs against a copy of the pipeline. What-if never mutates stored rows. Promote replays the set as row writes. Discard drops the copy.
 
 ## 6. Unified Read API
 

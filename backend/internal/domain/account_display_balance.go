@@ -5,7 +5,14 @@ import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 // The visible loan reaches a balance target only when its complete balance
 // does. Paying principal alone cannot mark outstanding interest as paid off.
 func evaluateDisplayAccountBalance(path *types.ProjectionPath, display *types.AccountDisplay, target float64) AccountBalancePathResult {
-	for _, row := range path.Rows {
+	return evaluateDisplayAccountBalanceTimeline(types.TimelineFromPath(path), display, target)
+}
+
+func evaluateDisplayAccountBalanceTimeline(timeline *types.EvaluationTimeline, display *types.AccountDisplay, target float64) AccountBalancePathResult {
+	if timeline == nil {
+		return AccountBalancePathResult{}
+	}
+	for _, row := range timeline.Rows {
 		if row.IsHistorical {
 			continue
 		}

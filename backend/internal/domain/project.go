@@ -64,14 +64,17 @@ func EvaluateProjectionPathOptional(path *types.ProjectionPath, model *types.Fin
 	}
 	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
 	readers, simulators := set.PartitionByKind()
+	timeline := types.TimelineFromPath(path)
 	readers.EvaluateDeterministic(&EvaluationContext{
 		Path:        path,
+		Timeline:    timeline,
 		Model:       effectiveModel,
 		DetailLevel: "detailed",
 	})
 	readerCollection := readers.Result()
 	simulators.EvaluateDeterministic(&EvaluationContext{
 		Path:             path,
+		Timeline:         timeline,
 		Model:            effectiveModel,
 		MonteCarloSample: monteCarloSample,
 		DetailLevel:      "detailed",
@@ -91,14 +94,17 @@ func EvaluateProjectionPath(path *types.ProjectionPath, settings *types.Projecti
 	// Preserve existing fast path: model comes from path.
 	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
 	readers, simulators := set.PartitionByKind()
+	timeline := types.TimelineFromPath(path)
 	readers.EvaluateDeterministic(&EvaluationContext{
 		Path:        path,
+		Timeline:    timeline,
 		Model:       &path.EffectiveModel,
 		DetailLevel: "detailed",
 	})
 	readerCollection := readers.Result()
 	simulators.EvaluateDeterministic(&EvaluationContext{
 		Path:             path,
+		Timeline:         timeline,
 		Model:            &path.EffectiveModel,
 		MonteCarloSample: monteCarloSample,
 		DetailLevel:      "detailed",

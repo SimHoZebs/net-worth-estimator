@@ -102,6 +102,13 @@ type transactionTotals struct {
 
 // EvaluateTransactionFulfillment evaluates fulfillment over the selected transactions.
 func EvaluateTransactionFulfillment(path *types.ProjectionPath, config types.TransactionFulfillmentConfig, includeDetails bool) *TransactionFulfillmentPathResult {
+	return EvaluateTransactionFulfillmentTimeline(types.TimelineFromPath(path), config, includeDetails)
+}
+
+func EvaluateTransactionFulfillmentTimeline(timeline *types.EvaluationTimeline, config types.TransactionFulfillmentConfig, includeDetails bool) *TransactionFulfillmentPathResult {
+	if timeline == nil {
+		return &TransactionFulfillmentPathResult{Events: []fulfillmentEventJSON{}, Dates: []map[string]any{}, Transactions: []map[string]any{}}
+	}
 	var selectedIDs map[string]bool
 	if config.TransactionIDs != nil {
 		selectedIDs = map[string]bool{}
@@ -109,7 +116,7 @@ func EvaluateTransactionFulfillment(path *types.ProjectionPath, config types.Tra
 			selectedIDs[id] = true
 		}
 	}
-	evaluatedEvents := evaluateTransactionEvents(path)
+	evaluatedEvents := evaluateTransactionEventsTimeline(timeline)
 	result := &TransactionFulfillmentPathResult{Events: []fulfillmentEventJSON{}, Dates: []map[string]any{}, Transactions: []map[string]any{}}
 	totalsByTransactionID := map[string]*transactionTotals{}
 	type dateTotals struct {
@@ -162,13 +169,13 @@ func EvaluateTransactionFulfillment(path *types.ProjectionPath, config types.Tra
 
 	accountByID := map[string]types.Account{}
 	if includeDetails {
-		for _, account := range path.EffectiveModel.Accounts {
+		for _, account := range timeline.EffectiveModel.Accounts {
 			accountByID[account.ID] = account
 		}
 	}
 	if includeDetails {
-		detailTransactions := ResolvedTransactionTransactions(&path.EffectiveModel)
-		detailCaps := RuleCapsByID(&path.EffectiveModel)
+		detailTransactions := ResolvedTransactionTransactions(&timeline.EffectiveModel)
+		detailCaps := RuleCapsByID(&timeline.EffectiveModel)
 		for index := range detailTransactions {
 			transaction := &detailTransactions[index]
 			if selectedIDs != nil && !selectedIDs[transaction.ID] {
@@ -257,10 +264,17 @@ func EvaluateTransactionFulfillment(path *types.ProjectionPath, config types.Tra
 }
 
 func diagnoseFulfillmentConfig(path *types.ProjectionPath, config types.TransactionFulfillmentConfig) []types.EvaluationDiagnostic {
+	return diagnoseFulfillmentConfigTimeline(types.TimelineFromPath(path), config)
+}
+
+func diagnoseFulfillmentConfigTimeline(timeline *types.EvaluationTimeline, config types.TransactionFulfillmentConfig) []types.EvaluationDiagnostic {
 	if config.TransactionIDs == nil {
 		return nil
 	}
-	transactionIDs := TransactionIDs(&path.EffectiveModel)
+	if timeline == nil {
+		return nil
+	}
+	transactionIDs := TransactionIDs(&timeline.EffectiveModel)
 	diagnostics := []types.EvaluationDiagnostic{}
 	for _, transactionID := range config.TransactionIDs {
 		if !transactionIDs[transactionID] {
@@ -306,10 +320,10 @@ var transactionFulfillmentDefinition = &EvaluationDefinition{
 		// and per-transaction arrays here duplicated those 7446 events (~2.3 MB).
 		// EvaluateTransactionFulfillment keeps its detail capability for direct
 		// callers; the served path never pays for it.
-		return EvaluateTransactionFulfillment(ctx.Path, typed, false), nil
+		return EvaluateTransactionFulfillmentTimeline(ctx.GetTimeline(), typed, false), nil
 	},
 	DiagnoseConfig: func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic {
-		return diagnoseFulfillmentConfig(ctx.Path, config.(types.TransactionFulfillmentConfig))
+		return diagnoseFulfillmentConfigTimeline(ctx.GetTimeline(), config.(types.TransactionFulfillmentConfig))
 	},
 
 	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
