@@ -173,6 +173,70 @@ test("account detail controls remain usable across responsive resizes", async ({
 	await expect(sheet).not.toBeVisible();
 });
 
+for (const width of [320, 390]) {
+	test(`account transactions fit a ${width}px phone without horizontal scroll`, async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width, height: 900 });
+		const longTitle =
+			"A very long transaction title that exceeds the phone viewport and must truncate";
+		const created = await page.request.post("/v1/transactions", {
+			data: {
+				name: longTitle,
+				sourceAccountId: "checking",
+				destinations: [],
+				amount: { value: 123.45 },
+				date: "2026-01-20",
+				enabled: true,
+			},
+		});
+		expect(created.ok()).toBe(true);
+		await page.goto("/accounts");
+		await page
+			.getByRole("button", { name: "Open Everyday checking transactions" })
+			.click();
+		const sheet = page.getByRole("region", { name: "Account details" });
+		await expect(sheet).toBeVisible();
+		await sheet
+			.getByRole("searchbox", { name: "Search account transactions" })
+			.fill("very long transaction");
+		await expect(
+			sheet.getByRole("button", { name: new RegExp(longTitle.slice(0, 20)) }),
+		).toBeVisible();
+		const table = sheet.getByRole("region", {
+			name: /Transactions involving this account/,
+		});
+		await expect(table).toBeVisible();
+		await expect
+			.poll(async () =>
+				table.evaluate((element) => element.scrollWidth - element.clientWidth),
+			)
+			.toBeLessThanOrEqual(0);
+		await expect
+			.poll(
+				async () =>
+					await page.evaluate(
+						() => document.documentElement.scrollWidth - innerWidth,
+					),
+			)
+			.toBeLessThanOrEqual(0);
+		const title = page.locator(`strong[title="${longTitle}"]`);
+		await expect(title).toBeVisible();
+		const titleBox = await title.boundingBox();
+		expect(titleBox).not.toBeNull();
+		expect(titleBox!.x + titleBox!.width).toBeLessThanOrEqual(width + 1);
+		const truncated = await title.evaluate((element) => ({
+			scrollWidth: element.scrollWidth,
+			clientWidth: element.clientWidth,
+			textOverflow: getComputedStyle(element).textOverflow,
+			whiteSpace: getComputedStyle(element).whiteSpace,
+		}));
+		expect(truncated.textOverflow).toBe("ellipsis");
+		expect(truncated.whiteSpace).toBe("nowrap");
+		expect(truncated.scrollWidth).toBeGreaterThan(truncated.clientWidth);
+	});
+}
+
 for (const width of [320, 390, 768, 1440]) {
 	test(`failed-save forms and notifications remain usable at ${width}px`, async ({
 		page,

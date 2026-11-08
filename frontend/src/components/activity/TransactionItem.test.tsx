@@ -59,7 +59,7 @@ describe("TransactionItemRow", () => {
 		expect(onSelect).toHaveBeenCalledOnce();
 	});
 
-	it("caps title and breadcrumb at a fixed character length with ellipsis", () => {
+	it("caps title and breadcrumb at a fixed character length with ellipsis, viewport width on phones", () => {
 		const title = "A very long transaction title that should truncate";
 		render(
 			<Table aria-label="Transactions">
@@ -80,12 +80,16 @@ describe("TransactionItemRow", () => {
 		const titleEl = screen.getByText(title);
 		expect(titleEl.className).toContain("truncate");
 		expect(titleEl.className).toContain("max-w-[48ch]");
+		expect(titleEl.className).toContain("max-sm:max-w-[calc(100vw_-_13rem)]");
 		expect(titleEl.getAttribute("title")).toBe(title);
 		const breadcrumb = screen.getByText(
 			"From Some very long account name path",
 		);
 		expect(breadcrumb.className).toContain("truncate");
 		expect(breadcrumb.className).toContain("max-w-[32ch]");
+		expect(breadcrumb.className).toContain(
+			"max-sm:max-w-[calc(100vw_-_13rem)]",
+		);
 	});
 
 	it("keeps unavailable selection disabled", () => {

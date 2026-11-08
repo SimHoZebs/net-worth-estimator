@@ -78,15 +78,15 @@ export function TransactionItemRow({
 					>
 						{icon}
 					</span>
-					<span className="flex min-w-0 flex-col gap-1">
+					<span className="flex min-w-0 flex-1 flex-col gap-1">
 						<strong
 							title={title}
-							className="block max-w-[48ch] truncate text-xs font-semibold"
+							className="block max-w-[48ch] truncate text-xs font-semibold max-sm:max-w-[calc(100vw_-_13rem)]"
 						>
 							{title}
 						</strong>
 						{slots?.subtitle && (
-							<span className="block max-w-[32ch] truncate text-xs text-muted">
+							<span className="block max-w-[32ch] truncate text-xs text-muted max-sm:max-w-[calc(100vw_-_13rem)]">
 								{slots.subtitle}
 							</span>
 						)}
