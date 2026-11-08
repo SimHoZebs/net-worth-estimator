@@ -110,7 +110,7 @@ export function TransactionsPanel({
 							slots={{
 								subtitle: route ? <span>{route}</span> : undefined,
 								mobile: <span>{dateText}</span>,
-								badges: (pending || transaction.void || excluded) && (
+								badges: (transaction.void || excluded) && (
 									<>
 										{transaction.void ? (
 											<Badge
@@ -118,13 +118,6 @@ export function TransactionsPanel({
 												className={transactionBadgeStyles()}
 											>
 												Did not post
-											</Badge>
-										) : pending ? (
-											<Badge
-												tone="neutral"
-												className={transactionBadgeStyles()}
-											>
-												Pending
 											</Badge>
 										) : (
 											excluded && (
@@ -145,6 +138,14 @@ export function TransactionsPanel({
 										transaction={transaction}
 										resolved={resolvedAmounts?.get(transaction.id)}
 									/>
+									{pending ? (
+										<Badge
+											tone="neutral"
+											className={transactionBadgeStyles()}
+										>
+											Pending
+										</Badge>
+									) : null}
 									{transaction.claimScheduleId &&
 										transaction.claimOccurrenceDate && (
 											<Badge tone="neutral">

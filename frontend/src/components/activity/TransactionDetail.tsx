@@ -1428,7 +1428,12 @@ export function TransactionDetail({
 												·
 											</span>
 										)}
-										<span className="text-sm text-muted">{accountRoute}</span>
+										<span
+											title={accountRoute}
+											className="block max-w-[32ch] truncate text-xs text-muted"
+										>
+											{accountRoute}
+										</span>
 									</>
 								)}
 							</div>

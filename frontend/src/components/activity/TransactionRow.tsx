@@ -100,8 +100,7 @@ export function TransactionRow({
 						{dateLabel(transaction.date, true)}
 					</time>
 				),
-				badges: (transaction.pending ||
-					transaction.void ||
+				badges: (transaction.void ||
 					transaction.excluded ||
 					transaction.shortfall > 0.01 ||
 					receiptBadge ||
@@ -113,10 +112,6 @@ export function TransactionRow({
 							<Badge tone="neutral" className={transactionBadgeStyles()}>
 								Did not post
 								<span className="sr-only">bank hold that did not post</span>
-							</Badge>
-						) : transaction.pending ? (
-							<Badge tone="neutral" className={transactionBadgeStyles()}>
-								Pending
 							</Badge>
 						) : (
 							transaction.excluded && (
@@ -148,6 +143,11 @@ export function TransactionRow({
 							? exactMoney(0)
 							: `${transaction.direction === "in" ? "+" : "−"}${exactMoney(transaction.amount)}`}
 					</strong>
+					{transaction.pending ? (
+						<Badge tone="neutral" className={transactionBadgeStyles()}>
+							Pending
+						</Badge>
+					) : null}
 					{transaction.shortfall > 0.01 && (
 						<small className="block text-xs text-warning-text">
 							{exactMoney(transaction.requested)} planned

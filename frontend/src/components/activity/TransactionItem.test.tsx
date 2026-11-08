@@ -59,6 +59,35 @@ describe("TransactionItemRow", () => {
 		expect(onSelect).toHaveBeenCalledOnce();
 	});
 
+	it("caps title and breadcrumb at a fixed character length with ellipsis", () => {
+		const title = "A very long transaction title that should truncate";
+		render(
+			<Table aria-label="Transactions">
+				<TableBody>
+					<TransactionItemRow
+						date="Today"
+						icon={null}
+						tone="transfer"
+						title={title}
+						amount="$0"
+						actionLabel="View record"
+						onSelect={() => {}}
+						slots={{ subtitle: "From Some very long account name path" }}
+					/>
+				</TableBody>
+			</Table>,
+		);
+		const titleEl = screen.getByText(title);
+		expect(titleEl.className).toContain("truncate");
+		expect(titleEl.className).toContain("max-w-[48ch]");
+		expect(titleEl.getAttribute("title")).toBe(title);
+		const breadcrumb = screen.getByText(
+			"From Some very long account name path",
+		);
+		expect(breadcrumb.className).toContain("truncate");
+		expect(breadcrumb.className).toContain("max-w-[32ch]");
+	});
+
 	it("keeps unavailable selection disabled", () => {
 		const onSelect = vi.fn();
 		render(

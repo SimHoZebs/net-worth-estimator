@@ -243,48 +243,46 @@ export function SharedFeed({
 										</span>
 									),
 									mobile: <time dateTime={day}>{dateLabel(day, true)}</time>,
-									badges: (item.transaction.pending || isSaved) && (
-										<>
-											{item.transaction.pending && (
-												<Badge
-													tone="neutral"
-													className={transactionBadgeStyles()}
-												>
-													Pending
-												</Badge>
-											)}
-											{isSaved && (
-												<Badge
-													tone="neutral"
-													className={transactionBadgeStyles()}
-												>
-													Saved
-												</Badge>
-											)}
-										</>
-									),
+									badges: isSaved ? (
+										<Badge
+											tone="neutral"
+											className={transactionBadgeStyles()}
+										>
+											Saved
+										</Badge>
+									) : null,
 								}}
 								amount={
-									literal === null ? (
-										<strong
-											className={transactionAmountStyles()}
-											title="Shared amount is calculated"
-										>
-											Varies
-										</strong>
-									) : (
-										<strong
-											className={transactionAmountStyles({
-												positive: tone === "inflow",
-											})}
-										>
-											{tone === "inflow"
-												? `+${exactMoney(literal)}`
-												: tone === "outflow"
-													? `−${exactMoney(literal)}`
-													: exactMoney(literal)}
-										</strong>
-									)
+									<>
+										{literal === null ? (
+											<strong
+												className={transactionAmountStyles()}
+												title="Shared amount is calculated"
+											>
+												Varies
+											</strong>
+										) : (
+											<strong
+												className={transactionAmountStyles({
+													positive: tone === "inflow",
+												})}
+											>
+												{tone === "inflow"
+													? `+${exactMoney(literal)}`
+													: tone === "outflow"
+														? `−${exactMoney(literal)}`
+														: exactMoney(literal)}
+											</strong>
+										)}
+										{item.transaction.pending ? (
+											<Badge
+												tone="neutral"
+												className={transactionBadgeStyles()}
+											>
+												Pending
+											</Badge>
+										) : null}
+									</>
 								}
 								actionLabel={`Save a copy of ${item.transaction.name} on ${dateLabel(day, true)}${item.transaction.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
 								onSelect={() => void onSave(item)}

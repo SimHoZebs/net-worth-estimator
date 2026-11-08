@@ -79,11 +79,16 @@ export function TransactionItemRow({
 						{icon}
 					</span>
 					<span className="flex min-w-0 flex-col gap-1">
-						<strong className="text-xs font-semibold [overflow-wrap:anywhere]">
+						<strong
+							title={title}
+							className="block max-w-[48ch] truncate text-xs font-semibold"
+						>
 							{title}
 						</strong>
 						{slots?.subtitle && (
-							<span className="text-xs text-muted">{slots.subtitle}</span>
+							<span className="block max-w-[32ch] truncate text-xs text-muted">
+								{slots.subtitle}
+							</span>
 						)}
 						{slots?.mobile && (
 							<span className="hidden text-xs text-muted max-sm:block">

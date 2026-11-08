@@ -30,9 +30,9 @@ export const transactionCellStyles = cva("py-3", {
 	variants: {
 		column: {
 			date: "w-[1%] pr-3 pl-0 text-xs whitespace-nowrap text-muted max-sm:hidden",
-			name: "w-auto px-5 whitespace-normal max-sm:px-4",
+			name: "w-auto min-w-0 px-5 whitespace-normal max-sm:px-4",
 			amount:
-				"w-32 pr-1 pl-3 text-right whitespace-nowrap tabular-nums max-sm:w-24 max-sm:pr-0 max-sm:pl-2",
+				"w-auto pr-1 pl-3 text-right whitespace-nowrap tabular-nums max-sm:pr-0 max-sm:pl-2",
 		},
 	},
 });

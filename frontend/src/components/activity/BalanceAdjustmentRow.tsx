@@ -34,7 +34,6 @@ export function BalanceAdjustmentRow({
 				actionLabel={`View balance adjustment on ${dateLabel(date, true)}`}
 				onSelect={() => setOpen(true)}
 				slots={{
-					subtitle: "Not income or spending",
 					mobile: dateLabel(date, true),
 				}}
 			/>

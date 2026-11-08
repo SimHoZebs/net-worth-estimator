@@ -22,9 +22,9 @@ export const transactionControlStyles = cva(
 			shape: {
 				inline: "text-inherit",
 				compact: "text-xs text-inherit",
-				name: "min-w-0 flex-auto text-xl leading-[1.3] font-semibold tracking-tight text-inherit",
+				name: "field-sizing-content w-auto min-w-[8ch] max-w-[48ch] text-xl leading-[1.3] font-semibold tracking-tight text-inherit",
 				amount:
-					"w-auto min-w-0 flex-auto text-2xl leading-[1.3] font-medium tracking-tight text-inherit tabular-nums",
+					"field-sizing-content w-auto min-w-[4ch] max-w-[14ch] text-2xl leading-[1.3] font-medium tracking-tight text-inherit tabular-nums",
 				date: "min-w-0 text-sm font-medium text-ink",
 				account: "text-sm font-semibold text-ink",
 			},
