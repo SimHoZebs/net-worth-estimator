@@ -91,25 +91,5 @@ func EvaluateProjectionPath(path *types.ProjectionPath, settings *types.Projecti
 	if path == nil {
 		return EvaluateProjectionPathOptional(nil, nil, settings, monteCarloSample)
 	}
-	// Preserve existing fast path: model comes from path.
-	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
-	readers, simulators := set.PartitionByKind()
-	timeline := types.TimelineFromPath(path)
-	readers.EvaluateDeterministic(&EvaluationContext{
-		Path:        path,
-		Timeline:    timeline,
-		Model:       &path.EffectiveModel,
-		DetailLevel: "detailed",
-	})
-	readerCollection := readers.Result()
-	simulators.EvaluateDeterministic(&EvaluationContext{
-		Path:             path,
-		Timeline:         timeline,
-		Model:            &path.EffectiveModel,
-		MonteCarloSample: monteCarloSample,
-		DetailLevel:      "detailed",
-	})
-	simulatorCollection := simulators.Result()
-	collection := MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
-	return collection.Evaluations
+	return EvaluateProjectionPathOptional(path, &path.EffectiveModel, settings, monteCarloSample)
 }
