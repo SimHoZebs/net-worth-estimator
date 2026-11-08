@@ -5,10 +5,8 @@
 - Do not state file name or line number unless it's absolutely necessary to communicate the idea.
 - Use established terminologies in the project instead of inventing a synonym.
 - Prefer to use full sentences with minimal punctuations that breaks it.
-
-## Subagent model
-
-- ONLY if you are an OpenAI model, set `model: "openai/gpt-6.1-terra#medium"` explicitly on every subagent call. Otherwise, leave it empty.
+- Use markdown to structure large responses.
+- Use @simhozebs/pele-cli to generate PNG of mermaid diagrams to paste in chat for visual communication.
 
 ## Latest state only
 
@@ -37,8 +35,7 @@
 
 ## Start and verify
 
-- Dev stack: `dev/README.md`. Verification gate: `TESTING.md`.
-- GitHub Actions is the default full gate. Run the narrowest local check for what you touched, push the branch, and fix from the hosted run. Do not run every suite locally before each push.
+- Run the narrowest local check for what you touched and fix from the hosted run. Do not run every suite locally before each push.
 - Every branch push triggers the `Tests` workflow. Watch the run for your exact commit before landing:
 
 ```bash
@@ -62,9 +59,8 @@ gh run watch "$run" --exit-status
 - Push fixes to the same branch. The workflow reruns for the new commit. Reuse the same feedback loop until it is green. A cancelled watch means a newer push replaced the run; resolve the new SHA instead of debugging the cancelled one.
 - Land only when the branch run is green. The one exception is a failure that reproduces on the exact current `origin/main` SHA: link that failing run in the landing message and file the fix before or with the landing. A release still requires every gate to pass on the release commit.
 - After the landing push, resolve the `main` run for the new SHA and watch it. Squash or rebase mints a different commit from the one you tested. If the landed run is red for a new reason, fix it immediately.
-- After landing, verify the migration itself and never treat a green `Tests` run as a deployed release. Check that the Northflank `waypoint-release` run for the landed SHA is `success` with its `migrate` step at exit 0, that `GET https://http--nwe-api--bc5m9smksgps.code.run/readyz` returns `ok` and never `maintenance`, and record the workflow run ID and migration backup hash. If the release failed, the API stays in maintenance — inspect the failed stage and retry the same reviewed target before declaring the work complete.
-- `End-to-end tests` is not part of per-branch work. It runs nightly, on dispatch, and on pull requests carrying the `e2e` label. Dispatch it for changes to auth, images, migrations, or the proxy.
-- When CI is unavailable, `scripts/test --gate` is the local equivalent of the `Tests` workflow.
+- Verify the migration. Check that the Northflank `waypoint-release` run for the landed SHA is `success` with its `migrate` step at exit 0, that `GET https://http--nwe-api--bc5m9smksgps.code.run/readyz` returns `ok` and never `maintenance`, and record the workflow run ID and migration backup hash. If the release failed, inspect the failed stage and retry the same reviewed target before declaring the work complete.
+- Dispatch `End-to-end tests` for changes to auth, images, migrations, or the proxy. Otherwise, it runs nightly, on dispatch, and on pull requests carrying the `e2e` label.
 - If your work impacts the frontend interactions or visuals in any way, take screenshots and/or gifs of the workflow you touched and share in chat.
 
 ## Landing visualization (viz/)
@@ -79,6 +75,5 @@ gh run watch "$run" --exit-status
 - Frontend is Vercel project `simhozebs-projects/net-worth-estimator` (`https://net-worth-estimator.vercel.app`). The CLI evaluates root `vercel.mjs` with local shell env, so export `BACKEND_URL`, `NET_WORTH_ESTIMATOR_PUBLIC_URL`, and the proxy secret for CLI runs. `.vercelignore` patterns are root-anchored.
 - API is Northflank service `nwe-api` in project `net-worth` (us-central, Sandbox) at `https://http--nwe-api--bc5m9smksgps.code.run`. Keep the `http--` prefix. Smallest compute plan, 6 GB volume at `/data`, boots with `/app/api-boot.sh`, health at `/readyz`, port 10000. The image workflow builds backend, frontend, and Better Auth images after `Tests`.
 - Identity target is Better Auth on Bun from `auth/better-auth/Dockerfile`, port 8000, health `/healthz`. Live cutover remains an explicit operator step. PostgreSQL and SQLite are supported. Go embeds Casbin and reads `NET_WORTH_ESTIMATOR_AUTHZ_DB`. Follow `auth/better-auth/one-time/README.md` before replacing a deployed provider. Northflank release requires `AUTH_CUTOVER_READY=true` plus prepared identity service/addon IDs. Keep the exact existing issuer and subjects. No source push performs live conversion or changes shared tailnet routes.
-- Identity setup initializes schema and the application-owned OAuth client only. It never creates users or sessions. Users sign up through the ordinary frontend endpoint independently of deployment. Ops uses that same endpoint only for exceptional account creation. Disposable dev/test fixtures are excluded from deployment images. The API reads `NET_WORTH_ESTIMATOR_GUEST_SUBJECT`. Use explicit `setupdb --issuer ... --subject ...` before guest-data publication.
 - Northflank notes: env PATCH replaces all variables; boot command nests under `deployment.docker`; use exact `Dockerfile` names; one build at a time; one free volume; no volume snapshots, so the API database has no automated backup.
 - Northflank access is via the authenticated `northflank` CLI (`northflank list workflow-runs --project net-worth --workflow waypoint-release`, `get workflow-run`, `get service logs --project net-worth --service nwe-api`). The Komodo `NORTHFLANK_API_TOKEN` is expired; do not use it. Spend runs near $15 of the $20 allowance; check dashboard billing before growing.
