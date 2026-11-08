@@ -38,9 +38,9 @@ func TestNilPathIndeterminateForRequiredEvaluator(t *testing.T) {
 		t.Fatal("existing evaluators default to requiring projection")
 	}
 	required := &EvaluationDefinition{
-		Type: "req",
-		Name: "req",
-		Kind: EvaluationKindReader,
+		Type:        "req",
+		Name:        "req",
+		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
 			return nil, &probeErr{s: "must not be called without path"}

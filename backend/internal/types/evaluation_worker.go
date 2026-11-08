@@ -18,7 +18,7 @@ type EvaluationRun struct {
 // Revision + Fingerprint derive from projection_states.revision and
 // det_evaluations_json; both track when model/evaluation config changed.
 type EvaluationSnapshot struct {
-	Revision   int64
-	Fingerprint string
+	Revision           int64
+	Fingerprint        string
 	DetEvaluationsJSON string
 }
