@@ -57,7 +57,7 @@ func TestImportModelRejectsMalformedAnnualCap(t *testing.T) {
 			{"id", "name", "enabled"},
 			{"checking", "Checking", "true"},
 		},
-		CheckpointsFile: {{"AccountId", "Balance", "ObservedAt"}},
+		CheckpointsFile:  {{"AccountId", "Balance", "ObservedAt"}},
 		TransactionsFile: {{"id", "name", "amount", "postedTime", "enabled"}},
 		RulesFile: {
 			{"id", "name", "amount", "frequency", "startDate", "enabled", "annualCap"},
