@@ -58,6 +58,10 @@ type EvaluationContext struct {
 	MonteCarloSample *types.MonteCarloSample
 	Timeline         *types.EvaluationTimeline
 	DetailLevel      string // "detailed" | "summary"
+	// DirtyFrom is the inclusive ISO date from which the projection was
+	// dirtied (empty = clean / unknown). Evaluators with declared
+	// Dependents may skip when their window excludes the dirty suffix.
+	DirtyFrom string
 }
 
 // GetTimeline returns a source-agnostic timeline for deterministic readers.
@@ -71,6 +75,14 @@ func (c *EvaluationContext) GetTimeline() *types.EvaluationTimeline {
 		return c.Timeline
 	}
 	return types.TimelineFromPath(c.Path)
+}
+
+// EvaluationDependents declares the evaluator's dependency window. FromDate
+// is the earliest date inspected; AccountIDs narrows to specific accounts.
+// Nil Dependents means always affected (default, preserves behavior).
+type EvaluationDependents struct {
+	AccountIDs []string
+	FromDate   types.IsoDate
 }
 
 // EvaluationFinalizeContext is passed to stochastic finalization.
@@ -125,6 +137,13 @@ type EvaluationDefinition struct {
 	ParseConfig    func(config any) (any, error)
 
 	EvaluatePath func(ctx *EvaluationContext, config any) (PathResult, error)
+
+	// Dependents declares the evaluator's dependency window. Nil means
+	// always affected (today's default). When set, the runtime may skip
+	// EvaluatePath if the evaluation window does not intersect a dirty
+	// timeline. Future evaluators may opt into per-evaluator invalidation;
+	// existing evaluators stay on the always-run default.
+	Dependents func(ctx *EvaluationContext, config any) *EvaluationDependents
 
 	CreateAccumulator func(config any, deterministicResult PathResult) (Accumulator, error)
 	Accumulate        func(accumulator Accumulator, pathResult PathResult) error
@@ -372,6 +391,23 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 			Message:  "Projection data is unavailable for this evaluation.",
 		})
 		return
+	}
+	if r.definition.Dependents != nil && ctx.DirtyFrom != "" {
+		deps := r.definition.Dependents(ctx, r.configuredRaw)
+		if deps != nil && deps.FromDate != "" && deps.FromDate > types.IsoDate(ctx.DirtyFrom) {
+			// Dirty suffix is after the evaluator's earliest interest date and
+			// no overlap: reader can keep its stored envelope (skip).
+			// Timeline window check is conservative: if Timeline.StartDate is
+			// already after DirtyFrom, skip; else run.
+			if tl := ctx.GetTimeline(); tl != nil && tl.StartDate < types.IsoDate(ctx.DirtyFrom) {
+				r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
+					Code:     "evaluation-skipped",
+					Severity: "info",
+					Message:  "Skipped; dependents window excludes dirty suffix.",
+				})
+				return
+			}
+		}
 	}
 	if r.definition.DiagnoseConfig != nil {
 		r.diagnostics = append(r.diagnostics, r.definition.DiagnoseConfig(ctx, r.configuredRaw)...)

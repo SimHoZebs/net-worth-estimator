@@ -118,3 +118,70 @@ func TestEvaluateProjectionPathOptionalNilPath(t *testing.T) {
 		t.Fatalf("expected populated empty tables, got %+v", got)
 	}
 }
+
+func TestDependentsSkipsWhenWindowExcludesDirty(t *testing.T) {
+	called := false
+	def := &EvaluationDefinition{
+		Type:        "deps",
+		Name:        "deps",
+		Kind:        EvaluationKindReader,
+		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
+		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
+			called = true
+			return &freeResult{value: 1}, nil
+		},
+		Dependents: func(ctx *EvaluationContext, cfg any) *EvaluationDependents {
+			return &EvaluationDependents{FromDate: "2027-01-01"}
+		},
+		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
+	}
+	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
+		evaluationType: "deps",
+		configuredRaw:  map[string]any{},
+		instanceID:     "1",
+		name:           "deps",
+		definition:     def,
+	}}}
+	model := &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
+	path := &types.ProjectionPath{EffectiveModel: *model, ProjectionStartDate: "2026-01-01", ProjectionEndDate: "2027-12-31"}
+	set.EvaluateDeterministic(&EvaluationContext{Path: path, Model: model, DirtyFrom: "2026-06-01"})
+	runtime := set.runtimes[0]
+	if called {
+		t.Fatal("should have skipped; dependents window excludes dirty")
+	}
+	found := false
+	for _, d := range runtime.diagnostics {
+		if d.Code == "evaluation-skipped" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected evaluation-skipped diagnostic, got %+v", runtime.diagnostics)
+	}
+}
+
+func TestNilDependentsAlwaysRun(t *testing.T) {
+	def := &EvaluationDefinition{
+		Type:        "always",
+		Name:        "always",
+		Kind:        EvaluationKindReader,
+		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
+		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
+			return &freeResult{value: 7}, nil
+		},
+		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
+	}
+	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
+		evaluationType: "always",
+		configuredRaw:  map[string]any{},
+		instanceID:     "1",
+		name:           "always",
+		definition:     def,
+	}}}
+	model := &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
+	path := &types.ProjectionPath{EffectiveModel: *model}
+	set.EvaluateDeterministic(&EvaluationContext{Path: path, Model: model, DirtyFrom: "2026-06-01"})
+	if set.runtimes[0].deterministic == nil {
+		t.Fatalf("nil dependents must always run, got %+v", set.runtimes[0].diagnostics)
+	}
+}
