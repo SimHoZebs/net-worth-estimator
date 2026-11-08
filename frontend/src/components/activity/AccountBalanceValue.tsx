@@ -12,7 +12,9 @@ export function AccountBalanceValue({
 }) {
 	const amount = parseDisplayNumber(edit.draft.balance);
 	return (
-		<div className="flex min-w-0 flex-col gap-2 pt-1 pb-2">
+		<div
+			className={`flex min-w-0 flex-col items-start gap-2 pt-1 pb-2 md:items-end ${edit.observedAt !== null ? "md:w-80" : ""}`}
+		>
 			<span className="text-xs text-muted">Balance</span>
 			<span className="type-value inline-flex min-w-0 items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight">
 				<span aria-hidden="true">$</span>
@@ -34,7 +36,7 @@ export function AccountBalanceValue({
 				/>
 			</span>
 			{edit.observedAt !== null && (
-				<div className="flex flex-col items-start gap-2">
+				<div className="flex flex-col items-start gap-2 md:items-end">
 					<label
 						htmlFor={`${edit.formId}-time`}
 						className="inline-flex max-w-full flex-wrap items-center gap-2 text-sm text-muted"
@@ -53,7 +55,7 @@ export function AccountBalanceValue({
 						/>
 					</label>
 					{edit.previous.isFetching || edit.previous.isPending ? (
-						<p role="status" className="m-0 text-xs text-muted">
+						<p role="status" className="m-0 text-xs text-muted md:text-right">
 							Loading balance at this time…
 						</p>
 					) : edit.previous.isError ? (
@@ -67,14 +69,14 @@ export function AccountBalanceValue({
 							</button>
 						</p>
 					) : (
-						<p className="m-0 text-xs text-muted">
+						<p className="m-0 text-xs text-muted md:text-right">
 							Previous balance {exactMoney(edit.previousBalance!)}.{" "}
 							{amount !== null && (
 								<>Adjustment {exactMoney(amount - edit.previousBalance!)}.</>
 							)}
 						</p>
 					)}
-					<p className="m-0 text-xs text-muted">
+					<p className="m-0 text-xs text-muted md:text-right">
 						Recorded in Transactions as a balance adjustment, not income or
 						spending.
 					</p>

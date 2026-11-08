@@ -159,9 +159,16 @@ test("account detail controls remain usable across responsive resizes", async ({
 		expect(box.x).toBeGreaterThanOrEqual(0);
 		expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
 		await expect(sheet.getByLabel("Transaction source")).toBeVisible();
-		await expect(sheet.getByRole("button", { name: "Accounts" })).toBeVisible();
+		await expect(
+			page
+				.getByRole("navigation", { name: "Breadcrumb" })
+				.getByRole("button", { name: "Accounts" }),
+		).toBeVisible();
 	}
-	await sheet.getByRole("button", { name: "Accounts" }).click();
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(sheet).not.toBeVisible();
 });

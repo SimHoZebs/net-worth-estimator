@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "@tanstack/react-router";
 import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
 import { balanceAdjustmentActivity } from "../../domain/balanceAdjustmentActivity.ts";
@@ -37,12 +38,14 @@ import {
 } from "../../state/savedState.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
+import { useBreadcrumbSlot } from "../../workspace/breadcrumbSlot.tsx";
 import { Button } from "../../components/Button.tsx";
 import { ArrowLeft } from "lucide-react";
 
 /**
- * Presentational account detail. Renders the breadcrumb and the
- * transaction, recurring, and settings tabs in the main window.
+ * Presentational account detail. Renders the transaction, recurring,
+ * and settings tabs in the main window. The topbar renders the
+ * breadcrumb trail.
  */
 export function AccountDetailView({
 	account,
@@ -85,6 +88,34 @@ export function AccountDetailView({
 		}
 		onClose();
 	};
+	const breadcrumbSlot = useBreadcrumbSlot();
+	const breadcrumb = (
+		<nav aria-label="Breadcrumb">
+			<ol className="m-0 flex min-w-0 list-none flex-nowrap items-center gap-2 p-0 text-xs">
+				<li className="flex-none">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={requestClose}
+					>
+						<ArrowLeft size={16} aria-hidden="true" />
+						Accounts
+					</Button>
+				</li>
+				<li aria-hidden="true" className="flex-none text-muted">
+					/
+				</li>
+				<li
+					aria-current="page"
+					title={account.name}
+					className="min-w-0 max-w-[32ch] truncate font-medium"
+				>
+					{account.name}
+				</li>
+			</ol>
+		</nav>
+	);
 	// Recorded facts render from saved rows alone. The forecast loads only
 	// after the viewer asks for projected activity.
 	const [forecastRequested, setForecastRequested] = useState(false);
@@ -163,27 +194,7 @@ export function AccountDetailView({
 			aria-label="Account details"
 			className="grid min-w-0 gap-6 [&>*]:min-w-0"
 		>
-			<nav aria-label="Breadcrumb">
-				<ol className="m-0 flex list-none flex-wrap items-center gap-2 p-0 text-sm">
-					<li>
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={requestClose}
-						>
-							<ArrowLeft size={16} aria-hidden="true" />
-							Accounts
-						</Button>
-					</li>
-					<li aria-hidden="true" className="text-muted">
-						/
-					</li>
-					<li aria-current="page" className="font-medium">
-						{account.name}
-					</li>
-				</ol>
-			</nav>
+			{breadcrumbSlot ? createPortal(breadcrumb, breadcrumbSlot) : null}
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div className="flex min-w-0 items-center gap-3">
 					<AccountIcon account={account} size="lg" />
@@ -210,10 +221,14 @@ export function AccountDetailView({
 						discardDisabled={edit.saving}
 					/>
 				) : undefined}
+				<form
+					id={edit.formId}
+					className="ml-auto min-w-0"
+					onSubmit={(event) => void edit.submit(event)}
+				>
+					<AccountBalanceValue edit={edit} readOnly={locked} />
+				</form>
 			</div>
-			<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
-				<AccountBalanceValue edit={edit} readOnly={locked} />
-			</form>
 			<Tabs
 				items={[
 					{
@@ -227,7 +242,7 @@ export function AccountDetailView({
 				value={view}
 				onChange={setView}
 				label="Account view"
-				className="my-4 max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-0"
+				className="mb-0 max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-0"
 				panelClassName="flex min-w-0 flex-col gap-4"
 			>
 				{view === "transactions" ? (
@@ -327,8 +342,9 @@ function useTransactionView() {
 
 /**
  * Route-level account page. Resolves the account from saved rows and
- * renders the detail in the main window with a breadcrumb back to
- * the accounts list. Editors open as overlays above this page.
+ * renders the detail in the main window. The topbar renders the
+ * breadcrumb back to the accounts list. Editors open as overlays
+ * above this page.
  */
 export function AccountDetailPage({ accountId }: { accountId: string }) {
 	const router = useRouter();

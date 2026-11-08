@@ -1,5 +1,6 @@
 import { ArrowLeft, Plus, Users } from "lucide-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { ErrorNotice } from "../components/ErrorNotice.tsx";
@@ -21,6 +22,7 @@ import {
 	useUpdateMemberRole,
 } from "../state/groups.ts";
 import { useRouter } from "@tanstack/react-router";
+import { useBreadcrumbSlot } from "../workspace/breadcrumbSlot.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { SharedFeed } from "./groups/SharedFeed.tsx";
 
@@ -30,6 +32,7 @@ export function GroupsPage({
 	selectedGroupId: string | null;
 }) {
 	const router = useRouter();
+	const breadcrumbSlot = useBreadcrumbSlot();
 	const selected = selectedGroupId;
 	const goToGroups = () => void router.navigate({ to: "/groups" });
 	const openGroup = (id: string) =>
@@ -167,15 +170,39 @@ export function GroupsPage({
 	}
 
 	if (selected) {
+		const groupName = detail?.name ?? "Group";
+		const breadcrumb = (
+			<nav aria-label="Breadcrumb">
+				<ol className="m-0 flex min-w-0 list-none flex-nowrap items-center gap-2 p-0 text-xs">
+					<li className="flex-none">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							onClick={goToGroups}
+						>
+							<ArrowLeft size={16} aria-hidden="true" />
+							Groups
+						</Button>
+					</li>
+					<li aria-hidden="true" className="flex-none text-muted">
+						/
+					</li>
+					<li
+						aria-current="page"
+						title={groupName}
+						className="min-w-0 max-w-[32ch] truncate font-medium"
+					>
+						{groupName}
+					</li>
+				</ol>
+			</nav>
+		);
 		return (
 			<section aria-label="Group details" className="grid gap-6">
-				<div>
-					<Button variant="ghost" size="sm" onClick={() => goToGroups()}>
-						<ArrowLeft size={16} aria-hidden="true" />
-						All groups
-					</Button>
-				</div>
-
+				{breadcrumbSlot
+					? createPortal(breadcrumb, breadcrumbSlot)
+					: null}
 				{detailError ? (
 					<ErrorNotice
 						message={detailError}
