@@ -11,43 +11,45 @@ import (
 )
 
 // Rerunning the base simulation must NOT be the default: reader is the
-// zero-value Kind, simulators opt in with Kind simulator plus AllowSimulation,
+// zero-value simulates flag, simulators opt in with simulates=true,
 // and the base path cache separates the base hash from the eval key.
 
 func TestEvaluationKindDefaultsToReader(t *testing.T) {
 	var def *EvaluationDefinition
-	if def.KindOrDefault() != EvaluationKindReader {
+	if def.IsSimulator() {
 		t.Fatal("nil definition must default to reader")
 	}
 	def = &EvaluationDefinition{}
-	if def.KindOrDefault() != EvaluationKindReader || def.IsSimulator() {
+	if def.IsSimulator() {
 		t.Fatal("zero-value definition must be a reader, not a simulator")
 	}
-	simulator := &EvaluationDefinition{Kind: EvaluationKindSimulator, AllowSimulation: true}
+	simulator := &EvaluationDefinition{simulates: true}
 	if !simulator.IsSimulator() {
-		t.Fatal("Kind simulator plus flag must opt into simulation")
+		t.Fatal("simulates flag must opt into simulation")
 	}
-	halfOptIn := &EvaluationDefinition{Kind: EvaluationKindSimulator}
+	halfOptIn := &EvaluationDefinition{}
 	if halfOptIn.IsSimulator() {
-		t.Fatal("Kind simulator without the explicit flag must not opt into simulation")
+		t.Fatal("zero value must not opt into simulation")
 	}
 }
 
 func TestEvaluationRegistryRejectsSimulatorWithoutFlag(t *testing.T) {
+	// Simulator constructors are no longer a Kind enum; a plain field
+	// cannot create a simulator. Registering a definition without
+	// Dependents must still panic (new gate).
 	registry := NewEvaluationRegistry()
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
-			t.Fatal("registering Kind simulator without AllowSimulation must panic")
+			t.Fatal("registering without Dependents must panic")
 		}
-		if message, ok := recovered.(string); !ok || !strings.Contains(message, "AllowSimulation") {
-			t.Fatalf("panic must name the missing opt-in, got %v", recovered)
+		if message, ok := recovered.(string); !ok || !strings.Contains(message, "Dependents") {
+			t.Fatalf("panic must name the missing Dependents, got %v", recovered)
 		}
 	}()
 	registry.Register(&EvaluationDefinition{
 		Type: "simulator-without-flag",
 		Name: "simulator without flag",
-		Kind: EvaluationKindSimulator,
 	})
 }
 
@@ -63,7 +65,7 @@ func TestEvaluationRegistryValidatesKnownDefinitions(t *testing.T) {
 				t.Fatalf("%s must be an explicit simulator", entry.Type)
 			}
 		default:
-			if definition.IsSimulator() || definition.KindOrDefault() != EvaluationKindReader {
+			if definition.IsSimulator() {
 				t.Fatalf("%s must be a reader", entry.Type)
 			}
 		}
@@ -329,12 +331,11 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 	}()
 	<-entered
 	simulator := &EvaluationDefinition{
-		Type:            "test-concurrent-simulator",
-		Name:            "test concurrent simulator",
-		Kind:            EvaluationKindSimulator,
-		AllowSimulation: true,
-		ValidateConfig:  func(any) error { return nil },
-		ParseConfig:     func(config any) (any, error) { return config, nil },
+		Type:           "test-concurrent-simulator",
+		Name:           "test concurrent simulator",
+		simulates:      true,
+		ValidateConfig: func(any) error { return nil },
+		ParseConfig:    func(config any) (any, error) { return config, nil },
 		EvaluatePath: func(ctx *EvaluationContext, _ any) (PathResult, error) {
 			if err := requireResimulationAllowed("simulatePurchases"); err != nil {
 				return nil, err

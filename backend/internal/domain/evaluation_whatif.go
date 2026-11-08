@@ -200,8 +200,7 @@ func whatIfStatus(deterministic PathResult, probabilistic types.JsonValue) types
 var whatIfDefinition = &EvaluationDefinition{
 	Type:              types.EvaluationTypeWhatIf,
 	Name:              "What-if",
-	Kind:              EvaluationKindSimulator,
-	AllowSimulation:   true,
+	simulates:         true,
 	ValidateConfig:    validateWhatIfConfig,
 	ParseConfig:       parseWhatIfConfig,
 	EvaluatePath:      evaluateWhatIf,

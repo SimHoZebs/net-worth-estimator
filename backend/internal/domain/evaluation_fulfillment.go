@@ -300,7 +300,7 @@ var transactionFulfillmentDefinition = &EvaluationDefinition{
 	Name: "Transaction fulfillment",
 
 	// Reader: answers from the cached path's transaction events only.
-	Kind: EvaluationKindReader,
+	// simulates stays false — readers never simulate.
 
 	ValidateConfig: ValidateFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {

@@ -879,8 +879,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 
 	// Simulator: FI replays continuing transactions in branch transitions against
 	// the shared base path. Branch state only; never a fresh Prepare.
-	Kind:            EvaluationKindSimulator,
-	AllowSimulation: true,
+	simulates: true,
 
 	ValidateConfig: ValidateFIPlanConfig,
 	ParseConfig: func(config any) (any, error) {

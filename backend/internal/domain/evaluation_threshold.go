@@ -59,7 +59,7 @@ func NewReachedDateReader(
 	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
 	satisfied func(deterministic PathResult) bool,
 ) *EvaluationDefinition {
-	return newReachedDateDefinition(evalType, name, EvaluationKindReader, false, validate, parse, evaluate, satisfied)
+	return newReachedDateDefinition(evalType, name, false, validate, parse, evaluate, satisfied)
 }
 
 // NewReachedDateSimulator is the simulator variant of NewReachedDateReader for
@@ -72,13 +72,12 @@ func NewReachedDateSimulator(
 	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
 	satisfied func(deterministic PathResult) bool,
 ) *EvaluationDefinition {
-	return newReachedDateDefinition(evalType, name, EvaluationKindSimulator, true, validate, parse, evaluate, satisfied)
+	return newReachedDateDefinition(evalType, name, true, validate, parse, evaluate, satisfied)
 }
 
 func newReachedDateDefinition(
 	evalType, name string,
-	kind EvaluationKind,
-	allowSimulator bool,
+	simulates bool,
 	validate func(config any) error,
 	parse func(config any) (any, error),
 	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
@@ -88,13 +87,11 @@ func newReachedDateDefinition(
 		Type: evalType,
 		Name: name,
 
-		Kind:            kind,
-		AllowSimulation: allowSimulator,
-
 		ValidateConfig: validate,
 		ParseConfig:    parse,
 		EvaluatePath:   evaluate,
 		Dependents:     func(ctx *EvaluationContext, config any) *EvaluationDependents { return DependsOnEverything() },
+		simulates:      simulates,
 
 		CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
 			return &thresholdAccumulator{reachedDates: []string{}}, nil

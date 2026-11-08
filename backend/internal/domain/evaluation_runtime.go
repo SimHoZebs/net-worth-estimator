@@ -24,32 +24,15 @@ import (
 //     EvaluatePath answers over one path; Accumulate plus Finalize aggregate
 //     sampled paths; Status drives the UI verdict.
 //   - Simulator: runs simulations against shared base path state (FI,
-//     purchases). Requires Kind simulator PLUS AllowSimulation, DetailLevel
-//     handling, and DescribeStochasticWork/MeasureStochasticWork for progress.
-// Optional hooks: DescribeStochasticWork and MeasureStochasticWork only tune
-// progress-bar labels and default to one unit per run; DiagnoseConfig folds
-// into ParseConfig when absent.
+//     purchases). Requires AllowSimulation, DetailLevel handling, and
+//     DescribeStochasticWork/MeasureStochasticWork for progress.
 //
 // Simulation contract: rerunning the base simulation is NOT the default.
-// Every definition is a reader (Kind "" or "reader") unless it
-// opts into simulation with BOTH Kind "simulator" AND AllowSimulation true.
 // Reader evaluations run against the cached ProjectionPath shared by all
 // evaluations; while a reader EvaluatePath runs, PrepareSimulationRequest,
 // Simulate, simulateScheduled, and simulatePurchases refuse to run and report
 // a reader violation. Simulator evaluations (purchases, FI) reuse the shared
 // base path state and run simulations only — never a fresh Prepare per eval.
-
-// EvaluationKind states whether an evaluator may run simulations.
-type EvaluationKind string
-
-const (
-	// EvaluationKindReader answers from the cached path only. This is
-	// the default: the zero value ("") means reader.
-	EvaluationKindReader EvaluationKind = "reader"
-	// EvaluationKindSimulator runs simulations against shared base path state.
-	// Requires AllowSimulation as an explicit second opt-in.
-	EvaluationKindSimulator EvaluationKind = "simulator"
-)
 
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
@@ -127,15 +110,11 @@ type PathResult interface {
 type Accumulator interface{}
 
 // EvaluationDefinition is the typed contract each evaluator implements.
+// The base fields are reader-only. Stochastic fields belong on
+// SimulatorDefinition only — readers leave them empty and never simulate.
 type EvaluationDefinition struct {
 	Type string
 	Name string
-
-	// Kind selects the simulation contract. "" defaults to reader:
-	// answer from ctx.Path only. Simulator requires Kind simulator PLUS
-	// AllowSimulation; one without the other is misconfigured.
-	Kind            EvaluationKind
-	AllowSimulation bool
 
 	// RequiresProjectionPath declares whether the evaluator needs a
 	// non-nil ctx.Path. Nil means required (zero-value safe, preserves
@@ -154,29 +133,26 @@ type EvaluationDefinition struct {
 	// shared state changes. Validate enforces this at registration.
 	Dependents func(ctx *EvaluationContext, config any) *EvaluationDependents
 
+	Status func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus
+
+	DiagnoseConfig func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic
+
+	// Stochastic hooks are simulator-only. Readers leave these nil.
 	CreateAccumulator func(config any, deterministicResult PathResult) (Accumulator, error)
 	Accumulate        func(accumulator Accumulator, pathResult PathResult) error
 	Finalize          func(accumulator Accumulator, ctx *EvaluationFinalizeContext) (types.JsonValue, error)
 
-	Status func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus
-
 	DescribeStochasticWork func(ctx *EvaluationContext, config any) *EvaluationWorkloadPlan
 	MeasureStochasticWork  func(accumulator Accumulator) *EvaluationWorkloadMeasurement
 
-	DiagnoseConfig func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic
+	// simulates is set only by SimulatorDefinition constructors. Readers
+	// leave it false so they cannot resimulate inside EvaluatePath.
+	simulates bool
 }
 
-// KindOrDefault resolves the zero value to reader.
-func (d *EvaluationDefinition) KindOrDefault() EvaluationKind {
-	if d == nil || d.Kind == "" {
-		return EvaluationKindReader
-	}
-	return d.Kind
-}
-
-// IsSimulator reports explicit simulator opt-in: Kind simulator plus the flag.
+// IsSimulator reports whether the definition runs branch simulations.
 func (d *EvaluationDefinition) IsSimulator() bool {
-	return d != nil && d.Kind == EvaluationKindSimulator && d.AllowSimulation
+	return d != nil && d.simulates
 }
 
 // NeedsProjectionPath reports whether the evaluator requires a non-nil path.
@@ -199,15 +175,10 @@ func NewEvaluationRegistry() *EvaluationRegistry {
 	return &EvaluationRegistry{definitions: map[string]*EvaluationDefinition{}}
 }
 
-// Register adds a definition; duplicate registration panics. Simulator opt-in
-// requires both Kind simulator and AllowSimulation; one without the other
-// panics so a resimulating evaluator can never register by accident.
+// Register adds a definition; duplicate registration panics.
 func (r *EvaluationRegistry) Register(definition *EvaluationDefinition) {
 	if _, exists := r.definitions[definition.Type]; exists {
 		panic(fmt.Sprintf("Evaluation definition %q is already registered.", definition.Type))
-	}
-	if definition.Kind == EvaluationKindSimulator && !definition.AllowSimulation {
-		panic(fmt.Sprintf("Evaluation definition %q selects Kind simulator without AllowSimulation.", definition.Type))
 	}
 	if definition.Dependents == nil {
 		panic(fmt.Sprintf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", definition.Type))
@@ -221,9 +192,6 @@ func (r *EvaluationRegistry) Register(definition *EvaluationDefinition) {
 func (r *EvaluationRegistry) Validate() error {
 	for _, evaluationType := range r.order {
 		definition := r.definitions[evaluationType]
-		if definition.Kind == EvaluationKindSimulator && !definition.AllowSimulation {
-			return fmt.Errorf("Evaluation definition %q selects Kind simulator without AllowSimulation.", evaluationType)
-		}
 		if definition.Dependents == nil {
 			return fmt.Errorf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", evaluationType)
 		}

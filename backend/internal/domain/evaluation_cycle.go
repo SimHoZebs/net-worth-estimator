@@ -241,7 +241,7 @@ var cycleFulfillmentDefinition = &EvaluationDefinition{
 	Name: "Cycle fulfillment",
 
 	// Reader: answers from the cached path's rows and events only.
-	Kind: EvaluationKindReader,
+	// simulates stays false — readers never simulate.
 
 	ValidateConfig: ValidateCycleFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {

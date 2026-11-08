@@ -16,7 +16,6 @@ func projectionFreeDefinition() *EvaluationDefinition {
 	return &EvaluationDefinition{
 		Type:                   "probe-free",
 		Name:                   "Probe Free",
-		Kind:                   EvaluationKindReader,
 		RequiresProjectionPath: boolPtr(false),
 		ParseConfig:            func(c any) (any, error) { return map[string]any{}, nil },
 		Dependents:             func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
@@ -41,7 +40,6 @@ func TestNilPathIndeterminateForRequiredEvaluator(t *testing.T) {
 	required := &EvaluationDefinition{
 		Type:        "req",
 		Name:        "req",
-		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
 			return nil, &probeErr{s: "must not be called without path"}
@@ -125,7 +123,6 @@ func TestDependentsSkipsWhenWindowExcludesDirty(t *testing.T) {
 	def := &EvaluationDefinition{
 		Type:        "deps",
 		Name:        "deps",
-		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
 			called = true
@@ -165,7 +162,6 @@ func TestNilDependentsSkippedWhenDirty(t *testing.T) {
 	def := &EvaluationDefinition{
 		Type:        "always",
 		Name:        "always",
-		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
 			return &freeResult{value: 7}, nil
@@ -203,7 +199,6 @@ func TestDependsOnEverythingAlwaysRuns(t *testing.T) {
 	def := &EvaluationDefinition{
 		Type:        "always2",
 		Name:        "always2",
-		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		Dependents:  func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
@@ -240,7 +235,6 @@ func TestDataChangeGateSimulatesDirty(t *testing.T) {
 	narrow := &EvaluationDefinition{
 		Type:        "narrow",
 		Name:        "narrow",
-		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		Dependents: func(ctx *EvaluationContext, cfg any) *EvaluationDependents {
 			return &EvaluationDependents{AccountIDs: []string{"savings"}}
@@ -318,7 +312,6 @@ func TestDataChangeGateSimulatesDirty(t *testing.T) {
 	every := &EvaluationDefinition{
 		Type:        "every",
 		Name:        "every",
-		Kind:        EvaluationKindReader,
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
 		Dependents:  func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
