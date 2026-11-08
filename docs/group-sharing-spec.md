@@ -82,7 +82,7 @@ it. An independent valid manual grant is never silently revoked by those edits
 > late-import warning shown before enabling history. The exact consent-screen
 > wording returns for review in the settings-UI work.
 
-Late-import rule: any row created by bank sync, CSV import, or model
+Late-import rule: any row created by bank sync or model
 publication whose canonical date falls in range and whose accounts match
 qualifies without extra review, exactly like a pre-existing row.
 

@@ -3,8 +3,6 @@ package sqlite
 import (
 	"context"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
-	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -355,7 +353,7 @@ func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 	}
 }
 
-func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
+func TestModelReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
 	settled := syncSettledTransaction("posted-a", "prime_card", "Corner Store", "2026-08-03")
@@ -383,9 +381,7 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := testseed.Seed(database, filepath.Join(projectRoot(t), "frontend", "tests", "fixtures", "model")); err != nil {
-		t.Fatal(err)
-	}
+	seedBaseline(t, database)
 	restored, err := database.GetReceipt(receipt.ID)
 	if err != nil || restored.TransactionID != id {
 		t.Fatalf("replacement dropped bank evidence: %+v, %v", restored, err)

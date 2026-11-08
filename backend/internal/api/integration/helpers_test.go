@@ -24,6 +24,7 @@ func New(st store.Store, config Config) http.Handler {
 
 var openAPIStore = apitest.OpenStore
 var apiProjectRoot = apitest.ProjectRoot
+var seedBaseline = apitest.SeedBaseline
 var stochasticTestModel = apitest.StochasticModel
 var stochasticTestBody = apitest.StochasticBody
 var postStochastic = apitest.PostStochastic

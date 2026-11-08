@@ -10,7 +10,7 @@ import (
 // Store is the persistence seam behind the canonical model, projection
 // artifacts, and SimpleFIN sync state. The server, API handlers,
 // and sync runner depend only on this interface. Backends (SQLite files,
-// CSV directories, S3 blobs, a human with paper and mic, Turso, Postgres,
+// S3 blobs, a human with paper and mic, Turso, Postgres,
 // …) implement these methods plus a constructor, then run the conformance
 // suite in storetest to prove it.
 //

@@ -99,7 +99,7 @@ separate from the transaction form.
 - Recurrence rules have no category. Occurrences inherit nothing in this
   version.
 - Owner-authored transactions are not auto-classified.
-- A CSV model import deletes and reinserts transactions. The cascade drops every
+- Model replacement deletes and reinserts transactions. The cascade drops every
   sidecar assignment, including user overrides on bank rows that the import
   preserves. Bank values return on the next sync; inferred values return when
   the worker scans again.

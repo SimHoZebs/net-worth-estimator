@@ -15,7 +15,7 @@ import (
 // this file owns only preset row methods.
 // Preset writes run in their own transaction and never mark the model
 // model present: saving a preset into an empty database must not fake
-// a model. Clear and CSV import leave presets alone: presets are user
+// a model. Clear and model replacement leave presets alone: presets are user
 // configuration, not model data.
 //
 // Referential rule: none. The amount descriptor may reference placeholder

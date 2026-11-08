@@ -161,7 +161,7 @@ as stale.
 
 ## Lifecycle and privacy
 
-Transaction edits and reorders preserve receipts. Explicit transaction deletion, CSV
+Transaction edits and reorders preserve receipts. Explicit transaction deletion, model
 replacement of transactions, and clearing a user's data remove dependent receipts. The
 transaction-removal confirmation explains this consequence before save.
 
@@ -181,7 +181,7 @@ only; see `scanTransactionRow` in `backend/internal/store/model.go` — it never
 enters `FinancialModel`, financial revisions, or projection
 identities). Receipt creation appends and receipt deletion removes the ID in the
 same transaction as the receipt row, so the field never drifts. Transaction edits
-leave it untouched, transaction deletion removes it with the row, and CSV
+leave it untouched, transaction deletion removes it with the row, and model
 replacement resets it with the new rows.
 
 The financial-model response exposes it as `receiptLinks`, mapping each

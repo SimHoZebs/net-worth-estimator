@@ -253,7 +253,7 @@ The kill switch rejects writes with 403 without a separate endpoint list. The pr
 - row writes with server-generated UUIDv7 IDs and a shared cross-table ID registry;
 - projection state, slices, rows, generated facts, statistics, and evaluation outputs;
 - bridge-to-model account links;
-- CSV replacement import;
+- model replacement import;
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
@@ -351,13 +351,11 @@ The current schema stores:
 Planned purchases use dedicated `/v1/planned-purchases` CRUD and reorder routes.
 See [purchase persistence](docs/purchase-queue.md#persistence).
 
-The authenticated user router initializes a blank private workspace on first authorized access. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected user's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
-
-`cmd/importcsv` requires both an existing shared database and an explicit existing user resource ID. It invokes the same import path for operator-controlled replacement within that user's scope.
+The authenticated user router initializes a blank private workspace on first authorized access. `ImportModel` replaces the selected user's model state in one transaction and is used by fixture packs and tests. At runtime the populated database is authoritative: no seed file replaces canonical state. Production replacement uses a database backup and restore.
 
 ### Row writes and ownership
 
-Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, schedule starts and endings, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
+Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the model replacement path used by fixture packs and tests. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, schedule starts and endings, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
@@ -367,7 +365,7 @@ Each row write validates the resulting state at its finance or evaluation bounda
 
 ### Amount presets
 
-Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical model: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `saved: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
+Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical model: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `saved: false`. The table seeds 8 factory presets at migration time and survives `Clear` and model replacement: presets are user configuration, not model data.
 
 ### Transaction identity
 
@@ -481,7 +479,6 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 
 - `NoFloor` is `-1e13`.
 - `NoCeiling` is `+1e13`.
-- CSV accepts `Infinity` and `-Infinity` only as import spellings for those bounds.
 - A source can withdraw only `max(0, balance - minBalance)`.
 - A destination can receive only `max(0, maxBalance - balance)`.
 - Bounds are structural constraints, not labels or categories.
@@ -823,9 +820,8 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 
 | File                                                | Responsibility                                          |
 | --------------------------------------------------- | ------------------------------------------------------- |
-| `backend/cmd/server/main.go`                        | environment, first-boot seed, HTTP lifecycle            |
+| `backend/cmd/server/main.go`                        | environment, HTTP lifecycle                             |
 | `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler            |
-| `backend/cmd/importcsv/main.go`                     | offline seed replacement                                |
 | `backend/internal/api/server.go`                    | router and operation registration                       |
 | `backend/internal/api/read_only.go`                 | operation-based read-only write kill switch              |
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement                |
@@ -848,7 +844,6 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/projections/builder.go`       | canonical builds, slice persistence, unified reads       |
 | `backend/internal/store/sync.go`                    | sync application and bank directives                      |
 | `backend/internal/store/settlement.go`, `adapters/sqlite/settlements.go` | split settlement ledger, derived states  |
-| `backend/internal/csvio/import.go`                  | canonical model CSV parsing                             |
 | `backend/internal/domain/validation.go`             | authoritative model validation                          |
 | `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state                |
 | `backend/internal/domain/transitions.go`            | shared transaction execution                               |

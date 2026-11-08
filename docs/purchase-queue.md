@@ -99,6 +99,6 @@ full candidate simulations, not an optimizer.
 `planned_purchases` stores standalone rows under their owning user. Its funding
 account foreign key uses that same user scope. Import, clear, private refresh,
 and approved guest publication include these rows. Canonical JSON exports preserve
-purchases. Model CSVs do not represent them.
+purchases. The canonical model does not represent them.
 
 Version upgrades use a separate one-time operator script. Follow [deploy/MIGRATIONS.md](../deploy/MIGRATIONS.md) and the [planned purchases upgrade script](../backend/scripts/one-time/planned-purchases/README.md). Neither the server nor `setupdb` invokes conversion.

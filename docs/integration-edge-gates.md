@@ -69,8 +69,7 @@ Loading per harness:
   seeds are read through the pack accessors (`BankFeeds`, `SplitProbes`,
   `LedgerExpected`, `SyncState`, `SharingScript`, `InviteScript`).
 - Browser suite: `INTEGRATION_PACK=<pack>` in the environment. The
-  fixtureapi harness applies the pack's model and settings seeds instead of
-  the CSV model on its own isolated ports and throwaway database; the
+  fixtureapi harness applies the pack's model and settings seeds on its own isolated ports and throwaway database; the
   Playwright config forwards the variable explicitly. Empty keeps the default
   fixture.
 - Manual demo: `scripts/dev demo --pack safe-spending` starts the same
@@ -79,7 +78,7 @@ Loading per harness:
   unfulfilled recurring bill. It never touches the dev stack or owner data.
 - Bulk rows: `INTEGRATION_BULK=<NxM[:seed]>` in the environment, or `bulk`
   on one reset call. The harness injects tagged synthetic accounts beside
-  the pack or CSV baseline through the same additive builder the Go leg
+  the pack baseline through the same additive builder the Go leg
   uses (`InjectBulk`); reset clears them with the baseline. Per-call
   overrides beat the environment; empty disables bulk.
 

@@ -1,12 +1,13 @@
 package sqlite
 
 import (
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/integrationfixtures"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -130,4 +131,15 @@ func projectRoot(t *testing.T) string {
 		t.Fatalf("get working directory: %v", err)
 	}
 	return filepath.Clean(filepath.Join(workingDirectory, "..", "..", "..", "..", ".."))
+}
+
+func seedBaseline(t *testing.T, s store.Store) {
+	t.Helper()
+	pack, err := integrationfixtures.Load(integrationfixtures.PackBaseline)
+	if err != nil {
+		t.Fatalf("load baseline pack: %v", err)
+	}
+	if err := integrationfixtures.Apply(s, pack); err != nil {
+		t.Fatalf("seed baseline pack: %v", err)
+	}
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -232,8 +231,8 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { return a.DeleteAccountLink("same-bridge") },
 		func() error { return a.DeleteAccount("second") },
 		func() error {
-			_, err := testseed.Seed(a, filepath.Join(projectRoot(t), "frontend", "tests", "fixtures", "model"))
-			return err
+			seedBaseline(t, a)
+			return nil
 		},
 		func() error { return a.Clear() },
 	} {

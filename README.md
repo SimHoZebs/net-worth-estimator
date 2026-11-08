@@ -2,41 +2,15 @@
 
 Go API and SQLite persistence for household financial records, account maintenance, current position, evidence Analysis, and SimpleFIN protocol v2 synchronization. Deterministic and stochastic projections add future outcomes and configured evaluations. Financial records remain available independently of future simulation. `PRODUCT_INTENT.md` describes the product independently.
 
-## CSV Seed Data
+## Seeding
 
-The server never reads CSV directories. An empty database stays empty until import. The directories below back the offline `cmd/importcsv` replacement tool and `cmd/fixtureapi` browser-test seeding.
-
-```text
-public/configs/
-├── accounts.csv
-├── checkpoints.csv
-├── transactions.csv
-├── recurrence-rules.csv
-└── behavior/
-    ├── financial-independence.csv
-    ├── net-worth-threshold.csv
-    └── transaction-fulfillment.csv
-
-public/data/income/
-├── income-sources.csv
-└── tax-profiles.csv
-```
-
-Offline replacement from `backend/` requires an existing user. Set `USER_ID` to
-the verified resource ID from `/v1/auth/session`. Stop the application first:
-
-```bash
-go run ./cmd/importcsv \
-  -db /path/to/net-worth-estimator.db \
-  -user "$USER_ID" \
-  -model ../public/configs
-```
+The server never reads seed directories. An empty database stays empty until the user signs up and creates records. Browser tests seed a throwaway database from fixture packs under `backend/testdata/integration/v1` through `cmd/fixtureapi`; the baseline pack is the default.
 
 ## Persistence and Access
 
 - One application SQLite file holds each user's financial data, including the guest's data, and application sessions.
 - Every financial table is user-scoped. The verified issuer and subject identify its owner.
-- There is no HTTP reset route. Use a database backup and the offline import tool for replacement.
+- There is no HTTP reset route. Use a database backup for replacement.
 - Canonical edits and artifacts survive redeployment only when the SQLite file is on durable storage.
 
 Database setup is a deployment step handled by `setupdb` (see [the shared database guide](docs/shared-database.md)). The server never creates or repairs the schema; version upgrades use separate one-time operator scripts with a backup.
@@ -80,7 +54,7 @@ testing uses the production-like dev stack above. Do not run both frontends on
 
 ```bash
 # terminal 1
-# Local state comes from a database backup, never the shipped CSVs: copy a
+# Local state comes from a database backup, never a shipped seed: copy a
 # backup to the dev database path while the server is stopped. tmp/ is
 # gitignored and survives reboot, unlike /tmp.
 cp <backup>.db tmp/net-worth-estimator.db

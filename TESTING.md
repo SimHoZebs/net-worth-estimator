@@ -81,7 +81,7 @@ scripts/dev ps-all
 Transaction UUID migration and exact upstream identity checks:
 
 ```bash
-CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api/...
+CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/simplefin ./internal/api/...
 ```
 
 ## Frontend Gates
@@ -178,7 +178,7 @@ return, top layer, scroll lock, and layout occlusion stay in the integration sui
 
 ## Frontend Integration Tests
 
-The integration suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness, seeded from `frontend/tests/fixtures/`, and the Vite dev server pointed at it. Each run picks random free ports and a fresh temporary database. It never attaches to a dev server, and several agents can run it at the same time. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched. Specs and their shared helpers live under `frontend/tests/integration/`.
+The integration suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness, seeded from a fixture pack (baseline by default), and the Vite dev server pointed at it. Each run picks random free ports and a fresh temporary database. It never attaches to a dev server, and several agents can run it at the same time. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched. Specs and their shared helpers live under `frontend/tests/integration/`.
 
 ```bash
 (cd frontend && bunx --no-install playwright install chromium)
@@ -384,7 +384,7 @@ every supported target. Check actual volume access, nonzero exit propagation,
 exact build selection, and API startup only after migration success. The
 Northflank workflow and command template live in `deploy/northflank/`.
 
-The verification surface for the backend is its HTTP/SSE contract, CSV seed path, and SQLite persistence.
+The verification surface for the backend is its HTTP/SSE contract, fixture pack seed path, and SQLite persistence.
 
 ## Scoped Go Tests
 
@@ -484,7 +484,7 @@ cp <backup>.db tmp/net-worth-estimator-test.db
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-The server reads the restored database; it never scans the CSV directories. To start from a clean snapshot, stop the server and restore the backup again (removing the `-shm`/`-wal` companions if present).
+The server reads the restored database; it never scans seed directories. To start from a clean snapshot, stop the server and restore the backup again (removing the `-shm`/`-wal` companions if present).
 
 The defaults bind to `127.0.0.1:8787`. Set `HOST=0.0.0.0` only when another process must reach the listener.
 

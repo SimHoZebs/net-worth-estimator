@@ -7,14 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 )
 
 func TestReadOnlyPolicyUsesMatchedOperations(t *testing.T) {
@@ -116,10 +114,7 @@ func TestRowWriteReadOnlyMatrix(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			database := openAPIStore(t)
-			root := apiProjectRoot(t)
-			if _, err := testseed.Seed(database, filepath.Join(root, "public", "configs")); err != nil {
-				t.Fatalf("seed store: %v", err)
-			}
+			seedBaseline(t, database)
 			handler := New(database, test.config)
 
 			before := httptest.NewRecorder()

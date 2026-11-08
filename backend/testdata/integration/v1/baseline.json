@@ -1,0 +1,338 @@
+{
+  "pack": "baseline",
+  "version": 2,
+  "concern": "Default deterministic browser and API baseline. Five accounts with fixed balances; four posted transactions.",
+  "breaksIfMishandled": "Any surface that drops or duplicates a baseline row changes the default browser assertions.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "sourcePath": "model",
+        "accounts": [
+          {
+            "id": "checking",
+            "name": "Everyday checking",
+            "kind": "cash",
+            "minBalance": 0,
+            "maxBalance": 10000000000000,
+            "color": "#2f6f4f",
+            "enabled": true
+          },
+          {
+            "id": "savings",
+            "name": "Investment portfolio",
+            "kind": "investment",
+            "minBalance": 0,
+            "maxBalance": 10000000000000,
+            "color": "#3d7a5c",
+            "enabled": true
+          },
+          {
+            "id": "brokerage",
+            "name": "Brokerage",
+            "kind": "investment",
+            "minBalance": -10000000000000,
+            "maxBalance": 10000000000000,
+            "color": "#2b5f8a",
+            "enabled": true
+          },
+          {
+            "id": "loan",
+            "name": "Student loan",
+            "kind": "debt",
+            "minBalance": -10000000000000,
+            "maxBalance": 0,
+            "color": "#8a4b2b",
+            "enabled": true
+          },
+          {
+            "id": "home",
+            "name": "Home value",
+            "kind": "property",
+            "minBalance": -10000000000000,
+            "maxBalance": 10000000000000,
+            "color": "#7a5c2b",
+            "enabled": true
+          }
+        ],
+        "checkpoints": [
+          {
+            "AccountId": "checking",
+            "Balance": 4200,
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "savings",
+            "Balance": 15000,
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "brokerage",
+            "Balance": 20000,
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "loan",
+            "Balance": -18000,
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "home",
+            "Balance": 340000,
+            "observedAt": 1769903999
+          }
+        ],
+        "evaluations": {
+          "financialIndependence": [],
+          "netWorthThreshold": [
+            {
+              "instanceId": "net-worth-750k",
+              "name": "Reach $750,000 net worth",
+              "enabled": true,
+              "config": {
+                "target": 750000
+              }
+            }
+          ],
+          "accountBalance": [
+            {
+              "instanceId": "emergency-fund-20k",
+              "name": "Emergency fund reaches $20,000",
+              "enabled": true,
+              "config": {
+                "accountId": "savings",
+                "target": 20000
+              }
+            }
+          ],
+          "transactionFulfillment": [
+            {
+              "instanceId": "transaction-fulfillment",
+              "name": "Transaction fulfillment",
+              "enabled": true,
+              "config": {
+                "transactionIds": null
+              }
+            }
+          ],
+          "cycleFulfillment": []
+        },
+        "transactions": [
+          {
+            "id": "76b4f4bc-368e-5e6c-93df-9a85082a22fb",
+            "name": "Household payroll",
+            "sourceAccountId": null,
+            "destinations": [
+              "checking"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "1450.25"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1768435200,
+            "transactionTime": 1768435200,
+            "enabled": true
+          },
+          {
+            "id": "96e30468-9bc3-5473-8b6a-664bc2d56ce9",
+            "name": "Household payroll",
+            "sourceAccountId": null,
+            "destinations": [
+              "checking"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "1450.25"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1769644800,
+            "transactionTime": 1769644800,
+            "enabled": true
+          },
+          {
+            "id": "efd3efff-9cb9-5803-b0b1-5adbf8f0d2b4",
+            "name": "Household take-home pay",
+            "sourceAccountId": null,
+            "destinations": [
+              "checking"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "3980.75"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1769558400,
+            "transactionTime": 1769558400,
+            "enabled": true
+          },
+          {
+            "id": "c9cc20ed-121a-565b-86a4-b576b5c71e6f",
+            "name": "Home renovation",
+            "sourceAccountId": "checking",
+            "destinations": null,
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "9000"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1772928000,
+            "transactionTime": 1772755200,
+            "enabled": true
+          }
+        ],
+        "schedules": [
+          {
+            "id": "salary",
+            "name": "Salary",
+            "sourceAccountId": null,
+            "destinations": [
+              "checking"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "5600"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-01",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 4,
+            "enabled": true
+          },
+          {
+            "id": "spend",
+            "name": "Housing and living",
+            "sourceAccountId": "checking",
+            "destinations": null,
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "3800"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-05",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 4,
+            "enabled": true
+          },
+          {
+            "id": "invest",
+            "name": "Monthly investing",
+            "sourceAccountId": "checking",
+            "destinations": [
+              "brokerage"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "600"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-10",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 5,
+            "enabled": true
+          },
+          {
+            "id": "savings_contribution",
+            "name": "Retirement contribution",
+            "sourceAccountId": "checking",
+            "destinations": [
+              "savings"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "400"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-12",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 6,
+            "enabled": true
+          },
+          {
+            "id": "loan_payment",
+            "name": "Student loan payment",
+            "sourceAccountId": "checking",
+            "destinations": [
+              "loan"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "450"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-20",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 7,
+            "enabled": true
+          },
+          {
+            "id": "brokerage_growth",
+            "name": "Brokerage Growth",
+            "sourceAccountId": null,
+            "destinations": [
+              "brokerage"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "brokerage * rate"
+              },
+              "inputs": {
+                "brokerage": {
+                  "source": "provider",
+                  "provider": "model-value",
+                  "arguments": {
+                    "id": "brokerage"
+                  }
+                },
+                "rate": {
+                  "source": "provider",
+                  "provider": "occurrence-rate",
+                  "arguments": {
+                    "annualRate": 0.07,
+                    "volatility": 0.12
+                  }
+                }
+              }
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-15",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 8,
+            "enabled": true
+          }
+        ],
+        "paymentTerms": null
+      }
+    }
+  ]
+}

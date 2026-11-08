@@ -1,7 +1,0 @@
-id,name,sourceAccountId,destinations,amount,frequency,startDate,endDate,annualCap,priority,enabled
-salary,Salary,,checking,"{""config"":{""expression"":""5600""},""inputs"":{},""resolver"":""expression""}",monthly,2026-02-01,,,4,true
-spend,Housing and living,checking,,"{""config"":{""expression"":""3800""},""inputs"":{},""resolver"":""expression""}",monthly,2026-02-05,,,4,true
-invest,Monthly investing,checking,"[""brokerage""]","{""config"":{""expression"":""600""},""inputs"":{},""resolver"":""expression""}",monthly,2026-02-10,,,5,true
-savings_contribution,Retirement contribution,checking,"[""savings""]","{""config"":{""expression"":""400""},""inputs"":{},""resolver"":""expression""}",monthly,2026-02-12,,,6,true
-loan_payment,Student loan payment,checking,"[""loan""]","{""config"":{""expression"":""450""},""inputs"":{},""resolver"":""expression""}",monthly,2026-02-20,,,7,true
-brokerage_growth,Brokerage Growth,,"[""brokerage""]","{""config"":{""expression"":""brokerage * rate""},""inputs"":{""brokerage"":{""arguments"":{""id"":""brokerage""},""provider"":""model-value"",""source"":""provider""},""rate"":{""arguments"":{""annualRate"":0.07,""volatility"":0.12},""provider"":""occurrence-rate"",""source"":""provider""}},""resolver"":""expression""}",monthly,2026-02-15,,,8,true

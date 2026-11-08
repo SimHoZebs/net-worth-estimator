@@ -229,7 +229,7 @@ type Transaction struct {
 	// position. The store assigns it on create and preserves it on owner updates.
 	ExecutionOrder int64 `json:"executionOrder,omitempty"`
 	// Void marks a bank authorization that vanished without settling. Only
-	// the sync sets it through void-marking; CSV writes never create void
+	// the sync sets it through void-marking; model writes never create void
 	// rows. The owner may clear it to restore the hold as settled.
 	Void bool `json:"void,omitempty"`
 }

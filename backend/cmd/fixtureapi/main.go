@@ -1,4 +1,4 @@
-// Command fixtureapi serves the production API over a recorded CSV fixture and
+// Command fixtureapi serves the production API over a recorded fixture pack and
 // can restore that baseline on demand. It exists so browser tests exercise the
 // real Go engine and the real HTTP surface instead of a client-side stand-in.
 //
@@ -30,7 +30,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
@@ -96,20 +95,16 @@ func withFixturePrincipal(next http.Handler) http.Handler {
 	})
 }
 
-// loadFixturePack seeds the harness baseline. INTEGRATION_PACK names one
-// integration fixture pack (backend/testdata/integration/v1) to seed
-// instead of the CSV model, so the browser suite can run its journeys
-// against any edge-case dataset on its own isolated ports and throwaway
-// database. Empty selects the default CSV fixture.
-func loadFixturePack(modelPath string) (integrationfixtures.Pack, error) {
-	if pack := envOr("INTEGRATION_PACK", ""); pack != "" {
-		return integrationfixtures.Load(pack)
+// loadFixturePack seeds the harness baseline from one integration fixture
+// pack (backend/testdata/integration/v1), so the browser suite can run its
+// journeys against any edge-case dataset on its own isolated ports and
+// throwaway database. Empty selects the baseline pack.
+func loadFixturePack() (integrationfixtures.Pack, error) {
+	pack := envOr("INTEGRATION_PACK", "")
+	if pack == "" {
+		pack = integrationfixtures.PackBaseline
 	}
-	model, err := csvio.ImportModel(modelPath)
-	if err != nil {
-		return integrationfixtures.Pack{}, err
-	}
-	return integrationfixtures.FromModel(model), nil
+	return integrationfixtures.Load(pack)
 }
 
 func main() {
@@ -119,7 +114,6 @@ func main() {
 		port = parsed
 	}
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", filepath.Join(os.TempDir(), "waypoint-fixture.db"))
-	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
 	allowedOrigins, err := api.ParseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
 		log.Fatalf("configure allowed origins: %v", err)
@@ -173,14 +167,14 @@ func main() {
 		if _, err := application.SQL().Exec(`DELETE FROM sharing_grants WHERE audience_type = 'user' AND audience_id = ?`, fixtureActor); err != nil {
 			return fmt.Errorf("clear fixture direct shares: %w", err)
 		}
-		pack, err := loadFixturePack(modelPath)
+		pack, err := loadFixturePack()
 		if err != nil {
 			return fmt.Errorf("load fixture: %w", err)
 		}
 		if err := integrationfixtures.Apply(database, pack); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
-		// Bulk seed is additive on top of the pack or CSV baseline. The
+		// Bulk seed is additive on top of the pack baseline. The
 		// reset body may override the INTEGRATION_BULK environment so one
 		// spec can request bulk without restarting the harness.
 		bulkRaw := os.Getenv("INTEGRATION_BULK")
@@ -372,7 +366,6 @@ func main() {
 		writer.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(map[string]any{
 			"reset": true,
-			"model": modelPath,
 		})
 	}))
 	mux.Handle("/", fixtureHandler(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -403,11 +396,8 @@ func main() {
 		close(closed)
 	}()
 
-	source := modelPath
-	if pack := envOr("INTEGRATION_PACK", ""); pack != "" {
-		source = "pack " + pack
-	}
-	fmt.Printf("fixtureapi listening on %s from %s\n", server.Addr, source)
+	source := envOr("INTEGRATION_PACK", integrationfixtures.PackBaseline)
+	fmt.Printf("fixtureapi listening on %s from pack %s\n", server.Addr, source)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server: %v", err)
 	}

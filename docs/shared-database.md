@@ -25,7 +25,7 @@ that scope. An empty or missing scope never selects a default private user.
 Schema migration records are global. Model metadata, sync state, settings,
 ordering, presets, identity registries, and projection caches are user-scoped.
 Application sessions, provider grants, and logout replay records remain global
-identity tables. Financial clear, CSV import, refresh, and guest publication
+identity tables. Financial clear, refresh, and guest publication
 never replace those identity tables.
 
 ## Initial deployment and schema setup
@@ -195,7 +195,7 @@ discards derived projection caches. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
 
-The API container includes `setupdb`, `importcsv`, and `refreshmodel` under `/app`.
+The API container includes `setupdb` and `refreshmodel` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
 server container for migration or user replacement.

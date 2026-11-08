@@ -3,7 +3,6 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -197,12 +196,7 @@ func TestReadOnlyRejectsWritesButServesReads(t *testing.T) {
 
 func TestReadOnlyRejectsRowWrites(t *testing.T) {
 	database := openAPIStore(t)
-	root := apiProjectRoot(t)
-	if _, err := testseed.Seed(database,
-		filepath.Join(root, "public", "configs"),
-	); err != nil {
-		t.Fatalf("seed store: %v", err)
-	}
+	seedBaseline(t, database)
 	handler := New(database, Config{ReadOnly: true})
 
 	get := httptest.NewRecorder()
@@ -237,11 +231,7 @@ func TestReadOnlyRejectsRowWrites(t *testing.T) {
 
 func TestRowWriteReturnsRevision(t *testing.T) {
 	database := openAPIStore(t)
-	if _, err := testseed.Seed(database,
-		filepath.Join(apiProjectRoot(t), "public", "configs"),
-	); err != nil {
-		t.Fatalf("seed store: %v", err)
-	}
+	seedBaseline(t, database)
 	handler := New(database, Config{})
 
 	post := httptest.NewRecorder()
@@ -279,11 +269,7 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 
 func TestRowWriteRejectsInvalidRow(t *testing.T) {
 	database := openAPIStore(t)
-	if _, err := testseed.Seed(database,
-		filepath.Join(apiProjectRoot(t), "public", "configs"),
-	); err != nil {
-		t.Fatalf("seed store: %v", err)
-	}
+	seedBaseline(t, database)
 	handler := New(database, Config{})
 
 	before := httptest.NewRecorder()
@@ -450,11 +436,7 @@ func TestTransactionClaimOnPendingSeedPersists(t *testing.T) {
 
 func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
 	database := openAPIStore(t)
-	if _, err := testseed.Seed(database,
-		filepath.Join(apiProjectRoot(t), "public", "configs"),
-	); err != nil {
-		t.Fatalf("seed store: %v", err)
-	}
+	seedBaseline(t, database)
 	handler := New(database, Config{})
 
 	deleted := httptest.NewRecorder()

@@ -242,7 +242,7 @@ type preservedReceipt struct {
 	revision                                    int64
 }
 
-// loadReceiptsForTransactions snapshots receipt rows so CSV replacement can
+// loadReceiptsForTransactions snapshots receipt rows so model replacement can
 // restore evidence for preserved transactions after row deletion cascades.
 func loadReceiptsForTransactions(tx *userTx, transactionIDs []string) ([]preservedReceipt, error) {
 	if len(transactionIDs) == 0 {

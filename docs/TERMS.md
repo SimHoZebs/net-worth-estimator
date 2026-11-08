@@ -104,7 +104,7 @@ Both produce a result from their own inputs.
 | send edits to the server | save (base rows), promote (what-if)    |
 | throw away a what-if     | discard                               |
 | read the model           | load (copy), read (code)               |
-| import CSV into SQLite   | import                                |
+| load a model into SQLite | import |
 | sync a bank              | sync                                  |
 | report model problems    | validate (code), fix (copy)            |
 

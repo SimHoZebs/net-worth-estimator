@@ -34,7 +34,7 @@ process.on("exit", () => {
 });
 
 // The integration tests run against the real Go engine over real HTTP. The backend
-// is the fixtureapi harness seeded from the canonical CSV model on its own
+// is the fixtureapi harness seeded from a fixture pack on its own
 // ports, so a developer's running backend is never attached to or mutated.
 const apiOrigin =
 	process.env.FIXTURE_API_ORIGIN ?? `http://127.0.0.1:${apiPort}`;
@@ -95,16 +95,10 @@ export default defineConfig({
 				CGO_ENABLED: "0",
 				PORT: String(apiPort),
 				NET_WORTH_ESTIMATOR_DB: databasePath,
-				// `go -C backend` runs the binary with backend/ as its working
-				// directory, so seed paths are relative to the repository root.
-				// A purpose-built fixture keeps assertions stable and keeps a
-				// real household's details out of the suite.
-				NET_WORTH_ESTIMATOR_MODEL_PATH: "../frontend/tests/fixtures/model",
 				// INTEGRATION_PACK seeds the harness from an integration
-				// fixture pack instead of the CSV model, so the matrix
-				// runner can drive these specs against any edge dataset.
-				// Empty keeps the default fixture; see
-				// docs/integration-edge-gates.md. INTEGRATION_BULK adds
+				// fixture pack, so the matrix runner can drive these specs
+				// against any edge dataset. Empty selects the baseline pack;
+				// see docs/integration-edge-gates.md. INTEGRATION_BULK adds
 				// tagged synthetic accounts on top of that baseline.
 				INTEGRATION_PACK: process.env.INTEGRATION_PACK ?? "",
 				INTEGRATION_BULK: process.env.INTEGRATION_BULK ?? "",

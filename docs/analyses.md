@@ -46,7 +46,7 @@ It skips unchanged input revisions. It does not require a broker or external API
 
 All records belong to the existing verified user scope. Transaction deletion
 removes its dependent facts, findings, and feedback. A user clear also removes runs while
-retaining the monotonic input revision. CSV replacement preserves evidence for
+retaining the monotonic input revision. Model replacement preserves evidence for
 bank rows that the import contract preserves. Other users remain untouched.
 Private refreshes copy evidence. Financial-only sample publication excludes it.
 Database backups contain sensitive descriptions and analysis input snapshots.

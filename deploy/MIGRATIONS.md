@@ -33,7 +33,7 @@ A nonzero exit prevents API startup. The server never invokes this script.
 
 Keep one-time SQL and provider edits in this file. Do not add a migration
 registry, numbered chain, or historical-model converter to the backend.
-Use existing `setupdb`, `refreshmodel`, and `importcsv` tools where appropriate.
+Use existing `setupdb` and `refreshmodel` tools where appropriate.
 The image also provides `sqlite3` for offline SQL and SQLite-safe backups.
 
 Databases that still carry pre-rename tables must first run

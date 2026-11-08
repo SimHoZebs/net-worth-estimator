@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/ \
-    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel ./cmd/syncaudit ./cmd/authzctl
+    ./cmd/server ./cmd/setupdb ./cmd/refreshmodel ./cmd/syncaudit ./cmd/authzctl
 
 # Independent one-time operator tools. Neither server nor setupdb imports them.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \

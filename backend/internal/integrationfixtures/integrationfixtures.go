@@ -44,6 +44,7 @@ const (
 	PackNegativeNetWorth      = "negative-net-worth"
 	PackSafeSpending          = "safe-spending"
 	PackSafeSpendingShortfall = "safe-spending-shortfall"
+	PackBaseline              = "baseline"
 )
 
 // PackVersion is the only fixture format this loader reads. A format change
@@ -434,16 +435,6 @@ func (p Pack) LedgerExpected() *LedgerExpected {
 		}
 	}
 	return nil
-}
-
-// FromModel wraps a CSV-imported model as a one-seed pack. The browser
-// harness uses it for the default CSV baseline, which has no settings seed.
-func FromModel(model *types.FinancialModel) Pack {
-	return Pack{
-		Name:    "model",
-		Version: PackVersion,
-		Seeds:   []Seed{{Kind: SeedKindModel, Model: model}},
-	}
 }
 
 // Apply runs the seeds that mutate the user's saved state. Harness-specific

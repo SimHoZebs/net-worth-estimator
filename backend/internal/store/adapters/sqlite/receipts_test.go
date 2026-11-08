@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -207,7 +206,7 @@ func TestSetupRejectsMissingReceiptSchema(t *testing.T) {
 	}
 }
 
-func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
+func TestReceiptModelReplacementAndOwnerPendingMetadata(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "receipt-replacement")
 	p := seedReceiptTransaction(t, s)
@@ -229,9 +228,7 @@ func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 	if _, err := s.GetReceipt(r.ID); err != nil {
 		t.Fatal("owner update removed receipt", err)
 	}
-	if _, err := testseed.Seed(s, filepath.Join(projectRoot(t), "frontend", "tests", "fixtures", "model")); err != nil {
-		t.Fatal(err)
-	}
+	seedBaseline(t, s)
 	if _, err := s.GetReceipt(r.ID); !errors.Is(err, ErrReceiptNotFound) {
 		t.Fatalf("replacement retained dependent receipt: %v", err)
 	}

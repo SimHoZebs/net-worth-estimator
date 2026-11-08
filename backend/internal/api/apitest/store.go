@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/integrationfixtures"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
@@ -19,6 +20,18 @@ func OpenStore(t *testing.T) store.Store {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	return database
+}
+
+// SeedBaseline seeds the store from the baseline integration pack.
+func SeedBaseline(t *testing.T, s store.Store) {
+	t.Helper()
+	pack, err := integrationfixtures.Load(integrationfixtures.PackBaseline)
+	if err != nil {
+		t.Fatalf("load baseline pack: %v", err)
+	}
+	if err := integrationfixtures.Apply(s, pack); err != nil {
+		t.Fatalf("seed baseline pack: %v", err)
+	}
 }
 
 func ProjectRoot(t *testing.T) string {
