@@ -7,7 +7,7 @@ export const detailPropertyRowClassName =
 export const detailPropertyLabelClassName =
 	"w-36 flex-none text-sm font-semibold text-muted";
 export const detailFooterClassName =
-	"sticky bottom-0 z-10 -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5";
+	"sticky bottom-0 z-(--z-local) -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5";
 
 /** Inline controls keep their read layout and own their native interaction states. */
 export const transactionControlStyles = cva(

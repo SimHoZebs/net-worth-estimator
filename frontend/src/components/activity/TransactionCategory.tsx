@@ -22,14 +22,7 @@ import {
 	Wrench,
 	type LucideIcon,
 } from "lucide-react";
-import {
-	useEffect,
-	useId,
-	useLayoutEffect,
-	useRef,
-	useState,
-	type KeyboardEvent,
-} from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { categorizeTransaction } from "@/api/generated/endpoints.ts";
 import {
 	transactionCategoryLabel,
@@ -43,6 +36,10 @@ import { useSavedTransactions } from "../../state/savedState.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { mergeStyles } from "../mergeStyles.ts";
 import { controlStyles } from "../fieldStyles.ts";
+import {
+	supportsPopover,
+	useAnchoredPopover,
+} from "../popoverAnchor.ts";
 
 const categoryIcons: Record<TransactionCategoryKey, LucideIcon> = {
 	INCOME: BriefcaseBusiness,
@@ -62,10 +59,6 @@ const categoryIcons: Record<TransactionCategoryKey, LucideIcon> = {
 	TRAVEL: Plane,
 	RENT_AND_UTILITIES: House,
 };
-
-const supportsPopover =
-	typeof HTMLElement !== "undefined" &&
-	typeof HTMLElement.prototype.showPopover === "function";
 
 function CategoryOption({
 	value,
@@ -145,67 +138,19 @@ export function TransactionCategory({
 		: null;
 	const canReset = normalizedSource === "user";
 
-	useLayoutEffect(() => {
-		const popover = popoverRef.current;
-		const trigger = triggerRef.current;
-		if (!popover || !trigger) return;
-		if (!open) {
-			if (
-				typeof popover.hidePopover === "function" &&
-				popover.matches(":popover-open")
-			)
-				popover.hidePopover();
-			return;
-		}
-		const position = () => {
-			const rect = trigger.getBoundingClientRect();
-			const gap = 4;
-			const edge = 8;
-			const below = window.innerHeight - rect.bottom - edge - gap;
-			const above = rect.top - edge - gap;
-			const openAbove = below < 220 && above > below;
-			const maxHeight = Math.max(120, Math.min(320, openAbove ? above : below));
-			Object.assign(popover.style, {
-				position: "fixed",
-				inset: "auto",
-				margin: "0",
-				left: `${rect.left}px`,
-				width: `${rect.width}px`,
-				top: openAbove ? "auto" : `${rect.bottom + gap}px`,
-				bottom: openAbove ? `${window.innerHeight - rect.top + gap}px` : "auto",
-				maxHeight: `${maxHeight}px`,
-				overflowY: "auto",
-			});
-		};
-		position();
-		if (
-			typeof popover.showPopover === "function" &&
-			!popover.matches(":popover-open")
-		)
-			popover.showPopover();
-		const list = listboxRef.current;
-		const selectedOption = list?.querySelector<HTMLElement>(
-			'[role="option"][aria-selected="true"]',
-		);
-		(selectedOption ?? list)?.focus({ preventScroll: true });
-		window.addEventListener("resize", position);
-		window.addEventListener("scroll", position, true);
-		return () => {
-			window.removeEventListener("resize", position);
-			window.removeEventListener("scroll", position, true);
-		};
-	}, [open]);
-
-	useEffect(() => {
-		const popover = popoverRef.current;
-		if (!popover) return;
-		const onToggle = (event: Event) => {
-			const next = (event as Event & { newState?: string }).newState;
-			if (next === "closed") setOpen(false);
-		};
-		popover.addEventListener("toggle", onToggle);
-		return () => popover.removeEventListener("toggle", onToggle);
-	}, [open]);
+	useAnchoredPopover({
+		open,
+		triggerRef,
+		popoverRef,
+		onClose: () => setOpen(false),
+		onOpenFocus: () => {
+			const list = listboxRef.current;
+			const selectedOption = list?.querySelector<HTMLElement>(
+				'[role="option"][aria-selected="true"]',
+			);
+			(selectedOption ?? list)?.focus({ preventScroll: true });
+		},
+	});
 
 	const save = async (next: string | null) => {
 		if (saving) return;
@@ -315,7 +260,7 @@ export function TransactionCategory({
 						<div
 							ref={popoverRef}
 							id={popoverId}
-							popover={supportsPopover ? "auto" : undefined}
+							popover={supportsPopover() ? "auto" : undefined}
 							onKeyDown={(event) => {
 								if (event.key !== "Escape") return;
 								event.preventDefault();
@@ -323,7 +268,7 @@ export function TransactionCategory({
 								setOpen(false);
 								triggerRef.current?.focus();
 							}}
-							className="m-0 rounded-surface border border-solid border-line bg-surface p-1 shadow-overlay"
+							className="m-0 z-(--z-menu) rounded-surface border border-solid border-line bg-surface p-1 shadow-overlay"
 						>
 							{canReset && (
 								<button

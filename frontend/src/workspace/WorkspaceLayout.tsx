@@ -18,7 +18,7 @@ export function WorkspaceLayout({
 		<BreadcrumbSlotProvider>
 			<div className="min-h-screen">
 				<a
-					className="fixed -top-20 left-60 z-100 rounded-surface bg-primary px-5 py-3 text-on-primary focus:top-3 max-md:left-5"
+					className="fixed -top-20 left-60 z-(--z-skip) rounded-surface bg-primary px-5 py-3 text-on-primary focus:top-3 max-md:left-5"
 					href="#main-content"
 				>
 					Skip to main content

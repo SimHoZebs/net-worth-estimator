@@ -120,7 +120,7 @@ export function FinancialIndependenceCard({
 							onClick={pin.onPinChange}
 							disabled={pin.disabled}
 							aria-pressed={pin.pinned}
-							className="relative z-10 aria-pressed:bg-success-bg aria-pressed:text-success-text"
+							className="relative z-(--z-local) aria-pressed:bg-success-bg aria-pressed:text-success-text"
 						/>
 					)}
 				</div>
@@ -151,7 +151,7 @@ export function FinancialIndependenceCard({
 										type="button"
 										aria-haspopup="dialog"
 										onClick={() => setInspector(true)}
-										className="relative z-10 flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
+										className="relative z-(--z-local) flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
 									>
 										<TriangleAlert size={14} aria-hidden="true" />
 										{analysis.diagnostics.length} source or configuration{" "}

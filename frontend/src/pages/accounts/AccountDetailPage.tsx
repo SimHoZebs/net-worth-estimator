@@ -317,7 +317,7 @@ export function AccountDetailView({
 				</p>
 			)}
 			{edit.confirmCancel && (
-				<div className="sticky bottom-0 z-10 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface py-3">
+				<div className="sticky bottom-0 z-(--z-local) mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface py-3">
 					<DiscardConfirm
 						onContinue={() => {
 							setPendingEdit(null);

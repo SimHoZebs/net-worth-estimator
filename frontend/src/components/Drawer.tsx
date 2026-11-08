@@ -251,7 +251,10 @@ function DrawerSession({
 			ref={(node) => {
 				panelEl.current = node;
 			}}
-			className={mergeStyles(panelClassName, "waypoint-drawer flex")}
+			className={mergeStyles(
+				panelClassName,
+				"waypoint-drawer z-(--z-sheet) flex",
+			)}
 			data-side={side}
 			data-state={panelState}
 			tabIndex={-1}

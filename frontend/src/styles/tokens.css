@@ -50,6 +50,14 @@
 		);
 		--backdrop-blur: var(--blur-xs);
 		--sidebar: 0;
+		/* Layer scale. Native dialogs, popovers, and pickers paint in the
+		   top layer and ignore this scale. Open order decides there. */
+		--z-local: 10;
+		--z-guest: 20;
+		--z-sheet: 30;
+		--z-skip: 45;
+		--z-menu: 50;
+		--z-toast: 60;
 	}
 	@media (width >= theme(--breakpoint-md)) {
 		:root {
