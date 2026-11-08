@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -29,16 +30,11 @@ func DefaultSharingStartDate() string {
 	return time.Now().UTC().Format(calendarDay)
 }
 
-// parseSharingDay validates one YYYY-MM-DD calendar day. time.Parse alone
-// normalizes impossible days (February 30 becomes March 2), so values must
-// round-trip exactly.
+// parseSharingDay validates one YYYY-MM-DD calendar day through the shared
+// strict day check.
 func parseSharingDay(day string) (string, error) {
-	parsed, err := time.Parse(calendarDay, day)
-	if err != nil {
+	if _, err := domain.ParseIsoDate(day); err != nil {
 		return "", err
-	}
-	if parsed.Format(calendarDay) != day {
-		return "", fmt.Errorf("not a calendar day: %s", day)
 	}
 	return day, nil
 }

@@ -9,11 +9,16 @@ import (
 // Fixed-width, zero-padded dates sort chronologically as strings.
 // Callers must validate user-supplied dates before use.
 
-// ParseIsoDate parses a YYYY-MM-DD string as UTC midnight.
+// ParseIsoDate parses a YYYY-MM-DD string as UTC midnight. time.Parse alone
+// normalizes impossible days (February 30 becomes March 2), so values must
+// round-trip exactly.
 func ParseIsoDate(value string) (time.Time, error) {
 	t, err := time.ParseInLocation("2006-01-02", value, time.UTC)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("invalid ISO date %q: %w", value, err)
+	}
+	if FormatIsoDate(t) != value {
+		return time.Time{}, fmt.Errorf("invalid ISO date %q", value)
 	}
 	return t, nil
 }

@@ -7,6 +7,7 @@ import type { TransactionRecordBody } from "@/api/generated/model/transactionRec
 import type { Frequency } from "../../api/contracts.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { parseDisplayNumber } from "./formValues.ts";
+import { calendarDayMs } from "../../domain/calendarDay.ts";
 
 /**
  * A transaction is one fact. Its form carries the day it happened and never a
@@ -69,7 +70,8 @@ export interface ScheduleDraftValues {
 }
 
 export function midnightOfDay(day: string): number {
-	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
+	const ms = calendarDayMs(day);
+	return ms === null ? Number.NaN : Math.floor(ms / 1000);
 }
 
 /** UTC wall time for the editor, with seconds when the stored instant has them. */
@@ -80,6 +82,7 @@ export function timeOfDay(stamp: number | null | undefined): string {
 }
 
 export function combineDayTime(day: string, time: string): number {
+	if (calendarDayMs(day) === null) return Number.NaN;
 	return time
 		? Math.floor(new Date(`${day}T${time}Z`).getTime() / 1000)
 		: midnightOfDay(day);

@@ -2,6 +2,7 @@ import {
 	accountTransactions,
 	type AccountTransaction,
 } from "./accountActivity.ts";
+import { calendarDayMs } from "./calendarDay.ts";
 import { dateLabel, money, monthDay } from "./format.ts";
 import type { Account, Transaction } from "./model.ts";
 import type { TransactionResult, Projection } from "./result.ts";
@@ -86,13 +87,16 @@ export function failureLedger({
 	const shown =
 		peers.length > PEER_CAP
 			? [...peers]
-					.sort(
-						(a, b) =>
-							Math.abs(Date.parse(a.date) - Date.parse(failure.date)) -
-								Math.abs(Date.parse(b.date) - Date.parse(failure.date)) ||
+					.sort((a, b) => {
+						const failureMs = calendarDayMs(failure.date) ?? 0;
+						const aMs = calendarDayMs(a.date) ?? 0;
+						const bMs = calendarDayMs(b.date) ?? 0;
+						return (
+							Math.abs(aMs - failureMs) - Math.abs(bMs - failureMs) ||
 							(a.date < b.date ? -1 : a.date > b.date ? 1 : 0) ||
-							(a.id < b.id ? -1 : 1),
-					)
+							(a.id < b.id ? -1 : 1)
+						);
+					})
 					.slice(0, PEER_CAP)
 			: peers;
 	const transactionsById = new Map(transactions.map((item) => [item.id, item]));

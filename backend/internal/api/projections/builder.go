@@ -53,12 +53,11 @@ func midnightRFC3339(date string) string {
 	return date + "T00:00:00Z"
 }
 
+// midnightUnix returns Unix seconds for UTC midnight of a calendar day. It
+// uses the shared strict day check; an invalid day panics loudly instead of
+// silently returning epoch 0.
 func midnightUnix(date string) int64 {
-	moment, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return 0
-	}
-	return moment.UTC().Unix()
+	return domain.MustParseIsoDate(date).Unix()
 }
 
 // sliceForDate finds the slice whose [from, to) range contains the date.
