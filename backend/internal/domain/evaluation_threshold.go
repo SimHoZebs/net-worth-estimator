@@ -104,7 +104,11 @@ func newReachedDateDefinition(
 		},
 		Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
 			if probabilistic != nil {
-				probability, _ := probabilistic.(map[string]any)["probability"].(float64)
+				payload, ok := probabilistic.(map[string]any)
+				if !ok {
+					return types.StatusNotSatisfied
+				}
+				probability, _ := payload["probability"].(float64)
 				if probability >= 0.5 {
 					return types.StatusSatisfied
 				}

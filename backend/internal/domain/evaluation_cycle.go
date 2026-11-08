@@ -275,14 +275,21 @@ var cycleFulfillmentDefinition = &EvaluationDefinition{
 	},
 	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
 		if probabilistic != nil {
-			probability, _ := probabilistic.(map[string]any)["withinBudgetProbability"].(float64)
+			payload, ok := probabilistic.(map[string]any)
+			if !ok {
+				return types.StatusNotSatisfied
+			}
+			probability, _ := payload["withinBudgetProbability"].(float64)
 			if probability == 1 {
 				return types.StatusSatisfied
 			}
 			return types.StatusNotSatisfied
 		}
-		if deterministic != nil && deterministic.(*CycleFulfillmentPathResult).WithinBudget {
-			return types.StatusSatisfied
+		if deterministic != nil {
+			result, ok := deterministic.(*CycleFulfillmentPathResult)
+			if ok && result.WithinBudget {
+				return types.StatusSatisfied
+			}
 		}
 		return types.StatusNotSatisfied
 	},

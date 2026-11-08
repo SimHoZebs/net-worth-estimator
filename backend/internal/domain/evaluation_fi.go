@@ -1038,7 +1038,10 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 	},
 	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
 		if probabilistic != nil {
-			payload := probabilistic.(map[string]any)
+			payload, ok := probabilistic.(map[string]any)
+			if !ok {
+				return types.StatusNotSatisfied
+			}
 			// The payload stores *IsoDate values; a nil pointer boxed in the
 			// interface is not nil itself, so assert the concrete type.
 			if date, ok := payload["selfSustainingDate"].(*IsoDate); ok && date != nil {
@@ -1047,7 +1050,10 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 			return types.StatusNotSatisfied
 		}
 		if deterministic != nil {
-			analysis := deterministic.(*FIAnalysisResult)
+			analysis, ok := deterministic.(*FIAnalysisResult)
+			if !ok {
+				return types.StatusNotSatisfied
+			}
 			if analysis.Milestones.FirstSelfSustainingDate != nil {
 				return types.StatusSatisfied
 			}

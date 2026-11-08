@@ -217,7 +217,10 @@ func ParseFIPlan(config any) (types.FIPlan, error) {
 	if err := ValidateFIPlanConfig(config); err != nil {
 		return types.FIPlan{}, err
 	}
-	obj := config.(map[string]any)
+	obj, ok := asObject(config)
+	if !ok {
+		return types.FIPlan{}, fmt.Errorf("Financial independence configuration is invalid.")
+	}
 	plan := types.FIPlan{}
 	plan.MinimumNetWorth, _ = numberField(obj, "minimumNetWorth")
 	plan.AnnualExpenseTarget, _ = numberField(obj, "annualExpenseTarget")
@@ -245,16 +248,34 @@ func ParseFIPlan(config any) (types.FIPlan, error) {
 	}
 	if sourcesRaw, ok := obj["sources"].([]any); ok {
 		for _, sourceRaw := range sourcesRaw {
-			source := sourceRaw.(map[string]any)
-			fiSource := types.FISource{Included: source["included"].(bool)}
+			source, ok := sourceRaw.(map[string]any)
+			if !ok {
+				return types.FIPlan{}, fmt.Errorf("Financial independence configuration is invalid.")
+			}
+			included, ok := source["included"].(bool)
+			if !ok {
+				return types.FIPlan{}, fmt.Errorf("Financial independence configuration is invalid.")
+			}
+			fiSource := types.FISource{Included: included}
 			if source["type"] == "cashflow" {
+				transactionID, ok := stringField(source, "transactionId")
+				if !ok {
+					return types.FIPlan{}, fmt.Errorf("Financial independence configuration is invalid.")
+				}
 				fiSource.Type = "cashflow"
-				fiSource.TransactionID = source["transactionId"].(string)
+				fiSource.TransactionID = transactionID
 			} else {
+				accountID, ok := stringField(source, "accountId")
+				if !ok {
+					return types.FIPlan{}, fmt.Errorf("Financial independence configuration is invalid.")
+				}
 				fiSource.Type = "asset"
-				fiSource.AccountID = source["accountId"].(string)
+				fiSource.AccountID = accountID
 				if override, present := source["withdrawalRateOverride"]; present {
-					num := override.(float64)
+					num, ok := override.(float64)
+					if !ok {
+						return types.FIPlan{}, fmt.Errorf("Financial independence configuration is invalid.")
+					}
 					fiSource.WithdrawalRateOverride = &num
 				}
 			}

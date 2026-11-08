@@ -163,7 +163,10 @@ type AmountProviderInfo struct {
 var amountProviders = map[string]providerDefinition{
 	"model-value": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
-			id := args["id"].(string)
+			id, err := validateIDArgument(args)
+			if err != nil {
+				return 0, err
+			}
 			if v, ok := ctx.LatestRealizedTransactionAmounts[id]; ok {
 				return v, nil
 			}
@@ -191,7 +194,11 @@ var amountProviders = map[string]providerDefinition{
 	},
 	"account-balance": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
-			return ctx.Balances[args["id"].(string)], nil
+			id, err := validateIDArgument(args)
+			if err != nil {
+				return 0, err
+			}
+			return ctx.Balances[id], nil
 		},
 		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
 			id, err := validateIDArgument(args)

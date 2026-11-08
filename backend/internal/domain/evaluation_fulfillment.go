@@ -341,14 +341,21 @@ var transactionFulfillmentDefinition = &EvaluationDefinition{
 	},
 	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
 		if probabilistic != nil {
-			probability, _ := probabilistic.(map[string]any)["fullFulfillmentProbability"].(float64)
+			payload, ok := probabilistic.(map[string]any)
+			if !ok {
+				return types.StatusNotSatisfied
+			}
+			probability, _ := payload["fullFulfillmentProbability"].(float64)
 			if probability == 1 {
 				return types.StatusSatisfied
 			}
 			return types.StatusNotSatisfied
 		}
-		if deterministic != nil && deterministic.(*TransactionFulfillmentPathResult).FirstUnderfulfilledDate == nil {
-			return types.StatusSatisfied
+		if deterministic != nil {
+			result, ok := deterministic.(*TransactionFulfillmentPathResult)
+			if ok && result.FirstUnderfulfilledDate == nil {
+				return types.StatusSatisfied
+			}
 		}
 		return types.StatusNotSatisfied
 	},
