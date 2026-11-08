@@ -890,6 +890,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 		}
 		return parsed, nil
 	},
+	Dependents: func(ctx *EvaluationContext, config any) *EvaluationDependents { return DependsOnEverything() },
 
 	DescribeStochasticWork: func(ctx *EvaluationContext, config any) *EvaluationWorkloadPlan {
 		typed := config.(types.FIPlan)

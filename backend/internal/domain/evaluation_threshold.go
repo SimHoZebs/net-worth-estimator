@@ -94,6 +94,7 @@ func newReachedDateDefinition(
 		ValidateConfig: validate,
 		ParseConfig:    parse,
 		EvaluatePath:   evaluate,
+		Dependents:     func(ctx *EvaluationContext, config any) *EvaluationDependents { return DependsOnEverything() },
 
 		CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
 			return &thresholdAccumulator{reachedDates: []string{}}, nil

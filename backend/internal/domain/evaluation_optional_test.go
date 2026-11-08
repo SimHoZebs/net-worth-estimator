@@ -19,6 +19,7 @@ func projectionFreeDefinition() *EvaluationDefinition {
 		Kind:                   EvaluationKindReader,
 		RequiresProjectionPath: boolPtr(false),
 		ParseConfig:            func(c any) (any, error) { return map[string]any{}, nil },
+		Dependents:             func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
 		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
 			if ctx.Path != nil {
 				return nil, &probeErr{s: "unexpected path"}
@@ -160,7 +161,7 @@ func TestDependentsSkipsWhenWindowExcludesDirty(t *testing.T) {
 	}
 }
 
-func TestNilDependentsAlwaysRun(t *testing.T) {
+func TestNilDependentsSkippedWhenDirty(t *testing.T) {
 	def := &EvaluationDefinition{
 		Type:        "always",
 		Name:        "always",
@@ -181,7 +182,46 @@ func TestNilDependentsAlwaysRun(t *testing.T) {
 	model := &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
 	path := &types.ProjectionPath{EffectiveModel: *model}
 	set.EvaluateDeterministic(&EvaluationContext{Path: path, Model: model, DirtyFrom: "2026-06-01"})
+	if set.runtimes[0].deterministic != nil {
+		t.Fatalf("nil dependents (depends on nothing) must skip when dirty, got %+v", set.runtimes[0].diagnostics)
+	}
+	// Cold run (no dirty marker) must still run.
+	set2 := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
+		evaluationType: "always",
+		configuredRaw:  map[string]any{},
+		instanceID:     "1",
+		name:           "always",
+		definition:     def,
+	}}}
+	set2.EvaluateDeterministic(&EvaluationContext{Path: path, Model: model})
+	if set2.runtimes[0].deterministic == nil {
+		t.Fatalf("cold run (no dirty) must run, got %+v", set2.runtimes[0].diagnostics)
+	}
+}
+
+func TestDependsOnEverythingAlwaysRuns(t *testing.T) {
+	def := &EvaluationDefinition{
+		Type:        "always2",
+		Name:        "always2",
+		Kind:        EvaluationKindReader,
+		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
+		Dependents:  func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
+		EvaluatePath: func(ctx *EvaluationContext, cfg any) (PathResult, error) {
+			return &freeResult{value: 7}, nil
+		},
+		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
+	}
+	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
+		evaluationType: "always2",
+		configuredRaw:  map[string]any{},
+		instanceID:     "1",
+		name:           "always2",
+		definition:     def,
+	}}}
+	model := &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
+	path := &types.ProjectionPath{EffectiveModel: *model}
+	set.EvaluateDeterministic(&EvaluationContext{Path: path, Model: model, DirtyFrom: "2026-06-01"})
 	if set.runtimes[0].deterministic == nil {
-		t.Fatalf("nil dependents must always run, got %+v", set.runtimes[0].diagnostics)
+		t.Fatalf("DependsOnEverything must always run, got %+v", set.runtimes[0].diagnostics)
 	}
 }

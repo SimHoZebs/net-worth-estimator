@@ -310,6 +310,7 @@ var transactionFulfillmentDefinition = &EvaluationDefinition{
 		}
 		return parsed, nil
 	},
+	Dependents: func(ctx *EvaluationContext, config any) *EvaluationDependents { return DependsOnEverything() },
 
 	EvaluatePath: func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.TransactionFulfillmentConfig)

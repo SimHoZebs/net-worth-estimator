@@ -79,11 +79,14 @@ func (c *EvaluationContext) GetTimeline() *types.EvaluationTimeline {
 
 // EvaluationDependents declares the evaluator's dependency window. FromDate
 // is the earliest date inspected; AccountIDs narrows to specific accounts.
-// Nil Dependents means always affected (default, preserves behavior).
+// Nil means depends on nothing (default). Shipped evaluators declare
+// DependsOnEverything() explicitly so reruns are never silently skipped.
 type EvaluationDependents struct {
 	AccountIDs []string
 	FromDate   types.IsoDate
 }
+
+func DependsOnEverything() *EvaluationDependents { return &EvaluationDependents{} }
 
 // EvaluationFinalizeContext is passed to stochastic finalization.
 type EvaluationFinalizeContext struct {
@@ -139,10 +142,9 @@ type EvaluationDefinition struct {
 	EvaluatePath func(ctx *EvaluationContext, config any) (PathResult, error)
 
 	// Dependents declares the evaluator's dependency window. Nil means
-	// always affected (today's default). When set, the runtime may skip
-	// EvaluatePath if the evaluation window does not intersect a dirty
-	// timeline. Future evaluators may opt into per-evaluator invalidation;
-	// existing evaluators stay on the always-run default.
+	// depends on NOTHING so omission never silently becomes "everything".
+	// Every shipped evaluator must declare non-nil to guarantee reruns when
+	// shared state changes. Validate enforces this at registration.
 	Dependents func(ctx *EvaluationContext, config any) *EvaluationDependents
 
 	CreateAccumulator func(config any, deterministicResult PathResult) (Accumulator, error)
@@ -200,6 +202,9 @@ func (r *EvaluationRegistry) Register(definition *EvaluationDefinition) {
 	if definition.Kind == EvaluationKindSimulator && !definition.AllowSimulation {
 		panic(fmt.Sprintf("Evaluation definition %q selects Kind simulator without AllowSimulation.", definition.Type))
 	}
+	if definition.Dependents == nil {
+		panic(fmt.Sprintf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", definition.Type))
+	}
 	r.definitions[definition.Type] = definition
 	r.order = append(r.order, definition.Type)
 	sort.Strings(r.order) // keep deterministic iteration; type order comes from tables
@@ -211,6 +216,9 @@ func (r *EvaluationRegistry) Validate() error {
 		definition := r.definitions[evaluationType]
 		if definition.Kind == EvaluationKindSimulator && !definition.AllowSimulation {
 			return fmt.Errorf("Evaluation definition %q selects Kind simulator without AllowSimulation.", evaluationType)
+		}
+		if definition.Dependents == nil {
+			return fmt.Errorf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", evaluationType)
 		}
 	}
 	return nil
@@ -392,9 +400,28 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 		})
 		return
 	}
+	// Nil Dependents means depends on nothing. When a dirty marker is present,
+	// the evaluator is skipped instead of recomputing. Cold evaluations
+	// (no dirty marker) always run so a fresh evaluator still produces output.
+	if r.definition.Dependents == nil && ctx.DirtyFrom != "" {
+		r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
+			Code:     "evaluation-skipped",
+			Severity: "info",
+			Message:  "Skipped; no Dependents declared (nil means depends on nothing).",
+		})
+		return
+	}
 	if r.definition.Dependents != nil && ctx.DirtyFrom != "" {
 		deps := r.definition.Dependents(ctx, r.configuredRaw)
-		if deps != nil && deps.FromDate != "" && deps.FromDate > types.IsoDate(ctx.DirtyFrom) {
+		if deps == nil {
+			r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
+				Code:     "evaluation-skipped",
+				Severity: "info",
+				Message:  "Skipped; Dependents declares no affected window.",
+			})
+			return
+		}
+		if deps.FromDate != "" && deps.FromDate > types.IsoDate(ctx.DirtyFrom) {
 			// Dirty suffix is after the evaluator's earliest interest date and
 			// no overlap: reader can keep its stored envelope (skip).
 			// Timeline window check is conservative: if Timeline.StartDate is

@@ -100,6 +100,7 @@ func TestReaderEvaluationCannotResimulate(t *testing.T) {
 		// Zero Kind: reader by default.
 		ValidateConfig: func(any) error { return nil },
 		ParseConfig:    func(config any) (any, error) { return config, nil },
+		Dependents:     func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
 		EvaluatePath: func(ctx *EvaluationContext, _ any) (PathResult, error) {
 			if _, err := Simulate(types.SimulationRequest{}); err != nil {
 				return nil, err

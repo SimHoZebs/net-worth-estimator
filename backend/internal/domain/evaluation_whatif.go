@@ -205,6 +205,7 @@ var whatIfDefinition = &EvaluationDefinition{
 	ValidateConfig:    validateWhatIfConfig,
 	ParseConfig:       parseWhatIfConfig,
 	EvaluatePath:      evaluateWhatIf,
+	Dependents:        func(ctx *EvaluationContext, config any) *EvaluationDependents { return DependsOnEverything() },
 	CreateAccumulator: createWhatIfAccumulator,
 	Accumulate:        accumulateWhatIf,
 	Finalize:          finalizeWhatIf,
