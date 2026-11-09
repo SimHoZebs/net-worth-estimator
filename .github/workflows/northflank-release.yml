@@ -74,7 +74,7 @@ jobs:
           const sha = process.env.RELEASE_SHA;
           if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
           const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
-          const names = [`${repository}-backend`, `${repository}-auth`];
+          const names = [`${repository}-backend-northflank`, `${repository}-auth`];
           const tag = `sha-${sha}`;
           const interval = Number(process.env.IMAGE_POLL_INTERVAL_MS ?? 5000);
           const deadline = Date.now() + Number(process.env.IMAGE_POLL_TIMEOUT_MS ?? 30 * 60 * 1000);
@@ -121,7 +121,7 @@ jobs:
           const sha = process.env.RELEASE_SHA;
           if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
           const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
-          const apiImage = `ghcr.io/${repository}-backend:sha-${sha}`;
+          const apiImage = `ghcr.io/${repository}-backend-northflank:sha-${sha}`;
           const identityImage = `ghcr.io/${repository}-auth:sha-${sha}`;
           const identityService = process.env.IDENTITY_SERVICE_ID;
           const identityDatabase = process.env.IDENTITY_DATABASE_ADDON_ID;

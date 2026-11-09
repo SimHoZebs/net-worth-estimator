@@ -69,9 +69,9 @@ Use **Funding gaps** for the default transaction-funding evaluation and its outl
 **Analysis** is a versioned inference over saved evidence. It produces findings
 with reasons and uncertainty. Analysis runs independently of account sync and
 does not change the saved financial model. BNPL detection is an Analysis. Income
-evidence is the result of income-pattern Analysis, which remains planned.
+evidence is the result of income-pattern Analysis.
 
-An inference from recorded one-time external inflows, such as an annualized estimate of net pay. It never changes planned income and does not establish bank provenance.
+An inference from recorded recurring external inflows, such as an annualized estimate of net pay. The highest annualized candidate is the main consistent inflow when currencies are comparable, ranked without asking the user to state it. It never changes planned income and does not establish bank provenance. A replaceable judgment provider may refine the assessment; it may be automated or human-operated. Explicit feedback is audited independently of whether the provider learns from it. Hide and restore are never labels.
 
 Use **income evidence**. Its parts stay distinct: **deposit** (the record), **cadence** (the observed pattern), **estimate** (the annualized figure), **provenance** (where it came from).
 
@@ -91,7 +91,7 @@ Base forms save changes directly. Failed submissions retain their fields in the 
 
 **Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.
 
-**Income evidence** computes from recorded deposits. Its detector remains planned.
+**Income evidence** computes from recorded deposits.
 
 Both produce a result from their own inputs.
 

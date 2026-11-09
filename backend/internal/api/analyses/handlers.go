@@ -66,7 +66,7 @@ func (s *handler) listAnalyses(_ context.Context, _ *struct{}) (*struct {
 				continue
 			}
 			status.Run, status.State = &run, run.State
-			if run.InputRevision != revision || run.Version != status.Version || run.State == "superseded" {
+			if run.InputRevision != revision || !analysis.MatchesVersion(definition, run.Version) || run.State == "superseded" {
 				status.State = "queued"
 			}
 		}
@@ -106,15 +106,15 @@ func (s *handler) listAnalysisFindings(_ context.Context, input *listAnalysisFin
 		items = items[:input.Limit]
 		output.Body.NextCursor = items[len(items)-1].ID
 	}
-	versions := make(map[string]string, len(analysis.Definitions()))
+	definitions := make(map[string]analysis.Definition, len(analysis.Definitions()))
 	for _, definition := range analysis.Definitions() {
-		versions[definition.Type()] = definition.Version()
+		definitions[definition.Type()] = definition
 	}
 	for i := range items {
 		if items[i].Status != "active" {
 			continue
 		}
-		if version, ok := versions[items[i].AnalysisType]; ok && items[i].AnalyzerVersion != version {
+		if definition, ok := definitions[items[i].AnalysisType]; ok && !analysis.MatchesVersion(definition, items[i].AnalyzerVersion) {
 			items[i].Stale = true
 		}
 	}

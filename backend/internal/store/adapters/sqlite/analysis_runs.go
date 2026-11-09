@@ -52,7 +52,7 @@ func (s *sqliteStore) ClaimAnalysis(kind, version string) (types.AnalysisRun, ty
 			}
 		}
 		if previous.InputRevision == revision && previous.Version == version {
-			if previous.State == "succeeded" || (previous.State == "failed" && now-previous.CompletedAt < 30) {
+			if (previous.State == "succeeded" && (previous.Problem == "" || now-previous.CompletedAt < 30)) || (previous.State == "failed" && now-previous.CompletedAt < 30) {
 				return run, input, false, nil
 			}
 		}
@@ -100,7 +100,7 @@ func (s *sqliteStore) CompleteAnalysis(run types.AnalysisRun, findings []types.A
 		return err
 	}
 	state, now := "succeeded", time.Now().Unix()
-	if problem != "" {
+	if problem != "" && !types.RetryableJudgmentProblem(problem) {
 		state = "failed"
 		problem = "analysis-failed"
 	}

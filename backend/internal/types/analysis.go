@@ -25,6 +25,7 @@ type AnalysisTransaction struct {
 
 type AnalysisSnapshot struct {
 	Revision     int64
+	UserID       string
 	Transactions []AnalysisTransaction
 }
 
@@ -35,13 +36,25 @@ type AnalysisEvidence struct {
 }
 
 type AnalysisDetection struct {
-	TransactionID string             `json:"transactionId"`
-	Kind          string             `json:"kind"`
-	Provider      string             `json:"provider"`
-	Product       string             `json:"product"`
-	Role          string             `json:"role"`
-	Strength      string             `json:"strength"`
-	Evidence      []AnalysisEvidence `json:"evidence"`
+	TransactionID string                 `json:"transactionId"`
+	Kind          string                 `json:"kind"`
+	Provider      string                 `json:"provider"`
+	Product       string                 `json:"product"`
+	Role          string                 `json:"role"`
+	Strength      string                 `json:"strength"`
+	Evidence      []AnalysisEvidence     `json:"evidence"`
+	JudgmentInput *AnalysisJudgmentInput `json:"judgmentInput,omitempty"`
+	Judgment      *AnalysisJudgment      `json:"judgment,omitempty"`
+	Income        *AnalysisIncomePattern `json:"income,omitempty"`
+}
+
+// AnalysisIncomePattern is the source-currency summary of one detected pattern.
+// Display amounts remain separate from external assessment results.
+type AnalysisIncomePattern struct {
+	PatternID          string `json:"patternId"`
+	Currency           string `json:"currency"`
+	TypicalAmount      string `json:"typicalAmount"`
+	AnnualizedEstimate string `json:"annualizedEstimate"`
 }
 
 type AnalysisRun struct {

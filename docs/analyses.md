@@ -114,6 +114,88 @@ Like BNPL, recurring findings never create schedules or change the
 financial model. Creating a forecast schedule from a confirmed pattern is a
 separate explicit action with its own review.
 
+## Income first release
+
+Income means a recurring external inflow that plausibly funds the model.
+Deposit, cadence, estimate, and provenance stay distinct per `TERMS.md` `F`.
+The Go pattern gate is deterministic and owns evidence. A provider-neutral
+judgment boundary can refine strength using a model, rules, or an asynchronous
+human queue. The feature never selects an algorithm or interprets a probability.
+
+- Weekly, biweekly, monthly, quarterly, and annual inflow patterns are
+  detected from settled bank evidence grouped by source, account, currency,
+  and normalized merchant key. Three occurrences establish weekly through
+  quarterly patterns; two establish an annual pattern. Annualized estimate
+  is the median source amount times periods per year (52, 26, 12, 4, 1).
+- A payroll descriptor (payroll, salary, paycheck, direct deposit, direct
+  deposit abbreviation, ACH credit) or a source category that maps to
+  `INCOME` makes strength `strong`; otherwise strength is `moderate`.
+- Internal transfers are excluded by the exact opposite-leg rule from the
+  transfer detector (same absolute amount, opposite direction, different
+  account, within seven days). Refunds, reversals, chargebacks, and returns
+  are excluded by marker. Pending, void, zero, invalid, and undated rows
+  never form patterns.
+- Each occurrence carries its own finding. Its evidence lists every
+  occurrence in the pattern plus the estimated cadence, typical source
+  amount, and annualized estimate, so the basis is inspectable from one row.
+  The Income list groups occurrences into one compact row per pattern, with
+  source-currency amounts supplied as structured fields rather than parsed
+  from explanations or reconstructed from training features. Details retains
+  the explanation, per-occurrence review states, and visibility action.
+  Review uses the latest answered eligible occurrence, or the first eligible
+  occurrence for an unanswered pattern. It saves one explicit label and never
+  rewrites the other recorded answers. Withdrawn findings remain separate
+  from current patterns.
+- The highest annualized candidate is marked `income.main-inflow:annualized`
+  and described as the main consistent inflow. Other candidates keep
+  `income.inflow:annualized`. Ranking is by annualized estimate desc with
+  merchant and cadence tie breaks, so the user does not have to state the
+  main inflow. Ranking is withheld when candidates have different or missing
+  currencies because source amounts cannot be compared without conversion.
+  The finding never creates a schedule.
+- Cross-claim independence holds: a deposit may carry recurring, income,
+  and transfer claims without competing. Withdrawing, confirming, or
+  rejecting one kind never disturbs the others.
+
+## Replaceable judgment providers
+
+`judgment.Provider.Open` owns implementation-specific preparation and returns
+a session with an opaque revision and an evaluator. `Income` sees only domain
+evidence and `ready`, `pending`, or `unavailable` judgments. Learning is optional:
+response-only and human-queue adapters do not implement a training API.
+
+- Saved `judgmentInput` contains source-currency pattern statistics and at most
+  three recent source observations. Feature scaling and categorical encoding
+  belong inside a provider, never the detector, API, store, or UI.
+- Pattern identity includes owner, source, account, currency, merchant, and
+  cadence. Request identity hashes the exact domain evidence separately, so a
+  late answer for different evidence cannot be attached to a current request.
+- A ready judgment provides domain strength (`strong` or `moderate`) and an
+  optional explanation. The common boundary rejects malformed, duplicate,
+  missing, or mismatched responses before applying any judgment in a batch.
+- A pending judgment publishes deterministic findings with `judgment-pending`.
+  Unavailability publishes deterministic findings with `judgment-unavailable`.
+  Both are retryable after 30 seconds; neither blocks the worker or invents a
+  user's answer. A provider revision change refreshes unchanged bank evidence.
+- Explicit confirm/reject feedback remains an immutable, owner-scoped audit
+  event with the original request and run. Providers may consume it or ignore
+  it. Hide and restore are never labels. API reviews never wait on a provider.
+- User bank evidence and review decisions stay owner-scoped regardless of the
+  provider. Provider judgments never mutate the financial model or another
+  person's explicit answer.
+
+The default composition uses the neutral HTTP protocol when
+`INCOME_JUDGMENT_URL` is set. With no URL, detection is deterministic. Deploying
+a different compatible service at that URL changes no detector, persistence,
+or UI code. In-process adapters implement the same Provider port. See
+[the provider contract](judgment-providers.md) for replacement and privacy rules.
+
+The supplied implementation is the River service in `sidecar/income`. It alone
+owns scaling, probability thresholds, example counts, drift detection, and one
+shared online-learning model per deployment. Those details are absent from the
+application contract. See `sidecar/income/README.md` for its private storage and
+deployment requirements.
+
 ## Pattern to new schedule
 
 A confirmed repeating pattern becomes planned cash flow only through

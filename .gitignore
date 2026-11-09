@@ -10,3 +10,6 @@ tmp/
 /node_modules/
 /.vercel/
 /backend/server
+__pycache__/
+*.pyc
+/data/

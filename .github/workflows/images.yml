@@ -38,6 +38,10 @@ jobs:
             context: .
             file: frontend/Dockerfile
             target: ''
+          - image: backend-northflank
+            context: .
+            file: backend/Dockerfile
+            target: northflank
           - image: auth
             context: .
             file: auth/better-auth/Dockerfile
@@ -73,6 +77,9 @@ jobs:
           case "$COMPONENT" in
             backend)
               paths=(backend deploy/migrate.sh deploy/analysis-schema.sql)
+              ;;
+            backend-northflank)
+              paths=(backend sidecar/income deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql)
               ;;
             frontend)
               paths=(frontend package.json bun.lock extension/package.json)

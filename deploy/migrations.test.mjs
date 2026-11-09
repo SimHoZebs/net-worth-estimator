@@ -940,7 +940,7 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.equal(migration.group, "10001");
   assert.match(migration.command, /test -f.*NET_WORTH_ESTIMATOR_DB.*exec \/app\/migrate\.sh/);
   assert.equal(startApi.condition, "success");
-  assert.equal(startApi.spec.arguments.variables[0].value, "/app/api-boot.sh");
+  assert.equal(startApi.spec.arguments.variables[0].value, "python /app/northflank-runtime.py");
 });
 
 test("Northflank release waits for a green main Tests run and rejects unsafe calls", async () => {
@@ -1050,7 +1050,7 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   const fetch = async (url, options) => { request = { url, options }; return { ok: true }; };
   await executeRelease({ env: { RELEASE_SHA: sha, GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, fetch, { log() {} });
   assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
-  assert.equal(request.url.searchParams.get("API_IMAGE"), `ghcr.io/owner/repo-backend:sha-${sha}`);
+  assert.equal(request.url.searchParams.get("API_IMAGE"), `ghcr.io/owner/repo-backend-northflank:sha-${sha}`);
   assert.equal(request.url.searchParams.get("IDENTITY_IMAGE"), `ghcr.io/owner/repo-auth:sha-${sha}`);
   assert.equal(request.url.searchParams.get("IDENTITY_SERVICE_ID"), "prepared-identity");
   assert.equal(request.options.redirect, "error");
@@ -1094,13 +1094,37 @@ export NET_WORTH_ESTIMATOR_DB='/tmp/analysis fixture.db'
 owner="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT id FROM users;')"
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO accounts(user_id, id, position, name, kind, enabled) VALUES ('$owner', 'checking', 0, 'Checking', 'cash', 1);"
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_transaction_lifecycle;
+  DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
+  DROP TRIGGER IF EXISTS analysis_facts_insert;
+  DROP TRIGGER IF EXISTS analysis_facts_update;
+  DROP TRIGGER IF EXISTS analysis_facts_delete;
   DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
-  DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
+  DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
+  DROP INDEX IF EXISTS transactions_projection_slice;
+  DROP INDEX IF EXISTS projection_slices_state;
+  DROP INDEX IF EXISTS monte_carlo_statistics_slice;
+  DROP TABLE whatif_outputs;
+  DROP TABLE financial_independence_outputs;
+  DROP TABLE planned_purchases_outputs;
+  DROP TABLE cycle_fulfillment_outputs;
+  DROP TABLE transaction_fulfillment_outputs;
+  DROP TABLE account_balance_outputs;
+  DROP TABLE net_worth_threshold_outputs;
+  DROP TABLE monte_carlo_statistics;
+  DROP TABLE projection_rows;
+  DROP TABLE projection_slices;
+  DROP TABLE projection_states;
+  DROP TABLE provider_connections;
+  ALTER TABLE transactions DROP COLUMN projection_slice_id;
+  ALTER TABLE transactions DROP COLUMN event_json;
+  ALTER TABLE transactions DROP COLUMN applied_amount;
+  ALTER TABLE transactions DROP COLUMN outcome;
   DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');
   DROP TABLE checkpoints;
   CREATE TABLE checkpoints(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id INTEGER NOT NULL, position INTEGER NOT NULL, date TEXT NOT NULL, model_account_id TEXT NOT NULL, balance REAL NOT NULL, source TEXT NOT NULL DEFAULT 'user', PRIMARY KEY(user_id, id), UNIQUE(user_id, model_account_id, date));
   INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance, source) VALUES ('$owner', 1, 0, '2026-03-10', 'checking', 100, 'user');
-  INSERT INTO transactions(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, void) VALUES ('$owner', 'settled-a', 0, 'Groceries', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'simplefin', 0, 0), ('$owner', 'manual-a', 1, 'Owner', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'user', 0, 0);
+  INSERT INTO transactions(user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void) VALUES ('$owner', 'settled-a', 'Groceries', 'checking', 'null', '{}', 1773140400, 1773129600, 'simplefin', 0, 0), ('$owner', 'manual-a', 'Owner', 'checking', 'null', '{}', 1773140400, 1773129600, 'user', 0, 0);
+  INSERT INTO transaction_sim(user_id, transaction_id, position, enabled, execution_order) VALUES ('$owner', 'settled-a', 0, 0, 1), ('$owner', 'manual-a', 1, 0, 2);
   INSERT INTO transaction_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, transaction_id) VALUES ('$owner', 'simplefin', 'bridge-checking', 'tx1', 'settled-a');"
 export SIMPLEFIN_V2_MAPPING=/tmp/simplefin-map.json
 printf '{"version":1,"users":{"%s":{"connections":[{"connId":"CON-TEST"}],"accounts":{}}}}' "$owner" > "$SIMPLEFIN_V2_MAPPING"

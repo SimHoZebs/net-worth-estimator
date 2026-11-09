@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/import-casdoor-authz ./scripts/one-time/casdoor-authz
 
-FROM alpine:3.22
+FROM alpine:3.22 AS standalone
 
 RUN apk add --no-cache ca-certificates busybox-extras sqlite \
     && addgroup -S -g 10001 app \
@@ -54,3 +54,29 @@ USER app:app
 
 # CMD lets an operator select a separate maintenance process without rebuilding.
 CMD ["/app/server"]
+
+# Northflank Sandbox packaging only. The default backend image remains Go-only.
+FROM python:3.12-slim AS northflank
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates sqlite3 busybox-static \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /bin/busybox /usr/local/bin/busybox-extras \
+    && groupadd -g 10001 app && useradd -u 10001 -g app -m app \
+    && mkdir -p /app /data /home/app/.ssh && chmod 0700 /home/app/.ssh \
+    && chown -R app:app /data /home/app
+WORKDIR /app
+COPY sidecar/income/requirements.txt /app/income/requirements.txt
+RUN pip install --no-cache-dir -r /app/income/requirements.txt
+COPY --from=standalone /app/ /app/
+COPY sidecar/income/*.py /app/income/
+COPY deploy/northflank/runtime.py /app/northflank-runtime.py
+ENV HOST=0.0.0.0 PORT=8787 NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db \
+    INCOME_JUDGMENT_URL=http://127.0.0.1:8766 INCOME_MODEL_PATH=/data/income.sqlite3 \
+    PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
+    OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 GOMEMLIMIT=96MiB
+USER app:app
+EXPOSE 8787
+HEALTHCHECK --interval=10s --timeout=3s --start-period=90s --retries=6 \
+    CMD python -c 'import os,urllib.request; urllib.request.urlopen("http://127.0.0.1:"+os.environ["PORT"]+"/readyz",timeout=2); urllib.request.urlopen("http://127.0.0.1:8766/health",timeout=2)'
+CMD ["python", "/app/northflank-runtime.py"]
+
+FROM standalone AS default

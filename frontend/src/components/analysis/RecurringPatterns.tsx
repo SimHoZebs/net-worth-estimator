@@ -433,11 +433,7 @@ export function RecurringPatterns({
 			<header className="space-y-2">
 				<h2 className="m-0 text-lg font-semibold">Repeating payments</h2>
 				<p className="m-0 text-sm text-muted">
-					Analysis groups saved bank records that repeat on a steady rhythm.
-					Confirm a pattern, then create its forecast schedule or link its
-					payments to an existing schedule. Created plans start after the last
-					recorded payment; linked payments record an occurrence, so history is
-					never duplicated.
+					Review repeating payments before adding them to your forecast.
 				</p>
 			</header>
 			{patterns.map((pattern) => (

@@ -1,0 +1,74 @@
+package analysis
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
+)
+
+// NewIncome is the composition seam. The feature knows only Provider and the
+// domain evidence/decision contract; no algorithm or training API is selected here.
+func NewIncome(provider judgment.Provider) Definition {
+	if provider == nil {
+		return Income{}
+	}
+	return incomeProviderDefinition{provider: provider}
+}
+
+func defaultIncome() Definition {
+	endpoint := strings.TrimSpace(os.Getenv("INCOME_JUDGMENT_URL"))
+	if endpoint == "" {
+		return NewIncome(nil)
+	}
+	return NewIncome(judgment.NewHTTPProvider(endpoint, 5*time.Second))
+}
+
+type incomeProviderDefinition struct {
+	Income
+	provider judgment.Provider
+}
+
+func (d incomeProviderDefinition) Prepare(ctx context.Context, scoped store.AnalysisStore, owner string) (Definition, error) {
+	session, err := d.provider.Open(ctx, incomeFeedbackSource{scoped, owner})
+	if err != nil || session == nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return Income{version: IncomeVersion + "/unavailable", preparationErr: judgment.ErrUnavailable}, nil
+	}
+	if session.Revision() == "" {
+		return nil, fmt.Errorf("judgment provider returned an empty revision")
+	}
+	return Income{Judge: session, version: IncomeVersion + "/" + session.Revision()}, nil
+}
+
+type incomeFeedbackSource struct {
+	scoped store.AnalysisStore
+	owner  string
+}
+
+func (s incomeFeedbackSource) Owner() string { return s.owner }
+func (s incomeFeedbackSource) Page(after string, limit int) (judgment.FeedbackPage, error) {
+	events, err := s.scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{Cursor: after, Limit: limit})
+	if err != nil {
+		return judgment.FeedbackPage{}, err
+	}
+	page := judgment.FeedbackPage{Cursor: after, Feedback: []judgment.Feedback{}}
+	for _, event := range events {
+		page.Cursor = event.ID
+		if event.AnalysisType != "income" || (event.Request.Action != "confirm" && event.Request.Action != "reject") {
+			continue
+		}
+		if event.Prediction.JudgmentInput == nil {
+			return page, fmt.Errorf("income feedback %s is missing its reviewed evidence", event.ID)
+		}
+		page.Feedback = append(page.Feedback, judgment.Feedback{EventID: event.ID, RunID: event.RunID, Action: event.Request.Action, Request: *event.Prediction.JudgmentInput})
+	}
+	return page, nil
+}

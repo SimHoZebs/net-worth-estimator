@@ -4,9 +4,11 @@ package analysis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -17,9 +19,21 @@ type Definition interface {
 	Analyze(context.Context, types.AnalysisSnapshot) ([]types.AnalysisDetection, error)
 }
 
+// MatchesVersion checks algorithm compatibility on passive read paths. A
+// learning definition may include a scoring revision in its claimed version;
+// refreshing that revision belongs to the worker, not an API read.
+func MatchesVersion(definition Definition, version string) bool {
+	if matcher, ok := definition.(interface{ MatchesVersion(string) bool }); ok {
+		return matcher.MatchesVersion(version)
+	}
+	return version == definition.Version()
+}
+
 // Definitions is the composition point for built-in analyses. Definitions share
 // a lifecycle, not a classification switch or financial-model mutation path.
-func Definitions() []Definition { return []Definition{BNPL{}, Recurring{}, Transfer{}} }
+func Definitions() []Definition {
+	return []Definition{BNPL{}, Recurring{}, Transfer{}, defaultIncome()}
+}
 
 type Database interface {
 	ListAnalysisUsers() ([]string, error)
@@ -64,7 +78,7 @@ func (r *Runner) RunOnce(ctx context.Context) error {
 			continue
 		}
 		for _, definition := range r.definitions {
-			if err := r.run(ctx, scoped, definition); err != nil && firstError == nil {
+			if err := r.run(ctx, scoped, user, definition); err != nil && firstError == nil {
 				firstError = err
 			}
 		}
@@ -72,16 +86,29 @@ func (r *Runner) RunOnce(ctx context.Context) error {
 	return firstError
 }
 
-func (r *Runner) run(ctx context.Context, scoped store.AnalysisStore, definition Definition) error {
+func (r *Runner) run(ctx context.Context, scoped store.AnalysisStore, user string, definition Definition) error {
+	work, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	if preparer, ok := definition.(interface {
+		Prepare(context.Context, store.AnalysisStore, string) (Definition, error)
+	}); ok {
+		prepared, err := preparer.Prepare(work, scoped, user)
+		if err != nil {
+			return err
+		}
+		definition = prepared
+	}
 	run, input, claimed, err := scoped.ClaimAnalysis(definition.Type(), definition.Version())
 	if err != nil || !claimed {
 		return err
 	}
-	work, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
 	findings, analyzeErr := analyze(work, definition, input)
 	problem := ""
-	if analyzeErr != nil || work.Err() != nil {
+	if errors.Is(analyzeErr, judgment.ErrUnavailable) && work.Err() == nil {
+		problem = types.JudgmentUnavailable
+	} else if errors.Is(analyzeErr, judgment.ErrPending) && work.Err() == nil {
+		problem = types.JudgmentPending
+	} else if analyzeErr != nil || work.Err() != nil {
 		problem = "analysis-failed"
 		findings = nil
 	}

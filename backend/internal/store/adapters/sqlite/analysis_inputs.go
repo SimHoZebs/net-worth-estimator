@@ -43,7 +43,7 @@ func analysisRevision(tx *userTx) (int64, error) {
 }
 
 func loadAnalysisSnapshot(tx *userTx, revision int64) (types.AnalysisSnapshot, error) {
-	result := types.AnalysisSnapshot{Revision: revision, Transactions: []types.AnalysisTransaction{}}
+	result := types.AnalysisSnapshot{Revision: revision, UserID: tx.userID, Transactions: []types.AnalysisTransaction{}}
 	rows, err := tx.Query(`SELECT p.id, k.bridge_account_id, k.provider, p.pending, p.void, f.facts_json
 		FROM transaction_source_facts f JOIN transactions p ON p.user_id = f.user_id AND p.id = f.transaction_id
 		JOIN transaction_sync_keys k ON k.user_id = p.user_id AND k.transaction_id = p.id

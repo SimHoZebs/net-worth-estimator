@@ -44,6 +44,28 @@ jobs:
       - name: Run backend gates
         run: backend/scripts/verify.sh
 
+  income-sidecar:
+    name: Income sidecar tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the Python runtime
+        run: docker build -f sidecar/income/Dockerfile -t income-sidecar-test .
+      - name: Verify shared learning and durable feedback
+        run: docker run --rm --network none income-sidecar-test python -B -m unittest discover -s /app -p 'test_*.py' -v
+      - name: Verify Northflank process composition
+        run: python3 -B -m unittest discover -s deploy/northflank -p 'test_*.py' -v
+      - name: Build the Northflank deployment target
+        run: docker build --target northflank -f backend/Dockerfile -t northflank-income-test .
+      - name: Verify the constrained deployment
+        run: NORTHFLANK_TEST_IMAGE=northflank-income-test node --test deploy/northflank/container.test.mjs
+      - name: Verify offline migration in the deployment image
+        run: DEPLOYMENT_TEST_IMAGE=northflank-income-test node --test --test-name-pattern 'API image migrates' deploy/migrations.test.mjs
+
   gate:
     name: Frontend and static gates
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository

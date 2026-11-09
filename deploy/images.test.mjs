@@ -89,3 +89,13 @@ test("publishes both app images and the Bun identity runtime", () => {
   assert.match(auth, /FROM oven\/bun:1\.4\.4-slim/);
   assert.match(auth, /CMD \["bun", "run", "auth\/better-auth\/src\/server.ts"\]/);
 });
+
+test("Northflank co-location is an explicit image target, not the default backend", () => {
+  const backend = readFileSync(new URL("../backend/Dockerfile", import.meta.url), "utf8");
+  const release = readFileSync(new URL("../.github/workflows/northflank-release.yml", import.meta.url), "utf8");
+  assert.match(backend, /FROM python:3\.12-slim AS northflank/);
+  assert.match(backend, /FROM standalone AS default\s*$/);
+  assert.match(workflow, /image: backend-northflank[\s\S]*?target: northflank/);
+  assert.match(workflow, /paths=\(backend sidecar\/income deploy\/northflank deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
+  assert.match(release, /repository\}-backend-northflank:sha-/);
+});

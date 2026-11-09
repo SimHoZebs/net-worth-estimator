@@ -85,7 +85,7 @@
           "spec": {
             "templateType": "template",
             "templateId": "waypoint-api-command",
-            "arguments": { "variables": [{ "key": "COMMAND", "value": "/app/api-boot.sh" }] }
+            "arguments": { "variables": [{ "key": "COMMAND", "value": "python /app/northflank-runtime.py" }] }
           }
         }
       ]
