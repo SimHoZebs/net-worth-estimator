@@ -5,14 +5,13 @@ import (
 	"math"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const IncomeVersion = "income-v1"
+const IncomeVersion = "income-v2"
 
 // Income detects recurring external inflows and ranks the main consistent
 // inflow so the user does not have to name it. It is a pure Go deterministic
@@ -147,54 +146,18 @@ func (in Income) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]t
 		}
 	}
 
-	groups := map[string][]incomeCandidate{}
-	for _, tx := range input.Transactions {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		if tx.Pending || tx.Void {
-			continue
-		}
-		if transferIDs[tx.TransactionID] {
-			continue
-		}
-		facts := tx.Facts
-		text := strings.Join([]string{facts.Description, facts.Payee, facts.Memo, facts.Metadata["merchant_name"]}, " ")
-		if incomeRefundMarker.MatchString(text) {
-			continue
-		}
-		merchant := recurringKey(text)
-		if merchant == "" {
-			continue
-		}
-		amount, err := strconv.ParseFloat(facts.Amount, 64)
-		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount <= 0 || amount > 1e10 {
-			continue // income is positive inflow only
-		}
-		stamp := incomeStamp(facts)
-		if stamp <= 0 {
-			continue
-		}
-		key := strings.Join([]string{tx.SourceProvider, tx.AccountID, facts.Currency, "inflow", merchant}, "\x00")
-		groups[key] = append(groups[key], incomeCandidate{tx, amount, stamp / 86400, text})
+	groups, err := incomeGroups(ctx, input.Transactions, transferIDs)
+	if err != nil {
+		return nil, err
 	}
-
 	var patterns []*incomePattern
-	// To keep determinism, iterate keys sorted.
-	keys := make([]string, 0, len(groups))
-	for k := range groups {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
+	for _, group := range groups {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		group := groups[key]
 
-		amounts := make([]float64, 0, len(group))
-		for _, item := range group {
+		amounts := make([]float64, 0, len(group.candidates))
+		for _, item := range group.candidates {
 			amounts = append(amounts, math.Abs(item.amount))
 		}
 		typical := incomeMedian(amounts)
@@ -202,8 +165,8 @@ func (in Income) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]t
 			continue
 		}
 		// Amount outlier filter like recurring (15%).
-		kept := make([]incomeCandidate, 0, len(group))
-		for _, item := range group {
+		kept := make([]incomeCandidate, 0, len(group.candidates))
+		for _, item := range group.candidates {
 			if math.Abs(math.Abs(item.amount)-typical) <= recurringTolerance*typical {
 				kept = append(kept, item)
 			}
@@ -244,7 +207,7 @@ func (in Income) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]t
 		if !regular {
 			continue
 		}
-		merchant := strings.Split(key, "\x00")[4]
+		merchant := group.merchant
 		currency := kept[0].transaction.Facts.Currency
 		amountVals := make([]float64, 0, len(kept))
 		for _, item := range kept {
@@ -267,7 +230,7 @@ func (in Income) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]t
 			recency = float64(latestDay - kept[len(kept)-1].day)
 		}
 		patterns = append(patterns, &incomePattern{
-			patternID:      incomePatternID(input.UserID, key, cadence),
+			patternID:      incomePatternID(input.UserID, group.key, cadence),
 			merchant:       merchant,
 			cadence:        cadence,
 			cadenceDays:    cadenceMeta.days,

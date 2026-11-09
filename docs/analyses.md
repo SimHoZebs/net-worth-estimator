@@ -124,7 +124,13 @@ human queue. The feature never selects an algorithm or interprets a probability.
 
 - Weekly, biweekly, monthly, quarterly, and annual inflow patterns are
   detected from settled bank evidence grouped by source, account, currency,
-  and normalized merchant key. Three occurrences establish weekly through
+  normalized description, payee, merchant metadata, and income evidence.
+  The short merchant label is for display, not the payment-stream identity.
+  Payroll descriptors and source income categories separate distinct streams
+  before amount filtering, so small payments from an employer cannot suppress
+  its payroll. Variable bank reference suffixes and opaque reference tokens
+  are excluded from grouping but retained in immutable source evidence.
+  Three occurrences establish weekly through
   quarterly patterns; two establish an annual pattern. Annualized estimate
   is the median source amount times periods per year (52, 26, 12, 4, 1).
 - A payroll descriptor (payroll, salary, paycheck, direct deposit, direct
