@@ -44,13 +44,13 @@ git push -u origin "$branch"
 sha="$(git rev-parse HEAD)"
 run=""
 for attempt in 1 2 3 4 5 6; do
-  run="$(gh run list --branch "$branch" --workflow tests.yml --event push --limit 20 \
-    --json databaseId,headSha --jq ".[] | select(.headSha == \"$sha\") | .databaseId" | head -1)"
+  run="$(gh run list --commit "$sha" --workflow tests.yml --event push --limit 1 \
+    --json databaseId --jq '.[0].databaseId // empty')"
   [ -n "$run" ] && break
-  sleep 10
+  sleep 5
 done
 [ -n "$run" ] || { echo "no Tests run for $sha" >&2; exit 1; }
-gh run watch "$run" --exit-status
+gh run watch "$run" --exit-status --interval 10
 ```
 
 - Resolve the run ID once, then let `gh run watch` be the single waiter. Do not run extra `gh run list` or `gh run view` polls alongside it. Repeated list and view calls trigger a secondary GitHub Actions limit with `403`. On `403` or `429`, stop polling for 120 seconds, then retry a single check. Never tight loop list calls.
