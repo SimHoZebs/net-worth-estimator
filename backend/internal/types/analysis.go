@@ -36,21 +36,21 @@ type AnalysisEvidence struct {
 }
 
 type AnalysisDetection struct {
-	TransactionID string                 `json:"transactionId"`
-	Kind          string                 `json:"kind"`
-	Provider      string                 `json:"provider"`
-	Product       string                 `json:"product"`
-	Role          string                 `json:"role"`
-	Strength      string                 `json:"strength"`
-	Evidence      []AnalysisEvidence     `json:"evidence"`
-	JudgmentInput *AnalysisJudgmentInput `json:"judgmentInput,omitempty"`
-	Judgment      *AnalysisJudgment      `json:"judgment,omitempty"`
-	Income        *AnalysisIncomePattern `json:"income,omitempty"`
+	TransactionID string                  `json:"transactionId"`
+	Kind          string                  `json:"kind"`
+	Provider      string                  `json:"provider"`
+	Product       string                  `json:"product"`
+	Role          string                  `json:"role"`
+	Strength      string                  `json:"strength"`
+	Evidence      []AnalysisEvidence      `json:"evidence"`
+	JudgmentInput *AnalysisJudgmentInput  `json:"judgmentInput,omitempty"`
+	Judgment      *AnalysisJudgment       `json:"judgment,omitempty"`
+	Pattern       *AnalysisPaymentPattern `json:"pattern,omitempty"`
 }
 
-// AnalysisIncomePattern is the source-currency summary of one detected pattern.
+// AnalysisPaymentPattern is the source-currency summary of one detected pattern.
 // Display amounts remain separate from external assessment results.
-type AnalysisIncomePattern struct {
+type AnalysisPaymentPattern struct {
 	PatternID          string `json:"patternId"`
 	Currency           string `json:"currency"`
 	TypicalAmount      string `json:"typicalAmount"`

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
 	isMainIncome,
-	incomeLabel,
-	incomeStatus,
-	groupIncomePatterns,
-	incomeAmount,
-} from "./incomeFindings.ts";
+	paymentLabel as incomeLabel,
+	paymentStatus as incomeStatus,
+	groupPaymentPatterns,
+	paymentAmount as incomeAmount,
+} from "./paymentFindings.ts";
 
 const finding = {
 	id: "one",
@@ -17,7 +17,7 @@ const finding = {
 	stale: false,
 	dismissed: false,
 	feedbackRevision: 0,
-	income: {
+	pattern: {
 		patternId: "checking-payroll",
 		currency: "USD",
 		typicalAmount: "2000.00",
@@ -52,10 +52,10 @@ describe("income findings", () => {
 		const otherAccount = {
 			...finding,
 			id: "other",
-			income: { ...finding.income!, patternId: "savings-payroll" },
+			pattern: { ...finding.pattern!, patternId: "savings-payroll" },
 		};
 		const withdrawn = { ...finding, id: "old", status: "withdrawn" };
-		const groups = groupIncomePatterns([
+		const groups = groupPaymentPatterns([
 			finding,
 			second,
 			otherAccount,

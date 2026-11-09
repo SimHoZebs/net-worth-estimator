@@ -19,7 +19,7 @@ from pathlib import Path
 from river import compose, linear_model, optim, preprocessing
 from river.drift import ADWIN
 
-from evidence import features_from_request
+from evidence import features_from_request, baseline_decision
 
 
 def _new_model():
@@ -34,13 +34,14 @@ class ModelState:
     model: object = field(default_factory=_new_model)
     drift: object = field(default_factory=lambda: ADWIN(delta=0.002))
     examples_seen: int = 0
+    classification_counts: dict = field(default_factory=dict)
 
 
 class ConflictError(ValueError):
     pass
 
 
-class IncomeModelStore:
+class PaymentModelStore:
     def __init__(self, model_path: str | None = None):
         path = Path(model_path or os.environ.get("INCOME_MODEL_PATH", "/tmp/income.sqlite3"))
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,6 +58,8 @@ class IncomeModelStore:
         self._generation, self._revision = generation, revision
         # Corrupt or incompatible state is an operator-visible startup failure.
         self._state = pickle.loads(raw)
+        if not isinstance(self._state, ModelState) or "classification_counts" not in vars(self._state):
+            raise ValueError("incompatible learner state; configure a fresh payment learner database before startup")
 
     def close(self):
         with self._lock:
@@ -74,7 +77,7 @@ class IncomeModelStore:
         if not isinstance(owner, str) or not owner or len(owner) > 512:
             raise ValueError("owner is required")
         with self._lock:
-            return {"revision": f"{self._generation}:{self._revision}", "cursor": self._cursor(owner)}
+            return {"revision": f"payments-v1:{self._generation}:{self._revision}", "cursor": self._cursor(owner)}
 
     def evaluate(self, requests):
         if not isinstance(requests, list) or len(requests) > 10000:
@@ -83,14 +86,17 @@ class IncomeModelStore:
         with self._lock:
             out = []
             for request, feats in zip(requests, features):
-                if self._state.examples_seen < 2:
-                    strong = bool(feats["descriptor_hit"] or feats["category_income"])
+                if self._state.classification_counts.get(request["kind"], 0) < 2:
+                    decision = baseline_decision(request)
+                    strong = decision != "uncertain"
                 else:
                     probability = float(self._state.model.predict_proba_one(feats).get(True, 0.5))
-                    strong = probability >= 0.75
+                    decision = "supported" if probability >= 0.75 else "unsupported" if probability <= 0.25 else "uncertain"
+                    strong = decision != "uncertain"
                 out.append({"requestId": request["id"], "status": "ready",
+                            "decision": decision,
                             "strength": "strong" if strong else "moderate",
-                            "reason": "Evidence supports income." if strong else "Income remains uncertain."})
+                            "reason": f"Assessment of {request['question']['label']}: {decision}."})
             return out
 
     def observe(self, owner, after, cursor, feedback):
@@ -133,6 +139,8 @@ class IncomeModelStore:
                         candidate = ModelState()
                     candidate.model.learn_one(feats, label)
                     candidate.examples_seen += 1
+                    kind = item["request"]["kind"]
+                    candidate.classification_counts[kind] = candidate.classification_counts.get(kind, 0) + 1
                     learned += 1
                     self._db.execute("INSERT INTO events VALUES (?, ?, ?)", (owner, item["eventId"], fingerprint))
                 if learned:

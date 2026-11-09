@@ -56,7 +56,7 @@ func (s fixedJudgmentSession) Revision() string { return s.revision }
 func (fixedJudgmentSession) Evaluate(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
 	var decisions []types.AnalysisJudgment
 	for _, request := range requests {
-		decisions = append(decisions, types.AnalysisJudgment{RequestID: request.ID, Status: "ready", Strength: "strong", Reason: "Evidence supports income."})
+		decisions = append(decisions, types.AnalysisJudgment{RequestID: request.ID, Status: "ready", Decision: "supported", Strength: "strong", Reason: "Evidence supports income."})
 	}
 	return decisions, nil
 }
@@ -102,7 +102,7 @@ func TestIncomeSharedLearningRescoresAllOwnersWithoutBankChanges(t *testing.T) {
 	defer db.Close()
 	alice, bob := seedIncomeUser(t, db, "alice"), seedIncomeUser(t, db, "bob")
 	scorer := &sharedJudgmentProvider{cursors: map[string]string{}}
-	runner, err := analysis.NewRunner(db, analysis.NewIncome(scorer))
+	runner, err := analysis.NewRunner(db, analysis.NewPaymentPatterns(scorer))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestIncomeSidecarRecoveryRescoresUnchangedSnapshot(t *testing.T) {
 	defer db.Close()
 	scoped := seedIncomeUser(t, db, "owner")
 	scorer := &sharedJudgmentProvider{cursors: map[string]string{}, unavailable: true}
-	runner, _ := analysis.NewRunner(db, analysis.NewIncome(scorer))
+	runner, _ := analysis.NewRunner(db, analysis.NewPaymentPatterns(scorer))
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestIncomeWithdrawalRetainsReviewedAnswerAfterBankEvidenceChanges(t *testin
 	}
 	defer db.Close()
 	scoped := seedIncomeUser(t, db, "owner")
-	runner, err := analysis.NewRunner(db, analysis.Income{})
+	runner, err := analysis.NewRunner(db, analysis.PaymentPatterns{})
 	if err != nil {
 		t.Fatal(err)
 	}

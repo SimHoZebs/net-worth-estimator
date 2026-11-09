@@ -28,11 +28,14 @@ func Assess(ctx context.Context, evaluator Evaluator, requests []types.AnalysisJ
 		}
 		switch decision.Status {
 		case "ready":
+			if decision.Decision != "supported" && decision.Decision != "unsupported" && decision.Decision != "uncertain" {
+				return fallback, ErrUnavailable
+			}
 			if decision.Strength != "strong" && decision.Strength != "moderate" {
 				return fallback, ErrUnavailable
 			}
 		case "pending", "unavailable":
-			if decision.Strength != "" {
+			if decision.Strength != "" || decision.Decision != "" {
 				return fallback, ErrUnavailable
 			}
 		default:

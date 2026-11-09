@@ -14,7 +14,7 @@ model weights, probabilities, example counts, algorithms, or queue internals.
 - `Evaluator.Evaluate(context, requests) → judgments`: immediate domain results
   or an immediate `pending` response for delayed work.
 
-An income definition is composed with `analysis.NewIncome(provider)`. A new
+Payment classifications are composed with `analysis.NewPaymentPatterns(provider)`. A new
 implementation changes composition only, not the detector, API, store, or UI.
 The response-only and human-queue test implementations demonstrate replacement
 without any learning methods. No production LLM integration or human review
@@ -22,26 +22,31 @@ console is supplied by this change.
 
 ## Immutable evidence and decisions
 
-An `AnalysisJudgmentInput` contains `id`, `kind`, `patternId`, `pattern`, and
+An `AnalysisJudgmentInput` contains `id`, `kind`, `patternId`, `pattern`, `question`, and
 `samples`. Pattern statistics are source-currency amounts, cadence, occurrence
 count, variation, recency, and observed descriptor/category evidence. Up to
 three recent original transaction facts provide context for automated or
-human assessment. The detector does not encode model features.
+human assessment. Direction and named observed signals replace income-specific
+booleans. The question describes the requested classification's label, supporting,
+candidate and exclusion signals, and whether an unmarked stream is a candidate.
+It is immutable domain policy, not a feature vector or a required algorithm.
+The detector does not encode model features. Requests are batched at 100.
 
-`patternId` identifies the owner/account/source/currency/merchant/cadence
+`patternId` identifies the owner/account/source/currency/direction/descriptive-stream/cadence
 pattern. `id` hashes the exact request content. An asynchronous provider must
 persist and deduplicate jobs by this exact request ID, never by pattern ID
 alone. Changing request evidence produces a different ID. Return decisions
 only for requested IDs; late or foreign responses are rejected.
 
-Each judgment contains `requestId`, `status`, optional `strength`, and optional
+Different classifications share the stream ID but have distinct request IDs.
+Each judgment contains `requestId`, `status`, optional `decision`, `strength`, and optional
 `reason` (at most 2,000 bytes at the application boundary):
 
-| Status | Strength | Application behavior |
-| --- | --- | --- |
-| `ready` | `strong` or `moderate` | Use this domain assessment. |
-| `pending` | omitted | Preserve deterministic findings, show pending review, retry. |
-| `unavailable` | omitted | Preserve deterministic findings and retry. |
+| Status | Decision | Strength | Application behavior |
+| --- | --- | --- | --- |
+| `ready` | `supported`, `unsupported` or `uncertain` | `strong` or `moderate` | Use the assessment; explicit negatives remain correctable. |
+| `pending` | omitted | omitted | Preserve deterministic findings, show pending review, retry. |
+| `unavailable` | omitted | omitted | Preserve deterministic findings and retry. |
 
 Evaluation must return promptly and honor cancellation. A human queue returns
 pending rather than waiting for a reviewer. The worker publishes deferred

@@ -125,6 +125,15 @@ func applyAnalysisFeedback(tx *userTx, id string, input types.AnalysisFeedbackIn
 		}
 	}
 	if input.Action == "confirm" || input.Action == "reject" {
+		// A classification answer labels an exact immutable question/evidence
+		// request. Never append an event that a provider cannot consume, including
+		// corrections to reviewed withdrawn findings awaiting recomputation.
+		if pattern := feedback.Prediction.Pattern; pattern != nil {
+			request := feedback.Prediction.JudgmentInput
+			if request == nil || request.ID == "" || request.Kind != feedback.Prediction.Kind || request.PatternID != pattern.PatternID {
+				return feedback, store.ErrAnalysisFeedbackConflict
+			}
+		}
 		// Withdrawal retains the original run ID for provenance. An unanswered
 		// prompt must not label a prediction that no longer applies.
 		if feedback.Review == nil && status != "active" {

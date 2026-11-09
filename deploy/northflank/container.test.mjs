@@ -57,11 +57,11 @@ exec python /app/northflank-runtime.py
   }
   await ready();
   const feedback = `
-import json,urllib.request
+import copy,json,urllib.request
 def post(path,payload):
     req=urllib.request.Request('http://127.0.0.1:8766/'+path,data=json.dumps(payload).encode(),headers={'Content-Type':'application/json'})
     return json.load(urllib.request.urlopen(req,timeout=10))
-request={'id':'immutable-request','kind':'income','patternId':'owner-account-pattern','pattern':{'merchant':'acme','cadence':'biweekly','currency':'USD','typicalAmount':'2000.00','annualizedEstimate':'52000.00','occurrenceCount':3,'cadenceDays':14,'amountVariation':0,'intervalVariation':0,'recencyDays':0,'payrollDescriptor':True,'sourceCategoryIncome':False},'samples':[]}
+request={'id':'immutable-request','kind':'income','patternId':'owner-account-pattern','question':{'label':'income','supportSignals':['payroll-descriptor'],'candidateSignals':[],'excludeSignals':[],'suggestWithoutSignal':True},'pattern':{'merchant':'acme','cadence':'biweekly','currency':'USD','typicalAmount':'2000.00','annualizedEstimate':'52000.00','occurrenceCount':3,'cadenceDays':14,'amountVariation':0,'intervalVariation':0,'recencyDays':0,'direction':'inflow','signals':['payroll-descriptor']},'samples':[]}
 before=post('state',{'owner':'fixture'})
 batch={'owner':'fixture','after':'','cursor':'001','feedback':[{'eventId':'001','runId':'reviewed-run','action':'confirm','request':request}]}
 post('feedback',batch)
@@ -69,11 +69,26 @@ post('feedback',batch)
 after=post('state',{'owner':'fixture'})
 assert after['cursor']=='001' and after['revision']!=before['revision']
 assert post('evaluate',{'requests':[request]})['judgments'][0]['status']=='ready'
+# Hundreds of semantic hypotheses share this same process and learner. Exercise
+# bounded evaluations plus durable training without allocating a model per type.
+variants=[]
+for i in range(300):
+    variant=copy.deepcopy(request)
+    variant['id']=f'request-{i}'
+    variant['kind']=f'classification-{i}'
+    variants.append(variant)
+for start in range(0,300,100):
+    decisions=post('evaluate',{'requests':variants[start:start+100]})['judgments']
+    assert len(decisions)==100 and all(d['decision']=='supported' for d in decisions)
+for start,end in [(0,200),(200,300)]:
+    events=[{'eventId':f'{i+1:04d}','runId':'scale-run','action':'confirm','request':variants[i]} for i in range(start,end)]
+    post('feedback',{'owner':'scale-owner','after':f'{start:04d}' if start else '', 'cursor':f'{end:04d}', 'feedback':events})
+after=post('state',{'owner':'fixture'})
 print(after['revision'])
 `;
   const revision = await docker("exec", name, "python", "-c", feedback);
   const receipts = await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT COUNT(*) FROM events;");
-  assert.equal(receipts, "1");
+  assert.equal(receipts, "301");
   const peak = Number(await docker("exec", name, "cat", "/sys/fs/cgroup/memory.peak"));
   t.diagnostic(`Combined deployment peak including test clients: ${(peak / 1024 / 1024).toFixed(1)} MiB at 0.1 vCPU`);
   assert.ok(peak < 256 * 1024 * 1024);
@@ -83,7 +98,7 @@ print(after['revision'])
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.OOMKilled, false);
   await docker("start", name);
   await ready();
-  assert.equal(await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT generation || ':' || revision FROM model;"), revision);
+  assert.equal(await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT 'payments-v1:' || generation || ':' || revision FROM model;"), revision);
   assert.equal(await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT cursor FROM checkpoints WHERE owner='fixture';"), "001");
   await docker("stop", "--time", "12", name);
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.ExitCode, 0);

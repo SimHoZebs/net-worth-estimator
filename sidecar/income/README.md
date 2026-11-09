@@ -2,7 +2,7 @@
 
 This service is one implementation of the application-owned
 [judgment contract](../../docs/judgment-providers.md). Other models, rules, or
-human queues can replace it without changing the income feature. The application
+human queues can replace it without changing payment classifications. The application
 knows only immutable domain requests, opaque revisions, and domain judgments.
 
 ## River-owned behavior
@@ -14,11 +14,16 @@ and categorical indicators. No feature vectors or training counts appear in the
 application's request/result schema.
 
 The internal pipeline is StandardScaler plus logistic regression. Before two
-examples since initialization or drift reset, descriptor/category evidence
-determines strength. Afterwards, this adapter alone maps a probability of at
-least 0.75 to `strong`, otherwise `moderate`. These are implementation choices,
+examples for a classification since initialization or drift reset, the immutable
+domain question and observed signals determine the assessment. Afterwards, this
+adapter maps probabilities at least 0.75 to supported, at most 0.25 to unsupported,
+and intermediate values to uncertain. Decisive assessments have strong strength;
+uncertain assessments have moderate strength. These are implementation choices,
 not application policies or calibrated-probability claims. ADWIN monitors the
-shared error stream and resets the learner and example count on drift.
+shared error stream and resets the learner and example counts on drift.
+Classification/feature interactions are hashed into 8,192 buckets, bounding the
+shared scaler/weight feature space without a separate model per classification.
+Classification counts remain separate so income answers do not end rent cold start.
 
 ## Neutral private endpoints
 
@@ -26,7 +31,7 @@ shared error stream and resets the learner and example count on drift.
 - `POST /state` takes an owner and returns an opaque shared revision plus that
   owner's delivery cursor.
 - `POST /evaluate` takes `{"requests":[...]}` and returns
-  `{"judgments":[{"requestId":"...","status":"ready","strength":"strong","reason":"Evidence supports income."}]}`.
+  `{"judgments":[{"requestId":"...","status":"ready","decision":"supported","strength":"strong","reason":"Assessment of rent: supported."}]}`.
 - `POST /feedback` takes `owner`, `after`, `cursor`, and `feedback`. Each
   observation contains `eventId`, `runId`, `action`, and the original domain
   `request`. A successful call returns the acknowledged cursor, not learning
@@ -58,6 +63,12 @@ backups. The directory is created and checked at startup. River state is a
 trusted local pickle inside SQLite, never client-uploaded data. Corrupt or
 incompatible state fails visibly instead of silently resetting. Changing feature
 engineering or model policy requires a corresponding provider revision change.
+
+The directory and deployment settings retain their existing infrastructure names;
+the learner accepts any bounded classification ID and the generic question schema.
+Existing income state requires the explicit [offline upgrade and fresh learner
+path](../../backend/scripts/one-time/payment-patterns/README.md). There is no
+runtime legacy conversion or silent reset.
 
 ```bash
 docker build -f sidecar/income/Dockerfile -t income-judgment .

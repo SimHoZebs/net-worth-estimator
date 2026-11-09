@@ -8,7 +8,7 @@ import logging
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from model import ConflictError, IncomeModelStore
+from model import ConflictError, PaymentModelStore
 
 MAX_BODY = 4 * 1024 * 1024
 
@@ -76,7 +76,7 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8766)
     args = parser.parse_args()
-    store = IncomeModelStore()
+    store = PaymentModelStore()
     with Server((args.host, args.port), store) as server:
         try:
             server.serve_forever()

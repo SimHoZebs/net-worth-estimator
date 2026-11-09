@@ -28,7 +28,7 @@ async function openIncome(page: Page) {
 		.toBe(3);
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	return page.getByRole("region", { name: "Income", exact: true });
+	return page.getByRole("region", { name: "Payment patterns", exact: true });
 }
 
 test("income answers can be corrected and survive refresh without financial mutations", async ({
@@ -38,14 +38,14 @@ test("income answers can be corrected and survive refresh without financial muta
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	let income = await openIncome(page);
 	await expect(
-		income.getByText("Confirm or correct suggested income."),
+		income.getByText("Confirm or correct suggested payment purposes."),
 	).toBeVisible();
 	await expect(income.getByRole("row")).toHaveCount(2);
 	await expect(income.getByText("52,000 USD", { exact: true })).toBeVisible();
-	await expect(income.getByText(/This pattern suggests income/)).toBeHidden();
+	await expect(income.getByText(/Assessment of income/)).toBeHidden();
 	await income.locator("summary").focus();
 	await income.locator("summary").press("Enter");
-	await expect(income.getByText(/This pattern suggests income/)).toBeVisible();
+	await expect(income.getByText(/Assessment of income/)).toBeVisible();
 	await income.locator("summary").press("Enter");
 	const confirm = income
 		.getByRole("button", { name: /Confirm income for/ })
@@ -61,7 +61,7 @@ test("income answers can be corrected and survive refresh without financial muta
 	).toBeDisabled();
 	await page.reload();
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	income = page.getByRole("region", { name: "Income", exact: true });
+	income = page.getByRole("region", { name: "Payment patterns", exact: true });
 	await expect(
 		income.getByRole("button", { name: /Not income for/ }).first(),
 	).toBeDisabled();
@@ -87,7 +87,7 @@ test("income answers can be corrected and survive refresh without financial muta
 	expect(after.model).toEqual(before.model);
 	expect(after.revision).toBe(before.revision);
 	const accessibility = await new AxeBuilder({ page })
-		.include('[aria-label="Income"]')
+		.include('[aria-label="Payment patterns"]')
 		.disableRules(["color-contrast"])
 		.analyze();
 	expect(accessibility.violations).toEqual([]);
@@ -114,7 +114,7 @@ test("income review keeps its latest answer when a pattern spans findings pages"
 		.poll(async () => {
 			const status = await (await page.request.get("/v1/analyses")).json();
 			return status.analyses.find(
-				(item: { type: string }) => item.type === "income",
+				(item: { type: string }) => item.type === "payments",
 			)?.state;
 		})
 		.toBe("succeeded");
@@ -153,7 +153,10 @@ test("income review keeps its latest answer when a pattern spans findings pages"
 	).toBe(true);
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	const income = page.getByRole("region", { name: "Income", exact: true });
+	const income = page.getByRole("region", {
+		name: "Payment patterns",
+		exact: true,
+	});
 	await expect(income.getByRole("row")).toHaveCount(2);
 	await expect(
 		income.getByRole("button", { name: /Not income for/ }),

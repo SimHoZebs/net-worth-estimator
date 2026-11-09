@@ -795,9 +795,6 @@
 							"null"
 						]
 					},
-					"income": {
-						"$ref": "#/components/schemas/AnalysisIncomePattern"
-					},
 					"judgment": {
 						"$ref": "#/components/schemas/AnalysisJudgment"
 					},
@@ -806,6 +803,9 @@
 					},
 					"kind": {
 						"type": "string"
+					},
+					"pattern": {
+						"$ref": "#/components/schemas/AnalysisPaymentPattern"
 					},
 					"product": {
 						"type": "string"
@@ -1030,9 +1030,6 @@
 					"id": {
 						"type": "string"
 					},
-					"income": {
-						"$ref": "#/components/schemas/AnalysisIncomePattern"
-					},
 					"inputRevision": {
 						"format": "int64",
 						"type": "integer"
@@ -1049,6 +1046,9 @@
 					"lastCheckedAt": {
 						"format": "int64",
 						"type": "integer"
+					},
+					"pattern": {
+						"$ref": "#/components/schemas/AnalysisPaymentPattern"
 					},
 					"product": {
 						"type": "string"
@@ -1131,33 +1131,17 @@
 				],
 				"type": "object"
 			},
-			"AnalysisIncomePattern": {
-				"additionalProperties": false,
-				"properties": {
-					"annualizedEstimate": {
-						"type": "string"
-					},
-					"currency": {
-						"type": "string"
-					},
-					"patternId": {
-						"type": "string"
-					},
-					"typicalAmount": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"patternId",
-					"currency",
-					"typicalAmount",
-					"annualizedEstimate"
-				],
-				"type": "object"
-			},
 			"AnalysisJudgment": {
 				"additionalProperties": false,
 				"properties": {
+					"decision": {
+						"enum": [
+							"supported",
+							"unsupported",
+							"uncertain"
+						],
+						"type": "string"
+					},
 					"reason": {
 						"maxLength": 2000,
 						"type": "string"
@@ -1202,6 +1186,9 @@
 					"patternId": {
 						"type": "string"
 					},
+					"question": {
+						"$ref": "#/components/schemas/JudgmentQuestion"
+					},
 					"samples": {
 						"items": {
 							"$ref": "#/components/schemas/TransactionFacts"
@@ -1217,7 +1204,32 @@
 					"kind",
 					"patternId",
 					"pattern",
+					"question",
 					"samples"
+				],
+				"type": "object"
+			},
+			"AnalysisPaymentPattern": {
+				"additionalProperties": false,
+				"properties": {
+					"annualizedEstimate": {
+						"type": "string"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"patternId": {
+						"type": "string"
+					},
+					"typicalAmount": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"patternId",
+					"currency",
+					"typicalAmount",
+					"annualizedEstimate"
 				],
 				"type": "object"
 			},
@@ -3048,6 +3060,9 @@
 					"currency": {
 						"type": "string"
 					},
+					"direction": {
+						"type": "string"
+					},
 					"intervalVariation": {
 						"format": "double",
 						"type": "number"
@@ -3059,15 +3074,18 @@
 						"format": "int64",
 						"type": "integer"
 					},
-					"payrollDescriptor": {
-						"type": "boolean"
-					},
 					"recencyDays": {
 						"format": "double",
 						"type": "number"
 					},
-					"sourceCategoryIncome": {
-						"type": "boolean"
+					"signals": {
+						"items": {
+							"type": "string"
+						},
+						"type": [
+							"array",
+							"null"
+						]
 					},
 					"typicalAmount": {
 						"type": "string"
@@ -3084,8 +3102,54 @@
 					"amountVariation",
 					"intervalVariation",
 					"recencyDays",
-					"payrollDescriptor",
-					"sourceCategoryIncome"
+					"direction",
+					"signals"
+				],
+				"type": "object"
+			},
+			"JudgmentQuestion": {
+				"additionalProperties": false,
+				"properties": {
+					"candidateSignals": {
+						"items": {
+							"type": "string"
+						},
+						"type": [
+							"array",
+							"null"
+						]
+					},
+					"excludeSignals": {
+						"items": {
+							"type": "string"
+						},
+						"type": [
+							"array",
+							"null"
+						]
+					},
+					"label": {
+						"type": "string"
+					},
+					"suggestWithoutSignal": {
+						"type": "boolean"
+					},
+					"supportSignals": {
+						"items": {
+							"type": "string"
+						},
+						"type": [
+							"array",
+							"null"
+						]
+					}
+				},
+				"required": [
+					"label",
+					"supportSignals",
+					"candidateSignals",
+					"excludeSignals",
+					"suggestWithoutSignal"
 				],
 				"type": "object"
 			},

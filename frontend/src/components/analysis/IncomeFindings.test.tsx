@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { runInteractions } from "@/mocks/interactions.ts";
-import { IncomeFindings } from "./IncomeFindings.tsx";
+import { PaymentFindings as IncomeFindings } from "./PaymentFindings.tsx";
 
 const review = vi.hoisted(() => ({
 	mutate: vi.fn(),
@@ -24,7 +24,7 @@ function finding(id = "deposit"): AnalysisFinding {
 	return {
 		id,
 		transactionId: id,
-		analysisType: "income",
+		analysisType: "payments",
 		kind: "income",
 		provider: "acme",
 		product: "biweekly",
@@ -35,11 +35,11 @@ function finding(id = "deposit"): AnalysisFinding {
 		dismissed: false,
 		runId: "reviewed-run",
 		feedbackRevision: 0,
-		analyzerVersion: "income-v1",
+		analyzerVersion: "payments-v1/policy",
 		inputRevision: 1,
 		firstDetectedAt: 1,
 		lastCheckedAt: 1,
-		income: {
+		pattern: {
 			patternId: id,
 			currency: "USD",
 			typicalAmount: "2000.00",
@@ -196,7 +196,7 @@ describe("income review", () => {
 		view.rerender(ui([finding()]));
 		expect(screen.getByText("The answer could not be saved.")).toBeDefined();
 		expect(
-			screen.getByText("Confirm or correct suggested income."),
+			screen.getByText("Confirm or correct suggested payment purposes."),
 		).toBeDefined();
 	});
 
@@ -236,8 +236,8 @@ describe("income review", () => {
 			ui(Array.from({ length: 6 }, (_, index) => finding(`deposit-${index}`))),
 		);
 		await runInteractions([
-			{ click: ["button", "Show more income"] },
-			{ expectAbsent: ["button", "Show more income"] },
+			{ click: ["button", "Show more payment patterns"] },
+			{ expectAbsent: ["button", "Show more payment patterns"] },
 		]);
 		expect(screen.getAllByRole("row")).toHaveLength(7);
 	});
@@ -246,7 +246,7 @@ describe("income review", () => {
 		const first = finding();
 		const second = {
 			...finding("second"),
-			income: first.income,
+			pattern: first.pattern,
 			evidence: first.evidence,
 		};
 		render(ui([first, second]));

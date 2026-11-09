@@ -1,5 +1,15 @@
 # Migration SOP for every deployment
 
+## Shared payment patterns
+
+Existing income targets require the explicit
+[offline payment-pattern upgrade](../backend/scripts/one-time/payment-patterns/README.md)
+and a fresh learner database before running the new target. This preserves
+owner answers and immutable audit payloads without adding legacy formats to
+runtime. Compose, dev and Northflank are unverified. Keep the operator script
+until every supported target verifies it. Do not auto-release this change to an
+existing target before its operator window is complete.
+
 ## Account display relationships
 
 Before this release serves an existing application database, run the explicit

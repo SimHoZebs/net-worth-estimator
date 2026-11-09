@@ -22,14 +22,16 @@ func (f evaluator) Evaluate(ctx context.Context, requests []types.AnalysisJudgme
 
 func TestAssessmentValidatesExactRequestsAndDeferredStates(t *testing.T) {
 	requests := []types.AnalysisJudgmentInput{{ID: "a"}, {ID: "b"}}
-	ready := types.AnalysisJudgment{RequestID: "a", Status: "ready", Strength: "strong"}
+	ready := types.AnalysisJudgment{RequestID: "a", Status: "ready", Decision: "supported", Strength: "strong"}
 	for _, tc := range []struct {
 		name        string
 		decisions   []types.AnalysisJudgment
 		want        error
 		firstStatus string
 	}{
-		{"ready", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Strength: "moderate"}}, nil, "ready"},
+		{"ready", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Decision: "uncertain", Strength: "moderate"}}, nil, "ready"},
+		{"negative", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Decision: "unsupported", Strength: "strong"}}, nil, "ready"},
+		{"invalid decision", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Decision: "maybe", Strength: "strong"}}, judgment.ErrUnavailable, "unavailable"},
 		{"mixed pending", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "pending"}}, judgment.ErrPending, "ready"},
 		{"unavailable", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "unavailable"}}, judgment.ErrUnavailable, "ready"},
 		{"missing response", []types.AnalysisJudgment{ready}, judgment.ErrUnavailable, "unavailable"},

@@ -32,7 +32,7 @@ func MatchesVersion(definition Definition, version string) bool {
 // Definitions is the composition point for built-in analyses. Definitions share
 // a lifecycle, not a classification switch or financial-model mutation path.
 func Definitions() []Definition {
-	return []Definition{BNPL{}, Recurring{}, Transfer{}, defaultIncome()}
+	return []Definition{BNPL{}, Recurring{}, Transfer{}, defaultPaymentPatterns()}
 }
 
 type Database interface {

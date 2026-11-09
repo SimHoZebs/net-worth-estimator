@@ -30,7 +30,7 @@ func TestIncomeTransferMatchingChecksCancellationInsideBuckets(t *testing.T) {
 	}
 	items = append(items, types.AnalysisTransaction{TransactionID: "out", AccountID: "out", Facts: types.TransactionFacts{Amount: "-100", Currency: "USD", OccurredAt: 1767398400}})
 	ctx := &checkpointContext{Context: context.Background(), cancelAt: 110}
-	if _, err := incomeTransferIDs(ctx, items); err != context.Canceled {
+	if _, err := paymentTransferIDs(ctx, items); err != context.Canceled {
 		t.Fatalf("cancellation=%v checks=%d", err, ctx.checks)
 	}
 }

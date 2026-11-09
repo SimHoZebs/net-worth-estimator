@@ -35,7 +35,7 @@ func incomeDay(year int, month time.Month, day int) int64 {
 
 func analyzeIncome(t *testing.T, items []types.AnalysisTransaction) []types.AnalysisDetection {
 	t.Helper()
-	result, err := (analysis.Income{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "u1", Transactions: items})
+	result, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "u1", Transactions: items})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,8 +66,8 @@ func TestIncomeDetectsMainPayrollAndAnnualizes(t *testing.T) {
 		if !strings.Contains(item.Evidence[0].Reason, "52000") {
 			t.Fatalf("annualized missing in %q", item.Evidence[0].Reason)
 		}
-		if item.Income == nil || item.Income.TypicalAmount != "2000.00" || item.Income.AnnualizedEstimate != "52000.00" || item.Income.Currency != "USD" || item.Income.PatternID != item.JudgmentInput.PatternID {
-			t.Fatalf("missing source amount summary: %+v", item.Income)
+		if item.Pattern == nil || item.Pattern.TypicalAmount != "2000.00" || item.Pattern.AnnualizedEstimate != "52000.00" || item.Pattern.Currency != "USD" || item.Pattern.PatternID != item.JudgmentInput.PatternID {
+			t.Fatalf("missing source amount summary: %+v", item.Pattern)
 		}
 		if !strings.Contains(item.Evidence[0].Reason, "main consistent inflow") {
 			t.Fatalf("main phrase missing in %q", item.Evidence[0].Reason)
@@ -115,8 +115,8 @@ func TestIncomeSummaryPreservesUnscaledAmounts(t *testing.T) {
 		t.Fatalf("findings=%d", len(findings))
 	}
 	for _, finding := range findings {
-		if finding.Income.TypicalAmount != "25000.00" || finding.Income.AnnualizedEstimate != "650000.00" {
-			t.Fatalf("source amounts=%+v", finding.Income)
+		if finding.Pattern.TypicalAmount != "25000.00" || finding.Pattern.AnnualizedEstimate != "650000.00" {
+			t.Fatalf("source amounts=%+v", finding.Pattern)
 		}
 		if finding.JudgmentInput.Pattern.TypicalAmount != "25000.00" || finding.JudgmentInput.Pattern.AnnualizedEstimate != "650000.00" {
 			t.Fatal("judgment evidence changed the source amounts")
@@ -168,11 +168,11 @@ func TestIncomeJudgmentDeterminesStrengthWithoutLearning(t *testing.T) {
 		incomeTx("b", "ACME PAYROLL", "2000.00", incomeDay(2026, 1, 16)),
 		incomeTx("c", "ACME PAYROLL", "2000.00", incomeDay(2026, 1, 30)),
 	}
-	detector := analysis.Income{Judge: incomeEvaluator(func(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+	detector := analysis.PaymentPatterns{Judge: incomeEvaluator(func(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
 		if len(requests) != 1 || len(requests[0].Samples) != 3 {
 			t.Fatalf("evidence=%+v", requests)
 		}
-		return []types.AnalysisJudgment{{RequestID: requests[0].ID, Status: "ready", Strength: "moderate", Reason: "Income is not established."}}, nil
+		return []types.AnalysisJudgment{{RequestID: requests[0].ID, Status: "ready", Decision: "uncertain", Strength: "moderate", Reason: "Income is not established."}}, nil
 	})}
 	result, err := detector.Analyze(context.Background(), types.AnalysisSnapshot{UserID: "u1", Transactions: items})
 	if err != nil {
@@ -196,7 +196,7 @@ func TestIncomeFallsBackWhenJudgmentUnavailable(t *testing.T) {
 		incomeTx("b", "ACME PAYROLL", "2000.00", incomeDay(2026, 1, 16)),
 		incomeTx("c", "ACME PAYROLL", "2000.00", incomeDay(2026, 1, 30)),
 	}
-	detector := analysis.Income{Judge: incomeEvaluator(func(context.Context, []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+	detector := analysis.PaymentPatterns{Judge: incomeEvaluator(func(context.Context, []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
 		return nil, judgment.ErrUnavailable
 	})}
 	result, err := detector.Analyze(context.Background(), types.AnalysisSnapshot{UserID: "u1", Transactions: items})
@@ -224,7 +224,7 @@ func TestIncomePatternIdentityIncludesOwnerAccountAndCurrency(t *testing.T) {
 	if first[0].JudgmentInput.PatternID == first[3].JudgmentInput.PatternID {
 		t.Fatal("account patterns collided")
 	}
-	other, err := (analysis.Income{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "other", Transactions: items})
+	other, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "other", Transactions: items})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestIncomePatternIdentityIncludesOwnerAccountAndCurrency(t *testing.T) {
 func TestIncomeCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := (analysis.Income{}).Analyze(ctx, types.AnalysisSnapshot{Transactions: []types.AnalysisTransaction{incomeTx("a", "ACME PAYROLL", "2000.00", incomeDay(2026, 1, 2))}}); err != context.Canceled {
+	if _, err := (analysis.PaymentPatterns{}).Analyze(ctx, types.AnalysisSnapshot{Transactions: []types.AnalysisTransaction{incomeTx("a", "ACME PAYROLL", "2000.00", incomeDay(2026, 1, 2))}}); err != context.Canceled {
 		t.Fatalf("cancellation=%v", err)
 	}
 }

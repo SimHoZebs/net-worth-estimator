@@ -19,19 +19,19 @@ func TestIncomeSeparatesPayrollFromOtherPaymentsBySameMerchant(t *testing.T) {
 		incomeTx("other-c", "Amazon Developme PAYMENTS TLRXXXXXXXX2172 CCD ID: XXXXXX9299", "32.00", incomeDay(2026, 11, 2)),
 	}
 	calls := 0
-	detector := analysis.Income{Judge: incomeEvaluator(func(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+	detector := analysis.PaymentPatterns{Judge: incomeEvaluator(func(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
 		calls++
-		if len(requests) != 1 || requests[0].Pattern.OccurrenceCount != 3 || !requests[0].Pattern.PayrollDescriptor || requests[0].Pattern.TypicalAmount != "7450.00" {
+		if len(requests) != 1 || requests[0].Pattern.OccurrenceCount != 3 || len(requests[0].Pattern.Signals) == 0 || requests[0].Pattern.Signals[0] != "payroll-descriptor" || requests[0].Pattern.TypicalAmount != "7450.00" {
 			t.Fatalf("payroll did not reach the provider independently: %+v", requests)
 		}
-		return []types.AnalysisJudgment{{RequestID: requests[0].ID, Status: "ready", Strength: "strong"}}, nil
+		return []types.AnalysisJudgment{{RequestID: requests[0].ID, Status: "ready", Decision: "supported", Strength: "strong"}}, nil
 	})}
 	findings, err := detector.Analyze(context.Background(), types.AnalysisSnapshot{UserID: "owner", Transactions: items})
 	if err != nil || len(findings) != 3 || calls != 1 {
 		t.Fatalf("findings=%+v calls=%d err=%v", findings, calls, err)
 	}
 	for _, finding := range findings {
-		if finding.TransactionID[:6] != "salary" || finding.Product != "monthly" || finding.Income.AnnualizedEstimate != "89400.00" {
+		if finding.TransactionID[:6] != "salary" || finding.Product != "monthly" || finding.Pattern.AnnualizedEstimate != "89400.00" {
 			t.Fatalf("unrelated payments contaminated payroll: %+v", finding)
 		}
 	}
@@ -70,7 +70,7 @@ func TestIncomeStreamIdentityUsesMoreThanFirstMerchantWord(t *testing.T) {
 			if len(findings) != 6 {
 				t.Fatalf("want two complete streams, got %+v", findings)
 			}
-			if findings[0].Income.PatternID == findings[3].Income.PatternID {
+			if findings[0].Pattern.PatternID == findings[3].Pattern.PatternID {
 				t.Fatal("distinct streams share pattern identity")
 			}
 		})
@@ -89,7 +89,7 @@ func TestIncomeStreamReferenceChangesDoNotSplitOrReidentifyPatterns(t *testing.T
 	}
 	items[2].Facts.Description = "acme benefit payment REF: ZZZZZZ"
 	after := analyzeIncome(t, items)
-	if len(after) != 3 || before[0].Income.PatternID != after[0].Income.PatternID {
+	if len(after) != 3 || before[0].Pattern.PatternID != after[0].Pattern.PatternID {
 		t.Fatal("reference change reidentified a stream")
 	}
 	if before[0].JudgmentInput.ID == after[0].JudgmentInput.ID {
@@ -114,7 +114,7 @@ func TestIncomeStreamLeadingReferencesDoNotBecomeMerchantIdentity(t *testing.T) 
 	}
 	items[0].Facts.Description = "TLRXXXXXXXX2172 ACME PAYROLL"
 	after := analyzeIncome(t, items)
-	if len(after) != 3 || before[0].Income.PatternID != after[0].Income.PatternID {
+	if len(after) != 3 || before[0].Pattern.PatternID != after[0].Pattern.PatternID {
 		t.Fatal("leading reference changed pattern identity")
 	}
 }

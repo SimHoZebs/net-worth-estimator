@@ -31,11 +31,11 @@ func TestIncomeModelRevisionIsReviewableThroughPassiveAPIReads(t *testing.T) {
 	if _, err := scoped.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})); err != nil {
 		t.Fatal(err)
 	}
-	run, input, claimed, err := scoped.ClaimAnalysis("income", analysis.IncomeVersion+"/shared-generation:2")
+	run, input, claimed, err := scoped.ClaimAnalysis("payments", (analysis.PaymentPatterns{}).Version()+"/shared-generation:2")
 	if err != nil || !claimed {
 		t.Fatalf("claim=%v err=%v", claimed, err)
 	}
-	findings, err := (analysis.Income{}).Analyze(context.Background(), input)
+	findings, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), input)
 	if err != nil {
 		t.Fatal(err)
 	}

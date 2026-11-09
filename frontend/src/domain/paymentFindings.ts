@@ -1,19 +1,23 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 
-export interface IncomePattern {
+export interface PaymentPattern {
 	key: string;
 	findings: AnalysisFinding[];
 	anchor: AnalysisFinding;
 }
 
 /** Keep current and withdrawn evidence separate. A rescore does not change keys. */
-export function groupIncomePatterns(
+export function groupPaymentPatterns(
 	findings: AnalysisFinding[],
-): IncomePattern[] {
+): PaymentPattern[] {
 	const groups = new Map<string, AnalysisFinding[]>();
 	for (const finding of findings) {
-		if (finding.kind !== "income" || !finding.income) continue;
-		const key = JSON.stringify([finding.income.patternId, finding.status]);
+		if (!finding.pattern) continue;
+		const key = JSON.stringify([
+			finding.kind,
+			finding.pattern.patternId,
+			finding.status,
+		]);
 		const group = groups.get(key);
 		if (group) group.push(finding);
 		else groups.set(key, [finding]);
@@ -38,7 +42,7 @@ export function groupIncomePatterns(
 		);
 }
 
-export function incomeAmount(amount: string, currency: string): string {
+export function paymentAmount(amount: string, currency: string): string {
 	const numeric = new Intl.NumberFormat("en-US", {
 		maximumFractionDigits: 2,
 	}).format(Number(amount));
@@ -51,17 +55,22 @@ export function isMainIncome(finding: AnalysisFinding) {
 	);
 }
 
-export function incomeLabel(finding: AnalysisFinding) {
-	if (finding.review?.decision === "rejected") return "Not income";
-	if (finding.review?.decision === "confirmed") return "Confirmed income";
+export function paymentLabel(finding: AnalysisFinding) {
+	const label = finding.kind;
+	if (finding.review?.decision === "rejected") return `Not ${label}`;
+	if (finding.review?.decision === "confirmed") return `Confirmed ${label}`;
 	if (finding.judgment?.status === "pending") return "Review pending";
+	if (finding.judgment?.decision === "unsupported") return `Not ${label}`;
+	if (finding.judgment?.decision === "uncertain") return `Possible ${label}`;
 	if (isMainIncome(finding)) return "Main income";
-	return finding.strength === "strong" ? "Likely income" : "Possible income";
+	return finding.strength === "strong"
+		? `Likely ${label}`
+		: `Possible ${label}`;
 }
 
-export function incomeStatus(finding: AnalysisFinding) {
+export function paymentStatus(finding: AnalysisFinding) {
 	if (finding.status === "withdrawn") return "Withdrawn";
-	if (finding.review?.decision === "rejected") return "Not income";
+	if (finding.review?.decision === "rejected") return `Not ${finding.kind}`;
 	if (finding.dismissed) return "Dismissed";
 	if (finding.review?.decision === "confirmed") return "Confirmed";
 	if (finding.stale) return "Awaiting analysis";

@@ -10,7 +10,7 @@ import (
 
 // Match the Transfer detector's USD opposite-leg rule. Index by amount and
 // day so unrelated transactions never enter the matching loop.
-func incomeTransferIDs(ctx context.Context, transactions []types.AnalysisTransaction) (map[string]bool, error) {
+func paymentTransferIDs(ctx context.Context, transactions []types.AnalysisTransaction) (map[string]bool, error) {
 	type leg struct {
 		id, account string
 		cents, day  int64
@@ -29,7 +29,7 @@ func incomeTransferIDs(ctx context.Context, transactions []types.AnalysisTransac
 		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 || math.Abs(amount) > 1e10 {
 			continue
 		}
-		stamp := incomeStamp(tx.Facts)
+		stamp := paymentStamp(tx.Facts)
 		if stamp <= 0 {
 			continue
 		}

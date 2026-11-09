@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
-	groupIncomePatterns,
-	incomeAmount,
-	incomeLabel,
-	incomeStatus,
-} from "@/domain/incomeFindings.ts";
+	groupPaymentPatterns,
+	paymentAmount,
+	paymentLabel,
+	paymentStatus,
+} from "@/domain/paymentFindings.ts";
 import { cadenceLabel } from "@/domain/recurringPatterns.ts";
 import {
 	useDismissAnalysisFinding,
@@ -33,7 +33,7 @@ function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	};
 }
 
-export function IncomeFindings({
+export function PaymentFindings({
 	findings,
 	names,
 	readOnly,
@@ -45,15 +45,15 @@ export function IncomeFindings({
 	const review = useReviewAnalysisFinding();
 	const dismiss = useDismissAnalysisFinding();
 	const [rows, setRows] = useState(5);
-	const patterns = groupIncomePatterns(findings);
+	const patterns = groupPaymentPatterns(findings);
 	if (!patterns.length) return null;
 	const busy = review.isPending || dismiss.isPending;
 	return (
-		<section className="space-y-3" aria-label="Income">
+		<section className="space-y-3" aria-label="Payment patterns">
 			<header className="space-y-1">
-				<h2 className="m-0 text-lg font-semibold">Income</h2>
+				<h2 className="m-0 text-lg font-semibold">Payment patterns</h2>
 				<p className="m-0 text-sm text-muted">
-					Confirm or correct suggested income.
+					Confirm or correct suggested payment purposes.
 				</p>
 			</header>
 			<ErrorNotice
@@ -64,23 +64,23 @@ export function IncomeFindings({
 				}
 			/>
 			<DataTable
-				caption="Detected income patterns"
+				caption="Detected payment patterns"
 				showHeaders
 				columns={[
-					{ label: "Income" },
+					{ label: "Payment" },
 					{ label: "Annual estimate" },
 					{ label: "Review" },
 				]}
 			>
 				{patterns.slice(0, rows).map((pattern) => {
 					const finding = pattern.anchor;
-					const summary = finding.income!;
+					const summary = finding.pattern!;
 					const title = names.get(finding.transactionId) ?? finding.provider;
 					const inactive = finding.stale || finding.status === "withdrawn";
 					const status =
 						inactive || finding.dismissed
-							? incomeStatus(finding)
-							: incomeLabel(finding);
+							? paymentStatus(finding)
+							: paymentLabel(finding);
 					const depositCount = new Set(
 						finding.evidence?.flatMap((item) => item.transactionIds ?? []),
 					).size;
@@ -95,9 +95,15 @@ export function IncomeFindings({
 									<Badge tone="neutral">{status}</Badge>
 								</div>
 								<p className="mb-0 mt-1 text-xs text-muted">
-									{incomeAmount(summary.typicalAmount, summary.currency)} ·{" "}
+									{paymentAmount(summary.typicalAmount, summary.currency)} ·{" "}
 									{cadenceLabel(finding.product)} · {depositCount}{" "}
-									{depositCount === 1 ? "deposit" : "deposits"}
+									{finding.role === "inflow"
+										? depositCount === 1
+											? "deposit"
+											: "deposits"
+										: depositCount === 1
+											? "payment"
+											: "payments"}
 								</p>
 								<details className="mt-2 text-xs font-normal text-muted">
 									<summary className="cursor-pointer">
@@ -115,12 +121,12 @@ export function IncomeFindings({
 									)}
 									<ul
 										className="my-2 space-y-1 pl-4"
-										aria-label="Recorded deposits"
+										aria-label="Recorded payments"
 									>
 										{pattern.findings.map((item) => (
 											<li key={item.id}>
 												{names.get(item.transactionId) ?? item.provider} ·{" "}
-												{incomeStatus(item)}
+												{paymentStatus(item)}
 											</li>
 										))}
 									</ul>
@@ -130,7 +136,7 @@ export function IncomeFindings({
 											size="sm"
 											variant="secondary"
 											disabled={busy}
-											aria-label={`${finding.dismissed ? "Restore" : "Dismiss"} income flag for ${title}`}
+											aria-label={`${finding.dismissed ? "Restore" : "Dismiss"} ${finding.kind} flag for ${title}`}
 											onClick={() =>
 												dismiss.mutate({
 													id: finding.id,
@@ -144,7 +150,7 @@ export function IncomeFindings({
 								</details>
 							</TableHeader>
 							<TableCell className="align-top">
-								{incomeAmount(summary.annualizedEstimate, summary.currency)}
+								{paymentAmount(summary.annualizedEstimate, summary.currency)}
 							</TableCell>
 							<TableCell className="whitespace-normal align-top">
 								{!readOnly && (
@@ -158,7 +164,7 @@ export function IncomeFindings({
 												finding.review?.decision === "confirmed"
 											}
 											aria-pressed={finding.review?.decision === "confirmed"}
-											aria-label={`Confirm income for ${title}`}
+											aria-label={`Confirm ${finding.kind} for ${title}`}
 											onClick={() =>
 												review.mutate(answerInput(finding, "confirm"))
 											}
@@ -175,12 +181,12 @@ export function IncomeFindings({
 												finding.review?.decision === "rejected"
 											}
 											aria-pressed={finding.review?.decision === "rejected"}
-											aria-label={`Not income for ${title}`}
+											aria-label={`Not ${finding.kind} for ${title}`}
 											onClick={() =>
 												review.mutate(answerInput(finding, "reject"))
 											}
 										>
-											Not income
+											Not {finding.kind}
 										</Button>
 									</div>
 								)}
@@ -196,7 +202,7 @@ export function IncomeFindings({
 					size="sm"
 					onClick={() => setRows((value) => value + 10)}
 				>
-					Show more income
+					Show more payment patterns
 				</Button>
 			)}
 		</section>

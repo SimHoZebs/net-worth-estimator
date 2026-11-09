@@ -144,7 +144,7 @@ human queue. The feature never selects an algorithm or interprets a probability.
 - Each occurrence carries its own finding. Its evidence lists every
   occurrence in the pattern plus the estimated cadence, typical source
   amount, and annualized estimate, so the basis is inspectable from one row.
-  The Income list groups occurrences into one compact row per pattern, with
+  The Payment patterns list groups occurrences into one compact row per classification and pattern, with
   source-currency amounts supplied as structured fields rather than parsed
   from explanations or reconstructed from training features. Details retains
   the explanation, per-occurrence review states, and visibility action.
@@ -165,8 +165,10 @@ human queue. The feature never selects an algorithm or interprets a probability.
 
 ## Replaceable judgment providers
 
+Income and rent now share the [payment-stream classification pipeline](payment-patterns.md).
+
 `judgment.Provider.Open` owns implementation-specific preparation and returns
-a session with an opaque revision and an evaluator. `Income` sees only domain
+a session with an opaque revision and an evaluator. `PaymentPatterns` sees only domain
 evidence and `ready`, `pending`, or `unavailable` judgments. Learning is optional:
 response-only and human-queue adapters do not implement a training API.
 
@@ -176,7 +178,8 @@ response-only and human-queue adapters do not implement a training API.
 - Pattern identity includes owner, source, account, currency, merchant, and
   cadence. Request identity hashes the exact domain evidence separately, so a
   late answer for different evidence cannot be attached to a current request.
-- A ready judgment provides domain strength (`strong` or `moderate`) and an
+- A ready judgment provides an explicit decision (`supported`, `unsupported`,
+  or `uncertain`), domain strength (`strong` or `moderate`) and an
   optional explanation. The common boundary rejects malformed, duplicate,
   missing, or mismatched responses before applying any judgment in a batch.
 - A pending judgment publishes deterministic findings with `judgment-pending`.

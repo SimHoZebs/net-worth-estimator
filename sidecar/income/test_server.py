@@ -6,7 +6,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from model import IncomeModelStore
+from model import PaymentModelStore
 from server import Handler
 from test_model import request, feedback
 
@@ -14,7 +14,7 @@ from test_model import request, feedback
 class TestServer(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.store = IncomeModelStore(self.tmp.name + "/income.sqlite3")
+        self.store = PaymentModelStore(self.tmp.name + "/income.sqlite3")
 
     def tearDown(self):
         self.store.close()

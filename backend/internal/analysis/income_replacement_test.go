@@ -58,7 +58,7 @@ func TestIncomeWorksWithResponseOnlyProviderThatIgnoresFeedback(t *testing.T) {
 	}
 	defer db.Close()
 	scoped := seedIncomeUser(t, db, "owner")
-	runner, err := analysis.NewRunner(db, analysis.NewIncome(responseOnlyProvider{}))
+	runner, err := analysis.NewRunner(db, analysis.NewPaymentPatterns(responseOnlyProvider{}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestIncomeHumanQueuePendingThenReadyWithoutBankChanges(t *testing.T) {
 	defer db.Close()
 	scoped := seedIncomeUser(t, db, "owner")
 	queue := &queuedProvider{revision: "queue:0", requests: map[string]types.AnalysisJudgmentInput{}, answers: map[string]types.AnalysisJudgment{}}
-	runner, err := analysis.NewRunner(db, analysis.NewIncome(queue))
+	runner, err := analysis.NewRunner(db, analysis.NewPaymentPatterns(queue))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestIncomeHumanQueuePendingThenReadyWithoutBankChanges(t *testing.T) {
 	if err != nil || len(runs) != 1 || runs[0].State != "succeeded" || runs[0].Problem != types.JudgmentPending {
 		t.Fatalf("runs=%+v err=%v", runs, err)
 	}
-	queue.answers[before.JudgmentInput.ID] = types.AnalysisJudgment{RequestID: before.JudgmentInput.ID, Status: "ready", Strength: "moderate", Reason: "Reviewer could not establish income."}
+	queue.answers[before.JudgmentInput.ID] = types.AnalysisJudgment{RequestID: before.JudgmentInput.ID, Status: "ready", Decision: "uncertain", Strength: "moderate", Reason: "Reviewer could not establish income."}
 	queue.revision = "queue:1"
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)

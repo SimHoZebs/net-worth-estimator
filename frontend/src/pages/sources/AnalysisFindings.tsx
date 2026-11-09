@@ -14,7 +14,7 @@ import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { useAllAnalysisFindings } from "@/state/allAnalysisFindings.ts";
 import { Badge } from "@/components/Badge.tsx";
 import { Button } from "@/components/Button.tsx";
-import { IncomeFindings } from "@/components/analysis/IncomeFindings.tsx";
+import { PaymentFindings } from "@/components/analysis/PaymentFindings.tsx";
 import { RecurringPatterns } from "@/components/analysis/RecurringPatterns.tsx";
 import {
 	DataTable,
@@ -41,9 +41,7 @@ export function AnalysisFindings() {
 	const recurring = allFindings.filter(
 		(finding) => finding.kind === "recurring",
 	);
-	const income = (complete.data ?? []).filter(
-		(finding) => finding.kind === "income",
-	);
+	const payments = (complete.data ?? []).filter((finding) => !!finding.pattern);
 	const names = new Map(
 		transactions.map((transaction) => [transaction.id, transaction.name]),
 	);
@@ -157,11 +155,15 @@ export function AnalysisFindings() {
 				)}
 			</section>
 			{complete.isError ? (
-				<ErrorNotice message="Income findings could not be loaded completely. Try again." />
+				<ErrorNotice message="Payment findings could not be loaded completely. Try again." />
 			) : complete.isPending ? (
-				<p className="text-sm text-muted">Loading income findings…</p>
+				<p className="text-sm text-muted">Loading payment findings…</p>
 			) : (
-				<IncomeFindings findings={income} names={names} readOnly={readOnly} />
+				<PaymentFindings
+					findings={payments}
+					names={names}
+					readOnly={readOnly}
+				/>
 			)}
 			<RecurringPatterns
 				findings={recurring}
