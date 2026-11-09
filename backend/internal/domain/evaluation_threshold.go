@@ -46,9 +46,9 @@ type reachedDateResult interface {
 // for evaluations whose outcome is "the first date a measure crossed a
 // target". This is the entire plugin contract for this family — type, name,
 // config validation, path evaluation, and the deterministic satisfied
-// predicate. Accumulation, finalization, stochastic status, and the no-resim
-// Kind come from the shared wiring. Simulator evaluations (FI, purchases simulations)
-// keep the full EvaluationDefinition struct instead.
+// predicate. Accumulation, finalization, and stochastic status come from
+// the shared wiring. Simulator evaluations (purchases) use
+// NewReachedDateSimulator for the same shape with simulation permission.
 
 func (r *NetWorthThresholdPathResult) firstReached() *string { return r.FirstReachedDate }
 
@@ -58,32 +58,31 @@ func NewReachedDateReader(
 	parse func(config any) (any, error),
 	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
 	satisfied func(deterministic PathResult) bool,
-) *EvaluationDefinition {
-	return newReachedDateDefinition(evalType, name, false, validate, parse, evaluate, satisfied)
+) *ReaderDefinition {
+	return &ReaderDefinition{Evaluator: newReachedDateEvaluator(evalType, name, validate, parse, evaluate, satisfied)}
 }
 
 // NewReachedDateSimulator is the simulator variant of NewReachedDateReader for
 // evaluations that share the reached-date shape but run simulations against
-// shared base path state (purchases). Same wiring, explicit simulator opt-in.
+// shared base path state (purchases). Same wiring, simulator subtype.
 func NewReachedDateSimulator(
 	evalType, name string,
 	validate func(config any) error,
 	parse func(config any) (any, error),
 	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
 	satisfied func(deterministic PathResult) bool,
-) *EvaluationDefinition {
-	return newReachedDateDefinition(evalType, name, true, validate, parse, evaluate, satisfied)
+) *SimulatorDefinition {
+	return &SimulatorDefinition{Evaluator: newReachedDateEvaluator(evalType, name, validate, parse, evaluate, satisfied)}
 }
 
-func newReachedDateDefinition(
+func newReachedDateEvaluator(
 	evalType, name string,
-	simulates bool,
 	validate func(config any) error,
 	parse func(config any) (any, error),
 	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
 	satisfied func(deterministic PathResult) bool,
-) *EvaluationDefinition {
-	return &EvaluationDefinition{
+) Evaluator {
+	return Evaluator{
 		Type: evalType,
 		Name: name,
 
@@ -91,7 +90,6 @@ func newReachedDateDefinition(
 		ParseConfig:    parse,
 		EvaluatePath:   evaluate,
 		Dependents:     func(ctx *EvaluationContext, config any) *EvaluationDependents { return DependsOnEverything() },
-		simulates:      simulates,
 
 		CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
 			return &thresholdAccumulator{reachedDates: []string{}}, nil

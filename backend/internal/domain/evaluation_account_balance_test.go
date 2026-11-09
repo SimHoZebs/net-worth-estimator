@@ -129,7 +129,7 @@ func TestAccountBalanceDefinitionIsRegistered(t *testing.T) {
 	if !ok {
 		t.Fatalf("account balance evaluator is not registered")
 	}
-	if definition.Name == "" {
+	if definition.Base().Name == "" {
 		t.Fatalf("account balance evaluator needs a name")
 	}
 }

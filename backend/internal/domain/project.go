@@ -63,30 +63,21 @@ func EvaluateProjectionPathOptional(path *types.ProjectionPath, model *types.Fin
 		effectiveModel = &empty
 	}
 	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
-	readers, simulators := set.PartitionByKind()
 	timeline := types.TimelineFromPath(path)
-	readers.EvaluateDeterministic(&EvaluationContext{
-		Path:        path,
-		Timeline:    timeline,
-		Model:       effectiveModel,
-		DetailLevel: "detailed",
-	})
-	readerCollection := readers.Result()
-	simulators.EvaluateDeterministic(&EvaluationContext{
+	set.EvaluateDeterministic(&EvaluationContext{
 		Path:             path,
 		Timeline:         timeline,
 		Model:            effectiveModel,
 		MonteCarloSample: monteCarloSample,
 		DetailLevel:      "detailed",
 	})
-	simulatorCollection := simulators.Result()
-	collection := MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
+	collection := set.Result()
 	return collection.Evaluations
 }
 
-// EvaluateProjectionPath runs reader and simulator evaluations against a
-// built path. The projection entry points share it so stored and computed
-// results attach identical evaluation tables.
+// EvaluateProjectionPath runs every evaluator against a built path. The
+// projection entry points share it so stored and computed results attach
+// identical evaluation tables.
 func EvaluateProjectionPath(path *types.ProjectionPath, settings *types.ProjectionRuntimeSettings, monteCarloSample *types.MonteCarloSample) types.EvaluationResultTables {
 	if path == nil {
 		return EvaluateProjectionPathOptional(nil, nil, settings, monteCarloSample)

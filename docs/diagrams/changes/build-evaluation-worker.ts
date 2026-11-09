@@ -27,12 +27,11 @@ const html = `<!DOCTYPE html>
       :root { color-scheme: dark; --pele-bg:#141412; --pele-fg:#ece9df; --pele-muted:#a3a099; --pele-line:#ece9df; --pele-surface:#1e1e1b; --pele-surface-alt:#262622; --pele-border:#3a3a34; --pele-accent:#6aa2e8; --pele-font:system-ui,sans-serif; }
       *{box-sizing:border-box}
       body{margin:0;background:#141412;color:#ece9df;font-family:system-ui,sans-serif;line-height:1.5}
-      header{position:sticky;top:0;background:#1e1e1b;border-bottom:1px solid #3a3a34;padding:12px 24px}
+      header{position:static;background:#1e1e1b;border-bottom:1px solid #3a3a34;padding:12px 24px}
       header h1{font-size:18px;margin:0 0 4px}
       header p{margin:0;color:#a3a099;font-size:14px;max-width:100ch}
       main{max-width:1200px;margin:0 auto;padding:24px}
-      .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
-      @media(max-width:900px){.pair{grid-template-columns:1fr}}
+      .pair{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:24px}
       .pane h4{margin:0 0 8px;font-size:14px;color:#a3a099;font-weight:600}
       .diagram{background:#1e1e1b;border:1px solid #3a3a34;border-radius:8px;padding:16px;overflow-x:auto}
       .diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}
@@ -51,7 +50,7 @@ const html = `<!DOCTYPE html>
     </style>
   </head>
   <body>
-    <header><h1>Evaluation reader — optional projection path</h1><p>Generated with <code>@simhozebs/pele-cli</code> from <code>evaluation-worker-before.mmd</code> / <code>evaluation-worker-after.mmd</code>. How the data is made: <code>FinancialModel + EvaluationTables</code> → <code>PrepareSimulationRequest → Simulate → BuildProjectionPath</code> → <code>NewEvaluationRuntimeSet → PartitionByKind → EvaluatePath per Reader</code> → <code>MergeEvaluationResultCollections → EvaluationResultTables</code> (envelopes + diagnostics) → <code>shared result renderer</code> (<code>deterministic</code> + <code>stochastic SSE</code>) → <code>7 outputs</code> → <code>Frontend</code>. Inputs are identical on both sides. Before runs that chain synchronously per request and assumes <code>ProjectionPath</code> present. After keeps the chain synchronous — no worker — and adds only <code>NeedsProjectionPath</code>: nil paths report <code>projection-unavailable → indeterminate</code> instead of panicking. Status is derived from the existing projection manifest via passive <code>GET /v1/evaluations/status</code>.</p></header>
+    <header><h1>Evaluation reader — optional projection path</h1><p>Generated with <code>@simhozebs/pele-cli</code> from <code>evaluation-worker-before.mmd</code> / <code>evaluation-worker-after.mmd</code>. How the data is made: <code>FinancialModel + EvaluationTables</code> → <code>PrepareSimulationRequest → Simulate → BuildProjectionPath</code> → <code>NewEvaluationRuntimeSet → EvaluateDeterministic (one pass, input order) → EvaluationResultTables</code> (envelopes + diagnostics) → <code>shared result renderer</code> (<code>deterministic</code> + <code>stochastic SSE</code>) → <code>7 outputs</code> → <code>Frontend</code>. Inputs are identical on both sides. Before runs that chain synchronously per request and assumes <code>ProjectionPath</code> present. After keeps the chain synchronous — no worker — and adds only <code>NeedsProjectionPath</code>: nil paths report <code>projection-unavailable → indeterminate</code> instead of panicking. Status is derived from the existing projection manifest via passive <code>GET /v1/evaluations/status</code>.</p></header>
     <main>
       <div class="legend"><span class="kept">Kept</span><span class="modified">Modified</span><span class="added">Added</span></div>
       <div class="pair">
@@ -63,7 +62,7 @@ const html = `<!DOCTYPE html>
         <tr class="kept"><td>Inputs</td><td>FinancialModel + EvaluationTables (registry ParseConfig)</td><td>identical — same struct, same loader</td></tr>
         <tr class="kept"><td>ProjectionPath</td><td>PrepareSimulationRequest → Simulate → BuildProjectionPath (per request)</td><td>same pipeline; may return nil when unwritable or absent</td></tr>
         <tr class="modified"><td>Needs gate</td><td>ctx.Path assumed; nil panics plugin</td><td>NeedsProjectionPath; nil → projection-unavailable indeterminate</td></tr>
-        <tr class="kept"><td>Evaluation</td><td>PartitionByKind → EvaluatePath → Merge → EvaluationResultTables</td><td>same runtime, nil-safe via EvaluateProjectionPathOptional</td></tr>
+        <tr class="kept"><td>Evaluation</td><td>EvaluateDeterministic (one pass) → EvaluationResultTables</td><td>same runtime, nil-safe via EvaluateProjectionPathOptional</td></tr>
         <tr class="kept"><td>Renderer</td><td>shared result renderer → deterministic + stochastic SSE</td><td>unchanged renderer and 7 outputs</td></tr>
         <tr class="added"><td>Status</td><td>embedded in deterministic response</td><td>GET /v1/evaluations/status derived from projection manifest (passive, no-store)</td></tr>
       </table>

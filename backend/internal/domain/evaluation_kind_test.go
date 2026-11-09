@@ -10,33 +10,33 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Rerunning the base simulation must NOT be the default: reader is the
-// zero-value simulates flag, simulators opt in with simulates=true,
-// and the base path cache separates the base hash from the eval key.
+// Rerunning the base simulation must NOT be the default: the generic
+// Evaluator falls under ReaderDefinition unless registered as
+// SimulatorDefinition, the type itself decides simulation permission.
 
 func TestEvaluationKindDefaultsToReader(t *testing.T) {
-	var def *EvaluationDefinition
+	var def *ReaderDefinition
 	if def.IsSimulator() {
 		t.Fatal("nil definition must default to reader")
 	}
-	def = &EvaluationDefinition{}
+	def = &ReaderDefinition{Evaluator: Evaluator{}}
 	if def.IsSimulator() {
-		t.Fatal("zero-value definition must be a reader, not a simulator")
+		t.Fatal("zero-value reader must not be a simulator")
 	}
-	simulator := &EvaluationDefinition{simulates: true}
+	simulator := &SimulatorDefinition{Evaluator: Evaluator{}}
 	if !simulator.IsSimulator() {
-		t.Fatal("simulates flag must opt into simulation")
+		t.Fatal("simulator subtype must opt into simulation")
 	}
-	halfOptIn := &EvaluationDefinition{}
+	halfOptIn := &ReaderDefinition{Evaluator: Evaluator{}}
 	if halfOptIn.IsSimulator() {
-		t.Fatal("zero value must not opt into simulation")
+		t.Fatal("reader subtype must not opt into simulation")
 	}
 }
 
-func TestEvaluationRegistryRejectsSimulatorWithoutFlag(t *testing.T) {
-	// Simulator constructors are no longer a Kind enum; a plain field
-	// cannot create a simulator. Registering a definition without
-	// Dependents must still panic (new gate).
+func TestEvaluationRegistryRejectsMissingDependents(t *testing.T) {
+	// Any definition, whatever its subtype, must declare Dependents.
+	// Omitting it panics at registration so a missing gate never silently
+	// becomes "everything" or "nothing" by accident.
 	registry := NewEvaluationRegistry()
 	defer func() {
 		recovered := recover()
@@ -47,15 +47,15 @@ func TestEvaluationRegistryRejectsSimulatorWithoutFlag(t *testing.T) {
 			t.Fatalf("panic must name the missing Dependents, got %v", recovered)
 		}
 	}()
-	registry.Register(&EvaluationDefinition{
-		Type: "simulator-without-flag",
-		Name: "simulator without flag",
-	})
+	registry.Register(&ReaderDefinition{Evaluator: Evaluator{
+		Type: "missing-dependents",
+		Name: "missing dependents",
+	}})
 }
 
 func TestEvaluationRegistryValidatesKnownDefinitions(t *testing.T) {
 	if err := evaluationRegistryInstance.Validate(); err != nil {
-		t.Fatalf("known definitions must carry valid simulator opt-ins: %v", err)
+		t.Fatalf("known definitions must declare Dependents: %v", err)
 	}
 	for _, entry := range evaluationRegistryInstance.List() {
 		definition, _ := evaluationRegistryInstance.Get(entry.Type)
@@ -96,10 +96,10 @@ func TestReaderEvaluationCannotResimulate(t *testing.T) {
 	oldTries, oldPause := resimGuardTries, resimGuardPause
 	resimGuardTries, resimGuardPause = 3, time.Millisecond
 	defer func() { resimGuardTries, resimGuardPause = oldTries, oldPause }()
-	resimulating := &EvaluationDefinition{
+	resimulating := &ReaderDefinition{Evaluator: Evaluator{
 		Type: "test-resimulate",
 		Name: "test resimulate",
-		// Zero Kind: reader by default.
+		// Reader subtype: resimulation is refused by the guard.
 		ValidateConfig: func(any) error { return nil },
 		ParseConfig:    func(config any) (any, error) { return config, nil },
 		Dependents:     func(ctx *EvaluationContext, cfg any) *EvaluationDependents { return DependsOnEverything() },
@@ -113,7 +113,7 @@ func TestReaderEvaluationCannotResimulate(t *testing.T) {
 		Accumulate:        func(Accumulator, PathResult) error { return nil },
 		Finalize:          func(Accumulator, *EvaluationFinalizeContext) (types.JsonValue, error) { return nil, nil },
 		Status:            func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	registry := NewEvaluationRegistry()
 	registry.Register(resimulating)
 	// Drive the runtime directly: ParseConfig then guarded EvaluatePath.
@@ -154,7 +154,7 @@ func TestResimulationGuardToleratesBriefCrossRequestOverlap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		withReaderGuard(
-			&EvaluationDefinition{Type: "test-reader", Name: "test reader"},
+			&ReaderDefinition{Evaluator: Evaluator{Type: "test-reader", Name: "test reader"}},
 			"test-reader",
 			func() (PathResult, error) {
 				close(release)
@@ -245,7 +245,7 @@ func TestEvalOnlyChangeRecomputesBasePath(t *testing.T) {
 	}
 }
 
-func TestPartitionAndMergePreserveGlobalOrder(t *testing.T) {
+func TestUnifiedSetPreservesGlobalOrder(t *testing.T) {
 	path := kindTestPath(t)
 	tables := types.EmptyEvaluationTables()
 	tables.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
@@ -257,31 +257,37 @@ func TestPartitionAndMergePreserveGlobalOrder(t *testing.T) {
 	})
 
 	set := NewEvaluationRuntimeSet(&tables, evaluationRegistryInstance)
-	readers, simulators := set.PartitionByKind()
-	if len(readers.runtimes) != 2 || len(simulators.runtimes) != 1 {
-		t.Fatalf("partition must separate 2 readers from 1 simulator, got %d and %d",
-			len(readers.runtimes), len(simulators.runtimes))
+	// One set holds every evaluator; classification is by subtype at
+	// registration, not by a runtime split.
+	if len(set.runtimes) != 3 {
+		t.Fatalf("unified set must hold all 3 runtimes, got %d", len(set.runtimes))
 	}
-	if simulators.runtimes[0].instanceID != "purchases" {
-		t.Fatalf("simulator subset must hold the enabled purchase, got %q", simulators.runtimes[0].instanceID)
+	simulators := 0
+	for _, runtime := range set.runtimes {
+		if runtime.definition != nil && runtime.definition.IsSimulator() {
+			simulators++
+			if runtime.instanceID != "purchases" {
+				t.Fatalf("only the enabled purchase may be a simulator, got %q", runtime.instanceID)
+			}
+		}
+	}
+	if simulators != 1 {
+		t.Fatalf("unified set must classify exactly 1 simulator by subtype, got %d", simulators)
 	}
 
 	ctx := &EvaluationContext{Path: path, Model: &path.EffectiveModel, DetailLevel: "detailed"}
-	readers.EvaluateDeterministic(ctx)
-	simulators.EvaluateDeterministic(ctx)
-	readerCollection := readers.Result()
-	simulatorCollection := simulators.Result()
-	merged := MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
+	set.EvaluateDeterministic(ctx)
+	collection := set.Result()
 
-	if len(merged.Evaluations.NetWorthThreshold) != 1 {
-		t.Fatalf("merged result must carry the threshold eval, got %+v", merged.Evaluations.NetWorthThreshold)
+	if len(collection.Evaluations.NetWorthThreshold) != 1 {
+		t.Fatalf("result must carry the threshold eval, got %+v", collection.Evaluations.NetWorthThreshold)
 	}
-	purchases := merged.Evaluations.PlannedPurchases
+	purchases := collection.Evaluations.PlannedPurchases
 	if len(purchases) != 2 {
-		t.Fatalf("merged result must carry both purchase evals, got %+v", purchases)
+		t.Fatalf("result must carry both purchase evals, got %+v", purchases)
 	}
 	if purchases[0].InstanceID != "purchases" || purchases[1].InstanceID != "purchases-disabled" {
-		t.Fatalf("merge must preserve global table order, got %q then %q",
+		t.Fatalf("result must preserve global table order, got %q then %q",
 			purchases[0].InstanceID, purchases[1].InstanceID)
 	}
 	if purchases[1].Status != types.StatusIndeterminate {
@@ -303,7 +309,7 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 	var once sync.Once
 	unblock := func() { once.Do(func() { close(release) }) }
 	defer unblock()
-	blockingReader := &EvaluationDefinition{
+	blockingReader := &ReaderDefinition{Evaluator: Evaluator{
 		Type:           "test-blocking-reader",
 		Name:           "test blocking reader",
 		ValidateConfig: func(any) error { return nil },
@@ -316,7 +322,7 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus {
 			return types.StatusSatisfied
 		},
-	}
+	}}
 	readerSet := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: blockingReader.Type,
 		configuredRaw:  map[string]any{},
@@ -330,10 +336,9 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 		readerSet.EvaluateDeterministic(&EvaluationContext{Path: path, Model: &path.EffectiveModel})
 	}()
 	<-entered
-	simulator := &EvaluationDefinition{
+	simulator := &SimulatorDefinition{Evaluator: Evaluator{
 		Type:           "test-concurrent-simulator",
 		Name:           "test concurrent simulator",
-		simulates:      true,
 		ValidateConfig: func(any) error { return nil },
 		ParseConfig:    func(config any) (any, error) { return config, nil },
 		EvaluatePath: func(ctx *EvaluationContext, _ any) (PathResult, error) {
@@ -345,7 +350,7 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus {
 			return types.StatusSatisfied
 		},
-	}
+	}}
 	simulatorSet := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: simulator.Type,
 		configuredRaw:  map[string]any{},

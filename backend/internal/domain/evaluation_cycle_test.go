@@ -234,26 +234,26 @@ func TestCycleFulfillmentDefinitionIsRegistered(t *testing.T) {
 	if !ok {
 		t.Fatalf("cycle fulfillment evaluator is not registered")
 	}
-	if definition.Name == "" {
+	if definition.Base().Name == "" {
 		t.Fatalf("cycle fulfillment evaluator needs a name")
 	}
 }
 
 func TestCycleFulfillmentFinalizeReportsProbability(t *testing.T) {
 	definition, _ := EvaluationRegistryInstance.Get(types.EvaluationTypeCycleFulfillment)
-	acc, err := definition.CreateAccumulator(nil, nil)
+	acc, err := definition.Base().CreateAccumulator(nil, nil)
 	if err != nil {
 		t.Fatalf("accumulator: %v", err)
 	}
 	over := &CycleFulfillmentPathResult{WithinBudget: false, Spent: 900}
 	under := &CycleFulfillmentPathResult{WithinBudget: true, Spent: 100}
-	if err := definition.Accumulate(acc, over); err != nil {
+	if err := definition.Base().Accumulate(acc, over); err != nil {
 		t.Fatalf("accumulate: %v", err)
 	}
-	if err := definition.Accumulate(acc, under); err != nil {
+	if err := definition.Base().Accumulate(acc, under); err != nil {
 		t.Fatalf("accumulate: %v", err)
 	}
-	finalized, err := definition.Finalize(acc, nil)
+	finalized, err := definition.Base().Finalize(acc, nil)
 	if err != nil {
 		t.Fatalf("finalize: %v", err)
 	}
@@ -267,10 +267,10 @@ func TestCycleFulfillmentFinalizeReportsProbability(t *testing.T) {
 	if _, present := finalMap["spentPercentiles"]; !present {
 		t.Fatalf("probabilistic result missing spentPercentiles")
 	}
-	if status := definition.Status(under, nil); status != types.StatusSatisfied {
+	if status := definition.Base().Status(under, nil); status != types.StatusSatisfied {
 		t.Fatalf("deterministic status = %v", status)
 	}
-	if status := definition.Status(over, nil); status != types.StatusNotSatisfied {
+	if status := definition.Base().Status(over, nil); status != types.StatusNotSatisfied {
 		t.Fatalf("deterministic status = %v", status)
 	}
 }

@@ -1,0 +1,25 @@
+sequenceDiagram
+    actor Frontend
+    participant Builder
+    participant Engine
+    participant Runtime
+    participant Store
+    participant Status
+
+    Frontend->>Builder: POST /v1/projections/deterministic
+    Builder->>Store: LoadModel (single read-only tx)
+    Builder->>Engine: PrepareSimulationRequest
+    Engine->>Engine: Simulate (may fail → path nil)
+    Engine-->>Builder: *ProjectionPath or nil
+    Builder->>Runtime: EvaluateDeterministic
+    Runtime->>Runtime: NeedsProjectionPath guard (nil → projection-unavailable)
+    Runtime->>Runtime: Dependents check (nil=depends on nothing → skip if DirtyFrom)
+    Runtime->>Runtime: EvaluatePath per evaluator over EvaluationTimeline (projected or historical)
+    Runtime-->>Builder: EvaluationResultTables (envelopes + diagnostics)
+    Builder->>Store: Save*Outputs (built_revision)
+    Builder->>Store: PublishProjection (published_revision)
+    Builder-->>Frontend: deterministic result (SSE for stochastic)
+    Frontend->>Status: GET /v1/evaluations/status (passive, no-store)
+    Status->>Store: GetProjectionState (revision/published/dirty)
+    Store-->>Status: idle|queued|succeeded
+    Status-->>Frontend: status

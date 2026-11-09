@@ -236,12 +236,11 @@ type cycleAccumulator struct {
 	spentTotals       []float64
 }
 
-var cycleFulfillmentDefinition = &EvaluationDefinition{
+var cycleFulfillmentDefinition = &ReaderDefinition{Evaluator: Evaluator{
 	Type: types.EvaluationTypeCycleFulfillment,
 	Name: "Cycle fulfillment",
 
 	// Reader: answers from the cached path's rows and events only.
-	// simulates stays false — readers never simulate.
 
 	ValidateConfig: ValidateCycleFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {
@@ -308,4 +307,4 @@ var cycleFulfillmentDefinition = &EvaluationDefinition{
 		}
 		return types.StatusNotSatisfied
 	},
-}
+}}

@@ -295,12 +295,11 @@ type fulfillmentAccumulator struct {
 	unfulfilledAmounts []float64
 }
 
-var transactionFulfillmentDefinition = &EvaluationDefinition{
+var transactionFulfillmentDefinition = &ReaderDefinition{Evaluator: Evaluator{
 	Type: types.EvaluationTypeTransactionFulfillment,
 	Name: "Transaction fulfillment",
 
 	// Reader: answers from the cached path's transaction events only.
-	// simulates stays false — readers never simulate.
 
 	ValidateConfig: ValidateFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {
@@ -374,4 +373,4 @@ var transactionFulfillmentDefinition = &EvaluationDefinition{
 		}
 		return types.StatusNotSatisfied
 	},
-}
+}}

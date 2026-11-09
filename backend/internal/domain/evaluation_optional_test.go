@@ -12,8 +12,8 @@ type freeResult struct{ value int }
 
 func (f *freeResult) ToJSON() types.JsonValue { return map[string]any{"value": f.value} }
 
-func projectionFreeDefinition() *EvaluationDefinition {
-	return &EvaluationDefinition{
+func projectionFreeDefinition() *ReaderDefinition {
+	return &ReaderDefinition{Evaluator: Evaluator{
 		Type:                   "probe-free",
 		Name:                   "Probe Free",
 		RequiresProjectionPath: boolPtr(false),
@@ -26,7 +26,7 @@ func projectionFreeDefinition() *EvaluationDefinition {
 			return &freeResult{value: 42}, nil
 		},
 		Status: func(d PathResult, p types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 }
 
 type probeErr struct{ s string }
@@ -37,7 +37,7 @@ func TestNilPathIndeterminateForRequiredEvaluator(t *testing.T) {
 	if !netWorthThresholdDefinition.NeedsProjectionPath() {
 		t.Fatal("existing evaluators default to requiring projection")
 	}
-	required := &EvaluationDefinition{
+	required := &ReaderDefinition{Evaluator: Evaluator{
 		Type:        "req",
 		Name:        "req",
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
@@ -45,7 +45,7 @@ func TestNilPathIndeterminateForRequiredEvaluator(t *testing.T) {
 			return nil, &probeErr{s: "must not be called without path"}
 		},
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: "req",
 		configuredRaw:  map[string]any{},
@@ -95,15 +95,15 @@ func TestProbeFreeRunsWithoutPath(t *testing.T) {
 }
 
 func TestNeedsProjectionPathDefault(t *testing.T) {
-	def := &EvaluationDefinition{Type: "x"}
+	def := &ReaderDefinition{Evaluator: Evaluator{Type: "x"}}
 	if !def.NeedsProjectionPath() {
 		t.Fatal("nil flag defaults to required")
 	}
-	free := &EvaluationDefinition{Type: "y", RequiresProjectionPath: boolPtr(false)}
+	free := &ReaderDefinition{Evaluator: Evaluator{Type: "y", RequiresProjectionPath: boolPtr(false)}}
 	if free.NeedsProjectionPath() {
 		t.Fatal("explicit false means not required")
 	}
-	var nilDef *EvaluationDefinition
+	var nilDef *ReaderDefinition
 	if !nilDef.NeedsProjectionPath() {
 		t.Fatal("nil definition requires projection")
 	}
@@ -120,7 +120,7 @@ func TestEvaluateProjectionPathOptionalNilPath(t *testing.T) {
 
 func TestDependentsSkipsWhenWindowExcludesDirty(t *testing.T) {
 	called := false
-	def := &EvaluationDefinition{
+	def := &ReaderDefinition{Evaluator: Evaluator{
 		Type:        "deps",
 		Name:        "deps",
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
@@ -132,7 +132,7 @@ func TestDependentsSkipsWhenWindowExcludesDirty(t *testing.T) {
 			return &EvaluationDependents{FromDate: "2027-01-01"}
 		},
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: "deps",
 		configuredRaw:  map[string]any{},
@@ -159,7 +159,7 @@ func TestDependentsSkipsWhenWindowExcludesDirty(t *testing.T) {
 }
 
 func TestNilDependentsSkippedWhenDirty(t *testing.T) {
-	def := &EvaluationDefinition{
+	def := &ReaderDefinition{Evaluator: Evaluator{
 		Type:        "always",
 		Name:        "always",
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
@@ -167,7 +167,7 @@ func TestNilDependentsSkippedWhenDirty(t *testing.T) {
 			return &freeResult{value: 7}, nil
 		},
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: "always",
 		configuredRaw:  map[string]any{},
@@ -196,7 +196,7 @@ func TestNilDependentsSkippedWhenDirty(t *testing.T) {
 }
 
 func TestDependsOnEverythingAlwaysRuns(t *testing.T) {
-	def := &EvaluationDefinition{
+	def := &ReaderDefinition{Evaluator: Evaluator{
 		Type:        "always2",
 		Name:        "always2",
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
@@ -205,7 +205,7 @@ func TestDependsOnEverythingAlwaysRuns(t *testing.T) {
 			return &freeResult{value: 7}, nil
 		},
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: "always2",
 		configuredRaw:  map[string]any{},
@@ -232,7 +232,7 @@ func TestDataChangeGateSimulatesDirty(t *testing.T) {
 	}
 	tl := types.TimelineFromPath(path)
 	// Account dependence: narrowing to "savings" while "cash" changed → skip.
-	narrow := &EvaluationDefinition{
+	narrow := &ReaderDefinition{Evaluator: Evaluator{
 		Type:        "narrow",
 		Name:        "narrow",
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
@@ -243,7 +243,7 @@ func TestDataChangeGateSimulatesDirty(t *testing.T) {
 			return &freeResult{value: 99}, nil
 		},
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	set := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: "narrow",
 		configuredRaw:  map[string]any{},
@@ -309,7 +309,7 @@ func TestDataChangeGateSimulatesDirty(t *testing.T) {
 		t.Fatal("mutation should move threshold crossing; gate must surface new data")
 	}
 	// DependsOnEverything still always runs even with dirty — no silent staleness.
-	every := &EvaluationDefinition{
+	every := &ReaderDefinition{Evaluator: Evaluator{
 		Type:        "every",
 		Name:        "every",
 		ParseConfig: func(c any) (any, error) { return map[string]any{}, nil },
@@ -318,7 +318,7 @@ func TestDataChangeGateSimulatesDirty(t *testing.T) {
 			return &freeResult{value: 5}, nil
 		},
 		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus { return types.StatusSatisfied },
-	}
+	}}
 	set3 := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
 		evaluationType: "every",
 		configuredRaw:  map[string]any{},

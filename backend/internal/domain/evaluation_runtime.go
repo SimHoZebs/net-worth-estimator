@@ -15,17 +15,17 @@ import (
 // never import evaluator-specific logic.
 //
 // Plugin contract: a new check adds one type plus one definition, core loop
-// untouched. Two systems share this registry:
-//   - Reader: answers from the cached path only. Use NewReachedDateReader
-//     when the outcome is "the first date a measure crossed a target" (the
-//     whole plugin is 5 arguments); otherwise fill the shared accumulator
-//     wiring by hand and leave resimulation hooks nil. Core hooks (required):
-//     ParseConfig parses once and returns a typed config or error;
-//     EvaluatePath answers over one path; Accumulate plus Finalize aggregate
-//     sampled paths; Status drives the UI verdict.
-//   - Simulator: runs simulations against shared base path state (FI,
-//     purchases). Requires AllowSimulation, DetailLevel handling, and
-//     DescribeStochasticWork/MeasureStochasticWork for progress.
+// untouched. Every evaluator extends the generic Evaluator and falls under
+// one of two subtypes — ReaderDefinition or SimulatorDefinition — chosen at
+// registration. Core hooks are shared: ParseConfig parses once and returns
+// a typed config or error; EvaluatePath answers over one path; Accumulate
+// plus Finalize aggregate sampled paths; Status drives the UI verdict.
+// The subtypes differ only in simulation permission: a reader answers from
+// the cached path and never simulates; a simulator runs branch simulations
+// against shared base path state and needs DescribeStochasticWork and
+// MeasureStochasticWork for progress. NewReachedDateReader builds the
+// reached-date reader family; NewReachedDateSimulator builds the same shape
+// as a simulator (purchases).
 //
 // Simulation contract: rerunning the base simulation is NOT the default.
 // Reader evaluations run against the cached ProjectionPath shared by all
@@ -33,6 +33,8 @@ import (
 // Simulate, simulateScheduled, and simulatePurchases refuse to run and report
 // a reader violation. Simulator evaluations (purchases, FI) reuse the shared
 // base path state and run simulations only — never a fresh Prepare per eval.
+// There is no runtime split: one EvaluationRuntimeSet evaluates every
+// evaluator in input order with one context; the guard is per-instance.
 
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
@@ -109,10 +111,11 @@ type PathResult interface {
 // Accumulator consumes per-sample path results.
 type Accumulator interface{}
 
-// EvaluationDefinition is the typed contract each evaluator implements.
-// The base fields are reader-only. Stochastic fields belong on
-// SimulatorDefinition only — readers leave them empty and never simulate.
-type EvaluationDefinition struct {
+// Evaluator is the generic base every evaluator extends. The runtime and
+// the registry hold Definitions; each definition embeds one Evaluator.
+// All evaluators share the deterministic and accumulation hooks; the
+// Reader vs Simulator subtype alone decides simulation permission.
+type Evaluator struct {
 	Type string
 	Name string
 
@@ -137,27 +140,72 @@ type EvaluationDefinition struct {
 
 	DiagnoseConfig func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic
 
-	// Stochastic hooks are simulator-only. Readers leave these nil.
+	// Accumulation hooks aggregate sampled paths into a probabilistic
+	// result. Both subtypes use them; they do not imply simulation.
 	CreateAccumulator func(config any, deterministicResult PathResult) (Accumulator, error)
 	Accumulate        func(accumulator Accumulator, pathResult PathResult) error
 	Finalize          func(accumulator Accumulator, ctx *EvaluationFinalizeContext) (types.JsonValue, error)
 
 	DescribeStochasticWork func(ctx *EvaluationContext, config any) *EvaluationWorkloadPlan
 	MeasureStochasticWork  func(accumulator Accumulator) *EvaluationWorkloadMeasurement
-
-	// simulates is set only by SimulatorDefinition constructors. Readers
-	// leave it false so they cannot resimulate inside EvaluatePath.
-	simulates bool
 }
 
-// IsSimulator reports whether the definition runs branch simulations.
-func (d *EvaluationDefinition) IsSimulator() bool {
-	return d != nil && d.simulates
+// Definition is the registered form of an evaluator: one generic Evaluator
+// wrapped by exactly one subtype. The runtime set holds every Definition in
+// a single slice and evaluates them in input order.
+type Definition interface {
+	IsSimulator() bool
+	NeedsProjectionPath() bool
+	Base() *Evaluator
+}
+
+// ReaderDefinition is an Evaluator that answers from the cached path.
+// It never simulates.
+type ReaderDefinition struct {
+	Evaluator
+}
+
+func (r *ReaderDefinition) Base() *Evaluator {
+	if r == nil {
+		return nil
+	}
+	return &r.Evaluator
+}
+
+func (r *ReaderDefinition) IsSimulator() bool { return false }
+
+func (r *ReaderDefinition) NeedsProjectionPath() bool {
+	if r == nil {
+		return true
+	}
+	return r.Evaluator.NeedsProjectionPath()
+}
+
+// SimulatorDefinition is an Evaluator that runs branch simulations
+// against shared base path state.
+type SimulatorDefinition struct {
+	Evaluator
+}
+
+func (s *SimulatorDefinition) Base() *Evaluator {
+	if s == nil {
+		return nil
+	}
+	return &s.Evaluator
+}
+
+func (s *SimulatorDefinition) IsSimulator() bool { return true }
+
+func (s *SimulatorDefinition) NeedsProjectionPath() bool {
+	if s == nil {
+		return true
+	}
+	return s.Evaluator.NeedsProjectionPath()
 }
 
 // NeedsProjectionPath reports whether the evaluator requires a non-nil path.
 // Nil or unspecified means required (preserves behavior for all existing evaluators).
-func (d *EvaluationDefinition) NeedsProjectionPath() bool {
+func (d *Evaluator) NeedsProjectionPath() bool {
 	if d == nil || d.RequiresProjectionPath == nil {
 		return true
 	}
@@ -166,33 +214,40 @@ func (d *EvaluationDefinition) NeedsProjectionPath() bool {
 
 // EvaluationRegistry holds registered definitions keyed by type.
 type EvaluationRegistry struct {
-	definitions map[string]*EvaluationDefinition
+	definitions map[string]Definition
 	order       []string
 }
 
 // NewEvaluationRegistry creates an empty registry.
 func NewEvaluationRegistry() *EvaluationRegistry {
-	return &EvaluationRegistry{definitions: map[string]*EvaluationDefinition{}}
+	return &EvaluationRegistry{definitions: map[string]Definition{}}
 }
 
-// Register adds a definition; duplicate registration panics.
-func (r *EvaluationRegistry) Register(definition *EvaluationDefinition) {
-	if _, exists := r.definitions[definition.Type]; exists {
-		panic(fmt.Sprintf("Evaluation definition %q is already registered.", definition.Type))
+// Register adds a definition; duplicate registration panics. The definition
+// must be a ReaderDefinition or a SimulatorDefinition extending the generic
+// Evaluator; a bare Evaluator cannot register.
+func (r *EvaluationRegistry) Register(definition Definition) {
+	base := definition.Base()
+	evaluationType := ""
+	if base != nil {
+		evaluationType = base.Type
 	}
-	if definition.Dependents == nil {
-		panic(fmt.Sprintf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", definition.Type))
+	if _, exists := r.definitions[evaluationType]; exists {
+		panic(fmt.Sprintf("Evaluation definition %q is already registered.", evaluationType))
 	}
-	r.definitions[definition.Type] = definition
-	r.order = append(r.order, definition.Type)
+	if base == nil || base.Dependents == nil {
+		panic(fmt.Sprintf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", evaluationType))
+	}
+	r.definitions[evaluationType] = definition
+	r.order = append(r.order, evaluationType)
 	sort.Strings(r.order) // keep deterministic iteration; type order comes from tables
 }
 
 // Validate reports misconfigured definitions without mutating the registry.
 func (r *EvaluationRegistry) Validate() error {
 	for _, evaluationType := range r.order {
-		definition := r.definitions[evaluationType]
-		if definition.Dependents == nil {
+		base := r.definitions[evaluationType].Base()
+		if base == nil || base.Dependents == nil {
 			return fmt.Errorf("Evaluation definition %q must declare Dependents (nil means depends on nothing).", evaluationType)
 		}
 	}
@@ -200,7 +255,7 @@ func (r *EvaluationRegistry) Validate() error {
 }
 
 // Get returns the definition for a type, if registered.
-func (r *EvaluationRegistry) Get(evaluationType string) (*EvaluationDefinition, bool) {
+func (r *EvaluationRegistry) Get(evaluationType string) (Definition, bool) {
 	definition, ok := r.definitions[evaluationType]
 	return definition, ok
 }
@@ -209,7 +264,12 @@ func (r *EvaluationRegistry) Get(evaluationType string) (*EvaluationDefinition, 
 func (r *EvaluationRegistry) List() []struct{ Type, Name string } {
 	out := make([]struct{ Type, Name string }, 0, len(r.order))
 	for _, evaluationType := range r.order {
-		out = append(out, struct{ Type, Name string }{evaluationType, r.definitions[evaluationType].Name})
+		base := r.definitions[evaluationType].Base()
+		name := ""
+		if base != nil {
+			name = base.Name
+		}
+		out = append(out, struct{ Type, Name string }{evaluationType, name})
 	}
 	return out
 }
@@ -306,7 +366,7 @@ func requireResimulationAllowed(caller string) error {
 				firstEval = evalType
 			}
 			if attempt+1 == tries {
-				return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; mark Kind=simulator with explicit opt-in to run simulations", firstEval, caller)
+				return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; register as SimulatorDefinition to run simulations", firstEval, caller)
 			}
 			time.Sleep(resimGuardPause)
 			continue
@@ -317,10 +377,10 @@ func requireResimulationAllowed(caller string) error {
 }
 
 // withReaderGuard runs fn with resimulation refused when the definition
-// is a reader (the default). Simulator evaluations run unguarded and mark
-// their own depth so concurrent readers in other requests never block them.
-func withReaderGuard(definition *EvaluationDefinition, evalType string, fn func() (PathResult, error)) (PathResult, error) {
-	if definition.IsSimulator() {
+// is a reader. Simulator evaluations run unguarded and mark their own
+// depth so concurrent readers in other requests never block them.
+func withReaderGuard(definition Definition, evalType string, fn func() (PathResult, error)) (PathResult, error) {
+	if definition != nil && definition.IsSimulator() {
 		atomic.AddInt32(&simulatorSimDepth, 1)
 		defer atomic.AddInt32(&simulatorSimDepth, -1)
 		return fn()
@@ -340,7 +400,7 @@ type instanceRuntime struct {
 	instanceID     string
 	name           string
 	enabled        bool
-	definition     *EvaluationDefinition
+	definition     Definition
 	diagnostics    []types.EvaluationDiagnostic
 
 	deterministic    PathResult
@@ -367,7 +427,7 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 	if r.definition == nil || r.hasErrors() {
 		return
 	}
-	if r.definition.NeedsProjectionPath() && ctx.GetTimeline() == nil {
+	if r.definition.Base().NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
 			Code:     "projection-unavailable",
 			Severity: "info",
@@ -378,7 +438,7 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 	// Nil Dependents means depends on nothing. When a dirty marker is present,
 	// the evaluator is skipped instead of recomputing. Cold evaluations
 	// (no dirty marker) always run so a fresh evaluator still produces output.
-	if r.definition.Dependents == nil && ctx.DirtyFrom != "" {
+	if r.definition.Base().Dependents == nil && ctx.DirtyFrom != "" {
 		r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
 			Code:     "evaluation-skipped",
 			Severity: "info",
@@ -386,8 +446,8 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 		})
 		return
 	}
-	if r.definition.Dependents != nil && ctx.DirtyFrom != "" {
-		deps := r.definition.Dependents(ctx, r.configuredRaw)
+	if r.definition.Base().Dependents != nil && ctx.DirtyFrom != "" {
+		deps := r.definition.Base().Dependents(ctx, r.configuredRaw)
 		if deps == nil {
 			r.diagnostics = append(r.diagnostics, types.EvaluationDiagnostic{
 				Code:     "evaluation-skipped",
@@ -453,11 +513,11 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 			}
 		}
 	}
-	if r.definition.DiagnoseConfig != nil {
-		r.diagnostics = append(r.diagnostics, r.definition.DiagnoseConfig(ctx, r.configuredRaw)...)
+	if r.definition.Base().DiagnoseConfig != nil {
+		r.diagnostics = append(r.diagnostics, r.definition.Base().DiagnoseConfig(ctx, r.configuredRaw)...)
 	}
 	result, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {
-		return r.definition.EvaluatePath(ctx, r.configuredRaw)
+		return r.definition.Base().EvaluatePath(ctx, r.configuredRaw)
 	})
 	if err != nil {
 		r.diagnostics = append(r.diagnostics, errorDiagnostic("evaluation-runtime-error", err))
@@ -470,20 +530,20 @@ func (r *instanceRuntime) prepareStochasticWork(ctx *EvaluationContext) {
 	if r.definition == nil || r.hasErrors() {
 		return
 	}
-	if r.definition.NeedsProjectionPath() && ctx.GetTimeline() == nil {
+	if r.definition.Base().NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		return
 	}
-	if r.definition.DescribeStochasticWork == nil {
+	if r.definition.Base().DescribeStochasticWork == nil {
 		return
 	}
-	r.workloadPlan = r.definition.DescribeStochasticWork(ctx, r.configuredRaw)
+	r.workloadPlan = r.definition.Base().DescribeStochasticWork(ctx, r.configuredRaw)
 }
 
 func (r *instanceRuntime) startStochastic(configuredConfig any) {
 	if r.definition == nil || r.deterministic == nil || r.hasErrors() {
 		return
 	}
-	accumulator, err := r.definition.CreateAccumulator(configuredConfig, r.deterministic)
+	accumulator, err := r.definition.Base().CreateAccumulator(configuredConfig, r.deterministic)
 	if err != nil {
 		r.stochasticFailed = true
 		r.diagnostics = append(r.diagnostics, errorDiagnostic("evaluation-accumulator-error", err))
@@ -496,14 +556,14 @@ func (r *instanceRuntime) consume(ctx *EvaluationContext) {
 	if r.definition == nil || r.accumulator == nil || r.stochasticFailed {
 		return
 	}
-	if r.definition.NeedsProjectionPath() && ctx.GetTimeline() == nil {
+	if r.definition.Base().NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		return
 	}
 	pathResult, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {
-		return r.definition.EvaluatePath(ctx, r.configuredRaw)
+		return r.definition.Base().EvaluatePath(ctx, r.configuredRaw)
 	})
 	if err == nil {
-		err = r.definition.Accumulate(r.accumulator, pathResult)
+		err = r.definition.Base().Accumulate(r.accumulator, pathResult)
 	}
 	if err != nil {
 		r.stochasticFailed = true
@@ -516,7 +576,7 @@ func (r *instanceRuntime) finalize(ctx *EvaluationFinalizeContext) {
 	if r.definition == nil || r.accumulator == nil || r.stochasticFailed {
 		return
 	}
-	result, err := r.definition.Finalize(r.accumulator, ctx)
+	result, err := r.definition.Base().Finalize(r.accumulator, ctx)
 	if err != nil {
 		r.stochasticFailed = true
 		r.probabilistic = nil
@@ -531,8 +591,8 @@ func (r *instanceRuntime) workloadProgress(completedRuns, totalRuns int) *types.
 		return nil
 	}
 	var measurement *EvaluationWorkloadMeasurement
-	if r.accumulator != nil && !r.stochasticFailed && r.definition.MeasureStochasticWork != nil {
-		measurement = r.definition.MeasureStochasticWork(r.accumulator)
+	if r.accumulator != nil && !r.stochasticFailed && r.definition.Base().MeasureStochasticWork != nil {
+		measurement = r.definition.Base().MeasureStochasticWork(r.accumulator)
 	}
 	completedUnits := completedRuns * r.workloadPlan.UnitsPerRun
 	if measurement != nil {
@@ -568,7 +628,7 @@ func (r *instanceRuntime) envelope() types.EvaluationResultEnvelope {
 	if r.hasErrors() {
 		status = types.StatusWarning
 	} else if r.definition != nil {
-		status = r.definition.Status(r.deterministic, r.probabilistic)
+		status = r.definition.Base().Status(r.deterministic, r.probabilistic)
 	}
 	envelope := types.EvaluationResultEnvelope{
 		InstanceID:    r.instanceID,
@@ -670,7 +730,7 @@ func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *Evaluatio
 			set.runtimes = append(set.runtimes, runtimeInstance)
 			continue
 		}
-		parsedConfig, err := definition.ParseConfig(instance.rawConfig)
+		parsedConfig, err := definition.Base().ParseConfig(instance.rawConfig)
 		if err != nil {
 			runtimeInstance.diagnostics = append(runtimeInstance.diagnostics, errorDiagnostic("invalid-evaluation-config", err))
 			set.runtimes = append(set.runtimes, runtimeInstance)
@@ -681,66 +741,6 @@ func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *Evaluatio
 		set.runtimes = append(set.runtimes, runtimeInstance)
 	}
 	return set
-}
-
-// PartitionByKind splits a fully built runtime set into reader and simulator
-// subsets, preserving global ID validation and relative order. Only runtimes
-// with an explicit simulator definition run simulations; everything else —
-// readers, disabled instances, unknown types, and invalid configs — stays on
-// the reader side, which never resimulates.
-func (s *EvaluationRuntimeSet) PartitionByKind() (readers, simulators *EvaluationRuntimeSet) {
-	readers = &EvaluationRuntimeSet{}
-	simulators = &EvaluationRuntimeSet{}
-	for _, runtimeInstance := range s.runtimes {
-		if runtimeInstance.definition != nil && runtimeInstance.definition.IsSimulator() {
-			simulators.runtimes = append(simulators.runtimes, runtimeInstance)
-			continue
-		}
-		readers.runtimes = append(readers.runtimes, runtimeInstance)
-	}
-	return readers, simulators
-}
-
-// MergeEvaluationResultCollections combines per-kind collections in full-set
-// order. Each evaluation type belongs to one definition kind, so rows never
-// interleave; a reader-side diagnostic (disabled, unknown, or invalid
-// simulator config) keeps its global position among that table's rows.
-func MergeEvaluationResultCollections(set *EvaluationRuntimeSet, reader, simulator *types.EvaluationResultCollection) *types.EvaluationResultCollection {
-	merged := &types.EvaluationResultCollection{
-		Evaluations: types.EvaluationResultTables{
-			FinancialIndependence:  []types.EvaluationResultEnvelope{},
-			NetWorthThreshold:      []types.EvaluationResultEnvelope{},
-			AccountBalance:         []types.EvaluationResultEnvelope{},
-			TransactionFulfillment: []types.EvaluationResultEnvelope{},
-			CycleFulfillment:       []types.EvaluationResultEnvelope{},
-			// PlannedPurchases stays nil when empty: Result() appends per
-			// registered instance, and nil-vs-empty matters to DeepEqual
-			// callers that strip the table before comparing baselines.
-		},
-	}
-	byID := map[string]types.EvaluationResultEnvelope{}
-	for _, collection := range []*types.EvaluationResultCollection{reader, simulator} {
-		if collection == nil {
-			continue
-		}
-		for _, table := range collection.Evaluations.Tables() {
-			for _, envelope := range *table.Rows {
-				byID[envelope.InstanceID] = envelope
-			}
-		}
-	}
-	for _, runtimeInstance := range set.runtimes {
-		envelope, ok := byID[runtimeInstance.instanceID]
-		if !ok {
-			continue
-		}
-		rows := merged.Evaluations.ByType(runtimeInstance.evaluationType)
-		if rows == nil {
-			continue
-		}
-		*rows = append(*rows, envelope)
-	}
-	return merged
 }
 
 // EvaluateDeterministic runs all enabled evaluators once over the path.

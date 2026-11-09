@@ -873,13 +873,12 @@ type FIProbabilisticResult struct {
 	SelfSustainingProbability *float64 `json:"selfSustainingProbability"`
 }
 
-var financialIndependenceDefinition = &EvaluationDefinition{
+var financialIndependenceDefinition = &SimulatorDefinition{Evaluator: Evaluator{
 	Type: types.EvaluationTypeFinancialIndependence,
 	Name: "Financial independence",
 
 	// Simulator: FI replays continuing transactions in branch transitions against
 	// the shared base path. Branch state only; never a fresh Prepare.
-	simulates: true,
 
 	ValidateConfig: ValidateFIPlanConfig,
 	ParseConfig: func(config any) (any, error) {
@@ -1060,4 +1059,4 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 		}
 		return types.StatusNotSatisfied
 	},
-}
+}}

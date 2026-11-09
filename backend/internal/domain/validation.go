@@ -249,7 +249,7 @@ func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, model *type
 			continue
 		}
 		for index, instance := range *table.Rows {
-			if err := definition.ValidateConfig(instance.Config); err != nil {
+			if err := definition.Base().ValidateConfig(instance.Config); err != nil {
 				path := []any{"evaluations", table.Type, index}
 				addIssue(issues, types.SeverityError, "evaluation.config.invalid", err.Error(), path...)
 			}
