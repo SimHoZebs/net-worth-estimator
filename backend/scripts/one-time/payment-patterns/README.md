@@ -16,7 +16,7 @@ not a runtime compatibility path. New empty databases need no upgrade.
    as an archive. Its feature space cannot be reused by the generic classifier.
    No runtime conversion or automatic destructive reset is performed. The
    deployment variable name is unchanged; it now addresses the shared learner.
-4. Start the reviewed target. Verify fresh `payments-v1/` findings, preserved
+4. Start the reviewed target. Verify fresh `payments-v2/` findings, preserved
    answers and IDs, ready judgments, and `/readyz` returning `ok`.
 
 The generic learner starts cold. Old immutable income feedback remains in the

@@ -13,6 +13,9 @@ rebuilds the owner's streams; per-stream incremental bank updates are not implem
   full description, payee, merchant metadata, memo, source category and cadence.
   Opaque bank references and display labels do not define identity. Semantic
   classification rules do not participate in identity.
+  Hexadecimal references are excluded too. Bank-derived payee/merchant fragments
+  are normalized only when they correlate with that source reference between
+  the same descriptive prefix and ACH rail; unrelated payee properties survive.
 - Shared cadence/amount gates preserve income behavior, including its 15 percent
   amount/interval tolerance and annual minimum of two observations. Other
   cadences require three. Settled, dated nonzero observations only; matching

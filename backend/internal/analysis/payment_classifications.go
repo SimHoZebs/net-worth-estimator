@@ -40,7 +40,7 @@ func PaymentClassifications() []PaymentClassification {
 	}
 }
 
-var rentDescriptor = regexp.MustCompile(`(?i)\b(rent|rental|lease)\b`)
+var rentDescriptor = regexp.MustCompile(`(?i)\b(rent|rental|lease|biltrent)\b`)
 var mortgageDescriptor = regexp.MustCompile(`(?i)\b(mortgage|home[ _-]*loan)\b`)
 var cardRepayment = regexp.MustCompile(`(?i)\b(credit[ _-]*card|card[ _-]*(payment|repayment))\b`)
 var nonRentCharge = regexp.MustCompile(`(?i)\b(utilities|utility|parking|security[ _-]*deposit|hoa|association[ _-]*dues)\b`)

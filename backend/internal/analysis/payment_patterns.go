@@ -14,7 +14,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const PaymentPatternsVersion = "payments-v1"
+const PaymentPatternsVersion = "payments-v2"
 
 // PaymentPatterns extracts streams once and batches applicable classifications.
 // Definitions contain domain policy; evaluators own how judgments are produced.

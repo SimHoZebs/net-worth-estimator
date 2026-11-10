@@ -13,7 +13,42 @@ import (
 
 // Bank reference values are observations, not payment-stream identities.
 var paymentReferenceSuffix = regexp.MustCompile(`(?i)\b(?:(?:ppd|ccd)\s+)?(?:id|ref(?:erence)?|trace)\s*[:#].*$`)
-var paymentReferenceToken = regexp.MustCompile(`(?i)^[a-z]{0,4}[0-9x]{4,}$`)
+var paymentReferenceToken = regexp.MustCompile(`(?i)^(?:[a-z]{0,4}[0-9x]{4,}|[a-f0-9]{12,64})$`)
+var paymentRailReference = regexp.MustCompile(`(?i)\b([a-f0-9]{12,64})\s+(?:web|ppd|ccd|tel)\b`)
+var paymentReferenceLetters = regexp.MustCompile(`^[a-f ]+$`)
+
+// Some banks derive payees/merchants from a description by deleting numbers,
+// leaving variable letter fragments of a reference behind. Normalize only a
+// source-correlated fragment between the same descriptive prefix and ACH rail.
+// Independent counterparty properties and all original evidence remain intact.
+func paymentCounterpartyText(description, counterparty string) string {
+	normalized := paymentStreamText(counterparty)
+	match := paymentRailReference.FindStringSubmatchIndex(description)
+	if match == nil {
+		return normalized
+	}
+	prefix := paymentStreamText(description[:match[2]])
+	suffix := paymentStreamText(description[match[3]:])
+	if prefix == "" || suffix == "" || !strings.HasPrefix(normalized, prefix+" ") || !strings.HasSuffix(normalized, " "+suffix) {
+		return normalized
+	}
+	middle := strings.TrimSuffix(strings.TrimPrefix(normalized, prefix+" "), " "+suffix)
+	if !paymentReferenceLetters.MatchString(middle) {
+		return normalized
+	}
+	fragment := strings.ReplaceAll(middle, " ", "")
+	reference := strings.ToLower(description[match[2]:match[3]])
+	index := 0
+	for i := range reference {
+		if index < len(fragment) && reference[i] == fragment[index] {
+			index++
+		}
+	}
+	if index != len(fragment) {
+		return normalized
+	}
+	return prefix + " " + suffix
+}
 
 func paymentStreamText(text string) string {
 	text = paymentReferenceSuffix.ReplaceAllString(text, "")
@@ -55,8 +90,8 @@ func paymentGroups(ctx context.Context, transactions []types.AnalysisTransaction
 			continue
 		}
 		description := paymentStreamText(facts.Description)
-		payee := paymentStreamText(facts.Payee)
-		merchantName := paymentStreamText(facts.Metadata["merchant_name"])
+		payee := paymentCounterpartyText(facts.Description, facts.Payee)
+		merchantName := paymentCounterpartyText(facts.Description, facts.Metadata["merchant_name"])
 		// When a bank supplies its description only as a memo, preserve that
 		// descriptive identity rather than grouping every memo-only deposit.
 		if description == "" && payee == "" && merchantName == "" {

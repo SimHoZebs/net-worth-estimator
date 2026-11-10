@@ -35,7 +35,7 @@ function finding(id = "deposit"): AnalysisFinding {
 		dismissed: false,
 		runId: "reviewed-run",
 		feedbackRevision: 0,
-		analyzerVersion: "payments-v1/policy",
+		analyzerVersion: "payments-v2/policy",
 		inputRevision: 1,
 		firstDetectedAt: 1,
 		lastCheckedAt: 1,
