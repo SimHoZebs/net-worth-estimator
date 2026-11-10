@@ -20,14 +20,14 @@ failure. Leftover containers, volumes, or networks fail the gate.
 | Step | Coverage | Absorbs the manual |
 | --- | --- | --- |
 | `fixture` | Disposable provider seed, sealed import, generated subjects, `fixture.json` contract with test-only marking | Real-provider isolation setup |
-| `images` | Cold `docker build` of `backend/Dockerfile` and `frontend/Dockerfile` | `DEPLOYMENT_TEST_IMAGE` and `NGINX_TEST_IMAGE` prerequisites |
+| `images` | Builds the API, frontend, and Better Auth images; records immutable image IDs | Image preparation for the E2E steps |
 | `stack` | Schema and guest row from the image's own `setupdb`; stack health through the proxy | `smoke-compose.sh` / `smoke-backend.sh` |
-| `isolation` | Owner sign-in plus write plus CSRF; guest read/project with denied writes; provider grant then immediate revocation; second-user signup with restart persistence; stale-scope and cross-user rejection; shared-database row proof; logout with captured-cookie rejection | `auth/test-integration.mjs` |
+| `isolation` | Owner sign-in plus write plus CSRF; guest read/project with denied writes; provider grant then immediate revocation; second-user signup with restart persistence; stale-scope and cross-user rejection; shared-database row proof; logout with captured-cookie rejection | Manual identity journey setup |
 | `direct-share` | Share → inbox accept → copy → revoke across two real users, including dismiss/restore, decline, accept retry idempotency, and revoked-read denial | QA-03 journey with a stand-in identity |
 | `group-feed` | Group policy → feed → exclusion: viewer totals, explicit-grant copy, exclusion narrowing, revoke plus policy-off denial, copy survival | QA-03 journey with a stand-in identity |
 | `receipts` | Multipart upload through the real storage path, metadata and image round-trip, cross-user denial, deletion | Receipt checklist against live stacks |
 | `migration` | `/app/migrate.sh` from the target image against a snapshot copy: exit 0 on the complete-shape repeat path, integrity and foreign-key checks, live database byte-identical | Migration SOP rehearsal on the image (conversion-path coverage stays in `deploy/migrations.test.mjs`) |
-| `proxy-headers` | Origin enforcement through the real proxy image, provider-gateway health, sessionless probes | `nginx-provider` header regression |
+| `proxy-headers` | Existing large-provider-header and receipt-upload-limit regressions against the built frontend image, Origin enforcement, gateway health, and sessionless probes | Separate manual Nginx image preparation |
 | `teardown` | Compose removal plus explicit empty checks for containers, volumes, networks, and project processes | Manual `docker ps` forensics |
 
 ## What stays manual (with reasons)
@@ -54,8 +54,9 @@ failure. Leftover containers, volumes, or networks fail the gate.
   lever for a risky change.
 - **Budget: 30 minutes wall clock** (`E2E_BUDGET_SECONDS` in
   `auth/e2e-lib.mjs`, overridable with `scripts/test --e2e --timeout=N`).
-  A run that exceeds budget fails: slowness is signal about the stack, not
-  weather to wait out.
+  Expiry cancels active commands, readiness requests, and browser journeys.
+  Teardown has its own bounded two-minute budget so cancellation still
+  removes the disposable stack.
 - **Gates a release:** every step above `teardown` must read PASS.
   **Merely reports:** quarantined steps (see below) read QUARANTINED-FAIL
   without blocking, and the final timing report always prints for trend
@@ -92,7 +93,7 @@ inside the disposable root, and marked test-only in `fixture.json`
 | --- | --- |
 | `E2E_TEST_MUTATIONS=1` | Operator confirms disposable-only mutation |
 | Docker daemon | Host |
-| Playwright Chromium | `bun install`, shared browser cache |
+| Playwright Chromium | Install separately with `(cd frontend && bunx --no-install playwright install chromium)` after `bun install --frozen-lockfile`; see [browser prerequisites](../TESTING.md#integration-suite) |
 | Everything else (client secret, admin/user/guest passwords, subjects) | Generated per run; nothing from production, dev, or committed files |
 
 The disposable root (`tmp/e2e-<stamp>-<pid>/`) is removed on success and
@@ -102,15 +103,24 @@ root holds `e2e.env` and `credentials.json` at `0600`.
 ## Debugging a red run
 
 ```bash
-E2E_TEST_MUTATIONS=1 scripts/test --e2e --step=isolation  # one leg, images still build
-E2E_TEST_MUTATIONS=1 scripts/test --e2e --skip-build      # triage rerun, reuses images only
+E2E_TEST_MUTATIONS=1 scripts/test --e2e --step=images     # retain a reusable image set
+E2E_TEST_MUTATIONS=1 scripts/test --e2e --step=receipts --skip-build=RUN_ID
 E2E_TEST_MUTATIONS=1 scripts/test --e2e --cold-build      # true uncached image builds
 ```
 
-Every run mints a fresh fixture, ports, and disposable root; `--skip-build`
-reuses images only, never state. At least one cold run (full image builds)
-is required before landing gate changes; warm reruns exist for triage
-iteration only.
+Use the run ID printed by an images-only run or a failed run that completed
+its image builds. The retained root contains `images.json` with immutable IDs.
+Reuse validates that complete image set before provisioning and gives the
+new invocation its own tags. Teardown removes only those new tags, not the
+source run's images. Missing images fail before fixture setup. `--step=images`
+always retains its image root, even with `--clean`; remove it manually when it
+is no longer needed.
+
+Every invocation creates fresh credentials, ports, and database state.
+`--step` runs the selected step's prerequisites automatically; infrastructure
+selections stop at their requested boundary. Partial selections report
+`PARTIAL`, never full-gate `GREEN`. A full fresh-build run is still required
+before landing gate changes.
 
 ## Extra data for edge exploration
 

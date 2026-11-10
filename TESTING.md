@@ -5,7 +5,7 @@ This checkout holds the Go backend in `backend/`, the Waypoint frontend in `fron
 Use `./scripts/test` as the single entry point:
 
 ```bash
-scripts/test --unit          # no servers, Docker daemon, or credentials
+scripts/test --unit          # package/config checks; no pre-existing stack or credentials
 scripts/test --integration   # browser integration suite (fixture API and frontend server over real HTTP)
 scripts/test --all           # unit then integration
 scripts/test --matrix        # dataset-pack x identity-set edge matrix (see docs/integration-edge-gates.md)
@@ -16,13 +16,13 @@ Unit tests run without application servers. Package and configuration tests may 
 
 | Layer | Entry point | Location | Boots |
 | --- | --- | --- | --- |
-| Unit | `scripts/test --unit`, `bun --filter ./frontend test:unit` | `frontend/src/**/*.test.{ts,tsx}`, `frontend/scripts/**/*.test.ts`, Go packages | Nothing |
+| Unit | `scripts/test --unit`, `bun --filter ./frontend test:unit` | Frontend, Go, provider, script and deployment contracts | Disposable package fixtures; no Docker daemon |
 | Integration | `scripts/test --integration`, `bun --filter ./frontend test:integration` | `frontend/tests/integration/*.spec.ts` | Fixture API and frontend server over HTTP |
 | E2E | `E2E_TEST_MUTATIONS=1 scripts/test --e2e` | `auth/test-e2e.mjs` | Real provider and images |
 
 The root aliases are `bun run test:unit`, `bun run test:integration`, and `E2E_TEST_MUTATIONS=1 bun run test:e2e`. The e2e alias keeps the deliberate disposable-run confirmation.
 
-Unit includes the Go verify script, frontend unit tests, Better Auth provider tests with disposable databases, and e2e gate-contract tests. Run the whole unit file list, not only a new test. Integration boots real HTTP servers. E2E exercises real provider and deployment images against disposable state. Physical passkeys, external recovery delivery, and production mutations remain manual. `--all` covers tests, not the lint, typecheck, and build gates.
+Unit includes the Go verify script, frontend unit tests, Better Auth provider tests with disposable databases, and `scripts/test-contracts` for configuration, script, E2E contract, and host migration safety suites. Host migration checks need Go and sqlite3. Run the whole unit file list, not only a new test. Integration boots real HTTP servers. E2E exercises real provider and deployment images against disposable state. Physical passkeys, external recovery delivery, and production mutations remain manual. `--all` covers tests, not the lint, typecheck, and build gates.
 
 The purchase-capture extension adds `bun --filter ./extension test` to unit and `bun --filter ./extension test:browser` to integration. Its completion gate also runs `bun --filter ./extension lint` and `bun --filter ./extension build`. See [extension setup and verification](extension/README.md).
 
@@ -32,14 +32,16 @@ Gate rules and tier details live in [release gates](docs/release-gates.md), [int
 
 ## Local development
 
-Run `./dev/main.mjs setup` once, then use the dedicated dev Compose stack:
+For manual UI exploration, use synthetic data without a production snapshot or identity setup:
 
 ```bash
-docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
-docker compose --env-file .env.dev -f docker-compose.dev.yml down
+bun install --frozen-lockfile
+bun --filter ./frontend api:generate
+(cd frontend && bunx --no-install playwright install chromium)
+./dev/main.mjs demo --pack safe-spending
 ```
 
-This uses production Dockerfiles with isolated dev data, not the frontend or fixture API browser-test harness. `./dev/main.mjs refresh-db` replaces only the dev financial database from a consistent production snapshot. See [dev/README.md](dev/README.md).
+The demo uses the browser fixture harness and stops with Ctrl-C. Snapshot-backed development with production images is optional and owned by [dev/README.md](dev/README.md). Its `refresh-db` command replaces only the dev financial database from a consistent production snapshot.
 
 Dev setup checks: `node --test dev/*.test.mjs`. Provider checks: `bun --filter @waypoint/auth test`. Configuration checks require the Docker Compose CLI, but no running daemon.
 
@@ -71,10 +73,7 @@ Generate the API client before running frontend scripts directly: `bun --filter 
 Refresh the checked-in OpenAPI snapshot without a running server or financial data:
 
 ```bash
-OPENAPI_SNAPSHOT="$PWD/frontend/openapi.snapshot.json" CGO_ENABLED=0 \
-  go -C backend test ./internal/api -run TestRawRoutesAppearInOpenAPI -count=1
-(cd frontend && bunx --no-install oxfmt openapi.snapshot.json)
-bun --filter ./frontend api:generate
+bun --filter ./frontend openapi:refresh
 ```
 
 Run the routing regression specs with:
@@ -111,13 +110,13 @@ TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 
 ## Completion gate
 
-GitHub Actions is the full completion gate. Agents run the narrowest local check, push the branch, and watch the `Tests` workflow for the exact commit. To repeat it locally:
+Agents run the narrowest local check, push the branch, and watch hosted `Tests` for the exact commit. Completion and release requirements live in [release gates](docs/release-gates.md). For an optional local aggregate:
 
 ```bash
 scripts/test --gate
 ```
 
-That entry point checks install drift, generates the API client, runs backend, frontend, and extension gates in parallel groups, then runs the integration suite in shards. Use `--no-browser` for a fast run, `--shards=N` to control fan-out, and `KEEP_GATE_LOGS=1` for per-group logs. The pre-commit hook checks install drift and formatting only; it runs no tests. See [release gates](docs/release-gates.md) for the ship/no-ship contract and [integration edge gates](docs/integration-edge-gates.md) for the matrix.
+That command checks install drift, generates the API client, runs backend, frontend, provider, extension, and shared contract groups, then runs both browser suites. Use `--no-browser` to skip browsers, `--shards=N` to control frontend fan-out, and `KEEP_GATE_LOGS=1` for logs. Hosted Tests additionally verifies the income sidecar, Northflank deployment image, and Python payment-pattern upgrade. The local aggregate does not reproduce those jobs. The pre-commit hook checks install drift and formatting only; it runs no tests. See [integration edge gates](docs/integration-edge-gates.md) for the matrix.
 
 `node scripts/check-install.mjs` compares each workspace `package.json` against the root `bun.lock` and installed `node_modules`. Install or refresh everything with `bun install` from the repository root.
 
@@ -221,7 +220,7 @@ backend/scripts/bench-sim.sh checkpoints
 
 ## Real-data server
 
-Use a disposable database restored from a backup. Configure Better Auth, Casbin, and the verified primary-data owner through [the auth guide](auth/README.md). The server requires the same session configuration in dev and production. Use a SQLite-safe snapshot or stop the source before a file copy.
+These optional recipes investigate data-specific problems. They are not routine completion requirements. Use a disposable database restored from a backup. Configure Better Auth, Casbin, and the verified primary-data owner through [the auth guide](auth/README.md). The server requires the same session configuration in dev and production. Use a SQLite-safe snapshot or stop the source before a file copy.
 
 ```bash
 export COOKIE_FILE=/path/to/private/disposable-cookie-jar
@@ -397,16 +396,4 @@ Supply `COOKIE_FILE`, `RESOURCE_ID`, and `PUBLIC_ORIGIN` for an authorized owner
 
 ## Backend completion gate
 
-For a backend change, finish with:
-
-```bash
-backend/scripts/verify.sh ./internal/domain/...
-backend/scripts/verify.sh ./internal/api/...
-backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/simplefin
-backend/scripts/verify.sh ./cmd/server
-CGO_ENABLED=0 go -C backend build ./...
-git diff --check
-```
-
-For persistence, HTTP policy, SSE, or synchronization changes, also run the relevant direct checks above against a disposable database and record the observed status codes or event names.
+Run the narrowest relevant [scoped Go check](#scoped-go-tests) locally. Hosted Tests runs the complete backend suite. Follow [release gates](docs/release-gates.md) for completion; add direct disposable-state checks only when a changed boundary lacks automated coverage, and record that gap and its observed result.

@@ -153,9 +153,9 @@ journeys; duo/full/group journeys run in the Go suite.
 
 ## Uncovered by automation (never faked green)
 
-- Real identity-provider login, passkey, restart, revocation, refresh, and
-  administrator recovery: the Better Auth test guide and
-  `auth/test-integration.mjs` (manual, credential-gated).
+- Real-provider login, virtual passkeys, restart, revocation, and session
+  behavior are automated by [disposable E2E](e2e-gate.md). Live target
+  identity conversion and administrator recovery remain operator checks.
 - Physical passkeys and phone recovery: the manual checklist above.
 - Live bank sync and real mail OAuth exchange: manual direct checks; the
   automation seam stays at the sync-apply and fetch boundaries with the

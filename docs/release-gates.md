@@ -12,64 +12,33 @@ Vercel workflow uses the `Tests` gate directly for production frontend deploys.
 
 ## 1. Automated test gates
 
-The hosted `Tests` workflow runs the whole gate. To repeat it locally when
-CI is unavailable:
+For ordinary changes, run the narrowest relevant local check, then watch
+hosted `Tests` for the exact branch and landed commit. Do not repeat a
+blanket manual backend checklist. Add a direct disposable-state check only
+when a changed boundary lacks automated coverage, and record that gap.
+
+The optional local aggregate is:
 
 ```bash
 scripts/test --gate
 ```
 
-That single entry point checks install drift, generates the API client,
-runs the backend, frontend, and extension gates, then runs the browser
-suite in shards. `KEEP_GATE_LOGS=1` keeps per-group logs for forensics.
-`scripts/test --all` covers unit then integration; `scripts/test --unit`
-needs no servers, Docker, or credentials.
+Local command coverage and recipes live in [TESTING.md](../TESTING.md#completion-gate).
+The local aggregate is not the entire hosted workflow: hosted jobs also
+verify the income sidecar, Northflank deployment image, and Python
+payment-pattern upgrade. The workflow owns that inventory. Unit checks
+need no pre-existing stack, Docker daemon, or external credentials;
+package tests may create disposable local listeners.
 
-Backend gate (covers the calculation authority, persistence, HTTP/SSE
-policy, and synchronization):
+Browser integration owns isolated servers and temporary databases.
+It never attaches to the dev stack. Frontend and extension execution
+recipes remain in the testing guide and [extension guide](../extension/README.md).
 
-```bash
-backend/scripts/verify.sh ./internal/domain/...
-backend/scripts/verify.sh ./internal/api/...
-backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/simplefin
-backend/scripts/verify.sh ./cmd/server
-CGO_ENABLED=0 go -C backend build ./...
-git diff --check
-```
-
-`backend/scripts/verify.sh` runs the formatter check, the vet check, and
-the package tests with the production driver setting. The repository-wide
-`backend/scripts/verify.sh` catches cross-package breakage.
-
-Frontend gates (run from the repository root):
-
-```bash
-bun install --frozen-lockfile
-bun --filter ./frontend lint
-bun --filter ./frontend typecheck
-bun --filter ./frontend test:unit
-bun --filter ./frontend build
-bun --filter ./frontend test:integration
-```
-
-The integration suite drives the real engine over real HTTP on random free
-ports with a fresh temporary database per run. It never attaches to a dev
-server. Each shard starts its own servers, so concurrent runs stay
-isolated. Generate the API client before running frontend scripts
-directly (`bun --filter ./frontend api:generate`); the gate runner
-refreshes it so standalone runs never use a stale tree.
-
-Extension gates:
-
-```bash
-bun --filter ./extension lint
-bun --filter ./extension build
-bun --filter ./extension test:browser
-```
-
-with unit coverage under `bun --filter ./extension test`. See
-[extension setup and verification](../extension/README.md).
+Real-provider identity checks run automatically through the
+[disposable E2E gate](e2e-gate.md) with generated credentials. It runs
+nightly, on dispatch, and for pull requests carrying the `e2e` label.
+Dispatch it for auth, image, migration, and proxy changes. Partial E2E
+selections are debugging evidence, not a full release gate.
 
 Cross-feature journeys (QA-03) must pass repeatedly with no flakes
 before a release. They compose receipt review, recurring promotion,
@@ -113,16 +82,20 @@ the QA-03 test files' headers and in section 4 below.
   the actual-provider checklist in [the deployment index](../deploy/README.md)
   stays manual. Vercel deploys after the `Tests` run for the pushed `main`
   commit succeeds. Northflank deploys after the pinned images for that commit
-  are published; the image workflow itself runs only after `Tests` succeeds.
+   are published and the operator-owned `AUTH_CUTOVER_READY` guard is enabled;
+   the image workflow itself runs only after `Tests` succeeds. Landing and
+   release are distinct. A disabled guard must be reported as deployment
+   not requested, not as a successful deployment. An actual Northflank release
+   requires its workflow run ID, successful migration step, backup hash,
+   and an `ok` readiness response. Do not enable live cutover as a test step.
 
 ## 3. Credential-gated and manual gates
 
-These need real credentials, devices, or providers and stay manual.
+These need operator-owned external accounts, devices, or live targets and stay manual.
 A release notes each outcome; a skip names its reason.
 
-- Real-provider identity checks use [the authentication guide](../auth/README.md)
-  and `E2E_TEST_MUTATIONS=1 scripts/test --e2e` against disposable state.
-  Live target conversion and offline recovery remain operator checks.
+- Live target identity conversion and offline recovery use
+  [the authentication guide](../auth/README.md) and remain operator checks.
 - Physical passkeys and phone recovery: the [manual checklist](authentication.md#manual-physical-device-and-recovery-checklist).
 - Live bank verification: the SimpleFIN direct checks in
   [TESTING.md](../TESTING.md#simplefin-checks) with a writable owner
