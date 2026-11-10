@@ -103,11 +103,8 @@ export function SafeSpendingPreview({
 	// Hooks stay mounted while rows load, so derivations below are
 	// null-safe; the null gate before rendering only skips output.
 	const projectionTransactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
-	const cards = useMemo(
-		() =>
-			visibleAccounts(accounts ?? []).filter(
-				(account) => account.kind === "debt",
-			),
+	const candidateAccounts = useMemo(
+		() => visibleAccounts(accounts ?? []),
 		[accounts],
 	);
 	const settingsState = useSafeSpendingSettings();
@@ -131,19 +128,29 @@ export function SafeSpendingPreview({
 	});
 	const staleData = displayToday > (startDate ?? displayToday).slice(0, 10);
 
-	const trackedIds = useMemo(() => {
-		// Spending cards are debt accounts by convention (`*_card`); loans
-		// and other debt fall back to the full set when no card is present.
-		const cardLike = cards
-			.map((card) => card.id)
-			.filter((id) => id.endsWith("_card"));
-		const fallback = cardLike.length ? cardLike : cards.map((card) => card.id);
-		return resolveEffectiveIds(
-			settings.accountIds,
-			cards.map((card) => card.id),
-			fallback,
+	// Tracked cards are a user designation across every account. Before one
+	// is made, the default set stays the model's card accounts: `*_card`
+	// debt accounts, else debt accounts.
+	const defaultCardIds = useMemo(() => {
+		const debtAccounts = candidateAccounts.filter(
+			(account) => account.kind === "debt",
 		);
-	}, [settings.accountIds, cards]);
+		const cardLike = debtAccounts
+			.map((account) => account.id)
+			.filter((id) => id.endsWith("_card"));
+		return cardLike.length
+			? cardLike
+			: debtAccounts.map((account) => account.id);
+	}, [candidateAccounts]);
+	const trackedIds = useMemo(
+		() =>
+			resolveEffectiveIds(
+				settings.accountIds,
+				candidateAccounts.map((account) => account.id),
+				defaultCardIds,
+			),
+		[settings.accountIds, candidateAccounts, defaultCardIds],
+	);
 
 	const { cycle, closedCycle, perAccount, chargeCycles } = useCardCycleActivity(
 		{
@@ -152,7 +159,7 @@ export function SafeSpendingPreview({
 			startDate: startDate ?? displayToday,
 			checkpoints,
 			projection,
-			cards,
+			cards: candidateAccounts,
 			trackedIds,
 			statementDay: settings.statementDay,
 			displayToday,
@@ -522,35 +529,12 @@ export function SafeSpendingPreview({
 			</Notice>
 		);
 	if (!projection && !pending) return null;
-	if (!savedRowsPending && !settingsState.pending && !cards.length) {
-		return (
-			<Card aria-label="Safe card spending" className="relative">
-				<div className="flex items-center justify-between gap-4">
-					<h2 className={cardHeadingStyles}>
-						<CalendarDays
-							size={16}
-							className="shrink-0 text-muted"
-							aria-hidden="true"
-						/>
-						Safe card spending
-					</h2>
-				</div>
-				<p className="m-0 text-sm leading-relaxed text-muted">
-					Add a debt account to track a card statement cycle here.
-				</p>
-			</Card>
-		);
-	}
 
 	const { fullDaysLeft } = currentView.view.heroes;
 	const inlineView = cycleViewTab === "cycle" ? currentView : lastView;
 
 	const toggleAccount = (accountId: string) => {
-		const cardLike = cards
-			.map((card) => card.id)
-			.filter((id) => id.endsWith("_card"));
-		const fallback = cardLike.length ? cardLike : cards.map((card) => card.id);
-		const explicit = settings.accountIds ?? fallback;
+		const explicit = settings.accountIds ?? defaultCardIds;
 		const next = explicit.includes(accountId)
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];
@@ -634,50 +618,68 @@ export function SafeSpendingPreview({
 					Safe card spending
 				</h2>
 			</div>
-			<p className="m-0 text-xs">
-				{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
-				{fullDaysLeft === 1 ? "day" : "days"} left
-				{staleData
-					? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
-					: ""}
-			</p>
-			<SegmentedControl
-				className="mb-4"
-				ariaLabel="Safe card spending cycle view"
-				value={cycleViewTab}
-				onChange={setCycleViewTab}
-				items={SAFE_SPENDING_DETAIL_TABS.filter(
-					(
-						item,
-					): item is Extract<
-						(typeof SAFE_SPENDING_DETAIL_TABS)[number],
-						{ view: "charges" }
-					> => isSafeSpendingCycleTab(item.id),
-				).map((item) => ({ value: item.id, label: item.label }))}
-			/>
-			<SafeSpendingBillsPanel
-				heroes={inlineView.view.heroes}
-				cashNow={inlineView.view.cashNow}
-				allocation={inlineView.view.allocation}
-				funding={inlineView.view.funding}
-				trend={inlineView.trend}
-				section={inlineView.section}
-				closed={cycleViewTab === "last-cycle"}
-				accounts={accounts ?? []}
-				transactions={savedState}
-				readOnly={readOnly}
-				transactionOrder={transactionOrder}
-				onTransactionOrderChange={setTransactionOrder}
-			/>
-			<div className="flex flex-wrap items-center gap-4 border-t border-line pt-4">
-				<TextButton onClick={() => onDetail("cycle")}>
-					This cycle transactions
-				</TextButton>
-				<TextButton className="ml-auto" onClick={() => onDetail("last-cycle")}>
-					Last cycle transactions
-				</TextButton>
-				<TextButton onClick={() => onDetail("configure")}>Configure</TextButton>
-			</div>
+			{trackedIds.length > 0 ? (
+				<>
+					<p className="m-0 text-xs">
+						{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
+						{fullDaysLeft === 1 ? "day" : "days"} left
+						{staleData
+							? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
+							: ""}
+					</p>
+					<SegmentedControl
+						className="mb-4"
+						ariaLabel="Safe card spending cycle view"
+						value={cycleViewTab}
+						onChange={setCycleViewTab}
+						items={SAFE_SPENDING_DETAIL_TABS.filter(
+							(
+								item,
+							): item is Extract<
+								(typeof SAFE_SPENDING_DETAIL_TABS)[number],
+								{ view: "charges" }
+							> => isSafeSpendingCycleTab(item.id),
+						).map((item) => ({ value: item.id, label: item.label }))}
+					/>
+					<SafeSpendingBillsPanel
+						heroes={inlineView.view.heroes}
+						cashNow={inlineView.view.cashNow}
+						allocation={inlineView.view.allocation}
+						funding={inlineView.view.funding}
+						trend={inlineView.trend}
+						section={inlineView.section}
+						closed={cycleViewTab === "last-cycle"}
+						accounts={accounts ?? []}
+						transactions={savedState}
+						readOnly={readOnly}
+						transactionOrder={transactionOrder}
+						onTransactionOrderChange={setTransactionOrder}
+					/>
+					<div className="flex flex-wrap items-center gap-4 border-t border-line pt-4">
+						<TextButton onClick={() => onDetail("cycle")}>
+							This cycle transactions
+						</TextButton>
+						<TextButton
+							className="ml-auto"
+							onClick={() => onDetail("last-cycle")}
+						>
+							Last cycle transactions
+						</TextButton>
+						<TextButton onClick={() => onDetail("configure")}>
+							Configure
+						</TextButton>
+					</div>
+				</>
+			) : (
+				<div className="grid gap-3">
+					<p className="m-0 text-sm leading-relaxed text-muted">
+						Its statement cycle, spending, and balance settle here.
+					</p>
+					<TextButton onClick={() => onDetail("configure")}>
+						Choose a card
+					</TextButton>
+				</div>
+			)}
 			{detail && (
 				<SafeSpendingDetailShell
 					tab={detail}
@@ -711,7 +713,10 @@ export function SafeSpendingPreview({
 							config={{
 								statementDay: settings.statementDay,
 								reserve: settings.reserve,
-								cards: cards.map((card) => ({ id: card.id, name: card.name })),
+								cards: candidateAccounts.map((account) => ({
+									id: account.id,
+									name: account.name,
+								})),
 								trackedIds,
 								spendingAccounts: spendableAccounts.map((account) => ({
 									id: account.id,

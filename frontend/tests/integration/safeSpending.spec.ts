@@ -531,6 +531,32 @@ test("outlook shows the spending pace graph above the net worth graph", async ({
 	).toBeVisible();
 });
 
+test("designates any account as a tracked card and persists the choice", async ({
+	page,
+}) => {
+	await page.goto("/outlook?detail=safe-spending&tab=configure");
+	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
+	const tracked = drawer.getByRole("group", { name: "Tracked cards" });
+	const checking = tracked.getByRole("button", { name: /Everyday checking/ });
+	const loan = tracked.getByRole("button", { name: /Student loan/ });
+	await expect(checking).toHaveAttribute("aria-pressed", "false");
+	await expect(loan).toHaveAttribute("aria-pressed", "true");
+	const saved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith("/v1/safe-spending-settings") &&
+			response.request().method() === "PUT" &&
+			(response.request().postDataJSON()?.accountIds ?? []).length === 1,
+	);
+	await checking.click();
+	await loan.click();
+	await saved;
+	await expect(checking).toHaveAttribute("aria-pressed", "true");
+	await expect(loan).toHaveAttribute("aria-pressed", "false");
+	await page.reload();
+	await expect(checking).toHaveAttribute("aria-pressed", "true");
+	await expect(loan).toHaveAttribute("aria-pressed", "false");
+});
+
 for (const theme of ["light", "dark"] as const) {
 	test(`household budget fits a narrow ${theme} drawer and passes accessibility checks`, async ({
 		page,
