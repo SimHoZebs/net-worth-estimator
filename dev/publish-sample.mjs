@@ -40,7 +40,7 @@ export async function main(args) {
   const { values, positionals } = parsePublishArgs(args);
   if (values.help) {
     console.log(
-      "Usage: ./dev/main.mjs publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME]",
+      "Usage: scripts/dev publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME]",
     );
     return;
   }

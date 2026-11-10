@@ -16,7 +16,7 @@ Deep references for design and policy detail: [technical overview](TECHNICAL_OVE
 
 ## Develop
 
-Run `./dev/main.mjs setup` once, then the dedicated dev Compose stack:
+Run `scripts/dev setup` once, then the dedicated dev Compose stack:
 
 ```bash
 docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait

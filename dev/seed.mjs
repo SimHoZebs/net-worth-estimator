@@ -19,7 +19,7 @@ export function parseSeedArgs(args) {
 }
 
 export function validateSeed(values, positionals = []) {
-  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use ./dev/main.mjs --help.");
+  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   slotFromOptions(values);
   if (values.tailnet) throw new Error("--tailnet applies only to setup");
   if (values.pack !== undefined)
@@ -105,7 +105,7 @@ export async function main(args) {
   const { values, positionals } = parseSeedArgs(args);
   if (values.help) {
     console.log(
-      "Usage: ./dev/main.mjs seed (--bulk NxM[:seed] | --clear) [--user users/<64hex>] [--slot NAME]",
+      "Usage: scripts/dev seed (--bulk NxM[:seed] | --clear) [--user users/<64hex>] [--slot NAME]",
     );
     return;
   }

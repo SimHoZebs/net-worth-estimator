@@ -7,7 +7,7 @@
 Requires Docker Compose 5.0+, Node 24+, and Bun 1.4.4.
 
 ```bash
-./dev/main.mjs setup
+./scripts/dev setup
 ```
 
 Setup generates private credentials, provisions Better Auth and Casbin, and snapshots the stopped production database; stop the production container first so the file copies cleanly. Use `setup --from /absolute/path/backup.db` for an existing shared-schema backup and `--source-user "$SOURCE_USER"` when the source has several private users. Setup copies the selected financial data into the bootstrap dev user, excludes production identity records and other users, and does not start the API or frontend. Daily startup requires the existing complete schema and never creates or repairs a database.
@@ -35,20 +35,20 @@ sudo tailscale serve --bg --https=5178 http://127.0.0.1:5178
 sudo tailscale serve --bg --https=8000 http://127.0.0.1:8000
 ```
 
-For a new dev identity, run `./dev/main.mjs setup --tailnet`. Setup checks the routes without changing them and prints the HTTPS frontend and issuer URLs. Never reset shared Serve settings or switch an existing issuer to another origin without an explicit identity migration.
+For a new dev identity, run `scripts/dev setup --tailnet`. Setup checks the routes without changing them and prints the HTTPS frontend and issuer URLs. Never reset shared Serve settings or switch an existing issuer to another origin without an explicit identity migration.
 
 ## Explicit data operations
 
 Start the stack before these operations. Each command validates the incoming database, stops the API for the scoped update, then starts the same API container. `refresh-db` reads the configured snapshot source by default; stop the production container first so the file copies cleanly. `publish-sample` reads the current dev database by default.
 
 ```bash
-./dev/main.mjs refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
-./dev/main.mjs refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
-./dev/main.mjs publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
-./dev/main.mjs seed --bulk 20x200:7
-./dev/main.mjs seed --clear
-./dev/main.mjs demo --pack safe-spending
-./dev/main.mjs demo --pack safe-spending-shortfall
+./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
+./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
+./scripts/dev publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
+./scripts/dev seed --bulk 20x200:7
+./scripts/dev seed --clear
+./scripts/dev demo --pack safe-spending
+./scripts/dev demo --pack safe-spending-shortfall
 ```
 
 `refresh-db` backs up the shared application database under `tmp/dev/backups/` and replaces only the selected private user, preserving identities, passkeys, sessions, grants, logout records, and other users. `seed` injects tagged synthetic accounts beside existing dev data and `seed --clear` removes only those rows; real rows stay untouched and the prior database is backed up first. The default target is the bootstrap dev owner; pass `--user users/<64hex>` for another scope. `demo` starts the browser fixture API and Vite on isolated ports with a throwaway database and the named fixture pack; stop it with Ctrl-C. Automated checks may set `DEMO_HEADLESS=1` and `DEMO_EXIT_AFTER_MS=<ms>`. `publish-sample` publishes into the provisioned guest scope, never a sample wire; approve the exact financial data first, and use `--financial-only` to omit receipts, private projection history, Bridge links and credentials, sync keys and mappings, sync times, migration history, private defaults, and the source path.

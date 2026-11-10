@@ -13,7 +13,7 @@ export function parseStatusArgs(args) {
 }
 
 export function validateStatus(values, positionals = []) {
-  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use ./dev/main.mjs --help.");
+  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   if (values.slot || values.from || values.user || values["source-user"]) {
     throw new Error("ps-all takes no scope options. Run it bare to list every dev stack.");
   }
@@ -65,7 +65,7 @@ export async function main(args) {
   process.umask(0o077);
   const { values, positionals } = parseStatusArgs(args);
   if (values.help) {
-    console.log("Usage: ./dev/main.mjs ps-all");
+    console.log("Usage: scripts/dev ps-all");
     return;
   }
   await run(values, positionals);

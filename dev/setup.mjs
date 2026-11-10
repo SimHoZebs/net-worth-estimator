@@ -30,7 +30,7 @@ export function parseSetupArgs(args) {
 }
 
 export function validateSetup(values, positionals = []) {
-  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use ./dev/main.mjs --help.");
+  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   const slot = slotFromOptions(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
@@ -257,7 +257,7 @@ export async function main(args) {
   const { values, positionals } = parseSetupArgs(args);
   if (values.help) {
     console.log(
-      "Usage: ./dev/main.mjs setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--auth-port N] [--backend-port N]",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--auth-port N] [--backend-port N]",
     );
     return;
   }

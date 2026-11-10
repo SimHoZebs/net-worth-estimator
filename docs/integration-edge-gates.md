@@ -72,7 +72,7 @@ Loading per harness:
   fixtureapi harness applies the pack's model and settings seeds on its own isolated ports and throwaway database; the
   Playwright config forwards the variable explicitly. Empty keeps the default
   fixture.
-- Manual demo: `./dev/main.mjs demo --pack safe-spending` starts the same
+- Manual demo: `scripts/dev demo --pack safe-spending` starts the same
   fixture API and Vite on isolated ports, sets the browser clock to the pack's
   anchor date, and opens a headed browser. `safe-spending-shortfall` shows the
   unfulfilled recurring bill. It never touches the dev stack or owner data.

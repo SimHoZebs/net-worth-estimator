@@ -38,7 +38,7 @@ For manual UI exploration, use synthetic data without a production snapshot or i
 bun install --frozen-lockfile
 bun --filter ./frontend api:generate
 (cd frontend && bunx --no-install playwright install chromium)
-./dev/main.mjs demo --pack safe-spending
+scripts/dev demo --pack safe-spending
 ```
 
 The demo uses the browser fixture harness and stops with Ctrl-C. Snapshot-backed development with production images is optional and owned by [dev/README.md](dev/README.md). Its `refresh-db` command replaces only the dev financial database from a consistent production snapshot.
@@ -48,10 +48,10 @@ Dev setup checks: `node --test dev/*.test.mjs`. Provider checks: `bun --filter @
 Parallel agents use isolated slots instead of stopping the canonical stack or stealing its ports:
 
 ```bash
-./dev/main.mjs setup --slot shots
+scripts/dev setup --slot shots
 docker compose --env-file .env.dev.shots -f docker-compose.dev.yml up -d --build --wait
 docker compose --env-file .env.dev.shots -f docker-compose.dev.yml down
-./dev/main.mjs ps-all
+scripts/dev ps-all
 ```
 
 State lives in `tmp/dev-<slot>/`, the env file is `.env.dev.<slot>`, and the Compose project is `waypoint-dev-<slot>`. Slots are loopback-only; `--tailnet` stays on the canonical stack.
@@ -138,7 +138,6 @@ INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:integ
 The local aggregate and hosted CI run the Go journeys once and never set `INTEGRATION_PACK=ledger`, so the browser leg of the completeness journey skips itself there. The repetition and the browser leg are separate release work.
 
 ## Shared database isolation
-
 Isolation tests must use at least two users in the same physical SQLite file, with identical entity IDs, preset names, and upstream sync keys. Separate fixture files alone do not prove row-level isolation.
 
 ```bash

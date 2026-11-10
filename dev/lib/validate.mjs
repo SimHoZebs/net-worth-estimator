@@ -5,7 +5,7 @@ import { slotFromOptions } from "../config.mjs";
 // live here so behavior and error text stay identical.
 export function rejectPositionals(
   positionals,
-  message = "Unexpected dev arguments. Use ./dev/main.mjs --help.",
+  message = "Unexpected dev arguments. Use scripts/dev --help.",
 ) {
   if (positionals.length > 0) throw new Error(message);
 }

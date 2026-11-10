@@ -37,7 +37,7 @@ export async function main(args) {
   const { values, positionals } = parseRefreshArgs(args);
   if (values.help) {
     console.log(
-      "Usage: ./dev/main.mjs refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME]",
+      "Usage: scripts/dev refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME]",
     );
     return;
   }

@@ -27,7 +27,7 @@ function anchorFor(packPath) {
 
 export function validateDemo(values, positionals = []) {
   if (positionals.length > 0)
-    throw new Error("Unexpected demo arguments. Use ./dev/main.mjs --help.");
+    throw new Error("Unexpected demo arguments. Use scripts/dev --help.");
   for (const key of [
     "bulk",
     "clear",
@@ -103,7 +103,7 @@ export async function run(values, positionals) {
 export async function main(args) {
   const { values, positionals } = parseDemoArgs(args);
   if (values.help) {
-    console.log("Usage: ./dev/main.mjs demo [--pack NAME]");
+    console.log("Usage: scripts/dev demo [--pack NAME]");
     return;
   }
   await run(values, positionals);

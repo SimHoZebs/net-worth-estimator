@@ -79,7 +79,7 @@ bun --filter @waypoint/auth build
 bun run auth/better-auth/src/server.ts
 ```
 
-For Compose, merge `docker-compose.yml` and `auth/compose.auth.yml`, and set `AUTH_STATE_DIR` to the private identity directory. Neither server creates or repairs its schema. Use `./dev/main.mjs setup --slot NAME` for isolated development.
+For Compose, merge `docker-compose.yml` and `auth/compose.auth.yml`, and set `AUTH_STATE_DIR` to the private identity directory. Neither server creates or repairs its schema. Use `scripts/dev setup --slot NAME` for isolated development.
 
 ## Existing installations
 
