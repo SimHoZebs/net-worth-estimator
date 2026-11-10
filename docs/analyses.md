@@ -211,21 +211,23 @@ deployment requirements.
 
 ## Pattern to new schedule
 
-A confirmed repeating pattern becomes planned cash flow only through
-explicit approval in two steps: preview, then approve. Observed patterns
+A repeating pattern becomes planned cash flow through an explicit schedule
+action: preview, then create or link. Saving also records acceptance of the
+pattern in the same database transaction. No standalone confirmation is required.
+Previewing or cancelling never records acceptance. Observed patterns
 and forecast definitions stay different resources: findings and feedback
 remain the evidence, schedules remain the forecast.
 
 - `GET /v1/analysis-findings/{id}/pattern-to-new-schedule-preview` describes the schedule the
   pattern would create (name, amount, schedule, start) plus the forecast
   movements behind it and the recorded evidence. The plan stays visible
-  before confirmation, with approval waiting on it. Patterns that repeat
+  before acceptance, with creation available directly. Patterns that repeat
   every two weeks stay visible with a plain-language reason: schedules expand
   weekly, monthly, quarterly, or yearly, and no biweekly schedule exists
   yet.
 - `POST /v1/analysis-findings/{id}/pattern-to-new-schedule` creates the approved
   schedule through the ordinary finance row-write contract (validation,
-  revision, last-write-wins). It requires a confirmed finding and refuses a
+  revision, last-write-wins). It accepts an active, non-dismissed finding and refuses a
   second active schedule for the same pattern with 409.
 - One active generated schedule belongs to one confirmed source pattern. The
   record lives in `analysis_promotions` beside the evidence, never inside the
@@ -246,7 +248,7 @@ user clear removes pattern-to-new-schedule records with the model rows they name
 
 ## Pattern to existing schedule
 
-A confirmed pattern can also claim an existing schedule's occurrences instead
+A repeating pattern can also claim an existing schedule's occurrences instead
 of creating a new schedule. Each recorded movement becomes a manual
 `TransactionClaim` against its nearest free scheduled occurrence, so the
 projection stops double-counting and the recorded rows stay intact.
@@ -258,8 +260,8 @@ projection stops double-counting and the recorded rows stay intact.
   tolerance (15% of the nominal interval, at least one day). Preview is
   available in read-only mode, like new-schedule preview.
 - `POST /v1/analysis-findings/{id}/pattern-to-existing-schedule` with `{scheduleId}`
-  requires a confirmed finding and applies all claims through the
-  ordinary finance validation boundary in one atomic store write
+  accepts an active, non-dismissed finding and applies all claims and pattern
+  acceptance through the ordinary finance validation boundary in one atomic store write
   (concurrent additions serialize on a process-wide mutex). Already-correct
   claims stay put; other enabled transactions' claims on the same dates are
   never reused (disabled rows claim nothing, so their dates stay free).

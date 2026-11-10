@@ -82,7 +82,7 @@ func callAPI(t *testing.T, handler http.Handler, method, path, body string) *htt
 func TestPatternToNewScheduleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
-	handler := New(scoped, Config{})
+	handler := New(scoped, Config{Actor: func(context.Context) string { return "verified-subject" }})
 	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule-preview"
 	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule"
 
@@ -96,13 +96,13 @@ func TestPatternToNewScheduleHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Creatable {
-		t.Fatal("unconfirmed pattern previews as creatable")
+	if !preview.Preview.Creatable {
+		t.Fatal("unanswered pattern should be creatable")
 	}
-	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
-		t.Fatalf("unconfirmed create=%d %s", res.Code, res.Body.String())
+	feedbackBefore, err := scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})
+	if err != nil || len(feedbackBefore) != 0 {
+		t.Fatalf("preview wrote feedback: %+v %v", feedbackBefore, err)
 	}
-	confirmAPIFinding(t, handler, findings[0])
 	res = callAPI(t, handler, "GET", previewPath, "")
 	if res.Code != 200 {
 		t.Fatalf("preview=%d %s", res.Code, res.Body.String())
@@ -183,7 +183,7 @@ func TestPatternToNewScheduleHTTPContract(t *testing.T) {
 		t.Fatalf("evidence=%+v err=%v", findingsAfter, err)
 	}
 	feedback, err := scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})
-	if err != nil || len(feedback) != 1 {
+	if err != nil || len(feedback) != 1 || feedback[0].Actor != "verified-subject" {
 		t.Fatalf("feedback=%+v err=%v", feedback, err)
 	}
 	for _, config := range []Config{{ReadOnly: true}, {CanWrite: func(context.Context) bool { return false }}} {

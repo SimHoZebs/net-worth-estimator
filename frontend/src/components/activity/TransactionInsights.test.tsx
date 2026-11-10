@@ -6,6 +6,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runInteractions } from "@/mocks/interactions.ts";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
@@ -18,6 +19,33 @@ import {
 
 const reviewMutate = vi.hoisted(() => vi.fn());
 const dismissMutate = vi.hoisted(() => vi.fn());
+
+it("offers schedule actions for repeating payments without a Yes step", async () => {
+	render(
+		<TransactionInsightsPanel
+			suggestions={buildInsightSuggestions({
+				findings: [recurringFinding("one", "a"), recurringFinding("two", "b")],
+				transactionId: "a",
+			})}
+			names={new Map([["a", "Grocer"]])}
+			readOnly={false}
+			onDone={() => {}}
+		/>,
+	);
+	expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
+	await runInteractions([
+		{ click: ["button", "Create forecast schedule for Grocer"] },
+		{ expectText: "The forecast plan could not be loaded. Try again." },
+		{ click: ["button", "Close dialog"] },
+		{ click: ["button", "Not repeating"] },
+	]);
+	expect(reviewMutate).toHaveBeenCalledWith(
+		expect.objectContaining({
+			input: expect.objectContaining({ action: "reject" }),
+		}),
+		expect.anything(),
+	);
+});
 
 vi.mock("@/state/analyses.ts", () => ({
 	useReviewAnalysisFinding: () => ({

@@ -11,7 +11,7 @@ import (
 func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
-	handler := New(scoped, Config{})
+	handler := New(scoped, Config{Actor: func(context.Context) string { return "verified-subject" }})
 	// Create an existing monthly rule that matches the pattern routing.
 	ruleBody, _ := json.Marshal(map[string]any{
 		"name": "Grocer", "sourceAccountId": "checking",
@@ -42,15 +42,10 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Claimable {
-		t.Fatalf("unconfirmed preview claimable=%+v", preview.Preview)
+	feedbackBefore, err := scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})
+	if err != nil || len(feedbackBefore) != 0 {
+		t.Fatalf("preview wrote feedback: %+v %v", feedbackBefore, err)
 	}
-	addBody, _ := json.Marshal(map[string]any{"scheduleId": ruleID})
-	// Adding before confirmation is rejected without touching the model.
-	if res := callAPI(t, handler, "POST", addPath, string(addBody)); res.Code != 422 {
-		t.Fatalf("unconfirmed add=%d %s", res.Code, res.Body.String())
-	}
-	confirmAPIFinding(t, handler, findings[0])
 	res = callAPI(t, handler, "GET", previewPath, "")
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
@@ -65,7 +60,7 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	if len(want) != 3 {
 		t.Fatalf("assignments=%+v", preview.Preview.Assignments)
 	}
-	addBody, _ = json.Marshal(map[string]any{"scheduleId": ruleID})
+	addBody, _ := json.Marshal(map[string]any{"scheduleId": ruleID})
 	res = callAPI(t, handler, "POST", addPath, string(addBody))
 	if res.Code != 200 {
 		t.Fatalf("add=%d %s", res.Code, res.Body.String())
@@ -96,6 +91,10 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	}
 	if claimed != 3 {
 		t.Fatalf("claimed=%d model=%+v", claimed, model.Transactions)
+	}
+	feedback, err := scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})
+	if err != nil || len(feedback) != 1 || feedback[0].Review.Decision != "confirmed" || feedback[0].Actor != "verified-subject" {
+		t.Fatalf("acceptance=%+v err=%v", feedback, err)
 	}
 	// Idempotent retry keeps the same claims.
 	res = callAPI(t, handler, "POST", addPath, string(addBody))

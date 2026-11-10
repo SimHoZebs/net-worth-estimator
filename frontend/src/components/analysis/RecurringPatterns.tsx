@@ -72,7 +72,7 @@ export function NewScheduleDialog({
 				<ErrorNotice message="The forecast plan could not be loaded. Try again." />
 			) : created ? (
 				<div className="space-y-3">
-					<p className="m-0 text-sm">
+					<p className="m-0 text-sm" role="status">
 						Forecast schedule “{created}” created. Future{" "}
 						{plan.schedule
 							? frequencyLabel(plan.schedule.frequency).toLowerCase()
@@ -151,7 +151,7 @@ export function NewScheduleDialog({
 									)
 								}
 							>
-								{create.isPending ? "Creating…" : "Approve and create schedule"}
+								{create.isPending ? "Creating…" : "Create forecast schedule"}
 							</Button>
 						)}
 					</div>
@@ -336,33 +336,6 @@ function PatternCard({
 				}
 			/>
 			<div className="flex flex-wrap gap-2">
-				{!readOnly && !confirmed && !rejected && (
-					<>
-						<Button
-							type="button"
-							size="sm"
-							disabled={feedback.isPending}
-							aria-label={`Confirm repeating pattern for ${title}`}
-							onClick={() =>
-								feedback.mutate(answerInput(pattern.anchor, "confirm"))
-							}
-						>
-							Confirm
-						</Button>
-						<Button
-							type="button"
-							size="sm"
-							variant="secondary"
-							disabled={feedback.isPending}
-							aria-label={`Reject repeating pattern for ${title}`}
-							onClick={() =>
-								feedback.mutate(answerInput(pattern.anchor, "reject"))
-							}
-						>
-							Not repeating
-						</Button>
-					</>
-				)}
 				{!readOnly && rejected && (
 					<Button
 						type="button"
@@ -380,11 +353,11 @@ function PatternCard({
 				<Button
 					type="button"
 					size="sm"
-					variant="secondary"
-					aria-label={`Review forecast plan for ${title}`}
+					variant={readOnly ? "secondary" : "primary"}
+					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
 					onClick={() => setPlanOpen(true)}
 				>
-					Review forecast plan
+					{readOnly ? "Review forecast plan" : "Create forecast schedule"}
 				</Button>
 				<Button
 					type="button"
@@ -395,6 +368,20 @@ function PatternCard({
 				>
 					Link to existing schedule
 				</Button>
+				{!readOnly && !confirmed && !rejected && (
+					<Button
+						type="button"
+						size="sm"
+						variant="secondary"
+						disabled={feedback.isPending}
+						aria-label={`Reject repeating pattern for ${title}`}
+						onClick={() =>
+							feedback.mutate(answerInput(pattern.anchor, "reject"))
+						}
+					>
+						Not repeating
+					</Button>
+				)}
 			</div>
 			{planOpen && (
 				<NewScheduleDialog
@@ -435,7 +422,8 @@ export function RecurringPatterns({
 			<header className="space-y-2">
 				<h2 className="m-0 text-lg font-semibold">Repeating payments</h2>
 				<p className="m-0 text-sm text-muted">
-					Review repeating payments before adding them to your forecast.
+					Create a forecast schedule or link payments to an existing schedule.
+					Saving records your acceptance of the repeating pattern.
 				</p>
 			</header>
 			{patterns.map((pattern) => (

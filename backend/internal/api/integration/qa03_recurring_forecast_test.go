@@ -89,11 +89,9 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	} else if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Creatable {
-		t.Fatal("unconfirmed pattern previews as creatable")
+	if !preview.Preview.Creatable {
+		t.Fatal("unanswered pattern should be creatable")
 	}
-
-	confirmAPIFinding(t, handler, findings[0])
 
 	if res := callAPI(t, handler, "GET", previewPath, ""); res.Code != 200 {
 		t.Fatalf("preview = %d %s", res.Code, res.Body.String())

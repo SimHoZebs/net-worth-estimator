@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { runInteractions } from "@/mocks/interactions.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { PatternToExistingSchedulePreview } from "@/api/generated/model/patternToExistingSchedulePreview.ts";
@@ -123,7 +124,32 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("repeating-payment patterns", () => {
-	it("confirms the pattern without leaving the list", () => {
+	it("leaves acceptance untouched when a preview is cancelled or creation fails", async () => {
+		previewState.data = creatablePreview();
+		render(
+			<RecurringPatterns
+				findings={[recurringFinding("one", "a")]}
+				names={names}
+				readOnly={false}
+			/>,
+		);
+		await runInteractions([
+			{ click: ["button", "Create forecast schedule for Grocer"] },
+			{ click: ["button", "Cancel"] },
+		]);
+		expect(createMutate).not.toHaveBeenCalled();
+		expect(reviewMutate).not.toHaveBeenCalled();
+		createMutate.mockImplementation(
+			(_args: unknown, options: { onError: () => void }) => options.onError(),
+		);
+		await runInteractions([
+			{ click: ["button", "Create forecast schedule for Grocer"] },
+			{ click: ["button", "Create forecast schedule"] },
+			{ expectText: "The schedule could not be created." },
+		]);
+		expect(reviewMutate).not.toHaveBeenCalled();
+	});
+	it("offers forecast actions without a standalone confirmation", async () => {
 		render(
 			<RecurringPatterns
 				findings={[recurringFinding("one", "a"), recurringFinding("two", "b")]}
@@ -133,15 +159,19 @@ describe("repeating-payment patterns", () => {
 		);
 		expect(screen.getByText("Grocer")).toBeDefined();
 		expect(screen.getByText("Monthly · Payment · 2 recorded")).toBeDefined();
-		fireEvent.click(
+		expect(screen.queryByRole("button", { name: /Confirm/ })).toBeNull();
+		expect(
 			screen.getByRole("button", {
-				name: "Confirm repeating pattern for Grocer",
+				name: "Create forecast schedule for Grocer",
 			}),
-		);
+		).toBeDefined();
+		await runInteractions([
+			{ click: ["button", "Reject repeating pattern for Grocer"] },
+		]);
 		expect(reviewMutate).toHaveBeenCalledWith(
 			expect.objectContaining({
 				id: "one",
-				input: expect.objectContaining({ action: "confirm" }),
+				input: expect.objectContaining({ action: "reject" }),
 			}),
 		);
 	});
@@ -155,7 +185,9 @@ describe("repeating-payment patterns", () => {
 			/>,
 		);
 		fireEvent.click(
-			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
+			screen.getByRole("button", {
+				name: "Create forecast schedule for Grocer",
+			}),
 		);
 		expect(screen.getByText("2026-03-15 · 30.00 USD")).toBeDefined();
 		expect(
@@ -172,7 +204,9 @@ describe("repeating-payment patterns", () => {
 			},
 		);
 		fireEvent.click(
-			screen.getByRole("button", { name: "Approve and create schedule" }),
+			screen.getByRole("button", {
+				name: "Create forecast schedule",
+			}),
 		);
 		expect(createMutate).toHaveBeenCalledWith(
 			{ id: "one" },
@@ -199,13 +233,17 @@ describe("repeating-payment patterns", () => {
 			/>,
 		);
 		fireEvent.click(
-			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
+			screen.getByRole("button", {
+				name: "Create forecast schedule for Grocer",
+			}),
 		);
 		expect(
 			screen.getByText(/cannot become forecast schedules yet/),
 		).toBeDefined();
 		expect(
-			screen.queryByRole("button", { name: "Approve and create schedule" }),
+			screen.queryByRole("button", {
+				name: "Create forecast schedule",
+			}),
 		).toBeNull();
 	});
 	it("hides answers and approval in read-only mode", () => {

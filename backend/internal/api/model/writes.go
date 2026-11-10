@@ -65,7 +65,7 @@ func runFinanceRowWriteGuarded[T any](s *handler, guard func(*types.FinancialMod
 // creation shares the manual row-write contract: validation, revision, and
 // last-write-wins.
 // Generated rules append after the current maximum priority.
-func PersistFinanceSchedule(st store.Store, rule types.Schedule) (types.Schedule, []types.ModelValidationIssue, bool, string, error) {
+func PersistFinanceSchedule(st store.Store, rule types.Schedule, persist func(types.Schedule) (types.Schedule, error)) (types.Schedule, []types.ModelValidationIssue, bool, string, error) {
 	resolved := rule
 	return runFinanceRowWriteWithStore(st, func(model *types.FinancialModel) {
 		max := -1
@@ -77,7 +77,7 @@ func PersistFinanceSchedule(st store.Store, rule types.Schedule) (types.Schedule
 		resolved.Priority = max + 1
 		model.Schedules = replaceByID(model.Schedules, resolved.ID, scheduleID, resolved)
 	}, func() (types.Schedule, error) {
-		return st.CreateSchedule(resolved)
+		return persist(resolved)
 	})
 }
 

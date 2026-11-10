@@ -3,6 +3,7 @@
 package modelstate
 
 import (
+	"errors"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
@@ -10,6 +11,8 @@ import (
 // WriteError maps storage failures to the existing model-write HTTP errors.
 func WriteError(err error) error {
 	switch {
+	case errors.Is(err, store.ErrAnalysisFeedbackConflict):
+		return huma.Error409Conflict("The saved data changed. Review the pattern again.")
 	case store.IsNotFound(err):
 		return huma.Error404NotFound("row not found")
 	case store.IsIDConflict(err):

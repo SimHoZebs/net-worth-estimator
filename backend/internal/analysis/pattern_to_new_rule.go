@@ -88,7 +88,6 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	if anchor.Status != "active" {
 		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
 	}
-	confirmed := anchor.Review != nil && anchor.Review.Decision == "confirmed"
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
 		occurrenceIDs = append(occurrenceIDs, evidence.TransactionIDs...)
@@ -200,9 +199,9 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	for _, date := range domain.RuleScheduleDates(rule, domain.AdvanceRuleDate(rule.StartDate, frequency, 5)) {
 		preview.Upcoming = append(preview.Upcoming, types.UpcomingNewScheduleOccurrence{Date: date, Amount: formatCents(typical)})
 	}
-	if !confirmed {
+	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
 		preview.Creatable = false
-		preview.Reason = "Confirm this repeating pattern before creating its forecast rule."
+		preview.Reason = "Review this repeating pattern again before creating its forecast schedule."
 	}
 	if input.ExistingScheduleID != "" {
 		preview.Creatable = false

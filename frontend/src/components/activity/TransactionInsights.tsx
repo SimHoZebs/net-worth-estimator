@@ -194,8 +194,7 @@ export function TransactionInsightsPanel({
 	const [voidSaving, setVoidSaving] = useState(false);
 	const [voidError, setVoidError] = useState<string | null>(null);
 	const [ruleDialog, setRuleDialog] = useState<"new" | "existing" | null>(null);
-	// A confirmed repeating pattern leaves the queue on refetch, so the
-	// detail step keeps its own snapshot to offer rule creation.
+	// Keep the pattern visible while a schedule action refreshes the queue.
 	const [recurringSnapshot, setRecurringSnapshot] =
 		useState<RecurringPattern | null>(null);
 	const durationRef = useRef<HTMLInputElement>(null);
@@ -244,8 +243,7 @@ export function TransactionInsightsPanel({
 		setVoidError(null);
 	};
 
-	// The detail step for a confirmed repeating pattern survives the
-	// refetch that drops it from the queue.
+	// An open schedule dialog survives acceptance removing the pattern from the queue.
 	const shown: InsightSuggestion | null =
 		recurringSnapshot != null
 			? { kind: "recurring", pattern: recurringSnapshot, priority: 2 }
@@ -291,7 +289,7 @@ export function TransactionInsightsPanel({
 		? "Did this hold post as one of these charges?"
 		: isBnpl
 			? `Is this a buy now, pay later payment from ${providerLabel(shown.finding.provider)}?`
-			: "Is this a repeating payment?";
+			: "Add this repeating payment to your forecast?";
 	const findingId =
 		shown.kind === "bnpl"
 			? shown.finding.id
@@ -346,8 +344,6 @@ export function TransactionInsightsPanel({
 			{
 				onSuccess: () => {
 					if (action === "confirm") {
-						if (active?.kind === "recurring")
-							setRecurringSnapshot(active.pattern);
 						setPhase("details");
 					} else if (active) markHandled(active);
 				},
@@ -482,7 +478,7 @@ export function TransactionInsightsPanel({
 						vanished hold record.
 					</p>
 				</div>
-			) : phase === "question" && !recurringSnapshot ? (
+			) : phase === "question" && !recurringSnapshot && isBnpl ? (
 				<div className="grid grid-cols-2 gap-2">
 					<Button
 						type="button"
@@ -536,27 +532,43 @@ export function TransactionInsightsPanel({
 			) : (
 				<div className="grid gap-2">
 					<p className="m-0 text-xs leading-relaxed text-muted">
-						Confirmed as repeating. Create its forecast schedule or link its
-						payments to an existing schedule. Recorded payments stay unchanged.
+						Create a forecast schedule or link payments to an existing schedule.
+						Saving records your acceptance of the pattern. Recorded payments
+						stay unchanged.
 					</p>
 					<div className="flex flex-wrap gap-2">
 						<Button
 							type="button"
-							variant="secondary"
+							variant="primary"
 							size="sm"
-							aria-label={`Review forecast plan for ${patternTitleText}`}
-							onClick={() => setRuleDialog("new")}
+							aria-label={`Create forecast schedule for ${patternTitleText}`}
+							onClick={() => {
+								setRecurringSnapshot(detailsPattern);
+								setRuleDialog("new");
+							}}
 						>
-							Review forecast plan
+							Create forecast schedule
 						</Button>
 						<Button
 							type="button"
 							variant="secondary"
 							size="sm"
 							aria-label={`Link repeating pattern for ${patternTitleText} to an existing schedule`}
-							onClick={() => setRuleDialog("existing")}
+							onClick={() => {
+								setRecurringSnapshot(detailsPattern);
+								setRuleDialog("existing");
+							}}
 						>
 							Link to existing schedule
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							disabled={busy || readOnly}
+							onClick={() => answer("reject")}
+						>
+							Not repeating
 						</Button>
 					</div>
 				</div>
@@ -572,7 +584,12 @@ export function TransactionInsightsPanel({
 				}
 			/>
 
-			<div className={mergeStyles(detailFooterClassName, "mt-8 max-sm:sticky max-sm:mx-0 max-sm:px-5")}>
+			<div
+				className={mergeStyles(
+					detailFooterClassName,
+					"mt-8 max-sm:sticky max-sm:mx-0 max-sm:px-5",
+				)}
+			>
 				{shown.kind === "void" ? (
 					<>
 						<Button
@@ -657,7 +674,10 @@ export function TransactionInsightsPanel({
 					findingId={detailsPattern.anchor.id}
 					title={patternTitleText}
 					readOnly={readOnly}
-					onClose={() => setRuleDialog(null)}
+					onClose={() => {
+						setRuleDialog(null);
+						setRecurringSnapshot(null);
+					}}
 				/>
 			)}
 			{ruleDialog === "existing" && detailsPattern && (
@@ -666,7 +686,10 @@ export function TransactionInsightsPanel({
 					title={patternTitleText}
 					names={names}
 					readOnly={readOnly}
-					onClose={() => setRuleDialog(null)}
+					onClose={() => {
+						setRuleDialog(null);
+						setRecurringSnapshot(null);
+					}}
 				/>
 			)}
 		</div>

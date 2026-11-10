@@ -113,9 +113,9 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 		preview.Reason = "This pattern changed since confirmation. Review it again."
 		return preview, nil
 	}
-	if anchor.Review == nil || anchor.Review.Decision != "confirmed" {
+	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
 		preview.Claimable = false
-		preview.Reason = "Confirm this repeating pattern before adding its payments to a forecast rule."
+		preview.Reason = "Review this repeating pattern again before linking its payments to a forecast schedule."
 		return preview, nil
 	}
 	assignments, err := analysis.BuildPatternToExistingSchedule(analysis.PatternToExistingScheduleInput{

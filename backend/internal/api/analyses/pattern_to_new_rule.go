@@ -80,8 +80,7 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 	}
 	if !preview.Creatable {
 		// A visible plan without a rule cannot become one yet. A visible
-		// plan with a rule waits on approval state: confirmation first,
-		// then at most one active rule per pattern.
+		// plan with a rule permits at most one active rule per pattern.
 		if preview.Schedule == nil {
 			return nil, huma.Error422UnprocessableEntity(preview.Reason)
 		}
@@ -101,16 +100,14 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 		StartDate:       preview.Schedule.StartDate,
 		Enabled:         true,
 	}
-	// Record the pattern-to-rule link before creating the rule row. A link
-	// without a rule reads as inactive, so a retry after an interrupted
-	// approval replaces the link instead of creating a second rule.
-	if err := s.store.RecordPatternToNewSchedule(types.PatternToNewSchedule{PatternKey: preview.PatternKey, ScheduleID: rule.ID}); err != nil {
-		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
+	actor := ""
+	if s.actor != nil {
+		actor = s.actor(ctx)
 	}
-	row, issues, saved, revision, err := model.PersistFinanceSchedule(s.store, rule)
+	row, issues, saved, revision, err := model.PersistFinanceSchedule(s.store, rule, func(schedule types.Schedule) (types.Schedule, error) {
+		return s.store.CreatePatternSchedule(input.ID, preview.PatternKey, actor, schedule)
+	})
 	if err != nil || !saved {
-		// Leave a concurrent winner's link alone: remove only our own.
-		_ = s.store.RemovePatternToNewSchedule(preview.PatternKey, rule.ID)
 		if err != nil {
 			return nil, err
 		}

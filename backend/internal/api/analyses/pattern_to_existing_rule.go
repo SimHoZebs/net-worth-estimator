@@ -90,8 +90,8 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	}
 	if !preview.Claimable {
 		// The adapter returns no assignments on any Claimable=false path, so
-		// every not-claimable preview is an invalid request: unconfirmed
-		// patterns wait on review, disabled rules need enabling, and
+		// every not-claimable preview is an invalid request: rejected
+		// patterns need review again, disabled rules need enabling, and
 		// mismatched schedules need a different rule.
 		if preview.Reason == "" {
 			return nil, huma.Error422UnprocessableEntity("This pattern cannot be added yet.")
@@ -143,7 +143,11 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 			return nil, huma.Error422UnprocessableEntity(issue.Message)
 		}
 	}
-	rows, err := s.store.SetTransactionClaims(claims)
+	actor := ""
+	if s.actor != nil {
+		actor = s.actor(ctx)
+	}
+	rows, err := s.store.SetPatternTransactionClaims(input.ID, actor, claims)
 	if err != nil {
 		if errors.Is(err, store.ErrPatternToExistingScheduleInvalid) {
 			return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")

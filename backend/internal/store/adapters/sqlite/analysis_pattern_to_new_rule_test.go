@@ -144,7 +144,7 @@ func TestPatternToNewSchedulePreviewGuards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if unconfirmed.Creatable || unconfirmed.Schedule == nil || unconfirmed.Reason == "" {
+	if !unconfirmed.Creatable || unconfirmed.Schedule == nil || unconfirmed.Reason != "" {
 		t.Fatalf("unconfirmed=%+v", unconfirmed)
 	}
 	anchor := confirmFinding(t, s, findings[0])

@@ -12,11 +12,24 @@ import (
 // pending bank row becomes a claimed occurrence) so concurrent name or
 // amount edits never lose data.
 func (s *sqliteStore) SetTransactionClaims(claims []types.TransactionClaimUpdate) ([]types.Transaction, error) {
+	return s.setTransactionClaims(claims, nil)
+}
+
+func (s *sqliteStore) SetPatternTransactionClaims(findingID, actor string, claims []types.TransactionClaimUpdate) ([]types.Transaction, error) {
+	return s.setTransactionClaims(claims, func(tx *userTx) error { return acceptRecurringPattern(tx, findingID, actor) })
+}
+
+func (s *sqliteStore) setTransactionClaims(claims []types.TransactionClaimUpdate, accept func(*userTx) error) ([]types.Transaction, error) {
 	if len(claims) == 0 {
 		return []types.Transaction{}, nil
 	}
 	updated := make([]types.Transaction, 0, len(claims))
 	err := withRowTx(s.db, func(tx *userTx) error {
+		if accept != nil {
+			if err := accept(tx); err != nil {
+				return err
+			}
+		}
 		for _, item := range claims {
 			if item.TransactionID == "" {
 				return store.InvalidID(item.TransactionID)

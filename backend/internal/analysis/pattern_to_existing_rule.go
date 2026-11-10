@@ -110,8 +110,8 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	if anchor.Status != "active" {
 		return nil, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
 	}
-	if anchor.Review == nil || anchor.Review.Decision != "confirmed" {
-		return nil, fmt.Errorf("%w: pattern is not confirmed", ErrPatternStale)
+	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
+		return nil, fmt.Errorf("%w: pattern needs review again", ErrPatternStale)
 	}
 	if len(input.OccurrenceIDs) == 0 {
 		return nil, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
