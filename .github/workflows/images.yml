@@ -79,7 +79,7 @@ jobs:
               paths=(backend deploy/migrate.sh deploy/analysis-schema.sql)
               ;;
             backend-northflank)
-              paths=(backend sidecar/income deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql)
+              paths=(backend ml deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql)
               ;;
             frontend)
               paths=(frontend package.json bun.lock extension/package.json)

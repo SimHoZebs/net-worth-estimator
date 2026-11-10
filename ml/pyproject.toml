@@ -1,0 +1,6 @@
+[project]
+name = "ml"
+version = "0.1.0"
+description = "River implementation of the judgment provider"
+requires-python = "==3.12.*"
+dependencies = ["river==0.22.0"]

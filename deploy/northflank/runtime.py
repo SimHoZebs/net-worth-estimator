@@ -23,12 +23,12 @@ def run():
     signal.signal(signal.SIGINT, stop)
     try:
         children.append(subprocess.Popen([
-            sys.executable, "/app/income/server.py", "--host", "127.0.0.1", "--port", "8766",
+            sys.executable, "/app/ml/server.py", "--host", "127.0.0.1", "--port", "8766",
         ]))
         deadline = time.monotonic() + 75
         while not stopping:
             if children[0].poll() is not None:
-                raise RuntimeError("income provider exited during startup")
+                raise RuntimeError("ml provider exited during startup")
             try:
                 with urllib.request.urlopen("http://127.0.0.1:8766/health", timeout=1) as response:
                     if response.status == 200:
@@ -36,7 +36,7 @@ def run():
             except (urllib.error.URLError, TimeoutError):
                 pass
             if time.monotonic() >= deadline:
-                raise RuntimeError("income provider did not become ready")
+                raise RuntimeError("ml provider did not become ready")
             time.sleep(0.1)
         if stopping:
             return 0

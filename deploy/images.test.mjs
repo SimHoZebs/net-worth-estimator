@@ -96,6 +96,6 @@ test("Northflank co-location is an explicit image target, not the default backen
   assert.match(backend, /FROM python:3\.12-slim AS northflank/);
   assert.match(backend, /FROM standalone AS default\s*$/);
   assert.match(workflow, /image: backend-northflank[\s\S]*?target: northflank/);
-  assert.match(workflow, /paths=\(backend sidecar\/income deploy\/northflank deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
+  assert.match(workflow, /paths=\(backend ml deploy\/northflank deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
   assert.match(release, /repository\}-backend-northflank:sha-/);
 });

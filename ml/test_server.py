@@ -14,7 +14,7 @@ from test_model import request, feedback
 class TestServer(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.store = PaymentModelStore(self.tmp.name + "/income.sqlite3")
+        self.store = PaymentModelStore(self.tmp.name + "/ml.sqlite3")
 
     def tearDown(self):
         self.store.close()

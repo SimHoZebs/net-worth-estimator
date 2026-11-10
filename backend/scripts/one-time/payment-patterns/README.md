@@ -11,11 +11,12 @@ not a runtime compatibility path. New empty databases need no upgrade.
    reviews, dismissal, revisions and immutable feedback payloads survive.
    It removes obsolete live provider requests/results, leaving the old version
    stale until the new worker recomputes. Financial rows are untouched.
-3. Set the existing `INCOME_MODEL_PATH` deployment setting to a **new** private
-   path, for example `/data/payments.sqlite3`. Preserve the old learner database
+3. Set the existing `INCOME_MODEL_PATH` deployment setting to the renamed
+   `ML_MODEL_PATH` variable with a **new** private path, for example
+   `/data/ml.sqlite3`. Preserve the old learner database
    as an archive. Its feature space cannot be reused by the generic classifier.
    No runtime conversion or automatic destructive reset is performed. The
-   deployment variable name is unchanged; it now addresses the shared learner.
+   renamed variable now addresses the shared learner.
 4. Start the reviewed target. Verify fresh `payments-v2/` findings, preserved
    answers and IDs, ready judgments, and `/readyz` returning `ok`.
 

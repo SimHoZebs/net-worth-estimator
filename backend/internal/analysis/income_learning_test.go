@@ -163,7 +163,7 @@ func TestIncomeSharedLearningRescoresAllOwnersWithoutBankChanges(t *testing.T) {
 	}
 }
 
-func TestIncomeSidecarRecoveryRescoresUnchangedSnapshot(t *testing.T) {
+func TestIncomeProviderRecoveryRescoresUnchangedSnapshot(t *testing.T) {
 	db, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +182,7 @@ func TestIncomeSidecarRecoveryRescoresUnchangedSnapshot(t *testing.T) {
 	}
 	after := incomeFindings(t, scoped)[0]
 	if before.RunID == after.RunID || before.InputRevision != after.InputRevision {
-		t.Fatal("sidecar recovery did not rescore unchanged evidence")
+		t.Fatal("provider recovery did not rescore unchanged evidence")
 	}
 }
 

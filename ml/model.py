@@ -2,7 +2,7 @@
 
 Domain evidence comes from the immutable Go prediction, never a prediction
 cache. This adapter alone engineers features. SQLite commits model state, event deduplication, and owner checkpoints
-together. Only this process owns the database; run one sidecar per deployment.
+together. Only this process owns the database; run one ML service per deployment.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class ConflictError(ValueError):
 
 class PaymentModelStore:
     def __init__(self, model_path: str | None = None):
-        path = Path(model_path or os.environ.get("INCOME_MODEL_PATH", "/tmp/income.sqlite3"))
+        path = Path(model_path or os.environ.get("ML_MODEL_PATH", "/tmp/ml.sqlite3"))
         path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._db = sqlite3.connect(path, check_same_thread=False)

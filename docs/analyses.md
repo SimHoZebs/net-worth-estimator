@@ -198,15 +198,15 @@ response-only and human-queue adapters do not implement a training API.
   person's explicit answer.
 
 The default composition uses the neutral HTTP protocol when
-`INCOME_JUDGMENT_URL` is set. With no URL, detection is deterministic. Deploying
+`ML_JUDGMENT_URL` is set. With no URL, detection is deterministic. Deploying
 a different compatible service at that URL changes no detector, persistence,
 or UI code. In-process adapters implement the same Provider port. See
 [the provider contract](judgment-providers.md) for replacement and privacy rules.
 
-The supplied implementation is the River service in `sidecar/income`. It alone
+The supplied implementation is the River service in `ml`. It alone
 owns scaling, probability thresholds, example counts, drift detection, and one
 shared online-learning model per deployment. Those details are absent from the
-application contract. See `sidecar/income/README.md` for its private storage and
+application contract. See `ml/README.md` for its private storage and
 deployment requirements.
 
 ## Pattern to new schedule

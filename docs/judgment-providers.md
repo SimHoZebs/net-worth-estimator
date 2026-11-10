@@ -73,7 +73,7 @@ background runner opens a provider session, before claiming the analysis run.
 
 ## Neutral HTTP adapter
 
-The built-in composition reads `INCOME_JUDGMENT_URL` and uses a 5-second HTTP
+The built-in composition reads `ML_JUDGMENT_URL` and uses a 5-second HTTP
 timeout within the runner's 20-second context. These are bounded service calls,
 not the maximum time a queued human job can remain pending. The service exposes:
 

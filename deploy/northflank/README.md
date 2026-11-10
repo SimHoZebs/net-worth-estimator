@@ -3,7 +3,7 @@
 Co-locating Go and River is a **Northflank Sandbox deployment decision**, not a
 feature requirement. The application depends only on the judgment provider
 contract. Other deployments can use the default Go-only image and any compatible
-separate provider at `INCOME_JUDGMENT_URL`, or omit it for deterministic analysis.
+separate provider at `ML_JUDGMENT_URL`, or omit it for deterministic analysis.
 
 The explicit `northflank` target in `backend/Dockerfile` is published as
 `net-worth-estimator-backend-northflank:sha-<commit>`. It adds Python, River, and
@@ -22,7 +22,7 @@ this packaging.
 The existing API volume holds two independent databases:
 
 - `/data/net-worth-estimator.db`: owner-scoped evidence and feedback audit.
-- `/data/income.sqlite3`: River learner, deduplication receipts, and owner cursors.
+- `/data/ml.sqlite3`: River learner, deduplication receipts, and owner cursors.
 
 No extra service, database addon, volume, GPU, or external model subscription is
 needed. Keep the existing single API instance and `nf-compute-10` allocation

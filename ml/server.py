@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Private-network HTTP adapter for the deployment-wide income learner."""
+"""Private-network HTTP adapter for the deployment-wide ML learner."""
 from __future__ import annotations
 
 import argparse
@@ -20,7 +20,7 @@ class Server(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "income-sidecar/1"
+    server_version = "ml/1"
 
     def _json(self, code, payload):
         body = json.dumps(payload, allow_nan=False).encode()
@@ -67,12 +67,12 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError) as exc:
             self._json(400, {"error": str(exc)})
         except Exception:
-            logging.exception("income sidecar request failed")
+            logging.exception("ml request failed")
             self._json(503, {"error": "scoring or storage unavailable"})
 
 
 def main():
-    parser = argparse.ArgumentParser(description="income river sidecar")
+    parser = argparse.ArgumentParser(description="ml river service")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8766)
     args = parser.parse_args()

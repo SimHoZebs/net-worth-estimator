@@ -22,7 +22,7 @@ func NewPaymentPatterns(provider judgment.Provider) Definition {
 }
 
 func defaultPaymentPatterns() Definition {
-	endpoint := strings.TrimSpace(os.Getenv("INCOME_JUDGMENT_URL"))
+	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
 	if endpoint == "" {
 		return NewPaymentPatterns(nil)
 	}

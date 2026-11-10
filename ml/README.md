@@ -15,16 +15,16 @@ The Go HTTP adapter owns orchestration; the service owns idempotency and persist
 
 ## Deployment
 
-Set `INCOME_JUDGMENT_URL` on the backend; without it the application remains deterministic. Run exactly one River instance per deployment. The default binding is `127.0.0.1:8766`, and the container binds `0.0.0.0:8766` for private networks. The endpoints are unauthenticated and must not be internet-exposed; apply the API's financial-data access controls to this service and its volume.
+Set `ML_JUDGMENT_URL` on the backend; without it the application remains deterministic. Run exactly one River instance per deployment. The default binding is `127.0.0.1:8766`, and the container binds `0.0.0.0:8766` for private networks. The endpoints are unauthenticated and must not be internet-exposed; apply the API's financial-data access controls to this service and its volume.
 
 The [Northflank Sandbox deployment](../../deploy/northflank/README.md) packages this provider beside Go in the existing API service to retain the free tier resource count. That is an infrastructure choice; the provider contract and the default Go-only backend image remain independent of Python and co-location.
 
-Mount persistent storage at `/data`; `INCOME_MODEL_PATH` defaults to `/data/income.sqlite3`. Use SQLite's backup API for consistent backups. River state is a trusted local pickle inside SQLite, never client-uploaded data, and corrupt or incompatible state fails visibly. Changing feature engineering or model policy requires a corresponding provider revision change. Existing income state requires the explicit offline payment-patterns upgrade; there is no runtime legacy conversion or silent reset.
+Mount persistent storage at `/data`; `ML_MODEL_PATH` defaults to `/data/ml.sqlite3`. Use SQLite's backup API for consistent backups. River state is a trusted local pickle inside SQLite, never client-uploaded data, and corrupt or incompatible state fails visibly. Changing feature engineering or model policy requires a corresponding provider revision change. Existing income state requires the explicit offline payment-patterns upgrade; there is no runtime legacy conversion or silent reset.
 
 ```bash
-docker build -f sidecar/income/Dockerfile -t income-judgment .
-docker run --rm --name income-judgment -p 127.0.0.1:8766:8766 \
-  -v income-judgment:/data income-judgment
-docker run --rm --network none income-judgment \
+docker build -f ml/Dockerfile -t ml .
+docker run --rm --name ml -p 127.0.0.1:8766:8766 \
+  -v ml:/data ml
+docker run --rm --network none ml \
   python -B -m unittest discover -s /app -p 'test_*.py' -v
 ```

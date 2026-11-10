@@ -30,7 +30,7 @@ def feedback(event="001", action="confirm", evidence=None):
 class TestStore(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.path = os.path.join(self.tmp.name, "data", "income.sqlite3")
+        self.path = os.path.join(self.tmp.name, "data", "ml.sqlite3")
         self.store = PaymentModelStore(self.path)
 
     def tearDown(self):

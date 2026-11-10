@@ -57,6 +57,7 @@ CMD ["/app/server"]
 
 # Northflank Sandbox packaging only. The default backend image remains Go-only.
 FROM python:3.12-slim AS northflank
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates sqlite3 busybox-static \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /bin/busybox /usr/local/bin/busybox-extras \
@@ -64,13 +65,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && mkdir -p /app /data /home/app/.ssh && chmod 0700 /home/app/.ssh \
     && chown -R app:app /data /home/app
 WORKDIR /app
-COPY sidecar/income/requirements.txt /app/income/requirements.txt
-RUN pip install --no-cache-dir -r /app/income/requirements.txt
+COPY ml/pyproject.toml ml/uv.lock /app/ml/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv export --frozen --no-dev --no-hashes --no-emit-project --project /app/ml -o /tmp/requirements.txt && \
+    uv pip install --system --no-cache --compile-bytecode -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
 COPY --from=standalone /app/ /app/
-COPY sidecar/income/*.py /app/income/
+COPY ml/*.py /app/ml/
 COPY deploy/northflank/runtime.py /app/northflank-runtime.py
 ENV HOST=0.0.0.0 PORT=8787 NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db \
-    INCOME_JUDGMENT_URL=http://127.0.0.1:8766 INCOME_MODEL_PATH=/data/income.sqlite3 \
+    ML_JUDGMENT_URL=http://127.0.0.1:8766 ML_MODEL_PATH=/data/ml.sqlite3 \
     PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 GOMEMLIMIT=96MiB
 USER app:app

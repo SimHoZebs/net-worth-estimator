@@ -87,19 +87,19 @@ after=post('state',{'owner':'fixture'})
 print(after['revision'])
 `;
   const revision = await docker("exec", name, "python", "-c", feedback);
-  const receipts = await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT COUNT(*) FROM events;");
+  const receipts = await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT COUNT(*) FROM events;");
   assert.equal(receipts, "301");
   const peak = Number(await docker("exec", name, "cat", "/sys/fs/cgroup/memory.peak"));
   t.diagnostic(`Combined deployment peak including test clients: ${(peak / 1024 / 1024).toFixed(1)} MiB at 0.1 vCPU`);
   assert.ok(peak < 256 * 1024 * 1024);
   // A failed provider must terminate the API, rather than leave a partial stack.
-  await docker("exec", name, "python", "-c", "import os,signal; from pathlib import Path; [(os.kill(int(p.name),signal.SIGKILL)) for p in Path('/proc').iterdir() if p.name.isdigit() and p.joinpath('cmdline').exists() and b'/app/income/server.py' in p.joinpath('cmdline').read_bytes() and int(p.name)!=os.getpid()]");
+  await docker("exec", name, "python", "-c", "import os,signal; from pathlib import Path; [(os.kill(int(p.name),signal.SIGKILL)) for p in Path('/proc').iterdir() if p.name.isdigit() and p.joinpath('cmdline').exists() and b'/app/ml/server.py' in p.joinpath('cmdline').read_bytes() and int(p.name)!=os.getpid()]");
   assert.notEqual(await docker("wait", name), "0");
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.OOMKilled, false);
   await docker("start", name);
   await ready();
-  assert.equal(await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT 'payments-v1:' || generation || ':' || revision FROM model;"), revision);
-  assert.equal(await docker("exec", name, "sqlite3", "/data/income.sqlite3", "SELECT cursor FROM checkpoints WHERE owner='fixture';"), "001");
+  assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT 'payments-v1:' || generation || ':' || revision FROM model;"), revision);
+  assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT cursor FROM checkpoints WHERE owner='fixture';"), "001");
   await docker("stop", "--time", "12", name);
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.ExitCode, 0);
 });
