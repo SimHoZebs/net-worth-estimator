@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { databaseName, snapshotFile, validateSnapshot } from "../database.mjs";
+import { loadConfig, slotFromOptions, stateDirFor, withLock } from "../config.mjs";
 import { compose } from "./compose.mjs";
-import { run } from "./shell.mjs";
+import { root, run } from "./shell.mjs";
 import { snapshot } from "./snapshot.mjs";
 
 export async function refreshData({ config, stateDir, slot, source, sourceUser, user, publishing }) {
@@ -59,4 +60,26 @@ export async function refreshData({ config, stateDir, slot, source, sourceUser, 
   console.log(
     `The prior application database is in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/backups/.`,
   );
+}
+
+// Shared runner for refresh-db and publish-sample: identical scope
+// resolution, locking, and scoped replacement. Only the publishing flag
+// and the caller's validation differ.
+export async function runRefreshCommand(values, positionals, validate, publishing) {
+  validate(values, positionals);
+  const slot = slotFromOptions(values);
+  const stateDir = stateDirFor(root, slot);
+  const source = values.from ? { file: resolve(values.from) } : undefined;
+  await withLock(stateDir, async () => {
+    const config = await loadConfig(stateDir, false, source, undefined, { slot });
+    await refreshData({
+      config,
+      stateDir,
+      slot,
+      source,
+      sourceUser: values["source-user"],
+      user: values.user,
+      publishing,
+    });
+  });
 }

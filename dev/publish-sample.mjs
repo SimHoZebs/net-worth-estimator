@@ -1,30 +1,27 @@
-import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { loadConfig, slotFromOptions, stateDirFor, withLock } from "./config.mjs";
 import { devOptions } from "./lib/args.mjs";
 import { runIfCli } from "./lib/entry.mjs";
-import { refreshData } from "./lib/refresh.mjs";
-import { root } from "./lib/shell.mjs";
+import { runRefreshCommand } from "./lib/refresh.mjs";
+import {
+  checkSlot,
+  rejectBulkClearExceptSeed,
+  rejectPackExceptDemo,
+  rejectPortsAfterCreation,
+  rejectPositionals,
+  rejectTailnet,
+} from "./lib/validate.mjs";
 
 export function parsePublishArgs(args) {
   return parseArgs({ args, allowPositionals: true, options: devOptions });
 }
 
 export function validatePublish(values, positionals = []) {
-  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use ./dev/main.mjs --help.");
-  slotFromOptions(values);
-  if (values.bulk !== undefined || values.clear !== undefined)
-    throw new Error("--bulk and --clear apply only to seed.");
-  if (values.pack !== undefined)
-    throw new Error("--pack applies only to demo.");
-  if (values.tailnet) throw new Error("--tailnet applies only to setup");
-  if (
-    values["app-port"] !== undefined ||
-    values["auth-port"] !== undefined ||
-    values["backend-port"] !== undefined
-  ) {
-    throw new Error("Ports are fixed at slot creation. Pick a new --slot name for new ports.");
-  }
+  rejectPositionals(positionals);
+  checkSlot(values);
+  rejectBulkClearExceptSeed(values);
+  rejectPackExceptDemo(values);
+  rejectTailnet(values);
+  rejectPortsAfterCreation(values);
   if (!values["source-user"])
     throw new Error("--source-user is required. Select the reviewed financial scope explicitly.");
   // Publication targets the provisioned guest's user resource.
@@ -35,22 +32,7 @@ export function validatePublish(values, positionals = []) {
 }
 
 export async function run(values, positionals) {
-  validatePublish(values, positionals);
-  const slot = slotFromOptions(values);
-  const stateDir = stateDirFor(root, slot);
-  const source = values.from ? { file: resolve(values.from) } : undefined;
-  await withLock(stateDir, async () => {
-    const config = await loadConfig(stateDir, false, source, undefined, { slot });
-    await refreshData({
-      config,
-      stateDir,
-      slot,
-      source,
-      sourceUser: values["source-user"],
-      user: values.user,
-      publishing: true,
-    });
-  });
+  await runRefreshCommand(values, positionals, validatePublish, true);
 }
 
 export async function main(args) {

@@ -110,6 +110,24 @@ run_e2e() {
 # down beyond the test temp dirs. With --browser, the sharing specs also run
 # per pack against the pack-seeded fixture harness (fresh temp database and
 # random free ports per run, pruned on exit by the browser config).
+# One owner for pack/bulk env selection: the Go edge suite consumes
+# INTEGRATION_PACK/INTEGRATION_BULK/INTEGRATION_IDENTITY_SET, the browser
+# harness consumes only pack/bulk. Browser checks run once per pack.
+set_pack_env() {
+  local pack="$1" bulk="$2"
+  if [ "$pack" = "base" ]; then
+    unset INTEGRATION_PACK
+  else
+    INTEGRATION_PACK="$pack"
+    export INTEGRATION_PACK
+  fi
+  if [ -n "$bulk" ]; then
+    INTEGRATION_BULK="$bulk"
+    export INTEGRATION_BULK
+  else
+    unset INTEGRATION_BULK
+  fi
+}
 run_matrix() {
   local packs="$1" identities="$2" repeat="$3" browser="$4" specs="$5" bulk="$6"
   local failed=0 total=0
@@ -121,47 +139,26 @@ run_matrix() {
     for identity in $identities; do
       total=$((total + 1))
       echo "matrix: pack=${pack} identities=${identity} repeat=${repeat} bulk=${bulk:-none}"
-      if [ "$pack" = "base" ]; then
-        unset INTEGRATION_PACK
-      else
-        INTEGRATION_PACK="$pack"
-        export INTEGRATION_PACK
-      fi
+      set_pack_env "$pack" "$bulk"
       export INTEGRATION_IDENTITY_SET="$identity"
-      if [ -n "$bulk" ]; then
-        INTEGRATION_BULK="$bulk"
-        export INTEGRATION_BULK
-      else
-        unset INTEGRATION_BULK
-      fi
       if CGO_ENABLED=0 go -C backend test ./internal/integrationedge/ ./internal/integrationfixtures/ -count="$repeat"; then
         echo "matrix: ok pack=${pack} identities=${identity}"
       else
         echo "matrix: FAIL pack=${pack} identities=${identity}"
         failed=$((failed + 1))
       fi
-      if [ "$browser" -eq 1 ]; then
-        if [ "$pack" = "base" ]; then
-          unset INTEGRATION_PACK
-        else
-          INTEGRATION_PACK="$pack"
-          export INTEGRATION_PACK
-        fi
-        if [ -n "$bulk" ]; then
-          INTEGRATION_BULK="$bulk"
-          export INTEGRATION_BULK
-        else
-          unset INTEGRATION_BULK
-        fi
-        # shellcheck disable=SC2086
-        if bun --filter ./frontend test:integration -- $specs; then
-          echo "matrix: ok browser pack=${pack}"
-        else
-          echo "matrix: FAIL browser pack=${pack}"
-          failed=$((failed + 1))
-        fi
-      fi
     done
+    unset INTEGRATION_IDENTITY_SET
+    if [ "$browser" -eq 1 ]; then
+      set_pack_env "$pack" "$bulk"
+      # shellcheck disable=SC2086
+      if bun --filter ./frontend test:integration -- $specs; then
+        echo "matrix: ok browser pack=${pack}"
+      else
+        echo "matrix: FAIL browser pack=${pack}"
+        failed=$((failed + 1))
+      fi
+    fi
   done
   IFS="$old_ifs"
   unset INTEGRATION_PACK INTEGRATION_IDENTITY_SET INTEGRATION_BULK
