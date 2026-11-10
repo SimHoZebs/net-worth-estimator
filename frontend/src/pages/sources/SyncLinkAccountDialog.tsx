@@ -92,15 +92,9 @@ export function SyncLinkAccountDialog({
 				</div>
 			)}
 			<Notice tone="warning" className="m-0">
-				<p className="m-0">
-					The synced account takes the manual account's name, color, type,
-					balance limits, and the settings that point at it. The manual account,
-					its balance history, and its transactions are deleted.
-				</p>
-				<p className="mt-2 mb-0">
-					Sharing permissions that include the manual account will apply to the
-					synced account, including its imported bank history.
-				</p>
+				The manual account and its history are permanently deleted. Sharing
+				permissions that include it will apply to the synced account, including
+				its imported bank history.
 			</Notice>
 			<FieldError message={error} />
 			<div className={dialogActionsStyles}>
