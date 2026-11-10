@@ -38,10 +38,19 @@ export function AnalysisFindings() {
 	}));
 	const allFindings = query.data?.findings ?? [];
 	const findings = allFindings.filter((finding) => finding.kind === "bnpl");
-	const recurring = allFindings.filter(
+	const payments = (complete.data ?? []).filter((finding) => !!finding.pattern);
+	const repetition = (complete.data ?? []).filter(
 		(finding) => finding.kind === "recurring",
 	);
-	const payments = (complete.data ?? []).filter((finding) => !!finding.pattern);
+	const linkedStreams = new Set(
+		payments
+			.filter((finding) => finding.streamId)
+			.map((finding) => JSON.stringify([finding.streamId, finding.status])),
+	);
+	const recurring = repetition.filter(
+		(finding) =>
+			!linkedStreams.has(JSON.stringify([finding.streamId, finding.status])),
+	);
 	const names = new Map(
 		transactions.map((transaction) => [transaction.id, transaction.name]),
 	);
@@ -161,6 +170,7 @@ export function AnalysisFindings() {
 			) : (
 				<PaymentFindings
 					findings={payments}
+					repetition={repetition}
 					names={names}
 					readOnly={readOnly}
 				/>

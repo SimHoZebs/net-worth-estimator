@@ -14,7 +14,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-const PaymentPatternsVersion = "payments-v2"
+const PaymentPatternsVersion = "payments-v3"
 
 // PaymentPatterns extracts streams once and batches applicable classifications.
 // Definitions contain domain policy; evaluators own how judgments are produced.
@@ -67,6 +67,10 @@ type paymentOccurrence struct {
 
 // paymentStream contains observations only, independent of semantic labels.
 type paymentStream struct {
+	streamID                                                                  string
+	recurrence                                                                *paymentStream
+	nonrepeating                                                              *paymentStream
+	external                                                                  *paymentStream
 	patternID, merchant, cadence, currency, direction                         string
 	cadenceDays, typical, annualized, amountCV, gapCV, medianGap, recencyDays float64
 	occurrences                                                               []paymentOccurrence
@@ -116,89 +120,6 @@ func paymentStamp(facts types.TransactionFacts) int64 {
 	return facts.PostedTime
 }
 
-func detectPaymentStreams(ctx context.Context, input types.AnalysisSnapshot) ([]*paymentStream, error) {
-	transfers, err := paymentTransferIDs(ctx, input.Transactions)
-	if err != nil {
-		return nil, err
-	}
-	groups, err := paymentGroups(ctx, input.Transactions, transfers)
-	if err != nil {
-		return nil, err
-	}
-	var latestDay int64
-	for _, tx := range input.Transactions {
-		if !tx.Pending && !tx.Void {
-			latestDay = max(latestDay, paymentStamp(tx.Facts)/86400)
-		}
-	}
-	var streams []*paymentStream
-	for _, group := range groups {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		amounts := make([]float64, 0, len(group.candidates))
-		for _, item := range group.candidates {
-			amounts = append(amounts, math.Abs(item.amount))
-		}
-		typical := paymentMedian(amounts)
-		if typical <= 0 {
-			continue
-		}
-		kept := make([]paymentOccurrence, 0, len(group.candidates))
-		for _, item := range group.candidates {
-			if math.Abs(math.Abs(item.amount)-typical) <= recurringTolerance*typical {
-				kept = append(kept, item)
-			}
-		}
-		if len(kept) < 2 {
-			continue
-		}
-		sort.Slice(kept, func(i, j int) bool {
-			if kept[i].day != kept[j].day {
-				return kept[i].day < kept[j].day
-			}
-			return kept[i].transaction.TransactionID < kept[j].transaction.TransactionID
-		})
-		gaps := make([]float64, 0, len(kept)-1)
-		for i := 1; i < len(kept); i++ {
-			gaps = append(gaps, float64(kept[i].day-kept[i-1].day))
-		}
-		medianGap := paymentMedian(gaps)
-		if medianGap <= 0 {
-			continue
-		}
-		var cadence paymentCadence
-		for _, option := range paymentCadences {
-			if math.Abs(medianGap-option.days) <= recurringTolerance*option.days {
-				cadence = option
-				break
-			}
-		}
-		if cadence.id == "" || len(kept) < cadence.minOcc {
-			continue
-		}
-		regular := true
-		for _, gap := range gaps {
-			regular = regular && math.Abs(gap-medianGap) <= recurringTolerance*medianGap
-		}
-		if !regular {
-			continue
-		}
-		amounts = amounts[:0]
-		for _, item := range kept {
-			amounts = append(amounts, math.Abs(item.amount))
-		}
-		streams = append(streams, &paymentStream{
-			patternID: paymentPatternID(input.UserID, group.key, cadence.id), merchant: group.merchant,
-			cadence: cadence.id, cadenceDays: cadence.days, currency: kept[0].transaction.Facts.Currency,
-			direction: group.direction, typical: typical, annualized: typical * cadence.factor,
-			amountCV: paymentCV(amounts), gapCV: paymentCV(gaps), medianGap: medianGap,
-			recencyDays: float64(latestDay - kept[len(kept)-1].day), occurrences: kept, signals: paymentSignals(kept),
-		})
-	}
-	return streams, nil
-}
-
 func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]types.AnalysisDetection, error) {
 	definitions := p.Classifications
 	if definitions == nil {
@@ -219,9 +140,26 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 	var patterns []*classifiedPayment
 	for _, definition := range definitions {
 		for _, stream := range byDirection[definition.Direction] {
-			candidate := &classifiedPayment{paymentStream: stream, classification: definition}
-			if candidate.deterministicDecision() != "unsupported" {
-				patterns = append(patterns, candidate)
+			if definition.ExternalOnly {
+				stream = stream.external
+			}
+			if stream == nil {
+				continue
+			}
+			views := []*paymentStream{stream}
+			if stream.recurrence != nil {
+				views = []*paymentStream{stream.recurrence}
+				if !definition.RequireRecurrence && stream.nonrepeating != nil {
+					views = append(views, stream.nonrepeating)
+				}
+			} else if definition.RequireRecurrence {
+				continue
+			}
+			for _, view := range views {
+				candidate := &classifiedPayment{paymentStream: view, classification: definition}
+				if candidate.deterministicDecision() != "unsupported" {
+					patterns = append(patterns, candidate)
+				}
 			}
 		}
 	}
@@ -251,7 +189,7 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 	})
 	ranked := map[string][]*classifiedPayment{}
 	for _, pat := range patterns {
-		if pat.classification.RankMain && pat.decision() != "unsupported" {
+		if pat.classification.RankMain && pat.cadence != "" && pat.decision() != "unsupported" {
 			ranked[pat.classification.ID] = append(ranked[pat.classification.ID], pat)
 		}
 	}

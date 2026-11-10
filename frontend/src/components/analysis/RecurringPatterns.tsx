@@ -421,15 +421,17 @@ export function RecurringPatterns({
 	findings,
 	names,
 	readOnly,
+	label = "Repeating payments",
 }: {
 	findings: AnalysisFinding[];
 	names: Map<string, string>;
 	readOnly: boolean;
+	label?: string;
 }) {
 	const patterns = groupRecurringPatterns(findings);
 	if (patterns.length === 0) return null;
 	return (
-		<section className="space-y-4" aria-label="Repeating payments">
+		<section className="space-y-4" aria-label={label}>
 			<header className="space-y-2">
 				<h2 className="m-0 text-lg font-semibold">Repeating payments</h2>
 				<p className="m-0 text-sm text-muted">

@@ -816,6 +816,9 @@
 					"role": {
 						"type": "string"
 					},
+					"streamId": {
+						"type": "string"
+					},
 					"strength": {
 						"type": "string"
 					},
@@ -1069,6 +1072,9 @@
 						"type": "boolean"
 					},
 					"status": {
+						"type": "string"
+					},
+					"streamId": {
 						"type": "string"
 					},
 					"strength": {
@@ -3096,7 +3102,6 @@
 					"cadence",
 					"currency",
 					"typicalAmount",
-					"annualizedEstimate",
 					"occurrenceCount",
 					"cadenceDays",
 					"amountVariation",
@@ -3130,6 +3135,15 @@
 					},
 					"label": {
 						"type": "string"
+					},
+					"requiredSignals": {
+						"items": {
+							"type": "string"
+						},
+						"type": [
+							"array",
+							"null"
+						]
 					},
 					"suggestWithoutSignal": {
 						"type": "boolean"

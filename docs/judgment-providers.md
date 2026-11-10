@@ -28,9 +28,12 @@ count, variation, recency, and observed descriptor/category evidence. Up to
 three recent original transaction facts provide context for automated or
 human assessment. Direction and named observed signals replace income-specific
 booleans. The question describes the requested classification's label, supporting,
-candidate and exclusion signals, and whether an unmarked stream is a candidate.
+candidate, exclusion and required signals, and whether an unmarked stream is a candidate.
 It is immutable domain policy, not a feature vector or a required algorithm.
 The detector does not encode model features. Requests are batched at 100.
+One observation is valid evidence. Without established repetition, cadence is
+empty and `annualizedEstimate` is omitted. A recurrence-dependent definition
+records `regular-cadence` in the immutable question's `requiredSignals`.
 
 `patternId` identifies the owner/account/source/currency/direction/descriptive-stream/cadence
 pattern. `id` hashes the exact request content. An asynchronous provider must

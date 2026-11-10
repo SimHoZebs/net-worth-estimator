@@ -19,6 +19,7 @@ type JudgmentQuestion struct {
 	CandidateSignals     []string `json:"candidateSignals"`
 	ExcludeSignals       []string `json:"excludeSignals"`
 	SuggestWithoutSignal bool     `json:"suggestWithoutSignal"`
+	RequiredSignals      []string `json:"requiredSignals,omitempty"`
 }
 
 type JudgmentPattern struct {
@@ -26,7 +27,7 @@ type JudgmentPattern struct {
 	Cadence            string   `json:"cadence"`
 	Currency           string   `json:"currency"`
 	TypicalAmount      string   `json:"typicalAmount"`
-	AnnualizedEstimate string   `json:"annualizedEstimate"`
+	AnnualizedEstimate string   `json:"annualizedEstimate,omitempty"`
 	OccurrenceCount    int      `json:"occurrenceCount"`
 	CadenceDays        float64  `json:"cadenceDays"`
 	AmountVariation    float64  `json:"amountVariation"`

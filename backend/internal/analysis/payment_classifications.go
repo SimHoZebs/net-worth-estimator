@@ -31,12 +31,14 @@ type PaymentClassification struct {
 	ExcludeSignals       []string
 	SuggestWithoutSignal bool
 	RankMain             bool
+	RequireRecurrence    bool
+	ExternalOnly         bool
 }
 
 func PaymentClassifications() []PaymentClassification {
 	return []PaymentClassification{
-		{ID: "income", Label: "income", Direction: "inflow", SupportSignals: []string{"payroll-descriptor", "source-income"}, SuggestWithoutSignal: true, RankMain: true},
-		{ID: "rent", Label: "rent", Direction: "outflow", SupportSignals: []string{"rent-descriptor", "source-rent"}, CandidateSignals: []string{"housing-platform"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor", "non-rent-charge"}},
+		{ID: "income", Label: "income", Direction: "inflow", SupportSignals: []string{"payroll-descriptor", "source-income"}, CandidateSignals: []string{"regular-cadence"}, RankMain: true, ExternalOnly: true},
+		{ID: "rent", Label: "rent", Direction: "outflow", SupportSignals: []string{"rent-descriptor", "source-rent"}, CandidateSignals: []string{"housing-platform"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor", "non-rent-charge"}, ExternalOnly: true},
 	}
 }
 

@@ -1,8 +1,9 @@
 # Shared payment streams and classifications
 
-The `payments` analysis extracts recurring external inflows and outflows once per
-claimed owner snapshot. Income and rent are registry definitions over that shared
-structure, not independent runners, model services, feedback tables or UI pages.
+The `recurring` and `payments` analyses share transaction observations and derived
+statistics, cached per owner and bank revision within one worker pass. Repetition
+and purpose are independent assessments of that evidence. Income and rent are
+registry definitions, not separate model services, feedback tables or UI pages.
 The existing analysis lifecycle avoids reevaluation when the bank input, registry
 policy hash and provider revision are unchanged. A changed input currently
 rebuilds the owner's streams; per-stream incremental bank updates are not implemented.
@@ -10,21 +11,30 @@ rebuilds the owner's streams; per-stream incremental bank updates are not implem
 ## Boundaries
 
 - Stream identity uses owner, provider, account, currency, direction, normalized
-  full description, payee, merchant metadata, memo, source category and cadence.
+  full description, payee, merchant metadata, memo and source category.
+  Findings expose this cadence-independent `streamId`; purpose `patternId` also
+  distinguishes the cadence cohort when repetition is established.
   Opaque bank references and display labels do not define identity. Semantic
   classification rules do not participate in identity.
   Hexadecimal references are excluded too. Bank-derived payee/merchant fragments
   are normalized only when they correlate with that source reference between
   the same descriptive prefix and ACH rail; unrelated payee properties survive.
-- Shared cadence/amount gates preserve income behavior, including its 15 percent
+- Shared recurrence assessment uses a 15 percent
   amount/interval tolerance and annual minimum of two observations. Other
-  cadences require three. Settled, dated nonzero observations only; matching
-  internal-transfer legs and explicit refund/reversal markers are excluded.
+  cadences require three. Observations must be settled, dated and nonzero.
+  Repetition retains internal transfers and refunds. Purpose definitions can
+  select an external, non-refund evidence view; income and rent do so.
 - Classification definitions provide ID, label, direction, supporting signals,
-  candidate signals, exclusion signals and optional main-inflow ranking. New
+  candidate signals, exclusion signals, optional main-inflow ranking, external-only
+  eligibility and an explicit recurrence prerequisite. Repetition is not a
+  universal prerequisite: explicit rent or payroll evidence can support one
+  observation. Unmarked recurring inflows remain uncertain income candidates.
+  Findings without established repetition omit cadence and annual estimates. New
   utilities or mortgage definitions use the same detector, provider, persistence,
   feedback and UI. Genuinely different structures need specialized generators,
   not increasingly permissive recurring-stream heuristics.
+  Amount outliers outside a repeating cohort retain independent purpose
+  assessments without borrowing that cohort's cadence or annual estimate.
 - Evidence contains domain observations and an immutable classification question.
   Model feature engineering stays private to the provider. Stream identity and
   exact question/evidence request identity remain distinct. Each classification
@@ -34,7 +44,9 @@ rebuilds the owner's streams; per-stream incremental bank updates are not implem
   The existing deployment-wide learner shares learning, never owner bank facts
   or saved answers. Explicit negative judgments remain reviewable.
 - The compact Payment patterns table shows amounts and review controls. Details
-  holds the explanation, occurrence states and visibility action. No result or
+  holds the explanation, occurrence states, visibility action and related
+  repetition review and forecast controls. Unlinked repetition stays standalone.
+  Purpose and repetition keep separate lifecycles and explicit answers. No result or
   answer creates or edits a forecast schedule.
 
 ## Rent
@@ -60,3 +72,5 @@ measurements remain a release gate before enabling such workloads.
 Existing targets require the [explicit offline
 upgrade](../backend/scripts/one-time/payment-patterns/README.md). There are no
 runtime aliases, legacy storage readers or automatic learned-state conversions.
+The independent-assessment refactor adds no database migration; analyzer version
+changes refresh findings using the existing lifecycle.

@@ -36,6 +36,7 @@ type AnalysisEvidence struct {
 }
 
 type AnalysisDetection struct {
+	StreamID      string                  `json:"streamId,omitempty"`
 	TransactionID string                  `json:"transactionId"`
 	Kind          string                  `json:"kind"`
 	Provider      string                  `json:"provider"`

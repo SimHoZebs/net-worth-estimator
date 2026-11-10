@@ -150,6 +150,14 @@ class TestStore(unittest.TestCase):
             keys.update(features_from_request(evidence))
         self.assertLessEqual(len(keys), 8192)
 
+    def test_one_observation_does_not_invent_repetition_or_annual_estimate(self):
+        evidence=request()
+        evidence["pattern"].update({"occurrenceCount":1,"cadence":"","cadenceDays":0})
+        del evidence["pattern"]["annualizedEstimate"]
+        self.assertEqual(self.store.evaluate([evidence])[0]["decision"],"supported")
+        evidence["question"]["requiredSignals"]=["regular-cadence"]
+        self.assertEqual(self.store.evaluate([evidence])[0]["decision"],"unsupported")
+
 
 if __name__ == "__main__":
     unittest.main()

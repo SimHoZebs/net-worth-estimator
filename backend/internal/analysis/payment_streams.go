@@ -16,6 +16,8 @@ var paymentReferenceSuffix = regexp.MustCompile(`(?i)\b(?:(?:ppd|ccd)\s+)?(?:id|
 var paymentReferenceToken = regexp.MustCompile(`(?i)^(?:[a-z]{0,4}[0-9x]{4,}|[a-f0-9]{12,64})$`)
 var paymentRailReference = regexp.MustCompile(`(?i)\b([a-f0-9]{12,64})\s+(?:web|ppd|ccd|tel)\b`)
 var paymentReferenceLetters = regexp.MustCompile(`^[a-f ]+$`)
+var paymentBillingPhone = regexp.MustCompile(`\b[0-9]{3}[- ][0-9]{3}[- ][0-9]{4}\b`)
+var paymentDomainSuffix = regexp.MustCompile(`(?i)\b([a-z][a-z0-9-]*)\.(?:com|net|org)\b`)
 
 // Some banks derive payees/merchants from a description by deleting numbers,
 // leaving variable letter fragments of a reference behind. Normalize only a
@@ -52,6 +54,8 @@ func paymentCounterpartyText(description, counterparty string) string {
 
 func paymentStreamText(text string) string {
 	text = paymentReferenceSuffix.ReplaceAllString(text, "")
+	text = paymentBillingPhone.ReplaceAllString(text, "")
+	text = paymentDomainSuffix.ReplaceAllString(text, "$1")
 	cleaned := strings.Map(func(r rune) rune {
 		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
 			return r
@@ -75,20 +79,17 @@ type paymentGroup struct {
 	candidates []paymentOccurrence
 }
 
-func paymentGroups(ctx context.Context, transactions []types.AnalysisTransaction, transfers map[string]bool) ([]paymentGroup, error) {
+func paymentGroups(ctx context.Context, transactions []types.AnalysisTransaction) ([]paymentGroup, error) {
 	groups := map[string]*paymentGroup{}
 	for _, tx := range transactions {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if tx.Pending || tx.Void || transfers[tx.TransactionID] {
+		if tx.Pending || tx.Void {
 			continue
 		}
 		facts := tx.Facts
 		text := strings.Join([]string{facts.Description, facts.Payee, facts.Memo, facts.Metadata["merchant_name"]}, " ")
-		if paymentRefundMarker.MatchString(text) {
-			continue
-		}
 		description := paymentStreamText(facts.Description)
 		payee := paymentCounterpartyText(facts.Description, facts.Payee)
 		merchantName := paymentCounterpartyText(facts.Description, facts.Metadata["merchant_name"])

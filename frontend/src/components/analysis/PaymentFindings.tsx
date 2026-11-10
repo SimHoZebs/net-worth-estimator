@@ -20,6 +20,7 @@ import {
 	TableRow,
 } from "@/components/DataTable.tsx";
 import { ErrorNotice } from "@/components/ErrorNotice.tsx";
+import { RecurringPatterns } from "./RecurringPatterns.tsx";
 
 function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	return {
@@ -37,15 +38,25 @@ export function PaymentFindings({
 	findings,
 	names,
 	readOnly,
+	repetition = [],
 }: {
 	findings: AnalysisFinding[];
 	names: Map<string, string>;
 	readOnly: boolean;
+	repetition?: AnalysisFinding[];
 }) {
 	const review = useReviewAnalysisFinding();
 	const dismiss = useDismissAnalysisFinding();
 	const [rows, setRows] = useState(5);
 	const patterns = groupPaymentPatterns(findings);
+	const repetitionByStream = new Map<string, AnalysisFinding[]>();
+	for (const item of repetition) {
+		if (!item.streamId) continue;
+		const key = JSON.stringify([item.streamId, item.status]);
+		const items = repetitionByStream.get(key);
+		if (items) items.push(item);
+		else repetitionByStream.set(key, [item]);
+	}
 	if (!patterns.length) return null;
 	const busy = review.isPending || dismiss.isPending;
 	return (
@@ -74,6 +85,10 @@ export function PaymentFindings({
 			>
 				{patterns.slice(0, rows).map((pattern) => {
 					const finding = pattern.anchor;
+					const related =
+						repetitionByStream.get(
+							JSON.stringify([finding.streamId, finding.status]),
+						) ?? [];
 					const summary = finding.pattern!;
 					const title = names.get(finding.transactionId) ?? finding.provider;
 					const inactive = finding.stale || finding.status === "withdrawn";
@@ -93,10 +108,16 @@ export function PaymentFindings({
 								<div className="flex flex-wrap items-center gap-2">
 									<span className="font-semibold">{title}</span>
 									<Badge tone="neutral">{status}</Badge>
+									{related.some((item) => !item.stale) && (
+										<Badge tone="neutral">Repetition assessed</Badge>
+									)}
 								</div>
 								<p className="mb-0 mt-1 text-xs text-muted">
 									{paymentAmount(summary.typicalAmount, summary.currency)} ·{" "}
-									{cadenceLabel(finding.product)} · {depositCount}{" "}
+									{finding.product
+										? cadenceLabel(finding.product)
+										: "Repetition not established"}{" "}
+									· {depositCount}{" "}
 									{finding.role === "inflow"
 										? depositCount === 1
 											? "deposit"
@@ -114,6 +135,12 @@ export function PaymentFindings({
 											<li key={evidence.code}>{evidence.reason}</li>
 										))}
 									</ul>
+									<RecurringPatterns
+										findings={related}
+										names={names}
+										readOnly={readOnly}
+										label={`Repetition assessment for ${title}`}
+									/>
 									{finding.status === "withdrawn" && (
 										<p>
 											This pattern no longer applies. Answers are unavailable.
@@ -150,7 +177,9 @@ export function PaymentFindings({
 								</details>
 							</TableHeader>
 							<TableCell className="align-top">
-								{paymentAmount(summary.annualizedEstimate, summary.currency)}
+								{summary.annualizedEstimate
+									? paymentAmount(summary.annualizedEstimate, summary.currency)
+									: "Not established"}
 							</TableCell>
 							<TableCell className="whitespace-normal align-top">
 								{!readOnly && (

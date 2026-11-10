@@ -186,7 +186,7 @@ func TestIncomeSidecarRecoveryRescoresUnchangedSnapshot(t *testing.T) {
 	}
 }
 
-func TestIncomeWithdrawalRetainsReviewedAnswerAfterBankEvidenceChanges(t *testing.T) {
+func TestIncomePurposeRetainsReviewedAnswerWhenRepetitionIsNoLongerEstablished(t *testing.T) {
 	db, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -226,8 +226,8 @@ func TestIncomeWithdrawalRetainsReviewedAnswerAfterBankEvidenceChanges(t *testin
 		t.Fatal(err)
 	}
 	for _, finding := range incomeFindings(t, scoped) {
-		if finding.Status != "withdrawn" || finding.Stale {
-			t.Fatalf("withdrawal=%+v", finding)
+		if finding.Status != "active" || finding.Stale || finding.Product != "" || finding.Pattern.AnnualizedEstimate != "" {
+			t.Fatalf("purpose incorrectly depends on repetition=%+v", finding)
 		}
 		if finding.ID == first.ID && (finding.Review == nil || finding.Review.Decision != "confirmed") {
 			t.Fatal("withdrawal lost the explicit answer")

@@ -92,7 +92,7 @@ cadence. Merchant identity, cadence evidence, and forecast schedules remain dist
 
 - Weekly, biweekly, monthly, quarterly, and annual patterns are detected from
   settled bank evidence grouped by source, account, currency, direction, and a
-  normalized merchant key. Three occurrences establish weekly through quarterly
+  descriptive stream shared with purpose assessments. Three occurrences establish weekly through quarterly
   patterns; two establish an annual pattern.
 - Each occurrence carries its own finding. Its evidence lists every occurrence
   in the pattern plus the estimated cadence and typical source amount, so the
@@ -116,26 +116,28 @@ separate explicit action with its own review.
 
 ## Income first release
 
-Income means a recurring external inflow that plausibly funds the model.
+Income means an external inflow that plausibly funds the model. Repetition is
+an independent assessment, not a prerequisite for explicit income evidence.
 Deposit, cadence, estimate, and provenance stay distinct per `TERMS.md` `F`.
-The Go pattern gate is deterministic and owns evidence. A provider-neutral
+The Go observation extractor is deterministic and owns evidence. A provider-neutral
 judgment boundary can refine strength using a model, rules, or an asynchronous
 human queue. The feature never selects an algorithm or interprets a probability.
 
-- Weekly, biweekly, monthly, quarterly, and annual inflow patterns are
-  detected from settled bank evidence grouped by source, account, currency,
+- Inflows are assessed from settled bank evidence grouped by source, account, currency,
   normalized description, payee, merchant metadata, and income evidence.
   The short merchant label is for display, not the payment-stream identity.
   Payroll descriptors and source income categories separate distinct streams
   before amount filtering, so small payments from an employer cannot suppress
   its payroll. Variable bank reference suffixes and opaque reference tokens
   are excluded from grouping but retained in immutable source evidence.
-  Three occurrences establish weekly through
+  When repetition is established, three occurrences establish weekly through
   quarterly patterns; two establish an annual pattern. Annualized estimate
   is the median source amount times periods per year (52, 26, 12, 4, 1).
 - A payroll descriptor (payroll, salary, paycheck, direct deposit, direct
   deposit abbreviation, ACH credit) or a source category that maps to
-  `INCOME` makes strength `strong`; otherwise strength is `moderate`.
+  `INCOME` supports income even for one observation. Regular cadence alone is
+  an uncertain candidate. Without repetition, cadence and annual estimate remain
+  unestablished rather than extrapolated from one payment.
 - Internal transfers are excluded by the exact opposite-leg rule from the
   transfer detector (same absolute amount, opposite direction, different
   account, within seven days). Refunds, reversals, chargebacks, and returns
@@ -147,12 +149,14 @@ human queue. The feature never selects an algorithm or interprets a probability.
   The Payment patterns list groups occurrences into one compact row per classification and pattern, with
   source-currency amounts supplied as structured fields rather than parsed
   from explanations or reconstructed from training features. Details retains
-  the explanation, per-occurrence review states, and visibility action.
+  the explanation, per-occurrence review states, visibility action and linked
+  repetition review and forecast controls. Repetition answers never imply income
+  or rent, and purpose answers never confirm repetition.
   Review uses the latest answered eligible occurrence, or the first eligible
   occurrence for an unanswered pattern. It saves one explicit label and never
   rewrites the other recorded answers. Withdrawn findings remain separate
   from current patterns.
-- The highest annualized candidate is marked `income.main-inflow:annualized`
+- The highest candidate with established repetition is marked `income.main-inflow:annualized`
   and described as the main consistent inflow. Other candidates keep
   `income.inflow:annualized`. Ranking is by annualized estimate desc with
   merchant and cadence tie breaks, so the user does not have to state the

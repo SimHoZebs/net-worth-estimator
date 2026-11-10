@@ -24,15 +24,24 @@ func (pat *classifiedPayment) judgmentInput() *types.AnalysisJudgmentInput {
 	for _, item := range pat.occurrences[start:] {
 		samples = append(samples, item.transaction.Facts)
 	}
+	annualized := ""
+	if pat.cadence != "" {
+		annualized = strconv.FormatFloat(pat.annualized, 'f', 2, 64)
+	}
+	var required []string
+	if pat.classification.RequireRecurrence {
+		required = []string{"regular-cadence"}
+	}
 	request := types.AnalysisJudgmentInput{
 		Kind: pat.classification.ID, PatternID: pat.patternID, Samples: samples,
 		Question: types.JudgmentQuestion{Label: pat.classification.Label,
-			SupportSignals: pat.classification.SupportSignals, CandidateSignals: pat.classification.CandidateSignals,
+			RequiredSignals: required,
+			SupportSignals:  pat.classification.SupportSignals, CandidateSignals: pat.classification.CandidateSignals,
 			ExcludeSignals: pat.classification.ExcludeSignals, SuggestWithoutSignal: pat.classification.SuggestWithoutSignal},
 		Pattern: types.JudgmentPattern{
 			Merchant: pat.merchant, Cadence: pat.cadence, Currency: pat.currency,
 			TypicalAmount:      strconv.FormatFloat(pat.typical, 'f', 2, 64),
-			AnnualizedEstimate: strconv.FormatFloat(pat.annualized, 'f', 2, 64),
+			AnnualizedEstimate: annualized,
 			OccurrenceCount:    len(pat.occurrences), CadenceDays: pat.cadenceDays,
 			AmountVariation: pat.amountCV, IntervalVariation: pat.gapCV, RecencyDays: pat.recencyDays,
 			Direction: pat.direction, Signals: pat.signals,

@@ -77,8 +77,9 @@ func (r *Runner) RunOnce(ctx context.Context) error {
 			}
 			continue
 		}
+		observations := withPaymentObservations(ctx)
 		for _, definition := range r.definitions {
-			if err := r.run(ctx, scoped, user, definition); err != nil && firstError == nil {
+			if err := r.run(observations, scoped, user, definition); err != nil && firstError == nil {
 				firstError = err
 			}
 		}

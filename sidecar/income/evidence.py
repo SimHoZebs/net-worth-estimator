@@ -21,7 +21,7 @@ def features_from_request(request):
             raise ValueError(f"invalid {key}")
     values = {}
     for key in ("typicalAmount", "annualizedEstimate", "cadenceDays", "amountVariation", "intervalVariation", "recencyDays"):
-        value = pattern.get(key)
+        value = pattern.get(key, 0) if key == "annualizedEstimate" else pattern.get(key)
         if isinstance(value, bool) or not isinstance(value, (int, float, str)):
             raise ValueError(f"invalid {key}")
         value = float(value)
@@ -29,7 +29,7 @@ def features_from_request(request):
             raise ValueError(f"invalid {key}")
         values[key] = value
     count = pattern.get("occurrenceCount")
-    if type(count) is not int or not 2 <= count <= 1000000:
+    if type(count) is not int or not 1 <= count <= 1000000:
         raise ValueError("invalid occurrenceCount")
     if pattern.get("direction") not in ("inflow", "outflow"):
         raise ValueError("invalid direction")
@@ -70,13 +70,15 @@ def baseline_decision(request):
     question = request.get("question")
     if not isinstance(question, dict) or not isinstance(question.get("label"), str) or not 1 <= len(question["label"]) <= 128:
         raise ValueError("a classification question is required")
-    for key in ("supportSignals", "candidateSignals", "excludeSignals"):
+    for key in ("supportSignals", "candidateSignals", "excludeSignals", "requiredSignals"):
         signals = question.get(key)
         if signals is not None and (not isinstance(signals, list) or len(signals) > 100 or any(not isinstance(s, str) or not 1 <= len(s) <= 128 for s in signals)):
             raise ValueError(f"invalid {key}")
     if type(question.get("suggestWithoutSignal")) is not bool:
         raise ValueError("invalid suggestWithoutSignal")
     observed = set(request["pattern"].get("signals", []))
+    if not set(question.get("requiredSignals") or []).issubset(observed):
+        return "unsupported"
     if observed.intersection(question.get("excludeSignals") or []):
         return "unsupported"
     if observed.intersection(question.get("supportSignals") or []):
