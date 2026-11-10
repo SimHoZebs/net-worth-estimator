@@ -2,7 +2,7 @@
 
 The frontend and API can use different providers. They share one public browser origin through a reverse proxy, and neither application contains provider addresses. SQLite and Better Auth remain separate stateful dependencies. Database-engine and identity-provider migrations are outside this contract.
 
-Application and data migrations use [the shared migration SOP](MIGRATIONS.md). Every deployment adapter invokes the target image's `/app/migrate.sh` with the API stopped; it is not part of server startup.
+Application and data migrations run through the shared migration SOP in `MIGRATIONS.md`. Every deployment adapter invokes the target image's `/app/migrate.sh` with the API stopped; it is not part of server startup. Stop all API writers and take a verified backup before any migration.
 
 ## Runtime contract
 
@@ -28,6 +28,39 @@ Application and data migrations use [the shared migration SOP](MIGRATIONS.md). E
 Startup validates schema compatibility and OIDC discovery before it listens. Readiness does not continuously test Better Auth; identity outages fail closed on authenticated requests when verification is due. The scheduler, sync exclusion, token-refresh coordination, and active seeded simulations use process memory, so multiple replicas and scale-to-zero are outside this contract. Process replacement loses unfinished simulations; completed results, financial data, and application sessions persist in SQLite.
 
 Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
+
+## Database setup
+
+Provision the database once, before the API starts. `setupdb` creates the schema on a fresh database and validates it on an existing one. It never adds missing tables to an existing database and never provisions user workspaces beyond the explicit issuer and subject flags.
+
+```bash
+docker compose build backend
+docker compose run --rm --no-deps --entrypoint /app/setupdb backend \
+  --db /data/net-worth-estimator.db
+docker compose up -d
+```
+
+Without Compose, run the same step from the repository root:
+
+```bash
+CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
+CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
+  --db /private/application.db --issuer "$ISSUER" --subject "$GUEST_SUBJECT"
+```
+
+The API never creates a missing database and never repairs schema. Startup stops with an operator error when required tables are missing. Complete any one-time upgrade before the new API starts.
+
+## Backups
+
+Treat the whole application database as a credential store. It holds provider tokens and financial data for every user, so a full backup stays private and never serves as published guest data. Never copy a live database file alone; use the SQLite backup API and verify the backup before relying on it.
+
+```bash
+sqlite3 "$DB" ".backup '$BACKUP'"
+sqlite3 "$BACKUP" 'PRAGMA integrity_check;'
+sqlite3 "$BACKUP" 'SELECT COUNT(*) FROM pragma_foreign_key_check;'
+```
+
+Before new writes, restoring a verified backup returns the exact pre-upgrade state. After new writes, a rollback requires reconciliation or an accepted loss of those writes.
 
 ## Reverse proxy
 

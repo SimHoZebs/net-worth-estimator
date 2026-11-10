@@ -1,6 +1,8 @@
 # Authentication and authorization
 
-Better Auth on Bun owns passwords, passkeys, OAuth grants, and provider sessions. The Go API verifies OIDC and maintains durable application sessions, and embedded Go Casbin evaluates user-resource policies from the separate application-owned authorization database. Financial ownership derives from the exact issuer and immutable subject. The security boundary, session lifetime, revocation, device clients, and recovery are in [the authentication contract](../docs/authentication.md).
+Better Auth on Bun owns passwords, passkeys, OAuth grants, and provider sessions. The Go API verifies OIDC and maintains durable application sessions, and embedded Go Casbin evaluates user-resource policies from the separate application-owned authorization database. Financial ownership derives from the exact issuer and immutable subject.
+
+Application sessions have an absolute deadline of seven days by default, configurable through `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME`, and refresh does not extend it. The next request after the provider recheck interval re-verifies the token. Deleting a provider session revokes its tokens, password change revokes the user's grants and sessions, and logout deletes the grant. Device clients use the RFC 8628 start, poll, and refresh flow with a code approved at the provider. No mail-based recovery exists; an operator verifies identity before an offline password reset and never changes the immutable subject. Back up identity, application, policy, and private configuration together and restore the same issuer, subjects, and auth secret.
 
 ## Fresh installation
 

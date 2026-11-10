@@ -22,7 +22,15 @@ Drafts survive panel closure and browser restart. If a save's result is unknown,
 
 ## App API
 
-The extension is an independent client with its own manifest, dependencies, build, and tests, and it imports no frontend source. Both clients share the standalone planned-purchase API and storage described in [the purchase queue contract](../docs/purchase-queue.md).
+The extension is an independent client with its own manifest, dependencies, build, and tests, and it imports no frontend source. Both clients share the standalone planned-purchase API and storage. Purchases are standalone rows under their owning user, separate from transactions and recurrence rules. Priority is nonnegative and lower numbers come first.
+
+- `GET /v1/planned-purchases` reads the queue and model revision.
+- `POST /v1/planned-purchases` creates a purchase. Omitted priority appends it.
+- `PATCH /v1/planned-purchases/{id}` replaces purchase values. Omitted priority preserves it.
+- `DELETE /v1/planned-purchases/{id}` removes a purchase.
+- `POST /v1/planned-purchases/reorder` moves `{ id, beforeId }`. Empty `beforeId` appends.
+
+Create and update return `value/issues/saved/revision`. All writes use the normal validation, resource guard, permissions, and read-only protection. Duplicate IDs return `409`. The purchase queue document owns this contract.
 
 Device sign-in uses `/v1/auth/device/start`, `poll`, and `refresh`; `/v1/auth/session` identifies the user and resource. The worker reads `/v1/financial-model` and `/v1/status` for funding choices, queue order, and write permission. Only eligible account IDs and names reach the panel, and the worker keeps the financial model in memory. Save uses `POST /v1/planned-purchases` with `name`, `fundingAccountId`, `cost`, `earliestDate`, `priority`, and `enabled`, exactly like the app editor. Concurrent app and extension writes use the same last-write rules.
 
@@ -51,4 +59,4 @@ bun --filter ./extension test:browser
 backend/scripts/verify.sh
 ```
 
-Browser tests load a real extension in a disposable Chromium profile with a local HTTP fixture for the external app and provider. Go tests cover real SQLite, the purchase API, duplicate-ID responses, and the identity boundary. Real-provider sign-in, Brave, and physical passkeys need separate manual checks. The standalone purchase backend requires the one-time upgrade in [purchase persistence](../docs/purchase-queue.md#persistence).
+Browser tests load a real extension in a disposable Chromium profile with a local HTTP fixture for the external app and provider. Go tests cover real SQLite, the purchase API, duplicate-ID responses, and the identity boundary. Real-provider sign-in, Brave, and physical passkeys need separate manual checks. If the backend predates the `planned_purchases` table, run the one-time planned-purchases upgrade before using the extension.

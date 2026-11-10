@@ -32,8 +32,4 @@ a successful image build does not prove capacity. The constrained image test
 exercises startup, feedback, duplicate delivery, provider failure, persisted
 restart, and graceful shutdown at those limits.
 
-River commits model and delivery state atomically. Back up persistent storage
-with SQLite's backup API; the application migration backup does not include the
-River database, and no automatic volume snapshot is assumed. See
-[the River provider runbook](../../sidecar/income/README.md) and
-[the migration SOP](../MIGRATIONS.md).
+River commits model and delivery state atomically. Back up persistent storage with SQLite's backup API; the application migration backup does not include the River database, and no automatic volume snapshot is assumed.

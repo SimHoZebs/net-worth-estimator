@@ -1,6 +1,6 @@
 # Development stack
 
-`docker-compose.dev.yml` runs the production Dockerfiles and Better Auth on Bun with isolated dev storage, loopback ports, and external sync disabled. Compose owns the container lifecycle and does not load the production Compose files. Receipt extraction uses a local mock adapter with no cloud credentials; upload the [synthetic sample](../backend/internal/receipts/adapters/mock/testdata/market.png) to a saved expense to exercise it. See [receipt setup](../docs/receipts.md).
+`docker-compose.dev.yml` runs the production Dockerfiles and Better Auth on Bun with isolated dev storage, loopback ports, and external sync disabled. Compose owns the container lifecycle and does not load the production Compose files. Receipt extraction uses a local mock adapter with no cloud credentials; upload the synthetic sample at `backend/internal/receipts/adapters/mock/testdata/market.png` to a saved expense to exercise it.
 
 ## One-time setup
 
@@ -59,7 +59,7 @@ Use verified resource IDs for `TARGET_USER` and `SOURCE_USER`. The source must u
 
 Casbin grants access to each user's private data. Signup needs no role choice or manual grant; first verified access records member assignment, and explicit setup assigns viewer to the provisioned guest. Disposable development fixtures use the password recorded in `tmp/dev/config.json` (`TEST_AUTH_USER_PASSWORD`, file mode `0600`), which setup preserves across re-runs.
 
-One shared application database holds every private user, the published guest scope, and application sessions. The verified `guestSubject` in `tmp/dev/config.json` selects the provisioned guest for anonymous traffic. Dev keeps SimpleFIN sync disabled. Back up `.env.dev` and `tmp/dev/` to retain the full dev state; files use `0600` and private directories use `0700`. Existing installations require the reviewed policy assignments in [the authorization contract](../docs/authorization.md).
+One shared application database holds every private user, the published guest scope, and application sessions. The verified `guestSubject` in `tmp/dev/config.json` selects the provisioned guest for anonymous traffic. Dev keeps SimpleFIN sync disabled. Back up `.env.dev` and `tmp/dev/` to retain the full dev state; files use `0600` and private directories use `0700`. Fresh setup assigns viewer to the provisioned guest and records member assignment on first verified access with no manual grant step.
 
 ## Run from source
 

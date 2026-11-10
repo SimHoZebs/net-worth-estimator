@@ -30,12 +30,7 @@ never replace those identity tables.
 
 ## Initial deployment and schema setup
 
-Provision the database once, before the API starts:
-
-```bash
-CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
-  --db /private/application.db
-```
+Start from the deployment runbook for host and database setup and the auth runbook for identity and guest provisioning. This section covers what setup validates and what it never does.
 
 `setupdb` creates the private parent directory, database, and complete financial
 and identity schema for a fresh database. Existing databases must already have
@@ -52,16 +47,8 @@ removes completed transaction-ID audit bookkeeping before model refresh or publi
 For other unsupported shapes, restore a verified current-schema backup or prepare
 an operator upgrade specific to the source. No replacement converter is supplied.
 
-To provision any user's empty financial rows, pass both `--issuer` and
-`--subject`. Use the guest's provider subject for its application workspace:
-
-```bash
-CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
-  --db /private/application.db --issuer "$ISSUER" --subject "$GUEST_SUBJECT"
-```
-
 Provider group membership assigns permissions separately at account creation.
-Schema setup does not grant access.
+Schema setup does not grant access. User workspace flags are in the auth runbook.
 
 The API never creates a missing directory or database and never
 repairs the core financial/identity tables. Startup validates the
@@ -87,15 +74,6 @@ the shared schema, and the offline deployment migration provisions them
 before the API starts. A missing required sidecar fails current-schema
 validation until that migration runs. A missing core table or column
 beyond that allowlist still fails closed and requires the offline upgrade path above.
-
-With the authenticated Compose configuration selected, initial container setup is:
-
-```bash
-docker compose build backend
-docker compose run --rm --no-deps --entrypoint /app/setupdb backend \
-  --db /data/net-worth-estimator.db
-docker compose up -d
-```
 
 Use the same private environment file and volume for setup and the API. Komodo
 runs this setup as the stack `post_deploy` step on every deploy. That step
