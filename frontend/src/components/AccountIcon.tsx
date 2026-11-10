@@ -19,6 +19,9 @@ const icons: Record<Account["kind"], LucideIcon> = {
 	debt: Building2,
 };
 
+/** Shared kind glyphs for pickers that render options outside AccountIcon. */
+export const accountKindIcons: Record<Account["kind"], LucideIcon> = icons;
+
 export const accountIconStyles = cva(
 	"grid shrink-0 place-items-center rounded-control border",
 	{

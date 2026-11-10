@@ -162,18 +162,27 @@ it("keeps read-only property controls locked", () => {
 it("offers every account type on the read-only kind selector", async () => {
 	const user = userEvent.setup();
 	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
-	const select = screen.getByLabelText("Account type") as HTMLSelectElement;
-	expect(select.disabled).toBe(false);
-	expect(Array.from(select.options).map((option) => option.value)).toEqual([
-		"cash",
-		"investment",
-		"property",
-		"debt",
-	]);
-	await user.selectOptions(select, "debt");
+	const trigger = screen.getByLabelText("Account type");
+	expect(trigger.getAttribute("disabled")).toBeNull();
+	await user.click(trigger);
+	expect(
+		screen.getAllByRole("option").map((option) => option.textContent),
+	).toEqual(["Cash & savings", "Investments", "Property", "Debt"]);
+	await user.click(screen.getByRole("option", { name: "Debt" }));
 	expect(
 		await screen.findByRole("button", { name: "Save changes" }),
 	).toBeTruthy();
+});
+
+it("returns focus to the type picker when a kind change is discarded", async () => {
+	const user = userEvent.setup();
+	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
+	const trigger = screen.getByLabelText("Account type");
+	await user.click(trigger);
+	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(screen.getByRole("button", { name: "Discard changes" }));
+	expect(document.activeElement).toBe(trigger);
+	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });
 
 it("saves a synced account kind with its current bounds verbatim", async () => {
@@ -186,7 +195,8 @@ it("saves a synced account kind with its current bounds verbatim", async () => {
 	render(<Settings account={{ ...mortgage, kind: "cash", readOnly: true }} />, {
 		wrapper,
 	});
-	await user.selectOptions(screen.getByLabelText("Account type"), "debt");
+	await user.click(screen.getByLabelText("Account type"));
+	await user.click(screen.getByRole("option", { name: "Debt" }));
 	await user.click(screen.getByRole("button", { name: "Save changes" }));
 	await waitFor(() =>
 		expect(server.calls.some((call) => call.method === "PATCH")).toBe(true),
@@ -206,7 +216,8 @@ it("refuses a synced kind that contradicts the bank balance", async () => {
 	setServerModelFixture();
 	const user = userEvent.setup();
 	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
-	await user.selectOptions(screen.getByLabelText("Account type"), "debt");
+	await user.click(screen.getByLabelText("Account type"));
+	await user.click(screen.getByRole("option", { name: "Debt" }));
 	await user.click(screen.getByRole("button", { name: "Save changes" }));
 	expect(
 		await screen.findByText(
@@ -226,7 +237,8 @@ it("fails closed when the current bounds cannot be read", async () => {
 	render(<Settings account={{ ...mortgage, kind: "cash", readOnly: true }} />, {
 		wrapper,
 	});
-	await user.selectOptions(screen.getByLabelText("Account type"), "debt");
+	await user.click(screen.getByLabelText("Account type"));
+	await user.click(screen.getByRole("option", { name: "Debt" }));
 	// The synced-kind write carries the saved bounds verbatim, so an
 	// unreadable bounds cache must block the save instead of clearing
 	// real bounds to open.

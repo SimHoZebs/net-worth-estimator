@@ -15,17 +15,15 @@ test("account type changes fields inline and keeps shared identity controls", as
 	await included.uncheck();
 	await type.click();
 	await expect(
-		type.getByRole("option", { name: "Loan", exact: true }).locator("svg"),
+		dialog.getByRole("option", { name: "Loan", exact: true }).locator("svg"),
 	).toBeVisible();
-	await type.getByRole("option", { name: "Loan", exact: true }).click();
 	await expect(
-		type.getByRole("option", { name: "Loan", exact: true }),
-	).toHaveText("Loan");
-	await expect(type.locator("selectedcontent svg")).toBeVisible();
-	await expect(
-		type.getByRole("option", { name: "Debt", exact: true }),
+		dialog.getByRole("option", { name: "Debt", exact: true }),
 	).toHaveCount(0);
-	await expect(type.locator("option svg")).toHaveCount(4);
+	await expect(dialog.getByRole("option")).toHaveCount(4);
+	await dialog.getByRole("option", { name: "Loan", exact: true }).click();
+	await expect(type).toContainText("Loan");
+	await expect(type.locator("svg").first()).toBeVisible();
 	await expect(
 		dialog.getByLabel("Principal (USD)", { exact: true }),
 	).toBeVisible();
@@ -33,12 +31,16 @@ test("account type changes fields inline and keeps shared identity controls", as
 		0,
 	);
 	await expect(included).not.toBeChecked();
-	await type.selectOption("cash");
+	await type.click();
+	await dialog
+		.getByRole("option", { name: "Cash & savings", exact: true })
+		.click();
 	await expect(
 		dialog.getByLabel("Balance (USD)", { exact: true }),
 	).toBeVisible();
 	await expect(name).toHaveValue("Education loan");
-	await type.selectOption("loan");
+	await type.click();
+	await dialog.getByRole("option", { name: "Loan", exact: true }).click();
 	await name.fill("");
 	await dialog
 		.getByRole("button", { name: "Add account", exact: true })
@@ -61,8 +63,8 @@ test("one loan form creates one visible account and preserves terms on edit", as
 	const form = page.getByRole("dialog", { name: "Add account", exact: true });
 	await form.getByLabel("Account name").fill("Education loan");
 	const type = form.getByLabel("Account type");
-	await type.focus();
-	await type.selectOption("loan");
+	await type.click();
+	await form.getByRole("option", { name: "Loan", exact: true }).click();
 	await expect(type).toBeFocused();
 	await expect(page.getByRole("dialog")).toHaveCount(1);
 	await expect(form.getByLabel("Account name")).toHaveValue("Education loan");

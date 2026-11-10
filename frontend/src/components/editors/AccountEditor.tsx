@@ -1,14 +1,19 @@
 import { useId, useState } from "react";
 import type { Account } from "../../domain/model.ts";
-import { parseUnion } from "../../domain/guards.ts";
+import {
+	ACCOUNT_KINDS,
+	ACCOUNT_TYPE_LABELS,
+} from "../../domain/accountKinds.ts";
+import type { AccountKind } from "../../api/contracts.ts";
+import { accountKindIcons } from "../AccountIcon.tsx";
+import { OptionPicker } from "../OptionPicker.tsx";
 import {
 	persistSyncedAccountKind,
 	syncedKindError,
 } from "../../state/accountKind.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { Checkbox, InputField, SelectField } from "../Field.tsx";
+import { Checkbox, InputField } from "../Field.tsx";
 import { Modal } from "../Modal.tsx";
-import { AccountIcon } from "../AccountIcon.tsx";
 import { FieldError } from "../ErrorNotice.tsx";
 import { LoanEditor } from "./LoanEditor.tsx";
 import { OrdinaryAccountEditor } from "./OrdinaryAccountEditor.tsx";
@@ -74,6 +79,23 @@ export function AccountEditor(props: {
 		});
 	};
 
+	const typeOptions: {
+		value: string;
+		label: string;
+		icon: (typeof accountKindIcons)[AccountKind];
+	}[] = [
+		...ACCOUNT_KINDS.filter(
+			(kind) => kind !== "debt" || (item && !item.display),
+		).map((kind) => ({
+			value: kind,
+			label: ACCOUNT_TYPE_LABELS[kind],
+			icon: accountKindIcons[kind],
+		})),
+		...(!item || item?.display
+			? [{ value: "loan", label: "Loan", icon: accountKindIcons.debt }]
+			: []),
+	];
+
 	return (
 		<Modal
 			title={
@@ -81,65 +103,26 @@ export function AccountEditor(props: {
 			}
 			onClose={onClose}
 		>
-			<div className="mb-5 grid grid-cols-2 gap-5 max-sm:grid-cols-1">
-				<SelectField
-					rich
-					label="Account type"
-					name="accountType"
-					form={formId}
-					value={type}
-					disabled={!!item?.display || saving}
-					onChange={(event) =>
-						changeType(
-							parseUnion(event.target.value, [
-								"cash",
-								"investment",
-								"property",
-								"debt",
-								"loan",
-							] as const) ?? "cash",
-						)
+			<OptionPicker
+				label="Account type"
+				labelClassName="w-36 flex-none text-sm font-semibold text-muted"
+				value={type}
+				valueLabel={type === "loan" ? "Loan" : ACCOUNT_TYPE_LABELS[type]}
+				ValueIcon={
+					type === "loan" ? accountKindIcons.debt : accountKindIcons[type]
+				}
+				options={typeOptions}
+				onSelect={(next) => {
+					if (
+						next === "loan" ||
+						(ACCOUNT_KINDS as readonly string[]).includes(next)
+					) {
+						changeType(next as Account["kind"] | "loan");
 					}
-				>
-					{(
-						[
-							["cash", "Cash & savings"],
-							["investment", "Investments"],
-							["property", "Property"],
-						] as const
-					).map(([kind, label]) => (
-						<option key={kind} value={kind} aria-label={label}>
-							<AccountIcon
-								account={{ id: kind, kind, color: null }}
-								size="sm"
-								className="size-6"
-							/>
-							<span>{label}</span>
-						</option>
-					))}
-					{item && !item.display && (
-						<option value="debt" aria-label="Debt">
-							<AccountIcon
-								account={{ id: "debt", kind: "debt", color: null }}
-								size="sm"
-								className="size-6"
-							/>
-							<span>Debt</span>
-						</option>
-					)}
-					{(!item || item.display) && (
-						<option value="loan" aria-label="Loan">
-							<AccountIcon
-								account={{ id: "loan", kind: "debt", color: null }}
-								size="sm"
-								className="size-6"
-							/>
-							<span>Loan</span>
-						</option>
-					)}
-				</SelectField>
-				<FieldError message={typeError} />
-			</div>
+				}}
+				disabled={!!item?.display || saving}
+			/>
+			<FieldError message={typeError} />
 			<fieldset
 				disabled={readOnly || saving}
 				className="m-0 mb-5 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"

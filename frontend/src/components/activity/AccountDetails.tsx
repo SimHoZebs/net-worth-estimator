@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 import type { Account } from "../../domain/model.ts";
+import { ACCOUNT_TYPE_LABELS } from "../../domain/accountKinds.ts";
+import type { AccountKind } from "../../api/contracts.ts";
+import { accountKindIcons } from "../AccountIcon.tsx";
+import { OptionPicker } from "../OptionPicker.tsx";
 import { dateLabel } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { Checkbox } from "../Field.tsx";
@@ -73,41 +77,44 @@ export function AccountDetails({
 }) {
 	const locked = readOnly || edit.saving;
 	const { draft, formId } = edit;
+	const kindOptions = (["cash", "investment", "property", "debt"] as const).map(
+		(kind: AccountKind) => ({
+			value: kind,
+			label: ACCOUNT_TYPE_LABELS[kind],
+			icon: accountKindIcons[kind],
+		}),
+	);
 	return (
 		<section aria-label="Account settings" className="grid gap-4">
-			<PropertyRow label="Account type" htmlFor={`${formId}-kind`}>
-				<select
-					form={formId}
-					id={`${formId}-kind`}
-					name="kind"
-					value={draft.kind}
-					disabled={edit.saving}
-					className={transactionControlStyles({
-						element: "select",
-						shape: "account",
-						appearance: edit.activeField === "kind" ? "native" : "plain",
-					})}
-					onChange={(event) =>
-						edit.update(
-							{
-								kind:
-									parseUnion(event.target.value, [
-										"cash",
-										"investment",
-										"property",
-										"debt",
-									] as const) ?? "cash",
-							},
-							"kind",
-						)
-					}
-				>
-					<option value="cash">Cash &amp; savings</option>
-					<option value="investment">Investments</option>
-					<option value="property">Property</option>
-					<option value="debt">Debt</option>
-				</select>
-			</PropertyRow>
+			<OptionPicker
+				label="Account type"
+				labelClassName={detailPropertyLabelClassName}
+				triggerId={`${formId}-kind`}
+				value={draft.kind}
+				valueLabel={ACCOUNT_TYPE_LABELS[draft.kind]}
+				ValueIcon={accountKindIcons[draft.kind]}
+				options={kindOptions}
+				onSelect={(kind) =>
+					edit.update(
+						{
+							kind:
+								parseUnion(kind, [
+									"cash",
+									"investment",
+									"property",
+									"debt",
+								] as const) ?? "cash",
+						},
+						"kind",
+					)
+				}
+				disabled={edit.saving}
+			/>
+			{readOnly && (
+				<p className="m-0 text-xs text-muted">
+					Synced balances stay bank-owned; the type is yours to set.
+				</p>
+			)}
 			<PropertyRow label="Included">
 				<label
 					htmlFor={`${formId}-enabled`}
