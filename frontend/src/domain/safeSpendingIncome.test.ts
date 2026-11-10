@@ -104,7 +104,7 @@ describe("safeSpendingIncome", () => {
 		).toBe(1500);
 	});
 
-	it("exposes only enabled, current inflows into income accounts", () => {
+	it("exposes only enabled, unexpired inflows into income accounts", () => {
 		const regulated = [
 			rule("active"),
 			rule("disabled", { enabled: false }),
@@ -126,13 +126,14 @@ describe("safeSpendingIncome", () => {
 		});
 		expect(result.selectedScheduleIds).toEqual([
 			"active",
+			"future",
 			"starts-today",
 			"ends-today",
 		]);
 		expect(result.candidates.map((item) => item.id)).toEqual(
 			result.selectedScheduleIds,
 		);
-		expect(result.paycheck?.amount).toBe(200);
+		expect(result.paycheck?.amount).toBe(300);
 	});
 
 	it("scopes inflows to the selected income accounts, independent of spending", () => {
@@ -229,10 +230,9 @@ describe("incomeBundleAfter", () => {
 		).toBeNull();
 	});
 
-	it("keeps eligibility anchored to today, not the boundary", () => {
-		// `starts-late` begins after today but before the boundary. Anchoring
-		// eligibility to the boundary would admit it and add its first
-		// occurrence to the bundle; the today anchor keeps it out.
+	it("admits rules starting after today when they pay after the boundary", () => {
+		// `starts-late` begins after today but before the boundary. Its first
+		// occurrence follows the boundary, so it settles the statement.
 		expect(
 			incomeBundleAfter({
 				...input,
@@ -244,6 +244,6 @@ describe("incomeBundleAfter", () => {
 				afterIso: "2026-10-24",
 				incomeScheduleIds: ["salary", "starts-late"],
 			}),
-		).toEqual({ date: "2026-11-15", endDate: "2026-11-15", amount: 3300 });
+		).toEqual({ date: "2026-10-25", endDate: "2026-11-15", amount: 4000 });
 	});
 });

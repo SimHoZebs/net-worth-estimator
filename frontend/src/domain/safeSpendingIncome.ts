@@ -34,7 +34,9 @@ interface IncomeSelection {
  * Income sources are explicit positive recurring inflows into the selected
  * income accounts. Transfers within those accounts do not add income. Each
  * source contributes its next server-projected requested payment, once per
- * rule.
+ * rule. Rules remain selectable before their start date so a workspace can
+ * be configured ahead of the first payday; the projection decides whether
+ * an occurrence follows.
  */
 function selectIncome({
 	accounts,
@@ -62,7 +64,6 @@ function selectIncome({
 		(rule) =>
 			rule.enabled &&
 			rule.kind === "schedule" &&
-			rule.startDate <= today &&
 			(rule.endDate === null || rule.endDate >= today) &&
 			rule.toId !== null &&
 			destinations.has(rule.toId) &&
@@ -131,7 +132,7 @@ export function safeSpendingIncome(input: {
 
 /**
  * The statement-settlement bundle: the earliest payment per selected source
- * arriving after `afterIso`. Eligibility stays anchored to today; only the
+ * arriving after `afterIso`. Ended rules stay excluded; otherwise the
  * occurrence window moves, so each statement names the payday that settles
  * it.
  */
