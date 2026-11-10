@@ -50,7 +50,9 @@ The release stops every API writer, swaps the API container for a maintenance
 process that answers `/readyz` with `maintenance`, migrates the real database,
 and restores the API command only after the migration exits zero. The release
 waits for the API container to be running before it migrates, because the
-migration runs inside that container.
+migration runs inside that container. The identity image deploy runs after the
+API image deploy, so the API container is already settled when the migration
+attaches to it.
 
 Northflank can still refuse that command with `No running container found`
 when the container was replaced moments earlier. The migration never mutates

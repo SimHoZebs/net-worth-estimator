@@ -909,10 +909,10 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.equal(workflow.triggers[0].spec.token, "INJECT_PRIVATE_WEBHOOK_TOKEN");
   const steps = workflow.spec.spec.steps;
   assert.deepEqual(steps.map((step) => step.ref), [
-    "identity-backup", "stop-api-writers", "deploy-identity-image",
-    "deploy-maintenance-image", "await-api-container", "migrate", "start-api",
+    "identity-backup", "stop-api-writers", "deploy-maintenance-image",
+    "deploy-identity-image", "await-api-container", "migrate", "start-api",
   ]);
-  const [backup, stopApi, deployIdentity, deployApi, awaitContainer, migrate, startApi] = steps;
+  const [backup, stopApi, deployApi, deployIdentity, awaitContainer, migrate, startApi] = steps;
   assert.equal(backup.condition, "success");
   assert.equal(backup.spec.backupType, "dump");
   assert.equal(stopApi.condition, "success");
@@ -921,6 +921,16 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.match(maintenance, /httpd -f/);
   assert.match(maintenance, /-h \/tmp\/waypoint-maintenance/);
   assert.doesNotMatch(maintenance, /\/app\/server|\/data/);
+  // The API image lands before the identity image so the API container is
+  // already settled when the migration attaches to it.
+  assert.ok(
+    steps.findIndex((step) => step.ref === "deploy-maintenance-image") <
+      steps.findIndex((step) => step.ref === "deploy-identity-image"),
+  );
+  assert.ok(
+    steps.findIndex((step) => step.ref === "deploy-identity-image") <
+      steps.findIndex((step) => step.ref === "migrate"),
+  );
   assert.equal(awaitContainer.kind, "Condition");
   assert.equal(awaitContainer.condition, undefined);
   assert.equal(awaitContainer.spec.kind, "Service");

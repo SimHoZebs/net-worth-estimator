@@ -41,17 +41,6 @@
         },
         {
           "kind": "Release",
-          "ref": "deploy-identity-image",
-          "condition": "running",
-          "timeoutDuration": 600,
-          "spec": {
-            "type": "registry",
-            "origin": { "imagePath": "${args.IDENTITY_IMAGE}" },
-            "target": { "id": "${args.IDENTITY_SERVICE_ID}", "type": "service" }
-          }
-        },
-        {
-          "kind": "Release",
           "ref": "deploy-maintenance-image",
           "condition": "running",
           "timeoutDuration": 600,
@@ -59,6 +48,17 @@
             "type": "registry",
             "origin": { "imagePath": "${args.API_IMAGE}" },
             "target": { "id": "nwe-api", "type": "service" }
+          }
+        },
+        {
+          "kind": "Release",
+          "ref": "deploy-identity-image",
+          "condition": "running",
+          "timeoutDuration": 600,
+          "spec": {
+            "type": "registry",
+            "origin": { "imagePath": "${args.IDENTITY_IMAGE}" },
+            "target": { "id": "${args.IDENTITY_SERVICE_ID}", "type": "service" }
           }
         },
         {
