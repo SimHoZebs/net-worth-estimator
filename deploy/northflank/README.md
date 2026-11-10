@@ -33,3 +33,13 @@ exercises startup, feedback, duplicate delivery, provider failure, persisted
 restart, and graceful shutdown at those limits.
 
 River commits model and delivery state atomically. Back up persistent storage with SQLite's backup API; the application migration backup does not include the River database, and no automatic volume snapshot is assumed.
+
+## Release webhook
+
+At installation, replace `INJECT_PRIVATE_WEBHOOK_TOKEN` in `release.json`
+with a new private token and keep that value when applying later definition
+updates. Save the resulting webhook URL as the GitHub Actions secret through
+standard input, never command arguments, and never commit the token or URL.
+Northflank accepts `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` in the
+URL query, not a POST body. `RELEASE_SHA` is recorded for identification;
+the image references drive the deployment.

@@ -1,39 +1,5 @@
 # Migration SOP for every deployment
 
-## Shared payment patterns
-
-Existing income targets require the explicit
-[offline payment-pattern upgrade](../backend/scripts/one-time/payment-patterns/README.md)
-and a fresh learner database before running the new target. This preserves
-owner answers and immutable audit payloads without adding legacy formats to
-runtime. Compose, dev and Northflank are unverified. Keep the operator script
-until every supported target verifies it. Do not auto-release this change to an
-existing target before its operator window is complete.
-
-## Account display relationships
-
-Before this release serves an existing application database, run the explicit
-[account-display upgrade](../docs/account-displays.md#existing-databases).
-It adds `account_displays` without changing existing financial rows. Optional
-linking requires reviewed IDs for one user, two accounts, and two schedules.
-Runtime reads require the current table and never convert old account pairs.
-Retain the operator tool until canonical Compose, dev, and Northflank each
-verify this upgrade. All existing targets remain unverified for this feature.
-
-## Better Auth and Casbin cutover
-
-The identity replacement uses the separate
-[offline identity and policy import](../auth/better-auth/one-time/README.md).
-It does not run through API startup, normal setup, or `deploy/migrate.sh`.
-The API image includes `/app/import-casdoor-authz`; the Bun image includes the
-identity importer. Preserve the exact issuer and subjects on every target.
-Keep both one-time tools until Compose, dev, and Northflank verify the upgrade.
-
-Northflank release requires `AUTH_CUTOVER_READY=true` and the prepared resource IDs
-in `NORTHFLANK_IDENTITY_SERVICE_ID` and `NORTHFLANK_IDENTITY_DATABASE_ADDON_ID`.
-Leave the gate closed until identity import, policy import, and real-provider
-checks pass on the target. No source push performs a live identity conversion.
-
 ## One contract
 
 `deploy/migrate.sh` is the single replaceable migration body. The API image
@@ -46,80 +12,41 @@ registry, numbered chain, or historical-model converter to the backend.
 Use existing `setupdb` and `refreshmodel` tools where appropriate.
 The image also provides `sqlite3` for offline SQL and SQLite-safe backups.
 
-Databases that still carry pre-rename tables must first run
-the one-time `/app/upgrade-transaction-rename` tool (with the API stopped)
-to rename stored vocabulary to `transactions`, then run this body.
-The current body performs one combined offline upgrade. It converts the
-deployed user-scoped date-only checkpoints to exact UTC day-close instants
-and enables legacy settled bank rows with their posted event time, then
-provisions the Analysis evidence, findings, and feedback schema from frozen SQL
-in `analysis-schema.sql`. It then runs the independent
-`/app/upgrade-planned-purchases` tool to convert retired purchase policies.
-Conversion and repair run inside a candidate copy of a verified backup;
-`setupdb` only validates the complete current schema on that candidate. It
-also provisions the suppression-key and checkpoint available-balance
-sidecars when absent. A logical database digest proves that validation
-changes no schema or rows. Only the verified candidate is published over
-the original database, so the original file is never mutated before
-publication. It accepts current `shared-accounts-v1`
-storage with date-only or final checkpoints, zero or all Analysis tables, and
-either the retired or standalone purchase shape. Complete targets repeat read-only.
-Mixed purchase shapes and partial application or
-Analysis schemas fail before any backup. It checks integrity and foreign
-keys, creates a private `<database>.analysis-backup.XXXXXX/before.db` with
-the SQLite backup API, and compares every preexisting application table,
-except the schema-marker table, against that backup. Only the checkpoint
-date-to-instant conversion, settled-bank repair, explicit purchase-row
-conversion, the SimpleFIN v2 key rewrite, and removal of the completed
-`transaction_id_migrations` audit table may differ. The audit remains in the
-verified backup. Purchase conversion preserves all other rows, identities,
-and Analysis evidence. Unsafe purchase inputs leave the original unchanged. A
-complete target without that audit table repeats read-only checks only and never reactivates
-a post-upgrade owner disable.
-
-The SimpleFIN v2 key conversion is one additional offline step in the same
-candidate. `simplefin-v2-keys` rewrites `account_links`,
-`transaction_sync_keys`, and `suppressed_sync_keys` from bare account IDs to
-connection-scoped keys, verifies row counts, and records
-`simplefin-v2-keys`. It is a no-op when no SimpleFIN rows exist. When bare
-keys exist, the deployment supplies `SIMPLEFIN_V2_MAPPING` as a private
-runtime setting: a mode-0600 JSON map produced by `simplefin-v2-keys
---write-mapping` before the window. The map tool performs the only provider
-read. When every key already uses the connection-scoped form the tool
-records the marker without a mapping. A missing, ambiguous, or colliding
-mapping fails before publication when bare keys need it.
-A marked database repeats read-only verification and refuses bare keys.
-
-The account displays table is provision-if-missing in the same candidate.
-Absent creates an empty `account_displays` table on the verified backup
-candidate. Complete repeats read-only. A partial display schema fails
-before mutation. Existing displays verify byte-identical below, and the
-body never infers loan relationships. Operators link existing loan pairs
-explicitly with the one-time account-displays upgrade.
-
-The suppression-key and available-balance sidecars are also
-provision-if-missing in the same candidate. Absent creates each table
-empty; complete repeats read-only. A partial sidecar schema fails before
-mutation. Existing available-balance rows verify byte-identical below.
-For preexisting suppression rows, the SimpleFIN v2 rewrite below may
-change only bridge keys to its connection-scoped form.
-
-The old import default and pre-upgrade API-set exclusions share the same
-disabled flag. The conversion enables all legacy settled bank rows once,
-including those API exclusions. Later exclusions remain intact on retries.
-
-The adapter must keep every API writer stopped for the complete operation.
-Failed conversion, setup, or postconditions leave the original database
-byte-identical with the verified backup retained; no automatic rollback
-resumes the API and this body never restores over the data file. The private
+The authoritative step list is the body itself; this SOP states the contract
+around it, not the step list. In short: every conversion runs inside a candidate copy of a verified backup,
+`setupdb` validates the complete current schema on that candidate, and only
+the verified candidate is published over the original database. Failed
+conversion, setup, or postconditions leave the original database
+byte-identical with the verified backup retained. No automatic rollback
+resumes the API and the body never restores over the data file. The private
 `<database>.analysis-migration-pending` file from an actual previous attempt
-is recognized fail-closed. Retain this body until both supported targets
-verify it. No provider edits belong to this migration.
+is recognized fail-closed. Retain this body until every supported target
+verifies it.
+
+Databases that still carry pre-rename tables must first run the one-time
+`/app/upgrade-transaction-rename` tool (with the API stopped), then run this
+body. See [its README](../backend/scripts/one-time/transaction-rename/README.md)
+for the exact command.
 
 `api-boot.sh` provisions or validates current schema on hosts configured
-for that command. It does not provision users. Guest and signed-in workspaces
-use the shared authorized-access path. This is fresh/current schema setup,
-not the deployment migration hook. Keep the two separate.
+for that command. It does not provision users. This is fresh/current schema
+setup, not the deployment migration hook. Keep the two separate.
+
+## Pending one-time migrations
+
+Retire each script through this ledger only after every supported target
+verifies the upgrade. Do not auto-release a pending migration to an existing
+target before its operator window is complete.
+
+| Migration | Operator doc | Status and notes |
+| --- | --- | --- |
+| Payment patterns | [payment-patterns README](../backend/scripts/one-time/payment-patterns/README.md) | Unverified on Compose, dev, and Northflank. Existing income targets need the offline upgrade and a fresh learner database. |
+| Account displays | [Existing databases](../docs/account-displays.md#existing-databases) | Unverified on Compose, dev, and Northflank. Adds `account_displays` without changing financial rows; loan pairs link explicitly with reviewed IDs. |
+| Identity and policy cutover | [one-time cutover](../auth/better-auth/one-time/README.md) | Runs outside API startup, setup, and `migrate.sh`. Preserve the exact issuer and subjects. Northflank release stays gated on `AUTH_CUTOVER_READY=true` with prepared service and addon IDs. No source push performs a live identity conversion. |
+| Transaction simulation split | Tool at `backend/scripts/one-time/transaction-sim-split` | Retain until every supported target records the split. Never run the planned-purchase conversion against a pre-split target on its own; the body orders the split first. |
+| Planned purchases | [planned-purchases README](../backend/scripts/one-time/planned-purchases/README.md) | Runs inside the body after the split and converts retired purchase policies. Unsafe inputs leave the original unchanged. |
+| Bank source normalization | [bank-source README](../backend/scripts/one-time/bank-source/README.md) | Run on every supported target before deploying the strict settlement matcher. Both legacy counts must read zero before the API starts. |
+| SimpleFIN v2 keys | Tool usage: `simplefin-v2-keys --db PATH (--mapping PATH \| --write-mapping PATH)` | Runs inside the body. When bare keys exist, supply `SIMPLEFIN_V2_MAPPING` as a mode-0600 JSON map produced by `--write-mapping` before the window; the map tool performs the only provider read. A missing, ambiguous, or colliding mapping fails before publication. No-op when no SimpleFIN rows exist. |
 
 ## Supported execution paths
 
@@ -231,23 +158,10 @@ published images. Releases stay sequential: one at a time.
 
 `.github/workflows/northflank-release.yml` triggers on the `Tests` workflow for
 the exact `main` push, waits for the pinned backend and Better Auth image manifests,
-then requests the workflow with those image references. The
-`Publish container images` workflow runs on the same `Tests` completion. A manual
-dispatch requests the current `main` commit, requires a green `Tests` push run
-for it, and waits for its images. The release job has read-only repository
-access and no Northflank API credential. Its `NORTHFLANK_RELEASE_WEBHOOK`
-repository secret can only request workflow runs. The GitHub job confirms
-dispatch, not production completion. Check the Northflank run separately. This
-adapter does not depend on Northflank's native Git webhook registration, which
-currently cannot access this repository through its Git link.
-
-At installation, replace `INJECT_PRIVATE_WEBHOOK_TOKEN` with a new private token.
-Keep that value when applying later definition updates. Save the resulting
-webhook URL as the GitHub Actions secret through standard input, never command
-arguments. Northflank accepts `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` in
-the URL query, not a POST body. `RELEASE_SHA` is recorded for identification;
-the image references drive the deployment. Never commit the token or URL. Pause
-this trigger during a migration window.
+then requests the workflow with those image references. The release job has
+read-only repository access and no Northflank API credential. Its webhook secret
+can only request workflow runs. The GitHub job confirms dispatch, not production
+completion. Check the Northflank run separately.
 
 The ReadWriteOnce volume stays attached to its one API service. Northflank
 terminates the old pod before starting another pod with that volume. The
@@ -264,71 +178,14 @@ not a prerequisite for SQLite's backup operation.
 
 Reapply reviewed JSON through the Northflank API when definitions change.
 Read back the workflow, template, image pins, single-instance setting, mount,
-and command. Test nonzero command propagation before trusting the release gate.
+and command. Pause the release trigger during a migration window.
 
-## References and historical evidence
+## References
 
 - [Northflank migrations](https://northflank.com/docs/v1/application/release/run-migrations)
 - [Northflank workflows](https://northflank.com/docs/v1/application/release/configure-workflows)
 - [CI/CD override](https://northflank.com/docs/v1/application/release/manage-ci-cd)
 - [Volume access](https://northflank.com/docs/v1/application/databases-and-persistence/add-a-volume)
-- [Home-server execution record](https://github.com/SimHoZebs/home-server/blob/main/net-worth-estimator/MIGRATIONS.md)
 
-The ordinary-guest cutover predates this shared contract. Its script remains
-in infrastructure commit `592e6b8`. Northflank was initialized with the current
-user-scoped model. Never replay that host-specific script against Northflank's
-independent issuer or Postgres database.
-
-## Unified projection schema
-
-The unified projection adds tables and columns with no data conversion:
-`provider_connections`, `projection_states` (plus `det_evaluations_json` and
-`stoch_evaluations_json`), `projection_slices`, `projection_rows`,
-`monte_carlo_statistics` (plus `p25`, `p50`, `p75`), one typed output table
-per evaluation (`net_worth_threshold_outputs`, `account_balance_outputs`,
-`transaction_fulfillment_outputs`, `cycle_fulfillment_outputs`,
-`planned_purchases_outputs`, `financial_independence_outputs`,
-`whatif_outputs`),
-`checkpoints.provider`, and on `transactions`
-`projection_slice_id`, `event_json`, `applied_amount`, plus `outcome`.
-
-The offline body treats this group as absent, complete, or invalid. Absent
-creates every table and adds every column on the verified backup candidate.
-Complete repeats read-only. A partial group fails before mutation. `setupdb`
-then validates the complete schema on the candidate. Existing
-`projection_artifacts` tables are preserved when present but are no longer
-required. Previously stored `simplefin` row sources are normalized to `banksync` by
-the one-time bank-source script below. Provider identity remains in sync
-keys. Fresh databases need no body work: `SetupDatabase` creates the
-complete schema.
-
-## Transaction simulation split (one-time, inside the body)
-
-`deploy/migrate.sh` runs the standalone `upgrade-transaction-sim-split` tool on
-the verified candidate before checkpoint conversion and purchase conversion. It
-splits pre-split `transactions` rows into the transaction fact plus
-`transaction_sim` order and enablement plus `transaction_claims` occurrence
-links, drops the retired `destinations`, `receipt_ids`, and simulation columns,
-and converges both analysis lifecycle triggers. Every old column must be
-present and both satellites absent or empty; partial and mixed shapes fail
-closed. A repeat run on a completed target is read-only.
-
-The tool remains at `backend/scripts/one-time/transaction-sim-split` and builds
-into the API image. Verify it with
-`backend/scripts/verify.sh ./scripts/one-time/transaction-sim-split`. Never run
-the planned-purchase conversion against a pre-split target on its own: the
-purchase eligibility query reads the split shape, so the body orders the split
-first. Retain the tool until every supported target records the split.
-
-## Bank source normalization (one-time)
-
-Run `backend/scripts/one-time/bank-source/run.sh` with every API writer
-stopped and the real database path. The script backs up the database with
-SQLite's backup API, rewrites `transactions.source` and `checkpoints.source`
-from `simplefin` to `banksync`, and fails if any legacy value remains.
-Verify both counts are zero before starting the API. The strict settlement
-matcher requires `banksync`.
-
-Run this on every supported target before deploying the strict matcher.
-Retire the script only after every target records the migration and the
-strict matcher is live.
+The ordinary-guest cutover predates this shared contract. Never replay that
+host-specific script against Northflank's independent issuer or database.
