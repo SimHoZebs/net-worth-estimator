@@ -1,10 +1,20 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type APIRequestContext, test } from "./base.ts";
+import { expect, type APIRequestContext, type Locator, test } from "./base.ts";
 import type {
 	FinancialModelResponse,
 	JsonValue,
 } from "../../src/api/contracts.ts";
 import { FIXTURE_API } from "./fixture.ts";
+
+async function settleDrawer(dialog: Locator) {
+	// Even the 1ms reduced-motion animation can span a browser frame, and
+	// the sheet then reads as wider than the viewport.
+	await dialog.evaluate(async (element) => {
+		await Promise.all(
+			element.getAnimations().map((animation) => animation.finished),
+		);
+	});
+}
 
 async function addIndependence(
 	request: APIRequestContext,
@@ -82,14 +92,9 @@ test("compact financial independence cards open an inspector without more calcul
 	await expect(
 		dialog.getByRole("region", { name: "Financial independence checks" }),
 	).toHaveCount(0);
-	// The drawer slides in from the edge over 200ms. Let that animation
-	// finish before measuring, so the geometry below reads the resting
-	// sheet instead of a frame caught mid-slide.
-	await dialog.evaluate(async (element) => {
-		await Promise.all(
-			element.getAnimations().map((animation) => animation.finished),
-		);
-	});
+	// Measure the drawer only once its entry animation finished, so the
+	// geometry reads the resting sheet instead of a frame mid-slide.
+	await settleDrawer(dialog);
 	const drawerBox = (await dialog.boundingBox())!;
 	const viewport = page.viewportSize()!;
 	expect(drawerBox.y).toBeCloseTo(0, 0);
@@ -403,6 +408,7 @@ for (const theme of ["light", "dark"]) {
 			await expect(
 				dialog.getByRole("combobox", { name: "Start date" }),
 			).toHaveCount(0);
+			await settleDrawer(dialog);
 			const modalBox = await dialog.boundingBox();
 			expect(modalBox!.x).toBeGreaterThanOrEqual(0);
 			expect(modalBox!.x + modalBox!.width).toBeLessThanOrEqual(width);
