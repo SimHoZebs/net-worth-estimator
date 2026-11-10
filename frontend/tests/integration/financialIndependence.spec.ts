@@ -42,6 +42,10 @@ test("compact financial independence cards open an inspector without more calcul
 	request,
 }) => {
 	test.setTimeout(90_000);
+	// Slow lane: the fixture reseed and the full 400-run stochastic
+	// projection before the drawer opens overrun the budget on a loaded
+	// runner. The sibling mobile spec already carries this marker.
+	test.slow();
 	const id = await addIndependence(request);
 	let projections = 0;
 	page.on("request", (request) => {
@@ -78,6 +82,14 @@ test("compact financial independence cards open an inspector without more calcul
 	await expect(
 		dialog.getByRole("region", { name: "Financial independence checks" }),
 	).toHaveCount(0);
+	// The drawer slides in from the edge over 200ms. Let that animation
+	// finish before measuring, so the geometry below reads the resting
+	// sheet instead of a frame caught mid-slide.
+	await dialog.evaluate(async (element) => {
+		await Promise.all(
+			element.getAnimations().map((animation) => animation.finished),
+		);
+	});
 	const drawerBox = (await dialog.boundingBox())!;
 	const viewport = page.viewportSize()!;
 	expect(drawerBox.y).toBeCloseTo(0, 0);
