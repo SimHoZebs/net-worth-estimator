@@ -60,6 +60,29 @@ export const E2E_STEPS = Object.freeze([
   "teardown",
 ]);
 
+export function planSteps(selected = null) {
+  if (selected === null) return [...E2E_STEPS];
+  if (!E2E_STEPS.includes(selected)) throw new Error(`unknown step ${selected}: ${E2E_STEPS.join(", ")}`);
+  const infrastructure = ["fixture", "images", "stack"];
+  const boundary = infrastructure.indexOf(selected);
+  if (boundary !== -1) return [...infrastructure.slice(0, boundary + 1), "teardown"];
+  if (selected === "teardown") return ["teardown"];
+  const needsIdentity = ["isolation", "direct-share", "group-feed", "receipts"].includes(selected);
+  return [...infrastructure, ...(needsIdentity ? ["isolation"] : []),
+    ...(selected === "isolation" ? [] : [selected]), "teardown"];
+}
+
+export function retainedImages(manifest, runId) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(runId) ||
+      manifest?.runId !== runId || manifest.disposable !== E2E_DISPOSABLE_MARKER) {
+    throw new Error("image set must belong to a retained disposable E2E run");
+  }
+  for (const name of ["api", "front", "auth"]) {
+    if (!/^sha256:[a-f0-9]{64}$/.test(manifest[name])) throw new Error(`image set is missing the ${name} image ID`);
+  }
+  return [manifest.api, manifest.front, manifest.auth];
+}
+
 export function isQuarantined(step) {
   return E2E_QUARANTINE.some((entry) => entry.step === step);
 }
@@ -91,8 +114,7 @@ export function teardownChecks(runId) {
 }
 
 // Validate the disposable-fixture contract without touching the network.
-// Mirrors the assertions auth/test-integration.mjs makes after reading
-// fixture.json, so a malformed fixture fails fast before any container runs.
+// A malformed fixture fails fast before any container runs.
 export function validateFixtureContract(fixture, { stateDir, issuer } = {}) {
   const problems = [];
   if (!fixture || typeof fixture !== "object") return ["fixture must be a JSON object"];

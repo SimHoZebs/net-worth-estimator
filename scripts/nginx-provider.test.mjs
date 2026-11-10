@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 const image = process.env.NGINX_TEST_IMAGE;
+if (process.env.REQUIRE_NGINX_TEST_IMAGE === "1") assert.ok(image, "E2E must supply its Nginx image");
 
 test(
   "provider gateway accepts bounded large headers that fail with the default buffer",
   { skip: !image },
   async () => {
-    const directory = await mkdtemp("/tmp/opencode/nginx-provider-headers-");
+    const directory = await mkdtemp(join(tmpdir(), "nginx-provider-headers-"));
     const source = await readFile(
       new URL("../frontend/nginx.conf.template", import.meta.url),
       "utf8",

@@ -8,12 +8,11 @@
 // drives the user journeys in a real Chromium with real password sign-in.
 //
 // Usage:
-//   E2E_TEST_MUTATIONS=1 node auth/test-e2e.mjs [--skip-build] [--cold-build] [--step=name]
+//   E2E_TEST_MUTATIONS=1 node auth/test-e2e.mjs [--skip-build=RUN_ID] [--cold-build] [--step=name]
 //     [--timeout=seconds] [--clean]
 //
-//   --skip-build  reuse previously built e2e images (warm rerun; cold builds
-//                 run by default and at least one cold run is required)
-//   --step=name   run one journey step only (fixture/images/stack still run)
+//   --skip-build=RUN_ID reuse a retained run's immutable image set, never its state
+//   --step=name   run the selected step and its prerequisites (partial gate)
 //   --timeout=s   wall-clock budget in seconds (default E2E_BUDGET_SECONDS)
 //   --clean       remove the disposable root even on failure (it is removed
 //                 on success and kept on failure by default)
@@ -26,14 +25,11 @@
 // Full teardown runs on success and on failure; leftover containers,
 // volumes, or networks fail the gate.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
 import { mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { createRuntime } from "./e2e-runtime.mjs";
 import { chromium } from "../frontend/node_modules/@playwright/test/index.mjs";
 import { snapshotFile } from "../dev/database.mjs";
 import { pickFreePorts, usedSlotPorts } from "../dev/lib/slots.mjs";
@@ -43,8 +39,9 @@ import {
   E2E_BUDGET_SECONDS,
   E2E_DISPOSABLE_MARKER,
   E2E_SEED,
-  E2E_STEPS,
   isQuarantined,
+  planSteps,
+  retainedImages,
   teardownChecks,
   validateFixtureContract,
 } from "./e2e-lib.mjs";
@@ -63,7 +60,6 @@ import {
   sharedDatabaseIsolation,
 } from "./e2e-journeys.mjs";
 
-const run = promisify(execFile);
 const root = fileURLToPath(new URL("../", import.meta.url));
 const uid = process.getuid?.() ?? 1000;
 const gid = process.getgid?.() ?? 1000;
@@ -76,10 +72,12 @@ const args = Object.fromEntries(
 );
 if (args._) throw new Error(`unknown argument ${args._} (see header usage)`);
 const onlyStep = args.step || null;
-if (onlyStep && !E2E_STEPS.includes(onlyStep)) throw new Error(`unknown step ${onlyStep}: ${E2E_STEPS.join(", ")}`);
-if (onlyStep && ["fixture", "images", "stack", "teardown"].includes(onlyStep)) {
-  console.log(`e2e: --step=${onlyStep} runs infrastructure only and covers no journey; omit --step for a full run`);
-}
+const plan = planSteps(onlyStep);
+if (onlyStep) console.log(`e2e: partial gate: ${plan.join(" -> ")}; omit --step for full release evidence`);
+const reuseRun = args["skip-build"];
+if (reuseRun !== undefined && (typeof reuseRun !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(reuseRun)))
+  throw new Error("--skip-build needs a retained run ID (for example --skip-build=20261110t120000-123)");
+if (reuseRun && args["cold-build"]) throw new Error("--skip-build and --cold-build are mutually exclusive");
 const budget = Number(args.timeout ?? E2E_BUDGET_SECONDS);
 assert.ok(Number.isFinite(budget) && budget > 0, "--timeout needs a positive number of seconds");
 
@@ -89,7 +87,7 @@ assert.equal(
   "Set E2E_TEST_MUTATIONS=1 to confirm this run may mutate only its own disposable fixture",
 );
 
-const deadline = Date.now() + budget * 1000;
+let runtime = createRuntime(budget * 1000);
 const stamp = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15);
 const runId = `${stamp}-${process.pid}`.toLowerCase();
 const project = `nwe-e2e-${runId}`;
@@ -111,18 +109,9 @@ function record(step, status, detail = "", seconds = 0) {
   console.log(`e2e [${step}] ${status}${detail ? ` — ${detail}` : ""} (${seconds.toFixed(0)}s)`);
 }
 
-async function sh(cmd, argv, { env = {}, timeout = 120_000, log = null } = {}) {
-  const child = spawn(cmd, argv, { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
-  let out = "";
-  child.stdout.on("data", (data) => { out += data; });
-  child.stderr.on("data", (data) => { out += data; });
-  const timer = timeout ? setTimeout(() => child.kill("SIGKILL"), timeout) : null;
-  const [code] = await once(child, "exit");
-  if (timer) clearTimeout(timer);
-  if (log) await writeFile(log, out, { mode: 0o600 }).catch(() => {});
-  if (code !== 0) throw new Error(`${cmd} ${argv.join(" ")} exited ${code}\n${out.slice(-4000)}`);
-  return out;
-}
+const sh = (cmd, argv, options) => runtime.command(cmd, argv, options);
+const run = async (cmd, argv) => ({ stdout: await sh(cmd, argv) });
+const waitFor = (url, options) => runtime.waitFor(url, options);
 
 async function compose(env, ...argv) {
   return sh("docker", ["compose", "--env-file", resolve(workRoot, "e2e.env"),
@@ -132,26 +121,10 @@ async function compose(env, ...argv) {
     "-p", project, ...argv], { env, timeout: 600_000 });
 }
 
-async function waitFor(url, { timeout = 90_000, label = url } = {}) {
-  const start = Date.now();
-  let last = "";
-  while (Date.now() - start < timeout) {
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (response.ok) return;
-      last = `HTTP ${response.status}`;
-    } catch (error) {
-      last = error.message;
-    }
-    await new Promise((done) => setTimeout(done, 1000));
-  }
-  throw new Error(`timed out waiting for ${label}: ${last}`);
-}
-
 async function teardown(keep) {
   const failures = [];
   try {
-    await compose({}, "down", "--remove-orphans").catch((error) => failures.push(`compose down: ${error.message}`));
+    if (stackStarted) await compose({}, "down", "--remove-orphans");
   } catch (error) {
     failures.push(`compose down: ${error.message}`);
   }
@@ -165,11 +138,6 @@ async function teardown(keep) {
       failures.push(`${check.name} check failed: ${error.message}`);
     }
   }
-  let composeLeft = "";
-  try {
-    composeLeft = (await run("docker", ["compose", "-p", project, "ps", "-q"])).stdout.trim();
-  } catch { /* project gone is the goal */ }
-  if (composeLeft) failures.push(`compose project still lists: ${composeLeft}`);
   // Never prune another session's images. Keep this run's images on failure
   // for inspection, and remove only its exact tags after a successful run.
   if (!keep) await Promise.allSettled([apiTag, frontTag, authTag].map((tag) => run("docker", ["rmi", tag])));
@@ -183,13 +151,24 @@ function pngFixture() {
 }
 
 let browser;
+let stackStarted = false;
 const started = Date.now();
-let stepFilter = (name) => !onlyStep || onlyStep === name;
+const stepFilter = (name) => plan.includes(name);
+const selectionComplete = Symbol("selection complete");
+const finishBoundary = (step) => { if (onlyStep === step) throw selectionComplete; };
+runtime.signal.addEventListener("abort", () => { void browser?.close().catch(() => {}); }, { once: true });
 let failed = false;
 let teardownFailures = [];
 try {
   process.umask(0o077);
   await sh("docker", ["info"], { timeout: 30_000 });
+  if (onlyStep === "teardown") throw selectionComplete;
+  let sourceImages;
+  if (reuseRun) {
+    const manifest = JSON.parse(await readFile(resolve(root, `tmp/e2e-${reuseRun}/images.json`), "utf8"));
+    sourceImages = retainedImages(manifest, reuseRun);
+    for (const image of sourceImages) await sh("docker", ["image", "inspect", image]);
+  }
   await mkdir(identityDir, { recursive: true, mode: 0o700 });
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
   await mkdir(logDir, { recursive: true, mode: 0o700 });
@@ -213,7 +192,8 @@ try {
     const [authPort, appPort, gatewayPort, backendPort] = await pickFreePorts(4, [...used, 8080, 8787, 8000]);
     for (const [label, port] of [["provider", authPort], ["app", appPort], ["gateway", gatewayPort], ["backend", backendPort]]) {
       try {
-        await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(2000) });
+        const response = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(2000) });
+        await response.body?.cancel();
         throw new Error(`e2e ${label} port ${port} answered; refusing to attach to a live listener`);
       } catch (error) {
         if (/refusing to attach/.test(error.message)) throw error;
@@ -298,6 +278,7 @@ try {
     }, null, 2), { mode: 0o600 });
     record("fixture", "PASS", `provider + fixture at ${identityDir}`, (Date.now() - t) / 1000);
   }
+  finishBoundary("fixture");
 
   const issuer = process.env.NET_WORTH_ESTIMATOR_AUTH_ISSUER;
   const appOrigin = process.env.NET_WORTH_ESTIMATOR_PUBLIC_URL;
@@ -309,10 +290,8 @@ try {
   // ---- images: real builds ----------------------------------------------------
   {
     const t = Date.now();
-    if (args["skip-build"]) {
-      await run("docker", ["image", "inspect", apiTag]).catch(() => { throw new Error(`--skip-build needs image ${apiTag}`); });
-      await run("docker", ["image", "inspect", frontTag]).catch(() => { throw new Error(`--skip-build needs image ${frontTag}`); });
-      await run("docker", ["image", "inspect", authTag]).catch(() => { throw new Error(`--skip-build needs image ${authTag}`); });
+    if (sourceImages) {
+      for (const [index, tag] of [apiTag, frontTag, authTag].entries()) await sh("docker", ["tag", sourceImages[index], tag]);
       record("images", "PASS", "reused warm images", (Date.now() - t) / 1000);
     } else {
       const buildArgs = args["cold-build"] ? ["--no-cache"] : [];
@@ -328,7 +307,13 @@ try {
       record("images", "PASS", args["cold-build"] ? "builds of both images (no cache)" : "builds of both images (layer cache)", (Date.now() - t) / 1000);
     }
     await sh("docker", ["run", "--rm", "--network", "none", "--entrypoint", "/bin/sh", authTag, "-c", "test ! -e /app/auth/better-auth/test-support.ts && test ! -e /app/auth/better-auth/src/setup.test.ts"], { timeout: 30_000 });
+    const imageIDs = await Promise.all([apiTag, frontTag, authTag].map((tag) =>
+      sh("docker", ["image", "inspect", "--format", "{{.Id}}", tag]).then((id) => id.trim())));
+    await writeFile(resolve(workRoot, "images.json"), JSON.stringify({
+      disposable: E2E_DISPOSABLE_MARKER, runId, api: imageIDs[0], front: imageIDs[1], auth: imageIDs[2],
+    }), { mode: 0o600 });
   }
+  finishBoundary("images");
 
   // ---- stack: schema, guest row, boot ----------------------------------------
   // Helpers run image binaries with the disposable data dir mounted at
@@ -341,6 +326,7 @@ try {
       image, ...argv], { timeout: 300_000 });
   }
   async function bootStack() {
+    stackStarted = true;
     await compose({}, "up", "-d", "--no-build", "--wait");
     await waitFor(`${appOrigin}/healthz`, { label: "disposable API via proxy" });
     await waitFor(appOrigin, { label: "disposable frontend" });
@@ -357,9 +343,14 @@ try {
     await bootStack();
     record("stack", "PASS", "schema + guest row from image binaries, stack healthy", (Date.now() - t) / 1000);
   }
+  finishBoundary("stack");
 
   // ---- browser journeys -------------------------------------------------------
-  browser = await chromium.launch({ headless: true });
+  if (stepFilter("isolation")) {
+    browser = await chromium.launch({ headless: true });
+    if (runtime.signal.aborted) await browser.close();
+    runtime.signal.throwIfAborted();
+  }
   const journeyCtx = {
     origin: appOrigin,
     issuer,
@@ -395,9 +386,6 @@ try {
 
   const ownerBundle = await journey("isolation", () => ownerSignIn(journeyCtx));
   if (ownerBundle) await journey("isolation", () => passkeyJourneys(journeyCtx, ownerBundle));
-  if (onlyStep && onlyStep !== "isolation" && !ownerBundle) {
-    throw new Error(`--step=${onlyStep} needs the isolation leg first (omit --step for a full run)`);
-  }
   if (ownerBundle) {
     // Publish the owner's data into the provisioned guest scope, mirroring
     // production publication, with the API stopped (SQLite-safe).
@@ -487,6 +475,9 @@ try {
 
   // ---- provider headers through the real proxy image --------------------------
   await journey("proxy-headers", async () => {
+    await sh("node", ["--test", "scripts/nginx-provider.test.mjs", "scripts/nginx-receipts.test.mjs"], {
+      env: { NGINX_TEST_IMAGE: frontTag, REQUIRE_NGINX_TEST_IMAGE: "1" },
+    });
     const gateway = `http://127.0.0.1:${process.env.E2E_GATEWAY_PORT}`;
     const health = await fetch(`${gateway}/__gateway_healthz`, { signal: AbortSignal.timeout(10_000) });
     assert.equal(health.status, 200, "provider gateway listener must answer");
@@ -504,14 +495,22 @@ try {
 
   await journey("isolation", () => ownerLogout(journeyCtx, ownerBundle));
 } catch (error) {
-  failed = true;
-  console.error(`e2e: FATAL ${error.stack ?? error}`);
+  if (error !== selectionComplete) {
+    failed = true;
+    console.error(`e2e: FATAL ${error.stack ?? error}`);
+  }
 } finally {
-  await browser?.close().catch(() => {});
+  if (runtime.signal.aborted) failed = true;
+  runtime.dispose();
+  runtime = createRuntime(120_000);
+  const closingBrowser = browser?.close().catch(() => {});
   const total = (Date.now() - started) / 1000;
-  teardownFailures = await teardown(failed && !args.clean);
+  try {
+    teardownFailures = await teardown((failed && !args.clean) || onlyStep === "images");
+  } finally { runtime.dispose(); }
+  await closingBrowser;
   record("teardown", teardownFailures.length ? "FAIL" : "PASS", teardownFailures.join("; ") || "no leftovers");
-  console.log(`\ne2e: ${failed || teardownFailures.length ? "RED" : "GREEN"} in ${total.toFixed(0)}s (budget ${budget}s)`);
+  console.log(`\ne2e: ${failed || teardownFailures.length ? "RED" : onlyStep ? "PARTIAL" : "GREEN"} in ${total.toFixed(0)}s (budget ${budget}s)`);
   for (const row of report) console.log(`e2e report: ${row.step} ${row.status} ${row.seconds.toFixed(0)}s ${row.detail}`);
   if (total > budget) {
     console.error(`e2e: budget exceeded (${total.toFixed(0)}s > ${budget}s)`);

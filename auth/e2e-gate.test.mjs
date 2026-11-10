@@ -3,6 +3,12 @@
 // contract stay pinned here so drift fails fast in the unit tier.
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFile } from "node:child_process";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createRuntime } from "./e2e-runtime.mjs";
 import {
   E2E_BUDGET_SECONDS,
   E2E_DISPOSABLE_MARKER,
@@ -11,6 +17,8 @@ import {
   E2E_STEPS,
   E2E_TRANSPORT_ATTEMPTS,
   isQuarantined,
+  planSteps,
+  retainedImages,
   teardownChecks,
   validateFixtureContract,
 } from "./e2e-lib.mjs";
@@ -50,6 +58,31 @@ test("journey steps cover every required boundary", () => {
   assert.ok(!isQuarantined("isolation"), "isolation must always gate");
 });
 
+test("selected steps include their prerequisites and stop at their boundary", () => {
+  assert.deepEqual(planSteps(), [...E2E_STEPS]);
+  assert.deepEqual(planSteps("fixture"), ["fixture", "teardown"]);
+  assert.deepEqual(planSteps("images"), ["fixture", "images", "teardown"]);
+  assert.deepEqual(planSteps("stack"), ["fixture", "images", "stack", "teardown"]);
+  assert.deepEqual(planSteps("teardown"), ["teardown"]);
+  for (const step of ["isolation", "direct-share", "group-feed", "receipts"]) {
+    assert.deepEqual(planSteps(step), ["fixture", "images", "stack", "isolation", ...(step === "isolation" ? [] : [step]), "teardown"]);
+  }
+  for (const step of ["migration", "proxy-headers"]) {
+    assert.deepEqual(planSteps(step), ["fixture", "images", "stack", step, "teardown"]);
+  }
+  assert.throws(() => planSteps("missing"), /unknown step/);
+});
+
+test("image reuse accepts only complete immutable disposable image sets", () => {
+  const manifest = { runId: "retained-1", disposable: E2E_DISPOSABLE_MARKER,
+    api: `sha256:${"a".repeat(64)}`, front: `sha256:${"b".repeat(64)}`, auth: `sha256:${"c".repeat(64)}` };
+  assert.deepEqual(retainedImages(manifest, "retained-1"), [manifest.api, manifest.front, manifest.auth]);
+  assert.throws(() => retainedImages(manifest, "another-run"), /retained disposable/);
+  assert.throws(() => retainedImages(manifest, "../retained-1"), /retained disposable/);
+  assert.throws(() => retainedImages({ ...manifest, auth: "mutable:tag" }, "retained-1"), /auth image ID/);
+  assert.throws(() => retainedImages({ ...manifest, disposable: false }, "retained-1"), /retained disposable/);
+});
+
 test("seed is deterministic and frozen: fixed dates and names", () => {
   assert.equal(E2E_SEED.transactionDay, "2026-06-15");
   assert.ok(Number.isFinite(E2E_SEED.postedTime));
@@ -73,14 +106,14 @@ test("fixture contract rejects shared or production-like state", () => {
   const good = {
     testOnly: true,
     disposable: E2E_DISPOSABLE_MARKER,
-    stateDir: "/tmp/opencode/e2e-x/auth",
+    stateDir: join(tmpdir(), "e2e-x/auth"),
     settings: { publicUrl: "http://127.0.0.1:1" },
     subject: "owner-sub",
     guestSubject: "guest-sub",
     username: "e2e-owner",
   };
   assert.deepEqual(validateFixtureContract(good, {
-    stateDir: "/tmp/opencode/e2e-x/auth",
+    stateDir: join(tmpdir(), "e2e-x/auth"),
     issuer: "http://127.0.0.1:1",
   }), []);
   assert.ok(validateFixtureContract({ ...good, testOnly: false }).length > 0);
@@ -89,7 +122,19 @@ test("fixture contract rejects shared or production-like state", () => {
   assert.ok(validateFixtureContract({ ...good, subject: "" }).length > 0);
   assert.ok(validateFixtureContract(null).length > 0);
   assert.ok(
-    validateFixtureContract(good, { stateDir: "/elsewhere", issuer: "http://127.0.0.1:1" }).length > 0,
+    validateFixtureContract(good, { stateDir: join(tmpdir(), "elsewhere"), issuer: "http://127.0.0.1:1" }).length > 0,
     "state outside the disposable root must fail",
   );
+});
+
+test("containerized shell commands are killed and reaped at the deadline", async () => {
+  const image = process.env.NGINX_TEST_IMAGE;
+  if (!image) return;
+  const runtime = createRuntime(100);
+  try {
+    await assert.rejects(runtime.command("docker", ["run", "--rm", image, "sleep", "30"]), /deadline exceeded/);
+    await new Promise((done) => setTimeout(done, 250));
+    const { stdout } = await execFile("docker", ["ps", "--filter", `ancestor=${image}`, "--format", "{{.ID}}"]);
+    assert.equal(stdout.trim(), "", "timed-out container must be removed");
+  } finally { runtime.dispose(); }
 });
