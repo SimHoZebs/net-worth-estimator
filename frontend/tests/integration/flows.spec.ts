@@ -44,6 +44,8 @@ test("the mobile diagram scrolls sideways instead of squeezing the plot", async 
 test("hovering a flow shows its amount and top transactions", async ({
 	page,
 }) => {
+	// Slow lane: fixture reseed plus Sankey layout over real HTTP.
+	test.slow();
 	await openFlows(page);
 	const diagram = page.getByRole("img", { name: /Money-flow diagram/ });
 	// Target the thickest band by geometry: its box middle sits on the

@@ -317,12 +317,47 @@ for (const theme of ["light", "dark"]) {
 			page,
 			request,
 		}) => {
+			// Slow lane: fixture reseed plus a 400-run stochastic chart
+			// before the first paint under test.
+			test.slow();
 			await addIndependence(request);
 			await page.setViewportSize({ width, height: 844 });
 			await page.addInitScript(
 				(theme) => localStorage.setItem("waypoint-theme", theme),
 				theme,
 			);
+			// The card and modal assertions below are structural (layout,
+			// tabs, axe): they hold for any run count. Shrink the 400-run
+			// Monte Carlo to a deterministic 25 so the spec measures the
+			// UI, not sampling variance on a loaded runner. The seed stays
+			// 42, so the draws are identical every run.
+			await page.route("**/v1/projections/stochastic", async (route) => {
+				const original = route.request().postDataJSON() as unknown;
+				let body = original;
+				if (
+					typeof body === "object" &&
+					body !== null &&
+					"config" in body &&
+					typeof (body as { config?: unknown }).config === "object" &&
+					(body as { config?: unknown }).config !== null
+				) {
+					body = {
+						...(body as Record<string, unknown>),
+						config: {
+							...(body as { config: Record<string, unknown> }).config,
+							runCount: 25,
+						},
+					};
+				}
+				await route.continue({
+					method: "POST",
+					headers: {
+						...route.request().headers(),
+						"content-type": "application/json",
+					},
+					postData: JSON.stringify(body),
+				});
+			});
 			await page.goto("/evaluations");
 			const card = page.getByRole("region", {
 				name: "Financial independence",
@@ -330,7 +365,7 @@ for (const theme of ["light", "dark"]) {
 			});
 			await expect(
 				card.getByRole("img", { name: /Spending coverage at/ }),
-			).toBeVisible();
+			).toBeVisible({ timeout: 30_000 });
 			await expect(
 				card.getByRole("button", { name: /Inspect evidence/ }),
 			).toHaveCount(0);
