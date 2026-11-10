@@ -2,108 +2,38 @@
 
 Go API and SQLite persistence for household financial records, account maintenance, current position, evidence Analysis, and SimpleFIN protocol v2 synchronization. Deterministic and stochastic projections add future outcomes and configured evaluations. Financial records remain available independently of future simulation. `PRODUCT_INTENT.md` describes the product independently.
 
-## Seeding
+## Parts
 
-The server never reads seed directories. An empty database stays empty until the user signs up and creates records. Browser tests seed a throwaway database from fixture packs under `backend/testdata/integration/v1` through `cmd/fixtureapi`; the baseline pack is the default.
+| Part | Runbook | Contract |
+| --- | --- | --- |
+| Backend API | [deploy](deploy/README.md) | [technical overview](TECHNICAL_OVERVIEW.md), [shared database](docs/shared-database.md) |
+| Frontend | [deploy](deploy/README.md) | [technical overview](TECHNICAL_OVERVIEW.md) |
+| Better Auth identity | [auth](auth/README.md) | [authentication](docs/authentication.md), [authorization](docs/authorization.md) |
+| Purchase capture extension | [extension](extension/README.md) | [purchase queue](docs/purchase-queue.md) |
+| Income judgment sidecar | [sidecar/income](sidecar/income/README.md) | [judgment providers](docs/judgment-providers.md) |
+| Local development | [dev](dev/README.md) | [testing](TESTING.md) |
 
-## Persistence and Access
+## Develop
 
-- One application SQLite file holds each user's financial data, including the guest's data, and application sessions.
-- Every financial table is user-scoped. The verified issuer and subject identify its owner.
-- There is no HTTP reset route. Use a database backup for replacement.
-- Canonical edits and artifacts survive redeployment only when the SQLite file is on durable storage.
-
-Database setup is a deployment step handled by `setupdb` (see [the shared database guide](docs/shared-database.md)). The server never creates or repairs the schema; version upgrades use separate one-time operator scripts with a backup.
-
-## SimpleFIN Synchronization
-
-SimpleFIN sync writes balance checkpoints and disabled pending-charge transactions. Sync rows are not garbage-collected; keep mappings valid or purge source rows deliberately.
-
-## Development
+Run `./dev/main.mjs setup` once, then the dedicated dev Compose stack:
 
 ```bash
-./dev/main.mjs setup # once, including existing dev stacks
 docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
 docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
-Use **http://localhost:5178**, or the HTTPS URL printed by setup for tailnet access.
-The dedicated dev Compose file uses the production Dockerfiles and Better Auth on Bun
-image with isolated dev storage. Setup takes the initial SQLite-safe, read-only
-production snapshot. Daily Compose commands retain data and logins without a
-custom lifecycle wrapper. External sync stays disabled.
+Use **http://localhost:5178**, or the HTTPS URL printed by setup for tailnet access. See [the dev runbook](dev/README.md) for data operations, tailnet setup, and state recovery.
 
-Use `setup --from /path/backup.db` for an existing shared-schema backup. Use
-`--source-user "$SOURCE_USER"` when the source contains several private users.
-Use
-`./dev/main.mjs refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"`
-to refresh one user's financial data without resetting identities or passkeys.
-See [the dev guide](dev/README.md) for tailnet setup, private user data, published guest data,
-logs, and state recovery.
+## Deploy
 
-For a seeded safe-spending demo without touching the dev stack, run
-`./dev/main.mjs demo --pack safe-spending`. Use
-`--pack safe-spending-shortfall` for the unfulfilled recurring bill. The demo
-uses the same fixture packs as the browser suite and stops with Ctrl-C.
+The split deployment builds a Go API image and an Nginx frontend image. The frontend proxies `/v1` to the API under one public origin. See [the deployment runbook](deploy/README.md) for the runtime and reverse-proxy contracts, provider guides, and the migration SOP.
 
-## Run from Source (Advanced)
+Better Auth on Bun authenticates users in dev and production. The Go API verifies OIDC and embeds Casbin for application-owned authorization. See [the auth runbook](auth/README.md) and [the authentication contract](docs/authentication.md).
 
-For low-level source debugging, run the API and Vite separately. Normal manual
-testing uses the production-like dev stack above. Do not run both frontends on
-5178 at the same time.
+## Persistence
 
-```bash
-# terminal 1
-# Local state comes from a database backup, never a shipped seed: copy a
-# backup to the dev database path while the server is stopped. tmp/ is
-# gitignored and survives reboot, unlike /tmp.
-cp <backup>.db tmp/net-worth-estimator.db
-NET_WORTH_ESTIMATOR_DB=$PWD/tmp/net-worth-estimator.db \
-CGO_ENABLED=0 go -C backend run ./cmd/server
-```
+One application SQLite file holds each user's financial data, including the guest's data, and application sessions. Every financial table is user-scoped, and the verified issuer and subject identify its owner. There is no HTTP reset route. The server never reads seed directories and never creates or repairs the schema; database setup is a deployment step handled by `setupdb`. SimpleFIN sync rows are not garbage-collected; keep mappings valid or purge the source rows deliberately with `backend/scripts/purge-simplefin-sync.sql`. See [the shared database contract](docs/shared-database.md).
 
-```bash
-# terminal 2
-bun install --frozen-lockfile
-bun --filter ./frontend dev
-```
+## Testing
 
-The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`.
-
-## Container Images and Compose
-
-The split deployment has two images:
-
-- `backend/Dockerfile` builds the Go API. Local state comes from a database backup restored to the volume, never from files baked into the image.
-- `frontend/Dockerfile` builds the Waypoint bundle and serves it from Nginx. The image proxies `/v1` to the backend named by `BACKEND_URL` and keeps stochastic SSE streaming unbuffered.
-
-Initialize Better Auth and Casbin, then run the split stack through the [authentication guide](auth/README.md).
-For normal development, use the [dedicated dev stack](dev/README.md).
-For independent frontend/API hosts, use the [host-portable deployment guide](deploy/README.md).
-It covers Vercel's same-origin API proxy, Render, configurable ports, authenticated
-ingress, explicit database maintenance, and host cutover without application changes.
-
-The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
-
-The split images do not embed or build one another.
-
-Better Auth on Bun authenticates users in dev and production. The Go API verifies OIDC and embeds Casbin for application-owned authorization. Each user owns separate financial data. The provisioned guest receives viewer permissions. New signups receive a persistent member assignment. Identity storage supports SQLite and PostgreSQL. Financial and policy storage use private SQLite databases. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API share one public origin. See [authentication](docs/authentication.md) and [authorization](docs/authorization.md) for boundaries and migration.
-
-Any frontend host must proxy `/v1` to the backend under the same public origin for session cookies and CSRF protection. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
-
-Configure a backend service with this durable contract:
-
-| Setting                | Value                                                              |
-| ---------------------- | ------------------------------------------------------------------ |
-| Build                  | `backend/Dockerfile` with repository root context                  |
-| Port                   | `PORT`, default `8787`; bind `HOST=0.0.0.0`                       |
-| Health checks          | readiness `GET /readyz`; liveness `GET /healthz` on `PORT`         |
-| Instances              | `1`                                                                |
-| Persistent volume      | `/data`                                                            |
-| Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`              |
-| Public exposure        | only behind suitable access control                                |
-| Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`             |
-| Authentication         | Better Auth on Bun, OIDC, durable sessions, and Go Casbin |
-| Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1`                                  |
-
-Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.
+Use `./scripts/test` as the single entry point. See [testing](TESTING.md) for the layers, gates, and prerequisites.

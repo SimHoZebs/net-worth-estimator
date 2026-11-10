@@ -1,13 +1,8 @@
 # Host-portable deployment
 
-The frontend and API can use different providers. They share one public browser
-origin through a reverse proxy. Neither application contains provider addresses.
-SQLite and Better Auth remain separate stateful dependencies. Database-engine and
-identity-provider migrations are outside this contract.
+The frontend and API can use different providers. They share one public browser origin through a reverse proxy, and neither application contains provider addresses. SQLite and Better Auth remain separate stateful dependencies. Database-engine and identity-provider migrations are outside this contract.
 
-Application/data migrations use [the shared migration SOP](MIGRATIONS.md).
-Every configured deployment adapter invokes the target image's `/app/migrate.sh`
-with the API stopped. It is not part of server startup.
+Application and data migrations use [the shared migration SOP](MIGRATIONS.md). Every deployment adapter invokes the target image's `/app/migrate.sh` with the API stopped; it is not part of server startup.
 
 ## Runtime contract
 
@@ -18,67 +13,39 @@ with the API stopped. It is not part of server startup.
 | Browser API | `/v1/*` on the frontend's HTTPS origin, including `/v1/auth/*` |
 | Process | One always-on API instance, with outbound access to Better Auth and enabled integrations |
 | Listener | `HOST=0.0.0.0`, configurable `PORT` (default `8787`) |
-| Storage | Existing compatible SQLite file on durable, writable local storage |
+| Storage | Existing compatible SQLite file on durable, writable local storage at `/data` |
+| Database | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db` |
 | Schema | Explicit `setupdb` operation with the API stopped |
 | Liveness | `GET /healthz` reports process availability |
 | Readiness | `GET /readyz` checks the database connection with a two-second deadline |
 | Probes | No session, proxy secret, or user header required; no private data returned |
 | Shutdown | Deliver `SIGTERM`; allow at least 15 seconds for HTTP shutdown |
+| Public exposure | Only behind suitable access control |
+| Origin policy | Exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` |
+| Authentication | Better Auth on Bun, OIDC, durable sessions, and Go Casbin |
+| Write policy | Optional `NET_WORTH_ESTIMATOR_READ_ONLY=1` |
 
-Startup validates schema compatibility and OIDC discovery before it listens.
-Readiness does not continuously test Better Auth. Identity outages fail closed on
-authenticated requests when verification is due. Monitor those failures too.
+Startup validates schema compatibility and OIDC discovery before it listens. Readiness does not continuously test Better Auth; identity outages fail closed on authenticated requests when verification is due. The scheduler, sync exclusion, token-refresh coordination, and active seeded simulations use process memory, so multiple replicas and scale-to-zero are outside this contract. Process replacement loses unfinished simulations; completed results, financial data, and application sessions persist in SQLite.
 
-The scheduler, sync exclusion, token-refresh coordination, and active seeded
-simulations use process memory. Multiple replicas and scale-to-zero are outside
-this contract. Process replacement loses unfinished simulations. Completed
-results, financial data, and application sessions persist in SQLite.
+Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
 
-## Reverse-proxy contract
+## Reverse proxy
 
-Build the same frontend assets on every
-host. Route `/v1/*` to the API without changing the browser's origin. Preserve
-paths, queries, bodies, `Origin`, cookies, `Set-Cookie`, and API response headers.
-Keep API responses private and uncached.
+Route `/v1/*` to the API without changing the browser's origin. Preserve paths, queries, bodies, `Origin`, cookies, `Set-Cookie`, and API response headers. Keep API responses private and uncached.
 
-Two ingress arrangements are supported:
-
-1. **Host-preserving proxy:** Preserve browser `Host` and `Origin`. Forward the
-   public HTTPS scheme. Leave `NET_WORTH_ESTIMATOR_PROXY_SECRET` unset. Existing
-   Nginx and Compose deployments retain this behavior.
-2. **Authenticated proxy:** Set the same private `NET_WORTH_ESTIMATOR_PROXY_SECRET`
-   on the proxy and API. Replace these headers at the proxy, after client input:
+1. **Host-preserving proxy:** preserve browser `Host` and `Origin`, forward the public HTTPS scheme, and leave `NET_WORTH_ESTIMATOR_PROXY_SECRET` unset. Existing Nginx and Compose deployments use this mode.
+2. **Authenticated proxy:** set the same private `NET_WORTH_ESTIMATOR_PROXY_SECRET` on the proxy and API, then replace these headers at the proxy after client input:
 
    | Header | Value |
    | --- | --- |
    | `Waypoint-Proxy-Secret` | The shared secret |
-   | `Waypoint-Public-Origin` | The exact configured public origin, such as `https://app.example.com` |
+   | `Waypoint-Public-Origin` | The exact configured public origin |
 
-Use 32–256 URL-safe characters for the secret. Generate 32 random bytes as
-hexadecimal with a password manager or `openssl rand -hex 32`. Never put the
-secret in `VITE_*`, a client bundle, committed file, URL, or log.
-
-The API uses a constant-time digest comparison. It accepts only application
-origins and provider aliases from identity configuration. It normalizes Host
-and scheme before identity, CSRF, and CORS checks, then removes ingress headers.
-Unknown origins, duplicate headers, and incorrect secrets fail closed. Forwarded
-headers alone cannot select a login or callback address.
-
-The proxy must enforce its configured public hostname before it assigns that
-origin. It must preserve browser `Origin`. Vercel's configuration enforces the
-hostname match and replaces both ingress headers. Direct API requests fail
-with 403 in authenticated-proxy mode, except the two infrastructure probes.
-Use the frontend URL for CLI requests and the provider's signed back-channel logout
-callback. The API accepts one secret; coordinate proxy/API secret rotation.
+Use 32 to 256 URL-safe characters for the secret, generated with `openssl rand -hex 32`. Never put it in `VITE_*`, a client bundle, a committed file, a URL, or a log. The API compares digests in constant time, accepts only application origins and provider aliases from identity configuration, and fails closed on unknown origins, duplicate headers, or incorrect secrets. The proxy must enforce its configured public hostname before assigning that origin and must preserve browser `Origin`. Direct API requests fail with 403 in authenticated-proxy mode, except the two infrastructure probes. Use the frontend URL for CLI requests and the provider's signed back-channel logout callback. The API accepts one secret; coordinate proxy and API secret rotation.
 
 ### Streaming
 
-Deliver stochastic POST responses incrementally. Preserve `text/event-stream`,
-disable buffering and caching, and permit long response bodies. The API flushes
-an initial response and sends heartbeats every 15 seconds. Avoid Function wrappers.
-Vercel's external proxy permits 120 seconds before the first byte and between
-subsequent data. This is an inactivity limit, not a two-minute total duration.
-Verify actual provider behavior after deployment.
+Deliver stochastic POST responses incrementally. Preserve `text/event-stream`, disable buffering and caching, and permit long response bodies. The API flushes an initial response and sends heartbeats every 15 seconds. Vercel's external proxy permits 120 seconds before the first byte and between subsequent data, an inactivity limit rather than a total duration. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
 
 ## Deployment guides
 
@@ -87,7 +54,7 @@ Verify actual provider behavior after deployment.
 - [GHCR container images](images.md) — published images, digest pins, publisher checks.
 - [Shared migration SOP](MIGRATIONS.md) — one-time `/app/migrate.sh` contract every adapter runs.
 
-## Switch hosts without application changes
+## Switch hosts
 
 1. Keep stable custom application and identity hostnames where possible.
 2. Prepare destination runtime settings and durable storage.
@@ -97,10 +64,7 @@ Verify actual provider behavior after deployment.
 6. Update the proxy upstream and route the stable application hostname.
 7. Verify login, private access, writes, streaming, and restart persistence.
 
-Never use independent writable database copies as a cutover strategy. After
-destination writes, rollback requires reconciliation or an accepted loss of
-those writes. Browser drafts and cookies belong to their origin. An origin
-change can require sign-in and draft export. A stable origin avoids that issue.
+Never use independent writable database copies as a cutover strategy. After destination writes, rollback requires reconciliation or an accepted loss of those writes. Browser drafts and cookies belong to their origin; an origin change can require sign-in and draft export.
 
 ## Verification
 
@@ -108,23 +72,7 @@ change can require sign-in and draft export. A stable origin avoids that issue.
 node --test deploy/vercel.test.mjs scripts/smoke-compose.test.mjs
 docker build -f backend/Dockerfile -t waypoint-deployment-test .
 DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs
-```
-
-The image test uses disposable state without external networking. It checks a
-non-default port, readiness, non-root command override, explicit setup,
-schema-only boot without user creation, and proxy bypass rejection.
-Go integration tests use real HTTP/TLS, a mock OIDC provider,
-real API writes, CSRF rejection, incremental streaming, and restart persistence.
-
-For an actual deployment with a provisioned guest scope:
-
-```sh
 FRONTEND_URL=https://app.example.com sh scripts/smoke-compose.sh
 ```
 
-This smoke checks public proxy access, readiness, origin rejection, guest-scope
-resolution without a session kind, and final SSE completion. Also verify real
-Better Auth login/logout, user isolation, private writes, passkeys, signed logout
-delivery, incremental streaming, and restarts with disposable users. Never use
-production financial data as a fixture. The published `source_path` value
-`sample` is a content-only label; it implies no permissions.
+The image test uses disposable state without external networking and checks a non-default port, readiness, non-root command override, explicit setup, schema-only boot, and proxy bypass rejection. The smoke script checks public proxy access, readiness, origin rejection, guest-scope resolution, and final SSE completion. Also verify real Better Auth login and logout, user isolation, private writes, passkeys, signed logout delivery, incremental streaming, and restarts with disposable users. Never use production financial data as a fixture. The published `source_path` value `sample` is a content-only label; it implies no permissions.
