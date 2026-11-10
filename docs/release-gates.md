@@ -73,6 +73,14 @@ the QA-03 test files' headers and in section 4 below.
    not requested, not as a successful deployment. An actual Northflank release
    requires its workflow run ID, successful migration step, backup hash,
    and an `ok` readiness response. Do not enable live cutover as a test step.
+   A release that stops at the migration leaves the API in maintenance with the
+   database unchanged. Request the release again. A GitHub dispatch of the
+   release workflow requests the current `main` commit, so it releases the
+   failed target only while `main` still points at it; otherwise run the
+   workflow from the Northflank UI or API with the failed target's `RELEASE_SHA`,
+   `API_IMAGE`, and `IDENTITY_IMAGE`. Record the retried run; recovery
+   commands are in the
+   [Northflank deployment guide](../deploy/northflank/README.md#release-window-and-recovery).
 
 ## 3. Credential-gated and manual gates
 

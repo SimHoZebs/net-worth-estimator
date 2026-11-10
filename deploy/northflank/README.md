@@ -43,3 +43,52 @@ standard input, never command arguments, and never commit the token or URL.
 Northflank accepts `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` in the
 URL query, not a POST body. `RELEASE_SHA` is recorded for identification;
 the image references drive the deployment.
+
+## Release window and recovery
+
+The release stops every API writer, swaps the API container for a maintenance
+process that answers `/readyz` with `maintenance`, migrates the real database,
+and restores the API command only after the migration exits zero. The release
+waits for the API container to be running before it migrates, because the
+migration runs inside that container.
+
+Northflank can still refuse that command with `No running container found`
+when the container was replaced moments earlier. The migration never mutates
+the database before it publishes, so a refused command leaves the API in
+maintenance with the database unchanged. Request the release again. A GitHub
+manual dispatch of the release workflow requests the current `main` commit and
+its published images, so use it while `main` still points at the failed commit.
+To release the failed target exactly, run the workflow from the Northflank UI
+or API with `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` overridden to
+that target's values, as [the migration SOP](../MIGRATIONS.md) describes. A
+release that fails after the migration published must release that same
+reviewed target, or a newer commit that contains that migration, and never
+older code. A second release queues behind the first and never overlaps it.
+
+The policy for a failed release lives in [the migration SOP](../MIGRATIONS.md):
+inspect the failed stage, repair and retry the same reviewed target, and never
+promote old code over partial changes. A failed step leaves the API stopped or
+in maintenance. When the API is in maintenance, recovering the window takes
+these steps.
+
+1. Wait until `/readyz` answers `maintenance`. That answer shows the
+   maintenance container is serving. If the migration command is refused again
+   with `No running container found`, wait for that answer and run it again.
+   When nothing serves `/readyz`, the container is not up; request the release
+   again instead of running the migration.
+2. Run the migration as the API user and require exit zero.
+3. Restore the API process command. The patch changes only the command and
+   leaves credentials, ports, volumes, and identity settings untouched.
+
+```bash
+northflank exec service --project net-worth --service nwe-api --user 10001 --group 10001 \
+  --shell-cmd 'sh -c' --cmd 'test -f "$NET_WORTH_ESTIMATOR_DB" && exec /app/migrate.sh'
+northflank patch service combined --project net-worth --service nwe-api \
+  -i '{"deployment":{"instances":1,"docker":{"configType":"customCommand","customCommand":"python /app/northflank-runtime.py"}}}'
+```
+
+`--shell-cmd 'sh -c'` runs the command through the container shell, so
+`$NET_WORTH_ESTIMATOR_DB` expands inside the container rather than locally.
+Confirm `/readyz` answers `ok` and never `maintenance` afterwards. A release
+that fails after the API was stopped still requires a full green release of the
+reviewed target before it is complete.

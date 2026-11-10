@@ -910,9 +910,9 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   const steps = workflow.spec.spec.steps;
   assert.deepEqual(steps.map((step) => step.ref), [
     "identity-backup", "stop-api-writers", "deploy-identity-image",
-    "deploy-maintenance-image", "migrate", "start-api",
+    "deploy-maintenance-image", "await-api-container", "migrate", "start-api",
   ]);
-  const [backup, stopApi, deployIdentity, deployApi, migrate, startApi] = steps;
+  const [backup, stopApi, deployIdentity, deployApi, awaitContainer, migrate, startApi] = steps;
   assert.equal(backup.condition, "success");
   assert.equal(backup.spec.backupType, "dump");
   assert.equal(stopApi.condition, "success");
@@ -921,6 +921,12 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.match(maintenance, /httpd -f/);
   assert.match(maintenance, /-h \/tmp\/waypoint-maintenance/);
   assert.doesNotMatch(maintenance, /\/app\/server|\/data/);
+  assert.equal(awaitContainer.kind, "Condition");
+  assert.equal(awaitContainer.condition, undefined);
+  assert.equal(awaitContainer.spec.kind, "Service");
+  assert.equal(awaitContainer.spec.spec.type, "running");
+  assert.equal(awaitContainer.spec.spec.data.serviceId, "nwe-api");
+  assert.equal(awaitContainer.spec.spec.data.timeoutDuration, 600);
   for (const [step, image, target] of [
     [deployIdentity, "IDENTITY_IMAGE", "${args.IDENTITY_SERVICE_ID}"],
     [deployApi, "API_IMAGE", "nwe-api"],
@@ -935,6 +941,9 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
     assert.equal(step.spec.target.type, "service");
   }
   const migration = migrate.spec.spec.data;
+  assert.equal(migrate.spec.spec.type, "execute");
+  assert.equal(migrate.spec.spec.condition, "running");
+  assert.equal(migration.serviceId, "nwe-api");
   assert.equal(migration.options.dispatchOnly, false);
   assert.equal(migration.user, "10001");
   assert.equal(migration.group, "10001");
@@ -959,6 +968,8 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   assert.match(workflow, /IMAGE_POLL_INTERVAL_MS/);
   assert.match(workflow, /IMAGE_POLL_TIMEOUT_MS/);
   assert.match(workflow, /not anonymously readable/);
+  assert.match(workflow, /AbortSignal\.timeout\(60000\)/);
+  assert.match(workflow, /may still have accepted the release/);
   assert.doesNotMatch(workflow, /NORTHFLANK_API_TOKEN/);
 
   const blocks = [...workflow.matchAll(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/g)]

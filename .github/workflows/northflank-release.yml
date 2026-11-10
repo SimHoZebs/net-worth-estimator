@@ -143,8 +143,10 @@ jobs:
           url.searchParams.set("name", `main-${sha.slice(0, 12)}`);
           let response;
           try {
-            response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15000) });
-          } catch { throw new Error("Northflank release request failed"); }
-          if (!response.ok) throw new Error(`Northflank rejected release request (HTTP ${response.status})`);
+            response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(60000) });
+          } catch {
+            throw new Error("Northflank release request failed. Northflank may still have accepted the release, so check its workflow runs before requesting it again.");
+          }
+          if (!response.ok) throw new Error(`Northflank did not confirm the release request (HTTP ${response.status}). It may still have accepted the release, so check its workflow runs before requesting it again.`);
           console.log(`Requested Northflank workflow for ${sha} with pinned images. Track completion in Northflank.`);
           JS

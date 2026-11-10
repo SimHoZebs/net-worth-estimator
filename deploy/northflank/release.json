@@ -62,12 +62,24 @@
           }
         },
         {
+          "kind": "Condition",
+          "ref": "await-api-container",
+          "spec": {
+            "kind": "Service",
+            "spec": {
+              "type": "running",
+              "data": { "serviceId": "nwe-api", "timeoutDuration": 600 }
+            }
+          }
+        },
+        {
           "kind": "Action",
           "ref": "migrate",
           "spec": {
             "kind": "Service",
             "spec": {
               "type": "execute",
+              "condition": "running",
               "data": {
                 "serviceId": "nwe-api",
                 "command": "/bin/sh -c 'test -f \"$NET_WORTH_ESTIMATOR_DB\" && exec /app/migrate.sh'",
