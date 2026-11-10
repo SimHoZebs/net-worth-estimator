@@ -4,7 +4,7 @@ Rendered architecture visuals live in `docs/diagrams/` (Mermaid sources plus Pel
 
 The backend owns financial records, validation, persistence, historical current position, evidence Analysis, and optional deterministic and stochastic simulation with configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds user-scoped financial data and application identity state.
 
-`PRODUCT_INTENT.md` defines the product experience. This document defines the current Go contracts and domain behavior.
+`PRODUCT_INTENT.md` defines the product experience. This document defines the current Go contracts and domain behavior. Where the schema, OpenAPI, or a test already expresses a rule, this document defers to it instead of restating it.
 
 ## 1. System Boundary
 
@@ -133,7 +133,7 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 
 ### Status
 
-`GET /v1/status` returns `readOnly`, `hasModel`, `syncConfigured`, `syncHost` (when sync is configured), `syncQuotaUsed`, `syncQuotaLimit`, `lastSyncAt` (omitted when no sync completed), and `syncError` (omitted when no sync error). `hasModel` is a cheap presence check, not a model read. Session and resource discovery use `/v1/auth/session`. Full field set is defined by the OpenAPI snapshot (`frontend/openapi.snapshot.json`); `syncHost`, `syncQuotaUsed`, `syncQuotaLimit`, and `syncError` are defined in `backend/internal/api/status.go`.
+`GET /v1/status` exposes server capabilities and sync state. The OpenAPI snapshot defines the full field set; `hasModel` is a cheap presence check, not a model read. Session and resource discovery use `/v1/auth/session`.
 
 The frontend displays these provider-neutral sync signals. Provider setup and raw account-link management remain server concerns. Sync execution also stays server-side. The only user-facing mapping action retires one manual account in favor of the synced account already linked to a bridge account. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
 
@@ -297,54 +297,7 @@ integrity, and foreign keys before publication. Complete target databases
 only verify on retries. Fresh databases use `SetupDatabase` before the hook.
 The server and setup never invoke the migration. See `deploy/MIGRATIONS.md`.
 
-The current schema stores:
-
-| Table                    | Purpose                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `sessions`               | global application sessions with hashed tokens, opaque data, and expiry                                       |
-| `identity_grants`        | global provider grants and token credentials, bound to issuer and subject                                     |
-| `identity_logout_marks`  | global revocation markers that block delayed callbacks and stale grants                                       |
-| `identity_logout_tokens` | global signed logout token replay records                                                                     |
-| `users`                  | data owners, including the provisioned guest, unique by issuer and subject                                     |
-| `model_metadata`         | source path and model-present flag                                                                         |
-| `accounts`               | ordered account definitions                                                                                   |
-| `checkpoints`            | ordered balance observations, unique by account/instant, with required exact time (`observed_at`, no date column) |
-| `transactions`               | ordered UUID transaction definitions with owner, execution order, and explicit bank lifecycle |
-| `planned_purchases`      | user-scoped purchase intentions with fixed cost, funding account, earliest date, priority, and enabled state |
-| `receipts`               | private transaction attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
-| `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
-| `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
-| `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
-| `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
-| `evaluations`            | type, user-scoped instance ID, order, label, enablement, and JSON config                                      |
-| `entity_ids`             | shared ID registry across accounts, transactions, planned purchases, rules, and evaluations |
-| `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
-| `split_settlements`      | append-only payoff records against one split participant, with optional real-payment link                      |
-| `split_settlement_requests` | one recorded settlement per (actor, request ID); retries replay it                                         |
-| `sharing_requests`       | one recorded outcome per (actor, request ID) for mutating social requests; retries replay it                   |
-| `sharing_audit`          | append-only cross-user change trace: actor, action, target, link, status, key, and time; no transaction evidence |
-| `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
-| `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
-| `sync_state`             | last successful sync completion time                                                                          |
-| `provider_connections`     | one bank provider connection per scope with cursor and sync time       |
-| `projection_states`        | one canonical build state per user with revision and Unix dirty instant        |
-| `projection_slices`        | contiguous yearly build ranges with built revision and status           |
-| `projection_rows`          | one persisted timeline row payload per slice date                      |
-| `monte_carlo_statistics`   | portfolio net worth bands plus moments per slice date                  |
-| `net_worth_threshold_outputs`, `account_balance_outputs`, `transaction_fulfillment_outputs`, `cycle_fulfillment_outputs`, `planned_purchases_outputs`, `financial_independence_outputs`, `whatif_outputs` | one typed result row per state, kind, and instance |
-| `sync_credentials`         | per-user bank bridge address and selected cards for safe-spending math                                        |
-| `user_groups`              | named member groups                                                                                           |
-| `group_members`            | group membership with owner, admin, or member role                                                             |
-| `group_invites`            | single- or multi-use invite codes with expiry and revocation                                                   |
-| `transaction_source_facts` | bank-supplied transaction evidence: description, payee, memo, amount, currency, timestamps                     |
-| `analysis_inputs`          | monotonic user-scoped revision invalidated by fact changes                                                    |
-| `analysis_runs`            | execution records with producer version, input revision, and reproducible input snapshot                       |
-| `analysis_findings`        | one current finding per analysis, transaction, and finding kind                                                |
-| `analysis_feedback`        | append-only answer history with actor, prediction, detector version, and review                                |
-| `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
-| `transaction_sync_keys`      | exact provider/account/transaction identity mapped to a local transaction UUID                                    |
-| `transaction_categories`     | one sidecar category assignment per transaction with source and producer                                          |
-| `schema_migrations`      | compatibility markers and historical upgrade records |
+The store's schema definition is authoritative for tables, columns, and indexes. This document owns the persistence contract around it, not a table inventory.
 
 ### First boot and import
 
@@ -815,53 +768,3 @@ so a repeat run never re-enables an explicit disable. Delete-plus-
 tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. The settlement matcher reads merchant behavior classes from `backend/internal/simplefin/profiles.json`. `GET /v1/transactions/{id}/settle-candidates` exposes the same ranked candidates to the browser, so the frontend keeps no matching rule. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
-
-## 12. Backend Key Files
-
-| File                                                | Responsibility                                          |
-| --------------------------------------------------- | ------------------------------------------------------- |
-| `backend/cmd/server/main.go`                        | environment, HTTP lifecycle                             |
-| `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler            |
-| `backend/internal/api/server.go`                    | router and operation registration                       |
-| `backend/internal/api/read_only.go`                 | operation-based read-only write kill switch              |
-| `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement                |
-| `backend/internal/api/status.go`                    | aggregate server capabilities and sync status            |
-| `backend/internal/api/model/`                       | canonical model queries, row writes, and settings         |
-| `backend/internal/api/receipts/`                    | receipt HTTP operations and upload boundaries            |
-| `backend/internal/api/sync/`                        | SimpleFIN configuration, triggers, and account links      |
-| `backend/internal/api/projections/`                 | position, projections, and SSE                            |
-| `backend/internal/api/projections/runs.go`           | shared seeded computation and subscriber state           |
-| `backend/internal/api/internal/modelstate/`          | shared model revision and storage-error HTTP contracts    |
-| `backend/internal/sharing/`                       | cross-user grant/exclusion/copy/audit HTTP operations     |
-| `backend/internal/store/adapters/sqlite/sharing*.go` | consent rows, link identities, request IDs, and audit  |
-| `backend/internal/api/integration/`                 | whole-router HTTP contract tests                         |
-| `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle     |
-| `backend/internal/store/model.go`                   | seed/import replacement and ordered reload              |
-| `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning              |
-| `backend/internal/store/adapters/sqlite/projection_unified.go` | unified state, slices, rows, generated facts, statistics, outputs |
-| `backend/internal/store/adapters/sqlite/projection_dirty.go` | dirty-date mapping for every model write                  |
-| `backend/internal/ingest/ingest.go`                 | provider-neutral sync orchestration                           |
-| `backend/internal/api/projections/builder.go`       | canonical builds, slice persistence, unified reads       |
-| `backend/internal/store/sync.go`                    | sync application and bank directives                      |
-| `backend/internal/store/settlement.go`, `adapters/sqlite/settlements.go` | split settlement ledger, derived states  |
-| `backend/internal/domain/validation.go`             | authoritative model validation                          |
-| `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state                |
-| `backend/internal/domain/transitions.go`            | shared transaction execution                               |
-| `backend/internal/domain/simulate.go`               | deterministic kernel                                    |
-| `backend/internal/domain/path.go`                   | path and public-result adaptation                       |
-| `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                        |
-| `backend/internal/domain/evaluation_fi.go`          | financial-independence branch evaluation                |
-| `backend/internal/domain/evaluation_threshold.go`   | net-worth threshold evaluation                          |
-| `backend/internal/domain/evaluation_fulfillment.go` | transaction fulfillment evaluation                          |
-| `backend/internal/domain/project.go`                 | direct prepare, simulate, and evaluate orchestration    |
-| `backend/internal/domain/projection_pipeline.go`    | baseline engine and Monte Carlo runner wrappers         |
-| `backend/internal/domain/projection_reader.go`      | slice invalidation helpers                             |
-| `backend/internal/domain/recurrence_preprocessor.go` | deterministic versus stochastic rule classification    |
-| `backend/internal/domain/stochastic.go`             | worker execution and progress                           |
-| `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators            |
-| `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers                  |
-| `backend/internal/simplefin/runner.go`              | fetch/translate/apply orchestration and trigger guards  |
-| `backend/internal/simplefin/sync_translation.go`    | checkpoint and bank-transaction translation             |
-| `backend/internal/simplefin/reconcile.go`           | snapshot-to-directive lifecycle policy                  |
-| `backend/internal/simplefin/settle.go`              | ranked hold-to-posted candidates                        |
-| `backend/internal/simplefin/profiles.json`          | merchant settlement behavior classes                    |
