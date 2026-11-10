@@ -59,6 +59,7 @@ function stubApi(state: {
 	links?: { modelAccountId: string; bridgeName: string }[];
 	failConnect?: boolean;
 	failLinks?: boolean;
+	failBalances?: boolean;
 	failCredential?: boolean;
 	failIntegrations?: boolean;
 	supersedeIssues?: {
@@ -347,6 +348,11 @@ function stubApi(state: {
 		}
 		if (path.startsWith("/v1/accounts/balances")) {
 			record();
+			if (state.failBalances)
+				return new Response(JSON.stringify({ detail: "boom" }), {
+					status: 500,
+					headers: jsonHeaders(),
+				});
 			return new Response(
 				JSON.stringify({
 					accounts: balanceRows(),
@@ -729,6 +735,22 @@ it("excludes visible loans from bank-link candidates", async () => {
 	).toBeTruthy();
 });
 
+it("offers no link action on a synced loan", async () => {
+	stubApi({
+		configured: true,
+		loan: true,
+		links: [{ modelAccountId: "prime_card", bridgeName: "Bank loan" }],
+	});
+	render(<SyncSettings />);
+	expect(await screen.findByText("Synced accounts")).toBeTruthy();
+	expect(await screen.findByText("Manual loan")).toBeTruthy();
+	// The server rejects loan components on both sides of a merge, so the
+	// synced loan row offers no mapping action.
+	expect(
+		screen.queryByRole("button", { name: "More options for Manual loan" }),
+	).toBeNull();
+});
+
 it("links a manual account to a synced account", async () => {
 	const requests = stubApi({
 		configured: true,
@@ -874,6 +896,32 @@ it("falls back to the bridge name when the model account is gone", async () => {
 	render(<SyncSettings />);
 	expect(await screen.findByText("Synced accounts")).toBeTruthy();
 	expect(await screen.findByText("Old Bridge Name")).toBeTruthy();
+});
+
+it("explains missing link options when balances fail to load", async () => {
+	const state = {
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+		failBalances: true,
+	};
+	stubApi(state);
+	render(<SyncSettings />);
+	expect(await screen.findByText("Synced accounts")).toBeTruthy();
+	expect(
+		await screen.findByText("The manual accounts could not be loaded."),
+	).toBeTruthy();
+	state.failBalances = false;
+	fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+	expect(
+		await screen.findByRole("button", {
+			name: "More options for Checking",
+		}),
+	).toBeTruthy();
+	await waitFor(() => {
+		expect(
+			screen.queryByText("The manual accounts could not be loaded."),
+		).toBeNull();
+	});
 });
 
 it("shows an empty state when no accounts are synced", async () => {

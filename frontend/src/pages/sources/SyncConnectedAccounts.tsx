@@ -8,6 +8,10 @@ import type { Account } from "../../domain/model.ts";
 import { useSavedAccounts } from "../../state/savedState.ts";
 import { refreshSyncSettings, useSyncLinks } from "../../state/syncSettings.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
+import {
+	refreshAccounts,
+	useAccountBalances,
+} from "../../state/workspaceResources.ts";
 import { SyncLinkAccountDialog } from "./SyncLinkAccountDialog.tsx";
 
 export function SyncConnectedAccounts({
@@ -17,6 +21,7 @@ export function SyncConnectedAccounts({
 }) {
 	const links = useSyncLinks();
 	const savedAccounts = useSavedAccounts();
+	const balancesQuery = useAccountBalances();
 	const readOnly = useUserReadOnly();
 	const [linking, setLinking] = useState<{
 		bridgeAccountId: string;
@@ -42,6 +47,13 @@ export function SyncConnectedAccounts({
 	return (
 		<div className="border-t border-line p-5 sm:p-6">
 			<h3 className="mt-0 mb-4 text-base">Synced accounts</h3>
+			{balancesQuery.isError ? (
+				<ErrorNotice
+					message="The manual accounts could not be loaded."
+					action="Reload"
+					onAction={() => void refreshAccounts().catch(() => {})}
+				/>
+			) : null}
 			{links.isPending ? (
 				<Skeleton className="h-16 w-full" />
 			) : links.isError ? (
@@ -78,6 +90,7 @@ export function SyncConnectedAccounts({
 											</small>
 										) : null}
 									</div>
+									{/* A synced loan can never absorb a manual account: the server rejects loan components on both sides. */}
 									<ActionMenu
 										label={
 											account
@@ -86,7 +99,10 @@ export function SyncConnectedAccounts({
 										}
 										menuLabel="Synced account actions"
 										items={
-											account && !readOnly && manualAccounts.length > 0
+											account &&
+											!account.display &&
+											!readOnly &&
+											manualAccounts.length > 0
 												? [
 														{
 															id: "link-existing-account",

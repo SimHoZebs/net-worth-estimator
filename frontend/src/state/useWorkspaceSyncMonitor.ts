@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
+import { syncLinksKey } from "@/state/syncSettings.ts";
 import {
 	getAppliedSyncStamp,
 	markSyncApplied,
@@ -73,6 +74,16 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 				if (next === getAppliedSyncStamp(current)) return;
 				if (workspaceIsBusy()) return;
 				await refreshWorkspaceAfterSync(current, next);
+				// Account links resolve outside the workspace reload: without
+				// this, newly provisioned bank accounts stay out of the synced
+				// list (and link menus) until a manual sync or remount. Only
+				// mounted observers refetch, so idle pages pay nothing.
+				if (current === getUserScope()) {
+					await cache.invalidateQueries({
+						queryKey: syncLinksKey(current),
+						refetchType: "active",
+					});
+				}
 			} finally {
 				checking.current = false;
 			}

@@ -17,6 +17,7 @@ import {
 	resetSyncWorkspaceRefresh,
 } from "./syncWorkspaceRefresh.ts";
 import { userResourceKey } from "./workspaceResources.ts";
+import { syncLinksKey } from "./syncSettings.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 
 const status = {
@@ -296,6 +297,26 @@ it("re-arms the poll after a user switch", async () => {
 		).toHaveLength(1),
 	);
 	rendered.unmount();
+});
+
+it("refreshes sync links after a scheduled sync provisions accounts", async () => {
+	const fetcher = stubSync("after");
+	const cache = serverQueryClient();
+	const scope = getUserScope();
+	// Seed a links snapshot: the monitor must invalidate it once the new
+	// stamp is applied so newly provisioned bank accounts appear.
+	cache.setQueryData(syncLinksKey(scope), []);
+	renderHook(() => useWorkspaceSyncMonitor(true));
+	act(() => {
+		window.dispatchEvent(new Event("online"));
+	});
+	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(1));
+	await waitFor(() =>
+		expect(cache.getQueryState(syncLinksKey(scope))?.isInvalidated).toBe(
+			true,
+		),
+	);
+	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
 });
 
 it("does not reload an unchanged workspace", async () => {
