@@ -24,9 +24,8 @@ conversions complete from a single host.
 Consolidated index: `NWE_BACKLOG.md` (open records after removing completed
 work packages, plus export-only proposed `PERF-01.md`). Individual work packages
 are the `<ID>.md` files in this directory. Read
-`../docs/group-sharing-decisions.md` and
-`../docs/architecture-validation.md` before building group-sharing or
-caching work. Task descriptions are a dated planning snapshot, not live
+`../docs/authorization.md` and `../docs/unified-projection.md` before building
+group-sharing or caching work. Task descriptions are a dated planning snapshot, not live
 Notion sync; check current repository and Notion state as implementation
 proceeds. Respect `Depends on` relationships and open-issue labels. Do not
 start deferred source-transaction edits, a custom event broker, or an

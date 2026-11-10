@@ -20,6 +20,6 @@
 
 ### Implementation notes and boundaries
 
-Proposed export-only task; not a current Notion task. Extends backend/scripts/bench-sim.sh and backend/internal/domain/bench_sim_test.go; see [architecture validation](../docs/architecture-validation.md).
+Proposed export-only task; not a current Notion task. Extends backend/scripts/bench-sim.sh and backend/internal/domain/bench_sim_test.go; see [unified projection](../docs/unified-projection.md).
 
 **Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.

@@ -17,11 +17,11 @@ erDiagram
     TRANSACTION {
         uuid id PK
         uuid source_account_id FK
-        uuid dest_account_id FK
+        json destination_account_ids
         int posted_time
         int transaction_time
-        json amount_resolution
-        string source_type
+        json amount_resolution_json
+        string source
         uuid projection_slice_id FK
         json event_json
         decimal applied_amount
@@ -30,21 +30,20 @@ erDiagram
     RECURRENCE_RULE {
         uuid id PK
         uuid source_account_id FK
-        uuid dest_account_id FK
-        json schedule
-        int execution_order
+        json destinations
+        string frequency
         int priority
-        json amount_resolver
+        json amount_resolution_json
         decimal annual_cap
         date start_date
         date end_date
     }
     CHECKPOINT {
         uuid id PK
-        uuid account_id FK
-        timestamptz as_of_at
+        uuid model_account_id FK
+        timestamptz observed_at
         decimal balance
-        string source_type
+        string source
         string provider
     }
     MONTE_CARLO_STATISTIC {

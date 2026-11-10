@@ -1,6 +1,6 @@
 # Unified Projection Architecture
 
-This document owns the target architecture. It maps the six diagram blocks to code. It lists defaults so implementation can proceed without further product input.
+This document owns the current architecture. It maps the six diagram blocks to code and lists the defaults that govern projection storage and reads.
 
 Rendered visuals live in `docs/diagrams/` (`.mmd` sources plus Pele-generated `.svg`):
 
@@ -31,90 +31,13 @@ Rendered visuals live in `docs/diagrams/` (`.mmd` sources plus Pele-generated `.
 
 ## 1. Data Ingestion
 
-```mermaid
-erDiagram
-    PROVIDER_CONNECTION ||--o{ TRANSACTION : supplies
-    ACCOUNT ||--o{ TRANSACTION : owns
-    PROVIDER_CONNECTION {
-        uuid id PK
-        string provider_key
-        string status
-        string sync_cursor
-        string last_synced_at
-    }
-```
+The provider and transaction ERD is in [`diagrams/data-ingestion.mmd`](diagrams/data-ingestion.mmd).
 
 Providers are SimpleFIN plus CSV plus Bank plus Manual Entry. Plaid plus MX stay out of scope. The store owns the single dirty mark in ApplySyncPlan; the ingest orchestrator inherits invalidation through it identically for every provider. The orchestrator owns fetch plus provision plus apply plus last-sync stamping. Each adapter translates its native feed to checkpoints plus bank directives. Manual Entry writes rows directly. Gmail receipt discovery stays as is and does not enter this path.
 
 ## 2. Unified Data Model
 
-```mermaid
-erDiagram
-    ACCOUNT ||--o{ TRANSACTION : owns
-    ACCOUNT ||--o{ RECURRENCE_RULE : schedules
-    ACCOUNT ||--o{ CHECKPOINT : has
-    ACCOUNT ||--o{ MONTE_CARLO_STATISTIC : summarized_by
-    RECURRENCE_RULE |o--o{ TRANSACTION : generates
-
-    ACCOUNT {
-        uuid id PK
-        string name
-        string kind
-        decimal min_balance
-        decimal max_balance
-        string color
-        bool enabled
-    }
-    TRANSACTION {
-        uuid id PK
-        uuid source_account_id FK
-        uuid dest_account_id FK
-        int posted_time
-        int transaction_time
-        json amount_resolution
-        string source_type
-        uuid projection_slice_id FK
-        json event_json
-        decimal applied_amount
-        string outcome
-    }
-    RECURRENCE_RULE {
-        uuid id PK
-        uuid source_account_id FK
-        uuid dest_account_id FK
-        json schedule
-        int execution_order
-        int priority
-        json amount_resolver
-        decimal annual_cap
-        date start_date
-        date end_date
-    }
-    CHECKPOINT {
-        uuid id PK
-        uuid account_id FK
-        timestamptz as_of_at
-        decimal balance
-        string source_type
-        string provider
-    }
-    MONTE_CARLO_STATISTIC {
-        uuid id PK
-        uuid projection_slice_id FK
-        uuid account_id FK
-        timestamptz as_of_at
-        int sample_count
-        decimal mean
-        decimal median
-        decimal p10
-        decimal p25
-        decimal p50
-        decimal p75
-        decimal p90
-        decimal std_dev
-        decimal probability_below_zero
-    }
-```
+The full domain ERD is in [`diagrams/unified-data-model.mmd`](diagrams/unified-data-model.mmd).
 
 Notes:
 
@@ -123,25 +46,11 @@ Notes:
 - CHECKPOINT rows are facts and SETS their balance. No generated checkpoints persist: timeline rows already carry projected balances, and position plus balances replay live history.
 - MONTE_CARLO_STATISTIC stores portfolio net worth bands per date with an empty account id. Per-account bands arrive when the sampler tracks them. Percentile columns p25, p50, p75 complement p10, median, p90.
 - Generated TRANSACTION rows live in transactions with source `projected` and the public event as JSON. Every model, sync, and analysis read filters them out by null slice. Row writes never set a slice.
-- Evaluations, payment terms, planned purchases, and presets persist beside this diagram and enter the build as usual. Typed evaluation outputs persist per state and kind in one table per evaluation.
+- Evaluations, payment terms, planned purchases, and presets persist in their own tables and enter the build as usual. Typed evaluation outputs persist per state and kind in one table per evaluation.
 
 ## 3. Shared Projection Pipeline
 
-```mermaid
-flowchart TB
-    R[("Recurrence Rules")]
-    R --> PRE["Recurrence Preprocessor"]
-    PRE --> TYPE{"Rule behavior"}
-    TYPE -->|"Deterministic"| FIX["Fixed or calculated amount"]
-    TYPE -->|"Stochastic"| SAMPLE["Sample variable amount using stochastic model"]
-    FIX --> BASE["Baseline Projection Engine"]
-    MC["Monte Carlo Runner 1,000 trials"]
-    SAMPLE --> MC
-    BASE --> BC[("Baseline Checkpoints")]
-    MC --> AC[("Stochastic Checkpoints and statistics")]
-    BC --> READ["Unified Projection Reader"]
-    AC --> READ
-```
+The rule classification flow is in [`diagrams/recurrence-workflow.mmd`](diagrams/recurrence-workflow.mmd).
 
 Recurrence Preprocessor owns schedule and sampling decisions: it expands rules into dated occurrences for the window and classifies each rule through the amount registry. Deterministic rules use fixed or calculated amounts. Stochastic rules use sampled variable amounts. The Baseline Projection Engine runs the deterministic path; both Monte Carlo paths run trials with the frozen seed. All paths write TRANSACTION rows with source `projected`. No generated checkpoints persist: timeline rows carry projected balances, and position plus balances replay live history. Unified Projection Reader serves all three.
 
@@ -149,34 +58,7 @@ Amount calculation and simulation are separate phases inside the engine. Prepare
 
 ## 4. Incremental Slices with Single Date
 
-```mermaid
-erDiagram
-    PROJECTION_STATE ||--o{ PROJECTION_SLICE : divides_into
-    PROJECTION_SLICE ||--o{ TRANSACTION : generates
-    PROJECTION_SLICE ||--o{ MONTE_CARLO_STATISTIC : generates
-
-    PROJECTION_STATE {
-        uuid id PK
-        uuid scope_id
-        bigint revision
-        bigint published_revision
-        int dirty_from
-        timestamptz projection_start
-        timestamptz horizon_end
-        string calendar_timezone
-        string engine_version
-        int trial_count
-        bigint stochastic_seed
-    }
-    PROJECTION_SLICE {
-        uuid id PK
-        uuid projection_state_id FK
-        int from_at
-        int to_at
-        bigint built_revision
-        string status
-    }
-```
+The state, slice, and output ERD is in [`diagrams/incremental-slices.mmd`](diagrams/incremental-slices.mmd). The dirty, rebuild, and publish flow is in [`diagrams/slice-lifecycle.mmd`](diagrams/slice-lifecycle.mmd).
 
 Rules:
 
@@ -186,7 +68,7 @@ Rules:
 - Recompute suffix means delete suffix rows, rewrite the suffix manifest, persist the suffix, adopt the prefix, refresh evaluation outputs, and publish. Prefix inputs are identical by definition of the dirty date, so adoption is exact.
 - Readers serve only when the state is clean, slices cover the window at the current revision, evaluation tables match the built tables, and stored outputs are current.
 - Reads use `published_revision` only. Concurrent identical builds share one in-flight build per user.
-- Databases created before this change need a fresh setup. There is no runtime migration and no legacy alias.
+- Runtime and setup never convert an incompatible database. Unsupported shapes require an explicit operator upgrade or a fresh setup; no legacy alias reads old storage.
 
 ## 5. Evaluation Plugins
 

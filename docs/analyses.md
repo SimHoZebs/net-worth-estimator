@@ -20,8 +20,8 @@ after at least 30 seconds. Computation receives a 20-second context deadline.
 
 `backend/internal/analysis` owns definitions and the worker. Its persistence port
 is `store.AnalysisStore`. Add a definition to `analysis.Definitions()` to reuse
-the lifecycle. Recurring-pattern detection is a built-in consumer alongside
-BNPL. Transfer and receipt detection remain future consumers.
+the lifecycle. BNPL, recurring, transfer, and payment-pattern detection are
+built-in consumers.
 The current worker rechecks the changed user's complete saved evidence snapshot.
 It skips unchanged input revisions. It does not require a broker or external API.
 

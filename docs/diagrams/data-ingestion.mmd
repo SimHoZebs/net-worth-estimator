@@ -13,11 +13,11 @@ erDiagram
     TRANSACTION {
         uuid id PK
         uuid source_account_id FK
-        uuid dest_account_id FK
+        json destination_account_ids
         int posted_time
         int transaction_time
-        json amount_resolution
-        string source_type
+        json amount_resolution_json
+        string source
         uuid projection_slice_id FK
         json event_json
         decimal applied_amount

@@ -302,6 +302,24 @@ the one-time bank-source script below. Provider identity remains in sync
 keys. Fresh databases need no body work: `SetupDatabase` creates the
 complete schema.
 
+## Transaction simulation split (one-time, inside the body)
+
+`deploy/migrate.sh` runs the standalone `upgrade-transaction-sim-split` tool on
+the verified candidate before checkpoint conversion and purchase conversion. It
+splits pre-split `transactions` rows into the transaction fact plus
+`transaction_sim` order and enablement plus `transaction_claims` occurrence
+links, drops the retired `destinations`, `receipt_ids`, and simulation columns,
+and converges both analysis lifecycle triggers. Every old column must be
+present and both satellites absent or empty; partial and mixed shapes fail
+closed. A repeat run on a completed target is read-only.
+
+The tool remains at `backend/scripts/one-time/transaction-sim-split` and builds
+into the API image. Verify it with
+`backend/scripts/verify.sh ./scripts/one-time/transaction-sim-split`. Never run
+the planned-purchase conversion against a pre-split target on its own: the
+purchase eligibility query reads the split shape, so the body orders the split
+first. Retain the tool until every supported target records the split.
+
 ## Bank source normalization (one-time)
 
 Run `backend/scripts/one-time/bank-source/run.sh` with every API writer

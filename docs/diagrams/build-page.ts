@@ -101,7 +101,6 @@ const html = `<!DOCTYPE html>
     <header>
       <h1>Unified Projection Architecture</h1>
       <nav>
-      <a href="/changes/changes.html">Design changes: initial versus as built →</a>
       ${nav}
       </nav>
     </header>

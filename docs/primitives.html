@@ -312,10 +312,10 @@
         {
           id: "rule",
           lane: 0,
-          label: "RecurrenceRule",
-          sub: "Schedule plus transaction template",
+          label: "Schedule",
+          sub: "Repeats a transaction template",
           data: true,
-          src: "types.RecurrenceRule",
+          src: "types.Schedule",
         },
         {
           id: "terms",
@@ -339,7 +339,7 @@
           id: "occurrence",
           lane: 1,
           label: "Occurrence",
-          sub: "Rule instance, executes as transaction",
+          sub: "Schedule instance, executes as transaction",
           src: "domain.ResolveOccurrences",
         },
         {
@@ -418,26 +418,12 @@
           data: true,
           src: "domain.EvaluationRegistry",
         },
-        {
-          id: "analysis",
-          lane: 3,
-          label: "Analysis",
-          sub: "Grades inferences with evidence",
-          src: "domain.analyzePay",
-        },
-        {
-          id: "timing",
-          lane: 3,
-          label: "Timing card",
-          sub: "TimingPreview plus grouping",
-          src: "TimingPreview",
-        },
       ];
       const EDGES = [
         // Phases follow one run: references validated, history replayed, request
         // assembled, the per-occurrence execution loop, evaluation, readout.
         // Flows sharing a phase run together, not in sequence.
-        { f: "transaction", t: "rule", l: "names rule", phase: 1, src: "types.TransactionClaim" },
+        { f: "transaction", t: "rule", l: "names schedule", phase: 1, src: "types.TransactionClaim" },
         {
           f: "terms",
           t: "providers",
@@ -502,7 +488,7 @@
           phase: 3,
           src: "types.SimulationRequest",
         },
-        { f: "rule", t: "request", l: "carries rules", phase: 3, src: "types.SimulationRequest" },
+        { f: "rule", t: "request", l: "carries schedules", phase: 3, src: "types.SimulationRequest" },
         { f: "request", t: "engine", l: "executes", phase: 4, src: "domain.Simulate" },
         {
           f: "providers",
@@ -550,8 +536,6 @@
           phase: 5,
           src: "domain/evaluation_fi.go",
         },
-        { f: "events", t: "timing", l: "group", phase: 6, src: "TimingPreview" },
-        { f: "transaction", t: "analysis", l: "recorded inflows", phase: 6, src: "domain.analyzePay" },
       ];
       const W = 1280,
         H = 760,

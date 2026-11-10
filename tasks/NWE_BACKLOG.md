@@ -4,7 +4,7 @@
 
 **Coverage:** Open records after removing completed work packages, plus one export-only proposed benchmark task (PERF-01). Completed packages were removed on 2026-11-05.
 
-This is a planning export, not an implementation status report. The group-sharing task descriptions below reflect the later approved decisions in [group-sharing decisions](../docs/group-sharing-decisions.md) rather than only the older master backlog draft.
+This is a planning export, not an implementation status report. The group-sharing task descriptions below reflect the shipped decisions in [the authorization contract](../docs/authorization.md) rather than only the older master backlog draft.
 
 ## Index
 
@@ -280,7 +280,7 @@ Do not assume any broad Casdoor cross-user model permission.
 
 #### Implementation notes and boundaries
 
-Proposed export-only task; not a current Notion task. Extends backend/scripts/bench-sim.sh and backend/internal/domain/bench_sim_test.go; see [architecture validation](../docs/architecture-validation.md).
+Proposed export-only task; not a current Notion task. Extends backend/scripts/bench-sim.sh and backend/internal/domain/bench_sim_test.go; see [unified projection](../docs/unified-projection.md).
 
 **Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.
 

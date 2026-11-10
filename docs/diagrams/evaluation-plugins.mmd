@@ -3,7 +3,7 @@ flowchart TB
     stored rows plus live history"] --> READER["Evaluation Reader
     thresholds plus balances plus fulfillment"]
     READ --> SIM["Evaluation Simulator
-    independence plus what-if"]
+    independence plus planned purchases plus what-if"]
     SIM -.->|"Isolated what-if inputs"| PRE["Shared Projection Pipeline"]
     READER --> UI["Frontend"]
     SIM --> UI
