@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { createRef } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	Checkbox,
 	Field,
@@ -19,8 +19,6 @@ import {
 	type ControlStyleProps,
 	type FieldStyleProps,
 } from "./fieldStyles.ts";
-
-afterEach(cleanup);
 
 describe("field controls", () => {
 	it("forwards native input props, refs, and external form ownership", () => {

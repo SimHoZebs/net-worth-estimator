@@ -1,13 +1,11 @@
-import { cleanup, render, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import {
 	independenceEnvelope,
 	independenceItem,
 	independenceRow,
 } from "@/mocks/financialIndependence.ts";
 import { IndependenceSpending } from "./IndependenceSpending.tsx";
-
-afterEach(cleanup);
 
 type RowOverrides = NonNullable<Parameters<typeof independenceRow>[1]>;
 

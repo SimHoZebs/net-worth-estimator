@@ -21,9 +21,9 @@ describe("account-scoped transactions", () => {
 		});
 		expect(rows.filter((row) => row.source === "historical")).toHaveLength(3);
 		expect(rows.some((row) => row.transactionId === "renovation")).toBe(true);
-		expect(
-			rows.filter((row) => row.transactionId === "invest").length,
-		).toBeGreaterThan(100);
+		expect(rows.filter((row) => row.transactionId === "invest")).toHaveLength(
+			1,
+		);
 		expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
 	});
 
@@ -295,6 +295,11 @@ describe("account-scoped transactions", () => {
 	});
 
 	it("omits zero-value scheduled payments after a debt has been paid off", () => {
+		expect(
+			projection.transactions.some(
+				(row) => row.transactionId === "mortgage-payment" && row.realized === 0,
+			),
+		).toBe(true);
 		const rows = accountTransactions({
 			accountId: "mortgage",
 			accounts,

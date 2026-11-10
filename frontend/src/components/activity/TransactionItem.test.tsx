@@ -1,10 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { Table, TableBody, TableCell, TableRow } from "../DataTable.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
-
-afterEach(cleanup);
 
 describe("TransactionItemRow", () => {
 	it("supports table className overrides", () => {
@@ -59,7 +57,7 @@ describe("TransactionItemRow", () => {
 		expect(onSelect).toHaveBeenCalledOnce();
 	});
 
-	it("caps title and breadcrumb at a fixed character length with ellipsis, viewport width on phones", () => {
+	it("keeps the full title and breadcrumb available", () => {
 		const title = "A very long transaction title that should truncate";
 		render(
 			<Table aria-label="Transactions">
@@ -78,17 +76,12 @@ describe("TransactionItemRow", () => {
 			</Table>,
 		);
 		const titleEl = screen.getByText(title);
-		expect(titleEl.className).toContain("truncate");
-		expect(titleEl.className).toContain("max-w-[48ch]");
-		expect(titleEl.className).toContain("max-sm:max-w-[calc(100vw_-_13rem)]");
 		expect(titleEl.getAttribute("title")).toBe(title);
 		const breadcrumb = screen.getByText(
 			"From Some very long account name path",
 		);
-		expect(breadcrumb.className).toContain("truncate");
-		expect(breadcrumb.className).toContain("max-w-[32ch]");
-		expect(breadcrumb.className).toContain(
-			"max-sm:max-w-[calc(100vw_-_13rem)]",
+		expect(breadcrumb.textContent).toBe(
+			"From Some very long account name path",
 		);
 	});
 

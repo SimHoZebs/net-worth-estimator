@@ -1,11 +1,9 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { financialModelFixture } from "../../../mocks/financialModel.ts";
 import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
 import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
-
-afterEach(cleanup);
 
 function charge(
 	date: string,

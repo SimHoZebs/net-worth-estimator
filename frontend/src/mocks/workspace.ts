@@ -1,12 +1,16 @@
 import type { ServerStatus } from "../api/index.ts";
 import type { FinancialModel } from "../api/contracts.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
-import { getAccountBalances, userResourceKey } from "../state/workspaceResources.ts";
+import {
+	getAccountBalances,
+	userResourceKey,
+} from "../state/workspaceResources.ts";
 import {
 	financialModelFixture,
 	type FinancialModelFixture,
 } from "./financialModel.ts";
-import { fixtureAmount, fixtureModel } from "./model.ts";
+import { fixtureModel } from "./model.ts";
+import { transactionResponse } from "./transactionResponse.ts";
 
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
@@ -45,11 +49,14 @@ export function setServerModelFixture(
 			syncQuotaUsed: 0,
 			syncQuotaLimit: 0,
 		});
-		serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
-			accounts: [],
-			asOf: data.startDate,
-			revision,
-		});
+		serverQueryClient().setQueryData(
+			[...userResourceKey("balances"), "latest"],
+			{
+				accounts: [],
+				asOf: data.startDate,
+				revision,
+			},
+		);
 		serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {
 			schedules: [],
 			revision,
@@ -90,7 +97,9 @@ export function setServerModelFixture(
 			const displayAccount = data.accounts.find((row) => row.id === account.id);
 			return {
 				...account,
-				balance: checkpoint ? checkpoint.Balance : (displayAccount?.balance ?? 0),
+				balance: checkpoint
+					? checkpoint.Balance
+					: (displayAccount?.balance ?? 0),
 				observedOn: data.startDate,
 				hasCheckpoint: displayAccount?.balanceCheck ?? checkpoint !== undefined,
 				archived: displayAccount?.archived ?? false,
@@ -108,29 +117,7 @@ export function setServerModelFixture(
 		revision,
 	});
 	serverQueryClient().setQueryData([...userResourceKey("transactions"), ""], {
-		transactions: data.transactions
-			.filter((row) => row.kind === "transaction")
-			.map((row) => ({
-				...row,
-				sourceAccountId: row.fromId,
-				destinations: row.toId ? [row.toId] : null,
-				amount: fixtureAmount(row),
-				annualCap: null,
-				source: row.readOnly ? "banksync" : "user",
-				claim:
-					row.claimScheduleId && row.claimOccurrenceDate
-						? {
-								scheduleId: row.claimScheduleId,
-								occurrenceDate: row.claimOccurrenceDate,
-							}
-						: null,
-				postedTime: Math.floor(
-					Date.parse(`${row.postedDate ?? row.startDate}T00:00:00Z`) / 1000,
-				),
-				transactionTime: Math.floor(
-					Date.parse(`${row.startDate}T00:00:00Z`) / 1000,
-				),
-			})),
+		transactions: model.transactions.map(transactionResponse),
 		revision,
 	});
 	serverQueryClient().setQueryData(userResourceKey("eval-summary"), {
@@ -160,9 +147,12 @@ export function setServerModelFixture(
 export function setServerRevisionFixture(revision: string) {
 	const cached = getAccountBalances();
 	if (cached) {
-		serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
-			...cached,
-			revision,
-		});
+		serverQueryClient().setQueryData(
+			[...userResourceKey("balances"), "latest"],
+			{
+				...cached,
+				revision,
+			},
+		);
 	} else setServerModelFixture(financialModelFixture, { revision });
 }

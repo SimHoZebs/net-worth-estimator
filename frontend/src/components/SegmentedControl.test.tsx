@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { runInteractions } from "../mocks/interactions.ts";
 import { SegmentedControl } from "./SegmentedControl.tsx";
-
-afterEach(cleanup);
 
 function Harness() {
 	const [value, setValue] = useState<"day" | "week">("day");

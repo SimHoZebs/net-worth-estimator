@@ -1,7 +1,4 @@
 import { expect, test } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => resetFixture());
 
 test("evidence loads before the forecast", async ({ page }) => {
 	let release!: () => void;

@@ -1,12 +1,6 @@
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AccountIcon, AccountLabel } from "./AccountIcon.tsx";
 import { DetailList, DetailRow } from "./DetailRow.tsx";
 import {
@@ -20,8 +14,6 @@ import {
 	TableRow,
 	TableScroll,
 } from "./DataTable.tsx";
-
-afterEach(cleanup);
 
 describe("native table ownership", () => {
 	it("preserves native props and refs while merging external overrides", () => {

@@ -1,7 +1,4 @@
 import { expect, test } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => resetFixture());
 
 for (const viewport of [
 	{ width: 1440, height: 1080 },
@@ -37,21 +34,15 @@ for (const viewport of [
 		});
 		await name.fill("   ");
 		await save.scrollIntoViewIfNeeded();
-		const positions = async () => ({
-			dialog: await dialog.boundingBox(),
-			name: await name.boundingBox(),
-			save: await save.boundingBox(),
-		});
-		const before = await positions();
-		const beforeSaveY = before.save?.y ?? 0;
+		const beforeSaveY = (await save.boundingBox())?.y ?? 0;
 		await save.click();
 		await expect(dialog.getByRole("alert")).toContainText(
 			"Give the account a name.",
 		);
-		const after = await positions();
-		// Conditional FieldError appears only while a message exists, so the
-		// save control shifts down while feedback is visible.
-		expect(after.save?.y ?? 0).toBeGreaterThan(beforeSaveY);
+		expect((await save.boundingBox())?.y ?? 0).toBeGreaterThan(beforeSaveY);
+		await expect(dialog.getByRole("alert")).toBeVisible();
+		await expect(save).toBeInViewport();
+		await expect(save).toBeEnabled();
 		await name.fill("Layout test");
 		await save.scrollIntoViewIfNeeded();
 		for (let attempt = 0; attempt < 2; attempt++) {

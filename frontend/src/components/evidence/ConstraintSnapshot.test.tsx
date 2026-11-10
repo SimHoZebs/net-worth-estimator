@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { fireEvent, render } from "@testing-library/react";
+import { expect, it, vi } from "vitest";
 import { failureLedger } from "../../domain/constraintSnapshot.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import {
@@ -20,8 +20,6 @@ vi.mock("../activity/TransactionDetail.tsx", () => ({
 		</p>
 	),
 }));
-
-afterEach(cleanup);
 
 function snapshotProps() {
 	const projection = activityProjection();

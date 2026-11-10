@@ -4,6 +4,7 @@ import {
 	type BrowserContext,
 	type Page,
 } from "@playwright/test";
+import { resetFixture, type FixtureOptions } from "./fixture.ts";
 
 export {
 	expect,
@@ -13,7 +14,11 @@ export {
 	type Page,
 } from "@playwright/test";
 
-type Guards = { reportBrowserErrors: void };
+type Guards = {
+	reportBrowserErrors: void;
+	fixtureBaseline: void;
+	fixtureOptions: FixtureOptions;
+};
 
 function attachBrowserErrorWatchers(
 	target: {
@@ -55,6 +60,14 @@ function assertNoBrowserErrors(problems: string[]): void {
 // "Failed to load resource" line is skipped: it reports a request status,
 // and the suite injects those failures on purpose.
 export const test = base.extend<Guards>({
+	fixtureOptions: [{}, { option: true }],
+	fixtureBaseline: [
+		async ({ fixtureOptions }, use) => {
+			await resetFixture(fixtureOptions);
+			await use();
+		},
+		{ auto: true },
+	],
 	reportBrowserErrors: [
 		async ({ context }, use) => {
 			const problems: string[] = [];

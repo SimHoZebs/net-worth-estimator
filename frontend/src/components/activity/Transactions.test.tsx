@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import {
 	accountTransactions,
@@ -16,8 +16,6 @@ vi.mock("../analysis/TransactionAnalysis.tsx", async (importOriginal) => ({
 		<>{children}</>
 	),
 }));
-
-afterEach(cleanup);
 
 const { accounts, transactions, startDate } = financialModelFixture;
 

@@ -1,5 +1,5 @@
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dateLabel } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
 import { financialModelFixture } from "@/mocks/financialModel.ts";
@@ -17,7 +17,6 @@ vi.mock("@/state/savedState.ts", () => ({
 	useSavedEvaluations: vi.fn(),
 }));
 
-afterEach(cleanup);
 beforeEach(() => {
 	vi.mocked(useSavedAccounts).mockReturnValue(financialModelFixture.accounts);
 	vi.mocked(useSavedTransactions).mockReturnValue(

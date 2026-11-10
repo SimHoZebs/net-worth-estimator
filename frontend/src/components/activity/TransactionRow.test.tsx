@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { expect, it } from "vitest";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { TransactionRow } from "./TransactionRow.tsx";
-
-afterEach(cleanup);
 
 function voidTransaction(): {
 	transaction: AccountTransaction;

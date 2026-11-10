@@ -1,10 +1,8 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { evaluationFixture } from "../../mocks/projection.ts";
 import { EvaluationCard } from "./EvaluationCard.tsx";
-
-afterEach(cleanup);
 
 const evaluation = financialModelFixture.evaluations[0]!;
 

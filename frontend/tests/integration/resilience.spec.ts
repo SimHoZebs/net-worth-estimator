@@ -1,9 +1,5 @@
 import { expect, test } from "./base.ts";
-import { readSavedServerModel, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
+import { readSavedServerModel } from "./fixture.ts";
 
 // Chromium holds a fetch that starts while the context is offline and releases
 // it on reconnect, so this covers the deferred-save path: the edit must stay,
@@ -13,10 +9,7 @@ test("a dropped connection keeps the edit and finishes the save on reconnect", a
 	page,
 	context,
 }) => {
-	await page.goto("/sources");
-	await page.getByRole("link", { name: "Transactions", exact: true }).click();
-	await page.getByRole("tab", { name: /Recurring/ }).click();
-	await page.getByRole("button", { name: "Monthly investing" }).click();
+	await page.goto("/transactions?editor=transaction&id=invest");
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("910");
 

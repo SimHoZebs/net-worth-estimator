@@ -1095,7 +1095,12 @@ it("shows the category control on recordings but not on rules or void holds", ()
 	);
 	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
 	cleanup();
-	const voided = { ...transaction, id: "vanished", void: true, readOnly: false };
+	const voided = {
+		...transaction,
+		id: "vanished",
+		void: true,
+		readOnly: false,
+	};
 	render(
 		<TransactionDetail
 			transaction={occurrence(voided)}
@@ -1391,9 +1396,7 @@ it("opens a small modal from the occurred date to edit both dates", async () => 
 		expect(screen.queryByRole("button", { name: "Apply" })).toBeNull(),
 	);
 	await waitFor(() =>
-		expect(
-			screen.getByRole("button", { name: "Save changes" }),
-		).toBeTruthy(),
+		expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy(),
 	);
 	expect(screen.getByRole("button", { name: /Nov 1, 2026/ })).toBeTruthy();
 });

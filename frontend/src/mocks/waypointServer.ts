@@ -5,6 +5,7 @@ import type {
 	ServerStatus,
 } from "../api/index.ts";
 import { ok } from "./fetch.ts";
+import { transactionResponse } from "./transactionResponse.ts";
 
 // Single home for the workspace fetch fake. Migration left a copy of this
 // server inside remoteHooks.test.ts and smaller variants in other test
@@ -301,23 +302,10 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				return Array.isArray(destinations) && destinations.includes(accountId);
 			};
 			const transactions: unknown[] = [];
-			for (const transaction of current.transactions as unknown as Record<
-				string,
-				unknown
-			>[]) {
+			for (const transaction of current.transactions) {
 				if (!touches(transaction.sourceAccountId, transaction.destinations))
 					continue;
-				const syncOwned =
-					typeof transaction.source === "string" &&
-					transaction.source !== "" &&
-					transaction.source !== "user";
-				transactions.push({
-					...transaction,
-					syncOwned,
-					// Bank rows are owner-editable including pending and
-					// void.
-					readOnly: false,
-				});
+				transactions.push(transactionResponse(transaction));
 			}
 			return ok({ transactions, revision: narrowRevision });
 		}

@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { expect, it } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
-
-afterEach(cleanup);
 
 function syncRow(overrides: Partial<Transaction>): Transaction {
 	return {

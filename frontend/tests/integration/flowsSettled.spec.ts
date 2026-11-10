@@ -1,5 +1,4 @@
 import { expect, test } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
 
 // Settled bank history across seven months, every row posted before the
 // fixture projection start: the projection emits no transaction events
@@ -31,10 +30,11 @@ function settledHistory() {
 	return rows;
 }
 
+test.use({ fixtureOptions: { bankTransactions: settledHistory() } });
+
 test("settled bank history draws recorded flows with exact totals", async ({
 	page,
 }) => {
-	await resetFixture({ bankTransactions: settledHistory() });
 	await page.goto("/flows");
 	// Narrow to the seeded half-year so the window holds only settled
 	// history: no fixture rows, no forecast occurrences.
@@ -79,7 +79,6 @@ test("settled bank history draws recorded flows with exact totals", async ({
 test("a window with no settled rows shows no money movement", async ({
 	page,
 }) => {
-	await resetFixture({ bankTransactions: settledHistory() });
 	await page.goto("/flows");
 	await page.getByLabel("From date", { exact: true }).fill("2024-01-01");
 	await page.getByLabel("Through date", { exact: true }).fill("2024-01-31");

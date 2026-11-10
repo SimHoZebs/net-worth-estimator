@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { RouterContextProvider } from "@tanstack/react-router";
 import { createSubjectTestRouter } from "../mocks/testRouter.tsx";
 import { pageDefinition } from "./navigation.ts";
@@ -7,8 +7,6 @@ import { BreadcrumbSlotProvider } from "./breadcrumbSlot.tsx";
 import { WorkspaceTopbar } from "./WorkspaceHeader.tsx";
 import { createPortal } from "react-dom";
 import { useBreadcrumbSlot } from "./breadcrumbSlot.tsx";
-
-afterEach(cleanup);
 
 function PortalSubject() {
 	const slot = useBreadcrumbSlot();
@@ -26,9 +24,7 @@ function PortalSubject() {
 	return slot ? createPortal(breadcrumb, slot) : null;
 }
 
-async function renderTopbar(
-	initialEntry: "/outlook" | "/accounts/checking",
-) {
+async function renderTopbar(initialEntry: "/outlook" | "/accounts/checking") {
 	const isDetail = initialEntry.startsWith("/accounts");
 	const router = createSubjectTestRouter({
 		subjectRoute: isDetail ? "/accounts/$accountId" : "/outlook",

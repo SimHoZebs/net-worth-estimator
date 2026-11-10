@@ -10,8 +10,6 @@ const sample = fileURLToPath(
 	),
 );
 
-test.beforeEach(async () => resetFixture());
-
 async function seedExpense(page: Page) {
 	const response = await page.request.post("/v1/transactions", {
 		data: {

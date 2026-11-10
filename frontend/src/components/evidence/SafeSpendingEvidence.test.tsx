@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import {
 	transactionFixture,
@@ -15,8 +15,6 @@ vi.mock("../Modal.tsx", async (importOriginal) => ({
 		<section>{children}</section>
 	),
 }));
-
-afterEach(cleanup);
 
 describe("SafeSpendingEvidence", () => {
 	it("retains table headings, shortfall evidence, and date sorting", () => {

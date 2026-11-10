@@ -1,8 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { expect, it, vi } from "vitest";
 import { ReceiptExtractionAction } from "./ReceiptExtractionAction.tsx";
-
-afterEach(cleanup);
 
 it("shows an accessible busy state and blocks duplicate extraction", () => {
 	const onExtract = vi.fn();

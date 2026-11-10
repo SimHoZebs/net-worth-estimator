@@ -1,9 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
+import { readSavedServerModel, resetFixture } from "./fixture.ts";
 
-async function seedBNPL(readOnly = false) {
-	await resetFixture({
+function bnplFixture(readOnly = false) {
+	return {
 		readOnly,
 		bankTransactions: [
 			{
@@ -19,8 +19,23 @@ async function seedBNPL(readOnly = false) {
 				posted: Date.UTC(2026, 0, 21) / 1000,
 			},
 		],
-	});
+	};
 }
+
+test("the fixture seeds owned editable bank transactions", async () => {
+	await resetFixture(bnplFixture());
+	const saved = await readSavedServerModel();
+	expect(saved.transactions).toContainEqual(
+		expect.objectContaining({
+			id: expect.any(String),
+			name: "Klarna Pay in 4 installment",
+			sourceAccountId: "checking",
+			destinations: null,
+			syncOwned: true,
+			readOnly: false,
+		}),
+	);
+});
 
 async function openBNPL(page: Page) {
 	await expect
@@ -45,7 +60,7 @@ async function openBNPL(page: Page) {
 test("Yes confirms BNPL, collects total duration, and preserves the financial model", async ({
 	page,
 }) => {
-	await seedBNPL();
+	await resetFixture(bnplFixture());
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	let detail = await openBNPL(page);
 	await detail
@@ -125,7 +140,7 @@ test("Yes confirms BNPL, collects total duration, and preserves the financial mo
 test("No dismisses the prompt and records a negative label", async ({
 	page,
 }) => {
-	await seedBNPL();
+	await resetFixture(bnplFixture());
 	const detail = await openBNPL(page);
 	await detail
 		.getByRole("button", { name: "Review 1 suggestion", exact: true })
@@ -158,7 +173,7 @@ test("No dismisses the prompt and records a negative label", async ({
 test("a lost response retries the same answer without duplicate feedback", async ({
 	page,
 }) => {
-	await seedBNPL();
+	await resetFixture(bnplFixture());
 	const detail = await openBNPL(page);
 	let first = true;
 	const requestIds: string[] = [];
@@ -190,7 +205,7 @@ test("a lost response retries the same answer without duplicate feedback", async
 test("read-only users can inspect findings on a narrow screen", async ({
 	page,
 }) => {
-	await seedBNPL(true);
+	await resetFixture(bnplFixture(true));
 	await page.setViewportSize({ width: 390, height: 844 });
 	const detail = await openBNPL(page);
 	await expect(detail.getByText("Likely BNPL", { exact: true })).toBeVisible();

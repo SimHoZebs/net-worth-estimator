@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { safeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
 import { SafeSpendingTrendChart } from "./SafeSpendingTrendChart.tsx";
-
-afterEach(cleanup);
 
 function charge(date: string, amount: number): AccountTransaction {
 	return {

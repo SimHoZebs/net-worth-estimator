@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherEvaluation } from "@/domain/result.ts";
 import { financialModelFixture } from "@/mocks/financialModel.ts";
 import { evaluationFixture, projectionFixture } from "@/mocks/projection.ts";
@@ -42,7 +42,6 @@ const mockedPins = vi.mocked(usePinnedEvaluations);
 const mockedOutlookProjection = vi.mocked(useOutlookProjection);
 const mockedStatus = vi.mocked(useServerStatus);
 
-afterEach(cleanup);
 beforeEach(() => {
 	vi.clearAllMocks();
 	mockedAccounts.mockReturnValue(financialModelFixture.accounts);

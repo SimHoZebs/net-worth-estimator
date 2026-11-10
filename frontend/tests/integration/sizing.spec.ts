@@ -1,9 +1,4 @@
 import { expect, type Locator, type Page, test } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
 
 async function expectWithinViewport(element: Locator, page: Page) {
 	const box = await element.boundingBox();
@@ -265,9 +260,7 @@ for (const width of [320, 390, 768, 1440]) {
 				json: { status: 409, detail: "Sizing check holds the save." },
 			});
 		});
-		await page.goto("/transactions");
-		await page.getByRole("tab", { name: /Recurring/ }).click();
-		await page.getByRole("button", { name: "Monthly investing" }).click();
+		await page.goto("/transactions?editor=transaction&id=invest");
 		await page.getByLabel("Amount (USD)").click();
 		await page.getByLabel("Amount (USD)").fill("900");
 		await page.getByRole("button", { name: "Save changes" }).click();

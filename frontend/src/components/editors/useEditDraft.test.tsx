@@ -1,8 +1,6 @@
-import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { expect, it } from "vitest";
 import { useEditDraft } from "./useEditDraft.ts";
-
-afterEach(cleanup);
 
 it("takes a baseline when each field first becomes an edit", () => {
 	const view = renderHook(

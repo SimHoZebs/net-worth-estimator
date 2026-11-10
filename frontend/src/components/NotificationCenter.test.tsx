@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
 import { runInteractions } from "../mocks/interactions.ts";
 import {
 	notifyError,
@@ -9,8 +9,6 @@ import {
 import { NotificationCenter } from "./NotificationCenter.tsx";
 
 beforeEach(() => resetNotifications());
-
-afterEach(cleanup);
 
 it("runs a toast action and dismisses through the close control", async () => {
 	const onAction = vi.fn();

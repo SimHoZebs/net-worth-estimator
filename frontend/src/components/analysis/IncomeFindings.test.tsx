@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { runInteractions } from "@/mocks/interactions.ts";
 import { PaymentFindings as IncomeFindings } from "./PaymentFindings.tsx";
@@ -74,7 +74,6 @@ beforeEach(() => {
 		dismiss.isError =
 			false;
 });
-afterEach(cleanup);
 
 describe("income review", () => {
 	it("keeps explicit review available while an external judgment is pending", async () => {

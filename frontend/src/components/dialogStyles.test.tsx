@@ -1,11 +1,9 @@
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { render } from "@testing-library/react";
+import { expect, it } from "vitest";
 import { dialogActionsStyles } from "./dialogStyles.ts";
 import { mergeStyles } from "./mergeStyles.ts";
 import { Notice } from "./Notice.tsx";
 import { noticeStyles } from "./noticeStyles.ts";
-
-afterEach(cleanup);
 
 it("preserves dialog action order and allows native props and layout overrides", () => {
 	const view = render(

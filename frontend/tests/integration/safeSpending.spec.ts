@@ -1,10 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, trackBrowserErrors, type Locator } from "./base.ts";
-import { FIXTURE_API, resetFixture } from "./fixture.ts";
+import { FIXTURE_API } from "./fixture.ts";
 import { SAFE_SPENDING_LABELS as labels } from "../../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
 test.beforeEach(async ({ page, request }) => {
-	await resetFixture();
 	await page.clock.setFixedTime(new Date("2026-01-31T12:00:00Z"));
 	// Make salary current, rather than a future-start rule, without changing
 	// any projected amounts after the January balance checkpoint.

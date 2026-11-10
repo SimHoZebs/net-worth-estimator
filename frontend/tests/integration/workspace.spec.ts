@@ -3,15 +3,13 @@ import { expect, type Page, test } from "./base.ts";
 import type { FinancialModel } from "../../src/api/contracts.ts";
 import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
 
-test.beforeEach(async () => {
-	await resetFixture({ pinnedEvaluationIds: ["transaction-fulfillment"] });
+test.use({
+	fixtureOptions: { pinnedEvaluationIds: ["transaction-fulfillment"] },
 });
 
 /** Open the transaction detail for the fixture's investing transfer. */
 async function openInvestingTransactionDetail(page: Page) {
-	await page.getByRole("link", { name: "Transactions", exact: true }).click();
-	await page.getByRole("tab", { name: /Recurring/ }).click();
-	await page.getByRole("button", { name: "Monthly investing" }).click();
+	await page.goto("/transactions?editor=transaction&id=invest");
 	await page.getByLabel("Amount (USD)").click();
 }
 

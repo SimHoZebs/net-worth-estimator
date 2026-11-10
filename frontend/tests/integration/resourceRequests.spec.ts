@@ -1,12 +1,8 @@
 import { expect, type Page, test } from "./base.ts";
-import { readSavedServerModel, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => resetFixture());
+import { readSavedServerModel } from "./fixture.ts";
 
 async function editInvestingAmount(page: Page) {
-	await page.goto("/transactions");
-	await page.getByRole("tab", { name: /Recurring/ }).click();
-	await page.getByRole("button", { name: "Monthly investing" }).click();
+	await page.goto("/transactions?editor=transaction&id=invest");
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("900");
 }

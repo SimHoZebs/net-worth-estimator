@@ -1,10 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test, trackBrowserErrors } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
 
 async function openFlows(page: Page) {
 	await page.goto("/flows");

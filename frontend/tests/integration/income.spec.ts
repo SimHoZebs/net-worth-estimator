@@ -1,10 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
+import { readSavedServerModel, resetFixture } from "./fixture.ts";
 import type { AnalysisFinding } from "../../src/api/generated/model/analysisFinding.ts";
 
-async function seedIncome(readOnly = false) {
-	await resetFixture({
+function incomeFixture(readOnly = false) {
+	return {
 		readOnly,
 		bankTransactions: [2, 16, 30].map((day, index) => ({
 			id: `payroll-${index}`,
@@ -12,8 +12,23 @@ async function seedIncome(readOnly = false) {
 			amount: "2000.00",
 			posted: Date.UTC(2026, 0, day) / 1000,
 		})),
-	});
+	};
 }
+
+test("the fixture seeds owned editable bank transactions", async () => {
+	await resetFixture(incomeFixture());
+	const saved = await readSavedServerModel();
+	expect(saved.transactions).toContainEqual(
+		expect.objectContaining({
+			id: expect.any(String),
+			name: "ACME PAYROLL",
+			sourceAccountId: null,
+			destinations: expect.any(Array),
+			syncOwned: true,
+			readOnly: false,
+		}),
+	);
+});
 
 async function openIncome(page: Page) {
 	await expect
@@ -34,7 +49,7 @@ async function openIncome(page: Page) {
 test("income answers can be corrected and survive refresh without financial mutations", async ({
 	page,
 }) => {
-	await seedIncome();
+	await resetFixture(incomeFixture());
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	let income = await openIncome(page);
 	await expect(
@@ -94,7 +109,7 @@ test("income answers can be corrected and survive refresh without financial muta
 });
 
 test("income review remains read-only for readers", async ({ page }) => {
-	await seedIncome(true);
+	await resetFixture(incomeFixture(true));
 	const income = await openIncome(page);
 	await expect(income.getByRole("button")).toHaveCount(0);
 });

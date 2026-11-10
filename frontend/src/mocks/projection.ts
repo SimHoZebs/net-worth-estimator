@@ -110,53 +110,31 @@ function event(
  * a shortfall against a protected balance, a two-sided transfer, and enough
  * recurring occurrences to paginate.
  */
-/**
- * A model projection shaped like the engine output: every enabled recurring
- * transaction expanded monthly on its own day of month, a one-time renovation that
- * exceeds the protected balance, and a mortgage paid off after five years so its
- * scheduled payment continues at zero.
- */
 export function activityProjection(
 	model: typeof financialModelFixture = financialModelFixture,
 ): Projection {
-	const transactions: TransactionResult[] = [];
-	for (const transaction of model.transactions) {
-		if (!transaction.enabled) continue;
-		if (transaction.kind === "transaction") {
-			const shortfall = transaction.id === "renovation";
-			transactions.push(
-				event(
-					model,
-					transaction.id,
-					transaction.startDate,
-					shortfall ? 48000 : transaction.amount,
-					shortfall ? 12000 : transaction.amount,
-					shortfall ? "Protected account balance" : null,
-				),
-			);
-			continue;
-		}
-		const day = Number(transaction.startDate.slice(8, 10));
-		for (let month = 0; month < 120; month++) {
-			const year = 2026 + Math.floor(month / 12);
-			const monthIndex = ((month + 9) % 12) + 1;
-			const lastDay = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
-			const date = `${year}-${String(monthIndex).padStart(2, "0")}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
-			if (date <= model.startDate) continue;
-			// The mortgage is paid off after five years; the scheduled payment then
-			// continues at zero and must not appear as a transaction.
-			const paidOff = transaction.id === "mortgage-payment" && month >= 60;
-			transactions.push(
-				event(
-					model,
-					transaction.id,
-					date,
-					paidOff ? 0 : transaction.amount,
-					paidOff ? 0 : transaction.amount,
-					null,
-				),
-			);
-		}
-	}
+	// Explicit engine-shaped outcomes, not a second occurrence generator.
+	const transactions = [
+		event(model, "pay", "2026-09-28", 11200, 11200, null),
+		event(model, "living", "2026-10-01", 5400, 5400, null),
+		event(model, "mortgage-payment", "2026-10-01", 2050, 2050, null),
+		event(model, "invest", "2026-10-03", 1800, 1800, null),
+		event(model, "retirement-contribution", "2026-10-05", 1100, 1100, null),
+		event(model, "living", "2026-11-01", 5400, 5400, null),
+		event(
+			model,
+			"renovation",
+			"2028-06-15",
+			48000,
+			12000,
+			"Protected account balance",
+		),
+		event(model, "mortgage-payment", "2032-10-01", 0, 0, null),
+	].filter((row) =>
+		model.transactions.some(
+			(transaction) =>
+				transaction.id === row.transactionId && transaction.enabled,
+		),
+	);
 	return projectionFixture({ transactions });
 }

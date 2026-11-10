@@ -2,11 +2,6 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "./base.ts";
 import type { FinancialModel } from "../../src/api/contracts.ts";
 import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
-
 async function openChecking(page: Page) {
 	await page.goto("/accounts");
 	await page
@@ -242,7 +237,9 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await detail
 		.getByRole("button", { name: "Mar 6, 2026", exact: true })
 		.click();
-	await expect(page.getByRole("dialog", { name: "Transaction dates" })).toBeVisible();
+	await expect(
+		page.getByRole("dialog", { name: "Transaction dates" }),
+	).toBeVisible();
 	await expect(page.getByLabel("Posted")).toHaveValue("2026-03-08");
 	await page.getByLabel("Posted").fill("2026-03-10");
 	await page.getByRole("button", { name: "Apply" }).click();
@@ -480,7 +477,9 @@ test("an intraday time saves through the detail over the real API", async ({
 	await detail
 		.getByRole("button", { name: "Jan 15, 2026", exact: true })
 		.click();
-	await expect(page.getByRole("dialog", { name: "Transaction dates" })).toBeVisible();
+	await expect(
+		page.getByRole("dialog", { name: "Transaction dates" }),
+	).toBeVisible();
 	await page.getByLabel("Occurred").fill("2026-01-15");
 	await page.getByRole("button", { name: "Apply" }).click();
 	await detail.getByRole("button", { name: "Save changes" }).click();

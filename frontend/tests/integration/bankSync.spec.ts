@@ -118,10 +118,6 @@ async function stubSimplefin(
 	};
 }
 
-test.beforeEach(async () => {
-	await resetFixture();
-});
-
 for (const width of [1440, 390, 320]) {
 	test(`setup is accessible and fits at ${width}px`, async ({ page }) => {
 		await page.setViewportSize({ width, height: 900 });

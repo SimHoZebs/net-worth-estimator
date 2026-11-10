@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { graphFixture } from "../../domain/flowDiagramFixture.ts";
 import {
 	aggregateFlowEdges,
@@ -8,8 +8,6 @@ import {
 } from "../../domain/flowDiagram.ts";
 import { FlowSankey } from "./FlowSankey.tsx";
 import { FlowTable } from "./FlowTable.tsx";
-
-afterEach(cleanup);
 
 function inputProps() {
 	const graph = graphFixture();

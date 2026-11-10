@@ -2,10 +2,6 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./base.ts";
 import { resetFixture } from "./fixture.ts";
 
-test.beforeEach(async () => {
-	await resetFixture();
-});
-
 /** Create a group through the UI and land on its detail page. */
 async function createGroup(page: Page) {
 	await page.goto("/groups");

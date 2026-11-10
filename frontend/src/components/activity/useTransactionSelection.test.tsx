@@ -1,10 +1,8 @@
-import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { expect, it } from "vitest";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { useTransactionSelection } from "./useTransactionSelection.ts";
-
-afterEach(cleanup);
 
 it("keeps only identity and resolves refreshed records until removal", () => {
 	const savedTransaction = financialModelFixture.transactions[0]!;

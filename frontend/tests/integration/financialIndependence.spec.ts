@@ -4,11 +4,7 @@ import type {
 	FinancialModelResponse,
 	JsonValue,
 } from "../../src/api/contracts.ts";
-import { FIXTURE_API, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
+import { FIXTURE_API } from "./fixture.ts";
 
 async function addIndependence(
 	request: APIRequestContext,

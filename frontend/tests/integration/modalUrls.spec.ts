@@ -1,9 +1,4 @@
 import { expect, test } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
 
 for (const invalidLink of [false, true]) {
 	test(`navigation from a ${invalidLink ? "malformed" : "valid"} link during verification consumes its callback once, including after Back`, async ({

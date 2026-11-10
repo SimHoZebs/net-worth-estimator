@@ -1,11 +1,9 @@
-import { cleanup, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import type { Transaction } from "../../../domain/model.ts";
 import { financialModelFixture } from "../../../mocks/financialModel.ts";
 import { projectionFixture } from "../../../mocks/projection.ts";
 import { useCardCycleActivity } from "./useCardCycleActivity.ts";
-
-afterEach(cleanup);
 
 const card = {
 	...financialModelFixture.accounts[5]!,

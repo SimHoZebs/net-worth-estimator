@@ -1,10 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "./base.ts";
-import { FIXTURE_API, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
+import { FIXTURE_API } from "./fixture.ts";
 
 test("account type changes fields inline and keeps shared identity controls", async ({
 	page,
@@ -145,7 +141,9 @@ test("one loan form creates one visible account and preserves terms on edit", as
 		details.getByRole("button", { name: "Edit loan and payment terms" }),
 	).toBeEnabled();
 	expect(adjustmentRequests).toEqual([]);
-	await details.getByRole("button", { name: "Edit loan and payment terms" }).click();
+	await details
+		.getByRole("button", { name: "Edit loan and payment terms" })
+		.click();
 	const edit = page.getByRole("dialog", {
 		name: "Edit Education loan",
 		exact: true,

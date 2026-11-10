@@ -6,26 +6,28 @@ export const FIXTURE_API =
 	process.env.FIXTURE_API_ORIGIN ??
 	`http://127.0.0.1:${process.env.TEST_API_PORT ?? 8799}`;
 
+export interface FixtureOptions {
+	readOnly?: boolean;
+	pinnedEvaluationIds?: string[];
+	bulk?: string;
+	bankTransactions?: {
+		id: string;
+		description: string;
+		amount: string;
+		posted: number;
+		pending?: boolean;
+		extra?: Record<string, string>;
+	}[];
+	syncLink?: {
+		bridgeAccountId: string;
+		modelAccountId: string;
+		bridgeName: string;
+		currency?: string;
+	};
+}
+
 export async function resetFixture(
-	options: {
-		readOnly?: boolean;
-		pinnedEvaluationIds?: string[];
-		bulk?: string;
-		bankTransactions?: {
-			id: string;
-			description: string;
-			amount: string;
-			posted: number;
-			pending?: boolean;
-			extra?: Record<string, string>;
-		}[];
-		syncLink?: {
-			bridgeAccountId: string;
-			modelAccountId: string;
-			bridgeName: string;
-			currency?: string;
-		};
-	} = {},
+	options: FixtureOptions = {},
 ): Promise<void> {
 	const api = await request.newContext();
 	try {
@@ -64,13 +66,21 @@ export async function readSavedServerModel() {
 		type transaction = {
 			id: string;
 			name: string;
+			source?: string;
+			sourceAccountId: string | null;
+			destinations: string[] | null;
+			readOnly?: boolean;
 			amount: { config: { expression?: string } };
 			claim?: { scheduleId: string; occurrenceDate: string } | null;
 		};
 		type account = { id: string; minBalance: number };
 		return {
 			accounts: body.model.accounts as account[],
-			transactions: body.model.transactions as transaction[],
+			transactions: (body.model.transactions as transaction[]).map((row) => ({
+				...row,
+				syncOwned: Boolean(row.source && row.source !== "user"),
+				readOnly: row.readOnly ?? false,
+			})),
 			schedules: (body.model.schedules ?? []) as transaction[],
 		};
 	} finally {

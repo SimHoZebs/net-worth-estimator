@@ -1,8 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { SegmentedBar, type BarSegment } from "../SegmentedBar.tsx";
-
-afterEach(cleanup);
 
 const segments: BarSegment[] = [
 	{ label: "Available", amount: 75, pattern: "solid", tone: "sage" },

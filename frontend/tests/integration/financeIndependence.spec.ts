@@ -1,7 +1,5 @@
 import { expect, test, type Page } from "./base.ts";
-import { readSavedServerModel, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => resetFixture());
+import { readSavedServerModel } from "./fixture.ts";
 
 async function openCheckingActivity(page: Page) {
 	await page.goto("/accounts");

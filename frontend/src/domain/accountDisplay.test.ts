@@ -8,7 +8,7 @@ import {
 } from "./accountDisplay.ts";
 import { toAccountCards } from "./accountCards.ts";
 import { accountTrendRows } from "./chart.ts";
-import { activityProjection } from "../mocks/projection.ts";
+import { projectionFixture, transactionFixture } from "../mocks/projection.ts";
 import { accountTransactions } from "./accountActivity.ts";
 
 function account(id: string, balance: number): Account {
@@ -75,7 +75,7 @@ describe("visible accounts", () => {
 		const accounts = toDisplayAccounts(fixture());
 		const balances = { p: 0, i: -15 };
 		expect(displayBalance(accounts[0]!, balances)).toBe(-15);
-		const projection = activityProjection();
+		const projection = projectionFixture();
 		const points = [{ ...projection.points[0]!, balances }];
 		const result = accountTrendRows({ points, accounts });
 		expect(result.series).toHaveLength(1);
@@ -83,10 +83,10 @@ describe("visible accounts", () => {
 	});
 	it("shows one payment with both component deltas in account activity", () => {
 		const accounts = toDisplayAccounts(fixture());
-		const projection = activityProjection();
+		const projection = projectionFixture();
 		projection.transactions = [
 			{
-				...projection.transactions[0]!,
+				...transactionFixture(),
 				transactionId: "pay",
 				date: "2026-02-02",
 				fromId: "checking",

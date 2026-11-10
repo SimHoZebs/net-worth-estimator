@@ -1,15 +1,12 @@
 import {
-	cleanup,
 	fireEvent,
 	render,
 	screen,
 	waitFor,
 	within,
 } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 import { ReceiptImageActions } from "./ReceiptImageActions.tsx";
-
-afterEach(cleanup);
 
 function props() {
 	return {

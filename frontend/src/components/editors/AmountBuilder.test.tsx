@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { expect, it, vi } from "vitest";
 import { AmountBuilder } from "./AmountBuilder.tsx";
 import { buildTemplateAmount } from "./AmountBuilder.tsx";
 import {
@@ -7,8 +7,6 @@ import {
 	templateFieldsFromAmount,
 } from "./amountDraft.ts";
 import type { AmountTemplate } from "../../api/contracts.ts";
-
-afterEach(cleanup);
 
 it("starts from the saved built-in recipe and applies only explicit edits", () => {
 	const amount = {

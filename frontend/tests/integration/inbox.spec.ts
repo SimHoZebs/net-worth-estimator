@@ -1,9 +1,5 @@
 import { expect, type Page, test } from "./base.ts";
-import {
-	readSavedServerModel,
-	resetFixture,
-	seedInboxFixture,
-} from "./fixture.ts";
+import { readSavedServerModel, seedInboxFixture } from "./fixture.ts";
 
 const SEED = [
 	{ name: "Lake cabin groceries", amount: "60", day: "2026-06-15" },
@@ -23,7 +19,6 @@ test("inbox tabs render empty states when nothing is shared", async ({
 }) => {
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
-	await resetFixture();
 	const inbox = await openInbox(page);
 
 	await expect(inbox.getByText("Nothing waiting")).toBeVisible();
@@ -37,7 +32,6 @@ test("inbox tabs render empty states when nothing is shared", async ({
 });
 
 test("inbox lists pending direct shares", async ({ page }) => {
-	await resetFixture();
 	await seedInboxFixture(SEED);
 	const inbox = await openInbox(page);
 
@@ -54,7 +48,6 @@ test("inbox lists pending direct shares", async ({ page }) => {
 test("inbox accept saves an independent copy to the viewer model", async ({
 	page,
 }) => {
-	await resetFixture();
 	await seedInboxFixture([SEED[0]!]);
 	const inbox = await openInbox(page);
 	await expect(
@@ -86,7 +79,6 @@ test("inbox accept saves an independent copy to the viewer model", async ({
 });
 
 test("inbox decline moves the share to declined", async ({ page }) => {
-	await resetFixture();
 	await seedInboxFixture([SEED[0]!]);
 	const inbox = await openInbox(page);
 	await expect(
@@ -107,7 +99,6 @@ test("inbox decline moves the share to declined", async ({ page }) => {
 });
 
 test("inbox shows revoked shares as canceled", async ({ page }) => {
-	await resetFixture();
 	await seedInboxFixture(SEED, ["Lake cabin fuel"]);
 	const inbox = await openInbox(page);
 

@@ -196,8 +196,6 @@ describe("sidebar sync signals", () => {
 });
 
 describe("sidebar user placement", () => {
-	afterEach(cleanup);
-
 	function renderSession(session: Session) {
 		return renderRouterSubject(
 			<SessionContext

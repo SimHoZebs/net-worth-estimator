@@ -1,7 +1,5 @@
 import { expect, test } from "./base.ts";
-import { FIXTURE_API, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => resetFixture());
+import { FIXTURE_API } from "./fixture.ts";
 
 for (const scenario of [
 	{

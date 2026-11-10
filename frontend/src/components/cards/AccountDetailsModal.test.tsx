@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toAccountCard } from "../../domain/accountCards.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import {
@@ -30,8 +30,6 @@ vi.mock("../activity/TransactionDetail.tsx", () => ({
 		</p>
 	),
 }));
-
-afterEach(cleanup);
 
 beforeEach(() => {
 	// jsdom has no scrollIntoView; the pager scrolls the table into view.
@@ -133,6 +131,13 @@ describe("AccountDetailsModal", () => {
 
 	it("paginates long transaction lists client-side", () => {
 		const projection = activityProjection();
+		const transfer = projection.transactions.find(
+			(row) => row.transactionId === "invest",
+		)!;
+		projection.transactions = Array.from({ length: 45 }, (_, index) => ({
+			...transfer,
+			date: new Date(Date.UTC(2027, 0, index + 1)).toISOString().slice(0, 10),
+		}));
 		const card = toAccountCard({
 			account: financialModelFixture.accounts[0]!,
 			projection,

@@ -1,7 +1,5 @@
 import { expect, test } from "./base.ts";
-import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
-
-test.beforeEach(async () => resetFixture());
+import { FIXTURE_API, readSavedServerModel } from "./fixture.ts";
 
 test("editor navigation stays blocked while an account save is in flight", async ({
 	page,
@@ -228,7 +226,10 @@ test("header actions and inline close confirmation match transaction details", a
 	await page.goto("/accounts/checking");
 	const dialog = page.getByRole("region", { name: "Account details" });
 	await dialog.getByLabel("Account name").fill("Unsaved name");
-	await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("button", { name: "Accounts" }).click();
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	const confirm = dialog
 		.getByRole("alert")
 		.filter({ hasText: "Discard the changes in this form?" });
@@ -242,7 +243,10 @@ test("header actions and inline close confirmation match transaction details", a
 	);
 	await expect(dialog.getByLabel("Account name")).toBeFocused();
 	await dialog.getByLabel("Balance (USD)").fill("9999");
-	await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("button", { name: "Accounts" }).click();
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	await expect(confirm).toBeVisible();
 	await confirm.getByRole("button", { name: "Continue", exact: true }).click();
 	await expect(dialog.getByLabel("Balance (USD)")).toHaveValue("9999");
@@ -250,7 +254,10 @@ test("header actions and inline close confirmation match transaction details", a
 		.getByRole("button", { name: "Discard changes", exact: true })
 		.click();
 	await expect(dialog.getByLabel("Balance (USD)")).toBeFocused();
-	await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("button", { name: "Accounts" }).click();
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	await expect(page).toHaveURL(/\/accounts$/);
 	await expect(dialog).not.toBeVisible();
 });
@@ -307,7 +314,10 @@ test("settings persist across tabs and breadcrumb close asks before discard", as
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
 		"500",
 	);
-	await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("button", { name: "Accounts" }).click();
+	await page
+		.getByRole("navigation", { name: "Breadcrumb" })
+		.getByRole("button", { name: "Accounts" })
+		.click();
 	const confirm = dialog
 		.getByRole("alert")
 		.filter({ hasText: "Discard the changes in this form?" });

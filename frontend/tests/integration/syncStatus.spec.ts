@@ -1,9 +1,6 @@
 import { expect, test } from "./base.ts";
-import { resetFixture } from "./fixture.ts";
 
-test.beforeEach(async () => {
-	await resetFixture({ readOnly: true });
-});
+test.use({ fixtureOptions: { readOnly: true } });
 
 test.afterEach(async ({ page }) => {
 	await page.unrouteAll({ behavior: "wait" });

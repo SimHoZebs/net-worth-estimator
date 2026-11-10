@@ -2,7 +2,6 @@ import { expect, type Page, test } from "./base.ts";
 import {
 	FIXTURE_API,
 	readSavedServerModel,
-	resetFixture,
 	seedSharingFixture,
 } from "./fixture.ts";
 
@@ -30,7 +29,6 @@ test("group feed lists shared transactions with viewer totals", async ({
 }) => {
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
-	await resetFixture();
 	await seedSharingFixture("Cabin totals", "Dana", SEED);
 	const feed = await openSeededGroup(page, "Cabin totals");
 
@@ -56,7 +54,6 @@ test("group feed lists shared transactions with viewer totals", async ({
 });
 
 test("group feed filters narrow rows and totals together", async ({ page }) => {
-	await resetFixture();
 	await seedSharingFixture("Cabin filters", "Dana", SEED);
 	const feed = await openSeededGroup(page, "Cabin filters");
 	await expect(
@@ -83,7 +80,6 @@ test("group feed saves an independent copy to the viewer model", async ({
 	page,
 	request,
 }) => {
-	await resetFixture();
 	await seedSharingFixture("Cabin copy", "Dana", SEED);
 	const feed = await openSeededGroup(page, "Cabin copy");
 	await expect(

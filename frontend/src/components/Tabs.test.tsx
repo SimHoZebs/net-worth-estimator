@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runInteractions } from "../mocks/interactions.ts";
 import { Tabs, type TabItem } from "./Tabs.tsx";
-
-afterEach(cleanup);
 
 type Section = "one" | "two" | "three";
 const items: TabItem<Section>[] = [

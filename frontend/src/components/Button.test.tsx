@@ -1,15 +1,13 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { Save } from "lucide-react";
 import { createRef } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Button, IconButton, TextButton } from "./Button.tsx";
 import {
 	buttonStyles,
 	iconButtonStyles,
 	textButtonStyles,
 } from "./buttonStyles.ts";
-
-afterEach(cleanup);
 
 describe("native action primitives", () => {
 	it("defaults to a non-submit action and forwards native props and ref", () => {

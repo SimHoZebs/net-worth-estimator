@@ -1,5 +1,5 @@
 import { expect, request, test } from "./base.ts";
-import { FIXTURE_API, resetFixture } from "./fixture.ts";
+import { FIXTURE_API } from "./fixture.ts";
 
 // Ledger completeness in a real browser: the money diagram and the
 // transaction screens show the shared ledger seed's known rows and sums.
@@ -26,10 +26,6 @@ async function ledgerPresent(): Promise<boolean> {
 		await api.dispose();
 	}
 }
-
-test.beforeEach(async () => {
-	await resetFixture();
-});
 
 test("ledger diagram table shows every seeded flow with exact sums", async ({
 	page,

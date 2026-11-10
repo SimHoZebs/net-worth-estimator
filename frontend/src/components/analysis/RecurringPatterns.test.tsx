@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { runInteractions } from "@/mocks/interactions.ts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { PatternToExistingSchedulePreview } from "@/api/generated/model/patternToExistingSchedulePreview.ts";
 import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
@@ -120,8 +120,6 @@ beforeEach(() => {
 	existingRulePreviewState.isError = false;
 	vi.clearAllMocks();
 });
-
-afterEach(cleanup);
 
 describe("repeating-payment patterns", () => {
 	it("leaves acceptance untouched when a preview is cancelled or creation fails", async () => {

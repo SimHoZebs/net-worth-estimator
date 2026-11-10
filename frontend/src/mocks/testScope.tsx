@@ -1,5 +1,4 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { vi } from "vitest";
 import { suspendUserScope } from "../auth/resourceScope.ts";
@@ -32,9 +31,7 @@ export function setupQueryScope(): void {
 }
 
 export function teardownQueryScope(): void {
-	cleanup();
 	suspendUserScope();
-	resetServerQueryCache();
 	vi.unstubAllGlobals();
 }
 

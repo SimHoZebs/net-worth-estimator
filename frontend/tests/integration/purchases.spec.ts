@@ -6,10 +6,6 @@ import type {
 } from "../../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 
-test.beforeEach(async () => {
-	await resetFixture();
-});
-
 async function openPurchases(page: Page) {
 	await page.goto("/purchases");
 	await expect(
