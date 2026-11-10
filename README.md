@@ -22,7 +22,7 @@ SimpleFIN sync writes balance checkpoints and disabled pending-charge transactio
 ## Development
 
 ```bash
-./scripts/dev setup # once, including existing dev stacks
+./dev/main.mjs setup # once, including existing dev stacks
 docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
 docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
@@ -36,13 +36,13 @@ custom lifecycle wrapper. External sync stays disabled.
 Use `setup --from /path/backup.db` for an existing shared-schema backup. Use
 `--source-user "$SOURCE_USER"` when the source contains several private users.
 Use
-`./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"`
+`./dev/main.mjs refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"`
 to refresh one user's financial data without resetting identities or passkeys.
 See [the dev guide](dev/README.md) for tailnet setup, private user data, published guest data,
 logs, and state recovery.
 
 For a seeded safe-spending demo without touching the dev stack, run
-`./scripts/dev demo --pack safe-spending`. Use
+`./dev/main.mjs demo --pack safe-spending`. Use
 `--pack safe-spending-shortfall` for the unfulfilled recurring bill. The demo
 uses the same fixture packs as the browser suite and stops with Ctrl-C.
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { parseArgs } from "node:util";
 import { run as runSetup } from "./setup.mjs";
 import { run as runRefresh } from "./refresh-db.mjs";
@@ -26,7 +27,7 @@ export async function main(args) {
   const { values, positionals } = parseMainArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--auth-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | seed (--bulk NxM[:seed] | --clear) [--user USER_ID] [--slot NAME] | demo [--pack NAME] | ps-all",
+      "Usage: ./dev/main.mjs setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--auth-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | seed (--bulk NxM[:seed] | --clear) [--user USER_ID] [--slot NAME] | demo [--pack NAME] | ps-all",
     );
     return;
   }
@@ -38,7 +39,7 @@ export async function main(args) {
   const run = commands[command];
   if (!run)
     throw new Error(
-      "Use scripts/dev setup once. Use docker compose --env-file .env.dev -f docker-compose.dev.yml for up, down, ps, and logs.",
+      "Use ./dev/main.mjs setup once. Use docker compose --env-file .env.dev -f docker-compose.dev.yml for up, down, ps, and logs.",
     );
   await run(values, rest);
 }

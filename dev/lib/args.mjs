@@ -1,6 +1,6 @@
 // Single option table for every dev entry point. The dispatcher and each
 // purpose script parse the same flags so direct invocation
-// (`node dev/setup.mjs ...`) and router invocation (`scripts/dev setup ...`)
+// (`node dev/setup.mjs ...`) and router invocation (`./dev/main.mjs setup ...`)
 // accept and reject identically; each purpose module owns its semantic checks.
 export const devOptions = {
   from: { type: "string" },

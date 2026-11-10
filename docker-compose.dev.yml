@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: auth/better-auth/Dockerfile
-    user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
+    user: "${DEV_UID:?Run ./dev/main.mjs setup}:${DEV_GID:?Run ./dev/main.mjs setup}"
     restart: unless-stopped
     ports:
       - "127.0.0.1:${DEV_AUTH_PORT:-8000}:8000"
@@ -14,11 +14,11 @@ services:
       - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/auth:/data
     environment:
       AUTH_DATABASE: /data/identity.db
-      AUTH_PUBLIC_URL: ${DEV_AUTH_PUBLIC_URL:?Run scripts/dev setup}
-      APP_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
-      BETTER_AUTH_SECRET: ${DEV_BETTER_AUTH_SECRET:?Run scripts/dev setup}
-      AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run scripts/dev setup}
-      AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run scripts/dev setup}
+      AUTH_PUBLIC_URL: ${DEV_AUTH_PUBLIC_URL:?Run ./dev/main.mjs setup}
+      APP_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run ./dev/main.mjs setup}
+      BETTER_AUTH_SECRET: ${DEV_BETTER_AUTH_SECRET:?Run ./dev/main.mjs setup}
+      AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run ./dev/main.mjs setup}
+      AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run ./dev/main.mjs setup}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -28,7 +28,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
+    user: "${DEV_UID:?Run ./dev/main.mjs setup}:${DEV_GID:?Run ./dev/main.mjs setup}"
     ports:
       - "127.0.0.1:${DEV_BACKEND_DEBUG_PORT:-8788}:8787"
     volumes:
@@ -39,18 +39,18 @@ services:
       NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
       NET_WORTH_ESTIMATOR_AUTHZ_DB: /data/authorization.db
       NET_WORTH_ESTIMATOR_RECEIPT_SOURCE: mock
-      NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: ${DEV_APP_PUBLIC_URL:?Run ./dev/main.mjs setup}
       NET_WORTH_ESTIMATOR_AUTH_PROVIDER: better-auth
-      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${DEV_AUTH_PUBLIC_URL:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${DEV_AUTH_PUBLIC_URL:?Run ./dev/main.mjs setup}
       NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://auth:8000
-      NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run scripts/dev setup}
-      NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run scripts/dev setup}
-      NET_WORTH_ESTIMATOR_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
-      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${DEV_AUTH_PUBLIC_URL:?Run scripts/dev setup}/account
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run ./dev/main.mjs setup}
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run ./dev/main.mjs setup}
+      NET_WORTH_ESTIMATOR_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run ./dev/main.mjs setup}
+      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${DEV_AUTH_PUBLIC_URL:?Run ./dev/main.mjs setup}/account
       NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME: 168h
       NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL: 30s
       NET_WORTH_ESTIMATOR_ADMIN_SUBJECT: ${DEV_ADMIN_SUBJECT:-}
-      NET_WORTH_ESTIMATOR_GUEST_SUBJECT: ${DEV_GUEST_SUBJECT:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_GUEST_SUBJECT: ${DEV_GUEST_SUBJECT:?Run ./dev/main.mjs setup}
       NET_WORTH_ESTIMATOR_READ_ONLY: ""
     depends_on:
       auth:

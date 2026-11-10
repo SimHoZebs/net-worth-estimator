@@ -49,7 +49,7 @@ partial changes. See [purchase persistence](docs/purchase-queue.md#persistence).
 
 ## Manual Development
 
-Run `./scripts/dev setup` once, then use the dedicated dev Compose stack:
+Run `./dev/main.mjs setup` once, then use the dedicated dev Compose stack:
 
 ```bash
 docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
@@ -57,7 +57,7 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
 This uses production Dockerfiles with isolated dev data, not the Vite/fixture API
-browser-test harness. `./scripts/dev refresh-db` replaces only the dev financial
+browser-test harness. `./dev/main.mjs refresh-db` replaces only the dev financial
 database from a consistent production snapshot.
 See [dev/README.md](dev/README.md).
 
@@ -72,10 +72,10 @@ invocation. State lives in `tmp/dev-<slot>/`, the env file is
 loopback-only: `--tailnet` stays on the canonical stack.
 
 ```bash
-scripts/dev setup --slot shots
+./dev/main.mjs setup --slot shots
 docker compose --env-file .env.dev.shots -f docker-compose.dev.yml up -d --build --wait
 docker compose --env-file .env.dev.shots -f docker-compose.dev.yml down
-scripts/dev ps-all
+./dev/main.mjs ps-all
 ```
 
 Transaction UUID migration and exact upstream identity checks:

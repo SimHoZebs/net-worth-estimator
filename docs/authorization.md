@@ -74,7 +74,7 @@ and seeded in-flight runs also include the resource ID. SimpleFIN
 credentials stay in each user's own rows. Other users never inherit that integration.
 
 Published guest data is a snapshot, not a live alias of the owner's data.
-`./scripts/dev publish-sample --source-user SOURCE --user GUEST` explicitly
+`./dev/main.mjs publish-sample --source-user SOURCE --user GUEST` explicitly
 publishes reviewed rows into the provisioned guest user. It
 removes private projection history, Bridge links, sync timestamps, and the source
 filesystem path from the copy. Later private edits do not change the published guest data.

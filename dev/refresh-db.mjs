@@ -11,7 +11,7 @@ export function parseRefreshArgs(args) {
 }
 
 export function validateRefresh(values, positionals = []) {
-  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
+  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use ./dev/main.mjs --help.");
   slotFromOptions(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
@@ -55,7 +55,7 @@ export async function main(args) {
   const { values, positionals } = parseRefreshArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME]",
+      "Usage: ./dev/main.mjs refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME]",
     );
     return;
   }

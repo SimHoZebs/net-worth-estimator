@@ -19,7 +19,7 @@
 ## Parallel work
 
 - Before you begin new work, ensure you are working on the latest commit of origin/main. This does not apply if your work is explicitly regarding existing work in your tree.
-- Run parallel dev work in an isolated slot (`scripts/dev setup --slot NAME`, `scripts/dev ps-all`). Never stop the canonical stack or steal its ports to free your own.
+- Run parallel dev work in an isolated slot (`./dev/main.mjs setup --slot NAME`, `./dev/main.mjs ps-all`). Never stop the canonical stack or steal its ports to free your own.
 - Several agents may share one worktree and one branch under a single orchestrator that owns the branch.
 - The host's tailnet Serve routes and the canonical identity issuer are shared. Never change them.
 - Cut a feature branch for your work. Any agent whose branch has a green `Tests` run may ship it without waiting for the user: fetch, squash with semantic text, push fast-forward. If the push loses a race, refetch and retry. Never rebase pushed commits, never force-push, never amend commits you do not own.

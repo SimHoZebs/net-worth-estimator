@@ -11,7 +11,7 @@ export function parsePublishArgs(args) {
 }
 
 export function validatePublish(values, positionals = []) {
-  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
+  if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use ./dev/main.mjs --help.");
   slotFromOptions(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
@@ -58,7 +58,7 @@ export async function main(args) {
   const { values, positionals } = parsePublishArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME]",
+      "Usage: ./dev/main.mjs publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME]",
     );
     return;
   }

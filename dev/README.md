@@ -16,7 +16,7 @@ Requires Docker Compose 5.0+, Node 24+, and Bun 1.4.4. The data commands use
 [`docker compose start --wait`](https://github.com/docker/compose/blob/v5.0.0/cmd/compose/start.go).
 
 ```bash
-./scripts/dev setup
+./dev/main.mjs setup
 ```
 
 Setup generates private credentials, provisions Better Auth and Casbin, and snapshots the
@@ -40,7 +40,7 @@ exports runtime settings to the ignored `.env.dev` file without restarting servi
 
 `tmp/dev/config.json` retains setup credentials and the snapshot source. `.env.dev`
 contains only the runtime settings Compose needs. Both are private. Setup refuses
-to overwrite a different `.env.dev`. Preserve and reconcile any edits before retry.
+to overwrite a `.env.dev` whose settings differ. Preserve and reconcile any settings edits before retry.
 
 ## Daily commands
 
@@ -76,7 +76,7 @@ sudo tailscale serve --bg --https=5178 http://127.0.0.1:5178
 sudo tailscale serve --bg --https=8000 http://127.0.0.1:8000
 ```
 
-For a new dev identity, run `./scripts/dev setup --tailnet`. Setup checks the routes
+For a new dev identity, run `./dev/main.mjs setup --tailnet`. Setup checks the routes
 without changing them and prints the HTTPS frontend and issuer URLs. Daily Compose
 commands stay the same. Existing saved HTTPS origins remain unchanged when setup
 runs without flags. Never reset shared Serve settings or switch an existing issuer
@@ -90,13 +90,13 @@ It does not build images or change production data. Without --from, the source
 is the production container: stop it first so the file copies cleanly.
 
 ```bash
-./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
-./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
-./scripts/dev publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
-./scripts/dev seed --bulk 20x200:7
-./scripts/dev seed --clear
-./scripts/dev demo --pack safe-spending
-./scripts/dev demo --pack safe-spending-shortfall
+./dev/main.mjs refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
+./dev/main.mjs refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
+./dev/main.mjs publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
+./dev/main.mjs seed --bulk 20x200:7
+./dev/main.mjs seed --clear
+./dev/main.mjs demo --pack safe-spending
+./dev/main.mjs demo --pack safe-spending-shortfall
 ```
 
 `refresh-db` backs up the shared application database under `tmp/dev/backups/`.
