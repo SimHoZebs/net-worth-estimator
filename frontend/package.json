@@ -21,7 +21,7 @@
 		"test:unit": "vitest run",
 		"test:integration": "node scripts/test-integration.mjs",
 		"api:generate": "orval --config orval.config.ts",
-		"openapi:pull": "node scripts/pull-openapi.mjs",
+		"openapi:refresh": "bash ../scripts/refresh-openapi",
 		"build": "vite build",
 		"preview": "vite preview --host 0.0.0.0"
 	},

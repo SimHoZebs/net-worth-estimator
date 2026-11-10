@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
+import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import test, { after } from "node:test";
 
 const run = promisify(execFile);
 const root = new URL("../", import.meta.url).pathname;
 const script = new URL("./migrate.sh", import.meta.url).pathname;
-const tools = await mkdtemp("/tmp/opencode/bnpl-migration-tools-");
+const tools = await mkdtemp(join(tmpdir(), "bnpl-migration-tools-"));
 const owned = new Set([tools]);
 after(async () => { for (const directory of owned) await rm(directory, { recursive: true, force: true }); });
 await run("go", ["build", "-o", join(tools, "setupdb"), "./cmd/setupdb"], {
@@ -44,7 +45,7 @@ const migrate = async (db, env = {}) => {
 };
 const backups = async (directory) => (await readdir(directory)).filter((name) => name.includes(".analysis-backup."));
 async function sourceDatabase() {
-  const directory = await mkdtemp("/tmp/opencode/bnpl-migration-db-");
+  const directory = await mkdtemp(join(tmpdir(), "bnpl-migration-db-"));
   owned.add(directory);
   const db = join(directory, "application.db");
   await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "owner"]);
@@ -106,7 +107,7 @@ test("Analysis migration completes schema on a verified candidate and repeats wi
 test("Analysis migration leaves the original untouched on setup failure and permits retry", async () => {
   const { directory, db, owner } = await sourceDatabase();
   await seedFinalRows(db, owner);
-  const failures = await mkdtemp("/tmp/opencode/bnpl-migration-failure-");
+  const failures = await mkdtemp(join(tmpdir(), "bnpl-migration-failure-"));
   owned.add(failures);
   const stubFirstPath = failures + delimiter + tools + delimiter + process.env.PATH;
   await writeFile(join(failures, "setupdb"), `#!/bin/sh\ntouch '${join(failures, "ran")}'\nexit 23\n`, { mode: 0o700 });
@@ -130,7 +131,7 @@ test("Analysis migration leaves the original untouched on setup failure and perm
 test("failed row preservation leaves the original publishable without a pending file", async () => {
   const { directory, db, owner } = await sourceDatabase();
   await seedFinalRows(db, owner);
-  const failures = await mkdtemp("/tmp/opencode/bnpl-migration-corruption-");
+  const failures = await mkdtemp(join(tmpdir(), "bnpl-migration-corruption-"));
   owned.add(failures);
   await writeFile(join(failures, "setupdb"), `#!/bin/sh\n"${join(tools, "setupdb")}" "$@"\n# Corrupt the candidate the hook just provisioned, never the original.\ndb=""; for arg in "$@"; do if [ "$want_db" = 1 ]; then db="$arg"; fi; case "$arg" in --db) want_db=1;; *) want_db=0;; esac; done\nsqlite3 "$db" "UPDATE accounts SET name='Unexpected edit';"\n`, { mode: 0o700 });
   const dumpBefore = await sql(db, ".dump");

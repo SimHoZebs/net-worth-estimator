@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { delimiter, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const script = fileURLToPath(new URL("./export-komodo-db", import.meta.url));
 
-function run(args) {
+function run(args, env = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn("sh", [script, ...args], { encoding: "utf8" });
+    const child = spawn("sh", [script, ...args], { env: { ...process.env, ...env } });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => { stdout += d; });
@@ -36,8 +39,13 @@ test("export script rejects a relative database path", async () => {
   assert.match(stderr, /absolute/);
 });
 
-test("export script rejects a missing container", async () => {
-  const { code, stderr } = await run(["--container", "net-worth-does-not-exist-xyz"]);
+test("export script rejects a missing container using only disposable state", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-export-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(join(directory, "docker"), "#!/bin/sh\nexit 1\n", { mode: 0o700 });
+  const { code, stderr } = await run([
+    "--container", "net-worth-does-not-exist-xyz", "--dest", join(directory, "backup"),
+  ], { PATH: directory + delimiter + process.env.PATH });
   assert.equal(code, 1);
   assert.match(stderr, /Container not found/);
 });

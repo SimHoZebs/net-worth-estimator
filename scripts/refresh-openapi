@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Export the served contract offline, format it, then regenerate the client.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+OPENAPI_SNAPSHOT="$PWD/frontend/openapi.snapshot.json" CGO_ENABLED=0 \
+  go -C backend test ./internal/api -run '^TestRawRoutesAppearInOpenAPI$' -count=1
+(cd frontend && bunx --no-install oxfmt openapi.snapshot.json)
+bun --filter ./frontend api:generate
