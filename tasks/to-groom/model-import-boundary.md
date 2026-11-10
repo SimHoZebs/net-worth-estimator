@@ -10,4 +10,4 @@ Reject missing arrays before preview. Invalid supplied values must not silently 
 - Required shape: `frontend/src/api/contracts.ts:220-235`.
 - Consumers: `frontend/src/components/imports/ModelImportPreview.tsx:35-40`, `frontend/src/api/rowSync.ts:226-235`.
 
-Test preview and save comparison with missing arrays, malformed entries, and preserved extra fields. Coordinate the decoder with [payment-term capability checks](model-import-payment-terms.md). Financial cross-validation still belongs to the server.
+Test preview and save comparison with missing arrays, malformed entries, and preserved extra fields. Financial cross-validation still belongs to the server.

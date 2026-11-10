@@ -9,4 +9,4 @@ Replace the unchecked `eventPayload<T>` cast with event-specific shape decoders.
 - Tests: `frontend/src/api/sse.test.ts:24-76`.
 - HTTP cast: `frontend/src/api/client.ts:637-653`.
 
-Test missing progress, invalid fractions, malformed result bands, valid intermediate/final events, unknown events, optional fields, opaque evaluation data, and empty HTTP responses. Overly strict decoding is the main compatibility risk. Stream lifetime belongs to the separate [ownership task](range-stream-ownership.md).
+Test missing progress, invalid fractions, malformed result bands, valid intermediate/final events, unknown events, optional fields, opaque evaluation data, and empty HTTP responses. Overly strict decoding is the main compatibility risk.
