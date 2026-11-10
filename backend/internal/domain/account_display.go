@@ -56,7 +56,11 @@ func validateAccountDisplays(issues *[]types.ModelValidationIssue, model *types.
 		roles := map[string]string{}
 		for _, c := range d.Components {
 			member, exists := accounts[c.AccountID]
-			if !exists || claimed[c.AccountID] || member.Kind != "debt" || member.Enabled != a.Enabled || member.MaxBalanceValue() != 0 || (member.Display != nil && member.ID != a.ID) || roles[c.Role] != "" {
+			// Loan linkage is structural, never kind-gated: exclusive
+			// principal and interest components, matching inclusion,
+			// zero ceilings, and consistent rules. The frontend suggests
+			// debt-kind accounts when configuring the link.
+			if !exists || claimed[c.AccountID] || member.Enabled != a.Enabled || member.MaxBalanceValue() != 0 || (member.Display != nil && member.ID != a.ID) || roles[c.Role] != "" {
 				invalid = true
 			}
 			claimed[c.AccountID] = true

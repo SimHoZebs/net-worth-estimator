@@ -184,16 +184,14 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 		balances[row.AccountID] = row.Balance
 	}
 	for _, account := range enabled {
-		if account.Kind != types.AccountKindDebt {
-			continue
-		}
+		// Terms declare what is owed, so only a carried negative balance
+		// without terms leaves the liability unknown. A paid-off account
+		// needs no terms. A missing position row keeps the account
+		// flagged, since its balance cannot be confirmed as zero. Account
+		// kind never selects the set: any configured account counts.
 		if _, ok := terms[account.ID]; ok {
 			continue
 		}
-		// A paid-off debt account has no required minimums, matching the
-		// debt-burden check: only a carried balance without terms leaves
-		// the liability unknown. A missing position row keeps the
-		// account flagged, since its balance cannot be confirmed as zero.
 		balance, ok := balances[account.ID]
 		if !ok || balance < 0 {
 			unknownLiabilities = append(unknownLiabilities, account.ID)
@@ -237,7 +235,7 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 		partialReasons = append(partialReasons, fmt.Sprintf("%d account(s) have observations older than the %d-day recency guideline", len(staleIDs), options.StaleAfterDays))
 	}
 	if len(unknownLiabilities) > 0 {
-		partialReasons = append(partialReasons, "debt accounts lack payment terms, so required minimums are unknown")
+		partialReasons = append(partialReasons, "carried balances lack payment terms, so required minimums are unknown")
 	}
 	if coverageOut.MissingIncome {
 		partialReasons = append(partialReasons, "no income is recorded in the window")
@@ -268,7 +266,7 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 		summary = fmt.Sprintf("Records are complete at the %s cut. All %d checks computed: %d meeting, %d at risk, %d not meeting.", cutDay, len(report.Checks), meeting, atRisk, notMeeting)
 	}
 
-	actions := finExplainActions(model, report, options, sources, coverageOut, freshness)
+	actions := finExplainActions(model, report, options, sources, coverageOut, freshness, balances)
 
 	return types.FinancialHealthExplanation{
 		AsOfDate:     types.IsoDate(cutDay),
@@ -374,7 +372,7 @@ func finExplainFlowSources(model *types.FinancialModel, report types.FinancialHe
 // to the evidence behind it and to the user-configurable targets it
 // moves; insufficient-data and meeting checks never produce improvement
 // actions.
-func finExplainActions(model *types.FinancialModel, report types.FinancialHealthReport, options types.FinancialHealthExplanationOptions, sources []types.FinancialHealthAccountSource, coverage types.FinancialHealthCoverage, freshness types.FinancialHealthFreshness) []types.FinancialHealthProposedAction {
+func finExplainActions(model *types.FinancialModel, report types.FinancialHealthReport, options types.FinancialHealthExplanationOptions, sources []types.FinancialHealthAccountSource, coverage types.FinancialHealthCoverage, freshness types.FinancialHealthFreshness, balances map[string]float64) []types.FinancialHealthProposedAction {
 	actions := []types.FinancialHealthProposedAction{}
 	lookback := float64(report.Standards.LookbackDays)
 	if lookback < 1 {
@@ -409,19 +407,37 @@ func finExplainActions(model *types.FinancialModel, report types.FinancialHealth
 	}
 	if len(coverage.UnknownLiabilityAccountIDs) > 0 {
 		labeled := make([]string, 0, len(coverage.UnknownLiabilityAccountIDs))
+		evidence := []types.FinancialHealthEvidenceItem{}
 		for _, id := range coverage.UnknownLiabilityAccountIDs {
 			labeled = append(labeled, accountName(id))
+			// The owing account has no terms, so no check carries its
+			// minimum: the balance itself is the evidence. A missing
+			// position row carries no amount because the balance is
+			// unknown, not zero.
+			if carried, ok := balances[id]; ok {
+				evidence = append(evidence, types.FinancialHealthEvidenceItem{
+					Label:      accountName(id),
+					Detail:     "Carried negative balance without payment terms.",
+					Amount:     finHealthFloatPtr(math.Max(0, -carried)),
+					AccountIDs: []string{id},
+				})
+			} else {
+				evidence = append(evidence, types.FinancialHealthEvidenceItem{
+					Label:      accountName(id),
+					Detail:     "No balance observation at the cut, so the balance cannot be confirmed as zero.",
+					AccountIDs: []string{id},
+				})
+			}
 		}
 		debtCheck := finExplainCheckByID(report, types.FinancialHealthCheckDebtBurden)
-		evidence := []types.FinancialHealthEvidenceItem{}
 		targets := map[string]float64{}
 		if debtCheck != nil {
-			evidence = finExplainCopyEvidence(debtCheck.Evidence)
+			evidence = append(evidence, finExplainCopyEvidence(debtCheck.Evidence)...)
 			targets = finExplainCopyTargets(debtCheck.Threshold)
 		}
 		actions = append(actions, types.FinancialHealthProposedAction{
 			ID:       "clarify-liabilities",
-			Title:    "Add payment terms for debt accounts",
+			Title:    "Add payment terms for carried balances",
 			Detail:   fmt.Sprintf("Required minimums are unknown for %s: without payment terms the debt-burden check cannot weigh them against income.", strings.Join(labeled, ", ")),
 			CheckIDs: []string{types.FinancialHealthCheckDebtBurden, types.FinancialHealthCheckHighInterestDebt},
 			Evidence: evidence,

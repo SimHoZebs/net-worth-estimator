@@ -13,6 +13,10 @@ import { accountUpdateBody } from "../editors/accountFields.ts";
 import { getAccountBalances } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshAccountAdjustments } from "../../state/accountAdjustments.ts";
+import {
+	persistSyncedAccountKind,
+	syncedKindError,
+} from "../../state/accountKind.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 
 export type AccountEditField =
@@ -68,7 +72,10 @@ export function useAccountEdit(
 	const previousBalance = existing?.previousBalance ?? previous.data;
 	useBeforeUnload(activeField !== null && !saving);
 	const update = (patch: Partial<typeof source>, field: AccountEditField) => {
-		if (readOnly || saving) return;
+		// The kind selector stays available on synced accounts: kind is a
+		// user-configured label, and changing it is the supported way to
+		// update the type there.
+		if (saving || (readOnly && field !== "kind")) return;
 		edit.update(patch);
 		setActiveField(field);
 		if (field === "balance" && observedAt === null)
@@ -91,7 +98,53 @@ export function useAccountEdit(
 	};
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
-		if (readOnly || saving) return;
+		if (saving) return;
+		// Synced accounts lock every field except kind. A kind change
+		// writes only the kind plus the current bounds verbatim.
+		if (readOnly) {
+			if (edit.value.kind === account.kind) {
+				reset();
+				return;
+			}
+			if (edit.conflict) {
+				setError(
+					"This account changed during your edit. Discard your edits before applying new changes.",
+				);
+				return;
+			}
+			// The bank owns the balance, so a kind that contradicts it is
+			// reported plainly instead of written. Shared with the modal
+			// synced-kind path so both refuse identically.
+			const contradiction = syncedKindError(
+				parseDisplayNumber(edit.value.balance),
+				edit.value.kind,
+			);
+			if (contradiction) {
+				setError(contradiction);
+				return;
+			}
+			setSaving(true);
+			setError(null);
+			const ok = await persistSyncedAccountKind(
+				{
+					id: account.id,
+					name: account.name,
+					enabled: account.enabled,
+					color: account.color,
+				},
+				edit.value.kind,
+			);
+			setSaving(false);
+			if (ok) {
+				setActiveField(null);
+				setConfirmCancel(false);
+			} else {
+				setError(
+					"The account type could not be saved. Review the workspace notice and try again.",
+				);
+			}
+			return;
+		}
 		if (edit.conflict) {
 			setError(
 				"This account changed during your edit. Discard your edits before applying new changes.",

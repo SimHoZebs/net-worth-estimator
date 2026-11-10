@@ -24,8 +24,24 @@ export function AccountBalanceValue({
 					name="balance"
 					type="number"
 					required
-					min={edit.draft.kind === "debt" ? "-10000000000" : "0"}
-					max={edit.draft.kind === "debt" ? "0" : "10000000000"}
+					// A locked (synced) balance never blocks a kind change at the
+					// HTML layer: the submit path reports a plain-language
+					// mismatch instead of a constraint bubble on a field the
+					// owner cannot edit.
+					min={
+						readOnly
+							? undefined
+							: edit.draft.kind === "debt"
+								? "-10000000000"
+								: "0"
+					}
+					max={
+						readOnly
+							? undefined
+							: edit.draft.kind === "debt"
+								? "0"
+								: "10000000000"
+					}
 					step="0.01"
 					value={edit.draft.balance}
 					readOnly={readOnly || edit.saving}

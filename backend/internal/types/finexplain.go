@@ -64,9 +64,10 @@ type FinancialHealthFreshness struct {
 }
 
 // FinancialHealthCoverage summarizes what the flow window could use.
-// UnknownLiabilityAccountIDs names enabled debt accounts with a carried
-// balance (or an unconfirmed balance) and no payment terms, so their
-// required minimums cannot be computed. Paid-off debt needs no terms.
+// UnknownLiabilityAccountIDs names enabled accounts with a carried
+// negative balance (or an unconfirmed balance) and no payment terms, so
+// their required minimums cannot be computed. A paid-off account needs
+// no terms.
 // window flow transactions by raw author name, with owner rows (including the
 // empty author used before authorship is assigned) grouped as "manual".
 type FinancialHealthCoverage struct {

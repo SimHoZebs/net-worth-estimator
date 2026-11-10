@@ -24,6 +24,14 @@ func finHealthLiteralTransaction(id, name string, source *string, destinations [
 	}
 }
 
+func finHealthStandards() types.FinancialHealthStandards {
+	standards := types.DefaultFinancialHealthStandards()
+	// Liquid membership is caller configuration, not a kind default:
+	// tests state the liquid set openly.
+	standards.LiquidAccountIDs = []string{"checking"}
+	return standards
+}
+
 func finHealthFixture() (*types.FinancialModel, *types.CurrentPosition) {
 	checking := "checking"
 	model := &types.FinancialModel{
@@ -66,7 +74,7 @@ func finHealthCheckByID(report types.FinancialHealthReport, checkID string) type
 
 func TestEvaluateFinancialHealthOrderAndContracts(t *testing.T) {
 	model, position := finHealthFixture()
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	if len(report.Checks) != len(types.FinancialHealthCheckOrder) {
 		t.Fatalf("checks = %d, want %d", len(report.Checks), len(types.FinancialHealthCheckOrder))
 	}
@@ -95,7 +103,7 @@ func TestEvaluateFinancialHealthOrderAndContracts(t *testing.T) {
 
 func TestEvaluateFinancialHealthMeetingFixture(t *testing.T) {
 	model, position := finHealthFixture()
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	want := map[string]types.FinancialHealthStatus{
 		types.FinancialHealthCheckEmergencyCoverage:      types.FinancialHealthMeeting,
 		types.FinancialHealthCheckCashFlowSustainability: types.FinancialHealthMeeting,
@@ -120,7 +128,7 @@ func TestEvaluateFinancialHealthMeetingFixture(t *testing.T) {
 
 func TestEvaluateFinancialHealthAdjustableStandards(t *testing.T) {
 	model, position := finHealthFixture()
-	standards := types.DefaultFinancialHealthStandards()
+	standards := finHealthStandards()
 	standards.EmergencyMeetMonths = 6
 	standards.EmergencyRiskMonths = 3
 	standards.DebtBurdenMeetRatio = 0.01
@@ -153,7 +161,7 @@ func TestEvaluateFinancialHealthAdjustableStandards(t *testing.T) {
 func TestEvaluateFinancialHealthInsufficientData(t *testing.T) {
 	model, position := finHealthFixture()
 	model.Transactions = nil
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	for _, checkID := range []string{
 		types.FinancialHealthCheckEmergencyCoverage,
 		types.FinancialHealthCheckCashFlowSustainability,
@@ -217,7 +225,7 @@ func TestEvaluateFinancialHealthExclusions(t *testing.T) {
 		// Outside the window.
 		finHealthLiteralTransaction("old", "Old", &checking, nil, "999", "2026-01-05"),
 	)
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	if report.FlowCoverage.WindowTransactions != 7 || report.FlowCoverage.ResolvedTransactions != 6 || report.FlowCoverage.ExcludedTransactions != 1 {
 		t.Fatalf("coverage = %+v, want 7/6/1", report.FlowCoverage)
 	}
@@ -248,7 +256,7 @@ func TestEvaluateFinancialHealthExcludesStatefulAmounts(t *testing.T) {
 		TransactionTime: stamp,
 		Enabled:         true,
 	})
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	if report.FlowCoverage.ExcludedTransactions != 1 || report.FlowCoverage.ExcludedIDs[0] != "live-balance" {
 		t.Fatalf("coverage = %+v, want live-balance excluded", report.FlowCoverage)
 	}
@@ -277,7 +285,7 @@ func TestEvaluateFinancialHealthSpendingBands(t *testing.T) {
 				transactions = append(transactions, finHealthLiteralTransaction("rent-"+days[index], "Rent", &checking, nil, amount, days[index]))
 			}
 			model.Transactions = transactions
-			report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+			report := EvaluateFinancialHealth(model, position, finHealthStandards())
 			if got := finHealthCheckByID(report, types.FinancialHealthCheckSpendingConsistency).Status; got != testCase.want {
 				t.Fatalf("consistency = %q, want %q", got, testCase.want)
 			}
@@ -296,7 +304,7 @@ func TestEvaluateFinancialHealthMissingState(t *testing.T) {
 		{"bad date", &types.FinancialModel{}, &types.CurrentPosition{AsOfDate: "not-a-date"}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			report := EvaluateFinancialHealth(testCase.model, testCase.position, types.DefaultFinancialHealthStandards())
+			report := EvaluateFinancialHealth(testCase.model, testCase.position, finHealthStandards())
 			if len(report.Checks) != len(types.FinancialHealthCheckOrder) {
 				t.Fatalf("checks = %d, want full order even without state", len(report.Checks))
 			}
@@ -314,10 +322,12 @@ func TestNormalizeFinancialHealthStandards(t *testing.T) {
 	if normalized.LookbackDays < 7 {
 		t.Fatalf("lookback = %d, want a usable window", normalized.LookbackDays)
 	}
-	if len(normalized.LiquidAccountKinds) == 0 {
-		t.Fatalf("liquid kinds must default so emergency coverage has an input")
+	// Liquid membership is caller-owned: normalization never invents it.
+	caller := NormalizeFinancialHealthStandards(types.FinancialHealthStandards{LiquidAccountIDs: []string{"checking"}})
+	if len(caller.LiquidAccountIDs) != 1 || caller.LiquidAccountIDs[0] != "checking" {
+		t.Fatalf("liquid ids = %v, want the caller selection preserved", caller.LiquidAccountIDs)
 	}
-	inverted := types.DefaultFinancialHealthStandards()
+	inverted := finHealthStandards()
 	inverted.EmergencyMeetMonths, inverted.EmergencyRiskMonths = 1, 3
 	inverted.UtilizationMeetRatio, inverted.UtilizationRiskRatio = 0.5, 0.3
 	normalized = NormalizeFinancialHealthStandards(inverted)

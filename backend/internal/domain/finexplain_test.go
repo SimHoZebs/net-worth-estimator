@@ -15,7 +15,7 @@ func finExplainFixture() (*types.FinancialModel, *types.CurrentPosition, types.F
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
 		{AccountID: "card", Balance: -2000, Source: "banksync", ObservedAt: midnightUnix("2026-10-30")},
 	}
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	return model, position, report
 }
 
@@ -92,7 +92,7 @@ func TestExplainFinancialHealthMissingIncome(t *testing.T) {
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
 		{AccountID: "card", Balance: -2000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
 	}
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	explanation := ExplainFinancialHealth(model, position, report, types.DefaultFinancialHealthExplanationOptions())
 	if explanation.Completeness != types.FinancialHealthIncomplete {
 		t.Fatalf("completeness = %q, want incomplete without income", explanation.Completeness)
@@ -129,7 +129,7 @@ func TestExplainFinancialHealthMissingIncome(t *testing.T) {
 func TestExplainFinancialHealthUnknownLiabilities(t *testing.T) {
 	model, position, _ := finExplainFixture()
 	model.PaymentTerms = nil
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	explanation := ExplainFinancialHealth(model, position, report, types.DefaultFinancialHealthExplanationOptions())
 	coverage := explanation.Sufficiency.Coverage
 	if len(coverage.UnknownLiabilityAccountIDs) != 1 || coverage.UnknownLiabilityAccountIDs[0] != "card" {
@@ -157,7 +157,7 @@ func TestExplainFinancialHealthPaidOffDebtNeedsNoTerms(t *testing.T) {
 		{AccountID: "checking", Balance: 9000},
 		{AccountID: "card", Balance: 0},
 	}
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	explanation := ExplainFinancialHealth(model, position, report, types.DefaultFinancialHealthExplanationOptions())
 	if len(explanation.Sufficiency.Coverage.UnknownLiabilityAccountIDs) != 0 {
 		t.Fatalf("unknown liabilities = %v, want none for paid-off debt without terms", explanation.Sufficiency.Coverage.UnknownLiabilityAccountIDs)
@@ -173,7 +173,7 @@ func TestExplainFinancialHealthStaleSync(t *testing.T) {
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
 		{AccountID: "card", Balance: -2000, Source: "banksync", ObservedAt: midnightUnix("2026-08-01")},
 	}
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	explanation := ExplainFinancialHealth(model, position, report, types.DefaultFinancialHealthExplanationOptions())
 	freshness := explanation.Sufficiency.Freshness
 	if len(freshness.StaleAccountIDs) != 1 || freshness.StaleAccountIDs[0] != "card" {
@@ -218,7 +218,7 @@ func TestExplainFinancialHealthPartialIsNotFailure(t *testing.T) {
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
 		{AccountID: "card", Balance: 0, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
 	}
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	for _, check := range report.Checks {
 		if check.Status != types.FinancialHealthMeeting {
 			t.Fatalf("%s = %q, want every check meeting for this fixture", check.CheckID, check.Status)
@@ -238,7 +238,7 @@ func TestExplainFinancialHealthPartialIsNotFailure(t *testing.T) {
 
 func TestExplainFinancialHealthInsufficientState(t *testing.T) {
 	model, position := finHealthFixture()
-	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
+	report := EvaluateFinancialHealth(model, position, finHealthStandards())
 	for _, testCase := range []struct {
 		name     string
 		model    *types.FinancialModel
@@ -247,7 +247,7 @@ func TestExplainFinancialHealthInsufficientState(t *testing.T) {
 	}{
 		{"nil model", nil, position, report},
 		{"nil position", model, nil, report},
-		{"missing state report", model, position, EvaluateFinancialHealth(nil, nil, types.DefaultFinancialHealthStandards())},
+		{"missing state report", model, position, EvaluateFinancialHealth(nil, nil, finHealthStandards())},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			explanation := ExplainFinancialHealth(testCase.model, testCase.position, testCase.report, types.DefaultFinancialHealthExplanationOptions())
@@ -294,7 +294,7 @@ func TestExplainFinancialHealthActionsLinkEvidenceAndTargets(t *testing.T) {
 
 func TestComposeFinancialHealthDetailBundlesReportAndExplanation(t *testing.T) {
 	model, position, _ := finExplainFixture()
-	standards := types.DefaultFinancialHealthStandards()
+	standards := finHealthStandards()
 	options := types.DefaultFinancialHealthExplanationOptions()
 	detail := ComposeFinancialHealthDetail(model, position, standards, options)
 	wantReport := EvaluateFinancialHealth(model, position, standards)
@@ -325,7 +325,7 @@ func finExplainSnapshot(t *testing.T, value any) string {
 // simulator state.
 func TestExplainFinancialHealthReaderOnly(t *testing.T) {
 	model, position, _ := finExplainFixture()
-	standards := types.DefaultFinancialHealthStandards()
+	standards := finHealthStandards()
 	options := types.DefaultFinancialHealthExplanationOptions()
 	report := EvaluateFinancialHealth(model, position, standards)
 	beforeModel, beforePosition, beforeReport := finExplainSnapshot(t, model), finExplainSnapshot(t, position), finExplainSnapshot(t, report)

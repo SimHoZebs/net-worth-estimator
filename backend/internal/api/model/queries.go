@@ -26,12 +26,13 @@ func isSyncOwned(source string) bool {
 	return source != "" && source != "user"
 }
 
-// isArchivedDebt hides a paid-off debt: a debt account whose latest
-// observed balance at or before the viewed date is effectively zero.
-// The observed balance comes from the replay's selected observation, so
-// same-day instant ordering agrees with the current position.
-func isArchivedDebt(account types.Account, observedBalance *float64) bool {
-	if account.Kind != "debt" || observedBalance == nil {
+// isArchivedDebt hides a paid-off configured liability: an account with
+// payment terms whose latest observed balance at or before the viewed
+// date is effectively zero. The observed balance comes from the replay's
+// selected observation, so same-day instant ordering agrees with the
+// current position. Terms, not account kind, select the set.
+func isArchivedDebt(terms map[string]types.PaymentTerms, account types.Account, observedBalance *float64) bool {
+	if _, ok := terms[account.ID]; !ok || observedBalance == nil {
 		return false
 	}
 	return *observedBalance > -0.005 && *observedBalance < 0.005
@@ -147,6 +148,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 	}
 	rows := []accountBalanceRow{}
 	if model != nil {
+		terms := domain.PaymentTermsByAccount(model)
 		components := map[string]bool{}
 		for _, a := range model.Accounts {
 			if a.Display != nil {
@@ -189,7 +191,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				Name:             account.Name,
 				Kind:             account.Kind,
 				Enabled:          account.Enabled,
-				Archived:         isArchivedDebt(account, adjusted.ObservedBalance),
+				Archived:         isArchivedDebt(terms, account, adjusted.ObservedBalance),
 				Color:            account.Color,
 				MinBalance:       account.MinBalance,
 				MaxBalance:       account.MaxBalance,

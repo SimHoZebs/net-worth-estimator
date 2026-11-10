@@ -62,7 +62,7 @@ func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
 		code  string
 	}{
 		{"missing account", []types.PaymentTerms{{AccountID: "ghost", MinimumFixed: 25, DueDay: 10}}, "terms.account.missing"},
-		{"non-debt account", []types.PaymentTerms{{AccountID: "checking", MinimumFixed: 25, DueDay: 10}}, "terms.account.kind"},
+		{"any account takes terms", []types.PaymentTerms{{AccountID: "checking", MinimumFixed: 25, DueDay: 10}}, ""},
 		{"duplicate rows", []types.PaymentTerms{
 			{AccountID: "prime_card", MinimumFixed: 25, DueDay: 10},
 			{AccountID: "prime_card", MinimumFixed: 30, DueDay: 12},
@@ -77,6 +77,15 @@ func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			model := termsModel()
 			model.PaymentTerms = testCase.terms
+			if testCase.code == "" {
+				// Terms attach to any account: no kind gate rejects them.
+				for _, issue := range ValidateFinancialModel(model) {
+					if len(issue.Code) >= 6 && issue.Code[:6] == "terms." && issue.Severity == types.SeverityError {
+						t.Fatalf("unexpected terms error: %+v", issue)
+					}
+				}
+				return
+			}
 			if !termsCodes(ValidateFinancialModel(model))[testCase.code] {
 				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(model))
 			}

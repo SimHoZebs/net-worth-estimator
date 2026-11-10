@@ -26,10 +26,6 @@ func paymentTermsByAccount(terms []types.PaymentTerms) map[string]types.PaymentT
 
 func validatePaymentTerms(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) {
 	seen := map[string]bool{}
-	accountsByID := map[string]types.Account{}
-	for _, account := range model.Accounts {
-		accountsByID[account.ID] = account
-	}
 	for index, terms := range model.PaymentTerms {
 		path := []any{"paymentTerms", index}
 		if seen[terms.AccountID] {
@@ -45,11 +41,9 @@ func validatePaymentTerms(issues *[]types.ModelValidationIssue, model *types.Fin
 				append(path, "accountId")...)
 			continue
 		}
-		if accountsByID[terms.AccountID].Kind != types.AccountKindDebt {
-			addIssue(issues, types.SeverityError, "terms.account.kind",
-				fmt.Sprintf("Payment terms reference account '%s', which is not a debt account.", terms.AccountID),
-				append(path, "accountId")...)
-		}
+		// Payment terms attach to any account: the backend never gates
+		// features on account kind. The frontend suggests debt-kind
+		// accounts when configuring terms.
 		if terms.MinimumFixed < 0 || isNonFinite(terms.MinimumFixed) {
 			addIssue(issues, types.SeverityError, "terms.minimum.invalid",
 				fmt.Sprintf("Payment terms for '%s' need a fixed minimum at or above zero.", terms.AccountID),

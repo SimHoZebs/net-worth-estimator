@@ -7,7 +7,6 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/ingest"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // bridgeAdapter is the SimpleFIN TransactionProvider adapter. Native fetch
@@ -90,7 +89,6 @@ func (a bridgeAdapter) Provisions(native any) []store.SyncProvision {
 			Name:        account.Name,
 			Institution: institutions[account.ConnID],
 			Currency:    account.Currency,
-			Kind:        types.AccountKind(provisionKind(account)),
 		})
 	}
 	return provisions

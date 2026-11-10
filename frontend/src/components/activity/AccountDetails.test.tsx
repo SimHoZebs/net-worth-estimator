@@ -159,6 +159,83 @@ it("keeps read-only property controls locked", () => {
 	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });
 
+it("offers every account type on the read-only kind selector", async () => {
+	const user = userEvent.setup();
+	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
+	const select = screen.getByLabelText("Account type") as HTMLSelectElement;
+	expect(select.disabled).toBe(false);
+	expect(Array.from(select.options).map((option) => option.value)).toEqual([
+		"cash",
+		"investment",
+		"property",
+		"debt",
+	]);
+	await user.selectOptions(select, "debt");
+	expect(
+		await screen.findByRole("button", { name: "Save changes" }),
+	).toBeTruthy();
+});
+
+it("saves a synced account kind with its current bounds verbatim", async () => {
+	const server = stubTestServer();
+	setServerModelFixture();
+	const user = userEvent.setup();
+	const mortgage = financialModelFixture.accounts.find(
+		(account) => account.id === "mortgage",
+	)!;
+	render(<Settings account={{ ...mortgage, kind: "cash", readOnly: true }} />, {
+		wrapper,
+	});
+	await user.selectOptions(screen.getByLabelText("Account type"), "debt");
+	await user.click(screen.getByRole("button", { name: "Save changes" }));
+	await waitFor(() =>
+		expect(server.calls.some((call) => call.method === "PATCH")).toBe(true),
+	);
+	const body = server.calls.find((call) => call.method === "PATCH")!
+		.body as Record<string, unknown>;
+	expect(body.kind).toBe("debt");
+	expect(body.name).toBe(mortgage.name);
+	expect(body.minBalance).toBe(0);
+	expect(body.maxBalance).toBe(0);
+	expect(body.balance).toBeUndefined();
+	expect(body.observedAt).toBeUndefined();
+});
+
+it("refuses a synced kind that contradicts the bank balance", async () => {
+	const server = stubTestServer();
+	setServerModelFixture();
+	const user = userEvent.setup();
+	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
+	await user.selectOptions(screen.getByLabelText("Account type"), "debt");
+	await user.click(screen.getByRole("button", { name: "Save changes" }));
+	expect(
+		await screen.findByText(
+			"A debt account cannot hold a positive bank balance.",
+		),
+	).toBeTruthy();
+	expect(server.calls.some((call) => call.method === "PATCH")).toBe(false);
+});
+
+it("fails closed when the current bounds cannot be read", async () => {
+	const server = stubTestServer();
+	setServerModelFixture();
+	const user = userEvent.setup();
+	const mortgage = financialModelFixture.accounts.find(
+		(account) => account.id === "mortgage",
+	)!;
+	render(<Settings account={{ ...mortgage, kind: "cash", readOnly: true }} />, {
+		wrapper,
+	});
+	await user.selectOptions(screen.getByLabelText("Account type"), "debt");
+	// The synced-kind write carries the saved bounds verbatim, so an
+	// unreadable bounds cache must block the save instead of clearing
+	// real bounds to open.
+	resetServerQueryCache();
+	await user.click(screen.getByRole("button", { name: "Save changes" }));
+	expect(await screen.findByText(/could not be saved/i)).toBeTruthy();
+	expect(server.calls.some((call) => call.method === "PATCH")).toBe(false);
+});
+
 it("shows the linked bank identity as definition rows for synced accounts", () => {
 	render(
 		<Settings

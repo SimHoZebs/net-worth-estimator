@@ -163,8 +163,10 @@ type SyncApplySummary struct {
 }
 
 // SyncProvision is one bridge account needing link resolution: an
-// existing link is touched, otherwise the account is auto-provisioned.
-// Manual bindings are made through SaveAccountLink, never here.
+// existing link is touched, otherwise the account is auto-provisioned
+// with the neutral cash label. The owner configures the real type in
+// the UI; provisioning never infers it from bridge data. Manual
+// bindings are made through SaveAccountLink, never here.
 type SyncProvision struct {
 	BridgeID string
 	Name     string
@@ -172,7 +174,6 @@ type SyncProvision struct {
 	// connection, empty when the bridge reported none.
 	Institution string
 	Currency    string
-	Kind        types.AccountKind
 }
 
 // GeneratedTransaction is one engine-output transaction for a slice. Generated

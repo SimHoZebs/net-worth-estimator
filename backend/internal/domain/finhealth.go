@@ -26,9 +26,8 @@ func NormalizeFinancialHealthStandards(standards types.FinancialHealthStandards)
 	if normalized.LookbackDays > 5*365 {
 		normalized.LookbackDays = 5 * 365
 	}
-	if len(normalized.LiquidAccountKinds) == 0 {
-		normalized.LiquidAccountKinds = []string{string(types.AccountKindCash)}
-	}
+	// Liquid membership is caller configuration, never a kind default:
+	// normalization leaves the ID list untouched.
 	normalized.EmergencyMeetMonths = math.Max(0, finiteNonNegative(normalized.EmergencyMeetMonths, 0))
 	normalized.EmergencyRiskMonths = math.Max(0, finiteNonNegative(normalized.EmergencyRiskMonths, 0))
 	if normalized.EmergencyMeetMonths < normalized.EmergencyRiskMonths {
@@ -249,14 +248,14 @@ func EvaluateFinancialHealth(model *types.FinancialModel, position *types.Curren
 func evaluateEmergencyCoverage(inputs *finHealthInputs, standards types.FinancialHealthStandards, windowMonths float64) types.FinancialHealthCheckResult {
 	const checkID = types.FinancialHealthCheckEmergencyCoverage
 	liquid := map[string]bool{}
-	for _, kind := range standards.LiquidAccountKinds {
-		liquid[kind] = true
+	for _, id := range standards.LiquidAccountIDs {
+		liquid[id] = true
 	}
 	reserve := 0.0
 	evidence := []types.FinancialHealthEvidenceItem{}
 	liquidAccounts := 0
 	for _, account := range inputs.model.Accounts {
-		if !account.Enabled || !liquid[string(account.Kind)] {
+		if !account.Enabled || !liquid[account.ID] {
 			continue
 		}
 		liquidAccounts++
@@ -279,7 +278,7 @@ func evaluateEmergencyCoverage(inputs *finHealthInputs, standards types.Financia
 		"riskMonths": standards.EmergencyRiskMonths,
 	}
 	if liquidAccounts == 0 {
-		result := finHealthInsufficient(checkID, "No enabled accounts of the configured liquid kinds, so reserve coverage has insufficient data.")
+		result := finHealthInsufficient(checkID, "No enabled liquid accounts configured, so reserve coverage has insufficient data.")
 		result.Input, result.Threshold, result.Evidence = input, threshold, evidence
 		return result
 	}
@@ -352,7 +351,9 @@ func evaluateCashFlowSustainability(inputs *finHealthInputs, standards types.Fin
 }
 
 // evaluateDebtBurden compares required monthly minimums from payment terms
-// against average monthly inflow: burden = minimums / monthlyInflow.
+// against average monthly inflow: burden = minimums / monthlyInflow. The
+// configured set is the accounts carrying payment terms, never an
+// account-type filter.
 func evaluateDebtBurden(inputs *finHealthInputs, standards types.FinancialHealthStandards, windowMonths float64) types.FinancialHealthCheckResult {
 	const checkID = types.FinancialHealthCheckDebtBurden
 	terms := PaymentTermsByAccount(inputs.model)
@@ -360,7 +361,10 @@ func evaluateDebtBurden(inputs *finHealthInputs, standards types.FinancialHealth
 	evidence := []types.FinancialHealthEvidenceItem{}
 	debtAccounts := 0
 	for _, account := range inputs.model.Accounts {
-		if !account.Enabled || account.Kind != types.AccountKindDebt {
+		if !account.Enabled {
+			continue
+		}
+		if _, ok := terms[account.ID]; !ok {
 			continue
 		}
 		debtAccounts++
@@ -390,7 +394,7 @@ func evaluateDebtBurden(inputs *finHealthInputs, standards types.FinancialHealth
 		return types.FinancialHealthCheckResult{
 			CheckID:     checkID,
 			Status:      types.FinancialHealthMeeting,
-			Summary:     "No required debt minimums at the cut meet the configured debt-burden guideline.",
+			Summary:     "No required payment minimums at the cut meet the configured debt-burden guideline.",
 			Value:       finHealthFloatPtr(0),
 			Input:       input,
 			Calculation: "burden = monthlyMinimums / monthlyInflow",
@@ -417,6 +421,8 @@ func evaluateDebtBurden(inputs *finHealthInputs, standards types.FinancialHealth
 }
 
 // evaluateHighInterestDebt flags carried revolving balances as an interest-debt proxy.
+// The configured set is the accounts carrying payment terms, never an
+// account-type filter.
 func evaluateHighInterestDebt(inputs *finHealthInputs, standards types.FinancialHealthStandards) types.FinancialHealthCheckResult {
 	const checkID = types.FinancialHealthCheckHighInterestDebt
 	terms := PaymentTermsByAccount(inputs.model)
@@ -426,7 +432,10 @@ func evaluateHighInterestDebt(inputs *finHealthInputs, standards types.Financial
 	}
 	debtAccounts := 0
 	for _, account := range inputs.model.Accounts {
-		if !account.Enabled || account.Kind != types.AccountKindDebt {
+		if !account.Enabled {
+			continue
+		}
+		if _, ok := terms[account.ID]; !ok {
 			continue
 		}
 		debtAccounts++
@@ -452,10 +461,10 @@ func evaluateHighInterestDebt(inputs *finHealthInputs, standards types.Financial
 		return types.FinancialHealthCheckResult{
 			CheckID:     checkID,
 			Status:      types.FinancialHealthMeeting,
-			Summary:     "No enabled debt accounts at the cut meet the configured high-interest-debt guideline.",
+			Summary:     "No enabled accounts with payment terms at the cut meet the configured high-interest-debt guideline.",
 			Value:       finHealthFloatPtr(0),
 			Input:       input,
-			Calculation: "carriedBalance = sum over enabled debt accounts of max(0, -balance)",
+			Calculation: "carriedBalance = sum over enabled accounts with payment terms of max(0, -balance)",
 			Threshold:   threshold,
 			Evidence:    evidence,
 		}
@@ -466,7 +475,7 @@ func evaluateHighInterestDebt(inputs *finHealthInputs, standards types.Financial
 		Summary:     fmt.Sprintf("Carried balances total %.0f against the configured %.0f tolerance (rate data unavailable; carried balances are the proxy).", carried, standards.CarriedBalanceTolerance),
 		Value:       finHealthFloatPtr(carried),
 		Input:       input,
-		Calculation: "carriedBalance = sum over enabled debt accounts of max(0, -balance)",
+		Calculation: "carriedBalance = sum over enabled accounts with payment terms of max(0, -balance)",
 		Threshold:   threshold,
 		Evidence:    evidence,
 	}
@@ -508,7 +517,10 @@ func evaluateSavingsRate(inputs *finHealthInputs, standards types.FinancialHealt
 	}
 }
 
-// evaluateUtilization measures the limit-weighted drawn ratio.
+// evaluateUtilization measures the limit-weighted drawn ratio. Limits
+// come from the saved bounds alone: a negative floor implies a credit
+// limit against which a negative balance draws, and a positive ceiling
+// caps a positive balance. Account type never selects the branch.
 func evaluateUtilization(inputs *finHealthInputs, standards types.FinancialHealthStandards) types.FinancialHealthCheckResult {
 	const checkID = types.FinancialHealthCheckUtilization
 	weighted, limitTotal := 0.0, 0.0
@@ -519,11 +531,7 @@ func evaluateUtilization(inputs *finHealthInputs, standards types.FinancialHealt
 			continue
 		}
 		balance := inputs.balances[account.ID]
-		if account.Kind == types.AccountKindDebt {
-			floor := account.MinBalanceValue()
-			if floor == types.NoFloor || floor >= 0 {
-				continue
-			}
+		if floor := account.MinBalanceValue(); floor != types.NoFloor && floor < 0 {
 			limit := -floor
 			// Uncapped so over-limit breaches surface as ratios above 1.
 			drawn := math.Max(0, -balance)
@@ -558,7 +566,7 @@ func evaluateUtilization(inputs *finHealthInputs, standards types.FinancialHealt
 		"riskRatio": standards.UtilizationRiskRatio,
 	}
 	if defined == 0 || limitTotal <= 0 {
-		result := finHealthInsufficient(checkID, "No enabled accounts define a usable limit (debt floors or positive ceilings), so utilization has insufficient data.")
+		result := finHealthInsufficient(checkID, "No enabled accounts define a usable limit (negative floors or positive ceilings), so utilization has insufficient data.")
 		result.Threshold, result.Evidence = threshold, evidence
 		result.Input = map[string]float64{}
 		return result

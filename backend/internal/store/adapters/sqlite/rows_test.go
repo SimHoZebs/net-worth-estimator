@@ -235,8 +235,8 @@ func TestProvisionSyncAccounts(t *testing.T) {
 		t.Fatalf("save link: %v", err)
 	}
 	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
-		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD"},
+		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD"},
 	})
 	if err != nil {
 		t.Fatalf("provision: %v", err)
@@ -251,12 +251,14 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	}
 	found := false
 	for _, account := range loaded.Accounts {
-		if account.ID == newID && account.Name == "New Card" && string(account.Kind) == "debt" {
+		// Provisioning assigns the neutral cash label; the owner
+		// configures the real type in the UI.
+		if account.ID == newID && account.Name == "New Card" && account.Kind == types.AccountKindCash {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("provisioned account missing: %+v", loaded.Accounts)
+		t.Fatalf("provisioned account missing or mislabeled: %+v", loaded.Accounts)
 	}
 	links, err := store.ListAccountLinks()
 	if err != nil || len(links) != 2 {
@@ -264,7 +266,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	}
 	// Re-running is idempotent: links resolve, nothing new is created.
 	_, provisioned, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-new", Name: "Renamed Card", Currency: "USD", Kind: types.AccountKind("debt")},
+		{BridgeID: "bridge-new", Name: "Renamed Card", Currency: "USD"},
 	})
 	if err != nil || provisioned != 0 {
 		t.Fatalf("re-provision = %d, err %v", provisioned, err)
@@ -286,7 +288,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 func TestProvisionStoresInstitutionOnLink(t *testing.T) {
 	store := openTestStore(t)
 	_, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-chase", Name: "Checking 8472", Institution: "Chase", Currency: "USD", Kind: types.AccountKind("cash")},
+		{BridgeID: "bridge-chase", Name: "Checking 8472", Institution: "Chase", Currency: "USD"},
 	})
 	if err != nil {
 		t.Fatalf("provision: %v", err)
@@ -301,7 +303,7 @@ func TestProvisionStoresInstitutionOnLink(t *testing.T) {
 	// A later sync that reports no institution keeps the stored bank
 	// name instead of wiping it.
 	if _, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-chase", Name: "Checking 8472", Currency: "USD", Kind: types.AccountKind("cash")},
+		{BridgeID: "bridge-chase", Name: "Checking 8472", Currency: "USD"},
 	}); err != nil {
 		t.Fatalf("re-provision: %v", err)
 	}
@@ -314,7 +316,7 @@ func TestProvisionStoresInstitutionOnLink(t *testing.T) {
 	}
 	// A moved bank name does update on a later sync.
 	if _, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-chase", Name: "Checking 8472", Institution: "JPMorgan Chase", Currency: "USD", Kind: types.AccountKind("cash")},
+		{BridgeID: "bridge-chase", Name: "Checking 8472", Institution: "JPMorgan Chase", Currency: "USD"},
 	}); err != nil {
 		t.Fatalf("re-provision renamed: %v", err)
 	}
@@ -339,7 +341,7 @@ func TestProvisionReportsStaleLinks(t *testing.T) {
 		t.Fatalf("delete account: %v", err)
 	}
 	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD"},
 	})
 	if err != nil {
 		t.Fatalf("provision: %v", err)
@@ -358,7 +360,7 @@ func TestProvisionReportsStaleLinks(t *testing.T) {
 		t.Fatalf("recreate account: %v", err)
 	}
 	resolved, _, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD"},
 	})
 	if err != nil || resolved["bridge-checking"] != "checking" || len(stale) != 0 {
 		t.Fatalf("relink resolved = %v stale = %v err %v", resolved, stale, err)

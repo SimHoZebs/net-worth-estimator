@@ -316,7 +316,7 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 			resolved[item.BridgeID] = modelAccountID
 			continue
 		}
-		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Institution, item.Currency, item.Kind)
+		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Institution, item.Currency)
 		if err != nil {
 			return nil, 0, nil, err
 		}

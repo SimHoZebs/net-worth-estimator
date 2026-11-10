@@ -97,17 +97,6 @@ func checkpointInstant(balanceDate int64, now time.Time) int64 {
 	return now.Unix()
 }
 
-// provisionKind picks the model account kind for an auto-provisioned
-// account: investment when the bridge reports holdings, cash otherwise.
-// Card (debt) status is model-side configuration; a provisioned account
-// becomes card-eligible once linked and added to the card set.
-func provisionKind(account Account) string {
-	if len(account.Holdings) > 0 {
-		return "investment"
-	}
-	return "cash"
-}
-
 func truncateLabel(description string) string {
 	name := strings.TrimSpace(description)
 	if name == "" {

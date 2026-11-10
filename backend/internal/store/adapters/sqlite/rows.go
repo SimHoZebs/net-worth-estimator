@@ -838,7 +838,9 @@ func (s *sqliteStore) DeleteAccountLink(bridgeAccountID string) error {
 // EnsureLinkedAccount resolves a bridge account to a model account,
 // provisioning both the account and an auto link when unknown. It runs
 // inside the caller's sync transaction so errors roll everything back.
-func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, institution, currency string, kind types.AccountKind) (string, bool, error) {
+// Provisioned accounts carry the neutral cash label; the owner
+// configures the real type in the UI.
+func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, institution, currency string) (string, bool, error) {
 	var modelAccountID string
 	if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ? AND user_id = :user_id`, bridgeAccountID).Scan(&modelAccountID); err == nil {
 		if _, err := tx.Exec(
@@ -868,7 +870,7 @@ func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, institution, c
 	}
 	if _, err := tx.Exec(
 		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, user_id) VALUES (?,?,?,?,?,?,?,?, :user_id)`,
-		id, position, name, string(kind), types.NoFloor, types.NoCeiling, nil, 1,
+		id, position, name, string(types.AccountKindCash), types.NoFloor, types.NoCeiling, nil, 1,
 	); err != nil {
 		return "", false, fmt.Errorf("provision account for %s: %w", bridgeAccountID, err)
 	}

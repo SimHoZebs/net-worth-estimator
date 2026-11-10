@@ -58,9 +58,11 @@ var FinancialHealthCheckOrder = []string{
 type FinancialHealthStandards struct {
 	// LookbackDays bounds the realized-flow window ending at the as-of cut.
 	LookbackDays int `json:"lookbackDays"`
-	// LiquidAccountKinds names the account kinds counted as spendable
-	// reserves for emergency coverage (for example ["cash"]).
-	LiquidAccountKinds []string `json:"liquidAccountKinds"`
+	// LiquidAccountIDs names the accounts counted as spendable reserves
+	// for emergency coverage. Coverage is a caller configuration: the
+	// backend holds no account-type taxonomy, so callers pass the IDs
+	// openly instead of naming kinds.
+	LiquidAccountIDs []string `json:"liquidAccountIds"`
 	// EmergencyMeetMonths is the configured reserve guideline in months of
 	// average outflow. EmergencyRiskMonths is the lower band edge.
 	EmergencyMeetMonths float64 `json:"emergencyMeetMonths"`
@@ -96,7 +98,7 @@ type FinancialHealthStandards struct {
 func DefaultFinancialHealthStandards() FinancialHealthStandards {
 	return FinancialHealthStandards{
 		LookbackDays:             90,
-		LiquidAccountKinds:       []string{string(AccountKindCash)},
+		LiquidAccountIDs:         nil,
 		EmergencyMeetMonths:      3,
 		EmergencyRiskMonths:      1,
 		CashFlowRiskRatio:        0.9,

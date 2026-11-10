@@ -1,10 +1,15 @@
 import { useId, useState } from "react";
 import type { Account } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
+import {
+	persistSyncedAccountKind,
+	syncedKindError,
+} from "../../state/accountKind.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Modal } from "../Modal.tsx";
 import { AccountIcon } from "../AccountIcon.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { LoanEditor } from "./LoanEditor.tsx";
 import { OrdinaryAccountEditor } from "./OrdinaryAccountEditor.tsx";
 
@@ -15,12 +20,12 @@ export function AccountEditor(props: {
 	onClose: () => void;
 }) {
 	const { item, onClose } = props;
-	const [type, setType] = useState<Account["kind"] | "loan">(
-		item?.display ? "loan" : (item?.kind ?? "cash"),
-	);
+	const initialType = item?.display ? "loan" : (item?.kind ?? "cash");
+	const [type, setType] = useState<Account["kind"] | "loan">(initialType);
 	const [name, setName] = useState(item?.name ?? "");
 	const [enabled, setEnabled] = useState(item?.enabled ?? true);
 	const [saving, setSaving] = useState(false);
+	const [typeError, setTypeError] = useState<string | null>(null);
 	const formId = useId();
 	const enabledId = useId();
 	const readOnly = item?.readOnly ?? false;
@@ -28,8 +33,47 @@ export function AccountEditor(props: {
 		!saving &&
 			(name !== (item?.name ?? "") ||
 				enabled !== (item?.enabled ?? true) ||
-				type !== (item?.display ? "loan" : (item?.kind ?? "cash"))),
+				(!readOnly && type !== initialType)),
 	);
+
+	// The kind selector stays available on synced accounts: kind is a
+	// user-configured label, and changing it here persists immediately
+	// because the detail form below stays locked. The contradiction guard
+	// matches the detail pane: a kind the bank balance contradicts is
+	// refused with the same message instead of written.
+	const changeType = (next: Account["kind"] | "loan") => {
+		setTypeError(null);
+		if (!item || !readOnly || next === "loan" || type === "loan") {
+			setType(next);
+			return;
+		}
+		if (next === item.kind) {
+			setType(next);
+			return;
+		}
+		const contradiction = syncedKindError(item.balance, next);
+		if (contradiction) {
+			setType(next);
+			setTypeError(contradiction);
+			return;
+		}
+		setType(next);
+		void persistSyncedAccountKind(
+			{
+				id: item.id,
+				name: item.name,
+				enabled: item.enabled,
+				color: item.color,
+			},
+			next,
+		).then((ok) => {
+			if (!ok)
+				setTypeError(
+					"The account type could not be saved. Review the workspace notice and try again.",
+				);
+		});
+	};
+
 	return (
 		<Modal
 			title={
@@ -37,20 +81,16 @@ export function AccountEditor(props: {
 			}
 			onClose={onClose}
 		>
-			<fieldset
-				disabled={readOnly || saving}
-				className="m-0 mb-5 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
-			>
-				<legend className="sr-only">Account</legend>
+			<div className="mb-5 grid grid-cols-2 gap-5 max-sm:grid-cols-1">
 				<SelectField
 					rich
 					label="Account type"
 					name="accountType"
 					form={formId}
 					value={type}
-					disabled={!!item?.display}
+					disabled={!!item?.display || saving}
 					onChange={(event) =>
-						setType(
+						changeType(
 							parseUnion(event.target.value, [
 								"cash",
 								"investment",
@@ -77,9 +117,13 @@ export function AccountEditor(props: {
 							<span>{label}</span>
 						</option>
 					))}
-					{item?.kind === "debt" && !item.display && (
+					{item && !item.display && (
 						<option value="debt" aria-label="Debt">
-							<AccountIcon account={item} size="sm" className="size-6" />
+							<AccountIcon
+								account={{ id: "debt", kind: "debt", color: null }}
+								size="sm"
+								className="size-6"
+							/>
 							<span>Debt</span>
 						</option>
 					)}
@@ -94,6 +138,13 @@ export function AccountEditor(props: {
 						</option>
 					)}
 				</SelectField>
+				<FieldError message={typeError} />
+			</div>
+			<fieldset
+				disabled={readOnly || saving}
+				className="m-0 mb-5 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
+			>
+				<legend className="sr-only">Account</legend>
 				<InputField
 					label="Account name"
 					name="name"

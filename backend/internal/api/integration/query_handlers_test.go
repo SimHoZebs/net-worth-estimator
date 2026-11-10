@@ -659,6 +659,13 @@ func TestAccountListArchivedDebtUsesExactObservation(t *testing.T) {
 		}
 		ids[kind] = payload.Result.ID
 	}
+	// Archiving keys on configured terms, not kind: the debt account
+	// carries terms so a zero observed balance archives it.
+	termed := doRowRequest(t, handler, http.MethodPost, "/v1/payment-terms",
+		`{"accountId":"`+ids["debt"]+`","minimumFixed":25,"dueDay":15}`)
+	if termed.Code != http.StatusOK {
+		t.Fatalf("save payment terms status = %d, body %s", termed.Code, termed.Body.String())
+	}
 	morning := int64(1773100800) + 9*3600
 	evening := morning + 6*3600
 	type observationSeed struct {

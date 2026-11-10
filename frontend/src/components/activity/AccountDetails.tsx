@@ -81,7 +81,7 @@ export function AccountDetails({
 					id={`${formId}-kind`}
 					name="kind"
 					value={draft.kind}
-					disabled={locked}
+					disabled={edit.saving}
 					className={transactionControlStyles({
 						element: "select",
 						shape: "account",
@@ -105,7 +105,7 @@ export function AccountDetails({
 					<option value="cash">Cash &amp; savings</option>
 					<option value="investment">Investments</option>
 					<option value="property">Property</option>
-					{account.kind === "debt" && <option value="debt">Debt</option>}
+					<option value="debt">Debt</option>
 				</select>
 			</PropertyRow>
 			<PropertyRow label="Included">

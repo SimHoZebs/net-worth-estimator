@@ -144,6 +144,9 @@ func TestLedgerHealthYieldsDocumentedVerdicts(t *testing.T) {
 		guidelines := types.DefaultFinancialHealthStandards()
 		guidelines.LookbackDays = 119
 		guidelines.SavingsRateMeet = 0.50
+		// The caller names the liquid accounts openly; the ledger seed
+		// holds its reserve in checking and card.
+		guidelines.LiquidAccountIDs = []string{"checking", "card"}
 		return guidelines
 	}())
 	model, err := world.ownerSC.LoadModel()
