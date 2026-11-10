@@ -6,23 +6,23 @@ Use `./scripts/test` as the single entry point:
 
 ```bash
 scripts/test --unit          # no servers, Docker daemon, or credentials
-scripts/test --integration   # browser integration suite (fixture API + Vite over real HTTP)
+scripts/test --integration   # browser integration suite (fixture API and frontend server over real HTTP)
 scripts/test --all           # unit then integration
 scripts/test --matrix        # dataset-pack x identity-set edge matrix (see docs/integration-edge-gates.md)
 E2E_TEST_MUTATIONS=1 scripts/test --e2e  # disposable end-to-end gate
 ```
 
-The layers are separate. Do not boot a server in a unit test, and do not add a jsdom test to the integration runner.
+Unit tests run without application servers. Package and configuration tests may create disposable local HTTP listeners. Browser integration owns its servers and database. None of these commands needs the dev stack.
 
 | Layer | Entry point | Location | Boots |
 | --- | --- | --- | --- |
 | Unit | `scripts/test --unit`, `bun --filter ./frontend test:unit` | `frontend/src/**/*.test.{ts,tsx}`, `frontend/scripts/**/*.test.ts`, Go packages | Nothing |
-| Integration | `scripts/test --integration`, `bun --filter ./frontend test:integration` | `frontend/tests/integration/*.spec.ts` | Fixture API and Vite over HTTP |
+| Integration | `scripts/test --integration`, `bun --filter ./frontend test:integration` | `frontend/tests/integration/*.spec.ts` | Fixture API and frontend server over HTTP |
 | E2E | `E2E_TEST_MUTATIONS=1 scripts/test --e2e` | `auth/test-e2e.mjs` | Real provider and images |
 
 The root aliases are `bun run test:unit`, `bun run test:integration`, and `E2E_TEST_MUTATIONS=1 bun run test:e2e`. The e2e alias keeps the deliberate disposable-run confirmation.
 
-Unit includes the Go verify script, frontend Vitest, dev configuration tests, Better Auth provider tests with disposable databases, and e2e gate-contract tests. Vitest uses `isolate: false` and clears DOM, storage, timers, and module state between files; run its whole file list. Integration boots real HTTP servers. E2E exercises real provider and deployment images against disposable state. Physical passkeys, external recovery delivery, and production mutations remain manual. `--all` covers tests, not the lint, typecheck, and build gates.
+Unit includes the Go verify script, frontend unit tests, Better Auth provider tests with disposable databases, and e2e gate-contract tests. Run the whole unit file list, not only a new test. Integration boots real HTTP servers. E2E exercises real provider and deployment images against disposable state. Physical passkeys, external recovery delivery, and production mutations remain manual. `--all` covers tests, not the lint, typecheck, and build gates.
 
 The purchase-capture extension adds `bun --filter ./extension test` to unit and `bun --filter ./extension test:browser` to integration. Its completion gate also runs `bun --filter ./extension lint` and `bun --filter ./extension build`. See [extension setup and verification](extension/README.md).
 
@@ -39,7 +39,7 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wai
 docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
-This uses production Dockerfiles with isolated dev data, not the Vite/fixture API browser-test harness. `./dev/main.mjs refresh-db` replaces only the dev financial database from a consistent production snapshot. See [dev/README.md](dev/README.md).
+This uses production Dockerfiles with isolated dev data, not the frontend or fixture API browser-test harness. `./dev/main.mjs refresh-db` replaces only the dev financial database from a consistent production snapshot. See [dev/README.md](dev/README.md).
 
 Dev setup checks: `node --test dev/*.test.mjs`. Provider checks: `bun --filter @waypoint/auth test`. Configuration checks require the Docker Compose CLI, but no running daemon.
 
@@ -66,7 +66,7 @@ bun --filter ./frontend test:unit
 bun --filter ./frontend build
 ```
 
-Frontend scripts carry no pre-hooks. Generate the API client explicitly and once before running scripts directly: `bun --filter ./frontend api:generate`. `typecheck` covers `frontend/tsconfig.json` and `frontend/tests/tsconfig.json` through `bun check`; `build` runs `vite build` only.
+Generate the API client before running frontend scripts directly: `bun --filter ./frontend api:generate`.
 
 Refresh the checked-in OpenAPI snapshot without a running server or financial data:
 
@@ -77,29 +77,7 @@ OPENAPI_SNAPSHOT="$PWD/frontend/openapi.snapshot.json" CGO_ENABLED=0 \
 bun --filter ./frontend api:generate
 ```
 
-`bun --filter ./frontend lint:styles` rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. Font roles live in `frontend/src/styles/typography.css`; the lint gate checks design-system contracts only.
-
-Component behavior is tested as a scenario, not isolated clicks. `frontend/src/mocks/interactions.ts` provides a data-driven runner over Testing Library and `user-event`:
-
-```tsx
-await runInteractions(
-  [
-    { click: ["button", "Close dialog"] },
-    { expectText: "Discard the changes in this form?" },
-    { click: ["button", "Continue"] },
-    { expectNoText: "Discard the changes in this form?" },
-  ],
-  dialogScope("Home renovation"),
-);
-```
-
-Every interactive component needs scenarios for each state-changing control and close path. Dialogs with unsaved work need close, cancel, backdrop, continue, discard, and save failure. Native focus return, top layer, scroll lock, and layout occlusion stay in the integration suite. Keep `fireEvent` for native events the browser owns, such as file input.
-
-### Component interactions
-
-Workspace navigation uses TanStack Router file routes and the generated route tree. Commit the generated tree so unit tests and type checks work before the first build. Route metadata owns the current page; root search validation owns overlay query parameters and canonical URLs. Page query hooks retain resource-scope gating and data freshness; route preloads fetch code, not financial data. The search parser preserves string values and duplicate keys for validation. Account links use stable IDs, independent of names. An in-app dialog close undoes its open in history; a direct dialog link closes by replacement to its explicit destination. Editor evidence return destinations live in validated search so copied links retain them. Invalid and unavailable links keep their addresses and show an explicit error until dismissed; unknown pages show a not-found state. The workspace consumes Gmail callback flags once the resource scope is ready and reports the outcome through notifications on any page. The flag survives navigation only while verification is pending, not until a provider panel opens. Callback ownership outlives route and error boundaries; Back removes stale flag copies without repeating the notification or provider-cache invalidation.
-
-Routing regression checks cover nested group parameters, root redirects, validated search, OAuth callback consumption, editor return context, and browser Back/Forward:
+Run the routing regression specs with:
 
 ```bash
 bun --filter ./frontend test:integration -- modalUrls.spec.ts workspace.spec.ts groupSharing.spec.ts safeSpending.spec.ts
@@ -107,7 +85,7 @@ bun --filter ./frontend test:integration -- modalUrls.spec.ts workspace.spec.ts 
 
 ## Integration suite
 
-The integration suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts the `fixtureapi` harness, seeded from a fixture pack, and the Vite dev server itself. Each run picks random free ports and a fresh temporary database; several agents can run it concurrently.
+The integration suite drives the real Go engine over real HTTP. It starts its own fixture API, seeded from a fixture pack, and frontend server. Each run picks random free ports and a fresh temporary database; several agents can run it concurrently.
 
 ```bash
 (cd frontend && bunx --no-install playwright install chromium)
