@@ -12,7 +12,7 @@ Go API and SQLite persistence for household financial records, account maintenan
 | ML judgment service | [ml](ml/README.md) |
 | Local development | [dev](dev/README.md) |
 
-Deep references for design and policy detail: [technical overview](TECHNICAL_OVERVIEW.md), [testing](TESTING.md), [shared database](docs/shared-database.md), [authentication](docs/authentication.md), [authorization](docs/authorization.md), [purchase queue](docs/purchase-queue.md), [judgment providers](docs/judgment-providers.md).
+Deep references for design and policy detail: [technical overview](TECHNICAL_OVERVIEW.md), [testing](TESTING.md), [release gates](docs/release-gates.md), [shared database](docs/shared-database.md), [authentication](docs/authentication.md), [authorization](docs/authorization.md), [purchase queue](docs/purchase-queue.md), [judgment providers](docs/judgment-providers.md).
 
 ## Develop
 

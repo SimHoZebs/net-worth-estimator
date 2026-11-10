@@ -120,6 +120,23 @@ That command checks install drift, generates the API client, runs backend, front
 
 `node scripts/check-install.mjs` compares each workspace `package.json` against the root `bun.lock` and installed `node_modules`. Install or refresh everything with `bun install` from the repository root.
 
+### Cross-feature journeys
+
+The release bar for the cross-feature journeys (QA-03) lives in [release gates](docs/release-gates.md). They compose receipt review, recurring promotion, group sharing, flow drilldowns, and model integrity over production code paths and temporary databases. Run each journey three times to rule out flakes:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/api/integration/ -run 'TestQA03' -count=3
+```
+
+Completeness journeys join them: one fixed synthetic ledger (`backend/testdata/integration/v1/ledger.json`, hand-computed numbers in its extras) proved present on every surface — diagram, list, recurring proposal, receipts, sharing, inbox, splits, health checks — with bank re-syncs adding nothing:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/integrationledger/ -count=3
+INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:integration -- ledgerCompleteness.spec.ts
+```
+
+The local aggregate and hosted CI run the Go journeys once and never set `INTEGRATION_PACK=ledger`, so the browser leg of the completeness journey skips itself there. The repetition and the browser leg are separate release work.
+
 ## Shared database isolation
 
 Isolation tests must use at least two users in the same physical SQLite file, with identical entity IDs, preset names, and upstream sync keys. Separate fixture files alone do not prove row-level isolation.

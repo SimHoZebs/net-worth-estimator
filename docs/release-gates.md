@@ -41,24 +41,9 @@ Dispatch it for auth, image, migration, and proxy changes. Partial E2E
 selections are debugging evidence, not a full release gate.
 
 Cross-feature journeys (QA-03) must pass repeatedly with no flakes
-before a release. They compose receipt review, recurring promotion,
-group sharing, flow drilldowns, and model integrity over production
-code paths and temporary databases:
-
-```bash
-CGO_ENABLED=0 go -C backend test ./internal/api/integration/ -run 'TestQA03' -count=3
-```
-
-Completeness journeys join them: one fixed synthetic ledger
-(`backend/testdata/integration/v1/ledger.json`, hand-computed numbers
-in its extras) proved present on every surface — diagram, list,
-recurring proposal, receipts, sharing, inbox, splits, health checks —
-with bank re-syncs adding nothing:
-
-```bash
-CGO_ENABLED=0 go -C backend test ./internal/integrationledger/ -count=3
-INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:integration -- ledgerCompleteness.spec.ts
-```
+before a release. The surfaces they cover and the commands that run
+them live in the
+[testing guide](../TESTING.md#cross-feature-journeys).
 
 A green suite with mocked cores is a failing result: anything that
 cannot run against the real backend must be listed as uncovered with
