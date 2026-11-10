@@ -2,7 +2,12 @@ import { expect, type Page, test } from "./base.ts";
 import { readSavedServerModel } from "./fixture.ts";
 
 async function editInvestingAmount(page: Page) {
-	await page.goto("/transactions?editor=transaction&id=invest");
+	// Click-through, not the direct editor URL: the resource-change test
+	// below re-navigates after recovery, and that path depends on the
+	// history depth established by opening the editor in-app.
+	await page.goto("/transactions");
+	await page.getByRole("tab", { name: /Recurring/ }).click();
+	await page.getByRole("button", { name: "Monthly investing" }).click();
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("900");
 }
