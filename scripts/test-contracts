@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Package/configuration contracts shared by unit and completion entry points.
+# No pre-existing stack, credentials, or Docker daemon is required.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+node --test dev/*.test.mjs scripts/*.test.mjs auth/*.test.mjs \
+  deploy/images.test.mjs deploy/vercel.test.mjs \
+  deploy/migrations.test.mjs deploy/analysis-migration.test.mjs

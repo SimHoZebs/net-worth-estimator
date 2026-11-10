@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Unified test dispatcher: documents the unit vs integration split in one place.
-# Unit needs no servers, Docker daemon, or credentials.
+# Unit needs no pre-existing stack, Docker daemon, or credentials.
 # Integration boots servers, Docker images, or a real provider.
 # Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matrix opts]|--gate [--no-browser] [--without-backend] [--shards=N]|--help]
 set -euo pipefail
@@ -11,18 +11,18 @@ usage() {
   cat <<'EOF'
 Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matrix opts]|--gate [--no-browser] [--without-backend] [--shards=N]|--help]
 
-  --unit         go test + vitest + config contract tests (no servers/daemon/credentials)
+  --unit         package/config checks (no pre-existing stack/daemon/credentials)
   --integration  browser integration suite (fixtureapi + Vite over real HTTP)
   --all          --unit then --integration (tests only; not the completion gate:
                lint, typecheck, and build still run separately per TESTING.md)
   --e2e          disposable end-to-end gate: real provider, real images, real
                browser (needs E2E_TEST_MUTATIONS=1, Docker, ~30 min budget;
                pre-release/nightly cadence, not per push). See docs/e2e-gate.md.
-  --skip-build   with --e2e: reuse previously built e2e images (warm rerun;
+   --skip-build=ID with --e2e: reuse a retained e2e image set (warm rerun;
                images only — each run still mints a fresh fixture and ports)
   --cold-build   with --e2e: rebuild images with --no-cache (true cold build)
-  --step=name    with --e2e: run one journey step only (fixture/images/stack
-               still run; dependent journeys need the full run)
+  --step=name    with --e2e: run the selected step and its prerequisites
+               (infrastructure stops at its requested boundary)
   --timeout=N    with --e2e: wall-clock budget in seconds (default 1800)
   --clean        with --e2e: remove the disposable root even on failure
                (removed on success, kept on failure by default)
@@ -56,16 +56,13 @@ Matrix:
   unit         backend/scripts/verify.sh (CGO_ENABLED=0 gofmt+vet+test ./...)
                bun --filter ./frontend test:unit (vitest: src/** and scripts/**, jsdom)
                bun --filter ./extension test (node:test, no external APIs)
-               node --test dev/*.test.mjs (Compose CLI, no daemon)
-               bun --filter @waypoint/auth test (real provider, disposable database)
-               node --test scripts/*.test.mjs
-               node --test deploy/images.test.mjs deploy/vercel.test.mjs
-               node --test auth/e2e-gate.test.mjs (e2e budget/flake/fixture contract)
+                bun --filter @waypoint/auth test (real provider, disposable database)
+                bash scripts/test-contracts (config, scripts, auth, deployment safety)
   integration  bun --filter ./frontend test:integration (tests/integration/*.spec.ts, sharded)
                bun --filter ./extension test:browser (disposable browser profile)
   e2e          E2E_TEST_MUTATIONS=1 node auth/test-e2e.mjs (disposable provider,
                real images, real browser; covers the manual credential-gated
-               regressions: auth/test-integration.mjs journeys, smoke scripts,
+                regressions: identity journeys, smoke scripts,
                proxy-header and deployment-image checks,
                migration-on-image verification)
                INTEGRATION_PACK=<pack> seeds the fixture harness from
@@ -86,16 +83,12 @@ run_unit() {
   bun --filter ./frontend api:generate
   bun --filter ./frontend test:unit
   bun --filter ./extension test
-  # shellcheck disable=SC2086
-  node --test dev/*.test.mjs
   bun --filter @waypoint/auth test
-  node --test scripts/*.test.mjs
-  node --test deploy/images.test.mjs deploy/vercel.test.mjs
-  node --test auth/e2e-gate.test.mjs
+  bash scripts/test-contracts
 }
 
 run_integration() {
-  bun --filter ./frontend test:integration
+  bun --filter ./frontend test:integration || return "$?"
   bun --filter ./extension test:browser
 }
 
@@ -225,8 +218,8 @@ run_gate() {
     echo "gate: frontend, extension"
   fi
   start extension bash -c "bun --filter ./extension test && bun --filter ./extension lint && bun --filter ./extension build"
-  start auth bash -c "bun --filter @waypoint/auth lint && bun --filter @waypoint/auth typecheck && bun --filter @waypoint/auth test && bun --filter @waypoint/auth build && node --test dev/*.test.mjs"
-  start deploy bash -c "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml && node --test deploy/images.test.mjs deploy/vercel.test.mjs scripts/smoke-compose.test.mjs"
+  start auth bash -c "bun --filter @waypoint/auth lint && bun --filter @waypoint/auth typecheck && bun --filter @waypoint/auth test && bun --filter @waypoint/auth build"
+  start deploy bash -c "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml && bash scripts/test-contracts"
   start frontend-lint bun --filter ./frontend lint
   start frontend-checks bash -c "bun --filter ./frontend typecheck && bun --filter ./frontend test:unit && bun --filter ./frontend build"
 
@@ -248,7 +241,7 @@ run_gate() {
         export TEST_BROWSER_SHARDS="$shards"
       fi
       local integration_started=$SECONDS
-      if ! bun --filter ./frontend test:integration >"$logs/integration.log" 2>&1; then
+      if ! run_integration >"$logs/integration.log" 2>&1; then
         names+=(integration)
         started+=("$integration_started")
         report "$((${#names[@]} - 1))" 1
@@ -288,10 +281,10 @@ for argument in "$@"; do
       fi
       mode="$argument"
       ;;
-    --skip-build|--clean|--cold-build)
+    --clean|--cold-build)
       e2e_args="$e2e_args $argument"
       ;;
-    --step=*|--timeout=*|--seed-pack=*|--seed-bulk=*)
+    --skip-build=*|--step=*|--timeout=*|--seed-pack=*|--seed-bulk=*)
       e2e_args="$e2e_args $argument"
       ;;
     --no-browser) run_browser=0 ;;
