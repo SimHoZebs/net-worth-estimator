@@ -48,6 +48,9 @@ test("rent shares income review without changing financial rows", async ({
 	await expect(
 		patterns.getByRole("button", { name: "Review ACME PAYROLL" }),
 	).toBeVisible();
+	await expect(
+		patterns.getByRole("button", { name: "Review BILT CARD PAYMENT" }),
+	).toBeVisible();
 	await expect(patterns.getByText(/1,800 USD typical/)).toBeVisible();
 	await patterns.getByRole("button", { name: "Review BILT RENT" }).click();
 	const rentDialog = page.getByRole("dialog", { name: "BILT RENT" });
