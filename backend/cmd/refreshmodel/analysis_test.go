@@ -44,10 +44,13 @@ func TestPrivateAnalysisEvidenceIsExcludedFromPublicCopy(t *testing.T) {
 			t.Fatalf("private %s=%s", table, got)
 		}
 	}
+	if got := query(t, target, "SELECT COUNT(*) FROM analysis_fact_dirty WHERE user_id='owner'"); got != "1" {
+		t.Fatalf("private analysis_fact_dirty=%s", got)
+	}
 	if err := refresh(target, source, "other", "owner", true); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []string{"transaction_source_facts", "analysis_inputs", "analysis_runs", "analysis_findings"} {
+	for _, table := range []string{"transaction_source_facts", "analysis_inputs", "analysis_runs", "analysis_findings", "analysis_fact_dirty", "analysis_payment_streams"} {
 		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE user_id='owner'"); got != "0" {
 			t.Fatalf("public copied private %s=%s", table, got)
 		}

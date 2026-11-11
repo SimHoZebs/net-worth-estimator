@@ -29,6 +29,7 @@ var financialTables = []string{
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "gmail_credentials", "amount_presets", "safe_spending_settings",
 	"receipts", "email_receipts",
 	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
+	"analysis_fact_dirty", "analysis_payment_streams",
 	"provider_connections", "projection_states", "projection_slices", "monte_carlo_statistics",
 	"projection_rows",
 	"net_worth_threshold_outputs", "account_balance_outputs", "transaction_fulfillment_outputs",
@@ -226,12 +227,16 @@ var identityTables = map[string]bool{
 }
 
 // lazyTables are allowlisted tables that may be absent from either side
-// because their stores still create them on first use. All other tables,
-// including the suppression-key sidecar, must be present on both sides so
-// pre-existing snapshots fail closed instead of silently leaving stale rows.
+// because their stores still create them on first use. The incremental
+// analysis caches also qualify: a side without them rebuilds from scratch.
+// All other tables, including the suppression-key sidecar, must be present
+// on both sides so pre-existing snapshots fail closed instead of silently
+// leaving stale rows.
 var lazyTables = map[string]bool{
-	"email_receipts":         true,
-	"transaction_categories": true,
+	"email_receipts":           true,
+	"transaction_categories":   true,
+	"analysis_fact_dirty":      true,
+	"analysis_payment_streams": true,
 }
 
 func checkedTables(db *sql.DB) ([]tableShape, error) {
