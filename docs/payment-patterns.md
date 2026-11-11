@@ -45,9 +45,12 @@ rebuilds the owner's streams; per-stream incremental bank updates are not implem
   or saved answers. Explicit negative judgments remain reviewable.
 - Payment patterns use the same card layout as repeating payments: title,
   status badge, typical amount plus cadence plus recorded count, and Confirm
-  plus Not actions. Repetition always stays a standalone card list. Purpose
-  and repetition keep separate lifecycles and explicit answers. No result or
-  answer creates or edits a forecast schedule.
+  plus Not answers. The same cards offer the same forecast actions: create a
+  new schedule or link the recorded payments to an existing schedule, each
+  behind its preview. Acting records confirmation of the purpose pattern in
+  the same transaction. Confirm and Not record only the answer and never
+  create or edit a schedule. Repetition always stays a standalone card list.
+  Purpose and repetition keep separate lifecycles and explicit answers.
 
 ## Rent
 

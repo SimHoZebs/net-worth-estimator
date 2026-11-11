@@ -150,7 +150,9 @@ human queue. The feature never selects an algorithm or interprets a probability.
   source-currency amounts supplied as structured fields rather than parsed
   from explanations or reconstructed from training features. Cards match the
   repeating-payments layout: title, status badge, typical amount plus cadence
-  plus recorded count, and Confirm plus Not actions. Repetition always stays
+  plus recorded count, Confirm plus Not answers, and the same forecast
+  actions (create a new schedule or link to an existing schedule, each behind
+  its preview, recording confirmation). Repetition always stays
   a standalone card list. Repetition answers never imply income
   or rent, and purpose answers never confirm repetition.
   Review uses the latest answered eligible occurrence, or the first eligible
@@ -163,7 +165,8 @@ human queue. The feature never selects an algorithm or interprets a probability.
   merchant and cadence tie breaks, so the user does not have to state the
   main inflow. Ranking is withheld when candidates have different or missing
   currencies because source amounts cannot be compared without conversion.
-  The finding never creates a schedule.
+  Confirm records only the answer and never creates a schedule; the card's
+  forecast actions create or link schedules and record confirmation.
 - Cross-claim independence holds: a deposit may carry recurring, income,
   and transfer claims without competing. Withdrawing, confirming, or
   rejecting one kind never disturbs the others.
@@ -212,7 +215,7 @@ deployment requirements.
 
 ## Pattern to new schedule
 
-A repeating pattern becomes planned cash flow through an explicit schedule
+A repeating or payment pattern becomes planned cash flow through an explicit schedule
 action: preview, then create or link. Saving also records acceptance of the
 pattern in the same database transaction. No standalone confirmation is required.
 Previewing or cancelling never records acceptance. Observed patterns
@@ -249,7 +252,7 @@ user clear removes pattern-to-new-schedule records with the model rows they name
 
 ## Pattern to existing schedule
 
-A repeating pattern can also claim an existing schedule's occurrences instead
+A repeating or payment pattern can also claim an existing schedule's occurrences instead
 of creating a new schedule. Each recorded movement becomes a manual
 `TransactionClaim` against its nearest free scheduled occurrence, so the
 projection stops double-counting and the recorded rows stay intact.

@@ -37,7 +37,7 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 	if err := json.Unmarshal([]byte(reviewJSON), &anchor.Review); err != nil {
 		return preview, err
 	}
-	if anchor.Kind != "recurring" {
+	if !analysis.IsSchedulePatternKind(anchor.Kind) {
 		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToExistingScheduleInvalid, anchor.Kind)
 	}
 	occurrenceIDs := []string{}
@@ -115,7 +115,7 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 	}
 	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
 		preview.Claimable = false
-		preview.Reason = "Review this repeating pattern again before linking its payments to a forecast schedule."
+		preview.Reason = "Review this pattern again before linking its payments to a forecast schedule."
 		return preview, nil
 	}
 	assignments, err := analysis.BuildPatternToExistingSchedule(analysis.PatternToExistingScheduleInput{

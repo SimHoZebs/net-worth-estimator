@@ -16,10 +16,26 @@ import (
 // Pattern-to-new-rule errors classify why a pattern cannot become a forecast rule.
 // The persistence layer maps them to its invalid/conflict contract.
 var (
-	ErrNotRecurring      = errors.New("finding is not a recurring pattern")
+	ErrNotRecurring      = errors.New("finding is not a schedule pattern")
 	ErrPatternStale      = errors.New("recurring pattern changed since confirmation")
 	ErrPatternIncoherent = errors.New("recurring pattern evidence disagrees")
 )
+
+// IsSchedulePatternKind reports whether a finding kind can drive the
+// pattern-to-schedule actions: the recurring detector or any registry
+// payment classification. The registry is the composition point, so a new
+// classification becomes actionable without touching these gates.
+func IsSchedulePatternKind(kind string) bool {
+	if kind == "recurring" {
+		return true
+	}
+	for _, definition := range PaymentClassifications() {
+		if definition.ID == kind {
+			return true
+		}
+	}
+	return false
+}
 
 // recurringCadenceFrequencies maps detected cadences onto forecast rule
 // schedules. Biweekly has no rule schedule: rules expand weekly, monthly,
@@ -82,7 +98,7 @@ type PatternToNewScheduleInput struct {
 // Creatable=false instead of an error, so the interface can explain why.
 func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.PatternToNewSchedulePreview, error) {
 	anchor := input.Anchor
-	if anchor.Kind != "recurring" {
+	if !IsSchedulePatternKind(anchor.Kind) {
 		return types.PatternToNewSchedulePreview{}, ErrNotRecurring
 	}
 	if anchor.Status != "active" {
@@ -201,7 +217,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	}
 	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
 		preview.Creatable = false
-		preview.Reason = "Review this repeating pattern again before creating its forecast schedule."
+		preview.Reason = "Review this pattern again before creating its forecast schedule."
 	}
 	if input.ExistingScheduleID != "" {
 		preview.Creatable = false

@@ -68,6 +68,31 @@ func TestBuildPatternToExistingScheduleMapsToSchedule(t *testing.T) {
 	}
 }
 
+func TestBuildPatternToExistingScheduleAcceptsRentKind(t *testing.T) {
+	finding := existingRuleTestFinding()
+	finding.Kind = "rent"
+	finding.Pattern = &types.AnalysisPaymentPattern{PatternID: "rent-pattern", Currency: "USD", TypicalAmount: "1200.00"}
+	assignments, err := BuildPatternToExistingSchedule(PatternToExistingScheduleInput{
+		Anchor: finding, Transactions: existingRuleTestTransactions(), Facts: map[string]types.TransactionFacts{
+			"p1": {Amount: "-1200.00", Currency: "USD"},
+			"p2": {Amount: "-1200.00", Currency: "USD"},
+			"p3": {Amount: "-1200.00", Currency: "USD"},
+		}, Rule: existingRuleTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"p1": "2026-01-01", "p2": "2026-02-01", "p3": "2026-04-01"}
+	if len(assignments) != len(want) {
+		t.Fatalf("assignments=%+v", assignments)
+	}
+	for _, item := range assignments {
+		if want[item.TransactionID] != item.Date {
+			t.Fatalf("assignment=%+v want %v", item, want)
+		}
+	}
+}
+
 func TestBuildPatternToExistingScheduleRejectsRoutingMismatch(t *testing.T) {
 	rule := existingRuleTestRule()
 	other := "savings"

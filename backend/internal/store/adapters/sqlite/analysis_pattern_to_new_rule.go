@@ -39,7 +39,7 @@ func (s *sqliteStore) PreviewPatternToNewSchedule(findingID string) (types.Patte
 	if err := json.Unmarshal([]byte(reviewJSON), &anchor.Review); err != nil {
 		return preview, err
 	}
-	if anchor.Kind != "recurring" {
+	if !analysis.IsSchedulePatternKind(anchor.Kind) {
 		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToNewScheduleInvalid, anchor.Kind)
 	}
 	occurrenceIDs := []string{}

@@ -12,6 +12,10 @@ import { useReviewAnalysisFinding } from "@/state/analyses.ts";
 import { Badge } from "@/components/Badge.tsx";
 import { Button } from "@/components/Button.tsx";
 import { FieldError } from "@/components/ErrorNotice.tsx";
+import {
+	ExistingScheduleDialog,
+	NewScheduleDialog,
+} from "./RecurringPatterns.tsx";
 
 function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	return {
@@ -35,6 +39,8 @@ function PatternCard({
 	readOnly: boolean;
 }) {
 	const review = useReviewAnalysisFinding();
+	const [planOpen, setPlanOpen] = useState(false);
+	const [linkOpen, setLinkOpen] = useState(false);
 	const finding = pattern.anchor;
 	const title = paymentTitle(pattern, names);
 	const summary = finding.pattern!;
@@ -59,33 +65,70 @@ function PatternCard({
 			<FieldError
 				message={review.isError ? "The answer could not be saved." : null}
 			/>
-			{!readOnly && (
-				<div className="flex flex-wrap gap-2">
-					<Button
-						type="button"
-						size="sm"
-						variant="primary"
-						disabled={busy || inactive || confirmed}
-						aria-pressed={confirmed}
-						aria-label={`Confirm ${finding.kind} for ${title}`}
-						onClick={() => review.mutate(answerInput(finding, "confirm"))}
-					>
-						Confirm
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						variant="secondary"
-						disabled={
-							busy || inactive || finding.review?.decision === "rejected"
-						}
-						aria-pressed={finding.review?.decision === "rejected"}
-						aria-label={`Not ${finding.kind} for ${title}`}
-						onClick={() => review.mutate(answerInput(finding, "reject"))}
-					>
-						Not {finding.kind}
-					</Button>
-				</div>
+			<div className="flex flex-wrap gap-2">
+				<Button
+					type="button"
+					size="sm"
+					variant={readOnly ? "secondary" : "primary"}
+					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
+					onClick={() => setPlanOpen(true)}
+				>
+					{readOnly ? "Review forecast plan" : "Create forecast schedule"}
+				</Button>
+				<Button
+					type="button"
+					size="sm"
+					variant="secondary"
+					aria-label={`Link payment pattern for ${title} to an existing schedule`}
+					onClick={() => setLinkOpen(true)}
+				>
+					Link to existing schedule
+				</Button>
+				{!readOnly && (
+					<>
+						<Button
+							type="button"
+							size="sm"
+							variant="primary"
+							disabled={busy || inactive || confirmed}
+							aria-pressed={confirmed}
+							aria-label={`Confirm ${finding.kind} for ${title}`}
+							onClick={() => review.mutate(answerInput(finding, "confirm"))}
+						>
+							Confirm
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant="secondary"
+							disabled={
+								busy || inactive || finding.review?.decision === "rejected"
+							}
+							aria-pressed={finding.review?.decision === "rejected"}
+							aria-label={`Not ${finding.kind} for ${title}`}
+							onClick={() => review.mutate(answerInput(finding, "reject"))}
+						>
+							Not {finding.kind}
+						</Button>
+					</>
+				)}
+			</div>
+			{planOpen && (
+				<NewScheduleDialog
+					findingId={finding.id}
+					title={title}
+					readOnly={readOnly}
+					onClose={() => setPlanOpen(false)}
+				/>
+			)}
+			{linkOpen && (
+				<ExistingScheduleDialog
+					findingId={finding.id}
+					title={title}
+					names={names}
+					readOnly={readOnly}
+					onClose={() => setLinkOpen(false)}
+				/>
 			)}
 		</article>
 	);

@@ -107,7 +107,20 @@ test("income answers can be corrected and survive refresh without financial muta
 test("income review remains read-only for readers", async ({ page }) => {
 	await resetFixture(incomeFixture(true));
 	const income = await openIncome(page);
-	await expect(income.getByRole("button")).toHaveCount(0);
+	await expect(
+		income.getByRole("button", { name: /Confirm income for/ }),
+	).toHaveCount(0);
+	await expect(
+		income.getByRole("button", { name: /Not income for/ }),
+	).toHaveCount(0);
+	await expect(
+		income.getByRole("button", { name: /Review forecast plan for/ }),
+	).toBeVisible();
+	await expect(
+		income.getByRole("button", {
+			name: /Link payment pattern for .* to an existing schedule/,
+		}),
+	).toBeVisible();
 });
 
 test("income review keeps its latest answer when a pattern spans findings pages", async ({

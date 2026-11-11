@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -21,7 +22,7 @@ func acceptRecurringPattern(tx *userTx, findingID, actor string) error {
 	if err := json.Unmarshal([]byte(raw), &review); err != nil {
 		return err
 	}
-	if kind != "recurring" || status != "active" || dismissed || (review != nil && review.Decision == "rejected") {
+	if !analysis.IsSchedulePatternKind(kind) || status != "active" || dismissed || (review != nil && review.Decision == "rejected") {
 		return store.ErrAnalysisFeedbackConflict
 	}
 	if review != nil && review.Decision == "confirmed" {

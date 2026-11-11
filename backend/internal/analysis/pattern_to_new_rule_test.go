@@ -51,6 +51,81 @@ func TestBuildPatternToNewSchedulePreviewRejectsNonRecurring(t *testing.T) {
 	}
 }
 
+func paymentRuleTestInput(kind, cadence string, amounts ...string) PatternToNewScheduleInput {
+	account := "checking"
+	amount := func(value string) types.TransactionAmountResolution {
+		return types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": value}, Inputs: map[string]types.AmountInputBinding{}}
+	}
+	stamps := []int64{1768478400, 1771156800}
+	transactions := []types.Transaction{
+		{ID: "p1", Name: "Payroll", SourceAccountID: &account, Amount: amount("3000.00"), TransactionTime: stamps[0], Enabled: true},
+		{ID: "p2", Name: "Payroll", SourceAccountID: &account, Amount: amount("3000.00"), TransactionTime: stamps[1], Enabled: true},
+	}
+	facts := map[string]types.TransactionFacts{}
+	for i, id := range []string{"p1", "p2"} {
+		value := "3000.00"
+		if i < len(amounts) {
+			value = amounts[i]
+		}
+		facts[id] = types.TransactionFacts{Description: "ACME PAYROLL", Amount: value, Currency: "USD", OccurredAt: stamps[i]}
+	}
+	finding := types.AnalysisFinding{
+		AnalysisDetection: types.AnalysisDetection{
+			TransactionID: "p1", Kind: kind, Provider: "ACME PAYROLL", Product: cadence,
+			Role: "inflow", Strength: "moderate",
+			Evidence: []types.AnalysisEvidence{{Code: kind + ".cadence", Reason: "test", TransactionIDs: []string{"p1", "p2"}}},
+		},
+		ID: "finding-1", Status: "active",
+		Review: &types.AnalysisReview{Decision: "confirmed", Provider: "ACME PAYROLL", AnsweredAt: 1},
+	}
+	return PatternToNewScheduleInput{Anchor: finding, Transactions: transactions, Facts: facts, AccountIDs: []string{"checking"}}
+}
+
+func TestBuildPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
+	preview, err := BuildPatternToNewSchedulePreview(paymentRuleTestInput("income", "monthly", "3000.00", "3000.00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.Creatable || preview.Schedule == nil {
+		t.Fatalf("preview=%+v", preview)
+	}
+	if preview.Direction != "inflow" || preview.Cadence != "monthly" || preview.TypicalAmount != "3000.00" {
+		t.Fatalf("preview=%+v", preview)
+	}
+	if preview.Schedule.StartDate != "2026-03-15" || preview.Schedule.Frequency != types.FrequencyMonthly {
+		t.Fatalf("schedule=%+v", preview.Schedule)
+	}
+	if preview.PatternKey != RecurringPatternKey("income", "monthly", []string{"p2", "p1"}) {
+		t.Fatalf("key=%q", preview.PatternKey)
+	}
+}
+
+func TestBuildPatternToNewSchedulePreviewLeavesBiweeklyIncomeVisible(t *testing.T) {
+	preview, err := BuildPatternToNewSchedulePreview(paymentRuleTestInput("income", "biweekly", "3000.00", "3000.00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Creatable || preview.Schedule != nil || preview.Reason == "" {
+		t.Fatalf("preview=%+v", preview)
+	}
+	if len(preview.Occurrences) != 2 {
+		t.Fatalf("occurrences=%+v", preview.Occurrences)
+	}
+}
+
+func TestBuildPatternToNewSchedulePreviewLeavesNoCadenceRentVisible(t *testing.T) {
+	preview, err := BuildPatternToNewSchedulePreview(paymentRuleTestInput("rent", "", "-1200.00", "-1200.00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Creatable || preview.Schedule != nil || preview.Reason == "" {
+		t.Fatalf("preview=%+v", preview)
+	}
+	if preview.Direction != "outflow" || len(preview.Occurrences) != 2 {
+		t.Fatalf("preview=%+v", preview)
+	}
+}
+
 func TestBuildPatternToNewSchedulePreviewRejectsSplitEvidence(t *testing.T) {
 	input := newRuleTestInput()
 	other := "savings"

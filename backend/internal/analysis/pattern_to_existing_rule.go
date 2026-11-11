@@ -104,7 +104,7 @@ func existingRuleMatchesTransaction(rule types.Schedule, transaction types.Trans
 // the ordinary finance boundary.
 func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]types.PatternOccurrence, error) {
 	anchor := input.Anchor
-	if anchor.Kind != "recurring" {
+	if !IsSchedulePatternKind(anchor.Kind) {
 		return nil, ErrNotRecurring
 	}
 	if anchor.Status != "active" {
