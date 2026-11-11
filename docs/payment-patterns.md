@@ -59,8 +59,8 @@ Unchanged streams keep byte-identical findings with no new provider calls.
 
 ## Rent
 
-Rent applies to external outflows. Rent wording or a source rent category supports
-it; a known housing platform without those details is uncertain. Bilt is a useful
+Rent applies to external outflows. Rent wording supports it; a source rent
+category or a known housing platform is an uncertain candidate. Bilt is a useful
 housing signal but also supports mortgages. Card repayments, mortgage wording and
 clearly non-rent property charges exclude a deterministic suggestion. The
 [researched platform catalog](rent-platform-evidence.md) records primary sources.

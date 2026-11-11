@@ -49,7 +49,9 @@ def features_from_request(request):
         "gap_cv": min(values["intervalVariation"], 2),
         "cadence_days_n": values["cadenceDays"] / 365.25,
         "recency_n": min(values["recencyDays"] / 90, 1),
-        "currency:" + pattern["currency"]: 1,
+        # Currency is validated but never featurized: purpose must not depend
+        # on denomination. Amount scales stay currency-denominated (no FX),
+        # so cross-currency magnitude comparison remains approximate.
         "cadence:" + pattern["cadence"]: 1,
         "merchant:" + hashlib.sha256(pattern["merchant"].encode()).hexdigest(): 1,
     }

@@ -136,9 +136,9 @@ human queue. The feature never selects an algorithm or interprets a probability.
   quarterly patterns; two establish an annual pattern. Annualized estimate
   is the median source amount times periods per year (52, 26, 12, 4, 1).
 - A payroll descriptor (payroll, salary, paycheck, direct deposit, direct
-  deposit abbreviation, ACH credit) or a source category that maps to
-  `INCOME` supports income even for one observation. Regular cadence alone is
-  an uncertain candidate. Without repetition, cadence and annual estimate remain
+  deposit abbreviation, ACH credit) supports income even for one observation.
+  A source category that maps to `INCOME` is an uncertain candidate, as is
+  regular cadence alone. Without repetition, cadence and annual estimate remain
   unestablished rather than extrapolated from one payment.
 - Internal transfers are excluded by the exact opposite-leg rule from the
   transfer detector (same absolute amount, opposite direction, different

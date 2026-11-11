@@ -37,8 +37,8 @@ type PaymentClassification struct {
 
 func PaymentClassifications() []PaymentClassification {
 	return []PaymentClassification{
-		{ID: "income", Label: "income", Direction: "inflow", SupportSignals: []string{"payroll-descriptor", "source-income"}, CandidateSignals: []string{"regular-cadence"}, RankMain: true, ExternalOnly: true},
-		{ID: "rent", Label: "rent", Direction: "outflow", SupportSignals: []string{"rent-descriptor", "source-rent"}, CandidateSignals: []string{"housing-platform"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor", "non-rent-charge", "utility-descriptor", "insurance-descriptor"}, ExternalOnly: true},
+		{ID: "income", Label: "income", Direction: "inflow", SupportSignals: []string{"payroll-descriptor"}, CandidateSignals: []string{"regular-cadence", "source-income"}, RankMain: true, ExternalOnly: true},
+		{ID: "rent", Label: "rent", Direction: "outflow", SupportSignals: []string{"rent-descriptor"}, CandidateSignals: []string{"housing-platform", "source-rent"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor", "non-rent-charge", "utility-descriptor", "insurance-descriptor"}, ExternalOnly: true},
 		{ID: "utility", Label: "utility", Direction: "outflow", SupportSignals: []string{"utility-descriptor"}, CandidateSignals: []string{"utility-provider"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor"}, ExternalOnly: true},
 		{ID: "auto-insurance", Label: "auto insurance", Direction: "outflow", SupportSignals: []string{"insurance-descriptor"}, CandidateSignals: []string{"insurance-provider"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor"}, ExternalOnly: true},
 		{ID: "card-payment", Label: "card payment", Direction: "outflow", SupportSignals: []string{"card-repayment"}, CandidateSignals: []string{"card-issuer"}, ExcludeSignals: []string{"mortgage-descriptor"}, ExternalOnly: true},
