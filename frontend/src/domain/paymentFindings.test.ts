@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import { groupPaymentPatterns, paymentLabel } from "./paymentFindings.ts";
+import {
+	groupPaymentPatterns,
+	paymentLabel,
+	paymentStatus,
+	paymentTitle,
+} from "./paymentFindings.ts";
 
 describe("payment classifications", () => {
 	const rent = {
@@ -54,5 +59,28 @@ describe("payment classifications", () => {
 				{ ...rent, id: "mortgage", kind: "mortgage" },
 			]),
 		).toHaveLength(2);
+	});
+	it("uses repeating-style card status and titles", () => {
+		expect(paymentStatus(rent)).toBe("Needs review");
+		expect(
+			paymentStatus({
+				...rent,
+				review: { decision: "confirmed", provider: "acme", answeredAt: 1 },
+			}),
+		).toBe("Confirmed");
+		const [pattern] = groupPaymentPatterns([
+			{ ...rent, id: "one", transactionId: "a" },
+			{ ...rent, id: "two", transactionId: "b" },
+		]);
+		expect(
+			paymentTitle(
+				pattern!,
+				new Map([
+					["a", "Landlord"],
+					["b", "Landlord"],
+				]),
+			),
+		).toBe("Landlord");
+		expect(paymentTitle(pattern!, new Map())).toBe("Rent");
 	});
 });

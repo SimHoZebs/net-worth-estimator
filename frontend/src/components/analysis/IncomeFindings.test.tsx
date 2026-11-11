@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { runInteractions } from "@/mocks/interactions.ts";
@@ -10,14 +9,8 @@ const review = vi.hoisted(() => ({
 	isPending: false,
 	isError: false,
 }));
-const dismiss = vi.hoisted(() => ({
-	mutate: vi.fn(),
-	isPending: false,
-	isError: false,
-}));
 vi.mock("@/state/analyses.ts", () => ({
 	useReviewAnalysisFinding: () => review,
-	useDismissAnalysisFinding: () => dismiss,
 }));
 
 function finding(id = "deposit"): AnalysisFinding {
@@ -60,19 +53,9 @@ const ui = (items: AnalysisFinding[], readOnly = false) => (
 	<IncomeFindings findings={items} names={names} readOnly={readOnly} />
 );
 
-// DOM Testing Library does not map summary's native disclosure role. Exercise
-// the real element with user-event; browser scenarios verify its accessibility.
-async function toggleDetails() {
-	await userEvent.setup().click(screen.getByText("Details"));
-}
-
 beforeEach(() => {
 	vi.clearAllMocks();
-	review.isPending =
-		dismiss.isPending =
-		review.isError =
-		dismiss.isError =
-			false;
+	review.isPending = review.isError = false;
 });
 
 describe("income review", () => {
@@ -126,7 +109,6 @@ describe("income review", () => {
 				{
 					...confirmed,
 					feedbackRevision: 2,
-					dismissed: true,
 					review: { ...confirmed.review, decision: "rejected" },
 				},
 			]),
@@ -140,40 +122,19 @@ describe("income review", () => {
 		});
 	});
 
-	it("keeps visibility actions separate from training answers", async () => {
-		const original = finding();
-		const view = render(ui([original]));
-		await toggleDetails();
-		await runInteractions([
-			{ click: ["button", "Dismiss income flag for ACME payroll"] },
-		]);
-		expect(dismiss.mutate).toHaveBeenLastCalledWith({
-			id: original.id,
-			dismissed: true,
-		});
-		view.rerender(
-			ui([
-				{
-					...original,
-					dismissed: true,
-					review: { decision: "rejected", provider: "acme", answeredAt: 1 },
-				},
-			]),
-		);
-		await runInteractions([
-			{ click: ["button", "Restore income flag for ACME payroll"] },
-		]);
-		expect(dismiss.mutate).toHaveBeenLastCalledWith({
-			id: original.id,
-			dismissed: false,
-		});
-		await runInteractions([
-			{ click: ["button", "Restore income flag for ACME payroll"] },
-		]);
+	it("offers no visibility actions on the card", async () => {
+		render(ui([finding()]));
+		expect(
+			screen.queryByRole("button", { name: /Dismiss income flag/ }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: /Restore income flag/ }),
+		).toBeNull();
+		expect(screen.queryByText("Details")).toBeNull();
 		expect(review.mutate).not.toHaveBeenCalled();
 	});
 
-	it("disables answers on stale evidence and all controls while saving", async () => {
+	it("disables answers on stale evidence and while saving", async () => {
 		const view = render(ui([{ ...finding(), stale: true }]));
 		await runInteractions([
 			{ expectDisabled: ["button", "Confirm income for ACME payroll"] },
@@ -181,9 +142,9 @@ describe("income review", () => {
 		]);
 		review.isPending = true;
 		view.rerender(ui([finding()]));
-		await toggleDetails();
 		await runInteractions([
-			{ expectDisabled: ["button", "Dismiss income flag for ACME payroll"] },
+			{ expectDisabled: ["button", "Confirm income for ACME payroll"] },
+			{ expectDisabled: ["button", "Not income for ACME payroll"] },
 		]);
 		expect(review.mutate).not.toHaveBeenCalled();
 	});
@@ -200,7 +161,7 @@ describe("income review", () => {
 	});
 
 	it.each([undefined, "confirmed", "rejected"])(
-		"disables withdrawn answers while retaining visibility controls (%s)",
+		"disables withdrawn answers (%s)",
 		async (decision) => {
 			const original = finding();
 			const view = render(ui([original]));
@@ -216,15 +177,10 @@ describe("income review", () => {
 					},
 				]),
 			);
-			await toggleDetails();
 			await runInteractions([
 				{ expectDisabled: ["button", "Confirm income for ACME payroll"] },
 				{ expectDisabled: ["button", "Not income for ACME payroll"] },
-				{ expectEnabled: ["button", "Dismiss income flag for ACME payroll"] },
-				{
-					expectText:
-						"This pattern no longer applies. Answers are unavailable.",
-				},
+				{ expectText: "Withdrawn" },
 			]);
 			expect(review.mutate).not.toHaveBeenCalled();
 		},
@@ -234,14 +190,15 @@ describe("income review", () => {
 		render(
 			ui(Array.from({ length: 6 }, (_, index) => finding(`deposit-${index}`))),
 		);
+		expect(screen.getAllByRole("article")).toHaveLength(5);
 		await runInteractions([
 			{ click: ["button", "Show more payment patterns"] },
 			{ expectAbsent: ["button", "Show more payment patterns"] },
 		]);
-		expect(screen.getAllByRole("row")).toHaveLength(7);
+		expect(screen.getAllByRole("article")).toHaveLength(6);
 	});
 
-	it("shows one compact row per pattern and discloses evidence only on request", async () => {
+	it("shows one compact card per pattern without a details disclosure", async () => {
 		const first = finding();
 		const second = {
 			...finding("second"),
@@ -249,15 +206,11 @@ describe("income review", () => {
 			evidence: first.evidence,
 		};
 		render(ui([first, second]));
-		expect(screen.getAllByRole("row")).toHaveLength(2);
-		expect(screen.getByText("52,000 USD")).toBeDefined();
-		const details = screen
-			.getByText("Three payroll deposits")
-			.closest("details")!;
-		expect(details.open).toBe(false);
-		await toggleDetails();
-		expect(details.open).toBe(true);
-		await toggleDetails();
-		expect(details.open).toBe(false);
+		expect(screen.getAllByRole("article")).toHaveLength(1);
+		expect(screen.getByText(/2,000 USD typical/)).toBeDefined();
+		expect(screen.getByText(/2 recorded/)).toBeDefined();
+		expect(screen.queryByText("52,000 USD")).toBeNull();
+		expect(screen.queryByText("Three payroll deposits")).toBeNull();
+		expect(screen.queryByText("Details")).toBeNull();
 	});
 });

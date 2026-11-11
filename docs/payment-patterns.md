@@ -43,10 +43,10 @@ rebuilds the owner's streams; per-stream incremental bank updates are not implem
   One provider session handles all classifications and owner-scoped feedback.
   The existing deployment-wide learner shares learning, never owner bank facts
   or saved answers. Explicit negative judgments remain reviewable.
-- The compact Payment patterns table shows amounts and review controls. Details
-  holds the explanation, occurrence states, visibility action and related
-  repetition review and forecast controls. Unlinked repetition stays standalone.
-  Purpose and repetition keep separate lifecycles and explicit answers. No result or
+- Payment patterns use the same card layout as repeating payments: title,
+  status badge, typical amount plus cadence plus recorded count, and Confirm
+  plus Not actions. Repetition always stays a standalone card list. Purpose
+  and repetition keep separate lifecycles and explicit answers. No result or
   answer creates or edits a forecast schedule.
 
 ## Rent

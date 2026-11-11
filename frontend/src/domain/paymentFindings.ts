@@ -68,6 +68,31 @@ export function paymentLabel(finding: AnalysisFinding) {
 		: `Possible ${label}`;
 }
 
+export function paymentTitle(
+	pattern: PaymentPattern,
+	names: Map<string, string>,
+): string {
+	const counts = new Map<string, number>();
+	let best = "";
+	let bestCount = 0;
+	for (const finding of pattern.findings) {
+		const name = names.get(finding.transactionId) ?? "";
+		if (!name) continue;
+		const count = (counts.get(name) ?? 0) + 1;
+		counts.set(name, count);
+		if (count > bestCount) {
+			best = name;
+			bestCount = count;
+		}
+	}
+	if (best) return best;
+	const raw = (pattern.anchor.provider ?? "").trim() || pattern.anchor.kind;
+	const merchant = raw.trim();
+	return merchant
+		? merchant.charAt(0).toUpperCase() + merchant.slice(1)
+		: "Payment pattern";
+}
+
 export function paymentStatus(finding: AnalysisFinding) {
 	if (finding.status === "withdrawn") return "Withdrawn";
 	if (finding.review?.decision === "rejected") return `Not ${finding.kind}`;
@@ -75,5 +100,5 @@ export function paymentStatus(finding: AnalysisFinding) {
 	if (finding.review?.decision === "confirmed") return "Confirmed";
 	if (finding.stale) return "Awaiting analysis";
 	if (finding.judgment?.status === "pending") return "Review pending";
-	return "Active";
+	return "Needs review";
 }

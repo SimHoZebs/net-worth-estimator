@@ -1,9 +1,7 @@
 import { expect, test } from "./base.ts";
 import { readSavedServerModel, resetFixture } from "./fixture.ts";
 
-test("a rent purpose can exist without repetition or an annual estimate", async ({
-	page,
-}) => {
+test("a rent purpose can exist without repetition", async ({ page }) => {
 	await resetFixture({
 		bankTransactions: [
 			{
@@ -31,9 +29,7 @@ test("a rent purpose can exist without repetition or an annual estimate", async 
 	});
 	const before = await readSavedServerModel();
 	await expect(region.getByText(/Repetition not established/)).toBeVisible();
-	await expect(
-		region.getByRole("cell", { name: "Not established", exact: true }),
-	).toBeVisible();
+	await expect(region.getByText(/1 recorded/)).toBeVisible();
 	await region.getByRole("button", { name: /Confirm rent for/ }).click();
 	await expect(
 		region.getByRole("button", { name: /Confirm rent for/ }),
@@ -72,9 +68,9 @@ test("purpose and repetition share evidence but retain separate answers", async 
 	});
 	const before = await readSavedServerModel();
 	await payments.getByRole("button", { name: /Confirm rent for/ }).click();
-	await payments.locator("summary").click();
 	const repetition = page.getByRole("region", {
-		name: /Repetition assessment for/,
+		name: "Repeating payments",
+		exact: true,
 	});
 	await repetition
 		.getByRole("button", { name: /Reject repeating pattern for/ })

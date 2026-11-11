@@ -146,11 +146,12 @@ human queue. The feature never selects an algorithm or interprets a probability.
 - Each occurrence carries its own finding. Its evidence lists every
   occurrence in the pattern plus the estimated cadence, typical source
   amount, and annualized estimate, so the basis is inspectable from one row.
-  The Payment patterns list groups occurrences into one compact row per classification and pattern, with
+  The Payment patterns list groups occurrences into one card per classification and pattern, with
   source-currency amounts supplied as structured fields rather than parsed
-  from explanations or reconstructed from training features. Details retains
-  the explanation, per-occurrence review states, visibility action and linked
-  repetition review and forecast controls. Repetition answers never imply income
+  from explanations or reconstructed from training features. Cards match the
+  repeating-payments layout: title, status badge, typical amount plus cadence
+  plus recorded count, and Confirm plus Not actions. Repetition always stays
+  a standalone card list. Repetition answers never imply income
   or rent, and purpose answers never confirm repetition.
   Review uses the latest answered eligible occurrence, or the first eligible
   occurrence for an unanswered pattern. It saves one explicit label and never

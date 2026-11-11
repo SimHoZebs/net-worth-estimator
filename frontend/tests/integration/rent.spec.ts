@@ -42,8 +42,8 @@ test("rent shares income review without changing financial rows", async ({
 		name: "Payment patterns",
 		exact: true,
 	});
-	await expect(patterns.getByRole("row")).toHaveCount(3);
-	await expect(patterns.getByText("21,600 USD", { exact: true })).toBeVisible();
+	await expect(patterns.getByRole("article")).toHaveCount(2);
+	await expect(patterns.getByText(/1,800 USD typical/)).toBeVisible();
 	await patterns.getByRole("button", { name: /Confirm rent for/ }).click();
 	await expect(
 		patterns.getByRole("button", { name: /Confirm rent for/ }),

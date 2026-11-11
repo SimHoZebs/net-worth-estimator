@@ -42,15 +42,6 @@ export function AnalysisFindings() {
 	const repetition = (complete.data ?? []).filter(
 		(finding) => finding.kind === "recurring",
 	);
-	const linkedStreams = new Set(
-		payments
-			.filter((finding) => finding.streamId)
-			.map((finding) => JSON.stringify([finding.streamId, finding.status])),
-	);
-	const recurring = repetition.filter(
-		(finding) =>
-			!linkedStreams.has(JSON.stringify([finding.streamId, finding.status])),
-	);
 	const names = new Map(
 		transactions.map((transaction) => [transaction.id, transaction.name]),
 	);
@@ -170,13 +161,12 @@ export function AnalysisFindings() {
 			) : (
 				<PaymentFindings
 					findings={payments}
-					repetition={repetition}
 					names={names}
 					readOnly={readOnly}
 				/>
 			)}
 			<RecurringPatterns
-				findings={recurring}
+				findings={repetition}
 				names={names}
 				readOnly={readOnly}
 			/>

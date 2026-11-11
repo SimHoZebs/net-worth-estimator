@@ -55,13 +55,9 @@ test("income answers can be corrected and survive refresh without financial muta
 	await expect(
 		income.getByText("Confirm or correct suggested payment purposes."),
 	).toBeVisible();
-	await expect(income.getByRole("row")).toHaveCount(2);
-	await expect(income.getByText("52,000 USD", { exact: true })).toBeVisible();
-	await expect(income.getByText(/Assessment of income/)).toBeHidden();
-	await income.locator("summary").focus();
-	await income.locator("summary").press("Enter");
-	await expect(income.getByText(/Assessment of income/)).toBeVisible();
-	await income.locator("summary").press("Enter");
+	await expect(income.getByRole("article")).toHaveCount(1);
+	await expect(income.getByText(/2,000 USD typical/)).toBeVisible();
+	await expect(income.getByText(/3 recorded/)).toBeVisible();
 	const confirm = income
 		.getByRole("button", { name: /Confirm income for/ })
 		.first();
@@ -172,7 +168,7 @@ test("income review keeps its latest answer when a pattern spans findings pages"
 		name: "Payment patterns",
 		exact: true,
 	});
-	await expect(income.getByRole("row")).toHaveCount(2);
+	await expect(income.getByRole("article")).toHaveCount(1);
 	await expect(
 		income.getByRole("button", { name: /Not income for/ }),
 	).toBeDisabled();
