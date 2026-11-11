@@ -46,13 +46,14 @@ failures.
 
 ## The seed (`ml/seed.sqlite3`)
 
-45KB SQLite containing only the `model` row: warm weights and per-kind
-example counts from training on HF v2 (5k slice) plus MoneyData baseline
-findings, interleaved per source, in manual drift mode with
-dismiss-and-retry (one US→UK boundary trip, logged, detector restarted).
-Coverage gate enforced at export: every classifier kind ≥ 50 examples
-(actual: income 397, rent 127, utility 106, auto-insurance 80); probe of
-200 requests evaluates identically in-memory vs fresh load (200/200).
+64KB SQLite containing only the `model` row: warm weights and per-kind
+example counts from training on the full HF v2 set plus all of MoneyData
+(4,156 stream-level events), interleaved per source, in manual drift
+mode with dismiss-and-retry (one US→UK boundary trip, logged, detector
+restarted). Coverage gate enforced at export: every classifier kind ≥
+50 examples (actual: income 2,924, rent 208, utility 551,
+auto-insurance 473); probe of 200 requests evaluates identically
+in-memory vs fresh load (200/200).
 
 Regenerate (deterministic):
 
@@ -60,7 +61,7 @@ Regenerate (deterministic):
 cd ml && uv run --with pyarrow --with pandas --with openpyxl \
   eval/harness.py --source all \
   --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
-  --slice 5000 --cache-dir /tmp/opencode/evalboth \
+  --full --cache-dir /tmp/opencode/evalboth \
   --export-seed ml/seed.sqlite3
 ```
 
