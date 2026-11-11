@@ -21,7 +21,6 @@
 - Before you begin new work, ensure you are working on the latest commit of origin/main. This does not apply if your work is explicitly regarding existing work in your tree.
 - Run parallel dev work in an isolated slot (`scripts/dev setup --slot NAME`, `scripts/dev ps-all`). Never stop the canonical stack or steal its ports to free your own.
 - Several agents may share one worktree and one branch under a single orchestrator that owns the branch.
-- The host's tailnet Serve routes and the canonical identity issuer are shared. Never change them.
 - Cut a feature branch for your work. Any agent whose branch has a green `Tests` run may ship it without waiting for the user: fetch, squash with semantic text, push fast-forward. If the push loses a race, refetch and retry. Never rebase pushed commits, never force-push, never amend commits you do not own.
 - Land to main by rebasing your private commits onto the tip and fast-forwarding main (rebase-merge, linear history, no merge bubbles); delete the landed branch after. If main moved, refetch and rebase again. This never force-pushes: the rebase touches only your own commits and main moves fast-forward.
 - Do not merge `origin/main` into feature branches mid-task. Use `git fetch origin` for status; rebase private commits only while unpushed.
@@ -34,25 +33,17 @@
 - Record the OpenCode chat session ID in the commit message body so later sessions can trace the change to its authoring conversation.
 - A change is independent only if it functions as intended in production as-is, even if all later work stops indefinitely.
 
-## Deployment watchdog
-
-- One owner writes live deployment state: the Northflank workflow definition, the API service command, and release requests. Feature agents own their own code fixes and hand deployment writes to that owner.
-- The agent that landed a commit verifies its release. When an incident stalls, meaning the release is red, no new release run has started, and `main` has not advanced, the watchdog takes ownership instead of waiting for a human.
-- Fix forward. Never restore a database backup to recover a failed release. Retry a failed target while `main` still points at it. Once a migration has published, release that same reviewed target or a newer commit that contains it, never older code.
-- Detection is `node deploy/watchdog/incident.mjs`. The procedure is the `deployment-watchdog` skill.
-
 ## Delegation
 
-- When given an implementation task, delegate the work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
+- When given a task, delegate the implemenation work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
 - Split independent workstreams across parallel backgrounded subagents under a single orchestrator that owns the branch.
 - Retain final ownership of audit verification and shipment and remain the final entity that ships the change.
 - Prefer subagent models in this order with the listed effort as provider slash model hash variant.
   1. `opencode/longcat-2.5-free` at max effort where supported
   2. `opencode/deepseek-v4.1-flash-free#max`
   3. `opencode-go/muse-spark-1.3-contributor#xhigh`
-  4. `opencode-go/deepseek-v4.1-flash`
-  5. `openai/gpt-6.1-terra#medium`
-  6. Own model as last resort
+  4. `openai/gpt-6.1-terra#medium`
+  5. Own model as last resort
 
 ## Start and verify
 
@@ -83,13 +74,13 @@ gh run watch "$run" --exit-status --interval 10
 - Separate landing verification from release verification as defined in `docs/release-gates.md`. When `AUTH_CUTOVER_READY` disables release requests, report deployment as not requested; never enable the operator-owned guard as a testing step. For an actual release, verify that the Northflank `waypoint-release` run for the landed SHA is `success` with its `migrate` step at exit 0, that `GET https://http--nwe-api--bc5m9smksgps.code.run/readyz` returns `ok` and never `maintenance`, and record the workflow run ID and migration backup hash. If an enabled release failed, inspect the failed stage and retry the same reviewed target before declaring that release complete.
 - Verify the frontend deploy. Check that the `vercel-release` run for the landed SHA is `success`, which means its production deployment for that SHA is ready, and record the deployment id from the run log. When the Vercel project id is unset, the deploy job never runs and the frontend deploy is not requested; report it as not requested, never as a successful deployment.
 - Dispatch `End-to-end tests` for changes to auth, images, migrations, or the proxy. Otherwise, it runs nightly, on dispatch, and on pull requests carrying the `e2e` label.
-- If your work impacts the frontend interactions or visuals in any way, take screenshots and/or gifs of the workflow you touched and share in chat.
+- If your work impacts frontend interactions then capture one gif per interaction workflow you touched and share each gif in chat. When several distinct interactions are involved then capture one gif for each interaction. If your work impacts only static visuals then screenshots are sufficient. Pace each gif with one interaction every 3 seconds so the motion stays readable rather than rushed.
 
 ## Landing visualization (viz/)
 
-- `viz/` holds the backlog landing map (`nwe-landing-map.html`, Mermaid diagrams) and `viz/captures/` (Playwright screenshots/clips). Gitignored; never commit.
+- `viz/` holds the backlog landing map (`nwe-landing-map.html`, Mermaid diagrams) and `viz/captures/` (Playwright screenshots and gifs). Gitignored; never commit.
 - Serve from `viz/`: `python3 -m http.server 8123 --bind 127.0.0.1` (LAN: `--bind 0.0.0.0`). Map at `/nwe-landing-map.html`, captures at `/captures/<area>/<file>`.
-- Capture against TESTING.md browser harnesses on isolated ports; place media under `viz/captures/<area>/` with descriptive names and display it in chat through markdown formatting.
+- Capture against TESTING.md browser harnesses on isolated ports; place media under `viz/captures/<area>/` with descriptive names and display it in chat through markdown formatting. Pace interaction gifs with one interaction every 3 seconds.
 - Keep worktrees out of `/tmp`. Use the standard worktree dir; relocate with remove plus re-add at the same ref when a move must cross devices.
 
 ## Production deployment
