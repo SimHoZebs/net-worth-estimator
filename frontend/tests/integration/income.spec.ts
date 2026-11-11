@@ -127,7 +127,7 @@ test("income review remains read-only for readers", async ({ page }) => {
 		dialog.getByRole("button", { name: /Review forecast plan for/ }),
 	).toBeVisible();
 	await expect(
-		dialog.getByRole("button", { name: /Link .*schedule for/ }),
+		dialog.getByRole("button", { name: /Link .*schedule/ }),
 	).toBeVisible();
 });
 
@@ -197,10 +197,14 @@ test("income review keeps its latest answer when a pattern spans findings pages"
 	await expect(
 		dialog.getByRole("button", { name: /Not income for/ }),
 	).toBeDisabled();
+	await dialog.getByRole("button", { name: "Close dialog" }).click();
+	await expect(page.getByRole("dialog", { name: "ACME PAYROLL" })).toHaveCount(
+		0,
+	);
 	await page
 		.getByRole("button", { name: "Next findings", exact: true })
 		.click();
-	dialog = page.getByRole("dialog", { name: "ACME PAYROLL" });
+	dialog = await openIncomeDialog(page, patterns);
 	await expect(
 		dialog.getByRole("button", { name: /Not income for/ }),
 	).toBeDisabled();
