@@ -8,7 +8,7 @@
 //
 // An incident is one of:
 //   - the Northflank release for the current main tip failed
-//   - the Northflank release for the current main tip never concluded
+//   - a Northflank release is still open past the stuck threshold
 //   - the frontend deploy for the current main tip failed
 //   - readiness does not answer "ok" once the release window has closed
 //
@@ -78,8 +78,9 @@ export async function assess({
   const budget = () => Math.max(1_000, Math.min(CALL_TIMEOUT_MS, deadline - now()));
   const call = (command, args) => run(command, args, { timeout: budget() });
   let tip;
-  let release;
   let short;
+  // True while any release run keeps the API in its maintenance container.
+  let windowOpen = false;
 
   try {
     const refs = call("git", ["ls-remote", "origin", MAIN_REF]);
@@ -101,27 +102,38 @@ export async function assess({
         ]),
       );
       confirmed.add("release");
-      const latest = (listed.runs ?? []).find((entry) => entry.name === `main-${short}`);
+      const runs = listed.runs ?? [];
+      const latest = runs.find((entry) => entry.name === `main-${short}`);
+      // A missing timestamp means age is unknown. Treat that as still in
+      // flight rather than turning an absent field into a decades-old run.
+      const age = (run) => {
+        const started = Date.parse(run.startedAt ?? run.createdAt ?? "");
+        return Number.isFinite(started) ? now() - started : 0;
+      };
+      // A newer push can wait behind the previous target while that window
+      // still serves maintenance, so every open run hides readiness, not
+      // only the tip's.
+      const open = runs.filter((run) => !run.concluded);
+      const stuck = open
+        .filter((run) => age(run) > STUCK_AFTER_MS)
+        .sort((left, right) => age(right) - age(left))[0];
+      if (stuck) {
+        problems.push({
+          area: "release",
+          summary: `Northflank release ${stuck.name} never concluded`,
+          detail: `run ${stuck.id} started ${stuck.startedAt ?? stuck.createdAt ?? "at an unknown time"} and is still ${stuck.status}`,
+        });
+      } else if (open.length > 0) {
+        windowOpen = true;
+        const active = open.find((run) => run === latest) ?? open[0];
+        notes.push(
+          `${releaseWorkflow} ${active.name} is still running (${active.status})` +
+            (active === latest ? "" : "; its window holds readiness"),
+        );
+      }
       if (!latest) {
         notes.push(`no ${releaseWorkflow} run for main-${short} yet`);
-      } else if (!latest.concluded) {
-        // A missing timestamp means age is unknown. Treat that as still in
-        // flight rather than turning an absent field into a decades-old run.
-        const started = Date.parse(latest.startedAt ?? latest.createdAt ?? "");
-        const age = Number.isFinite(started) ? now() - started : 0;
-        if (age > STUCK_AFTER_MS) {
-          release = { state: "stuck", run: latest };
-          problems.push({
-            area: "release",
-            summary: `Northflank release ${latest.name} never concluded`,
-            detail: `run ${latest.id} started ${latest.startedAt ?? latest.createdAt ?? "at an unknown time"} and is still ${latest.status}`,
-          });
-        } else {
-          release = { state: "in-flight", run: latest };
-          notes.push(`${releaseWorkflow} ${latest.name} is still running (${latest.status})`);
-        }
-      } else if (latest.status === "failure") {
-        release = { state: "failed", run: latest };
+      } else if (latest.concluded && latest.status === "failure") {
         let detail = "";
         try {
           const inspected = JSON.parse(
@@ -146,8 +158,22 @@ export async function assess({
           summary: `Northflank release ${latest.name} failed`,
           detail: `run ${latest.id} concluded ${latest.concludedAt}${detail}`,
         });
-      } else {
-        release = { state: "complete", run: latest };
+      }
+      if (!stuck && !windowOpen) {
+        // A failed run leaves the API down, so only a successful close earns
+        // the boot grace before readiness counts.
+        const newest = runs
+          .filter((run) => run.concluded)
+          .sort(
+            (left, right) =>
+              (Date.parse(right.concludedAt ?? "") || 0) -
+              (Date.parse(left.concludedAt ?? "") || 0),
+          )[0];
+        const concluded = Date.parse(newest?.concludedAt ?? "");
+        windowOpen =
+          newest?.status !== "failure" &&
+          Number.isFinite(concluded) &&
+          now() - concluded < BOOT_GRACE_MS;
       }
     } catch (error) {
       blind.push(`release runs: ${error.message}`);
@@ -182,14 +208,7 @@ export async function assess({
   }
 
   // Readiness only means something once the release window has closed.
-  const concluded = Date.parse(release?.run?.concludedAt ?? "");
-  const expectedOpen =
-    release?.state === "in-flight" ||
-    (release?.state === "complete" &&
-      Number.isFinite(concluded) &&
-      now() - concluded < BOOT_GRACE_MS);
-
-  if (expectedOpen) {
+  if (windowOpen) {
     notes.push("readiness not evaluated: the release window is open");
   } else {
     try {

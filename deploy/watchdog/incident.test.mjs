@@ -76,6 +76,156 @@ test("a release for an older commit is ignored, because a newer tip supersedes i
   assert.equal(needsAgent(result), false);
 });
 
+test("readiness is not evidence while an earlier tip's release is still in flight", async () => {
+  const prior = releaseRun({
+    name: "main-199fb167a6d4",
+    status: "async_wait",
+    concluded: false,
+    concludedAt: null,
+    startedAt: "2026-11-11T02:35:00.000Z",
+    createdAt: "2026-11-11T02:34:58.000Z",
+  });
+  const result = await assess({
+    run: fakeRun({ runs: [prior] }),
+    read: async () => "maintenance",
+    now: () => Date.parse(prior.startedAt) + 2 * 60 * 1000,
+  });
+  assert.equal(result.problems.length, 0);
+  assert.match(result.notes.join("\n"), new RegExp(`no waypoint-release run for main-${SHORT} yet`));
+  assert.match(result.notes.join("\n"), /release window is open/);
+  assert.equal(needsAgent(result), false);
+});
+
+test("readiness waits for the boot grace of an earlier tip's release", async () => {
+  const prior = releaseRun({
+    name: "main-199fb167a6d4",
+    concludedAt: "2026-11-11T02:30:53.587Z",
+  });
+  const result = await assess({
+    run: fakeRun({ runs: [prior] }),
+    read: async () => "no healthy upstream",
+    now: () => Date.parse(prior.concludedAt) + 30_000,
+  });
+  assert.equal(result.problems.length, 0);
+  assert.match(result.notes.join("\n"), /release window is open/);
+  assert.equal(needsAgent(result), false);
+});
+
+test("an earlier tip's release past the stuck threshold is still an incident", async () => {
+  const prior = releaseRun({
+    name: "main-199fb167a6d4",
+    status: "waiting",
+    concluded: false,
+    concludedAt: null,
+  });
+  const result = await assess({
+    run: fakeRun({ runs: [prior] }),
+    read: async () => "maintenance",
+    now: () => Date.parse(CONCLUDED) + 45 * 60 * 1000,
+  });
+  assert.equal(result.problems.length, 2);
+  assert.match(result.problems[0].summary, /main-199fb167a6d4 never concluded/);
+  assert.equal(result.problems[1].area, "readiness");
+  assert.equal(needsAgent(result), true);
+});
+
+test("an older stuck release is reported even when a younger run is queued", async () => {
+  const stuck = releaseRun({
+    id: "run-old",
+    name: "main-199fb167a6d4",
+    status: "waiting",
+    concluded: false,
+    concludedAt: null,
+    startedAt: "2026-11-11T01:00:00.000Z",
+    createdAt: "2026-11-11T01:00:00.000Z",
+  });
+  const queued = releaseRun({
+    id: "run-new",
+    status: "waiting",
+    concluded: false,
+    concludedAt: null,
+    startedAt: "2026-11-11T02:59:00.000Z",
+    createdAt: "2026-11-11T02:59:00.000Z",
+  });
+  const result = await assess({
+    run: fakeRun({ runs: [queued, stuck] }),
+    read: async () => "maintenance",
+    now: () => Date.parse("2026-11-11T03:00:00.000Z"),
+  });
+  assert.equal(result.problems[0].area, "release");
+  assert.match(result.problems[0].summary, /main-199fb167a6d4 never concluded/);
+  assert.equal(result.problems[1].area, "readiness");
+  assert.equal(needsAgent(result), true);
+});
+
+test("a failed earlier release does not get the boot grace", async () => {
+  const prior = releaseRun({ name: "main-199fb167a6d4", status: "failure" });
+  const result = await assess({
+    run: fakeRun({ runs: [prior] }),
+    read: async () => "maintenance",
+    now: () => Date.parse(prior.concludedAt) + 30_000,
+  });
+  assert.equal(result.problems.length, 1);
+  assert.equal(result.problems[0].area, "readiness");
+  assert.equal(needsAgent(result), true);
+});
+
+test("readiness counts after an earlier tip's release closes past the grace", async () => {
+  const prior = releaseRun({ name: "main-199fb167a6d4" });
+  const result = await assess({
+    run: fakeRun({ runs: [prior] }),
+    read: async () => "maintenance",
+    now: () => Date.parse(prior.concludedAt) + 10 * 60 * 1000,
+  });
+  assert.equal(result.problems.length, 1);
+  assert.equal(result.problems[0].area, "readiness");
+  assert.equal(needsAgent(result), true);
+});
+
+test("a concluded run without start timestamps does not hide the boot grace", async () => {
+  const recent = releaseRun({
+    id: "run-recent",
+    name: "main-199fb167a6d4",
+    concludedAt: "2026-11-11T02:30:53.587Z",
+  });
+  const undated = releaseRun({
+    id: "run-undated",
+    name: "main-199fb167a6d5",
+    startedAt: null,
+    createdAt: null,
+    concludedAt: "2026-11-11T01:00:00.000Z",
+  });
+  const result = await assess({
+    run: fakeRun({ runs: [undated, recent] }),
+    read: async () => "maintenance",
+    now: () => Date.parse(recent.concludedAt) + 30_000,
+  });
+  assert.equal(result.problems.length, 0);
+  assert.match(result.notes.join("\n"), /release window is open/);
+  assert.equal(needsAgent(result), false);
+});
+
+test("the boot grace follows the most recently concluded run", async () => {
+  const older = releaseRun({
+    id: "run-older",
+    name: "main-199fb167a6d4",
+    concludedAt: "2026-11-11T01:00:00.000Z",
+  });
+  const newer = releaseRun({
+    id: "run-newer",
+    name: "main-199fb167a6d5",
+    concludedAt: "2026-11-11T02:30:53.587Z",
+  });
+  const result = await assess({
+    run: fakeRun({ runs: [older, newer] }),
+    read: async () => "maintenance",
+    now: () => Date.parse(newer.concludedAt) + 30_000,
+  });
+  assert.equal(result.problems.length, 0);
+  assert.match(result.notes.join("\n"), /release window is open/);
+  assert.equal(needsAgent(result), false);
+});
+
 test("readiness answering maintenance after the window closes is an incident", async () => {
   const result = await assess({
     run: fakeRun({ runs: [releaseRun()] }),
