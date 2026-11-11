@@ -35,7 +35,7 @@
 
 ## Delegation
 
-- When given a task, delegate the work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
+- When given an implementation task, delegate the work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
 - Split independent workstreams across parallel backgrounded subagents under a single orchestrator that owns the branch.
 - Retain final ownership of audit verification and shipment and remain the final entity that ships the change.
 - Prefer subagent models in this order with the listed effort as provider slash model hash variant.
