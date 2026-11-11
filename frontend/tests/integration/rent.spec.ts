@@ -39,23 +39,37 @@ test("rent shares income review without changing financial rows", async ({
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
 	const patterns = page.getByRole("region", {
-		name: "Payment patterns",
+		name: "Pattern review",
 		exact: true,
 	});
-	await expect(patterns.getByRole("article")).toHaveCount(2);
+	await expect(
+		patterns.getByRole("button", { name: "Review BILT RENT" }),
+	).toBeVisible();
+	await expect(
+		patterns.getByRole("button", { name: "Review ACME PAYROLL" }),
+	).toBeVisible();
 	await expect(patterns.getByText(/1,800 USD typical/)).toBeVisible();
-	await patterns.getByRole("button", { name: /Confirm rent for/ }).click();
+	await patterns.getByRole("button", { name: "Review BILT RENT" }).click();
+	const rentDialog = page.getByRole("dialog", { name: "BILT RENT" });
+	await rentDialog.getByRole("button", { name: /Confirm rent for/ }).click();
 	await expect(
-		patterns.getByRole("button", { name: /Confirm rent for/ }),
+		rentDialog.getByRole("button", { name: /Confirm rent for/ }),
 	).toBeDisabled();
+	await rentDialog.getByRole("button", { name: "Close dialog" }).click();
+	await patterns.getByRole("button", { name: "Review ACME PAYROLL" }).click();
+	const incomeDialog = page.getByRole("dialog", { name: "ACME PAYROLL" });
 	await expect(
-		patterns.getByRole("button", { name: /Confirm income for/ }),
+		incomeDialog.getByRole("button", { name: /Confirm income for/ }),
 	).toBeEnabled();
+	await incomeDialog.getByRole("button", { name: "Close dialog" }).click();
 	await page.reload();
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	await patterns.getByRole("button", { name: /Not rent for/ }).click();
+	await patterns.getByRole("tab", { name: "Saved (1)" }).click();
+	await patterns.getByRole("button", { name: "Review BILT RENT" }).click();
+	const savedDialog = page.getByRole("dialog", { name: "BILT RENT" });
+	await savedDialog.getByRole("button", { name: /Not rent for/ }).click();
 	await expect(
-		patterns.getByRole("button", { name: /Not rent for/ }),
+		savedDialog.getByRole("button", { name: /Not rent for/ }),
 	).toBeDisabled();
 	const audit = (await (await page.request.get("/v1/analysis-feedback")).json())
 		.feedback;

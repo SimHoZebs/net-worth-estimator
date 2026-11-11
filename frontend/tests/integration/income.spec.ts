@@ -30,7 +30,7 @@ test("the fixture seeds owned editable bank transactions", async () => {
 	);
 });
 
-async function openIncome(page: Page) {
+async function openPatterns(page: Page) {
 	await expect
 		.poll(async () => {
 			const data = await (
@@ -43,7 +43,15 @@ async function openIncome(page: Page) {
 		.toBe(3);
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	return page.getByRole("region", { name: "Payment patterns", exact: true });
+	return page.getByRole("region", { name: "Pattern review", exact: true });
+}
+
+async function openIncomeDialog(
+	page: Page,
+	patterns: ReturnType<Page["getByRole"]>,
+) {
+	await patterns.getByRole("button", { name: "Review ACME PAYROLL" }).click();
+	return page.getByRole("dialog", { name: "ACME PAYROLL" });
 }
 
 test("income answers can be corrected and survive refresh without financial mutations", async ({
@@ -51,38 +59,39 @@ test("income answers can be corrected and survive refresh without financial muta
 }) => {
 	await resetFixture(incomeFixture());
 	const before = await (await page.request.get("/v1/financial-model")).json();
-	let income = await openIncome(page);
+	let patterns = await openPatterns(page);
 	await expect(
-		income.getByText("Confirm or correct suggested payment purposes."),
+		patterns.getByText("Confirm or correct suggested payment purposes."),
 	).toBeVisible();
-	await expect(income.getByRole("article")).toHaveCount(1);
-	await expect(income.getByText(/2,000 USD typical/)).toBeVisible();
-	await expect(income.getByText(/3 recorded/)).toBeVisible();
-	const confirm = income
-		.getByRole("button", { name: /Confirm income for/ })
-		.first();
+	await expect(patterns.getByRole("button", { name: /^Review / })).toHaveCount(
+		1,
+	);
+	await expect(patterns.getByText(/2,000 USD typical/)).toBeVisible();
+	await expect(patterns.getByText(/3 recorded/)).toBeVisible();
+	let dialog = await openIncomeDialog(page, patterns);
+	const confirm = dialog.getByRole("button", { name: /Confirm income for/ });
 	await confirm.click();
 	await expect(confirm).toBeDisabled();
-	await income
-		.getByRole("button", { name: /Not income for/ })
-		.first()
-		.click();
-	await expect(
-		income.getByRole("button", { name: /Not income for/ }).first(),
-	).toBeDisabled();
+	const notIncome = dialog.getByRole("button", { name: /Not income for/ });
+	await notIncome.click();
+	await expect(notIncome).toBeDisabled();
 	await page.reload();
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	income = page.getByRole("region", { name: "Payment patterns", exact: true });
+	patterns = page.getByRole("region", {
+		name: "Pattern review",
+		exact: true,
+	});
+	await patterns.getByRole("tab", { name: "Dismissed (1)" }).click();
+	dialog = await openIncomeDialog(page, patterns);
 	await expect(
-		income.getByRole("button", { name: /Not income for/ }).first(),
+		dialog.getByRole("button", { name: /Not income for/ }),
 	).toBeDisabled();
-	await income
-		.getByRole("button", { name: /Confirm income for/ })
-		.first()
-		.click();
-	await expect(
-		income.getByRole("button", { name: /Confirm income for/ }).first(),
-	).toBeDisabled();
+	const confirmAgain = dialog.getByRole("button", {
+		name: /Confirm income for/,
+	});
+	await confirmAgain.click();
+	await expect(confirmAgain).toBeDisabled();
+	await dialog.getByRole("button", { name: "Close dialog" }).click();
 	const audit = (await (await page.request.get("/v1/analysis-feedback")).json())
 		.feedback;
 	expect(
@@ -98,7 +107,7 @@ test("income answers can be corrected and survive refresh without financial muta
 	expect(after.model).toEqual(before.model);
 	expect(after.revision).toBe(before.revision);
 	const accessibility = await new AxeBuilder({ page })
-		.include('[aria-label="Payment patterns"]')
+		.include('[aria-label="Pattern review"]')
 		.disableRules(["color-contrast"])
 		.analyze();
 	expect(accessibility.violations).toEqual([]);
@@ -106,20 +115,19 @@ test("income answers can be corrected and survive refresh without financial muta
 
 test("income review remains read-only for readers", async ({ page }) => {
 	await resetFixture(incomeFixture(true));
-	const income = await openIncome(page);
+	const patterns = await openPatterns(page);
 	await expect(
-		income.getByRole("button", { name: /Confirm income for/ }),
+		patterns.getByRole("button", { name: /Confirm income for/ }),
 	).toHaveCount(0);
 	await expect(
-		income.getByRole("button", { name: /Not income for/ }),
+		patterns.getByRole("button", { name: /Not income for/ }),
 	).toHaveCount(0);
+	const dialog = await openIncomeDialog(page, patterns);
 	await expect(
-		income.getByRole("button", { name: /Review forecast plan for/ }),
+		dialog.getByRole("button", { name: /Review forecast plan for/ }),
 	).toBeVisible();
 	await expect(
-		income.getByRole("button", {
-			name: /Link to existing schedule for/,
-		}),
+		dialog.getByRole("button", { name: /Link .*schedule for/ }),
 	).toBeVisible();
 });
 
@@ -177,23 +185,28 @@ test("income review keeps its latest answer when a pattern spans findings pages"
 	).toBe(true);
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	const income = page.getByRole("region", {
-		name: "Payment patterns",
+	const patterns = page.getByRole("region", {
+		name: "Pattern review",
 		exact: true,
 	});
-	await expect(income.getByRole("article")).toHaveCount(1);
+	await patterns.getByRole("tab", { name: "Dismissed (1)" }).click();
+	await expect(patterns.getByRole("button", { name: /^Review / })).toHaveCount(
+		1,
+	);
+	let dialog = await openIncomeDialog(page, patterns);
 	await expect(
-		income.getByRole("button", { name: /Not income for/ }),
+		dialog.getByRole("button", { name: /Not income for/ }),
 	).toBeDisabled();
 	await page
 		.getByRole("button", { name: "Next findings", exact: true })
 		.click();
+	dialog = page.getByRole("dialog", { name: "ACME PAYROLL" });
 	await expect(
-		income.getByRole("button", { name: /Not income for/ }),
+		dialog.getByRole("button", { name: /Not income for/ }),
 	).toBeDisabled();
-	await income.getByRole("button", { name: /Confirm income for/ }).click();
+	await dialog.getByRole("button", { name: /Confirm income for/ }).click();
 	await expect(
-		income.getByRole("button", { name: /Confirm income for/ }),
+		dialog.getByRole("button", { name: /Confirm income for/ }),
 	).toBeDisabled();
 	const audit = (await (await page.request.get("/v1/analysis-feedback")).json())
 		.feedback;

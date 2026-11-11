@@ -46,14 +46,16 @@ Unchanged streams keep byte-identical findings with no new provider calls.
   One provider session handles all classifications and owner-scoped feedback.
   The existing deployment-wide learner shares learning, never owner bank facts
   or saved answers. Explicit negative judgments remain reviewable.
-- Payment patterns use the same card layout as repeating payments: title,
-  status badge, typical amount plus cadence plus recorded count, and Confirm
-  plus Not answers. The same cards offer the same forecast actions: create a
-  new schedule or link the recorded payments to an existing schedule, each
-  behind its preview. Acting records confirmation of the purpose pattern in
-  the same transaction. Confirm and Not record only the answer and never
-  create or edit a schedule. Repetition always stays a standalone card list.
-  Purpose and repetition keep separate lifecycles and explicit answers.
+- Pattern review shows one queue for payment purposes and repetition: Review,
+  Saved, and Dismissed tabs with row counts, one row per payment stream with
+  title, cadence plus recorded count, typical amount, and a suggestion chip
+  per classification. One dialog per stream composes the explicit answers
+  (Confirm plus Not), the forecast actions (create a new schedule or link the
+  recorded payments to an existing schedule, each behind its preview), and
+  the visibility actions. Acting on a forecast records confirmation in the
+  same transaction. Confirm and Not record only the answer and never create
+  or edit a schedule. Purpose and repetition keep separate lifecycles and
+  explicit answers.
 
 ## Rent
 

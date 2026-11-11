@@ -1,44 +1,20 @@
 import { useState } from "react";
-import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
-import {
-	cadenceLabel,
-	directionLabel,
-	frequencyLabel,
-	groupRecurringPatterns,
-	patternTitle,
-	recurringPatternStatus,
-	type RecurringPattern,
-} from "@/domain/recurringPatterns.ts";
+import { frequencyLabel } from "@/domain/recurringPatterns.ts";
 import {
 	useAddPatternToExistingSchedule,
 	useCreatePatternToNewSchedule,
-	useDismissAnalysisFinding,
 	usePatternToExistingSchedulePreview,
 	usePatternToNewSchedulePreview,
-	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
 import { notifySuccess } from "@/state/notifications.ts";
 import { useSavedAccounts } from "@/state/savedState.ts";
 import { useTransactionCatalog } from "@/state/workspaceResources.ts";
-import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
 import { DetailRow } from "../DetailRow.tsx";
 import { ErrorNotice, FieldError } from "../ErrorNotice.tsx";
 import { SelectField } from "../Field.tsx";
 import { Modal } from "../Modal.tsx";
-
-function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
-	return {
-		id: finding.id,
-		input: {
-			requestId: crypto.randomUUID(),
-			runId: finding.runId,
-			revision: finding.feedbackRevision,
-			action,
-		},
-	};
-}
 
 export function NewScheduleDialog({
 	findingId,
@@ -286,144 +262,5 @@ export function ExistingScheduleDialog({
 				)}
 			</div>
 		</Modal>
-	);
-}
-
-function PatternCard({
-	pattern,
-	names,
-	readOnly,
-}: {
-	pattern: RecurringPattern;
-	names: Map<string, string>;
-	readOnly: boolean;
-}) {
-	const feedback = useReviewAnalysisFinding();
-	const dismiss = useDismissAnalysisFinding();
-	const [planOpen, setPlanOpen] = useState(false);
-	const [linkOpen, setLinkOpen] = useState(false);
-	const title = patternTitle(pattern, names);
-	const confirmed = pattern.confirmed;
-	const rejected = pattern.anchor.review?.decision === "rejected";
-	const actionable = confirmed ?? pattern.anchor;
-	return (
-		<article className="space-y-2 rounded-control border border-solid border-line p-4">
-			<div className="flex flex-wrap items-center gap-2">
-				<h3 className="m-0 text-sm font-semibold">{title}</h3>
-				<Badge tone={confirmed ? "success" : "neutral"}>
-					{recurringPatternStatus(pattern)}
-				</Badge>
-			</div>
-			<p className="m-0 text-xs text-muted">
-				{cadenceLabel(pattern.cadence)} · {directionLabel(pattern.anchor.role)}{" "}
-				· {pattern.findings.length} recorded
-			</p>
-			<FieldError
-				message={
-					feedback.isError || dismiss.isError
-						? "The answer could not be saved."
-						: null
-				}
-			/>
-			<div className="flex flex-wrap gap-2">
-				{!readOnly && rejected && (
-					<Button
-						type="button"
-						size="sm"
-						variant="secondary"
-						disabled={dismiss.isPending}
-						aria-label={`Review repeating pattern for ${title} again`}
-						onClick={() =>
-							dismiss.mutate({ id: pattern.anchor.id, dismissed: false })
-						}
-					>
-						Review again
-					</Button>
-				)}
-				<Button
-					type="button"
-					size="sm"
-					variant={readOnly ? "secondary" : "primary"}
-					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
-					onClick={() => setPlanOpen(true)}
-				>
-					{readOnly ? "Review forecast plan" : "Create forecast schedule"}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant="secondary"
-					aria-label={`Link repeating pattern for ${title} to an existing schedule`}
-					onClick={() => setLinkOpen(true)}
-				>
-					Link to existing schedule
-				</Button>
-				{!readOnly && !confirmed && !rejected && (
-					<Button
-						type="button"
-						size="sm"
-						variant="secondary"
-						disabled={feedback.isPending}
-						aria-label={`Reject repeating pattern for ${title}`}
-						onClick={() =>
-							feedback.mutate(answerInput(pattern.anchor, "reject"))
-						}
-					>
-						Not repeating
-					</Button>
-				)}
-			</div>
-			{planOpen && (
-				<NewScheduleDialog
-					findingId={actionable.id}
-					title={title}
-					readOnly={readOnly}
-					onClose={() => setPlanOpen(false)}
-				/>
-			)}
-			{linkOpen && (
-				<ExistingScheduleDialog
-					findingId={actionable.id}
-					title={title}
-					names={names}
-					readOnly={readOnly}
-					onClose={() => setLinkOpen(false)}
-				/>
-			)}
-		</article>
-	);
-}
-
-export function RecurringPatterns({
-	findings,
-	names,
-	readOnly,
-	label = "Repeating payments",
-}: {
-	findings: AnalysisFinding[];
-	names: Map<string, string>;
-	readOnly: boolean;
-	label?: string;
-}) {
-	const patterns = groupRecurringPatterns(findings);
-	if (patterns.length === 0) return null;
-	return (
-		<section className="space-y-4" aria-label={label}>
-			<header className="space-y-2">
-				<h2 className="m-0 text-lg font-semibold">Repeating payments</h2>
-				<p className="m-0 text-sm text-muted">
-					Create a forecast schedule or link payments to an existing schedule.
-					Saving records your acceptance of the repeating pattern.
-				</p>
-			</header>
-			{patterns.map((pattern) => (
-				<PatternCard
-					key={pattern.key}
-					pattern={pattern}
-					names={names}
-					readOnly={readOnly}
-				/>
-			))}
-		</section>
 	);
 }

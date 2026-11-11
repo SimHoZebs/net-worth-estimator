@@ -24,15 +24,17 @@ test("a rent purpose can exist without repetition", async ({ page }) => {
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
 	const region = page.getByRole("region", {
-		name: "Payment patterns",
+		name: "Pattern review",
 		exact: true,
 	});
 	const before = await readSavedServerModel();
 	await expect(region.getByText(/Repetition not established/)).toBeVisible();
 	await expect(region.getByText(/1 recorded/)).toBeVisible();
-	await region.getByRole("button", { name: /Confirm rent for/ }).click();
+	await region.getByRole("button", { name: "Review LANDLORD RENT" }).click();
+	const dialog = page.getByRole("dialog", { name: "LANDLORD RENT" });
+	await dialog.getByRole("button", { name: /Confirm rent for/ }).click();
 	await expect(
-		region.getByRole("button", { name: /Confirm rent for/ }),
+		dialog.getByRole("button", { name: /Confirm rent for/ }),
 	).toBeDisabled();
 	const data = await (await page.request.get("/v1/analysis-findings")).json();
 	expect(
@@ -62,21 +64,22 @@ test("purpose and repetition share evidence but retain separate answers", async 
 		.toBe(6);
 	await page.goto("/sources");
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
-	const payments = page.getByRole("region", {
-		name: "Payment patterns",
+	const patterns = page.getByRole("region", {
+		name: "Pattern review",
 		exact: true,
 	});
 	const before = await readSavedServerModel();
-	await payments.getByRole("button", { name: /Confirm rent for/ }).click();
-	const repetition = page.getByRole("region", {
-		name: "Repeating payments",
-		exact: true,
-	});
-	await repetition
+	await expect(
+		patterns.getByRole("button", { name: "Review BILT RENT" }),
+	).toBeVisible();
+	await patterns.getByRole("button", { name: "Review BILT RENT" }).click();
+	const dialog = page.getByRole("dialog", { name: "BILT RENT" });
+	await dialog.getByRole("button", { name: /Confirm rent for/ }).click();
+	await dialog
 		.getByRole("button", { name: /Reject repeating pattern for/ })
 		.click();
 	await expect(
-		payments.getByRole("button", { name: /Confirm rent for/ }),
+		dialog.getByRole("button", { name: /Confirm rent for/ }),
 	).toBeDisabled();
 	const audit = (await (await page.request.get("/v1/analysis-feedback")).json())
 		.feedback;

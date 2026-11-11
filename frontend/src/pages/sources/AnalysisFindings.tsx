@@ -14,8 +14,7 @@ import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { useAllAnalysisFindings } from "@/state/allAnalysisFindings.ts";
 import { Badge } from "@/components/Badge.tsx";
 import { Button } from "@/components/Button.tsx";
-import { PaymentFindings } from "@/components/analysis/PaymentFindings.tsx";
-import { RecurringPatterns } from "@/components/analysis/RecurringPatterns.tsx";
+import { PatternReview } from "@/components/analysis/PatternReview.tsx";
 import {
 	DataTable,
 	TableCell,
@@ -38,9 +37,8 @@ export function AnalysisFindings() {
 	}));
 	const allFindings = query.data?.findings ?? [];
 	const findings = allFindings.filter((finding) => finding.kind === "bnpl");
-	const payments = (complete.data ?? []).filter((finding) => !!finding.pattern);
-	const repetition = (complete.data ?? []).filter(
-		(finding) => finding.kind === "recurring",
+	const patterns = (complete.data ?? []).filter(
+		(finding) => finding.pattern || finding.kind === "recurring",
 	);
 	const names = new Map(
 		transactions.map((transaction) => [transaction.id, transaction.name]),
@@ -159,17 +157,8 @@ export function AnalysisFindings() {
 			) : complete.isPending ? (
 				<p className="text-sm text-muted">Loading payment findings…</p>
 			) : (
-				<PaymentFindings
-					findings={payments}
-					names={names}
-					readOnly={readOnly}
-				/>
+				<PatternReview findings={patterns} names={names} readOnly={readOnly} />
 			)}
-			<RecurringPatterns
-				findings={repetition}
-				names={names}
-				readOnly={readOnly}
-			/>
 		</>
 	);
 }
