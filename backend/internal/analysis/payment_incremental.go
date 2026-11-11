@@ -36,6 +36,16 @@ type IncrementalPaymentOutcome struct {
 // classification means one full rebuild that repopulates the cache instead.
 // Recurring, transfer, and BNPL detectors keep full recompute and are untouched.
 func AnalyzeIncrementalPayments(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, dirty []store.AnalysisDirtyFact, cached []store.AnalysisPaymentStream, prior []types.AnalysisDetection) (IncrementalPaymentOutcome, error) {
+	return analyzeIncrementalPayments(ctx, definitions, judge, preparationErr, input, dirty, cached, prior, nil, false)
+}
+
+// analyzeIncrementalPayments is the shared incremental worker. The exported
+// seam carries no resolver; definitions prepared with a ProviderResolver pass
+// it explicitly so recomputed streams match full Analyze exactly.
+// forceRebuild replays the full rebuild path after an analyzer-version change
+// even when the cache looks reusable, so new classifications materialize for
+// owners with no dirty facts.
+func analyzeIncrementalPayments(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, dirty []store.AnalysisDirtyFact, cached []store.AnalysisPaymentStream, prior []types.AnalysisDetection, resolver ProviderResolver, forceRebuild bool) (IncrementalPaymentOutcome, error) {
 	if definitions == nil {
 		definitions = PaymentClassifications()
 	}
@@ -43,10 +53,10 @@ func AnalyzeIncrementalPayments(ctx context.Context, definitions []PaymentClassi
 		return IncrementalPaymentOutcome{}, err
 	}
 	priorJudgments := indexPriorJudgments(prior)
-	if needsPaymentRebuild(definitions, cached, prior) {
-		return rebuildPaymentStreams(ctx, definitions, judge, preparationErr, input, cached, priorJudgments)
+	if forceRebuild || needsPaymentRebuild(definitions, cached, prior) {
+		return rebuildPaymentStreams(ctx, definitions, judge, preparationErr, input, cached, priorJudgments, resolver)
 	}
-	return updatePaymentStreams(ctx, definitions, judge, preparationErr, input, dirty, cached, prior, priorJudgments)
+	return updatePaymentStreams(ctx, definitions, judge, preparationErr, input, dirty, cached, prior, priorJudgments, resolver)
 }
 
 // needsPaymentRebuild reports whether the durable cache is unusable: no cache
@@ -92,11 +102,12 @@ func indexPriorJudgments(prior []types.AnalysisDetection) map[string]types.Analy
 	return out
 }
 
-func rebuildPaymentStreams(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, cached []store.AnalysisPaymentStream, priorJudgments map[string]types.AnalysisJudgment) (IncrementalPaymentOutcome, error) {
+func rebuildPaymentStreams(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, cached []store.AnalysisPaymentStream, priorJudgments map[string]types.AnalysisJudgment, resolver ProviderResolver) (IncrementalPaymentOutcome, error) {
 	streams, err := detectPaymentStreams(ctx, input)
 	if err != nil {
 		return IncrementalPaymentOutcome{}, err
 	}
+	enrichStreamsWithProviders(resolver, streams)
 	patterns := classifyPaymentStreams(definitions, streams)
 	judgmentErr := judgeSelectedPayments(ctx, judge, preparationErr, patterns, priorJudgments)
 	assignPaymentMain(patterns)
@@ -129,7 +140,7 @@ func rebuildPaymentStreams(ctx context.Context, definitions []PaymentClassificat
 	return outcome, judgmentErr
 }
 
-func updatePaymentStreams(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, dirty []store.AnalysisDirtyFact, cached []store.AnalysisPaymentStream, prior []types.AnalysisDetection, priorJudgments map[string]types.AnalysisJudgment) (IncrementalPaymentOutcome, error) {
+func updatePaymentStreams(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, dirty []store.AnalysisDirtyFact, cached []store.AnalysisPaymentStream, prior []types.AnalysisDetection, priorJudgments map[string]types.AnalysisJudgment, resolver ProviderResolver) (IncrementalPaymentOutcome, error) {
 	since := cached[0].ConsumedRevision
 	for _, entry := range cached[1:] {
 		since = min(since, entry.ConsumedRevision)
@@ -254,6 +265,7 @@ func updatePaymentStreams(ctx context.Context, definitions []PaymentClassificati
 		}
 		streams = append(streams, observePaymentStream(input.UserID, group, group.candidates, matched, latest))
 	}
+	enrichStreamsWithProviders(resolver, streams)
 	patterns := classifyPaymentStreams(definitions, streams)
 	judgeErr := judgeSelectedPayments(ctx, judge, preparationErr, patterns, priorJudgments)
 	findings, err := rankIncrementalPayments(ctx, definitions, patterns, prior, affected)
@@ -604,14 +616,17 @@ func cachePaymentStream(stream *paymentStream, revision int64) store.AnalysisPay
 // paymentIncrementalDefinition is the prepared payments definition. Prepare
 // snapshots the stream cache, dirty facts, and prior active findings; Analyze
 // recomputes affected streams only; CompleteIncremental publishes per-stream.
+// forceRebuild replays the full rebuild path once after an analyzer-version
+// change so new classifications materialize with no dirty facts.
 type paymentIncrementalDefinition struct {
-	base    PaymentPatterns
-	scoped  store.AnalysisStore
-	owner   string
-	dirty   []store.AnalysisDirtyFact
-	cached  []store.AnalysisPaymentStream
-	prior   []types.AnalysisDetection
-	outcome *IncrementalPaymentOutcome
+	base         PaymentPatterns
+	scoped       store.AnalysisStore
+	owner        string
+	dirty        []store.AnalysisDirtyFact
+	cached       []store.AnalysisPaymentStream
+	prior        []types.AnalysisDetection
+	outcome      *IncrementalPaymentOutcome
+	forceRebuild bool
 }
 
 func (d *paymentIncrementalDefinition) Type() string { return d.base.Type() }
@@ -627,9 +642,39 @@ func (d *paymentIncrementalDefinition) Analyze(ctx context.Context, input types.
 	if definitions == nil {
 		definitions = PaymentClassifications()
 	}
-	outcome, err := AnalyzeIncrementalPayments(ctx, definitions, d.base.Judge, d.base.preparationErr, input, d.dirty, d.cached, d.prior)
+	outcome, err := analyzeIncrementalPayments(ctx, definitions, d.base.Judge, d.base.preparationErr, input, d.dirty, d.cached, d.prior, d.base.Providers, d.forceRebuild)
 	d.outcome = &outcome
 	return outcome.Findings, err
+}
+
+// paymentsAnalyzerVersionChanged reports whether the latest completed payments
+// run predates the prepared definition. Registry additions and provider
+// catalog revisions only change the claimed version; without a forced rebuild
+// the dirty-only update would carry old findings forward forever for owners
+// with no bank changes. The check runs in Prepare, before ClaimAnalysis
+// inserts the in-flight running row, so the latest completed run is still
+// visible. Any load failure returns false so the run falls back to existing
+// behavior instead of failing. A mismatch forces exactly one rebuild: the
+// completed run then records the new version and later prepares match.
+func paymentsAnalyzerVersionChanged(scoped store.AnalysisStore, base PaymentPatterns) bool {
+	runs, _, err := scoped.ListAnalysisRuns()
+	if err != nil {
+		return false
+	}
+	for _, run := range runs {
+		if run.Type != "payments" || run.State == "running" {
+			continue
+		}
+		if !base.MatchesVersion(run.Version) {
+			return true
+		}
+		// A resolver added or removed without a catalog revision still moves
+		// enrichment on or off every stream, so presence alone forces one
+		// rebuild even when the registry hash still matches.
+		baseHasProviders := base.Providers != nil && base.Providers.Revision() != ""
+		return baseHasProviders != strings.Contains(run.Version, "/providers-")
+	}
+	return false
 }
 
 // CompleteIncremental publishes the stashed incremental outcome per-stream:

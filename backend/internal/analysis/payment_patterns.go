@@ -18,9 +18,12 @@ const PaymentPatternsVersion = "payments-v3"
 
 // PaymentPatterns extracts streams once and batches applicable classifications.
 // Definitions contain domain policy; evaluators own how judgments are produced.
+// Providers resolves massive provider catalogs lazily per stream; nil keeps
+// current behavior.
 type PaymentPatterns struct {
 	Judge           judgment.Evaluator
 	Classifications []PaymentClassification
+	Providers       ProviderResolver
 	version         string
 	preparationErr  error
 }
@@ -36,10 +39,14 @@ func (p PaymentPatterns) Version() string {
 	}
 	data, _ := json.Marshal(definitions)
 	hash := sha256.Sum256(data)
-	return PaymentPatternsVersion + "/" + hex.EncodeToString(hash[:8])
+	version := PaymentPatternsVersion + "/" + hex.EncodeToString(hash[:8])
+	if p.Providers != nil && p.Providers.Revision() != "" {
+		version += "/providers-" + p.Providers.Revision()
+	}
+	return version
 }
 func (p PaymentPatterns) MatchesVersion(version string) bool {
-	base := (PaymentPatterns{Classifications: p.Classifications}).Version()
+	base := (PaymentPatterns{Classifications: p.Classifications, Providers: p.Providers}).Version()
 	return version == base || strings.HasPrefix(version, base+"/")
 }
 
@@ -132,6 +139,9 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 	if err != nil {
 		return nil, err
 	}
+	// Provider signals resolve per stream, never per transaction, so catalog
+	// size never enters the per-occurrence scan.
+	enrichStreamsWithProviders(p.Providers, streams)
 	// Index once by structural applicability, not one transaction scan per type.
 	patterns := classifyPaymentStreams(definitions, streams)
 	if len(patterns) == 0 {

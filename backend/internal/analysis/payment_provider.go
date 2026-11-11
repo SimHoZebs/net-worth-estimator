@@ -21,6 +21,14 @@ func NewPaymentPatterns(provider judgment.Provider) Definition {
 	return paymentProviderDefinition{provider: provider}
 }
 
+// WithProviders attaches a lazy provider catalog while keeping the prepared
+// judgment provider. It shadows the embedded PaymentPatterns method so the
+// composition keeps its session instead of degrading to a bare value.
+func (d paymentProviderDefinition) WithProviders(r ProviderResolver) Definition {
+	d.Providers = r
+	return d
+}
+
 func defaultPaymentPatterns() Definition {
 	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
 	if endpoint == "" {
@@ -41,12 +49,12 @@ func (d paymentProviderDefinition) Prepare(ctx context.Context, scoped store.Ana
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		base = PaymentPatterns{Classifications: d.Classifications, version: d.PaymentPatterns.Version() + "/unavailable", preparationErr: judgment.ErrUnavailable}
+		base = PaymentPatterns{Classifications: d.Classifications, Providers: d.Providers, version: d.PaymentPatterns.Version() + "/unavailable", preparationErr: judgment.ErrUnavailable}
 	} else {
 		if session.Revision() == "" {
 			return nil, fmt.Errorf("judgment provider returned an empty revision")
 		}
-		base = PaymentPatterns{Classifications: d.Classifications, Judge: session, version: d.PaymentPatterns.Version() + "/" + session.Revision()}
+		base = PaymentPatterns{Classifications: d.Classifications, Providers: d.Providers, Judge: session, version: d.PaymentPatterns.Version() + "/" + session.Revision()}
 	}
 	// Idle ticks skip the heavy prior-findings load: when the cached streams
 	// already consumed the current input revision, the base definition runs
@@ -57,7 +65,7 @@ func (d paymentProviderDefinition) Prepare(ctx context.Context, scoped store.Ana
 	// Incremental state rides along when available; otherwise the resolved
 	// base still runs full recompute.
 	if dirty, cached, prior, ok := prepareIncremental(scoped); ok {
-		return &paymentIncrementalDefinition{base: base, scoped: scoped, owner: owner, dirty: dirty, cached: cached, prior: prior}, nil
+		return &paymentIncrementalDefinition{base: base, scoped: scoped, owner: owner, dirty: dirty, cached: cached, prior: prior, forceRebuild: paymentsAnalyzerVersionChanged(scoped, base)}, nil
 	}
 	return base, nil
 }

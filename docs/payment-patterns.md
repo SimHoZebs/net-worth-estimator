@@ -66,6 +66,33 @@ clearly non-rent property charges exclude a deterministic suggestion. The
 [researched platform catalog](rent-platform-evidence.md) records primary sources.
 User review is the explicit answer, not a provider probability or a brand match.
 
+## Utility
+
+Utility applies to external outflows. Generic service wording in the
+description (`utility`, `electric`, `water`, `gas`, `power`, `sewer`, `trash`,
+`waste`, `internet`, `broadband`, and close variants) supports it; a resolved
+utility provider without those details is an uncertain candidate. Card
+repayments and mortgage wording exclude a deterministic suggestion. Rent
+excludes generic utility wording so a `CLICKPAY ELECTRIC` bill is never
+claimed as rent.
+
+## Auto insurance
+
+Auto insurance applies to external outflows. Generic insurance wording plus a
+bounded set of top national carrier names (`geico`, `progressive`,
+`state farm`, `allstate`, `usaa`, `liberty mutual`, `farmers`, `nationwide`,
+`travelers`, `american family`, `auto insurance`, `car insurance`) supports it;
+a resolved insurance provider without those details is an uncertain candidate.
+Card repayments and mortgage wording exclude a deterministic suggestion. Rent
+excludes generic insurance wording.
+
+## Card payment
+
+Card payment applies to external outflows. Card repayment wording (`credit
+card`, `card payment`, `card repayment`) supports it; a resolved card issuer
+without those details is an uncertain candidate. Mortgage wording excludes a
+deterministic suggestion.
+
 ## Scale and deployment
 
 No new service, volume, paid dependency or allocation is required. Northflank's
@@ -76,6 +103,13 @@ exercises 300 definitions sharing one stream in three bounded provider calls.
 This does not establish production capacity for hundreds of active overlapping
 classifications on arbitrary transaction histories. Broader CPU/memory/load
 measurements remain a release gate before enabling such workloads.
+
+Provider catalogs stay out of always-loaded runtime memory. Descriptions carry
+only generic service words; provider names resolve lazily per stream (dozens
+per owner, never per transaction) through a resolver whose revision is
+suffixed onto the analyzer version, so catalog changes invalidate freshness
+through the existing version lifecycle. An empty catalog contributes no
+signals.
 
 Existing targets require the [explicit offline
 upgrade](../backend/scripts/one-time/payment-patterns/README.md). There are no

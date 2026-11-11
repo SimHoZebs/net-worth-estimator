@@ -868,3 +868,167 @@ func TestIncrementalPrepareSkipsPriorLoadOnIdleTick(t *testing.T) {
 		t.Fatal("changed tick skipped the prior load")
 	}
 }
+
+func upgradeBankSeed() []simplefin.Transaction {
+	return []simplefin.Transaction{
+		{ID: "p1", Description: "ACME PAYROLL", Amount: "2000", Posted: incomeDay(2026, 1, 2)},
+		{ID: "p2", Description: "ACME PAYROLL", Amount: "2000", Posted: incomeDay(2026, 2, 2)},
+		{ID: "p3", Description: "ACME PAYROLL", Amount: "2000", Posted: incomeDay(2026, 3, 2)},
+		{ID: "u1", Description: "PACIFIC ELECTRIC", Amount: "-120", Posted: incomeDay(2026, 1, 5)},
+		{ID: "u2", Description: "PACIFIC ELECTRIC", Amount: "-120", Posted: incomeDay(2026, 2, 5)},
+		{ID: "u3", Description: "PACIFIC ELECTRIC", Amount: "-120", Posted: incomeDay(2026, 3, 5)},
+	}
+}
+
+func applyUpgradeBank(t *testing.T, scoped store.Store, transactions []simplefin.Transaction, observed int64) {
+	t.Helper()
+	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", ConnID: "test-conn", Currency: "USD", Balance: "6000", BalanceDate: observed, Transactions: transactions}}}
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bank"): "checking"}, time.Unix(observed, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scoped.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func activePaymentFindings(t *testing.T, scoped store.Store) []types.AnalysisFinding {
+	t.Helper()
+	findings, err := scoped.ListAnalysisFindings(types.AnalysisFindingFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []types.AnalysisFinding
+	for _, item := range findings {
+		if item.AnalysisType == "payments" && item.Status == "active" {
+			out = append(out, item)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].TransactionID != out[j].TransactionID {
+			return out[i].TransactionID < out[j].TransactionID
+		}
+		return out[i].Kind < out[j].Kind
+	})
+	return out
+}
+
+func countActiveKind(findings []types.AnalysisFinding, kind string) int {
+	count := 0
+	for _, item := range findings {
+		if item.Kind == kind {
+			count++
+		}
+	}
+	return count
+}
+
+// TestIncrementalUpgradeRebuildsNewKinds replays the registry-upgrade gap: a
+// new classification ships while an idle owner's cache is stale from
+// unrelated churn, so the dirty-only update would never evaluate the new kind
+// on untouched streams. A recorded analyzer-version change forces one full
+// rebuild; later ticks return to the incremental path with no rebuild loop.
+func TestIncrementalUpgradeRebuildsNewKinds(t *testing.T) {
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	scoped, err := database.EnsureUser("owner", "issuer", "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scoped.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	seeded := upgradeBankSeed()
+	applyUpgradeBank(t, scoped, seeded, incomeDay(2026, 3, 5))
+	judge := &incrCountingJudge{decide: incrReadyDecision}
+	provider := &incrStubProvider{session: &incrStubSession{judge: judge, rev: "r1"}}
+	runner, err := analysis.NewRunner(database, analysis.NewPaymentPatterns(provider))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if active := activePaymentFindings(t, scoped); countActiveKind(active, "income") != 3 || countActiveKind(active, "utility") != 3 {
+		t.Fatalf("seed findings=%+v", active)
+	}
+	// Simulate the pre-upgrade world: the last completed run predates the new
+	// registry and carries no utility findings, while the stream cache stays.
+	run, _, claimed, err := scoped.ClaimAnalysis("payments", "payments-v0/simulated-pre-upgrade")
+	if err != nil || !claimed {
+		t.Fatalf("claim=%v claimed=%v err=%v", run, claimed, err)
+	}
+	if err := scoped.CompleteAnalysis(run, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if active := activePaymentFindings(t, scoped); len(active) != 0 {
+		t.Fatalf("simulated old world kept findings: %+v", active)
+	}
+	// Unrelated churn touches only the payroll stream; the utility stream is
+	// idle, so only a version-forced rebuild restores its findings.
+	seeded = append(cloneSimplefinTransactions(seeded), simplefin.Transaction{ID: "p4", Description: "ACME PAYROLL", Amount: "2000", Posted: incomeDay(2026, 4, 2)})
+	applyUpgradeBank(t, scoped, seeded, incomeDay(2026, 4, 2))
+	judge.calls, judge.requests = 0, 0
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	active := activePaymentFindings(t, scoped)
+	if countActiveKind(active, "income") != 4 || countActiveKind(active, "utility") != 3 {
+		t.Fatalf("upgrade did not rebuild idle streams: %+v", active)
+	}
+	if judge.calls != 1 || judge.requests != 2 {
+		t.Fatalf("upgrade did not take the rebuild path: calls=%d requests=%d", judge.calls, judge.requests)
+	}
+	afterUpgrade, _ := json.Marshal(active)
+	// An idle tick claims nothing and judges nothing: the rebuild loop ends.
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if judge.calls != 1 {
+		t.Fatalf("idle tick re-analyzed: calls=%d", judge.calls)
+	}
+	idle, _ := json.Marshal(activePaymentFindings(t, scoped))
+	if string(idle) != string(afterUpgrade) {
+		t.Fatal("idle tick rewrote findings")
+	}
+	// Later churn returns to the dirty-only path: only the touched payroll
+	// stream re-judges while the idle utility stream carries forward.
+	seeded = append(cloneSimplefinTransactions(seeded), simplefin.Transaction{ID: "p5", Description: "ACME PAYROLL", Amount: "2000", Posted: incomeDay(2026, 5, 2)})
+	applyUpgradeBank(t, scoped, seeded, incomeDay(2026, 5, 2))
+	judge.calls, judge.requests = 0, 0
+	if err := runner.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if judge.calls != 1 || judge.requests != 1 {
+		t.Fatalf("churn did not take the incremental path: calls=%d requests=%d", judge.calls, judge.requests)
+	}
+	churned := activePaymentFindings(t, scoped)
+	if countActiveKind(churned, "income") != 5 || countActiveKind(churned, "utility") != 3 {
+		t.Fatalf("churn findings=%+v", churned)
+	}
+	var beforeUtility, afterUtility []types.AnalysisDetection
+	for _, item := range active {
+		if item.Kind == "utility" {
+			beforeUtility = append(beforeUtility, item.AnalysisDetection)
+		}
+	}
+	for _, item := range churned {
+		if item.Kind == "utility" {
+			afterUtility = append(afterUtility, item.AnalysisDetection)
+		}
+	}
+	beforeRaw, _ := json.Marshal(beforeUtility)
+	afterRaw, _ := json.Marshal(afterUtility)
+	if string(beforeRaw) != string(afterRaw) {
+		t.Fatal("utility stream was not carried forward byte-identical")
+	}
+}
+
+func cloneSimplefinTransactions(items []simplefin.Transaction) []simplefin.Transaction {
+	out := make([]simplefin.Transaction, len(items))
+	copy(out, items)
+	return out
+}

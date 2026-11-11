@@ -37,15 +37,108 @@ func TestRentUsesSharedStreamsAndEvidence(t *testing.T) {
 		t.Run(tc.text, func(t *testing.T) {
 			items := rentTransactions(tc.text)
 			findings, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "owner", Transactions: items})
-			if err != nil || len(findings) != tc.count {
+			if err != nil {
 				t.Fatalf("findings=%+v err=%v", findings, err)
 			}
+			// Sibling generic classifications (utility, card-payment) may
+			// claim the same stream; this table pins rent behavior only.
+			var rent []types.AnalysisDetection
 			for _, f := range findings {
+				if f.Kind == "rent" {
+					rent = append(rent, f)
+				}
+			}
+			if len(rent) != tc.count {
+				t.Fatalf("rent findings=%+v err=%v", rent, err)
+			}
+			for _, f := range rent {
 				if f.Kind != "rent" || f.Role != "outflow" || f.Strength != tc.strength || f.Product != "monthly" || f.Pattern.TypicalAmount != "1800.00" || f.Pattern.AnnualizedEstimate != "21600.00" || f.JudgmentInput.Kind != "rent" {
 					t.Fatalf("finding=%+v", f)
 				}
 			}
 		})
+	}
+}
+
+func TestGenericClassificationsDetectSupportDescriptors(t *testing.T) {
+	for _, tc := range []struct {
+		text, kind, label string
+	}{
+		{"PACIFIC ELECTRIC", "utility", "utility"},
+		{"CITY WATER BILL", "utility", "utility"},
+		{"GEICO AUTO INSURANCE", "auto-insurance", "auto insurance"},
+		{"PROGRESSIVE INSURANCE", "auto-insurance", "auto insurance"},
+		{"CHASE CREDIT CARD PAYMENT", "card-payment", "card payment"},
+	} {
+		t.Run(tc.text, func(t *testing.T) {
+			findings, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "owner", Transactions: rentTransactions(tc.text)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var kinded []types.AnalysisDetection
+			for _, f := range findings {
+				if f.Kind == "rent" {
+					t.Fatalf("rent claimed generic text: %+v", f)
+				}
+				if f.Kind == tc.kind {
+					kinded = append(kinded, f)
+				}
+			}
+			if len(kinded) != 3 {
+				t.Fatalf("kind findings=%+v", findings)
+			}
+			for _, f := range kinded {
+				if f.Role != "outflow" || f.Strength != "strong" || f.Product != "monthly" || f.Pattern.TypicalAmount != "1800.00" || f.Pattern.AnnualizedEstimate != "21600.00" || f.JudgmentInput.Kind != tc.kind {
+					t.Fatalf("finding=%+v", f)
+				}
+				if !strings.Contains(f.Evidence[0].Reason, "Assessment of "+tc.label+": supported") {
+					t.Fatalf("missing support assessment: %q", f.Evidence[0].Reason)
+				}
+			}
+		})
+	}
+}
+
+func TestProviderResolverCandidatesWithoutDescriptorWords(t *testing.T) {
+	input := types.AnalysisSnapshot{UserID: "owner", Transactions: rentTransactions("DUKE 1234")}
+	resolved, err := analysis.PaymentPatterns{}.WithProviders(analysis.MapProviderResolver{Aliases: map[string]string{"duke": "utility-provider"}}).Analyze(context.Background(), input)
+	if err != nil || len(resolved) != 3 {
+		t.Fatalf("resolved=%+v err=%v", resolved, err)
+	}
+	for _, f := range resolved {
+		if f.Kind != "utility" || f.Strength != "moderate" || f.Product != "monthly" {
+			t.Fatalf("finding=%+v", f)
+		}
+		if !strings.Contains(f.Evidence[0].Reason, "Assessment of utility: uncertain") {
+			t.Fatalf("missing candidate assessment: %q", f.Evidence[0].Reason)
+		}
+	}
+	if bare, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), input); err != nil || len(bare) != 0 {
+		t.Fatalf("nil resolver should stay silent: %+v err=%v", bare, err)
+	}
+	if stub, err := (analysis.PaymentPatterns{}).WithProviders(analysis.MapProviderResolver{}).Analyze(context.Background(), input); err != nil || len(stub) != 0 {
+		t.Fatalf("empty catalog should stay silent: %+v err=%v", stub, err)
+	}
+}
+
+func TestRentExcludesGenericDescriptors(t *testing.T) {
+	findings, err := (analysis.PaymentPatterns{}).Analyze(context.Background(), types.AnalysisSnapshot{UserID: "owner", Transactions: rentTransactions("CLICKPAY ELECTRIC")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rent, utility := 0, 0
+	for _, f := range findings {
+		switch f.Kind {
+		case "rent":
+			rent++
+		case "utility":
+			utility++
+		default:
+			t.Fatalf("unexpected kind: %+v", f)
+		}
+	}
+	if rent != 0 || utility != 3 {
+		t.Fatalf("rent=%d utility=%d findings=%+v", rent, utility, findings)
 	}
 }
 

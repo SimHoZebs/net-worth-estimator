@@ -38,7 +38,10 @@ type PaymentClassification struct {
 func PaymentClassifications() []PaymentClassification {
 	return []PaymentClassification{
 		{ID: "income", Label: "income", Direction: "inflow", SupportSignals: []string{"payroll-descriptor", "source-income"}, CandidateSignals: []string{"regular-cadence"}, RankMain: true, ExternalOnly: true},
-		{ID: "rent", Label: "rent", Direction: "outflow", SupportSignals: []string{"rent-descriptor", "source-rent"}, CandidateSignals: []string{"housing-platform"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor", "non-rent-charge"}, ExternalOnly: true},
+		{ID: "rent", Label: "rent", Direction: "outflow", SupportSignals: []string{"rent-descriptor", "source-rent"}, CandidateSignals: []string{"housing-platform"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor", "non-rent-charge", "utility-descriptor", "insurance-descriptor"}, ExternalOnly: true},
+		{ID: "utility", Label: "utility", Direction: "outflow", SupportSignals: []string{"utility-descriptor"}, CandidateSignals: []string{"utility-provider"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor"}, ExternalOnly: true},
+		{ID: "auto-insurance", Label: "auto insurance", Direction: "outflow", SupportSignals: []string{"insurance-descriptor"}, CandidateSignals: []string{"insurance-provider"}, ExcludeSignals: []string{"card-repayment", "mortgage-descriptor"}, ExternalOnly: true},
+		{ID: "card-payment", Label: "card payment", Direction: "outflow", SupportSignals: []string{"card-repayment"}, CandidateSignals: []string{"card-issuer"}, ExcludeSignals: []string{"mortgage-descriptor"}, ExternalOnly: true},
 	}
 }
 
@@ -51,6 +54,15 @@ var nonRentCharge = regexp.MustCompile(`(?i)\b(utilities|utility|parking|securit
 // See docs/rent-platform-evidence.md for primary sources and ambiguity limits.
 var housingPlatform = regexp.MustCompile(`(?i)\b(bilt|rent[ _-]*cafe|click[ _-]*pay|zego|appfolio|foliospace|zillow|buildium|avail)\b`)
 
+// utilityDescriptor matches generic service words only, never provider names.
+// Provider identity resolves lazily through ProviderResolver instead.
+var utilityDescriptor = regexp.MustCompile(`(?i)\b(utility|utilities|electric|electricity|energy|water|gas|power|sewer|trash|waste|internet|broadband)\b`)
+
+// insuranceDescriptor matches generic insurance words plus a bounded set of
+// top US national carrier names. Regional carriers and brokers resolve lazily
+// through ProviderResolver instead.
+var insuranceDescriptor = regexp.MustCompile(`(?i)\b(insurance|insurer|auto[ _-]*insurance|car[ _-]*insurance|geico|progressive|state[ _-]*farm|allstate|usaa|liberty[ _-]*mutual|farmers|nationwide|travelers|american[ _-]*family)\b`)
+
 var paymentTextSignals = []struct {
 	id      string
 	pattern *regexp.Regexp
@@ -58,6 +70,7 @@ var paymentTextSignals = []struct {
 	{"payroll-descriptor", payrollDescriptor}, {"rent-descriptor", rentDescriptor},
 	{"mortgage-descriptor", mortgageDescriptor}, {"card-repayment", cardRepayment},
 	{"non-rent-charge", nonRentCharge}, {"housing-platform", housingPlatform},
+	{"utility-descriptor", utilityDescriptor}, {"insurance-descriptor", insuranceDescriptor},
 }
 
 func paymentSignals(items []paymentOccurrence) []string {
