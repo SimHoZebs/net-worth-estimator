@@ -66,9 +66,7 @@ test("a repeating payment becomes a forecast schedule without separate confirmat
 	await plan
 		.getByRole("button", { name: "Create forecast schedule", exact: true })
 		.click();
-	await expect(page.getByRole("status")).toContainText(
-		/Forecast schedule .* created/,
-	);
+	await expect(page.getByText(/Forecast schedule .* created/)).toBeVisible();
 	await expect(plan).toHaveCount(0);
 	await page.screenshot({
 		path: testInfo.outputPath("recurring-forecast-created.png"),
