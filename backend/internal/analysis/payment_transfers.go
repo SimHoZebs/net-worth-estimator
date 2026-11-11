@@ -8,9 +8,48 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+// paymentLegKeyFacts reads the opposite-leg matching key from bank facts
+// without any pending/void eligibility check, so a flipped or deleted fact
+// still names the legs it used to pair with. Currency, amount, and stamp
+// validity match the transfer detector exactly.
+func paymentLegKeyFacts(facts types.TransactionFacts) (cents, day int64, outflow bool, ok bool) {
+	if facts.Currency != "USD" {
+		return 0, 0, false, false
+	}
+	amount, err := strconv.ParseFloat(facts.Amount, 64)
+	if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 || math.Abs(amount) > 1e10 {
+		return 0, 0, false, false
+	}
+	stamp := paymentStamp(facts)
+	if stamp <= 0 {
+		return 0, 0, false, false
+	}
+	cents = int64(math.Round(math.Abs(amount) * 100))
+	if cents == 0 {
+		return 0, 0, false, false
+	}
+	return cents, stamp / 86400, amount < 0, true
+}
+
 // Match the Transfer detector's USD opposite-leg rule. Index by amount and
 // day so unrelated transactions never enter the matching loop.
 func paymentTransferIDs(ctx context.Context, transactions []types.AnalysisTransaction) (map[string]bool, error) {
+	pairs, err := paymentTransferPairs(ctx, transactions)
+	if err != nil {
+		return nil, err
+	}
+	matched := map[string]bool{}
+	for id := range pairs {
+		matched[id] = true
+	}
+	return matched, nil
+}
+
+// paymentTransferPairs applies the same opposite-leg rule but keeps both
+// sides of every pair. The incremental path recomputes both sides of any
+// touched pair, since a new leg can change exclusion in the stream holding
+// the other leg.
+func paymentTransferPairs(ctx context.Context, transactions []types.AnalysisTransaction) (map[string]map[string]bool, error) {
 	type leg struct {
 		id, account string
 		cents, day  int64
@@ -22,28 +61,21 @@ func paymentTransferIDs(ctx context.Context, transactions []types.AnalysisTransa
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if tx.Pending || tx.Void || tx.Facts.Currency != "USD" {
+		if tx.Pending || tx.Void {
 			continue
 		}
-		amount, err := strconv.ParseFloat(tx.Facts.Amount, 64)
-		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 || math.Abs(amount) > 1e10 {
+		cents, day, outflow, ok := paymentLegKeyFacts(tx.Facts)
+		if !ok {
 			continue
 		}
-		stamp := paymentStamp(tx.Facts)
-		if stamp <= 0 {
-			continue
-		}
-		l := leg{tx.TransactionID, tx.AccountID, int64(math.Round(math.Abs(amount) * 100)), stamp / 86400}
-		if l.cents == 0 {
-			continue
-		}
-		if amount < 0 {
+		l := leg{tx.TransactionID, tx.AccountID, cents, day}
+		if outflow {
 			outflows = append(outflows, l)
 		} else {
-			inflows[key{l.cents, l.day}] = append(inflows[key{l.cents, l.day}], l)
+			inflows[key{cents, day}] = append(inflows[key{cents, day}], l)
 		}
 	}
-	matched := map[string]bool{}
+	partners := map[string]map[string]bool{}
 	for _, o := range outflows {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -54,10 +86,16 @@ func paymentTransferIDs(ctx context.Context, transactions []types.AnalysisTransa
 					return nil, err
 				}
 				if o.account != i.account {
-					matched[o.id], matched[i.id] = true, true
+					if partners[o.id] == nil {
+						partners[o.id] = map[string]bool{}
+					}
+					if partners[i.id] == nil {
+						partners[i.id] = map[string]bool{}
+					}
+					partners[o.id][i.id], partners[i.id][o.id] = true, true
 				}
 			}
 		}
 	}
-	return matched, nil
+	return partners, nil
 }

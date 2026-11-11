@@ -113,6 +113,12 @@ func (r *Runner) run(ctx context.Context, scoped store.AnalysisStore, user strin
 		problem = "analysis-failed"
 		findings = nil
 	}
+	// Incremental definitions publish per-stream from their stashed outcome.
+	if committer, ok := definition.(interface {
+		CompleteIncremental(types.AnalysisRun, string) error
+	}); ok {
+		return committer.CompleteIncremental(run, problem)
+	}
 	return scoped.CompleteAnalysis(run, findings, problem)
 }
 

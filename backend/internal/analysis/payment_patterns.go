@@ -133,6 +133,30 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 		return nil, err
 	}
 	// Index once by structural applicability, not one transaction scan per type.
+	patterns := classifyPaymentStreams(definitions, streams)
+	if len(patterns) == 0 {
+		return []types.AnalysisDetection{}, nil
+	}
+	judgmentErr := p.preparationErr
+	if p.Judge != nil {
+		judgmentErr = judgePayments(ctx, p.Judge, patterns)
+	} else if judgmentErr != nil {
+		for _, pat := range patterns {
+			pat.judgment = &types.AnalysisJudgment{RequestID: pat.judgmentInput().ID, Status: "unavailable"}
+		}
+	}
+	// Income ranking remains source-currency comparable and excludes explicit negatives.
+	assignPaymentMain(patterns)
+	findings, err := paymentPatternFindings(ctx, patterns)
+	if err != nil {
+		return nil, err
+	}
+	return findings, judgmentErr
+}
+
+// classifyPaymentStreams indexes streams once by structural applicability,
+// not one transaction scan per type.
+func classifyPaymentStreams(definitions []PaymentClassification, streams []*paymentStream) []*classifiedPayment {
 	byDirection := map[string][]*paymentStream{}
 	for _, stream := range streams {
 		byDirection[stream.direction] = append(byDirection[stream.direction], stream)
@@ -163,18 +187,13 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 			}
 		}
 	}
-	if len(patterns) == 0 {
-		return []types.AnalysisDetection{}, nil
-	}
-	judgmentErr := p.preparationErr
-	if p.Judge != nil {
-		judgmentErr = judgePayments(ctx, p.Judge, patterns)
-	} else if judgmentErr != nil {
-		for _, pat := range patterns {
-			pat.judgment = &types.AnalysisJudgment{RequestID: pat.judgmentInput().ID, Status: "unavailable"}
-		}
-	}
-	// Income ranking remains source-currency comparable and excludes explicit negatives.
+	return patterns
+}
+
+// assignPaymentMain sorts candidates heaviest-first and marks the top
+// comparable RankMain candidate per classification. Currency mixing withholds
+// the mark instead of ranking incomparable amounts.
+func assignPaymentMain(patterns []*classifiedPayment) {
 	sort.Slice(patterns, func(i, j int) bool {
 		if patterns[i].annualized != patterns[j].annualized {
 			return patterns[i].annualized > patterns[j].annualized
@@ -202,12 +221,17 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 			group[0].isMain = true
 		}
 	}
+}
+
+// paymentPatternFindings renders one finding per occurrence in stable
+// transaction order. Keep explicit negative assessments of eligible
+// candidates correctable.
+func paymentPatternFindings(ctx context.Context, patterns []*classifiedPayment) ([]types.AnalysisDetection, error) {
 	findings := []types.AnalysisDetection{}
 	for _, pat := range patterns {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		// Keep explicit negative assessments of eligible candidates correctable.
 		findings = append(findings, pat.findings()...)
 	}
 	sort.Slice(findings, func(i, j int) bool {
@@ -216,5 +240,5 @@ func (p PaymentPatterns) Analyze(ctx context.Context, input types.AnalysisSnapsh
 		}
 		return findings[i].Kind < findings[j].Kind
 	})
-	return findings, judgmentErr
+	return findings, nil
 }

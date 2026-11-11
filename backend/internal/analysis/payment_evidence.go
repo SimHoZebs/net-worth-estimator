@@ -15,6 +15,11 @@ func paymentPatternID(owner, group, cadence string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// PaymentStreamIdentityVersion versions the payment-stream identity logic
+// above. A cached stream whose identity version mismatches must mean full
+// rebuild: the incremental worker never reuses stats or membership across it.
+const PaymentStreamIdentityVersion = 1
+
 func (pat *classifiedPayment) judgmentInput() *types.AnalysisJudgmentInput {
 	// A bounded sample provides inspectable evidence for models or human queues.
 	// Pattern statistics describe all occurrences. No engine-specific scaling,

@@ -342,6 +342,9 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 // same instant keeps precedence.
 func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error) {
 	var summary SyncApplySummary
+	if err := s.ensureIncrementalSchema(); err != nil {
+		return summary, err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return summary, fmt.Errorf("sync begin: %w", err)

@@ -72,6 +72,15 @@ func clearModel(tx *userTx) error {
 	if err := deleteModelRows(tx); err != nil {
 		return err
 	}
+	// Clearing the model drops every fact (cascading through the dirty
+	// tombstones just written), so wipe the incremental state too: an empty
+	// model rebuilds every stream from scratch.
+	if _, err := tx.Exec(`DELETE FROM analysis_payment_streams WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM analysis_fact_dirty WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear entity ids: %w", err)
 	}
@@ -189,6 +198,11 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		}
 	}
 	if err := deleteModelRows(tx); err != nil {
+		return err
+	}
+	// Model replacement re-keys owner rows, so cached stream membership
+	// cannot survive: force a full rebuild on the next worker pass.
+	if _, err := tx.Exec(`DELETE FROM analysis_payment_streams WHERE user_id = :user_id`); err != nil {
 		return err
 	}
 

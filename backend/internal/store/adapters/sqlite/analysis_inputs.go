@@ -42,6 +42,17 @@ func analysisRevision(tx *userTx) (int64, error) {
 	return revision, err
 }
 
+// AnalysisInputRevision reports the current analysis input revision without
+// loading any findings, so Prepare can skip heavy loads on idle ticks.
+func (s *sqliteStore) AnalysisInputRevision() (int64, error) {
+	var revision int64
+	err := s.db.QueryRow(`SELECT revision FROM analysis_inputs WHERE user_id = :user_id`).Scan(&revision)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return revision, err
+}
+
 func loadAnalysisSnapshot(tx *userTx, revision int64) (types.AnalysisSnapshot, error) {
 	result := types.AnalysisSnapshot{Revision: revision, UserID: tx.userID, Transactions: []types.AnalysisTransaction{}}
 	rows, err := tx.Query(`SELECT p.id, k.bridge_account_id, k.provider, p.pending, p.void, f.facts_json

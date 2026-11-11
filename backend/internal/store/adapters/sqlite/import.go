@@ -11,6 +11,9 @@ func (s *sqliteStore) ImportModel(model *types.FinancialModel) (*types.Financial
 	if model == nil {
 		return nil, fmt.Errorf("import model is required")
 	}
+	if err := s.ensureIncrementalSchema(); err != nil {
+		return nil, err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("import begin: %w", err)

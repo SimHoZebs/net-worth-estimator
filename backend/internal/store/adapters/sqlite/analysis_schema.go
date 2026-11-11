@@ -1,6 +1,6 @@
 package sqlite
 
-import "fmt"
+import "strings"
 
 var analysisSchema = []string{
 	`CREATE TABLE IF NOT EXISTS transaction_source_facts (
@@ -41,31 +41,45 @@ var analysisSchema = []string{
 		pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
 		PRIMARY KEY(user_id, pattern_key)
 	)`,
+	analysisFactDirtyDDL,
+	analysisPaymentStreamsDDL,
 }
+
+// analysisFactDirtyDDL is the durable dirty set for incremental payment
+// streams: one row per changed bank fact with the revision that changed it.
+// Tombstones have no foreign key so deletes survive the row delete. Fresh
+// databases get it from the shared schema; pre-existing databases gain it
+// on first incremental use, so no operator migration converts anything.
+const analysisFactDirtyDDL = `CREATE TABLE IF NOT EXISTS analysis_fact_dirty (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	transaction_id TEXT NOT NULL,
+	revision INTEGER NOT NULL,
+	kind TEXT NOT NULL,
+	PRIMARY KEY(user_id, transaction_id)
+)`
+
+// analysisPaymentStreamsDDL is the durable payment-stream cache: one row per
+// stream with opaque stats, member bank fact IDs, the consumed analysis
+// revision, and the identity version. Fresh databases get it from the shared
+// schema; pre-existing databases gain it on first incremental use.
+const analysisPaymentStreamsDDL = `CREATE TABLE IF NOT EXISTS analysis_payment_streams (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	stream_id TEXT NOT NULL,
+	stats_json TEXT NOT NULL DEFAULT '{}',
+	member_ids_json TEXT NOT NULL DEFAULT '[]',
+	consumed_revision INTEGER NOT NULL DEFAULT 0,
+	identity_version INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY(user_id, stream_id)
+)`
 
 var analysisTriggerNames = []string{"analysis_facts_insert", "analysis_facts_update", "analysis_facts_delete", "analysis_transaction_lifecycle", "analysis_transaction_sim_lifecycle"}
 
 func analysisSchemaStatements() []string {
 	statements := append([]string(nil), analysisSchema...)
-	for _, action := range []string{"INSERT", "UPDATE", "DELETE"} {
-		name, row := "analysis_facts_insert", "NEW"
-		if action == "UPDATE" {
-			name = "analysis_facts_update"
-		}
-		if action == "DELETE" {
-			name, row = "analysis_facts_delete", "OLD"
-		}
-		statements = append(statements, fmt.Sprintf(`CREATE TRIGGER IF NOT EXISTS %s AFTER %s ON transaction_source_facts BEGIN
-			INSERT INTO analysis_inputs(user_id, revision) VALUES (%s.user_id, 1)
-			ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
-		END`, name, action, row))
+	for _, ddl := range incrementalTriggerDDLs() {
+		statements = append(statements, strings.Replace(ddl, "CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS ", 1))
 	}
-	return append(statements, `CREATE TRIGGER IF NOT EXISTS analysis_transaction_lifecycle AFTER UPDATE OF pending, void ON transactions
-		WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
-		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.id)
-		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
-		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`,
-		`CREATE TRIGGER IF NOT EXISTS analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON transaction_sim
+	return append(statements, `CREATE TRIGGER IF NOT EXISTS analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON transaction_sim
 		WHEN (OLD.enabled != NEW.enabled)
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)

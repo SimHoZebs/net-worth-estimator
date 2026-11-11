@@ -35,37 +35,50 @@ func detectPaymentStreams(ctx context.Context, input types.AnalysisSnapshot) ([]
 	if err != nil {
 		return nil, err
 	}
-	var latest int64
-	for _, tx := range input.Transactions {
-		if !tx.Pending && !tx.Void {
-			latest = max(latest, paymentStamp(tx.Facts)/86400)
-		}
-	}
+	var latest = latestPaymentDay(input.Transactions)
 	streams := make([]*paymentStream, 0, len(groups))
 	for _, group := range groups {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		stream := observePaymentGroup(input.UserID, group, group.candidates, latest)
-		var external []paymentOccurrence
-		for _, item := range group.candidates {
-			if !transfers[item.transaction.TransactionID] && !paymentRefundMarker.MatchString(item.text) {
-				external = append(external, item)
-			}
-		}
-		if len(external) > 0 {
-			if len(external) == len(group.candidates) {
-				stream.external = stream
-			} else {
-				stream.external = observePaymentGroup(input.UserID, group, external, latest)
-			}
-		}
-		streams = append(streams, stream)
+		streams = append(streams, observePaymentStream(input.UserID, group, group.candidates, transfers, latest))
 	}
 	if cache != nil {
 		*cache = observationCache{owner: input.UserID, revision: input.Revision, streams: streams, loaded: true}
 	}
 	return streams, nil
+}
+
+// latestPaymentDay is the global recency anchor shared by every stream view.
+func latestPaymentDay(transactions []types.AnalysisTransaction) int64 {
+	var latest int64
+	for _, tx := range transactions {
+		if !tx.Pending && !tx.Void {
+			latest = max(latest, paymentStamp(tx.Facts)/86400)
+		}
+	}
+	return latest
+}
+
+// observePaymentStream summarizes one identity group and its external-only
+// view. The incremental path reuses it for affected groups only, so
+// recomputed statistics match full detection exactly.
+func observePaymentStream(owner string, group paymentGroup, candidates []paymentOccurrence, transfers map[string]bool, latest int64) *paymentStream {
+	stream := observePaymentGroup(owner, group, candidates, latest)
+	var external []paymentOccurrence
+	for _, item := range candidates {
+		if !transfers[item.transaction.TransactionID] && !paymentRefundMarker.MatchString(item.text) {
+			external = append(external, item)
+		}
+	}
+	if len(external) > 0 {
+		if len(external) == len(candidates) {
+			stream.external = stream
+		} else {
+			stream.external = observePaymentGroup(owner, group, external, latest)
+		}
+	}
+	return stream
 }
 
 func observePaymentGroup(owner string, group paymentGroup, items []paymentOccurrence, latest int64) *paymentStream {

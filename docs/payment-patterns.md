@@ -1,12 +1,15 @@
 # Shared payment streams and classifications
 
 The `recurring` and `payments` analyses share transaction observations and derived
-statistics, cached per owner and bank revision within one worker pass. Repetition
+statistics. Repetition
 and purpose are independent assessments of that evidence. Income and rent are
 registry definitions, not separate model services, feedback tables or UI pages.
 The existing analysis lifecycle avoids reevaluation when the bank input, registry
-policy hash and provider revision are unchanged. A changed input currently
-rebuilds the owner's streams; per-stream incremental bank updates are not implemented.
+policy hash and provider revision are unchanged. A changed input recomputes
+only the payment streams its dirty facts touch: sync maintains the changed
+fact set, a durable stream cache carries statistics and membership across runs,
+and findings publish per stream with withdrawal scoped to recomputed streams.
+Unchanged streams keep byte-identical findings with no new provider calls.
 
 ## Boundaries
 

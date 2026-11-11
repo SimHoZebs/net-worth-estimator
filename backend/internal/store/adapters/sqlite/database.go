@@ -88,6 +88,19 @@ func (d *Database) setupSchema() error {
 		return err
 	}
 	if tableCount != 0 {
+		// Additive incremental tables install on existing databases as
+		// ordinary setup: CREATE IF NOT EXISTS never rewrites rows, and
+		// outdated triggers refresh only when their body lacks dirty
+		// maintenance. Core analysis tables stay required, so a database
+		// missing them still fails validation below.
+		for _, ddl := range []string{analysisFactDirtyDDL, analysisPaymentStreamsDDL} {
+			if _, err := tx.Exec(ddl); err != nil {
+				return fmt.Errorf("setup incremental tables: %w", err)
+			}
+		}
+		if err := refreshIncrementalTriggersTx(tx); err != nil {
+			return err
+		}
 		if err := checkExistingSchema(tx); err != nil {
 			return err
 		}

@@ -50,6 +50,9 @@ func (s *sqliteStore) Close() error {
 
 // Clear removes all canonical model rows (used by tests/import).
 func (s *sqliteStore) Clear() error {
+	if err := s.ensureIncrementalSchema(); err != nil {
+		return err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("clear begin: %w", err)

@@ -22,8 +22,10 @@ after at least 30 seconds. Computation receives a 20-second context deadline.
 is `store.AnalysisStore`. Add a definition to `analysis.Definitions()` to reuse
 the lifecycle. BNPL, recurring, transfer, and payment-pattern detection are
 built-in consumers.
-The current worker rechecks the changed user's complete saved evidence snapshot.
-It skips unchanged input revisions. It does not require a broker or external API.
+The current worker rechecks the changed user's saved evidence. Payment streams
+recompute incrementally: only streams touched by changed bank facts re-derive
+statistics and judgments, and findings publish per stream. Unchanged input
+revisions skip the user without loading prior findings. It does not require a broker or external API.
 
 ## Persistence and privacy
 

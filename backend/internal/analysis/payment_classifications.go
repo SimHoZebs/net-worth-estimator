@@ -86,26 +86,33 @@ func paymentSignals(items []paymentOccurrence) []string {
 }
 
 func (p *classifiedPayment) deterministicDecision() string {
+	return deterministicPaymentDecision(p.classification, p.signals)
+}
+
+// deterministicPaymentDecision applies classification policy to observed
+// signals. The incremental path reuses it for carried-forward candidates
+// whose statistics stay cached.
+func deterministicPaymentDecision(classification PaymentClassification, signals []string) string {
 	has := map[string]bool{}
-	for _, s := range p.signals {
+	for _, s := range signals {
 		has[s] = true
 	}
-	for _, s := range p.classification.ExcludeSignals {
+	for _, s := range classification.ExcludeSignals {
 		if has[s] {
 			return "unsupported"
 		}
 	}
-	for _, s := range p.classification.SupportSignals {
+	for _, s := range classification.SupportSignals {
 		if has[s] {
 			return "supported"
 		}
 	}
-	for _, s := range p.classification.CandidateSignals {
+	for _, s := range classification.CandidateSignals {
 		if has[s] {
 			return "uncertain"
 		}
 	}
-	if p.classification.SuggestWithoutSignal {
+	if classification.SuggestWithoutSignal {
 		return "uncertain"
 	}
 	return "unsupported"
