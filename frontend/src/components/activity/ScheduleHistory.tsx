@@ -1,27 +1,60 @@
+import { useState } from "react";
 import { History } from "lucide-react";
+import { releaseOccurrence } from "@/api/generated/endpoints.ts";
 import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
+import { refreshTransactions } from "../../state/workspaceResources.ts";
+import { performSave } from "../../state/workspaceWrites.ts";
 import { Badge } from "../Badge.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
+
+/**
+ * Pending bank rows stay owner-editable for the occurrence claim even when
+ * the row is otherwise read-only, so removal follows the same gate.
+ */
+function canRemoveOccurrence(transaction: Transaction): boolean {
+	return (
+		!transaction.readOnly ||
+		(transaction.pending === true && transaction.syncOwned === true)
+	);
+}
 
 /**
  * Transactions that record an occurrence of one schedule, newest first. The
  * claim is the association, so this reads saved transactions rather than the
  * projected occurrence list. The shared transaction table owns the row
- * layout, status badges, and click-through.
+ * layout, status badges, and click-through. Each row also offers a direct
+ * Remove from history that releases the occurrence without opening the row.
  */
 export function ScheduleHistory({
 	transactions,
 	accounts,
 	startDate,
 	onSelect,
+	readOnly,
 }: {
 	transactions: Transaction[];
 	accounts: Account[];
 	startDate: string;
 	onSelect: (transaction: Transaction) => void;
+	readOnly?: boolean;
 }) {
+	const [removingId, setRemovingId] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const remove = async (transaction: Transaction) => {
+		if (removingId !== null || readOnly) return;
+		setRemovingId(transaction.id);
+		setError(null);
+		const ok = await performSave({
+			call: () => releaseOccurrence(transaction.id),
+			refresh: refreshTransactions,
+			failureMessage: "The occurrence could not be removed.",
+		});
+		setRemovingId(null);
+		if (!ok) setError("The occurrence could not be removed.");
+	};
 	return (
 		<section
 			className="mt-4 border-t border-line pt-4"
@@ -55,10 +88,17 @@ export function ScheduleHistory({
 							})}
 							savedTransaction={transaction}
 							onEdit={onSelect}
+							onRemove={
+								!readOnly && canRemoveOccurrence(transaction)
+									? () => void remove(transaction)
+									: undefined
+							}
+							removing={removingId === transaction.id}
 						/>
 					))}
 				</TransactionTable>
 			)}
+			<FieldError message={error} />
 		</section>
 	);
 }

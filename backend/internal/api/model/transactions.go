@@ -220,6 +220,24 @@ func (s *handler) recordTransaction(_ context.Context, input *transactionInput) 
 	}
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		transaction.Destinations = displayDestinations(model, transaction.Destinations)
+		if transaction.Claim == nil {
+			claimed := make(map[string]map[string]bool, len(model.Schedules))
+			for i := range model.Transactions {
+				existing := &model.Transactions[i]
+				if existing.Claim == nil || existing.ID == transaction.ID {
+					continue
+				}
+				dates, ok := claimed[existing.Claim.ScheduleID]
+				if !ok {
+					dates = map[string]bool{}
+					claimed[existing.Claim.ScheduleID] = dates
+				}
+				dates[existing.Claim.OccurrenceDate] = true
+			}
+			if match := domain.MatchAutoClaim(transaction, model.Schedules, claimed); match != nil {
+				transaction.Claim = match
+			}
+		}
 		model.Transactions = replaceByID(model.Transactions, transaction.ID, transactionID, transaction)
 	}, func() (types.Transaction, error) {
 		return s.store.CreateTransaction(transaction)

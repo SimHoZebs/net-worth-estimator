@@ -10,6 +10,7 @@ import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { Badge } from "../Badge.tsx";
+import { TextButton } from "../Button.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { useTransactionBNPL } from "../analysis/TransactionAnalysis.tsx";
 import { findingLabel } from "../../domain/analysisFindings.ts";
@@ -27,6 +28,8 @@ export function TransactionRow({
 	shortfallLabel,
 	divider,
 	shortfall,
+	onRemove,
+	removing,
 }: {
 	transaction: AccountTransaction;
 	savedTransaction: Transaction | null;
@@ -34,6 +37,9 @@ export function TransactionRow({
 	shortfallLabel?: string;
 	divider?: { tone: "warning" | "danger"; label: string };
 	shortfall?: boolean;
+	/** Direct removal that keeps the row click-through intact. */
+	onRemove?: () => void;
+	removing?: boolean;
 }) {
 	const DirectionIcon =
 		transaction.flow === "transfer"
@@ -159,6 +165,20 @@ export function TransactionRow({
 						>
 							{divider.label}
 						</small>
+					)}
+					{onRemove && (
+						<TextButton
+							type="button"
+							tone="danger"
+							disabled={removing}
+							onClick={(event) => {
+								event.stopPropagation();
+								onRemove();
+							}}
+							aria-label={`Remove ${transaction.name} from history`}
+						>
+							{removing ? "Removing…" : "Remove"}
+						</TextButton>
 					)}
 				</>
 			}

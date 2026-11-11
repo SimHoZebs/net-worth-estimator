@@ -434,5 +434,8 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 			return summary, fmt.Errorf("mark projection dirty: %w", err)
 		}
 	}
+	if err := s.autoClaimSweep(); err != nil {
+		return summary, err
+	}
 	return summary, nil
 }

@@ -363,6 +363,8 @@ function ScheduleCapsule({
 	locked,
 	scheduleControlId,
 	occurrenceOptions,
+	onRemoveOccurrence,
+	removingOccurrence,
 }: {
 	savedTransaction: Transaction;
 	draft: TransactionDraft;
@@ -376,62 +378,78 @@ function ScheduleCapsule({
 	scheduleControlId?: string;
 	/** Scheduled dates of the selected rule, closest to the posted day first. */
 	occurrenceOptions: string[];
+	/** Direct release of the saved occurrence without opening claim controls. */
+	onRemoveOccurrence?: () => void;
+	removingOccurrence?: boolean;
 }) {
 	const id = useId();
 	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
 	if (savedTransaction.kind === "transaction") {
 		if (!draft.claimScheduleId) return null;
 		return (
-			<p className="mt-4 flex items-center gap-2 text-xs leading-[1.6] text-muted">
-				<Link2 size={15} aria-hidden="true" />
-				<span>
-					Replaces{" "}
-					<select
-						className={transactionControlStyles({
-							element: "select",
-							shape: "compact",
-						})}
-						aria-label="Records an occurrence of"
-						name="claimScheduleId"
-						disabled={!claimEditable}
-						value={draft.claimScheduleId}
-						onChange={(event) =>
-							updateDraft({ claimScheduleId: event.target.value }, "schedule")
-						}
+			<div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-[1.6] text-muted">
+				<p className="flex items-center gap-2">
+					<Link2 size={15} aria-hidden="true" />
+					<span>
+						Replaces{" "}
+						<select
+							className={transactionControlStyles({
+								element: "select",
+								shape: "compact",
+							})}
+							aria-label="Records an occurrence of"
+							name="claimScheduleId"
+							disabled={!claimEditable}
+							value={draft.claimScheduleId}
+							onChange={(event) =>
+								updateDraft({ claimScheduleId: event.target.value }, "schedule")
+							}
+						>
+							<option value="">No link</option>
+							{draft.claimScheduleId && (
+								<option value={draft.claimScheduleId}>
+									{claimScheduleName ?? draft.claimScheduleId}
+								</option>
+							)}
+						</select>{" "}
+						on{" "}
+						<select
+							className={transactionControlStyles({
+								element: "select",
+								shape: "compact",
+							})}
+							aria-label="Replaces occurrence on"
+							name="claimOccurrenceDate"
+							disabled={!claimEditable}
+							value={draft.claimOccurrenceDate}
+							onChange={(event) =>
+								updateDraft(
+									{ claimOccurrenceDate: event.target.value },
+									"schedule",
+								)
+							}
+						>
+							<option value="">Choose a date</option>
+							{occurrenceOptions.map((date) => (
+								<option key={date} value={date}>
+									{dateLabel(date, true)}
+								</option>
+							))}
+						</select>
+					</span>
+				</p>
+				{onRemoveOccurrence && claimEditable && (
+					<TextButton
+						type="button"
+						tone="danger"
+						disabled={removingOccurrence}
+						onClick={onRemoveOccurrence}
+						aria-label={`Remove occurrence recorded by ${savedTransaction.name}`}
 					>
-						<option value="">No link</option>
-						{draft.claimScheduleId && (
-							<option value={draft.claimScheduleId}>
-								{claimScheduleName ?? draft.claimScheduleId}
-							</option>
-						)}
-					</select>{" "}
-					on{" "}
-					<select
-						className={transactionControlStyles({
-							element: "select",
-							shape: "compact",
-						})}
-						aria-label="Replaces occurrence on"
-						name="claimOccurrenceDate"
-						disabled={!claimEditable}
-						value={draft.claimOccurrenceDate}
-						onChange={(event) =>
-							updateDraft(
-								{ claimOccurrenceDate: event.target.value },
-								"schedule",
-							)
-						}
-					>
-						<option value="">Choose a date</option>
-						{occurrenceOptions.map((date) => (
-							<option key={date} value={date}>
-								{dateLabel(date, true)}
-							</option>
-						))}
-					</select>
-				</span>
-			</p>
+						{removingOccurrence ? "Removing…" : "Remove"}
+					</TextButton>
+				)}
+			</div>
 		);
 	}
 	const annualIncrease = Number(draft.annualIncrease) || 0;
@@ -981,6 +999,8 @@ export function TransactionDetail({
 	const [endScheduleError, setEndScheduleError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [removingClaim, setRemovingClaim] = useState(false);
+	const [claimRemoveError, setClaimRemoveError] = useState<string | null>(null);
 	const once = savedTransaction.kind === "transaction";
 	const canEdit = !edit.readOnlyReason;
 	// Settled and pending bank rows are editable and removable through the
@@ -1116,6 +1136,25 @@ export function TransactionDetail({
 				? "The schedule could not be removed."
 				: "The transaction could not be removed.",
 		);
+	// Direct release of the saved occurrence claim. The row itself stays;
+	// only the link to the schedule occurrence is removed.
+	const removeClaim = async () => {
+		if (removingClaim || readOnly || !savedTransaction.claimScheduleId) return;
+		setRemovingClaim(true);
+		setClaimRemoveError(null);
+		const ok = await performSave({
+			call: () => releaseOccurrence(savedTransaction.id),
+			refresh: refreshTransactions,
+			failureMessage: "The occurrence could not be removed.",
+		});
+		setRemovingClaim(false);
+		if (!ok) setClaimRemoveError("The occurrence could not be removed.");
+	};
+	const claimRemovable =
+		!readOnly &&
+		savedTransaction.kind === "transaction" &&
+		savedTransaction.claimScheduleId !== null &&
+		(!edit.readOnlyReason || canClaimOccurrence(savedTransaction));
 	// Ending a schedule records one real transaction and removes the
 	// schedule. The server copies the schedule's amount and accounts; only
 	// the day it actually happened is new input.
@@ -1578,6 +1617,10 @@ export function TransactionDetail({
 							editing={edit.activeField === "schedule"}
 							locked={!canEdit}
 							scheduleControlId={`${edit.formId}-schedule`}
+							onRemoveOccurrence={
+								claimRemovable ? () => void removeClaim() : undefined
+							}
+							removingOccurrence={removingClaim}
 						/>
 					</div>
 					<MoreOptions
@@ -1595,10 +1638,13 @@ export function TransactionDetail({
 							accounts={fullAccounts}
 							startDate={savedTransaction.startDate}
 							onSelect={setHistorySelection}
+							readOnly={Boolean(readOnly)}
 						/>
 					)}
 					<FieldError
-						message={[subscription.error, edit.error].filter(Boolean).join(" ")}
+						message={[subscription.error, edit.error, claimRemoveError]
+							.filter(Boolean)
+							.join(" ")}
 					/>
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">
