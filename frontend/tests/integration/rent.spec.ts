@@ -65,6 +65,14 @@ test("rent shares income review without changing financial rows", async ({
 		incomeDialog.getByRole("button", { name: /Confirm income for/ }),
 	).toBeEnabled();
 	await incomeDialog.getByRole("button", { name: "Close dialog" }).click();
+	await patterns
+		.getByRole("button", { name: "Review BILT CARD PAYMENT" })
+		.click();
+	const cardDialog = page.getByRole("dialog", { name: "BILT CARD PAYMENT" });
+	await expect(
+		cardDialog.getByRole("button", { name: /Confirm card-payment for/ }),
+	).toBeEnabled();
+	await cardDialog.getByRole("button", { name: "Close dialog" }).click();
 	await page.reload();
 	await page.getByRole("tab", { name: "Analysis", exact: true }).click();
 	await patterns.getByRole("tab", { name: "Saved (1)" }).click();
