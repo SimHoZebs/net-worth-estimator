@@ -118,7 +118,7 @@ test("income review remains read-only for readers", async ({ page }) => {
 	).toBeVisible();
 	await expect(
 		income.getByRole("button", {
-			name: /Link payment pattern for .* to an existing schedule/,
+			name: /Link to existing schedule for/,
 		}),
 	).toBeVisible();
 });

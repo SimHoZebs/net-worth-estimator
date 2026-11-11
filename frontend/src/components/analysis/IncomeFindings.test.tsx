@@ -236,7 +236,7 @@ describe("income review", () => {
 		).toBeDefined();
 		expect(
 			screen.getByRole("button", {
-				name: "Link payment pattern for ACME payroll to an existing schedule",
+				name: "Link to existing schedule for ACME payroll",
 			}),
 		).toBeDefined();
 		review.isError = true;
@@ -405,10 +405,7 @@ describe("payment forecast actions", () => {
 		render(ui([finding()]));
 		await runInteractions([
 			{
-				click: [
-					"button",
-					"Link payment pattern for ACME payroll to an existing schedule",
-				],
+				click: ["button", "Link to existing schedule for ACME payroll"],
 			},
 			{ expectText: "Matched occurrences" },
 			{ click: ["button", "Link payments to schedule"] },
@@ -454,10 +451,7 @@ describe("payment forecast actions", () => {
 		render(ui([finding()], true));
 		await runInteractions([
 			{
-				click: [
-					"button",
-					"Link payment pattern for ACME payroll to an existing schedule",
-				],
+				click: ["button", "Link to existing schedule for ACME payroll"],
 			},
 			{ expectText: "Matched occurrences" },
 		]);

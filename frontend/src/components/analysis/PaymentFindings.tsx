@@ -79,7 +79,7 @@ function PatternCard({
 					type="button"
 					size="sm"
 					variant="secondary"
-					aria-label={`Link payment pattern for ${title} to an existing schedule`}
+					aria-label={`Link to existing schedule for ${title}`}
 					onClick={() => setLinkOpen(true)}
 				>
 					Link to existing schedule
