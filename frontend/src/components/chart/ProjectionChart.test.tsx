@@ -83,9 +83,15 @@ async function show() {
 		}),
 	);
 	render(<ProjectionChart onEvidence={onEvidence} />);
-	await screen.findByRole("img", {
-		name: "Net worth over the trailing 30 days",
-	});
+	// The chart paints asynchronously after the mocked queries resolve;
+	// the default 1s query timeout flakes on loaded CI runners.
+	await screen.findByRole(
+		"img",
+		{
+			name: "Net worth over the trailing 30 days",
+		},
+		{ timeout: 10_000 },
+	);
 	return { onEvidence };
 }
 

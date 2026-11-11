@@ -103,4 +103,7 @@ test("Unicode and email-style usernames work in setup and native signup", async 
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}, 30000);
+  // Two full setup+signup cycles with bcrypt-cost-12 hashing each; loaded
+  // CI runners regularly exceed the suite default, so this test gets its
+  // own budget instead of flaking the gate.
+}, 60000);
