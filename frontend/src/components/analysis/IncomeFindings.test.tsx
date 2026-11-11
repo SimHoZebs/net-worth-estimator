@@ -4,6 +4,7 @@ import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { PatternToExistingSchedulePreview } from "@/api/generated/model/patternToExistingSchedulePreview.ts";
 import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
 import { runInteractions } from "@/mocks/interactions.ts";
+import { resetNotifications, useNotifications } from "@/state/notifications.ts";
 import { PaymentFindings as IncomeFindings } from "./PaymentFindings.tsx";
 
 const review = vi.hoisted(() => ({
@@ -125,6 +126,7 @@ beforeEach(() => {
 	existingPreviewState.data = undefined;
 	existingPreviewState.isPending = false;
 	existingPreviewState.isError = false;
+	resetNotifications();
 });
 
 describe("income review", () => {
@@ -337,9 +339,14 @@ describe("payment forecast actions", () => {
 			{ click: ["button", "Create forecast schedule for ACME payroll"] },
 			{ click: ["button", "Create forecast schedule"] },
 		]);
-		expect(screen.getByRole("status").textContent).toContain(
-			"Forecast schedule “ACME payroll” created.",
-		);
+		const toast = useNotifications
+			.getState()
+			.items.find((item) => item.key === "forecast-schedule");
+		expect(toast?.kind).toBe("success");
+		expect(toast?.message).toBe("Forecast schedule “ACME payroll” created.");
+		expect(
+			screen.queryByRole("dialog", { name: /Forecast plan for/ }),
+		).toBeNull();
 		expect(createMutate).toHaveBeenCalledWith(
 			{ id: "deposit" },
 			expect.objectContaining({}),

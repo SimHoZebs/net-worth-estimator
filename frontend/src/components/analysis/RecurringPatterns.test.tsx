@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { PatternToExistingSchedulePreview } from "@/api/generated/model/patternToExistingSchedulePreview.ts";
 import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
+import { resetNotifications, useNotifications } from "@/state/notifications.ts";
 import { RecurringPatterns } from "./RecurringPatterns.tsx";
 
 const reviewMutate = vi.hoisted(() => vi.fn());
@@ -119,6 +120,7 @@ beforeEach(() => {
 	existingRulePreviewState.isPending = false;
 	existingRulePreviewState.isError = false;
 	vi.clearAllMocks();
+	resetNotifications();
 });
 
 describe("repeating-payment patterns", () => {
@@ -210,9 +212,14 @@ describe("repeating-payment patterns", () => {
 			{ id: "one" },
 			expect.objectContaining({}),
 		);
+		const toast = useNotifications
+			.getState()
+			.items.find((item) => item.key === "forecast-schedule");
+		expect(toast?.kind).toBe("success");
+		expect(toast?.message).toBe("Forecast schedule “Grocer” created.");
 		expect(
-			screen.getByText(/Forecast schedule “Grocer” created/),
-		).toBeDefined();
+			screen.queryByRole("dialog", { name: /Forecast plan for/ }),
+		).toBeNull();
 	});
 	it("explains plans that cannot become rules yet", () => {
 		previewState.data = {

@@ -18,6 +18,7 @@ import {
 	usePatternToNewSchedulePreview,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
+import { notifySuccess } from "@/state/notifications.ts";
 import { useSavedAccounts } from "@/state/savedState.ts";
 import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { Badge } from "../Badge.tsx";
@@ -55,7 +56,6 @@ export function NewScheduleDialog({
 	const preview = usePatternToNewSchedulePreview(findingId);
 	const create = useCreatePatternToNewSchedule();
 	const accounts = useSavedAccounts();
-	const [created, setCreated] = useState<string | null>(null);
 	const [failed, setFailed] = useState(false);
 	const plan = preview.data;
 	const accountName =
@@ -72,20 +72,6 @@ export function NewScheduleDialog({
 				<p className="text-sm text-muted">Loading the forecast plan…</p>
 			) : preview.isError || !plan ? (
 				<ErrorNotice message="The forecast plan could not be loaded. Try again." />
-			) : created ? (
-				<div className="space-y-3">
-					<p className="m-0 text-sm" role="status">
-						Forecast schedule “{created}” created. Future{" "}
-						{plan.schedule
-							? frequencyLabel(plan.schedule.frequency).toLowerCase()
-							: ""}{" "}
-						movements will appear in projections. The recorded payments below
-						stay unchanged.
-					</p>
-					<Button type="button" variant="secondary" onClick={onClose}>
-						Close
-					</Button>
-				</div>
 			) : (
 				<div className="space-y-4">
 					<dl className="m-0 space-y-2">
@@ -146,7 +132,11 @@ export function NewScheduleDialog({
 										{
 											onSuccess: (result) => {
 												setFailed(false);
-												setCreated(result.value.name);
+												notifySuccess(
+													"forecast-schedule",
+													`Forecast schedule “${result.value.name}” created.`,
+												);
+												onClose();
 											},
 											onError: () => setFailed(true),
 										},
