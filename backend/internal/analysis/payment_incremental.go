@@ -668,9 +668,9 @@ func paymentsAnalyzerVersionChanged(scoped store.AnalysisStore, base PaymentPatt
 		if !base.MatchesVersion(run.Version) {
 			return true
 		}
-		// A resolver added or removed without a catalog revision still moves
-		// enrichment on or off every stream, so presence alone forces one
-		// rebuild even when the registry hash still matches.
+		// A resolver added or removed with a catalog revision still moves
+		// enrichment on or off every stream, so presence with a non-empty
+		// revision forces one rebuild even when the registry hash still matches.
 		baseHasProviders := base.Providers != nil && base.Providers.Revision() != ""
 		return baseHasProviders != strings.Contains(run.Version, "/providers-")
 	}

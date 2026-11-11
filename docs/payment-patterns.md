@@ -69,8 +69,8 @@ User review is the explicit answer, not a provider probability or a brand match.
 ## Utility
 
 Utility applies to external outflows. Generic service wording in the
-description (`utility`, `electric`, `water`, `gas`, `power`, `sewer`, `trash`,
-`waste`, `internet`, `broadband`, and close variants) supports it; a resolved
+description (`utility`, `utilities`, `electric`, `electricity`, `energy`,
+`water`, `gas`, `power`, `sewer`, `trash`, `waste`, `internet`, `broadband`) supports it; a resolved
 utility provider without those details is an uncertain candidate. Card
 repayments and mortgage wording exclude a deterministic suggestion. Rent
 excludes generic utility wording so a `CLICKPAY ELECTRIC` bill is never
