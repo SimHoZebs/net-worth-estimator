@@ -548,6 +548,71 @@ if [ "$analysis" = 5 ]; then
   fi
 fi
 
+# Refresh the Analysis triggers to the dirty-maintenance bodies and provision
+# the incremental dirty set and stream cache on candidates that predate them.
+# The bodies must match deploy/analysis-schema.sql exactly; rows are never
+# touched, so preexisting findings verify byte-identical below. This runs
+# before verification so the later setupdb digest check stays read-only.
+if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
+  incremental_sql="$backup/analysis-incremental.sql"
+  cat > "$incremental_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS analysis_fact_dirty (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  transaction_id TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  PRIMARY KEY(user_id, transaction_id)
+);
+CREATE TABLE IF NOT EXISTS analysis_payment_streams (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  stream_id TEXT NOT NULL,
+  stats_json TEXT NOT NULL DEFAULT '{}',
+  member_ids_json TEXT NOT NULL DEFAULT '[]',
+  consumed_revision INTEGER NOT NULL DEFAULT 0,
+  identity_version INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(user_id, stream_id)
+);
+DROP TRIGGER IF EXISTS analysis_facts_insert;
+DROP TRIGGER IF EXISTS analysis_facts_update;
+DROP TRIGGER IF EXISTS analysis_facts_delete;
+DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
+CREATE TRIGGER analysis_facts_insert AFTER INSERT ON transaction_source_facts BEGIN
+  INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
+  ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
+  INSERT INTO analysis_fact_dirty(user_id, transaction_id, revision, kind)
+  VALUES (NEW.user_id, NEW.transaction_id, (SELECT revision FROM analysis_inputs WHERE user_id = NEW.user_id), 'added')
+  ON CONFLICT(user_id, transaction_id) DO UPDATE SET revision = excluded.revision, kind = excluded.kind;
+END;
+CREATE TRIGGER analysis_facts_update AFTER UPDATE ON transaction_source_facts BEGIN
+  INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
+  ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
+  INSERT INTO analysis_fact_dirty(user_id, transaction_id, revision, kind)
+  VALUES (NEW.user_id, NEW.transaction_id, (SELECT revision FROM analysis_inputs WHERE user_id = NEW.user_id),
+    CASE WHEN IFNULL(json_extract(OLD.facts_json, '$.amount'), '') != IFNULL(json_extract(NEW.facts_json, '$.amount'), '') THEN 'amount-corrected' ELSE 'facts-changed' END)
+  ON CONFLICT(user_id, transaction_id) DO UPDATE SET revision = excluded.revision, kind = excluded.kind;
+END;
+CREATE TRIGGER analysis_facts_delete AFTER DELETE ON transaction_source_facts BEGIN
+  INSERT INTO analysis_inputs(user_id, revision) VALUES (OLD.user_id, 1)
+  ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
+  INSERT INTO analysis_fact_dirty(user_id, transaction_id, revision, kind)
+  VALUES (OLD.user_id, OLD.transaction_id, (SELECT revision FROM analysis_inputs WHERE user_id = OLD.user_id), 'deleted')
+  ON CONFLICT(user_id, transaction_id) DO UPDATE SET revision = excluded.revision, kind = excluded.kind;
+END;
+CREATE TRIGGER analysis_transaction_lifecycle AFTER UPDATE OF pending, void ON transactions
+  WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
+  AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.id)
+  BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
+  ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
+  INSERT INTO analysis_fact_dirty(user_id, transaction_id, revision, kind)
+  VALUES (NEW.user_id, NEW.id, (SELECT revision FROM analysis_inputs WHERE user_id = NEW.user_id),
+    CASE WHEN OLD.void != NEW.void THEN 'void-flipped' ELSE 'pending-flipped' END)
+  ON CONFLICT(user_id, transaction_id) DO UPDATE SET revision = excluded.revision, kind = excluded.kind; END;
+DDL
+  if ! sqlite3 "$candidate" < "$incremental_sql" > "$backup/analysis-incremental.log" 2>&1; then
+    fail "Candidate Analysis incremental upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+
 # Provision the accepted-friendships table on pre-friend candidates. The
 # DDL mirrors the application schema exactly; rows are never touched, so
 # preexisting friendships verify byte-identical below.
@@ -879,12 +944,14 @@ if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
     verify_same analysis_promotions || fail "Candidate changed preexisting Analysis table analysis_promotions. Original unchanged; backup retained at $backup. Keep the API stopped."
   fi
   triggers_same=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
-    SELECT EXISTS (SELECT sql FROM main.sqlite_master WHERE type = 'trigger' AND name != 'analysis_transaction_sim_lifecycle' EXCEPT SELECT sql FROM before.sqlite_master WHERE type = 'trigger' AND name != 'analysis_transaction_sim_lifecycle')
-        OR EXISTS (SELECT sql FROM before.sqlite_master WHERE type = 'trigger' EXCEPT SELECT sql FROM main.sqlite_master WHERE type = 'trigger');") \
+    SELECT EXISTS (SELECT sql FROM main.sqlite_master WHERE type = 'trigger' AND name NOT IN ('analysis_transaction_sim_lifecycle','analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') EXCEPT SELECT sql FROM before.sqlite_master WHERE type = 'trigger' AND name NOT IN ('analysis_transaction_sim_lifecycle','analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle'))
+        OR EXISTS (SELECT sql FROM before.sqlite_master WHERE type = 'trigger' AND name NOT IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') EXCEPT SELECT sql FROM main.sqlite_master WHERE type = 'trigger');") \
     || fail "Cannot verify candidate triggers; refusing to publish."
   test "$triggers_same" = 0 || fail "Candidate changed Analysis triggers. Original unchanged; backup retained at $backup. Keep the API stopped."
+  test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') AND sql LIKE '%analysis_fact_dirty%';")" = 4 \
+    || fail "Candidate Analysis triggers lack dirty maintenance. Original unchanged; backup retained at $backup. Keep the API stopped."
 else
-  empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback) + (SELECT COUNT(*) FROM analysis_promotions);") \
+  empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback) + (SELECT COUNT(*) FROM analysis_promotions) + (SELECT COUNT(*) FROM analysis_fact_dirty) + (SELECT COUNT(*) FROM analysis_payment_streams);") \
     || fail "Cannot verify provisioned Analysis tables; refusing to publish."
   test "$empty" = 0 || fail "Provisioned Analysis tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi

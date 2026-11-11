@@ -1165,6 +1165,8 @@ done
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO transaction_source_facts(user_id,transaction_id,facts_json) VALUES ('$owner','settled-a','{}');"
 /app/migrate.sh >/dev/null
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT facts_json FROM transaction_source_facts;')" = '{}'
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') AND sql LIKE '%analysis_fact_dirty%';")" = 4
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('analysis_fact_dirty','analysis_payment_streams');")" = 2
 sha256sum /app/migrate.sh
 `]);
   const expected = createHash("sha256").update(await readFile(script)).digest("hex");
