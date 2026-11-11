@@ -31,6 +31,7 @@
 - Prune only your own worktree and branch after ship lands. Never touch another session's scope.
 - Before any merge, confirm no worktree is mid-rebase or mid-merge.
 - Run the narrowest local checks before you commit, and commit only your own scope. Keep each complete semantic chunk in one commit, including fixes found during that feature's development or review. Split only independent changes.
+- Record the OpenCode chat session ID in the commit message body so later sessions can trace the change to its authoring conversation.
 - A change is independent only if it functions as intended in production as-is, even if all later work stops indefinitely.
 
 ## Deployment watchdog
