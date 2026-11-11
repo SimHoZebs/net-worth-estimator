@@ -10,12 +10,18 @@ One deployment-wide River model learns from everyone's explicit confirm and reje
 - `POST /state` takes an owner and returns an opaque shared revision and delivery cursor.
 - `POST /evaluate` takes `{"requests":[...]}` and returns `{"judgments":[...]}`.
 - `POST /feedback` takes `owner`, `after`, `cursor`, and `feedback`, and returns the acknowledged cursor. Each observation contains `eventId`, `runId`, `action`, and the original domain request.
+- `POST /drift/reset` wipes the learner to a fresh model, clears a pending drift review, and bumps the revision.
+- `POST /drift/dismiss` keeps the learned weights, restarts only the drift detector window, clears a pending drift review, and bumps the revision so downstream rescores.
+
+`POST /state` also returns a `drift` object with `mode`, `pending`, `estimation` (current error-rate estimate), `width` (detector window size), and cumulative `warnings`/`detections` counts. A fired warning logs a warning line; a fired drift detection logs an error line. Reset and dismiss of a detector that is not pending return 409.
 
 The Go HTTP adapter owns orchestration; the service owns idempotency and persistence. SQLite commits model updates, event receipts, and the delivery cursor together, so lost responses cannot train twice. Conflicting replays return 409, invalid requests 400, and persistence or evaluation failures a logged 503.
 
 ## Deployment
 
 Set `ML_JUDGMENT_URL` on the backend; without it the application remains deterministic. Run exactly one River instance per deployment. The default binding is `127.0.0.1:8766`, and the container binds `0.0.0.0:8766` for private networks. The endpoints are unauthenticated and must not be internet-exposed; apply the API's financial-data access controls to this service and its volume.
+
+`ML_DRIFT_MODE` selects the drift response: `auto` (default) wipes the learner on detection, while `manual` freezes learning, flags the detector pending, and keeps serving evaluations from the frozen weights until an operator confirms `POST /drift/reset` or dismisses with `POST /drift/dismiss`. Any other value fails startup visibly. While pending, non-empty feedback is rejected with 409; the Go adapter treats any non-200 feedback response as a retryable failure without advancing cursors on either side, so the same batch is redelivered on a later tick and no feedback is lost. The rejected batch is rolled back whole: none of its events are recorded and the delivery cursor does not advance, so after reset or dismiss the redelivered batch trains fully instead of dedupe-skipping against the events table. Already-acknowledged batches stay learned on their original weights, matching the previous auto-reset behavior. Dismiss restarts only the detector window; a redelivered batch that still carries enough shift evidence trips the fresh detector again and waits for the next operator decision.
 
 The [Northflank Sandbox deployment](../../deploy/northflank/README.md) packages this provider beside Go in the existing API service to retain the free tier resource count. That is an infrastructure choice; the provider contract and the default Go-only backend image remain independent of Python and co-location.
 

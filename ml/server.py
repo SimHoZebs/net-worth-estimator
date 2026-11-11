@@ -42,7 +42,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(503, {"error": "storage unavailable"})
 
     def do_POST(self):
-        if self.path not in ("/state", "/evaluate", "/feedback"):
+        if self.path not in ("/state", "/evaluate", "/feedback", "/drift/reset", "/drift/dismiss"):
             self._json(404, {"error": "not found"})
             return
         try:
@@ -58,9 +58,13 @@ class Handler(BaseHTTPRequestHandler):
                 out = store.state(payload.get("owner"))
             elif self.path == "/evaluate":
                 out = {"judgments": store.evaluate(payload.get("requests"))}
-            else:
+            elif self.path == "/feedback":
                 out = store.observe(payload.get("owner"), payload.get("after"),
                                     payload.get("cursor"), payload.get("feedback"))
+            elif self.path == "/drift/reset":
+                out = store.reset_drift()
+            else:
+                out = store.dismiss_drift()
             self._json(200, out)
         except ConflictError as exc:
             self._json(409, {"error": str(exc)})

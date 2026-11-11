@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import pickle
 import sqlite3
@@ -41,10 +42,18 @@ class ConflictError(ValueError):
     pass
 
 
+class _DriftTripped(Exception):
+    """Control flow for a manual-mode drift trip; never escapes observe."""
+
+
 class PaymentModelStore:
     def __init__(self, model_path: str | None = None):
         path = Path(model_path or os.environ.get("ML_MODEL_PATH", "/tmp/ml.sqlite3"))
         path.parent.mkdir(parents=True, exist_ok=True)
+        mode = (os.environ.get("ML_DRIFT_MODE") or "auto").strip()
+        if mode not in ("auto", "manual"):
+            raise ValueError("ML_DRIFT_MODE must be auto or manual")
+        self._drift_mode = mode
         self._lock = threading.Lock()
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL")
@@ -53,7 +62,9 @@ class PaymentModelStore:
             self._db.execute("CREATE TABLE IF NOT EXISTS model (id INTEGER PRIMARY KEY CHECK(id=1), generation TEXT NOT NULL, revision INTEGER NOT NULL, state BLOB NOT NULL)")
             self._db.execute("CREATE TABLE IF NOT EXISTS checkpoints (owner TEXT PRIMARY KEY, cursor TEXT NOT NULL)")
             self._db.execute("CREATE TABLE IF NOT EXISTS events (owner TEXT NOT NULL, event_id TEXT NOT NULL, fingerprint TEXT NOT NULL, PRIMARY KEY(owner, event_id))")
+            self._db.execute("CREATE TABLE IF NOT EXISTS drift (id INTEGER PRIMARY KEY CHECK(id=1), pending INTEGER NOT NULL, warnings INTEGER NOT NULL, detections INTEGER NOT NULL)")
             self._db.execute("INSERT OR IGNORE INTO model VALUES (1, ?, 0, ?)", (str(uuid.uuid4()), pickle.dumps(ModelState())))
+            self._db.execute("INSERT OR IGNORE INTO drift VALUES (1, 0, 0, 0)")
         generation, revision, raw = self._db.execute("SELECT generation, revision, state FROM model WHERE id=1").fetchone()
         self._generation, self._revision = generation, revision
         # Corrupt or incompatible state is an operator-visible startup failure.
@@ -77,7 +88,11 @@ class PaymentModelStore:
         if not isinstance(owner, str) or not owner or len(owner) > 512:
             raise ValueError("owner is required")
         with self._lock:
-            return {"revision": f"payments-v1:{self._generation}:{self._revision}", "cursor": self._cursor(owner)}
+            pending, warnings, detections = self._db.execute("SELECT pending, warnings, detections FROM drift WHERE id=1").fetchone()
+            return {"revision": f"payments-v1:{self._generation}:{self._revision}", "cursor": self._cursor(owner),
+                    "drift": {"mode": self._drift_mode, "pending": bool(pending),
+                              "estimation": float(self._state.drift.estimation), "width": int(self._state.drift.width),
+                              "warnings": warnings, "detections": detections}}
 
     def evaluate(self, requests):
         if not isinstance(requests, list) or len(requests) > 10000:
@@ -118,35 +133,89 @@ class PaymentModelStore:
             checkpoint = self._cursor(owner)
             if checkpoint not in (after, cursor):
                 raise ConflictError("feedback checkpoint changed; reload state")
+            pending, _, _ = self._db.execute("SELECT pending, warnings, detections FROM drift WHERE id=1").fetchone()
+            if pending and feedback:
+                raise ConflictError("drift review pending; resolve via /drift/reset or /drift/dismiss")
             # Work on a copy: disk failure must leave both model and checkpoint
             # unchanged in memory as well as on disk.
             candidate = pickle.loads(pickle.dumps(self._state))
             learned = 0
-            with self._db:
-                for item in feedback:
-                    fingerprint = hashlib.sha256(json.dumps(item, sort_keys=True, allow_nan=False).encode()).hexdigest()
-                    prior = self._db.execute("SELECT fingerprint FROM events WHERE owner=? AND event_id=?", (owner, item["eventId"])).fetchone()
-                    if prior:
-                        if prior[0] != fingerprint:
-                            raise ConflictError("feedback event payload changed")
-                        continue
-                    if checkpoint == cursor:
-                        raise ConflictError("replayed batch contains a new event")
-                    feats, label = features_from_request(item["request"]), item["action"] == "confirm"
-                    pred = candidate.model.predict_one(feats)
-                    candidate.drift.update(int(bool(pred) != label))
-                    if candidate.drift.drift_detected:
-                        candidate = ModelState()
-                    candidate.model.learn_one(feats, label)
-                    candidate.examples_seen += 1
-                    kind = item["request"]["kind"]
-                    candidate.classification_counts[kind] = candidate.classification_counts.get(kind, 0) + 1
-                    learned += 1
-                    self._db.execute("INSERT INTO events VALUES (?, ?, ?)", (owner, item["eventId"], fingerprint))
-                if learned:
-                    self._db.execute("UPDATE model SET revision=?, state=? WHERE id=1", (self._revision+1, pickle.dumps(candidate)))
-                self._db.execute("INSERT INTO checkpoints VALUES (?, ?) ON CONFLICT(owner) DO UPDATE SET cursor=excluded.cursor", (owner, cursor))
+            warned = 0
+            detected = 0
+            tripped = False
+            try:
+                with self._db:
+                    for item in feedback:
+                        fingerprint = hashlib.sha256(json.dumps(item, sort_keys=True, allow_nan=False).encode()).hexdigest()
+                        prior = self._db.execute("SELECT fingerprint FROM events WHERE owner=? AND event_id=?", (owner, item["eventId"])).fetchone()
+                        if prior:
+                            if prior[0] != fingerprint:
+                                raise ConflictError("feedback event payload changed")
+                            continue
+                        if checkpoint == cursor:
+                            raise ConflictError("replayed batch contains a new event")
+                        feats, label = features_from_request(item["request"]), item["action"] == "confirm"
+                        pred = candidate.model.predict_one(feats)
+                        candidate.drift.update(int(bool(pred) != label))
+                        if getattr(candidate.drift, "warning_detected", False):
+                            warned += 1
+                            logging.warning("ml drift warning for owner %s", owner)
+                        if candidate.drift.drift_detected:
+                            detected += 1
+                            if self._drift_mode == "manual":
+                                tripped = True
+                                raise _DriftTripped
+                            logging.error("ml drift detected for owner %s; reset learner", owner)
+                            candidate = ModelState()
+                        candidate.model.learn_one(feats, label)
+                        candidate.examples_seen += 1
+                        kind = item["request"]["kind"]
+                        candidate.classification_counts[kind] = candidate.classification_counts.get(kind, 0) + 1
+                        learned += 1
+                        self._db.execute("INSERT INTO events VALUES (?, ?, ?)", (owner, item["eventId"], fingerprint))
+                    if warned or detected:
+                        self._db.execute("UPDATE drift SET warnings=warnings+?, detections=detections+? WHERE id=1", (warned, detected))
+                    if learned:
+                        self._db.execute("UPDATE model SET revision=?, state=? WHERE id=1", (self._revision+1, pickle.dumps(candidate)))
+                    self._db.execute("INSERT INTO checkpoints VALUES (?, ?) ON CONFLICT(owner) DO UPDATE SET cursor=excluded.cursor", (owner, cursor))
+            except _DriftTripped:
+                pass
+            if tripped:
+                # The tripping batch raised before commit, so none of its events
+                # were recorded and the delivery cursor did not advance. The Go
+                # adapter treats the 409 as a retryable failure, so the same
+                # batch is redelivered after reset or dismiss and trains fully.
+                logging.error("ml drift detected for owner %s; learning frozen pending operator review", owner)
+                with self._db:
+                    self._db.execute("UPDATE drift SET pending=1, warnings=warnings+?, detections=detections+? WHERE id=1", (warned, detected))
+                raise ConflictError("drift detected; learning frozen pending review via /drift/reset or /drift/dismiss")
             if learned:
                 self._state = candidate
                 self._revision += 1
             return {"cursor": cursor}
+
+    def reset_drift(self):
+        with self._lock:
+            pending = self._db.execute("SELECT pending FROM drift WHERE id=1").fetchone()[0]
+            if not pending:
+                raise ConflictError("no drift review pending")
+            with self._db:
+                self._db.execute("UPDATE model SET revision=?, state=? WHERE id=1", (self._revision+1, pickle.dumps(ModelState())))
+                self._db.execute("UPDATE drift SET pending=0 WHERE id=1")
+            self._state = ModelState()
+            self._revision += 1
+            return {"revision": f"payments-v1:{self._generation}:{self._revision}", "pending": False}
+
+    def dismiss_drift(self):
+        with self._lock:
+            pending = self._db.execute("SELECT pending FROM drift WHERE id=1").fetchone()[0]
+            if not pending:
+                raise ConflictError("no drift review pending")
+            candidate = pickle.loads(pickle.dumps(self._state))
+            candidate.drift = ADWIN(delta=candidate.drift.delta)
+            with self._db:
+                self._db.execute("UPDATE model SET revision=?, state=? WHERE id=1", (self._revision+1, pickle.dumps(candidate)))
+                self._db.execute("UPDATE drift SET pending=0 WHERE id=1")
+            self._state = candidate
+            self._revision += 1
+            return {"revision": f"payments-v1:{self._generation}:{self._revision}", "pending": False}
