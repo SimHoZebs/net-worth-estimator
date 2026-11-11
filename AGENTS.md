@@ -39,7 +39,7 @@
 - One owner writes live deployment state: the Northflank workflow definition, the API service command, and release requests. Feature agents own their own code fixes and hand deployment writes to that owner.
 - The agent that landed a commit verifies its release. When an incident stalls, meaning the release is red, no new release run has started, and `main` has not advanced, the watchdog takes ownership instead of waiting for a human.
 - Fix forward. Never restore a database backup to recover a failed release. Retry a failed target while `main` still points at it. Once a migration has published, release that same reviewed target or a newer commit that contains it, never older code.
-- Detection is `node deploy/watchdog/incident.mjs`. The loop, the failure classes, and the boundaries are in `deploy/watchdog/README.md`.
+- Detection is `node deploy/watchdog/incident.mjs`. The procedure is the `deployment-watchdog` skill.
 
 ## Delegation
 

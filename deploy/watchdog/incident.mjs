@@ -2,9 +2,9 @@
 // Report a deployment incident for the net-worth-estimator release pipeline.
 //
 // Exit 0 when the deployment needs an agent, 1 when healthy. The inverted
-// convention is deliberate: this script is a schedule wake condition, and a
-// wake fires on exit 0. Everything that prevents a check from running is
-// reported so a broken watchdog wakes an agent instead of failing silently.
+// convention is deliberate: a caller treats exit 0 as "wake someone".
+// Everything that prevents a check from running is reported so a broken
+// watchdog wakes an agent instead of failing silently.
 //
 // An incident is one of:
 //   - the Northflank release for the current main tip failed
@@ -33,7 +33,7 @@ const MAIN_REF = "refs/heads/main";
 const BOOT_GRACE_MS = 3 * 60 * 1000;
 /** A release that never concludes is itself the incident. */
 const STUCK_AFTER_MS = 30 * 60 * 1000;
-/** The scheduler caps a whole check at 30 seconds, so the check budgets itself. */
+/** Keep the whole check bounded so a caller can rely on it returning promptly. */
 const CHECK_BUDGET_MS = 20_000;
 const CALL_TIMEOUT_MS = 8_000;
 
