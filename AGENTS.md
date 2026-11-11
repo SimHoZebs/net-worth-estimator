@@ -33,6 +33,19 @@
 - Run the narrowest local checks before you commit, and commit only your own scope. Keep each complete semantic chunk in one commit, including fixes found during that feature's development or review. Split only independent changes.
 - A change is independent only if it functions as intended in production as-is, even if all later work stops indefinitely.
 
+## Delegation
+
+- When given a task, delegate the work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
+- Split independent workstreams across parallel backgrounded subagents under a single orchestrator that owns the branch.
+- Retain final ownership of audit verification and shipment and remain the final entity that ships the change.
+- Prefer subagent models in this order with the listed effort as provider slash model hash variant.
+  1. `opencode/longcat-2.5-free` at max effort where supported
+  2. `opencode/deepseek-v4.1-flash-free#max`
+  3. `opencode-go/muse-spark-1.3-contributor#xhigh`
+  4. `opencode-go/deepseek-v4.1-flash`
+  5. `openai/gpt-6.1-terra#medium`
+  6. Own model as last resort
+
 ## Start and verify
 
 - Run the narrowest local check for what you touched and fix from the hosted run. Do not run every suite locally before each push.
