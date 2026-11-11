@@ -72,9 +72,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     rm /tmp/requirements.txt
 COPY --from=standalone /app/ /app/
 COPY ml/*.py /app/ml/
+COPY ml/seed.sqlite3 /app/ml/seed.sqlite3
 COPY deploy/northflank/runtime.py /app/northflank-runtime.py
 ENV HOST=0.0.0.0 PORT=8787 NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db \
     ML_JUDGMENT_URL=http://127.0.0.1:8766 ML_MODEL_PATH=/data/ml.sqlite3 \
+    ML_SEED_PATH=/app/ml/seed.sqlite3 \
     PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 GOMEMLIMIT=96MiB
 USER app:app

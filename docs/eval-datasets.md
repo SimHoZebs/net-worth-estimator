@@ -78,7 +78,9 @@ transfer.
 
 ## Boot behavior (`deploy/northflank/runtime.py`)
 
-_Takes effect with the pending Northflank seeding follow-up (runtime wiring + image COPY); until then the seed file is inert._
+Seed wiring is live: at boot the runtime installs the baked seed over a
+missing or unlearned live database, keeps a database that recorded
+feedback or holds a pending drift review, and fails loud on corruption.
 
 The ML service starts before the Go server. When `ML_SEED_PATH` points at
 the baked seed, it is installed as `ML_MODEL_PATH` only if the live
