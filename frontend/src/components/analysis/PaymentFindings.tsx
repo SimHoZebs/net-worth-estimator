@@ -43,6 +43,8 @@ function PatternCard({
 	const [linkOpen, setLinkOpen] = useState(false);
 	const finding = pattern.anchor;
 	const title = paymentTitle(pattern, names);
+	const kindLabel =
+		finding.kind.charAt(0).toUpperCase() + finding.kind.slice(1);
 	const summary = finding.pattern!;
 	const confirmed = finding.review?.decision === "confirmed";
 	const inactive = finding.stale || finding.status === "withdrawn";
@@ -118,6 +120,7 @@ function PatternCard({
 					findingId={finding.id}
 					title={title}
 					readOnly={readOnly}
+					eyebrow={kindLabel}
 					onClose={() => setPlanOpen(false)}
 				/>
 			)}
@@ -127,6 +130,7 @@ function PatternCard({
 					title={title}
 					names={names}
 					readOnly={readOnly}
+					heading="Link recorded payments to a schedule"
 					onClose={() => setLinkOpen(false)}
 				/>
 			)}

@@ -43,11 +43,13 @@ export function NewScheduleDialog({
 	findingId,
 	title,
 	readOnly,
+	eyebrow = "Repeating payment",
 	onClose,
 }: {
 	findingId: string;
 	title: string;
 	readOnly: boolean;
+	eyebrow?: string;
 	onClose: () => void;
 }) {
 	const preview = usePatternToNewSchedulePreview(findingId);
@@ -63,7 +65,7 @@ export function NewScheduleDialog({
 	return (
 		<Modal
 			title={`Forecast plan for ${title}`}
-			eyebrow="Repeating payment"
+			eyebrow={eyebrow}
 			onClose={onClose}
 		>
 			{preview.isPending ? (
@@ -176,12 +178,14 @@ export function ExistingScheduleDialog({
 	title,
 	names,
 	readOnly,
+	heading = "Link repeating payments to a schedule",
 	onClose,
 }: {
 	findingId: string;
 	title: string;
 	names: Map<string, string>;
 	readOnly: boolean;
+	heading?: string;
 	onClose: () => void;
 }) {
 	const catalog = useTransactionCatalog();
@@ -200,11 +204,7 @@ export function ExistingScheduleDialog({
 	const [failed, setFailed] = useState(false);
 	const plan = preview.data;
 	return (
-		<Modal
-			title={`Link repeating payments to a schedule`}
-			eyebrow={title}
-			onClose={onClose}
-		>
+		<Modal title={heading} eyebrow={title} onClose={onClose}>
 			<div className="space-y-4">
 				<SelectField
 					label="Existing forecast schedule"
