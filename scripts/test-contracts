@@ -5,4 +5,5 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 node --test dev/*.test.mjs scripts/*.test.mjs auth/*.test.mjs \
   deploy/images.test.mjs deploy/vercel.test.mjs \
-  deploy/migrations.test.mjs deploy/analysis-migration.test.mjs
+  deploy/migrations.test.mjs deploy/analysis-migration.test.mjs \
+  deploy/watchdog/incident.test.mjs

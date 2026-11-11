@@ -86,6 +86,7 @@ Deliver stochastic POST responses incrementally. Preserve `text/event-stream`, d
 - [API on Render or another container host](render.md) — service settings, disk maintenance, setupdb usage.
 - [GHCR container images](images.md) — published images, digest pins, publisher checks.
 - [Shared migration SOP](MIGRATIONS.md) — one-time `/app/migrate.sh` contract every adapter runs.
+- [Deployment watchdog](watchdog/README.md) — detection, the remediation loop, and who owns a deployment failure.
 - [Release gates](../docs/release-gates.md) — the ship/no-ship checklist, the manual operator checks, and the known coverage gaps.
 
 ## Switch hosts
