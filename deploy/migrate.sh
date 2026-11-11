@@ -572,6 +572,20 @@ CREATE TABLE IF NOT EXISTS analysis_payment_streams (
   identity_version INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(user_id, stream_id)
 );
+DDL
+  if ! sqlite3 "$candidate" < "$incremental_sql" > "$backup/analysis-incremental.log" 2>&1; then
+    fail "Candidate Analysis incremental upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+  # Rewrite trigger bodies only when stale or missing. Unconditional rewrites
+  # churn sqlite_master order and break byte-identical verification below, so
+  # current bodies stay exactly as they are.
+  stale_triggers=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') AND sql NOT LIKE '%analysis_fact_dirty%';") \
+    || fail "Cannot inspect Analysis triggers. Original unchanged; backup retained at $backup."
+  present_triggers=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle');") \
+    || fail "Cannot inspect Analysis triggers. Original unchanged; backup retained at $backup."
+  if [ "$stale_triggers" != 0 ] || [ "$present_triggers" != 4 ]; then
+    incremental_triggers="$backup/analysis-incremental-triggers.sql"
+    cat > "$incremental_triggers" <<'DDL'
 DROP TRIGGER IF EXISTS analysis_facts_insert;
 DROP TRIGGER IF EXISTS analysis_facts_update;
 DROP TRIGGER IF EXISTS analysis_facts_delete;
@@ -608,8 +622,9 @@ CREATE TRIGGER analysis_transaction_lifecycle AFTER UPDATE OF pending, void ON t
     CASE WHEN OLD.void != NEW.void THEN 'void-flipped' ELSE 'pending-flipped' END)
   ON CONFLICT(user_id, transaction_id) DO UPDATE SET revision = excluded.revision, kind = excluded.kind; END;
 DDL
-  if ! sqlite3 "$candidate" < "$incremental_sql" > "$backup/analysis-incremental.log" 2>&1; then
-    fail "Candidate Analysis incremental upgrade failed. Original unchanged; backup retained at $backup."
+    if ! sqlite3 "$candidate" < "$incremental_triggers" >> "$backup/analysis-incremental.log" 2>&1; then
+      fail "Candidate Analysis trigger refresh failed. Original unchanged; backup retained at $backup."
+    fi
   fi
 fi
 
