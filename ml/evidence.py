@@ -6,6 +6,8 @@ start, and probability thresholds are private implementation details here.
 import hashlib
 import math
 
+FEATURE_BUCKETS = 32768
+
 
 def features_from_request(request):
     if not isinstance(request, dict) or not isinstance(request.get("kind"), str) or not 1 <= len(request["kind"]) <= 128:
@@ -63,7 +65,7 @@ def features_from_request(request):
         values["signal:" + signal] = 1
     features = {}
     for key, value in values.items():
-        bucket = int.from_bytes(hashlib.sha256((prefix + key).encode()).digest()[:4], "big") % 8192
+        bucket = int.from_bytes(hashlib.sha256((prefix + key).encode()).digest()[:4], "big") % FEATURE_BUCKETS
         features[bucket] = features.get(bucket, 0) + value
     return features
 

@@ -98,7 +98,7 @@ print(after['revision'])
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.OOMKilled, false);
   await docker("start", name);
   await ready();
-  assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT 'payments-v1:' || generation || ':' || revision FROM model;"), revision);
+  assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT 'payments-v2:b32768:h0.75:l0.25:' || generation || ':' || revision FROM model;"), revision);
   assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT cursor FROM checkpoints WHERE owner='fixture';"), "001");
   await docker("stop", "--time", "12", name);
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.ExitCode, 0);

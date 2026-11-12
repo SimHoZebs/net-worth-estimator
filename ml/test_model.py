@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from evidence import features_from_request
+from evidence import FEATURE_BUCKETS, features_from_request
 from model import ConflictError, PaymentModelStore
 
 
@@ -31,6 +31,8 @@ def feedback(event="001", action="confirm", evidence=None):
 class TestStore(unittest.TestCase):
     def setUp(self):
         os.environ.pop("ML_DRIFT_MODE", None)
+        os.environ.pop("ML_THRESHOLD_HIGH", None)
+        os.environ.pop("ML_THRESHOLD_LOW", None)
         self.tmp = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.tmp.name, "data", "ml.sqlite3")
         self.store = PaymentModelStore(self.path)
@@ -38,6 +40,8 @@ class TestStore(unittest.TestCase):
     def tearDown(self):
         self.store.close()
         self.tmp.cleanup()
+        os.environ.pop("ML_THRESHOLD_HIGH", None)
+        os.environ.pop("ML_THRESHOLD_LOW", None)
 
     def test_every_owner_contributes_to_one_model(self):
         before = self.store.state("bob")["revision"]
@@ -59,7 +63,7 @@ class TestStore(unittest.TestCase):
         evidence["pattern"]["typicalAmount"] = "25000.00"
         features = features_from_request(evidence)
         self.assertTrue(features)
-        self.assertTrue(all(0 <= key < 8192 for key in features))
+        self.assertTrue(all(0 <= key < FEATURE_BUCKETS for key in features))
         self.assertEqual(evidence["pattern"]["typicalAmount"], "25000.00")
         evidence["pattern"]["signals"] = []
         self.assertEqual(self.store.evaluate([evidence])[0]["strength"], "moderate")
@@ -152,7 +156,7 @@ class TestStore(unittest.TestCase):
             evidence = request(str(i))
             evidence["kind"] = f"type-{i}"
             keys.update(features_from_request(evidence))
-        self.assertLessEqual(len(keys), 8192)
+        self.assertLessEqual(len(keys), FEATURE_BUCKETS)
 
     def test_one_observation_does_not_invent_repetition_or_annual_estimate(self):
         evidence=request()
@@ -278,6 +282,82 @@ class TestStore(unittest.TestCase):
             self.store.reset_drift()
         with self.assertRaises(ConflictError):
             self.store.dismiss_drift()
+
+    def test_revision_uses_payments_v2_with_buckets_and_thresholds(self):
+        revision = self.store.state("alice")["revision"]
+        self.assertTrue(revision.startswith("payments-v2:"))
+        self.assertIn(f"b{FEATURE_BUCKETS}", revision)
+        self.assertIn("h0.75", revision)
+        self.assertIn("l0.25", revision)
+
+    def test_custom_thresholds_change_revision_and_boundary_decisions(self):
+        self.store.observe("alice", "", "002", [feedback("001"), feedback("002")])
+        with mock.patch.object(self.store._state.model, "predict_proba_one", return_value={True: 0.8}):
+            self.assertEqual(self.store.evaluate([request()])[0]["decision"], "supported")
+        default_revision = self.store.state("alice")["revision"]
+        with mock.patch.dict(os.environ, {"ML_THRESHOLD_HIGH": "0.9", "ML_THRESHOLD_LOW": "0.1"}):
+            custom_path = os.path.join(self.tmp.name, "custom.sqlite3")
+            custom = PaymentModelStore(custom_path)
+            try:
+                custom.observe("alice", "", "002", [feedback("001"), feedback("002")])
+                with mock.patch.object(custom._state.model, "predict_proba_one", return_value={True: 0.8}):
+                    self.assertEqual(custom.evaluate([request()])[0]["decision"], "uncertain")
+                with mock.patch.object(custom._state.model, "predict_proba_one", return_value={True: 0.2}):
+                    self.assertEqual(custom.evaluate([request()])[0]["decision"], "uncertain")
+                with mock.patch.object(custom._state.model, "predict_proba_one", return_value={True: 0.05}):
+                    self.assertEqual(custom.evaluate([request()])[0]["decision"], "unsupported")
+                custom_revision = custom.state("alice")["revision"]
+                self.assertNotEqual(default_revision, custom_revision)
+                self.assertIn("h0.9", custom_revision)
+                self.assertIn("l0.1", custom_revision)
+            finally:
+                custom.close()
+
+    def test_invalid_thresholds_raise(self):
+        cases = [("0.2", "0.8"), ("1.5", "0.25"), ("0.75", "-0.1"), ("0.5", "0.5"), ("abc", "0.25"), ("0.75", "nan")]
+        for index, (high, low) in enumerate(cases):
+            with self.subTest(high=high, low=low):
+                with mock.patch.dict(os.environ, {"ML_THRESHOLD_HIGH": high, "ML_THRESHOLD_LOW": low}):
+                    with self.assertRaises(ValueError):
+                        PaymentModelStore(os.path.join(self.tmp.name, f"bad-{index}.sqlite3"))
+
+    def test_legacy_state_without_bucket_keys_raises(self):
+        import pickle
+
+        from model import ModelState
+        path = os.path.join(self.tmp.name, "legacy.sqlite3")
+        seed = PaymentModelStore(path)
+        seed.close()
+        legacy = ModelState()
+        del legacy.__dict__["buckets"]
+        del legacy.__dict__["format_version"]
+        db = sqlite3.connect(path)
+        try:
+            with db:
+                db.execute("UPDATE model SET state=? WHERE id=1", (pickle.dumps(legacy),))
+        finally:
+            db.close()
+        with self.assertRaises(ValueError) as ctx:
+            PaymentModelStore(path)
+        self.assertIn("ML_MODEL_PATH", str(ctx.exception))
+
+    def test_old_state_with_wrong_bucket_count_raises(self):
+        import pickle
+
+        from model import ModelState
+        path = os.path.join(self.tmp.name, "old.sqlite3")
+        seed = PaymentModelStore(path)
+        seed.close()
+        old_state = ModelState(buckets=8192, format_version=1)
+        db = sqlite3.connect(path)
+        try:
+            with db:
+                db.execute("UPDATE model SET state=? WHERE id=1", (pickle.dumps(old_state),))
+        finally:
+            db.close()
+        with self.assertRaises(ValueError) as ctx:
+            PaymentModelStore(path)
+        self.assertIn("ML_MODEL_PATH", str(ctx.exception))
 
 
 if __name__ == "__main__":
