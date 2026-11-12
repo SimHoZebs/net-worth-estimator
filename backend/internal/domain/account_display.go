@@ -9,10 +9,13 @@ import (
 )
 
 // BuildLoan compiles the form to existing financial primitives. Saved IDs
-// preserve history when terms change.
+// preserve history when terms change. An empty FundingAccountID produces a
+// dormant payment rule with nil SourceAccountID: it moves nothing until
+// funding is set. Rate 0 and payment 0 are already valid and mean dormant
+// interest/payment.
 func BuildLoan(id, interestID, interestRuleID, paymentRuleID string, terms types.LoanTerms) (types.LoanBundle, error) {
-	if strings.TrimSpace(terms.Name) == "" || terms.ObservedAt <= 0 || terms.FundingAccountID == "" || terms.FundingAccountID == id || terms.FundingAccountID == interestID {
-		return types.LoanBundle{}, fmt.Errorf("enter a name, exact observation time, and a separate funding account")
+	if strings.TrimSpace(terms.Name) == "" || terms.ObservedAt <= 0 || terms.FundingAccountID == id || terms.FundingAccountID == interestID {
+		return types.LoanBundle{}, fmt.Errorf("enter a name and exact observation time; funding must be a separate account when set")
 	}
 	for _, amount := range []float64{terms.Principal, terms.AccruedInterest, terms.Payment, terms.AnnualRate} {
 		if math.IsNaN(amount) || math.IsInf(amount, 0) || amount < 0 || amount > 1e10 {
@@ -32,7 +35,11 @@ func BuildLoan(id, interestID, interestRuleID, paymentRuleID string, terms types
 			"principal": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": id}},
 			"rate":      {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": terms.AnnualRate, "volatility": 0.0}},
 		}}}
-	payment := types.Schedule{ID: paymentRuleID, Name: name + " Payment", SourceAccountID: &terms.FundingAccountID, Destinations: []string{interestID, id}, Frequency: terms.PaymentFrequency, StartDate: terms.PaymentStartDate, Enabled: terms.Enabled, Priority: 7,
+	var paymentSource *string
+	if terms.FundingAccountID != "" {
+		paymentSource = &terms.FundingAccountID
+	}
+	payment := types.Schedule{ID: paymentRuleID, Name: name + " Payment", SourceAccountID: paymentSource, Destinations: []string{interestID, id}, Frequency: terms.PaymentFrequency, StartDate: terms.PaymentStartDate, Enabled: terms.Enabled, Priority: 7,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": fmt.Sprintf("%g", terms.Payment)}, Inputs: map[string]types.AmountInputBinding{}}}
 	return types.LoanBundle{Accounts: []types.Account{principal, interest}, Checkpoints: []types.Checkpoint{{AccountID: id, Balance: -terms.Principal, ObservedAt: terms.ObservedAt, Source: "user"}, {AccountID: interestID, Balance: -terms.AccruedInterest, ObservedAt: terms.ObservedAt, Source: "user"}}, Schedules: []types.Schedule{charge, payment}}, nil
 }

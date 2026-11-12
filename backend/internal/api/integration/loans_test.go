@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -175,8 +176,8 @@ func TestSingleDebtViaAccountsIsRejected(t *testing.T) {
 	if converted.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("convert status = %d, want 422: %s", converted.Code, converted.Body.String())
 	}
-	if !strings.Contains(converted.Body.String(), "POST /v1/loans") {
-		t.Fatalf("convert must direct to POST /v1/loans: %s", converted.Body.String())
+	if !strings.Contains(converted.Body.String(), "PUT /v1/loans") {
+		t.Fatalf("convert must direct to PUT /v1/loans: %s", converted.Body.String())
 	}
 
 	// Legacy single-row debts stay editable when they keep kind=debt and
@@ -197,5 +198,208 @@ func TestSingleDebtViaAccountsIsRejected(t *testing.T) {
 	missing := doRowRequest(t, h, http.MethodPatch, "/v1/accounts/missing-debt-id", `{"name":"Ghost","kind":"debt","enabled":true}`)
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing debt update status = %d, want 404: %s", missing.Code, missing.Body.String())
+	}
+}
+
+func TestLoanAdoptsLegacyDebtPreservingBalance(t *testing.T) {
+	st := openAPIStore(t)
+	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := st.CreateAccount(types.Account{Name: "Legacy", Kind: types.AccountKindDebt, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.SaveCheckpoint(types.Checkpoint{AccountID: legacy.ID, Balance: -5000, ObservedAt: 1783987199}); err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	adoptBody := `{"name":"Adopted","principal":5000,"accruedInterest":0,"observedAt":1784073599,"recordBalances":false,"annualRate":0,"interestFrequency":"monthly","interestStartDate":"2026-08-13","payment":0,"paymentFrequency":"monthly","paymentStartDate":"2026-08-13","fundingAccountId":"checking","enabled":true}`
+	adopted := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPut, "/v1/loans/"+legacy.ID, adoptBody))
+	if !adopted.Saved || adopted.Result.Display == nil {
+		t.Fatalf("adopt = %+v", adopted)
+	}
+	if adopted.Result.ID != legacy.ID {
+		t.Fatalf("principal id changed: %s want %s", adopted.Result.ID, legacy.ID)
+	}
+	if adopted.Result.Kind != types.AccountKindDebt {
+		t.Fatalf("adopted kind = %s, want debt", adopted.Result.Kind)
+	}
+	d := adopted.Result.Display
+	if len(d.Components) != 2 || d.Components[0].AccountID != legacy.ID || d.Components[0].Role != "principal" || d.Components[1].Role != "interest" {
+		t.Fatalf("components = %+v", d.Components)
+	}
+	if adopted.Result.Name != "Adopted (Principal)" {
+		t.Fatalf("principal name = %q, want Adopted (Principal)", adopted.Result.Name)
+	}
+	model := assertSavedModelIdentity(t, st, adopted.Revision)
+	if len(model.Accounts) != 3 {
+		t.Fatalf("accounts = %d, want 3", len(model.Accounts))
+	}
+	if len(model.Schedules) != 2 {
+		t.Fatalf("schedules = %d, want 2", len(model.Schedules))
+	}
+	kept := false
+	for _, c := range model.Checkpoints {
+		if c.AccountID == legacy.ID && c.ObservedAt == 1783987199 && c.Balance == -5000 {
+			kept = true
+		}
+	}
+	if !kept {
+		t.Fatalf("legacy checkpoint lost: %+v", model.Checkpoints)
+	}
+	interestID := d.Components[1].AccountID
+	var interest types.Account
+	for _, a := range model.Accounts {
+		if a.ID == interestID {
+			interest = a
+		}
+	}
+	if interest.ID == "" || interest.Name != "Adopted (Interest)" {
+		t.Fatalf("interest = %+v", interest)
+	}
+	var charge, payment types.Schedule
+	for _, r := range model.Schedules {
+		if r.ID == d.InterestScheduleID {
+			charge = r
+		}
+		if r.ID == d.PaymentScheduleID {
+			payment = r
+		}
+	}
+	rate, amount, _, err := domain.LoanRuleTerms(legacy.ID, charge, payment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rate != 0 || amount != 0 {
+		t.Fatalf("inert rules = %v %v", rate, amount)
+	}
+	if payment.SourceAccountID == nil || *payment.SourceAccountID != "checking" {
+		t.Fatalf("payment source = %+v", payment.SourceAccountID)
+	}
+}
+
+func TestLoanAdoptsCashAccountToDebt(t *testing.T) {
+	st := openAPIStore(t)
+	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	cash, err := st.CreateAccount(types.Account{Name: "Savings", Kind: types.AccountKindCash, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	adopted := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPut, "/v1/loans/"+cash.ID, loanBody))
+	if !adopted.Saved || adopted.Result.Display == nil {
+		t.Fatalf("adopt cash = %+v", adopted)
+	}
+	if adopted.Result.ID != cash.ID || adopted.Result.Kind != types.AccountKindDebt {
+		t.Fatalf("adopted = %+v", adopted.Result)
+	}
+	model := assertSavedModelIdentity(t, st, adopted.Revision)
+	if len(model.Accounts) != 3 || len(model.Schedules) != 2 || len(model.Checkpoints) != 2 {
+		t.Fatalf("incomplete adoption: %+v", model)
+	}
+}
+
+func TestLoanAdoptsWithEmptyFundingOverHTTP(t *testing.T) {
+	st := openAPIStore(t)
+	cash, err := st.CreateAccount(types.Account{Name: "Savings", Kind: types.AccountKindCash, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	adoptBody := `{"name":"Dormant","principal":2000,"accruedInterest":0,"observedAt":1784073599,"recordBalances":true,"annualRate":0,"interestFrequency":"monthly","interestStartDate":"2026-08-13","payment":0,"paymentFrequency":"monthly","paymentStartDate":"2026-08-13","fundingAccountId":"","enabled":true}`
+	adopted := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPut, "/v1/loans/"+cash.ID, adoptBody))
+	if !adopted.Saved || adopted.Result.Display == nil {
+		t.Fatalf("empty-funding adopt = %+v", adopted)
+	}
+	for _, issue := range adopted.Issues {
+		if issue.Severity == types.SeverityError {
+			t.Fatalf("empty-funding adopt issue: %+v", issue)
+		}
+	}
+	model := assertSavedModelIdentity(t, st, adopted.Revision)
+	var payment types.Schedule
+	for _, r := range model.Schedules {
+		if r.ID == adopted.Result.Display.PaymentScheduleID {
+			payment = r
+		}
+	}
+	if payment.ID == "" {
+		t.Fatalf("payment rule missing: %+v", model.Schedules)
+	}
+	if payment.SourceAccountID != nil {
+		t.Fatalf("dormant payment source = %+v, want nil", payment.SourceAccountID)
+	}
+}
+
+func TestLoanAdoptionRecordsNegativePrincipalForCashHistory(t *testing.T) {
+	st := openAPIStore(t)
+	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	cash, err := st.CreateAccount(types.Account{Name: "Savings", Kind: types.AccountKindCash, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.SaveCheckpoint(types.Checkpoint{AccountID: cash.ID, Balance: 2000, ObservedAt: 1783987199}); err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	adoptBody := `{"name":"Converted","principal":2000,"accruedInterest":0,"observedAt":1784073599,"recordBalances":false,"annualRate":0,"interestFrequency":"monthly","interestStartDate":"2026-08-13","payment":0,"paymentFrequency":"monthly","paymentStartDate":"2026-08-13","fundingAccountId":"checking","enabled":true}`
+	adopted := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPut, "/v1/loans/"+cash.ID, adoptBody))
+	if !adopted.Saved || adopted.Result.Display == nil {
+		t.Fatalf("adopt cash history = %+v", adopted)
+	}
+	model := assertSavedModelIdentity(t, st, adopted.Revision)
+	negative := false
+	for _, c := range model.Checkpoints {
+		if c.AccountID == cash.ID && c.Balance == -2000 {
+			negative = true
+		}
+	}
+	if !negative {
+		t.Fatalf("no negative principal observation: %+v", model.Checkpoints)
+	}
+}
+func TestLoanDormantPairPassesDisplayValidation(t *testing.T) {
+	bundle, err := domain.BuildLoan("p", "i", "charge", "pay", types.LoanTerms{Name: "Dormant", Principal: 1000, ObservedAt: 1, AnnualRate: 0, InterestFrequency: "monthly", InterestStartDate: "2026-01-01", Payment: 0, PaymentFrequency: "monthly", PaymentStartDate: "2026-01-01", FundingAccountID: "", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.Schedules[1].SourceAccountID != nil {
+		t.Fatalf("dormant payment source = %+v, want nil", bundle.Schedules[1].SourceAccountID)
+	}
+	rate, amount, _, err := domain.LoanRuleTerms("p", bundle.Schedules[0], bundle.Schedules[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rate != 0 || amount != 0 {
+		t.Fatalf("dormant terms = %v %v", rate, amount)
+	}
+	model := &types.FinancialModel{Accounts: bundle.Accounts, Schedules: bundle.Schedules, Checkpoints: bundle.Checkpoints, Evaluations: types.EmptyEvaluationTables()}
+	for _, issue := range domainValidate(model) {
+		if issue.Severity == types.SeverityError {
+			t.Fatalf("dormant pair invalid: %+v", issue)
+		}
+	}
+}
+
+func TestLoanUpdateMissingAndComponentConflicts(t *testing.T) {
+	st := openAPIStore(t)
+	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	created := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPost, "/v1/loans", loanBody))
+	interestID := created.Result.Display.Components[1].AccountID
+	missing := doRowRequest(t, h, http.MethodPut, "/v1/loans/missing-loan-id", loanBody)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing update status = %d, want 404: %s", missing.Code, missing.Body.String())
+	}
+	conflict := doRowRequest(t, h, http.MethodPut, "/v1/loans/"+interestID, loanBody)
+	if conflict.Code != http.StatusConflict {
+		t.Fatalf("component update status = %d, want 409: %s", conflict.Code, conflict.Body.String())
 	}
 }

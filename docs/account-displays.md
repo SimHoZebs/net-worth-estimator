@@ -14,9 +14,13 @@ capitalization. The form states the charge frequency explicitly.
 
 Create a debt through **Add account → Account type → Debt**.
 The principal, interest, and payment fields appear in that same account dialog.
+Convert an existing account the same way through **Edit account → Account type → Debt**;
+saving adopts its balance as principal with zero accrued interest.
 
-Loan edits preserve account and schedule IDs and existing observations.
-Only an explicit balance edit records a new pair of observations. Components
+Loan edits, including converted accounts, preserve account and schedule IDs and existing observations.
+Only an explicit balance edit records a new pair of observations, except that
+conversion always records the adopted pair so a prior cash-positive balance
+cannot survive as the debt balance. Components
 retain separate observation timestamps. A combined recorded total appears
 only when both observations share the same instant. Modeled balances can
 always be summed at the same projection cut.

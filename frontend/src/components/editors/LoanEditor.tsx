@@ -79,8 +79,10 @@ function LoanForm({
 	const rateArguments = rateBinding?.arguments as
 		| Record<string, unknown>
 		| undefined;
+	const plain = !!item && !item.display;
 	const principal = Math.abs(
-		item?.components?.find((c) => c.role === "principal")?.balance ?? 0,
+		item?.components?.find((c) => c.role === "principal")?.balance ??
+			(plain ? (item?.balance ?? 0) : 0),
 	);
 	const interest = Math.abs(
 		item?.components?.find((c) => c.role === "interest")?.balance ?? 0,
@@ -92,16 +94,22 @@ function LoanForm({
 		rate: String(
 			typeof rateArguments?.annualRate === "number"
 				? Number((rateArguments.annualRate * 100).toFixed(4))
-				: item
+				: item && !plain
 					? ""
 					: 0,
 		),
 		payment: String(
-			paymentRule ? (literalAmountOf(paymentRule.amount) ?? "") : item ? "" : 0,
+			paymentRule
+				? (literalAmountOf(paymentRule.amount) ?? "")
+				: item && !plain
+					? ""
+					: 0,
 		),
 		funding:
 			paymentRule?.sourceAccountId ??
-			accounts.find((a) => a.kind === "cash" && !a.archived)?.id ??
+			accounts.find(
+				(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
+			)?.id ??
 			"",
 		interestFrequency: (charge?.frequency ?? "monthly") as Frequency,
 		paymentFrequency: (paymentRule?.frequency ?? "monthly") as Frequency,
@@ -124,7 +132,7 @@ function LoanForm({
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving || item?.readOnly) return;
-		if (item && (!charge || !paymentRule)) {
+		if (item?.display && (!charge || !paymentRule)) {
 			setError("The loan's account rules are missing.");
 			return;
 		}
@@ -266,7 +274,6 @@ function LoanForm({
 						label="Pay from"
 						rich
 						name="funding"
-						required
 						value={values.funding}
 						onChange={(e) => change("funding", e.target.value)}
 					>

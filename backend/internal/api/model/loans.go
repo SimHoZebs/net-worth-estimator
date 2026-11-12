@@ -90,6 +90,45 @@ func (s *handler) updateLoan(_ context.Context, input *struct {
 		}
 		return s.saveLoan(bundle, false)
 	}
+	// Adopt a plain existing account as principal when it has no display
+	// and is not already a loan component. The existing account ID stays
+	// the principal/visible ID; fresh UUIDs back the interest account and
+	// the two rules. Existing checkpoints and history survive via upsert;
+	// the display linkage and names follow BuildLoan conventions.
+	for _, existing := range model.Accounts {
+		if existing.ID != input.ID {
+			continue
+		}
+		if existing.Display != nil {
+			break
+		}
+		if err := requireOrdinaryAccount(model, input.ID); err != nil {
+			return nil, err
+		}
+		ids := make([]string, 3)
+		for i := range ids {
+			id, err := uuid.NewV7()
+			if err != nil {
+				return nil, huma.Error500InternalServerError(err.Error())
+			}
+			ids[i] = id.String()
+		}
+		bundle, err := domain.BuildLoan(existing.ID, ids[0], ids[1], ids[2], input.Body)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity(err.Error())
+		}
+		for _, prior := range model.Accounts {
+			if prior.ID == bundle.Accounts[0].ID {
+				bundle.Accounts[0].MinBalance = prior.MinBalance
+				bundle.Accounts[0].Color = prior.Color
+			}
+		}
+		// Adoption always records the principal and interest pair at
+		// observedAt: a converted cash account may carry a positive
+		// checkpoint, and the debt principal needs its negative
+		// observation even when the magnitude is unchanged.
+		return s.saveLoan(bundle, false)
+	}
 	return nil, huma.Error404NotFound("Loan not found")
 }
 
@@ -105,10 +144,17 @@ func (s *handler) saveLoan(bundle types.LoanBundle, create bool) (*accountOutput
 			if create {
 				bundle.Schedules[i].Priority = maximum + i + 1
 			} else {
+				matched := false
 				for _, existing := range model.Schedules {
 					if existing.ID == bundle.Schedules[i].ID {
 						bundle.Schedules[i].Priority = existing.Priority
+						matched = true
+						break
 					}
+				}
+				if !matched {
+					maximum++
+					bundle.Schedules[i].Priority = maximum
 				}
 			}
 		}

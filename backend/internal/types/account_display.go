@@ -27,7 +27,7 @@ type LoanTerms struct {
 	Payment           float64   `json:"payment" minimum:"0" maximum:"10000000000"`
 	PaymentFrequency  Frequency `json:"paymentFrequency"`
 	PaymentStartDate  IsoDate   `json:"paymentStartDate"`
-	FundingAccountID  string    `json:"fundingAccountId" minLength:"1"`
+	FundingAccountID  string    `json:"fundingAccountId" doc:"Empty means dormant: the payment rule carries no source until funding is set"`
 	Enabled           bool      `json:"enabled"`
 }
 

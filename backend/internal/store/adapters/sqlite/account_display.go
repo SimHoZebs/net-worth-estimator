@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -54,6 +55,8 @@ func loadAccountDisplays(q queryer, accounts []types.Account) error {
 
 // SaveLoan changes all owned records in one user-scoped transaction. It
 // never replaces the model, sync records, sharing grants, or history.
+// Adoption writes one existing principal alongside one new interest account
+// and two new rules, so update mode inserts rows it does not already own.
 func (s *sqliteStore) SaveLoan(bundle types.LoanBundle, create bool) (types.Account, error) {
 	if len(bundle.Accounts) != 2 || len(bundle.Schedules) != 2 {
 		return types.Account{}, fmt.Errorf("invalid loan bundle")
@@ -65,8 +68,18 @@ func (s *sqliteStore) SaveLoan(bundle types.LoanBundle, create bool) (types.Acco
 				if err := insertAccountTx(tx, a); err != nil {
 					return err
 				}
-			} else if err := updateAccountTx(tx, a); err != nil {
-				return err
+			} else {
+				exists, err := accountExists(tx, a.ID)
+				if err != nil {
+					return err
+				}
+				if exists {
+					if err := updateAccountTx(tx, a); err != nil {
+						return err
+					}
+				} else if err := insertAccountTx(tx, a); err != nil {
+					return err
+				}
 			}
 			if err := saveAccountDisplay(tx, *a); err != nil {
 				return err
@@ -79,21 +92,39 @@ func (s *sqliteStore) SaveLoan(bundle types.LoanBundle, create bool) (types.Acco
 		}
 		for i := range bundle.Schedules {
 			r := &bundle.Schedules[i]
-			position, err := nextTablePosition(tx, "recurrence_rules")
-			if err != nil {
-				return err
-			}
 			if create {
+				position, err := nextTablePosition(tx, "recurrence_rules")
+				if err != nil {
+					return err
+				}
 				if err := claimRowID(tx, r.ID, "rule"); err != nil {
 					return err
 				}
-			} else {
-				if err := tx.QueryRow(`SELECT position, priority FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, r.ID).Scan(&position, &r.Priority); err != nil {
+				if err := insertRule(tx, position, r); err != nil {
 					return err
 				}
-				if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, r.ID); err != nil {
+				continue
+			}
+			var position, priority int
+			if err := tx.QueryRow(`SELECT position, priority FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, r.ID).Scan(&position, &priority); err != nil {
+				if err != sql.ErrNoRows {
 					return err
 				}
+				fresh, err := nextTablePosition(tx, "recurrence_rules")
+				if err != nil {
+					return err
+				}
+				if err := claimRowID(tx, r.ID, "rule"); err != nil {
+					return err
+				}
+				if err := insertRule(tx, fresh, r); err != nil {
+					return err
+				}
+				continue
+			}
+			r.Priority = priority
+			if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, r.ID); err != nil {
+				return err
 			}
 			if err := insertRule(tx, position, r); err != nil {
 				return err

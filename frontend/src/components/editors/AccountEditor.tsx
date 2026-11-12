@@ -25,7 +25,8 @@ export function AccountEditor(props: {
 	onClose: () => void;
 }) {
 	const { item, onClose } = props;
-	const initialType = item?.display ? "loan" : (item?.kind ?? "cash");
+	const initialType =
+		item?.display || item?.kind === "debt" ? "loan" : (item?.kind ?? "cash");
 	const [type, setType] = useState<Account["kind"] | "loan">(initialType);
 	const [name, setName] = useState(item?.name ?? "");
 	const [enabled, setEnabled] = useState(item?.enabled ?? true);
@@ -84,16 +85,12 @@ export function AccountEditor(props: {
 		label: string;
 		icon: (typeof accountKindIcons)[AccountKind];
 	}[] = [
-		...ACCOUNT_KINDS.filter(
-			(kind) => kind !== "debt" || (item && !item.display),
-		).map((kind) => ({
+		...ACCOUNT_KINDS.filter((kind) => kind !== "debt").map((kind) => ({
 			value: kind,
 			label: ACCOUNT_TYPE_LABELS[kind],
 			icon: accountKindIcons[kind],
 		})),
-		...(!item || item?.display
-			? [{ value: "loan", label: "Debt", icon: accountKindIcons.debt }]
-			: []),
+		{ value: "loan", label: "Debt", icon: accountKindIcons.debt },
 	];
 
 	return (

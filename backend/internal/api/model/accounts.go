@@ -121,7 +121,7 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 			if existing.Kind == types.AccountKindDebt {
 				return nil
 			}
-			return huma.Error422UnprocessableEntity("Convert to debt through the debt form backed by POST /v1/loans so principal, interest, and rules stay consistent.")
+			return huma.Error422UnprocessableEntity("Convert an existing account to debt through PUT /v1/loans/{id} so principal, interest, and rules stay consistent.")
 		}
 		return nil
 	}
