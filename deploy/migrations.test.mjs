@@ -192,6 +192,7 @@ test("one-time audit-table removal preserves all current data and the backup", a
   const { db, owner } = await fullBase(directory);
   await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);
     INSERT INTO sessions VALUES('session',X'0102',999);`);
+  await sqlite(db, `INSERT INTO account_displays(user_id,account_id,display_json) VALUES ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');`);
   const expected = (await sqlite(db, ".dump")).stdout;
   await sqlite(db, `CREATE TABLE transaction_id_migrations(user_id TEXT NOT NULL, old_id TEXT NOT NULL, new_id TEXT NOT NULL, PRIMARY KEY(user_id,old_id));
     INSERT INTO transaction_id_migrations VALUES ('${owner}','opening','01900000-0000-7000-8000-000000000001');`);
@@ -374,7 +375,7 @@ test("existing friendships survive migration byte-identical", async (t) => {
   assert.deepEqual(await backups(directory), []);
 });
 
-test("pre-display database gains an empty account displays table with data preserved", async (t) => {
+test("pre-display database gains backfilled passthrough displays with data preserved", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displays-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
@@ -388,7 +389,10 @@ test("pre-display database gains an empty account displays table with data prese
   assert.doesNotMatch(result.stdout, /verified, nothing to do/);
 
   assert.equal(await rows(db, "SELECT user_id, account_id, display_json FROM account_displays LIMIT 0;"), "");
-  assert.equal(await rows(db, "SELECT COUNT(*) FROM account_displays;"), "0");
+  assert.equal(
+    await rows(db, "SELECT account_id, display_json FROM account_displays;"),
+    `checking|{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}`,
+  );
   assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
   assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
@@ -466,6 +470,7 @@ test("existing sidecar rows survive migration byte-identical", async (t) => {
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
   await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO account_displays(user_id,account_id,display_json) VALUES ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');`);
   await sqlite(db, `INSERT INTO checkpoints(user_id, id, position, model_account_id, balance, source, observed_at) VALUES ('${owner}', 1, 0, 'checking', 100, 'banksync', 1773187199);`);
   await sqlite(db, `INSERT INTO checkpoint_available_balances(user_id, model_account_id, observed_at, available_balance) VALUES ('${owner}', 'checking', 1773187199, 90);`);
   await sqlite(db, `INSERT INTO suppressed_sync_keys(user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at) VALUES ('${owner}', 'banksync', 'bridge-checking', 'tx-1', 123);`);
@@ -625,6 +630,10 @@ test("historical forward no-op checkpoints are pruned with owner rows preserved"
   const result = await migrate(db);
   assert.match(result.stdout, /noop checkpoint prune complete/);
   assert.equal(await rows(db, "SELECT COUNT(*) FROM checkpoints;"), "2");
+  assert.equal(
+    await rows(db, "SELECT account_id, display_json FROM account_displays;"),
+    `checking|{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}`,
+  );
   assert.equal(await rows(db, `SELECT COUNT(*) FROM checkpoints WHERE source = 'user';`), "1");
   assert.equal(await rows(db, `SELECT balance FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0310};`), "100.0");
   assert.equal(await rows(db, `SELECT balance FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0311 + 86400};`), "150.0");
@@ -712,7 +721,7 @@ test("complete target verification leaves committed WAL data untouched", async (
   await assert.rejects(run(process.execPath, ["--input-type=module", "-e", `
     import { DatabaseSync } from 'node:sqlite';
     const db = new DatabaseSync(process.argv[1]);
-    db.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'wal-asset',0,'Retained WAL asset','cash',1 FROM users;");
+    db.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'wal-asset',0,'Retained WAL asset','cash',1 FROM users; INSERT INTO account_displays(user_id,account_id,display_json) SELECT id,'wal-asset',json_object('name', 'Retained WAL asset', 'components', json_array(json_object('accountId', 'wal-asset', 'role', 'primary')), 'interestScheduleId', '', 'paymentScheduleId', '') FROM users;");
     process.kill(process.pid, 'SIGKILL');
   `, db]), (error) => error.signal === "SIGKILL");
   const before = await sha256File(db);

@@ -387,6 +387,12 @@ case "$analysis" in
 esac
 friendships=$(friendships_state "$db") || fail "Cannot inspect friendships schema; refusing to guess."
 displays=$(account_displays_state "$db") || fail "Cannot inspect account displays schema; refusing to guess."
+if [ "$displays" = 1 ]; then
+  undisplayed=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM accounts a WHERE NOT EXISTS (SELECT 1 FROM account_displays d WHERE d.user_id = a.user_id AND d.account_id = a.id) AND NOT EXISTS (SELECT 1 FROM account_displays d, json_each(d.display_json, '\$.components') WHERE d.user_id = a.user_id AND (json_each.value ->> 'accountId') = a.id);") \
+    || fail "Cannot inspect account display coverage; refusing to guess."
+else
+  undisplayed=1
+fi
 suppressed=$(suppressed_state "$db") || fail "Cannot inspect suppression-key schema; refusing to guess."
 available=$(available_state "$db") || fail "Cannot inspect available-balance schema; refusing to guess."
 if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
@@ -458,7 +464,7 @@ fi
 # dry run must also report zero deletable rows before exiting early. The dry
 # run executes on a private read-only backup copy so the original database
 # and its WAL sidecars stay byte-identical.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -710,10 +716,13 @@ DDL
   fi
 fi
 
-# Provision the account displays table on pre-display candidates. The DDL
-# mirrors the application schema exactly; the provisioned table stays empty
-# so production never infers loan relationships, and preexisting displays
-# verify byte-identical below.
+# Provision the account displays table on pre-display candidates, then
+# backfill stored 1:1 passthrough displays for accounts that lack visible
+# coverage. Only single-self primary rows with empty rule IDs are inserted,
+# structurally matching the application encoder (compact JSON, same key
+# order; Go HTML-escapes edge-case characters this SQL path does not, which
+# verification tolerates because it compares parsed structure, never bytes),
+# so production never infers loan relationships. Unnamed accounts fail closed.
 if [ "$displays" = 0 ]; then
   displays_sql="$backup/displays.sql"
   cat > "$displays_sql" <<'DDL'
@@ -728,6 +737,17 @@ DDL
   if ! sqlite3 "$candidate" < "$displays_sql" > "$backup/displays.log" 2>&1; then
     fail "Candidate account displays upgrade failed. Original unchanged; backup retained at $backup."
   fi
+fi
+uncovered="NOT EXISTS (SELECT 1 FROM account_displays d WHERE d.user_id = a.user_id AND d.account_id = a.id) AND NOT EXISTS (SELECT 1 FROM account_displays d, json_each(d.display_json, '\$.components') WHERE d.user_id = a.user_id AND (json_each.value ->> 'accountId') = a.id)"
+# SQLite trim() strips spaces only; enumerate the ASCII whitespace the app
+# trims so tab-only names fail closed here too. Anything more exotic still
+# fails closed later at application validation, never silently backfilled.
+unnamed_ws="trim(a.name, ' ' || char(9) || char(10) || char(13) || char(11) || char(12))"
+unnamed=$(sqlite3 "$candidate" "SELECT COUNT(*) FROM accounts a WHERE (a.name IS NULL OR $unnamed_ws = '') AND $uncovered;") \
+  || fail "Cannot inspect account names for display backfill. Original unchanged; backup retained at $backup."
+test "$unnamed" = 0 || fail "Cannot backfill a display for an unnamed account. Original unchanged; backup retained at $backup."
+if ! sqlite3 "$candidate" "INSERT INTO account_displays (user_id, account_id, display_json) SELECT a.user_id, a.id, json_object('name', a.name, 'components', json_array(json_object('accountId', a.id, 'role', 'primary')), 'interestScheduleId', '', 'paymentScheduleId', '') FROM accounts a WHERE $uncovered;" > "$backup/displays-backfill.log" 2>&1; then
+  fail "Candidate display backfill failed. Original unchanged; backup retained at $backup."
 fi
 
 # Provision required suppression-key and available-balance sidecars on
@@ -910,8 +930,9 @@ fi
 
 # Verify the full candidate before publication: target schema, integrity,
 # foreign keys, and every preserved table against the backup. Only the
-# checkpoint date-to-instant conversion and the settled-bank repair may
-# differ; Analysis rows for preexisting Analysis must be byte-identical.
+# checkpoint date-to-instant conversion, the settled-bank repair, and the
+# passthrough display backfill may differ; Analysis rows for preexisting
+# Analysis must be byte-identical.
 check_target "$candidate" || fail "Candidate Analysis verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_promotions "$candidate" || fail "Candidate promotion verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_transfer_links "$candidate" || fail "Candidate transfer-link verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
@@ -965,12 +986,42 @@ verify_simplefin_keys() {
   fi
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys') ORDER BY name;") \
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays') ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
   verify_same "$table" || fail "Candidate changed preserved table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
 done
+
+# Account displays gain stored 1:1 passthrough rows for uncovered accounts,
+# so the generic byte-identical check cannot apply. Every preexisting row
+# must survive byte-identical, and every added row must be a well-formed
+# passthrough (single self primary component, empty rule IDs, the owning
+# account's own name) for an account the backup left uncovered.
+verify_displays_backfill() {
+  has_before=$(sqlite3 -readonly "$before" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='account_displays';") || return 1
+  if [ "$has_before" = 1 ]; then
+    preexisting=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+      SELECT EXISTS(SELECT * FROM before.account_displays EXCEPT SELECT * FROM main.account_displays);") || return 1
+    test "$preexisting" = 0 || return 1
+    newfilter="AND NOT EXISTS (SELECT 1 FROM before.account_displays o WHERE o.user_id = m.user_id AND o.account_id = m.account_id AND o.display_json = m.display_json)"
+  else
+    newfilter=""
+  fi
+  malformed=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT COUNT(*) FROM main.account_displays m WHERE 1 = 1 $newfilter
+    AND ((SELECT a.name FROM main.accounts a WHERE a.user_id = m.user_id AND a.id = m.account_id) IS NULL
+      OR json_extract(m.display_json, '\$.name') != (SELECT a.name FROM main.accounts a WHERE a.user_id = m.user_id AND a.id = m.account_id)
+      OR json_array_length(m.display_json, '\$.components') != 1
+      OR json_extract(m.display_json, '\$.components[0].accountId') != m.account_id
+      OR json_extract(m.display_json, '\$.components[0].role') != 'primary'
+      OR json_extract(m.display_json, '\$.interestScheduleId') != ''
+      OR json_extract(m.display_json, '\$.paymentScheduleId') != '');") || return 1
+  test "$malformed" = 0 || return 1
+  doublecovered=$(sqlite3 "$candidate" "SELECT COUNT(*) FROM account_displays d, json_each(d.display_json, '\$.components') WHERE json_each.value ->> 'accountId' != d.account_id AND EXISTS (SELECT 1 FROM account_displays o WHERE o.user_id = d.user_id AND o.account_id = (json_each.value ->> 'accountId'));") || return 1
+  test "$doublecovered" = 0 || return 1
+}
+verify_displays_backfill || fail "Candidate display backfill is not limited to well-formed passthrough rows. Original unchanged; backup retained at $backup. Keep the API stopped."
 
 if [ "$mode" = convert ]; then
   same_count=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT (SELECT COUNT(*) FROM main.checkpoints) != (SELECT COUNT(*) FROM before.checkpoints);") \

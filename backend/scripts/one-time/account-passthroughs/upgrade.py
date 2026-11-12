@@ -23,6 +23,10 @@ def passthrough(account_id, name):
     }
 
 
+def encode_display(display):
+    return json.dumps(display, separators=(",", ":"))
+
+
 def upgrade(database, backup):
     database, backup = Path(database), Path(backup)
     if not database.is_file():
@@ -62,7 +66,7 @@ def upgrade(database, backup):
                         raise ValueError("Account name must be nonempty for a passthrough display")
                     db.execute(
                         "INSERT INTO account_displays (user_id, account_id, display_json) VALUES (?,?,?)",
-                        (user, account_id, json.dumps(passthrough(account_id, name))),
+                        (user, account_id, encode_display(passthrough(account_id, name))),
                     )
             violations = db.execute("PRAGMA foreign_key_check").fetchall()
             if violations:
