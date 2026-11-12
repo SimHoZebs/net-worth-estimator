@@ -80,8 +80,8 @@ func (w *Worker) runUser(ctx context.Context, scoped store.Store) error {
 	if err != nil {
 		return err
 	}
-	for transactionID, category := range results {
-		if err := scoped.SetInferredTransactionCategory(transactionID, category, w.classifier.Version()); err != nil && !store.IsNotFound(err) {
+	for transactionID, classified := range results {
+		if err := scoped.SetInferredTransactionCategory(transactionID, classified.Category, classified.Producer); err != nil && !store.IsNotFound(err) {
 			return err
 		}
 	}

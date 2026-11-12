@@ -58,6 +58,46 @@ EXPECTED_KIND = {
 }
 MAPPED_KINDS = sorted(set(EXPECTED_KIND.values()))
 
+# Dataset label -> category key (locked; mirrors the Go evalharness table).
+# Transfer is direction-dependent (TRANSFER_IN on inflow, TRANSFER_OUT
+# otherwise); labels without an entry carry no category expectation.
+EXPECTED_CATEGORY = {
+    "Income": "INCOME",
+    "Rent": "RENT_AND_UTILITIES",
+    "Utilities": "RENT_AND_UTILITIES",
+    "Insurance": "GENERAL_SERVICES",
+    "Mortgage": "LOAN_PAYMENTS",
+    "Transfer": None,
+    "Groceries": "FOOD_AND_DRINK",
+    "Restaurants": "FOOD_AND_DRINK",
+    "Shopping": "GENERAL_MERCHANDISE",
+    "Transportation": "TRANSPORTATION",
+    "Entertainment": "ENTERTAINMENT",
+    "Subscription": "ENTERTAINMENT",
+    "Healthcare": "MEDICAL",
+    "Travel": "TRAVEL",
+    "Education": "GENERAL_SERVICES",
+    "Personal Care": "PERSONAL_CARE",
+    "Fees": "BANK_FEES",
+}
+
+# Category keys with a dataset-mapped expectation, in display order.
+# HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT are exempt: no HF label
+# maps to them, so they stay baseline until production feedback arrives.
+CATEGORY_KINDS = [
+    "INCOME", "TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS", "BANK_FEES",
+    "ENTERTAINMENT", "FOOD_AND_DRINK", "GENERAL_MERCHANDISE",
+    "MEDICAL", "PERSONAL_CARE", "GENERAL_SERVICES",
+    "TRANSPORTATION", "TRAVEL", "RENT_AND_UTILITIES",
+]
+
+
+def resolve_expected_category(label: str, direction: str) -> str:
+    """Locked label-to-category mapping; Transfer follows the row direction."""
+    if label == "Transfer":
+        return "TRANSFER_IN" if direction == "inflow" else "TRANSFER_OUT"
+    return EXPECTED_CATEGORY.get(label, "")
+
 # Alias derivation: dataset categories whose merchants resolve to a provider
 # signal through the real MapProviderResolver seam.
 ALIAS_SIGNAL = {
@@ -233,6 +273,134 @@ def run_go_harness(
         payload = json.load(handle)
     payload["_go_seconds"] = elapsed
     return payload
+
+
+def category_baseline_decision(request: dict) -> str:
+    """Cold-start policy for one category request, mirroring evidence.py.
+
+    support -> supported, candidate/suggest -> uncertain, exclude/missing ->
+    unsupported. Only "supported" counts as a prediction when scoring.
+    """
+    question = request.get("question") or {}
+    observed = set((request.get("pattern") or {}).get("signals", []))
+    if set(question.get("requiredSignals") or []) - observed:
+        return "unsupported"
+    if observed.intersection(question.get("excludeSignals") or []):
+        return "unsupported"
+    if observed.intersection(question.get("supportSignals") or []):
+        return "supported"
+    if question.get("suggestWithoutSignal") or observed.intersection(
+        question.get("candidateSignals") or []
+    ):
+        return "uncertain"
+    return "unsupported"
+
+
+def category_requests_by_id(entries: list[dict]) -> dict[str, dict]:
+    """Dedupe category entries to one training/eval item per request."""
+    requests: dict[str, dict] = {}
+    for entry in entries:
+        req = entry.get("request") or {}
+        request_id = req.get("id")
+        if not request_id or request_id in requests:
+            continue
+        requests[request_id] = {
+            "request": {
+                "id": req["id"],
+                "kind": req["kind"],
+                "patternId": req["patternId"],
+                "pattern": req["pattern"],
+                "question": req["question"],
+                "samples": req["samples"],
+            },
+            "kind": req["kind"],
+            "signals": list((req.get("pattern") or {}).get("signals", [])),
+            "transaction_ids": [],
+            "expected": entry.get("expectedCategory", ""),
+        }
+    for entry in entries:
+        req = entry.get("request") or {}
+        item = requests.get(req.get("id", ""))
+        if item is not None:
+            item["transaction_ids"].append(entry.get("transactionId"))
+    return requests
+
+
+def score_category_arm(
+    transactions: list[dict], entries: list[dict]
+) -> dict:
+    """Score category requests against the locked label-to-category mapping.
+
+    The deterministic cold-start baseline predicts exactly the kinds whose
+    domain evidence supports them; uncertain and missing predictions count
+    as wrong whenever an expectation exists. Pair-counted per key, with a
+    strict exact-predicted-set top-level accuracy like score_arm.
+    """
+    info = {t["id"]: t for t in transactions}
+    for entry in entries:
+        stem = entry.get("transactionId", "")
+        row = info.get(stem)
+        if row is None:
+            raise ValueError(f"category entry links unknown transaction {stem}")
+        locked = resolve_expected_category(row["category"], row["direction"])
+        if row.get("expectedCategory") != locked or entry.get("expectedCategory") != locked:
+            raise ValueError(
+                f"category mapping drift on {stem}: label={row['category']} "
+                f"direction={row['direction']} go={row.get('expectedCategory')!r} "
+                f"entry={entry.get('expectedCategory')!r} locked={locked!r}"
+            )
+    expected = {t["id"]: t.get("expectedCategory", "") for t in transactions}
+    predicted: dict[str, set[str]] = defaultdict(set)
+    for entry in entries:
+        if category_baseline_decision(entry.get("request") or {}) == "supported":
+            kind = (entry.get("request") or {}).get("kind", "")
+            if kind.startswith("category:"):
+                predicted[entry.get("transactionId", "")].add(kind[len("category:"):])
+    kinds = CATEGORY_KINDS + ["none"]
+    confusion = {e: {p: 0 for p in kinds} for e in kinds}
+    for stem, want in expected.items():
+        got = predicted.get(stem, set())
+        want_key = want if want in CATEGORY_KINDS else "none"
+        if not got:
+            confusion[want_key]["none"] += 1
+        for kind in got:
+            confusion[want_key][kind if kind in kinds else "none"] += 1
+    per_kind = {}
+    for kind in CATEGORY_KINDS:
+        tp = confusion[kind][kind]
+        fp = sum(confusion[e][kind] for e in kinds if e != kind)
+        fn = sum(confusion[kind][p] for p in kinds if p != kind)
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + fn) if tp + fn else 0.0
+        per_kind[kind] = {
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "precision": precision,
+            "recall": recall,
+            "f1": (
+                2 * precision * recall / (precision + recall)
+                if precision + recall
+                else 0.0
+            ),
+        }
+    none_expected = sum(1 for w in expected.values() if w not in CATEGORY_KINDS)
+    none_clean = confusion["none"]["none"]
+    return {
+        "transactions": len(expected),
+        "entries": len(entries),
+        "per_kind": per_kind,
+        "confusion": confusion,
+        "none_expected": none_expected,
+        "none_clean": none_clean,
+        "none_clean_rate": (none_clean / none_expected) if none_expected else 1.0,
+        "accuracy": sum(
+            1
+            for stem, want in expected.items()
+            if (predicted.get(stem, set()) == {want} if want in CATEGORY_KINDS else not predicted.get(stem))
+        )
+        / len(expected),
+    }
 
 
 def findings_by_request(findings: list[dict]) -> dict[str, dict]:
@@ -445,13 +613,25 @@ class LearnerRun:
         The trajectory records (batch, probe accuracy, cumulative detections)
         so learning-curve movement can be separated from real drift trips.
         With dismiss_trips, a manual-mode drift trip dismisses the detector
-        (weights kept) and retries the batch once instead of aborting; any
-        other failure, or a second trip on the same batch, raises.
+        (weights kept) and retries the batch once instead of aborting; if
+        the retried batch trips again, it is halved and each half retried
+        the same way, down to 25 events — a shift inside one transport
+        batch must not abort a fixed-label curriculum, and no event is
+        ever skipped. Any other failure, or a trip on a <=25 span, raises.
         """
+        from model import ConflictError
+
         trajectory = []
+        if not items:
+            return trajectory
         cursor = self.store.state(owner)["cursor"]
-        for start in range(0, len(items), 200):
-            batch = items[start : start + 200]
+        spans = [(0, len(items))]
+        while spans:
+            start, end = spans.pop(0)
+            if end - start > 200:
+                spans.insert(0, (start + 200, end))
+                end = start + 200
+            batch = items[start:end]
             feedback = []
             for request, action in batch:
                 self._event_count[owner] += 1
@@ -469,23 +649,39 @@ class LearnerRun:
             try:
                 try:
                     self.store.observe(owner, after, cursor, feedback)
-                except Exception as exc:
-                    from model import ConflictError
-
-                    if (
-                        dismiss_trips
-                        and isinstance(exc, ConflictError)
-                        and "drift detected" in str(exc)
+                except ConflictError as exc:
+                    if not (
+                        dismiss_trips and "drift detected" in str(exc)
                     ):
+                        raise
+                    print(
+                        f"eval: drift trip on batch {start // 200}, "
+                        f"dismissing detector and retrying",
+                        flush=True,
+                    )
+                    self.dismiss()
+                    try:
+                        self.store.observe(owner, after, cursor, feedback)
+                    except ConflictError as retry_exc:
+                        if "drift detected" not in str(retry_exc):
+                            raise
+                        if end - start <= 25:
+                            raise
                         print(
-                            f"eval: drift trip on batch {start // 200}, "
-                            f"dismissing detector and retrying",
+                            f"eval: batch {start // 200} tripped again, "
+                            f"splitting {end - start} events",
                             flush=True,
                         )
                         self.dismiss()
-                        self.store.observe(owner, after, cursor, feedback)
-                    else:
-                        raise
+                        mid = start + (end - start) // 2
+                        spans.insert(0, (mid, end))
+                        spans.insert(0, (start, mid))
+                        # The tripping batch committed nothing, so the
+                        # checkpoint still precedes it; rewind the cursor
+                        # and the event counter past its uncommitted events.
+                        cursor = after
+                        self._event_count[owner] -= len(feedback)
+                        continue
             finally:
                 self.train_ms.append(
                     (time.perf_counter() - started) * 1000 / max(1, len(feedback))
@@ -558,6 +754,14 @@ def decision_accuracy(
     }
 
 
+def _evaluate_all(learner: LearnerRun, requests: list[dict]) -> list[dict]:
+    """Score every request; the learner bounds a single evaluate call."""
+    judgments: list[dict] = []
+    for start in range(0, len(requests), 5000):
+        judgments.extend(learner.evaluate_timed(requests[start : start + 5000]))
+    return judgments
+
+
 def run_arm(
     name: str,
     arm_requests: dict[str, dict],
@@ -568,7 +772,8 @@ def run_arm(
     try:
         requests = [request for request, _ in ordered]
         actions = [action for _, action in ordered]
-        pre = decision_accuracy(learner.evaluate_timed(requests), actions)
+        # The learner bounds one evaluate call; large arms score in chunks.
+        pre = decision_accuracy(_evaluate_all(learner, requests), actions)
         drift_before = learner.drift(owner)
         probe_requests = requests[:100]
         probe_actions = actions[:100]
@@ -577,7 +782,7 @@ def run_arm(
             probe_requests=probe_requests, probe_actions=probe_actions,
         )
         drift_after = learner.drift(owner)
-        post = decision_accuracy(learner.evaluate_timed(requests), actions)
+        post = decision_accuracy(_evaluate_all(learner, requests), actions)
         peak_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
         train = sorted(learner.train_ms)
         ev = sorted(learner.eval_ms)
@@ -661,16 +866,20 @@ def run_seed_recipe(
     ordered_lists: list[tuple[str, list[tuple[dict, str]]]],
     seed_path: Path,
     probe_path: Path,
+    cat_ordered_lists: list[tuple[str, list[tuple[dict, str]]]] = (),
     min_per_kind: int = 50,
 ) -> dict:
     """Canonical seed recipe: concatenated sources, manual drift mode.
 
-    Trains every source's interleaved baseline order in sequence (HF
-    descriptors, then MoneyData timelines), dismissing the detector and
-    retrying on drift trips so one shift never wipes the seed. Exports a
-    database with ONLY the model row and fails loudly unless every
-    classifier kind clears the coverage minimum — a seed that leaves a
-    kind cold is worse than no seed.
+    Trains every source's interleaved payment baseline order in sequence,
+    then every source's interleaved category order (HF descriptors, then
+    MoneyData timelines), dismissing the detector and retrying on drift
+    trips so one shift never wipes the seed. Exports a database with ONLY
+    the model row and fails loudly unless every payment classifier kind
+    and every mapped category kind clears the coverage minimum — a seed
+    that leaves a kind cold is worse than no seed. HOME_IMPROVEMENT and
+    GOVERNMENT_AND_NON_PROFIT are exempt (no dataset label maps to them;
+    they stay baseline until production feedback).
     """
     from seed_export import export_seed, verify_seed
 
@@ -679,10 +888,16 @@ def run_seed_recipe(
     ordered: list[tuple[dict, str]] = []
     for _, items in ordered_lists:
         ordered.extend(items)
+    cat_ordered: list[tuple[dict, str]] = []
+    for _, items in cat_ordered_lists:
+        cat_ordered.extend(items)
     learner = LearnerRun(keep=True)
     try:
         learner.observe_batches(
             "eval-seed", ordered, run_id="seed-run", dismiss_trips=True
+        )
+        learner.observe_batches(
+            "eval-seed", cat_ordered, run_id="seed-cat-run", dismiss_trips=True
         )
         counts = _model_counts(learner.db_path)
         short = {
@@ -690,11 +905,21 @@ def run_seed_recipe(
             for k in sorted(set(MAPPED_KINDS) | set(counts))
         }
         missing = [k for k in MAPPED_KINDS if counts.get(k, 0) < min_per_kind]
-        if missing:
+        cat_short = {
+            f"category:{k}": counts.get(f"category:{k}", 0)
+            for k in CATEGORY_KINDS
+        }
+        missing_cat = [
+            k for k in CATEGORY_KINDS
+            if counts.get(f"category:{k}", 0) < min_per_kind
+        ]
+        if missing or missing_cat:
             raise ValueError(
-                f"seed coverage gate failed (minimum {min_per_kind} per kind): {short}"
+                f"seed coverage gate failed (minimum {min_per_kind} per kind): "
+                f"{short} {cat_short}"
             )
         probe_requests = [request for request, _ in ordered[:200]]
+        probe_requests += [request for request, _ in cat_ordered[:200]]
         in_memory = learner.evaluate_timed(probe_requests)
         with open(probe_path, "w") as handle:
             json.dump(
@@ -710,8 +935,11 @@ def run_seed_recipe(
         drift = learner.drift("eval-seed")
         return {
             "recipe": "multi-source baseline findings, manual mode",
-            "events": len(ordered),
+            "events": len(ordered) + len(cat_ordered),
+            "payment_events": len(ordered),
+            "category_events": len(cat_ordered),
             "coverage_counts": short,
+            "category_coverage_counts": cat_short,
             "export": info,
             "probe_path": str(probe_path),
             "probe_requests": len(probe_requests),
@@ -763,10 +991,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_source(args, cache: Path, tag: str, rows: list[dict],
-               source_label: str, source_license: str) -> tuple[dict, list]:
-    """One full eval pass for a dataset; returns (report, seed_ordered).
+               source_label: str, source_license: str) -> tuple[dict, list, list]:
+    """One full eval pass for a dataset; returns (report, seed_ordered, cat_seed_ordered).
 
-    seed_ordered is the interleaved baseline (request, action) list for
+    seed_ordered is the interleaved payment baseline (request, action) list
+    and cat_seed_ordered the interleaved category (request, action) list for
     the combined seed phase. Report filenames are suffixed per source so a
     combined run never clobbers single-source outputs.
     """
@@ -841,6 +1070,22 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
         ),
         "interleaved",
     )
+
+    cat_entries = output["findings"].get("categoryRequests", [])
+    cat_scored = score_category_arm(transactions, cat_entries)
+    cat_requests = category_requests_by_id(cat_entries)
+    cat_expected_by_request = {
+        request_id: (f"category:{item['expected']}" if item["expected"] else "")
+        for request_id, item in cat_requests.items()
+    }
+    cat_learner_arms = {}
+    for name, order in (("cat-interleaved", "interleaved"),
+                        ("cat-sequential", "sequential")):
+        cat_ordered = order_requests(cat_requests, cat_expected_by_request, order)
+        cat_learner_arms[name] = run_arm(f"{tag}-{name}", cat_requests, cat_ordered)
+    cat_seed_ordered = order_requests(
+        cat_requests, cat_expected_by_request, "interleaved"
+    )
     report = {
         "dataset": {
             "source": source_label,
@@ -858,8 +1103,10 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
         "alias_table_size": len(aliases),
         "alias_hit_rate": alias_hits,
         "deterministic": arms_output,
+        "category_deterministic": cat_scored,
         "signal_support": support,
         "learner": learner_arms,
+        "category_learner": cat_learner_arms,
         "shift_probe": probe,
         "seed": None,
     }
@@ -868,7 +1115,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
         json.dump(report, handle, indent=2)
     print(f"### source: {tag}")
     print_summary(report)
-    return report, seed_ordered
+    return report, seed_ordered, cat_seed_ordered
 
 
 def main() -> None:
@@ -878,6 +1125,7 @@ def main() -> None:
 
     tags = ("hf-v2", "moneydata") if args.source == "all" else (args.source,)
     seed_inputs: list[tuple[str, list]] = []
+    cat_seed_inputs: list[tuple[str, list]] = []
     for tag in tags:
         if tag == "hf-v2":
             parquet_path = download_parquet(cache, PARQUET_URL)
@@ -890,18 +1138,49 @@ def main() -> None:
             rows = load_moneydata(args.moneydata_path)
             source_label = MONEYDATASET_ID
             source_license = "CC BY 4.0 (citation required, see README)"
-        _, seed_ordered = run_source(args, cache, tag, rows,
+        _, seed_ordered, cat_seed_ordered = run_source(args, cache, tag, rows,
                                      source_label, source_license)
         seed_inputs.append((tag, seed_ordered))
+        cat_seed_inputs.append((tag, cat_seed_ordered))
 
     if args.export_seed is not None:
         probe_path = args.seed_probe or (cache / "seed-probe.json")
-        seed = run_seed_recipe(seed_inputs, args.export_seed, probe_path)
+        seed = run_seed_recipe(seed_inputs, args.export_seed, probe_path,
+                               cat_ordered_lists=cat_seed_inputs)
         print("### combined seed")
         print(json.dumps(
-            {"events": seed["events"], "coverage_counts": seed["coverage_counts"],
+            {"events": seed["events"],
+             "payment_events": seed["payment_events"],
+             "category_events": seed["category_events"],
+             "coverage_counts": seed["coverage_counts"],
+             "category_coverage_counts": seed["category_coverage_counts"],
              "verification": seed["verification"],
              "drift_at_export": seed["drift_at_export"]}, indent=2))
+
+
+def print_learner_arm(name: str, arm: dict) -> None:
+    print(
+        f"  {name:18s} events={arm['events']} "
+        f"pre={arm['pre']['accuracy']:.4f} post={arm['post']['accuracy']:.4f} "
+        f"lift={arm['lift']:+.4f} trips={arm['trips']} warnings={arm['warnings']} "
+        f"train_ms/event med={arm['train_per_event_ms']['median']:.3f} "
+        f"p90={arm['train_per_event_ms']['p90']:.3f} "
+        f"eval_ms/event med={arm['eval_per_event_ms']['median']:.3f} "
+        f"peak_rss_mb={arm['peak_rss_mb']:.1f}"
+    )
+    print(
+        f"    pre_decisions={arm['pre']['decision_counts']} "
+        f"decisive={arm['pre']['decisive_rate']:.3f} | "
+        f"post_decisions={arm['post']['decision_counts']} "
+        f"decisive={arm['post']['decisive_rate']:.3f}"
+    )
+    print(
+        f"    trajectory(batch:probe_acc/decisive/detections): "
+        + " ".join(
+            f"{t['batch']}:{t['probe_accuracy']:.3f}/{t['decisive_rate']:.3f}/{t['detections']}"
+            for t in arm.get("trajectory", [])
+        )
+    )
 
 
 def print_summary(report: dict) -> None:
@@ -955,30 +1234,32 @@ def print_summary(report: dict) -> None:
             for e in MAPPED_KINDS + ["none"]
         )
         print(f"  {arm}: {cells}")
+    scored = report["category_deterministic"]
+    print("\n## Deterministic category arm (cold-start keyword policy)")
+    print(
+        f"transactions={scored['transactions']} entries={scored['entries']} "
+        f"overall_accuracy={scored['accuracy']:.4f} "
+        f"expected-none clean {scored['none_clean']}/{scored['none_expected']} "
+        f"({scored['none_clean_rate']:.4f})"
+    )
+    for kind in CATEGORY_KINDS:
+        m = scored["per_kind"][kind]
+        print(
+            f"  {kind:22s} P={m['precision']:.4f} R={m['recall']:.4f} "
+            f"F1={m['f1']:.4f} (tp={m['tp']} fp={m['fp']} fn={m['fn']})"
+        )
+    print("  confusion rows expected -> predicted " + "/".join(CATEGORY_KINDS + ["none"]))
+    for exp in CATEGORY_KINDS + ["none"]:
+        cells = " ".join(
+            f"{p}={scored['confusion'][exp][p]}" for p in CATEGORY_KINDS + ["none"]
+        )
+        print(f"    {exp:22s} {cells}")
     print("\n## Learner arms (fresh store each; strict accuracy, uncertain counts as wrong)")
     for name, arm in report["learner"].items():
-        print(
-            f"  {name:18s} events={arm['events']} "
-            f"pre={arm['pre']['accuracy']:.4f} post={arm['post']['accuracy']:.4f} "
-            f"lift={arm['lift']:+.4f} trips={arm['trips']} warnings={arm['warnings']} "
-            f"train_ms/event med={arm['train_per_event_ms']['median']:.3f} "
-            f"p90={arm['train_per_event_ms']['p90']:.3f} "
-            f"eval_ms/event med={arm['eval_per_event_ms']['median']:.3f} "
-            f"peak_rss_mb={arm['peak_rss_mb']:.1f}"
-        )
-        print(
-            f"    pre_decisions={arm['pre']['decision_counts']} "
-            f"decisive={arm['pre']['decisive_rate']:.3f} | "
-            f"post_decisions={arm['post']['decision_counts']} "
-            f"decisive={arm['post']['decisive_rate']:.3f}"
-        )
-        print(
-            f"    trajectory(batch:probe_acc/decisive/detections): "
-            + " ".join(
-                f"{t['batch']}:{t['probe_accuracy']:.3f}/{t['decisive_rate']:.3f}/{t['detections']}"
-                for t in arm.get("trajectory", [])
-            )
-        )
+        print_learner_arm(name, arm)
+    print("\n## Category learner arms (confirm expected kind, reject other emitted kinds)")
+    for name, arm in report["category_learner"].items():
+        print_learner_arm(name, arm)
     probe = report["shift_probe"]
     if "skipped" in probe:
         print(f"\n## Synthetic shift probe skipped: {probe['skipped']}")

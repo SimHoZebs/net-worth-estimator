@@ -19,12 +19,19 @@ type Input struct {
 	Facts         *types.TransactionFacts
 }
 
+// Classified is one classifier decision. Producer names the exact classifier
+// version that supplied it, so the stored assignment records its origin.
+type Classified struct {
+	Category string
+	Producer string
+}
+
 // Classifier maps uncategorized transactions onto the supported category keys.
 // Missing transaction IDs stay uncategorized. Implementations must be safe for
 // concurrent calls and must honor context cancellation.
 type Classifier interface {
 	Version() string
-	Classify(ctx context.Context, inputs []Input) (map[string]string, error)
+	Classify(ctx context.Context, inputs []Input) (map[string]Classified, error)
 }
 
 // KeywordClassifier is the deterministic mock implementation. It recognizes a
@@ -36,14 +43,14 @@ type KeywordClassifier struct{}
 func (KeywordClassifier) Version() string { return "keyword-v1" }
 
 // Classify returns one category per recognized transaction.
-func (c KeywordClassifier) Classify(ctx context.Context, inputs []Input) (map[string]string, error) {
-	results := map[string]string{}
+func (c KeywordClassifier) Classify(ctx context.Context, inputs []Input) (map[string]Classified, error) {
+	results := map[string]Classified{}
 	for _, input := range inputs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		if category, ok := classifyKeyword(input); ok {
-			results[input.TransactionID] = category
+			results[input.TransactionID] = Classified{Category: category, Producer: c.Version()}
 		}
 	}
 	return results, nil

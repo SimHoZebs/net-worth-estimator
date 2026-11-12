@@ -15,12 +15,14 @@ import (
 	"flag"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -43,6 +45,28 @@ var expectedKinds = map[string]string{
 	"Income": "income", "Rent": "rent", "Utilities": "utility", "Insurance": "auto-insurance",
 }
 
+// expectedCategories maps dataset labels onto category keys (locked). Transfer
+// resolves by direction at emission time: TRANSFER_IN on inflow, TRANSFER_OUT
+// otherwise. Labels without an entry map to "", meaning no expectation.
+var expectedCategories = map[string]string{
+	"Income":         "INCOME",
+	"Rent":           "RENT_AND_UTILITIES",
+	"Utilities":      "RENT_AND_UTILITIES",
+	"Insurance":      "GENERAL_SERVICES",
+	"Mortgage":       "LOAN_PAYMENTS",
+	"Groceries":      "FOOD_AND_DRINK",
+	"Restaurants":    "FOOD_AND_DRINK",
+	"Shopping":       "GENERAL_MERCHANDISE",
+	"Transportation": "TRANSPORTATION",
+	"Entertainment":  "ENTERTAINMENT",
+	"Subscription":   "ENTERTAINMENT",
+	"Healthcare":     "MEDICAL",
+	"Travel":         "TRAVEL",
+	"Education":      "GENERAL_SERVICES",
+	"Personal Care":  "PERSONAL_CARE",
+	"Fees":           "BANK_FEES",
+}
+
 type fixtureAlias struct {
 	Match  string `json:"match"`
 	Signal string `json:"signal"`
@@ -60,20 +84,69 @@ type fixture struct {
 }
 
 type evalTransaction struct {
-	ID           string   `json:"id"`
-	Description  string   `json:"description"`
-	Category     string   `json:"category"`
-	ExpectedKind string   `json:"expectedKind"`
-	Direction    string   `json:"direction"`
-	Amount       string   `json:"amount"`
-	Dates        []string `json:"dates"`
+	ID               string   `json:"id"`
+	Description      string   `json:"description"`
+	Category         string   `json:"category"`
+	ExpectedKind     string   `json:"expectedKind"`
+	ExpectedCategory string   `json:"expectedCategory"`
+	Direction        string   `json:"direction"`
+	Amount           string   `json:"amount"`
+	Dates            []string `json:"dates"`
+}
+
+// categoryRequestEntry is one categorization judgment request for the single
+// representative occurrence of a descriptor row, with the locked
+// label-to-category expectation for scoring and training.
+type categoryRequestEntry struct {
+	Request          types.AnalysisJudgmentInput `json:"request"`
+	ExpectedCategory string                      `json:"expectedCategory"`
+	TransactionID    string                      `json:"transactionId"`
 }
 
 type evalOutput struct {
-	Meta         map[string]any                       `json:"meta"`
-	Aliases      []fixtureAlias                       `json:"aliases"`
-	Transactions []evalTransaction                    `json:"transactions"`
-	Findings     map[string][]types.AnalysisDetection `json:"findings"`
+	Meta         map[string]any    `json:"meta"`
+	Aliases      []fixtureAlias    `json:"aliases"`
+	Transactions []evalTransaction `json:"transactions"`
+	Findings     map[string]any    `json:"findings"`
+}
+
+// expectedCategoryFor resolves a dataset label to its locked category key.
+// Transfer is direction-dependent; unknown labels carry no expectation.
+func expectedCategoryFor(label string, inflow bool) string {
+	if label == "Transfer" {
+		if inflow {
+			return "TRANSFER_IN"
+		}
+		return "TRANSFER_OUT"
+	}
+	return expectedCategories[label]
+}
+
+// categoryEntriesFor builds the categorization judgment requests for one
+// representative occurrence of a descriptor row: the bare description as the
+// name, direction from the dataset sign, and the representative amount.
+func categoryEntriesFor(index int, label, description string, inflow bool, amount string) []categoryRequestEntry {
+	direction := "out"
+	if inflow {
+		direction = "in"
+	}
+	transactionID := fmt.Sprintf("eval-%06d", index)
+	requests := categorization.CategoryJudgmentRequests(categorization.Input{
+		TransactionID: transactionID + "-cat",
+		Name:          description,
+		Direction:     direction,
+		Facts:         &types.TransactionFacts{Description: description, Amount: amount, Currency: "USD"},
+	})
+	expected := expectedCategoryFor(label, inflow)
+	entries := make([]categoryRequestEntry, 0, len(requests))
+	for _, request := range requests {
+		entries = append(entries, categoryRequestEntry{
+			Request:          request,
+			ExpectedCategory: expected,
+			TransactionID:    transactionID,
+		})
+	}
+	return entries
 }
 
 // hashMix folds the fixed seed, descriptor, and occurrence index into one
@@ -134,6 +207,7 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 
 	snapshot := types.AnalysisSnapshot{Revision: 1, UserID: "eval-owner"}
 	emitted := make([]evalTransaction, 0, len(fix.Rows))
+	categoryEntries := make([]categoryRequestEntry, 0, len(fix.Rows))
 	for i, row := range fix.Rows {
 		description, inflow := splitSign(row.Description)
 		if description == "" {
@@ -149,6 +223,10 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 		if !ok {
 			baseAmount = 100
 		}
+		amount := strconv.FormatFloat(sign*baseAmount, 'f', 2, 64)
+		// The categorization builder carries direction in its own field;
+		// the learner evidence layer requires a non-negative amount.
+		catAmount := strconv.FormatFloat(math.Abs(sign*baseAmount), 'f', 2, 64)
 		dates := make([]string, 0, months)
 		for k := 0; k < months; k++ {
 			mix := hashMix(seed, row.Description, k)
@@ -177,10 +255,12 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 		}
 		emitted = append(emitted, evalTransaction{
 			ID: fmt.Sprintf("eval-%06d", i), Description: description, Category: row.Category,
-			ExpectedKind: expectedKinds[row.Category], Direction: direction,
-			Amount: strconv.FormatFloat(sign*baseAmount, 'f', 2, 64),
-			Dates:  dates,
+			ExpectedKind: expectedKinds[row.Category], ExpectedCategory: expectedCategoryFor(row.Category, inflow),
+			Direction: direction,
+			Amount:    amount,
+			Dates:     dates,
 		})
+		categoryEntries = append(categoryEntries, categoryEntriesFor(i, row.Category, description, inflow, catAmount)...)
 	}
 
 	ctx := context.Background()
@@ -210,8 +290,9 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 		},
 		Aliases:      fix.Aliases,
 		Transactions: emitted,
-		Findings: map[string][]types.AnalysisDetection{
+		Findings: map[string]any{
 			"baseline": baseline, "providers": augmented,
+			"categoryRequests": categoryEntries,
 		},
 	}
 	encoded, err := json.MarshalIndent(out, "", "  ")

@@ -34,8 +34,11 @@ func TestKeywordClassifierRecognizesCommonInputs(t *testing.T) {
 	}
 	for _, item := range cases {
 		got, ok := results[item.input.TransactionID]
-		if ok != item.recognized || got != item.expected {
-			t.Fatalf("%s: got %q, %v; want %q, %v", item.name, got, ok, item.expected, item.recognized)
+		if ok != item.recognized || got.Category != item.expected {
+			t.Fatalf("%s: got %+v, %v; want %q, %v", item.name, got, ok, item.expected, item.recognized)
+		}
+		if ok && got.Producer != (KeywordClassifier{}).Version() {
+			t.Fatalf("%s: producer=%q", item.name, got.Producer)
 		}
 	}
 }
@@ -53,7 +56,7 @@ func TestKeywordClassifierUsesSourceEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if results["one"] != types.CategoryFoodAndDrink {
+	if results["one"].Category != types.CategoryFoodAndDrink {
 		t.Fatalf("results=%+v", results)
 	}
 }

@@ -22,6 +22,21 @@ arms. Timing measurements substantiate the online-learner volume claim.
   names; the labels are provided. Treat results as evidence about
   descriptor handling, not as production precision/recall.
 
+## Category mapping (locked)
+
+HF/MoneyData labels map onto category keys identically in the Go
+evalharness and the Python scorer (a mismatch raises): Income→INCOME,
+Rent→RENT_AND_UTILITIES, Utilities→RENT_AND_UTILITIES,
+Insurance→GENERAL_SERVICES, Mortgage→LOAN_PAYMENTS,
+Transfer→TRANSFER_IN on inflow else TRANSFER_OUT, Groceries→FOOD_AND_DRINK,
+Restaurants→FOOD_AND_DRINK, Shopping→GENERAL_MERCHANDISE,
+Transportation→TRANSPORTATION, Entertainment→ENTERTAINMENT,
+Subscription→ENTERTAINMENT, Healthcare→MEDICAL, Travel→TRAVEL,
+Education→GENERAL_SERVICES, Personal Care→PERSONAL_CARE, Fees→BANK_FEES.
+HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT are exempt — no dataset
+label maps to them, so they stay cold-start baseline until production
+feedback arrives.
+
 The data is **never vendored**: the harness downloads the 1.6MB parquet at
 eval time into `ml/eval/.cache/` (gitignored) and reuses it on later runs.
 
@@ -58,15 +73,17 @@ uv run --with pyarrow --with pandas --with openpyxl eval/harness.py \
 `--source` selects `hf-v2` (default), `moneydata` (needs `--moneydata-path`),
 or `all` (per-source reports plus a combined seed phase).
 
-Seed export (canonical recipe: per-source interleaved baseline orders,
-manual drift mode with dismiss-and-retry, fixed seeds) trains a kept
-store, then writes a seed database containing ONLY the model row (warm
-weights, classification counts, generation, revision) with
-events/checkpoints emptied and drift counters reset. Export fails loudly
-unless every classifier kind clears its coverage minimum. The harness
-also writes a probe set (`--seed-probe`) and verifies that a fresh load
-of the seed evaluates the probe identically to the in-memory trained
-state. The canonical seed is versioned at `ml/seed.sqlite3` (see
+Seed export (canonical recipe: per-source interleaved payment baseline
+orders followed by per-source interleaved category orders, manual drift
+mode with dismiss-and-retry, fixed seeds) trains a kept store, then
+writes a seed database containing ONLY the model row (warm weights,
+counts, generation, revision) with events/checkpoints emptied and drift
+counters reset. Export fails loudly unless every payment classifier kind
+and every mapped category kind clears its coverage minimum (50 examples;
+HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT exempt — no dataset label
+maps to them). The harness also writes a probe set (`--seed-probe`)
+covering payment and category requests and verifies that a fresh load of
+the seed evaluates the probe identically to the in-memory trained state. The canonical seed is versioned at `ml/seed.sqlite3` (see
 `docs/eval-datasets.md` for provenance); regenerate with the command
 above rather than hand-editing it. Standalone use:
 `python eval/seed_export.py export --src ... --dest ...` and
@@ -77,9 +94,11 @@ Reproducibility covers weights, counts, revision, and decisions; the
 Stages: (1) download parquet, (2) sample + build fixture (rows + alias
 table), (3) Go harness expands each descriptor into a monthly occurrence
 series and runs `PaymentPatterns{}.Analyze` nil-resolver plus
-`.WithProviders` with a `MapProviderResolver`, (4) Python scores
-deterministic output vs labels, trains throwaway `PaymentModelStore`
-instances (`ML_MODEL_PATH` under `/tmp`, `ML_DRIFT_MODE=auto`),
+`.WithProviders` with a `MapProviderResolver`, and emits one
+`categorization.CategoryJudgmentRequests` set per descriptor for the
+category arm, (4) Python scores deterministic output vs labels, trains
+throwaway `PaymentModelStore` instances (`ML_MODEL_PATH` under `/tmp`,
+`ML_DRIFT_MODE=auto`),
 (5) optionally exports a verified seed DB (`--export-seed`), and
 (6) writes `ml/eval/.cache/report.json` plus a stdout summary. The harness
 touches only `PaymentModelStore.state/evaluate/observe` (stable API).
@@ -113,6 +132,18 @@ touches only `PaymentModelStore.state/evaluate/observe` (stable API).
   typically show a negative strict lift because the undertrained model
   hedges `uncertain` — watch `decisive_rate` recover as event volume grows
   rather than reading early negative lift as model damage.
+- `category_deterministic`: cold-start keyword-policy baseline per
+  category key (precision/recall/F1, confusion): only support-backed kinds
+  predict; uncertain and missing predictions count as wrong wherever an
+  expectation exists; `accuracy` is the stricter exact-predicted-set match;
+  `none_clean_rate` is the true-negative rate on rows with no mapped
+  category (MoneyData unmapped rows).
+- `category_learner.<arm>`: strict accuracy before/after training on the
+  same category requests (`confirm` the expected kind, `reject` other
+  emitted kinds for the same transaction), lift, trips, and per-event
+  latency. Small volumes show the same negative strict lift as the payment
+  arms while the undertrained model hedges `uncertain`; watch
+  `decisive_rate` recover as event volume grows.
 - `shift_probe`: synthetic abrupt label flip after convergence; shows the
   detector actually trips and what the accuracy cost looks like.
 - `seed`: always `null` in the persisted report; the combined export summary (path, revision, counts, `verification.identical`) is printed to stdout by `--export-seed`.

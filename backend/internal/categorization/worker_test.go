@@ -131,3 +131,35 @@ func TestWorkerLeavesUnknownRowsUncategorized(t *testing.T) {
 		t.Fatalf("unknown row gained a category: %+v", got)
 	}
 }
+
+type stubProducerClassifier struct {
+	producer string
+}
+
+func (s stubProducerClassifier) Version() string { return "stub-composite" }
+
+func (s stubProducerClassifier) Classify(ctx context.Context, inputs []categorization.Input) (map[string]categorization.Classified, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	results := map[string]categorization.Classified{}
+	for _, input := range inputs {
+		results[input.TransactionID] = categorization.Classified{Category: types.CategoryTravel, Producer: s.producer}
+	}
+	return results, nil
+}
+
+func TestWorkerWritesPerResultProducer(t *testing.T) {
+	scoped, database := newCategoryStore(t)
+	transactionID := seedCharge(t, scoped, "LOCAL SHOP", "shop", "")
+	worker, err := categorization.NewWorker(database, stubProducerClassifier{producer: "ml-categories-v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := categoryOf(t, scoped, transactionID); got.Producer != "ml-categories-v1" {
+		t.Fatalf("producer=%+v", got)
+	}
+}

@@ -46,14 +46,26 @@ failures.
 
 ## The seed (`ml/seed.sqlite3`)
 
-64KB SQLite containing only the `model` row: warm weights and per-kind
+552KB SQLite containing only the `model` row: warm weights and per-kind
 example counts from training on the full HF v2 set plus all of MoneyData
-(4,156 stream-level events), interleaved per source, in manual drift
-mode with dismiss-and-retry (one US→UK boundary trip, logged, detector
-restarted). Coverage gate enforced at export: every classifier kind ≥
-50 examples (actual: income 2,924, rent 208, utility 551,
-auto-insurance 473); probe of 200 requests evaluates identically
-in-memory vs fresh load (200/200).
+(27,633 stream-level events: 4,156 payment-pattern plus 23,477
+single-transaction category), interleaved per source with payment orders
+first then category orders, in manual drift mode with dismiss-and-retry
+(10 trips, all dismissed with weights kept and the detector restarted;
+one twice-tripping transport batch was halved and retrained in halves,
+no event skipped). Coverage gate enforced at export: every payment
+classifier kind and every mapped category kind ≥ 50 examples (payment
+actual: income 2,924, rent 208, utility 551, auto-insurance 473;
+category actual: INCOME 1,031, TRANSFER_IN 1,303, TRANSFER_OUT 2,275,
+LOAN_PAYMENTS 559, BANK_FEES 763, ENTERTAINMENT 682, FOOD_AND_DRINK
+1,026, GENERAL_MERCHANDISE 3,130, MEDICAL 1,527, PERSONAL_CARE 1,466,
+GENERAL_SERVICES 1,133, TRANSPORTATION 1,362, TRAVEL 1,067,
+RENT_AND_UTILITIES 5,641). HOME_IMPROVEMENT and
+GOVERNMENT_AND_NON_PROFIT are exempt from the 50-example export gate
+(no dataset label maps to them; cross-talk training still gave them 43
+and 469 examples respectively, so their weights are warm but thinly
+evidenced). Probe of 400 requests (200 payment + 200
+category) evaluates identically in-memory vs fresh load (400/400).
 
 Regenerate (deterministic):
 

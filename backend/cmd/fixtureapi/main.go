@@ -34,6 +34,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/integrationfixtures"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
@@ -374,7 +375,7 @@ func main() {
 	}
 	stopAnalyses := analysisRunner.Start(context.Background(), time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
 	defer stopAnalyses()
-	categoryWorker, err := categorization.NewWorker(application, categorization.KeywordClassifier{})
+	categoryWorker, err := categorization.NewWorker(application, categoryClassifier())
 	if err != nil {
 		log.Fatalf("configure categorization: %v", err)
 	}
@@ -750,5 +751,22 @@ func parseBool(value string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// categoryClassifier prefers the learner-backed composite only when the
+// operator explicitly enables it. The warm category seed is deliberately
+// conservative: on held-out descriptors the learner claims few rows and its
+// confident judgments trail keyword precision, so keyword stays the default
+// until a measured flip condition is met. ML_JUDGMENT_URL alone keeps the
+// keyword mock.
+func categoryClassifier() categorization.Classifier {
+	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
+	if endpoint == "" || strings.TrimSpace(os.Getenv("ML_CATEGORIES")) != "1" {
+		return categorization.KeywordClassifier{}
+	}
+	return categorization.CompositeClassifier{
+		ML:      categorization.NewMLClassifier(judgment.NewHTTPProvider(endpoint, 5*time.Second)),
+		Keyword: categorization.KeywordClassifier{},
 	}
 }

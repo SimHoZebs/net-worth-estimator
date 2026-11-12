@@ -28,6 +28,32 @@ def feedback(event="001", action="confirm", evidence=None):
     return {"eventId": event, "runId": "reviewed-run", "action": action, "request": evidence or request()}
 
 
+CATEGORY_KEYS = (
+    "INCOME", "TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS", "BANK_FEES",
+    "ENTERTAINMENT", "FOOD_AND_DRINK", "GENERAL_MERCHANDISE", "HOME_IMPROVEMENT",
+    "MEDICAL", "PERSONAL_CARE", "GENERAL_SERVICES", "GOVERNMENT_AND_NON_PROFIT",
+    "TRANSPORTATION", "TRAVEL", "RENT_AND_UTILITIES",
+)
+
+
+def category_request(rid="category-1", kind="category:FOOD_AND_DRINK", signals=("dining-descriptor",)):
+    signals = list(signals)
+    return {
+        "id": rid, "kind": kind, "patternId": f"txn-content-hash-{rid}",
+        "question": {"label": kind.split(":", 1)[1].lower().replace("_", " "),
+                     "supportSignals": ["dining-descriptor"], "candidateSignals": ["dining-candidate"],
+                     "excludeSignals": ["card-repayment"], "suggestWithoutSignal": False},
+        "pattern": {
+            "merchant": f"merchant-{rid}", "cadence": "", "currency": "USD",
+            "typicalAmount": "42.50",
+            "occurrenceCount": 1, "cadenceDays": 0,
+            "amountVariation": 0, "intervalVariation": 0,
+            "recencyDays": 0, "direction": "outflow", "signals": signals,
+        },
+        "samples": [{"description": "BISTRO 123", "amount": "-42.50", "currency": "USD"}],
+    }
+
+
 class TestStore(unittest.TestCase):
     def setUp(self):
         os.environ.pop("ML_DRIFT_MODE", None)
@@ -165,6 +191,46 @@ class TestStore(unittest.TestCase):
         self.assertEqual(self.store.evaluate([evidence])[0]["decision"],"supported")
         evidence["question"]["requiredSignals"]=["regular-cadence"]
         self.assertEqual(self.store.evaluate([evidence])[0]["decision"],"unsupported")
+
+    def test_category_cold_start_follows_observed_signals(self):
+        supported = category_request(signals=["dining-descriptor"])
+        self.assertNotIn("annualizedEstimate", supported["pattern"])
+        self.assertTrue(all(0 <= key < FEATURE_BUCKETS for key in features_from_request(supported)))
+        judged = self.store.evaluate([supported])[0]
+        self.assertEqual((judged["decision"], judged["strength"]), ("supported", "strong"))
+        unsupported = category_request("category-2", signals=[])
+        judged = self.store.evaluate([unsupported])[0]
+        self.assertEqual((judged["decision"], judged["strength"]), ("unsupported", "strong"))
+        candidate = category_request("category-3", signals=["dining-candidate"])
+        judged = self.store.evaluate([candidate])[0]
+        self.assertEqual((judged["decision"], judged["strength"]), ("uncertain", "moderate"))
+
+    def test_category_training_counts_stay_per_kind(self):
+        first = category_request("category-1", signals=["dining-descriptor"])
+        second = category_request("category-2", signals=["dining-descriptor"])
+        self.store.observe("alice", "", "002", [
+            {"eventId": "001", "runId": "reviewed-run", "action": "confirm", "request": first},
+            {"eventId": "002", "runId": "reviewed-run", "action": "reject", "request": second},
+        ])
+        self.assertEqual(self.store._state.classification_counts, {"category:FOOD_AND_DRINK": 2})
+        travel = category_request("category-3", kind="category:TRAVEL", signals=[])
+        with mock.patch.object(self.store._state.model, "predict_proba_one", return_value={True: 0.99}):
+            self.assertEqual(self.store.evaluate([travel])[0]["decision"], "unsupported")
+
+    def test_feature_space_is_bounded_for_payments_and_categories(self):
+        kinds = ["income", "rent", "utility", "auto-insurance", "card-payment"]
+        kinds += [f"category:{key}" for key in CATEGORY_KEYS]
+        self.assertEqual(len(kinds), 21)
+        keys = set()
+        for i, kind in enumerate(kinds):
+            if kind.startswith("category:"):
+                evidence = category_request(f"bounded-{i}", kind=kind)
+            else:
+                evidence = request(f"bounded-{i}")
+                evidence["kind"] = kind
+            evidence["pattern"]["merchant"] = f"bounded-merchant-{i}"
+            keys.update(features_from_request(evidence))
+        self.assertLessEqual(len(keys), FEATURE_BUCKETS)
 
     def test_drift_stats_are_visible_in_state(self):
         drift = self.store.state("alice")["drift"]
