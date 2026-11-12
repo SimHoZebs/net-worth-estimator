@@ -29,6 +29,10 @@ await run("go", ["build", "-o", join(tools, "simplefin-v2-keys"), "./scripts/one
   cwd: new URL("../backend/", import.meta.url).pathname,
   env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "prune-noop-checkpoints"), "./scripts/one-time/noop-checkpoints"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
 
 const sqlite = (db, sql) => run("sqlite3", [db, sql]);
 const rows = async (db, sql) => (await sqlite(db, sql)).stdout.trim();
@@ -607,8 +611,36 @@ test("final checkpoints gain the additive unified projection schema", async (t) 
   assert.deepEqual(await backups(directory), backupsBefore);
 });
 
-test("partial projection schema fails closed with the original unchanged", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-projection-partial-"));
+test("historical forward no-op checkpoints are pruned with owner rows preserved", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-noop-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,provider,observed_at) VALUES
+    ('${owner}',1,0,'checking',100,'banksync','simplefin',${DAY_CLOSE_0310}),
+    ('${owner}',2,1,'checking',100,'banksync','simplefin',${DAY_CLOSE_0311}),
+    ('${owner}',3,2,'checking',150,'user','',${DAY_CLOSE_0311 + 86400});`);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM checkpoints;"), "3");
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /noop checkpoint prune complete/);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM checkpoints;"), "2");
+  assert.equal(await rows(db, `SELECT COUNT(*) FROM checkpoints WHERE source = 'user';`), "1");
+  assert.equal(await rows(db, `SELECT balance FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0310};`), "100.0");
+  assert.equal(await rows(db, `SELECT balance FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0311 + 86400};`), "150.0");
+  assert.equal(await rows(db, `SELECT COUNT(*) FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0311};`), "0");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+
+  const hashAfter = await sha256File(db);
+  const backupsBefore = await backups(directory);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+  assert.deepEqual(await backups(directory), backupsBefore);
+});
+
+test("partial projection schema fails closed with the original unchanged", async (t) => {  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-projection-partial-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
   await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);

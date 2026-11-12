@@ -17,6 +17,9 @@
 #   7. The account_displays table is provisioned when absent.
 #   8. The suppression-key and checkpoint available-balance sidecars are
 #      provisioned when absent.
+#   9. Historical forward no-op bank checkpoints are pruned: posted balances
+#      that match the modeled balance need no row. Owner rows, first
+#      observations, and changed available balances survive.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -451,8 +454,27 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
-  exit 0
+# A schema-complete target may still hold historical no-op checkpoints, so a
+# dry run must also report zero deletable rows before exiting early. The dry
+# run executes on a private read-only backup copy so the original database
+# and its WAL sidecars stay byte-identical.
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then
+  dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
+  dry_copy="$dry_dir/dry.db"
+  if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
+    rm -rf "$dry_dir"
+    fail "Candidate no-op dry-run backup failed; refusing to report verified."
+  fi
+  dry_out=""
+  if ! dry_out=$(prune-noop-checkpoints --db "$dry_copy" --dry-run 2>&1); then
+    rm -rf "$dry_dir"
+    fail "Candidate no-op dry run failed without backup; refusing to report verified."
+  fi
+  rm -rf "$dry_dir"
+  case "$dry_out" in
+    *" 0 deletable,"*) info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+      exit 0 ;;
+  esac
 fi
 
 # Snapshot the original with the SQLite backup API into a new private
@@ -1344,6 +1366,30 @@ esac
 test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
   || fail "Candidate account_links institution column is missing. Original unchanged; backup retained at $backup. Keep the API stopped."
 
+# Prune historical forward no-op bank checkpoints on the candidate. The
+# runtime sync path already skips these rows; this removes rows that predate
+# that guard. Owner rows, first observations, and changed available balances
+# survive; an unpreparable model prunes nothing for that user.
+owner_before=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM checkpoints WHERE source = 'user';") \
+  || fail "Cannot count owner checkpoints before prune. Original unchanged; backup retained at $backup. Keep the API stopped."
+if ! prune-noop-checkpoints --db "$candidate" > "$backup/noop-checkpoints.log" 2>&1; then
+  printf 'migrate: no-op checkpoint prune failed: %s\n' "$(cat "$backup/noop-checkpoints.log")" >&2
+  fail "Candidate no-op prune failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+info "$(cat "$backup/noop-checkpoints.log")"
+owner_after=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM checkpoints WHERE source = 'user';") \
+  || fail "Cannot count owner checkpoints after prune. Original unchanged; backup retained at $backup. Keep the API stopped."
+test "$owner_before" = "$owner_after" || fail "Candidate deleted owner checkpoints ($owner_before -> $owner_after). Original unchanged; backup retained at $backup. Keep the API stopped."
+if ! prune-noop-checkpoints --db "$candidate" --dry-run > "$backup/noop-checkpoints-dry.log" 2>&1; then
+  printf 'migrate: no-op checkpoint verification failed: %s\n' "$(cat "$backup/noop-checkpoints-dry.log")" >&2
+  fail "Candidate no-op verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+case "$(cat "$backup/noop-checkpoints-dry.log")" in
+  *" 0 deletable,"*) ;;
+  *) fail "Candidate still holds deletable no-op checkpoints. Original unchanged; backup retained at $backup. Keep the API stopped." ;;
+esac
+check_integrity "$candidate" || fail "Candidate integrity check failed after no-op prune. Original unchanged; backup retained at $backup. Keep the API stopped."
+
 # Setup validates the final shape only. A digest of the logical database also
 # proves that the validator did not rewrite any candidate rows or schema.
 validation_before=$(sqlite3 "$candidate" .dump | sha256sum)
@@ -1368,7 +1414,7 @@ test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
 if [ "$mode" = convert ]; then
-  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, and provisioned Analysis, unified projection, and account institution schema from $backup."
+  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, pruned no-op checkpoints, and provisioned Analysis, unified projection, and account institution schema from $backup."
 else
-  info "Completed current application, unified projection, and account institution schema on final checkpoints from $backup."
+  info "Completed current application, unified projection, and account institution schema with no-op checkpoint prune on final checkpoints from $backup."
 fi

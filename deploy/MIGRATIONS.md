@@ -46,6 +46,7 @@ target before its operator window is complete.
 | Transaction simulation split | Tool at `backend/scripts/one-time/transaction-sim-split` | Retain until every supported target records the split. Never run the planned-purchase conversion against a pre-split target on its own; the body orders the split first. |
 | Planned purchases | [planned-purchases README](../backend/scripts/one-time/planned-purchases/README.md) | Runs inside the body after the split and converts retired purchase policies. Unsafe inputs leave the original unchanged. |
 | Bank source normalization | [bank-source README](../backend/scripts/one-time/bank-source/README.md) | Run on every supported target before deploying the strict settlement matcher. Both legacy counts must read zero before the API starts. |
+| No-op checkpoint prune | [noop-checkpoints README](../backend/scripts/one-time/noop-checkpoints/README.md) | Unverified on Compose, dev, and Northflank. Runs inside the body after provisioning; deletes only forward sync-owned zero-delta checkpoints. |
 | SimpleFIN v2 keys | Tool usage: `simplefin-v2-keys --db PATH (--mapping PATH \| --write-mapping PATH)` | Runs inside the body. When bare keys exist, supply `SIMPLEFIN_V2_MAPPING` as a mode-0600 JSON map produced by `--write-mapping` before the window; the map tool performs the only provider read. A missing, ambiguous, or colliding mapping fails before publication. No-op when no SimpleFIN rows exist. |
 
 ## Supported execution paths
