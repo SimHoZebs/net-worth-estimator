@@ -60,6 +60,10 @@ old packs in place.
 | safe-spending | Card spending thresholds, pace projection, and a protected-reserve crossing | Missing income selection, card charges, or reserve hides the dividers and pace |
 | safe-spending-shortfall | A recurring bill the cash balance cannot fulfill | Missing raised savings contribution or income selection hides the unfulfilled row |
 
+### Seed coverage for new features
+
+Every feature lands with fixture-seed coverage for its data shape. When no existing pack or seed kind can express what the feature needs (new account topology, new bank-feed shape, new row-to-row link, etc.), the same branch adds the missing pack or seed kind plus the harness support to load it. A feature that cannot be seeded cannot be demonstrated in demo, browser specs, or captures; extend the seeds, never land around them. Concrete gap: the fixture harness maps all bank rows to one checking account, so cross-account transfer-pair linking currently has no browser/pack coverage.
+
 Loading per harness:
 
 - Store and API tests: `integrationfixtures.SeedUser` (throwaway database,
