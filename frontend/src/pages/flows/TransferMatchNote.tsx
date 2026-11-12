@@ -1,14 +1,26 @@
+import { useState } from "react";
 import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.ts";
-import { useAnalysisFindings } from "../../state/analyses.ts";
+import type { TransferLink } from "../../api/generated/model/transferLink.ts";
+import { ApiHttpError } from "../../api/http.ts";
+import { Button } from "../../components/Button.tsx";
+import { ErrorNotice, FieldError } from "../../components/ErrorNotice.tsx";
+import {
+	useAnalysisFindings,
+	useConfirmTransferPair,
+	useRemoveTransferLinkByLeg,
+	useTransferLinks,
+} from "../../state/analyses.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
 
-/** Read-only transfer-pair annotation (VIS-03 consumer). The VIS-03
- * `Transfer` analyzer (backend/internal/analysis/transfer.go) publishes one
- * detection per observed leg with kind "transfer": strength "strong" for a
- * matched pair with no rival or a clear scoring winner, "moderate" with all
- * candidates ranked best-first when several match. Transfer edges are counted once in transfer
- * totals — never as income plus spending — and this note shows what the
- * matcher observed about the opposite leg. Review actions stay out:
- * ambiguous-match review UX is VIS-03's open decision. */
+/** Read-only transfer-pair annotation (VIS-03 consumer) with confirm actions.
+ * The VIS-03 `Transfer` analyzer (backend/internal/analysis/transfer.go)
+ * publishes one detection per observed leg with kind "transfer": strength
+ * "strong" for a matched pair with no rival or a clear scoring winner,
+ * "moderate" with all candidates ranked best-first when several match.
+ * Transfer edges are counted once in transfer totals — never as income plus
+ * spending — and this note shows what the matcher observed about the
+ * opposite leg. A strong leg links directly; an ambiguous leg offers the
+ * ranked candidates inline; a confirmed link unlinks by either leg. */
 export function transferFindingsForEdge(
 	findings: AnalysisFinding[],
 	transactionIds: string[],
@@ -24,21 +36,95 @@ export function transferFindingsForEdge(
 	);
 }
 
+/** Detector-ranked opposite legs best-first: evidence TransactionIDs[0] is
+ * the observed leg itself, so peers are the remaining ids in order. */
+export function transferPeers(finding: AnalysisFinding): string[] {
+	const seen = new Set([finding.transactionId]);
+	const peers: string[] = [];
+	for (const evidence of finding.evidence ?? [])
+		for (const id of evidence.transactionIds ?? [])
+			if (!seen.has(id)) {
+				seen.add(id);
+				peers.push(id);
+			}
+	return peers;
+}
+
+/** Confirmed link touching any leg of the edge, when one is observed. */
+export function transferLinkForEdge(
+	links: TransferLink[],
+	transactionIds: string[],
+): TransferLink | undefined {
+	const ids = new Set(transactionIds);
+	return links.find((link) => ids.has(link.legA) || ids.has(link.legB));
+}
+
 export function TransferMatchNote({
 	transactionIds,
 	transferCount,
+	readOnly: readOnlyProp,
 }: {
 	transactionIds: string[];
 	/** Number of source transactions behind the edge. */
 	transferCount: number;
+	/** Write-permission override; production reads server policy. */
+	readOnly?: boolean;
 }) {
+	const scopeReadOnly = useUserReadOnly();
+	const readOnly = readOnlyProp ?? scopeReadOnly;
 	const query = useAnalysisFindings(transactionIds);
+	const linksQuery = useTransferLinks();
+	const confirm = useConfirmTransferPair();
+	const unlink = useRemoveTransferLinkByLeg();
+	const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
 	const findings = transferFindingsForEdge(
 		query.data?.findings ?? [],
 		transactionIds,
 	);
 	const matched = findings.filter((finding) => finding.strength === "strong");
 	const ambiguous = findings.filter((finding) => finding.strength !== "strong");
+	const actionable = findings
+		.map((finding) => ({ finding, peers: transferPeers(finding) }))
+		.filter((entry) => entry.peers.length > 0)
+		.sort((a, b) => a.peers.length - b.peers.length)[0];
+	const peers = actionable?.peers ?? [];
+	const peer =
+		selectedPeer && peers.includes(selectedPeer)
+			? selectedPeer
+			: peers[0];
+	const link = transferLinkForEdge(
+		linksQuery.data?.links ?? [],
+		transactionIds,
+	);
+	const unlinkLeg = link
+		? (transactionIds.find((id) => id === link.legA || id === link.legB) ??
+			link.legA)
+		: null;
+	const busy = confirm.isPending || unlink.isPending;
+	const failure = confirm.isError
+		? confirm.error
+		: unlink.isError
+			? unlink.error
+			: null;
+	const inlineError =
+		failure instanceof ApiHttpError && failure.status === 422
+			? (failure.detail ??
+				"These two transactions cannot be linked as one transfer.")
+			: null;
+	const noticeError =
+		failure && !inlineError
+			? failure instanceof Error
+				? failure.message
+				: "The transfer pair could not be saved."
+			: null;
+	const matcherDetail = actionable?.finding.evidence?.[0]?.reason ?? null;
+	const confirmPair = () => {
+		if (!actionable || !peer || busy) return;
+		confirm.mutate({
+			id: actionable.finding.id,
+			peerTransactionId: peer,
+		});
+	};
 	return (
 		<div className="mt-3 border-t border-line pt-3">
 			<p className="text-xs text-muted">
@@ -64,6 +150,82 @@ export function TransferMatchNote({
 					No matching opposite transfer is confirmed yet.
 				</p>
 			)}
+			{!readOnly && link && unlinkLeg && (
+				<div className="mt-2 space-y-2">
+					<p className="m-0 text-xs font-semibold text-success-text">
+						Linked as transfer.
+					</p>
+					<Button
+						type="button"
+						size="sm"
+						variant="secondary"
+						disabled={busy}
+						aria-label={`Unlink the confirmed transfer touching ${unlinkLeg}`}
+						onClick={() => unlink.mutate({ transactionId: unlinkLeg })}
+					>
+						{unlink.isPending ? "Unlinking…" : "Unlink"}
+					</Button>
+				</div>
+			)}
+			{!readOnly && !link && actionable && actionable.peers.length === 1 && (
+				<div className="mt-2">
+					<Button
+						type="button"
+						size="sm"
+						disabled={busy || !peer}
+						aria-label={`Link as transfer with ${peer}`}
+						onClick={confirmPair}
+					>
+						{confirm.isPending ? "Linking…" : "Link as transfer"}
+					</Button>
+				</div>
+			)}
+			{!readOnly && !link && actionable && actionable.peers.length > 1 && (
+				<fieldset
+					disabled={busy}
+					className="mt-2 space-y-2 border-0 p-0"
+				>
+					<legend className="text-xs font-semibold">
+						Which transaction is the opposite side?
+					</legend>
+					<div className="space-y-1">
+						{actionable.peers.map((peerId) => (
+							<label
+								key={peerId}
+								className="flex items-center gap-2 text-xs"
+							>
+								<input
+									type="radio"
+									name={`transfer-peer-${actionable.finding.id}`}
+									value={peerId}
+									checked={peer === peerId}
+									onChange={() => setSelectedPeer(peerId)}
+								/>
+								<span>{peerId}</span>
+							</label>
+						))}
+					</div>
+					<Button
+						type="button"
+						size="sm"
+						disabled={busy || !peer}
+						aria-label={`Link as transfer with ${peer}`}
+						onClick={confirmPair}
+					>
+						{confirm.isPending ? "Linking…" : "Link as transfer"}
+					</Button>
+				</fieldset>
+			)}
+			{matcherDetail && (
+				<details className="mt-1">
+					<summary className="cursor-pointer text-xs text-muted">
+						Matcher detail
+					</summary>
+					<p className="m-0 mt-1 text-xs text-muted">{matcherDetail}</p>
+				</details>
+			)}
+			<FieldError message={inlineError} />
+			<ErrorNotice message={noticeError} />
 		</div>
 	);
 }

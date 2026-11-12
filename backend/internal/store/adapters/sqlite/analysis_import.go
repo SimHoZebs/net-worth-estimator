@@ -13,6 +13,10 @@ func preserveAnalysisEvidence(tx *userTx) (func() error, error) {
 			`INSERT INTO analysis_findings(id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`, 12},
 		{`SELECT e.id, e.request_id, e.finding_id, e.run_id, e.created_at, e.payload_json FROM analysis_feedback e JOIN analysis_findings f ON f.user_id = e.user_id AND f.id = e.finding_id JOIN transactions p ON p.user_id = f.user_id AND p.id = f.transaction_id WHERE e.user_id = :user_id AND p.source != 'user' AND p.projection_slice_id IS NULL`,
 			`INSERT INTO analysis_feedback(id, request_id, finding_id, run_id, created_at, payload_json, user_id) VALUES (?, ?, ?, ?, ?, ?, :user_id)`, 6},
+		{`SELECT l.leg_a, l.leg_b, l.finding_id, l.actor, l.created_at FROM analysis_transfer_links l JOIN transactions p ON p.user_id = l.user_id AND p.id = l.leg_a JOIN transactions q ON q.user_id = l.user_id AND q.id = l.leg_b WHERE l.user_id = :user_id AND p.source != 'user' AND q.source != 'user' AND p.projection_slice_id IS NULL AND q.projection_slice_id IS NULL`,
+			`INSERT INTO analysis_transfer_links(leg_a, leg_b, finding_id, actor, created_at, user_id) VALUES (?, ?, ?, ?, ?, :user_id)`, 5},
+		{`SELECT m.transaction_id, m.leg_a, m.leg_b FROM analysis_transfer_link_members m JOIN transactions p ON p.user_id = m.user_id AND p.id = m.leg_a JOIN transactions q ON q.user_id = m.user_id AND q.id = m.leg_b WHERE m.user_id = :user_id AND p.source != 'user' AND q.source != 'user' AND p.projection_slice_id IS NULL AND q.projection_slice_id IS NULL`,
+			`INSERT INTO analysis_transfer_link_members(transaction_id, leg_a, leg_b, user_id) VALUES (?, ?, ?, :user_id)`, 3},
 	}
 	type savedRow struct {
 		query string

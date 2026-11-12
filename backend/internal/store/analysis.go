@@ -25,6 +25,17 @@ type AnalysisStore interface {
 	RecordPatternToNewSchedule(record types.PatternToNewSchedule) error
 	RemovePatternToNewSchedule(patternKey, ruleID string) error
 	PreviewPatternToExistingSchedule(findingID, ruleID string) (types.PatternToExistingSchedulePreview, error)
+	// ConfirmTransferPair wires one detector-ranked opposite-leg pair as a
+	// single transfer: it validates both legs, replaces any active link
+	// touching either leg, and records analysis feedback acceptance for the
+	// finding in the same transaction. Confirming the same pair again
+	// returns the same link. Same-sign pairs are out of scope and rejected.
+	ConfirmTransferPair(findingID, peerTransactionID, actor string) (types.TransferLink, error)
+	// RemoveTransferLinkByLeg deletes the active link touching one leg.
+	// A leg with no active link reports ErrNotFound.
+	RemoveTransferLinkByLeg(transactionID string) (types.TransferLink, error)
+	// ListTransferLinks returns every active confirmed pair in leg order.
+	ListTransferLinks() ([]types.TransferLink, error)
 	// ListAnalysisDirtyFacts reports bank facts that changed after sinceRevision.
 	// Rows are durable tombstones (including deletes) ordered by revision.
 	// Consumers advance their per-stream consumed revision instead of deleting.

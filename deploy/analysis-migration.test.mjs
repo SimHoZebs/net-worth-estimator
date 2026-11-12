@@ -52,9 +52,10 @@ async function sourceDatabase() {
   const owner = await sql(db, "SELECT id FROM users;");
   await sql(db, `DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
     DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
+    DROP TABLE analysis_transfer_link_members; DROP TABLE analysis_transfer_links;
     DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
     DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
-    DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');`);
+    DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1','analysis-transfer-links-v1');`);
   await sql(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
     ('${owner}','checking',0,'Fixture checking','cash',1);`);
   return { directory, db, owner };
@@ -101,6 +102,29 @@ test("Analysis migration completes schema on a verified candidate and repeats wi
   const hashBefore = await sha256File(db);
   await migrate(db);
   assert.deepEqual(await backups(directory), names);
+  assert.equal(await sha256File(db), hashBefore);
+});
+
+test("Analysis migration provisions transfer links on a six-table source and repeats without writes", async () => {
+  const { db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
+  await migrate(db);
+  // A pre-transfer source carries the six legacy Analysis tables: drop only
+  // the link tables and their schema marker to simulate it, keeping rows
+  // everywhere else.
+  await sql(db, `DROP TABLE analysis_transfer_link_members; DROP TABLE analysis_transfer_links;
+    DELETE FROM schema_migrations WHERE name = 'analysis-transfer-links-v1';`);
+  const before = await sql(db, "SELECT count(*) FROM analysis_promotions;");
+  await migrate(db);
+  assert.equal(await sql(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await sql(db, "PRAGMA foreign_key_check;"), "");
+  // The candidate gained both link tables empty; legacy rows are untouched.
+  assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('analysis_transfer_links','analysis_transfer_link_members');"), "2");
+  assert.equal(await sql(db, "SELECT count(*) FROM analysis_transfer_links; SELECT count(*) FROM analysis_transfer_link_members;"), "0\n0");
+  assert.equal(await sql(db, "SELECT count(*) FROM analysis_promotions;"), before);
+  assert.equal(await sql(db, "SELECT count(*) FROM schema_migrations WHERE name='analysis-transfer-links-v1';"), "1");
+  const hashBefore = await sha256File(db);
+  await migrate(db);
   assert.equal(await sha256File(db), hashBefore);
 });
 

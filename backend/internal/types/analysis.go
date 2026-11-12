@@ -90,3 +90,16 @@ type AnalysisFindingFilter struct {
 	Cursor         string
 	Limit          int
 }
+
+// TransferLink is one user-confirmed transfer pair: two settled bank
+// transactions the detector ranked as opposite legs of one internal money
+// movement, wired by explicit review to render count-once. LegA and LegB
+// are the two transaction IDs in lexicographic order. The link names the
+// finding that proposed the pair and the verified actor who confirmed it.
+type TransferLink struct {
+	LegA      string `json:"legA"`
+	LegB      string `json:"legB"`
+	FindingID string `json:"findingId"`
+	Actor     string `json:"actor"`
+	CreatedAt int64  `json:"createdAt"`
+}

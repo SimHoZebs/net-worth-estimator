@@ -133,7 +133,7 @@ type classifiedAttempts struct {
 	internalTransferAmount float64
 }
 
-func classifyAttempts(attempts []*types.TransactionEvent, transactionsByID map[string]*types.Transaction) classifiedAttempts {
+func classifyAttempts(attempts []*types.TransactionEvent, transactionsByID map[string]*types.Transaction, links []TransferLinkPair) classifiedAttempts {
 	result := classifiedAttempts{accountImpacts: map[string][]types.AccountDelta{}}
 	for _, attempt := range attempts {
 		transaction, ok := transactionsByID[attempt.Origin.TransactionID]
@@ -158,12 +158,72 @@ func classifyAttempts(attempts []*types.TransactionEvent, transactionsByID map[s
 			result.internalTransferAmount += attempt.RealizedAmount
 		}
 	}
+	netLinkedAttempts(&result, attempts, transactionsByID, links)
 	return result
+}
+
+// netLinkedAttempts keeps confirmed pairs count-once in row totals: linked
+// actuals that classify as an external outflow plus an external inflow with
+// equal absolute realized amounts move from inflow/outflow into transfer.
+// Per-account impacts stay untouched (they remain the balance truth); only
+// the classification totals shift. Pairs that do not both appear that date
+// as external and opposite stay split, so money is never dropped.
+func netLinkedAttempts(result *classifiedAttempts, attempts []*types.TransactionEvent, transactionsByID map[string]*types.Transaction, links []TransferLinkPair) {
+	if len(links) == 0 {
+		return
+	}
+	byID := map[string][]*types.TransactionEvent{}
+	for _, attempt := range attempts {
+		id := attempt.Origin.TransactionID
+		byID[id] = append(byID[id], attempt)
+	}
+	netted := map[string]bool{}
+	for _, link := range links {
+		if netted[link.A] || netted[link.B] {
+			continue
+		}
+		first, ok := transactionsByID[link.A]
+		if !ok {
+			continue
+		}
+		second, ok := transactionsByID[link.B]
+		if !ok {
+			continue
+		}
+		outID, inID := link.A, link.B
+		if IsExternalInflow(first) && IsExternalOutflow(second) {
+			outID, inID = link.B, link.A
+		} else if !IsExternalOutflow(first) || !IsExternalInflow(second) {
+			continue
+		}
+		var outSum, inSum float64
+		for _, attempt := range byID[outID] {
+			outSum += attempt.RealizedAmount
+		}
+		for _, attempt := range byID[inID] {
+			inSum += attempt.RealizedAmount
+		}
+		outX, inX := roundCurrency(outSum), roundCurrency(inSum)
+		if outX <= 0 || outX != inX {
+			continue
+		}
+		result.externalOutflowAmount -= outX
+		result.externalInflowAmount -= inX
+		result.internalTransferAmount += outX
+		netted[link.A], netted[link.B] = true, true
+	}
 }
 
 // BuildProjectionPath adapts a run into the evaluator-facing path.
 func BuildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun) *types.ProjectionPath {
-	return buildProjectionPath(prepared, run, true)
+	return buildProjectionPath(prepared, run, true, nil)
+}
+
+// BuildProjectionPathWithLinks adapts a run like BuildProjectionPath and
+// additionally nets confirmed transfer pairs into transfer row totals, so
+// the timeline classifies linked actuals the same way flows renders them.
+func BuildProjectionPathWithLinks(prepared *types.PreparedProjection, run *types.SimulationRun, links []TransferLinkPair) *types.ProjectionPath {
+	return buildProjectionPath(prepared, run, true, links)
 }
 
 // BuildStochasticSamplePath adapts one Monte Carlo sample run. Sample
@@ -173,10 +233,10 @@ func BuildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 // cashflow totals — so impact classification is skipped. Every retained
 // field is bit-identical to BuildProjectionPath.
 func BuildStochasticSamplePath(prepared *types.PreparedProjection, run *types.SimulationRun) *types.ProjectionPath {
-	return buildProjectionPath(prepared, run, false)
+	return buildProjectionPath(prepared, run, false, nil)
 }
 
-func buildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun, detailed bool) *types.ProjectionPath {
+func buildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun, detailed bool, links []TransferLinkPair) *types.ProjectionPath {
 	effectiveModel := prepared.EffectiveModel
 	var transactionsByID map[string]*types.Transaction
 	var attemptsByDate map[string][]*types.TransactionEvent
@@ -205,7 +265,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	for _, snapshot := range run.Snapshots {
 		classified := classifiedAttempts{}
 		if detailed {
-			classified = classifyAttempts(attemptsByDate[snapshot.Date], transactionsByID)
+			classified = classifyAttempts(attemptsByDate[snapshot.Date], transactionsByID, links)
 		}
 		projectedRows = append(projectedRows, createRow(
 			snapshot.Date, false, snapshot.Balances, effectiveModel.Accounts,
@@ -232,7 +292,13 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 
 // AdaptSimulationRun produces RawProjectionOutput (path + public result).
 func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.SimulationRun) (*types.ProjectionPath, *types.ProjectionResult) {
-	path := BuildProjectionPath(prepared, run)
+	return AdaptSimulationRunWithLinks(prepared, run, nil)
+}
+
+// AdaptSimulationRunWithLinks adapts a run like AdaptSimulationRun and nets
+// confirmed transfer pairs into transfer row totals.
+func AdaptSimulationRunWithLinks(prepared *types.PreparedProjection, run *types.SimulationRun, links []TransferLinkPair) (*types.ProjectionPath, *types.ProjectionResult) {
+	path := BuildProjectionPathWithLinks(prepared, run, links)
 	events := publicTransactionEvents(path)
 	result := RenderProjectionResult(path.Rows, events, path.EffectiveModel, run.InitialState.Balances, run.Request.StartDate)
 	return path, result
@@ -240,6 +306,13 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 
 // ProjectRawFinancialModel prepares and simulates without evaluations.
 func ProjectRawFinancialModel(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionPath, *types.ProjectionResult, error) {
+	return ProjectRawFinancialModelWithLinks(model, settings, overrides, monteCarloSample, nil)
+}
+
+// ProjectRawFinancialModelWithLinks prepares and simulates like
+// ProjectRawFinancialModel and nets confirmed transfer pairs into
+// transfer row totals.
+func ProjectRawFinancialModelWithLinks(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample, links []TransferLinkPair) (*types.ProjectionPath, *types.ProjectionResult, error) {
 	prepared, err := orchestratedPrepare(model, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, nil, err
@@ -248,7 +321,7 @@ func ProjectRawFinancialModel(model *types.FinancialModel, settings *types.Proje
 	if err != nil {
 		return nil, nil, err
 	}
-	path, result := AdaptSimulationRun(prepared, &run)
+	path, result := AdaptSimulationRunWithLinks(prepared, &run, links)
 	return path, result, nil
 }
 

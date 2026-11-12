@@ -78,7 +78,11 @@ func (s *handler) flowGraph(_ context.Context, input *struct {
 	}
 	clipped := clipProjectionRange(result, input.Body.Range)
 	start, end := flowWindow(input.Body.Range, clipped.Timeline.Rows, clipped.TransactionEvents)
-	graph, err := domain.BuildFlowGraph(&path.EffectiveModel, clipped.TransactionEvents, clipped.Timeline.Rows, start, end)
+	links, err := s.store.ListTransferLinks()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	graph, err := domain.BuildFlowGraphWithLinks(&path.EffectiveModel, clipped.TransactionEvents, clipped.Timeline.Rows, start, end, domain.TransferLinkPairs(links))
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}

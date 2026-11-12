@@ -45,12 +45,20 @@ revisions skip the user without loading prior findings. It does not require a br
   verified actor, action, original prediction, detector version, run, input revision,
   and resulting review. Referenced input snapshots survive ordinary run pruning.
   Feedback is private evidence for later evaluation, not automatic retraining.
+- `analysis_transfer_links` plus `analysis_transfer_link_members` hold one
+  user-confirmed opposite-leg pair per two rows: legs store normalized with
+  one membership row per leg, so one leg belongs to at most one link.
+  Confirming records acceptance for the reviewed finding in the same write;
+  unlinking leaves the finding in place for a later decision. Transaction or
+  finding deletion cascades the links that name them; a user clear removes
+  links with the model rows; model replacement preserves links whose legs
+  are bank rows the import contract preserves.
 
 All records belong to the existing verified user scope. Transaction deletion
-removes its dependent facts, findings, and feedback. A user clear also removes runs while
+removes its dependent facts, findings, feedback, and transfer links. A user clear also removes runs while
 retaining the monotonic input revision. Model replacement preserves evidence for
 bank rows that the import contract preserves. Other users remain untouched.
-Private refreshes copy evidence. Financial-only sample publication excludes it.
+Private refreshes copy evidence including transfer links. Financial-only sample publication excludes it.
 Database backups contain sensitive descriptions and analysis input snapshots.
 Historical run snapshots can retain deleted transaction evidence until run
 retention or user clearing removes them. Feedback for other transactions can keep
@@ -305,6 +313,30 @@ match that lists all candidates ranked best-first for review.
 - Each leg carries its own finding, so transfer evidence coexists with BNPL
   and other independent claims on one transaction. Dismissal survives
   detector reruns; repeated imports refresh the same findings.
+- A ranked candidate becomes one movement through explicit review:
+  `POST /v1/analysis-findings/{id}/transfer-pair` with `{peerTransactionId}`
+  wires the finding's leg to a detector-ranked peer from its
+  `Evidence[0].TransactionIDs`. The pair must be opposite settled legs on
+  different accounts: exact absolute cents, USD, timestamps within 7 days,
+  and single-sided bank routes. Same-sign pairs are out of scope and rejected
+  with a reason naming that limitation. Confirming records acceptance for
+  the finding in the same database write; confirming the same pair again
+  returns the same link. A second link touching either leg replaces the
+  first, and `DELETE /v1/transfer-links/by-leg/{transactionId}` unlinks.
+  `GET /v1/transfer-links` lists the private confirmed pairs. Writes need
+  permission and a writable server; cross-user IDs return 404.
+- Confirmed pairs render count-once in flows: an in-window external outflow
+  plus an external inflow with equal absolute realized amounts collapses
+  into one transfer edge from the outflow account to the inflow account,
+  carrying both dated source records, and the class totals move with it
+  (transfer up, inflow and outflow down) so reconciliation still agrees.
+  Pairs that do not classify as external and opposite stay on their own
+  edges; unlinking restores the two legs. The projection timeline applies
+  the same netting to same-date linked actuals so its transfer, inflow, and
+  outflow totals agree with flows. The flow graph nets over its whole
+  window, so a cross-day pair still collapses there; the timeline classifies
+  each date separately, so cross-day legs keep their own date rows and only
+  same-date legs net — the window sums still agree.
 - Open: whether review stays a ranked candidate list in the findings or
   becomes a dedicated pair-picker.
 
@@ -347,7 +379,8 @@ existing exclusions. Browser refreshes read results only; they never run analysi
 
 Back up the application database. Stop the API. Run the existing explicit
 `setupdb` command before starting the new server. Setup installs
-`transaction-analysis-v1` and `analysis-feedback-v1`; runtime rejects an incomplete schema. Restore a
+`transaction-analysis-v1`, `analysis-feedback-v1`, and
+`analysis-transfer-links-v1`; runtime rejects an incomplete schema. Restore a
 compatible backup for schema rollback.
 
 Container releases run that setup through the shared `deploy/migrate.sh` hook.

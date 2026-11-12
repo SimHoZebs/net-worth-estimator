@@ -28,7 +28,7 @@
 #
 # Supported sources are the full `shared-accounts-v1` base with either
 # checkpoint shape (deployed date-only, or final observation instants) and
-# with zero or all six Analysis tables. Partial Analysis schemas, unknown
+# with zero, six, or all eight Analysis tables. Partial Analysis schemas, unknown
 # checkpoint shapes (including a date+observed_at mix, which was never
 # deployed), pre-user-scope tables, malformed or NULL or normalized-invalid
 # dates, and missing or non-integer or non-positive posted instants all fail
@@ -134,8 +134,17 @@ check_promotions() {
     SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions LIMIT 0;' || return 1
 }
 
+# Transfer links wire one user-confirmed opposite-leg pair as a single
+# movement. Sources that predate the link tables carry the other six
+# Analysis tables; the candidate provisions these two for them below.
+check_transfer_links() {
+  sqlite3 -readonly "$1" '
+    SELECT user_id, leg_a, leg_b, finding_id, actor, created_at FROM analysis_transfer_links LIMIT 0;
+    SELECT user_id, transaction_id, leg_a, leg_b FROM analysis_transfer_link_members LIMIT 0;' || return 1
+}
+
 analysis_count() {
-  sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions');"
+  sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','analysis_transfer_links','analysis_transfer_link_members');"
 }
 
 # Sharing tracks provision-if-missing like friendships: absent is expected
@@ -370,18 +379,21 @@ esac
 
 analysis=$(analysis_count "$db") || fail "Cannot inspect Analysis schema; refusing to guess."
 case "$analysis" in
-  0|5|6) ;;
+  0|5|6|8) ;;
   *) fail "Partial Analysis schema. Refusing automatic repair." ;;
 esac
 friendships=$(friendships_state "$db") || fail "Cannot inspect friendships schema; refusing to guess."
 displays=$(account_displays_state "$db") || fail "Cannot inspect account displays schema; refusing to guess."
 suppressed=$(suppressed_state "$db") || fail "Cannot inspect suppression-key schema; refusing to guess."
 available=$(available_state "$db") || fail "Cannot inspect available-balance schema; refusing to guess."
-if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
+if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
 fi
-if [ "$analysis" = 6 ]; then
+if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
   check_promotions "$db" || fail "Incomplete promotion schema. Refusing automatic repair."
+fi
+if [ "$analysis" = 8 ]; then
+  check_transfer_links "$db" || fail "Incomplete transfer-link schema. Refusing automatic repair."
 fi
 sharing=$(sharing_count "$db") || fail "Cannot inspect sharing schema; refusing to guess."
 case "$sharing" in
@@ -439,7 +451,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
   exit 0
 fi
 
@@ -532,7 +544,9 @@ fi
 # Frozen upgrade SQL stays outside application setup. A complete Analysis
 # schema stays untouched; partial schemas already failed the source preflight.
 # A source that predates promotion links keeps its five tables verified
-# above and gains only the empty link table here.
+# above and gains only the empty promotions table here. A source that
+# predates transfer links keeps its six tables and gains only the two empty
+# link tables below.
 if [ "$analysis" = 0 ]; then
   if ! sqlite3 "$candidate" < "$script_dir/analysis-schema.sql" > "$backup/analysis.log" 2>&1; then
     fail "Candidate Analysis upgrade failed. Original unchanged; backup retained at $backup."
@@ -545,6 +559,32 @@ if [ "$analysis" = 5 ]; then
     PRIMARY KEY(user_id, pattern_key)
   );" > "$backup/analysis.log" 2>&1; then
     fail "Candidate promotion upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
+  if ! sqlite3 "$candidate" "CREATE TABLE analysis_transfer_links (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    leg_a TEXT NOT NULL,
+    leg_b TEXT NOT NULL CHECK(leg_a < leg_b),
+    finding_id TEXT NOT NULL,
+    actor TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY(user_id, leg_a, leg_b),
+    FOREIGN KEY(user_id, finding_id) REFERENCES analysis_findings(user_id, id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id, leg_a) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id, leg_b) REFERENCES transactions(user_id, id) ON DELETE CASCADE
+  );
+  CREATE TABLE analysis_transfer_link_members (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    transaction_id TEXT NOT NULL,
+    leg_a TEXT NOT NULL,
+    leg_b TEXT NOT NULL,
+    PRIMARY KEY(user_id, transaction_id),
+    FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id, leg_a, leg_b) REFERENCES analysis_transfer_links(user_id, leg_a, leg_b) ON DELETE CASCADE
+  );
+  INSERT INTO schema_migrations(name) VALUES ('analysis-transfer-links-v1');" > "$backup/analysis-transfers.log" 2>&1; then
+    fail "Candidate transfer-link upgrade failed. Original unchanged; backup retained at $backup."
   fi
 fi
 
@@ -852,6 +892,7 @@ fi
 # differ; Analysis rows for preexisting Analysis must be byte-identical.
 check_target "$candidate" || fail "Candidate Analysis verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_promotions "$candidate" || fail "Candidate promotion verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+check_transfer_links "$candidate" || fail "Candidate transfer-link verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_sharing "$candidate" || fail "Candidate sharing verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_integrity "$candidate" || fail "Candidate integrity check failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 candidate_cols=$(cp_cols "$candidate")
@@ -951,12 +992,17 @@ else
   verify_same checkpoints || fail "Candidate changed final checkpoints. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 
-if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
+if [ "$analysis" = 5 ] || [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
   for table in transaction_source_facts analysis_inputs analysis_runs analysis_findings analysis_feedback; do
     verify_same "$table" || fail "Candidate changed preexisting Analysis table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
   done
-  if [ "$analysis" = 6 ]; then
+  if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
     verify_same analysis_promotions || fail "Candidate changed preexisting Analysis table analysis_promotions. Original unchanged; backup retained at $backup. Keep the API stopped."
+  fi
+  if [ "$analysis" = 8 ]; then
+    for table in analysis_transfer_links analysis_transfer_link_members; do
+      verify_same "$table" || fail "Candidate changed preexisting Analysis table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
+    done
   fi
   triggers_same=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
     SELECT EXISTS (SELECT sql FROM main.sqlite_master WHERE type = 'trigger' AND name NOT IN ('analysis_transaction_sim_lifecycle','analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') EXCEPT SELECT sql FROM before.sqlite_master WHERE type = 'trigger' AND name NOT IN ('analysis_transaction_sim_lifecycle','analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle'))
@@ -966,7 +1012,7 @@ if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
   test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle') AND sql LIKE '%analysis_fact_dirty%';")" = 4 \
     || fail "Candidate Analysis triggers lack dirty maintenance. Original unchanged; backup retained at $backup. Keep the API stopped."
 else
-  empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback) + (SELECT COUNT(*) FROM analysis_promotions) + (SELECT COUNT(*) FROM analysis_fact_dirty) + (SELECT COUNT(*) FROM analysis_payment_streams);") \
+  empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback) + (SELECT COUNT(*) FROM analysis_promotions) + (SELECT COUNT(*) FROM analysis_transfer_links) + (SELECT COUNT(*) FROM analysis_transfer_link_members) + (SELECT COUNT(*) FROM analysis_fact_dirty) + (SELECT COUNT(*) FROM analysis_payment_streams);") \
     || fail "Cannot verify provisioned Analysis tables; refusing to publish."
   test "$empty" = 0 || fail "Provisioned Analysis tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi

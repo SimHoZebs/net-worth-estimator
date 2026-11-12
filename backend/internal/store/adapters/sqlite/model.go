@@ -66,6 +66,12 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM analysis_promotions WHERE user_id = :user_id`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM analysis_transfer_link_members WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM analysis_transfer_links WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM safe_spending_settings WHERE user_id = :user_id`); err != nil {
 		return err
 	}

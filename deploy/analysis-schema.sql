@@ -49,6 +49,30 @@ CREATE TABLE analysis_promotions (
   pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY(user_id, pattern_key)
 );
+-- Confirmed transfer pairs link two detector-ranked opposite legs as one
+-- movement. Legs store normalized with one membership row per leg, so one
+-- leg belongs to at most one link. Cascades drop links with the rows they name.
+CREATE TABLE analysis_transfer_links (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  leg_a TEXT NOT NULL,
+  leg_b TEXT NOT NULL CHECK(leg_a < leg_b),
+  finding_id TEXT NOT NULL,
+  actor TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id, leg_a, leg_b),
+  FOREIGN KEY(user_id, finding_id) REFERENCES analysis_findings(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id, leg_a) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id, leg_b) REFERENCES transactions(user_id, id) ON DELETE CASCADE
+);
+CREATE TABLE analysis_transfer_link_members (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  transaction_id TEXT NOT NULL,
+  leg_a TEXT NOT NULL,
+  leg_b TEXT NOT NULL,
+  PRIMARY KEY(user_id, transaction_id),
+  FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id, leg_a, leg_b) REFERENCES analysis_transfer_links(user_id, leg_a, leg_b) ON DELETE CASCADE
+);
 -- The incremental dirty set and stream cache below mirror the application
 -- schema exactly (dirty bodies must contain the analysis_fact_dirty write,
 -- matching incrementalTriggerDDLs in
@@ -105,5 +129,5 @@ CREATE TRIGGER IF NOT EXISTS analysis_transaction_sim_lifecycle AFTER UPDATE OF 
   AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)
   BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
   ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END;
-INSERT INTO schema_migrations(name) VALUES ('transaction-analysis-v1'), ('analysis-feedback-v1');
+INSERT INTO schema_migrations(name) VALUES ('transaction-analysis-v1'), ('analysis-feedback-v1'), ('analysis-transfer-links-v1');
 COMMIT;

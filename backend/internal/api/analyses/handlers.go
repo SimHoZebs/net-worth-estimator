@@ -37,6 +37,9 @@ func Register(api huma.API, st store.Store, canWrite func(context.Context) bool,
 	huma.Register(api, huma.Operation{OperationID: "preview-pattern-to-existing-schedule", Method: "GET", Path: "/v1/analysis-findings/{id}/pattern-to-existing-schedule-preview", Summary: "Preview adding a confirmed pattern's payments to an existing schedule"}, s.previewPatternToExistingSchedule)
 	huma.Register(api, huma.Operation{OperationID: "add-pattern-to-existing-schedule", Method: "POST", Path: "/v1/analysis-findings/{id}/pattern-to-existing-schedule", Summary: "Add a confirmed pattern's payments to an existing schedule"}, s.addPatternToExistingSchedule)
 	huma.Register(api, huma.Operation{OperationID: "list-analysis-feedback", Method: "GET", Path: "/v1/analysis-feedback", Summary: "Read private labeled feedback with prediction provenance"}, s.listAnalysisFeedback)
+	huma.Register(api, huma.Operation{OperationID: "confirm-transfer-pair", Method: "POST", Path: "/v1/analysis-findings/{id}/transfer-pair", Summary: "Confirm a detector-ranked pair as one transfer"}, s.confirmTransferPair)
+	huma.Register(api, huma.Operation{OperationID: "remove-transfer-link", Method: "DELETE", Path: "/v1/transfer-links/by-leg/{transactionId}", Summary: "Remove the active transfer link touching one leg"}, s.removeTransferLink)
+	huma.Register(api, huma.Operation{OperationID: "list-transfer-links", Method: "GET", Path: "/v1/transfer-links", Summary: "List confirmed transfer pairs"}, s.listTransferLinks)
 }
 
 func (s *handler) listAnalyses(_ context.Context, _ *struct{}) (*struct {

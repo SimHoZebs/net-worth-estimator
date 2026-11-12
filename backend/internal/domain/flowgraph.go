@@ -88,6 +88,33 @@ func settledHistoryEvents(model *types.FinancialModel, transactions []types.Tran
 
 // BuildFlowGraph aggregates windowed events into directed edges.
 func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) (*types.FlowGraph, error) {
+	return BuildFlowGraphWithLinks(model, events, rows, startDate, endDate, nil)
+}
+
+// TransferLinkPair names two transaction IDs the user confirmed as one
+// internal movement. Netting renders a confirmed pair count-once: the two
+// single-sided legs collapse into one transfer edge.
+type TransferLinkPair struct {
+	A string
+	B string
+}
+
+// TransferLinkPairs converts stored links into netting pairs.
+func TransferLinkPairs(links []types.TransferLink) []TransferLinkPair {
+	pairs := make([]TransferLinkPair, 0, len(links))
+	for _, link := range links {
+		pairs = append(pairs, TransferLinkPair{A: link.LegA, B: link.LegB})
+	}
+	return pairs
+}
+
+// BuildFlowGraphWithLinks aggregates windowed events into directed edges,
+// collapsing confirmed transfer pairs that both classify as external and
+// opposite into single transfer edges. A nil link set renders every leg on
+// its own route. A pair nets only when both legs fall in-window as an
+// external outflow plus an external inflow with equal absolute realized
+// amounts; anything else stays on its own edges so money is never dropped.
+func BuildFlowGraphWithLinks(model *types.FinancialModel, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string, links []TransferLinkPair) (*types.FlowGraph, error) {
 	if !IsValidIsoDate(startDate) || !IsValidIsoDate(endDate) {
 		return nil, fmt.Errorf("flow window dates must be YYYY-MM-DD")
 	}
@@ -245,6 +272,8 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 		}
 	}
 
+	netConfirmedTransferPairs(transactionByID, edges, nodes, &totals, &reconciliation, links)
+
 	for _, row := range rows {
 		if CompareIsoDates(string(row.Date), startDate) < 0 || CompareIsoDates(string(row.Date), endDate) > 0 {
 			continue
@@ -350,4 +379,146 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 	graph.Reconciliation = reconciliation
 
 	return graph, nil
+}
+
+// netConfirmedTransferPairs collapses confirmed pairs that both classify as
+// external and opposite into single transfer edges. A pair nets only when
+// both legs fall in-window as an external outflow plus an external inflow
+// with equal absolute realized amounts; anything else stays on its own
+// edges so money is never dropped. Event-side and edge-side sums move
+// together, so reconciliation still agrees.
+func netConfirmedTransferPairs(transactionByID map[string]*types.Transaction, edges map[flowEdgeKey]*types.FlowEdge, nodes map[string]*types.FlowNode, totals *types.FlowTotals, reconciliation *types.FlowReconciliation, links []TransferLinkPair) {
+	for _, link := range links {
+		first, ok := transactionByID[link.A]
+		if !ok {
+			continue
+		}
+		second, ok := transactionByID[link.B]
+		if !ok {
+			continue
+		}
+		outLeg, inLeg := first, second
+		outID, inID := link.A, link.B
+		if IsExternalInflow(first) && IsExternalOutflow(second) {
+			outLeg, inLeg = second, first
+			outID, inID = link.B, link.A
+		} else if !IsExternalOutflow(first) || !IsExternalInflow(second) {
+			continue
+		}
+		source, ok := TransactionSourceAccount(outLeg)
+		if !ok || len(inLeg.Destinations) == 0 {
+			continue
+		}
+		destination := inLeg.Destinations[0]
+		for _, movement := range []string{types.FlowMovementActual, types.FlowMovementProjected} {
+			outEdge, ok := edges[flowEdgeKey{from: source, to: types.FlowNodeIDExternal, kind: types.FlowKindOutflow, movement: movement}]
+			if !ok {
+				continue
+			}
+			inEdge, ok := edges[flowEdgeKey{from: types.FlowNodeIDExternal, to: destination, kind: types.FlowKindInflow, movement: movement}]
+			if !ok {
+				continue
+			}
+			outRecords, outSum := legRecords(outEdge, outID)
+			inRecords, inSum := legRecords(inEdge, inID)
+			if len(outRecords) == 0 || len(inRecords) == 0 {
+				continue
+			}
+			if outSum <= 0 || outSum != inSum {
+				continue
+			}
+			// The legs must live only on their expected edges: a legsplit
+			// across routes stays untouched instead of partially netted.
+			contained := true
+			for key, other := range edges {
+				if key.movement != movement || other == outEdge || other == inEdge {
+					continue
+				}
+				if hasLegRecord(other, outID) || hasLegRecord(other, inID) {
+					contained = false
+					break
+				}
+			}
+			if !contained {
+				continue
+			}
+			amount := outSum
+			removeLegRecords(outEdge, outID, nodes)
+			removeLegRecords(inEdge, inID, nodes)
+			if len(outEdge.Sources) == 0 {
+				delete(edges, flowEdgeKey{from: source, to: types.FlowNodeIDExternal, kind: types.FlowKindOutflow, movement: movement})
+			}
+			if len(inEdge.Sources) == 0 {
+				delete(edges, flowEdgeKey{from: types.FlowNodeIDExternal, to: destination, kind: types.FlowKindInflow, movement: movement})
+			}
+			transfer, ok := edges[flowEdgeKey{from: source, to: destination, kind: types.FlowKindTransfer, movement: movement}]
+			if !ok {
+				transfer = &types.FlowEdge{From: source, To: destination, Kind: types.FlowKindTransfer, Movement: movement, Sources: []types.FlowSourceRecord{}}
+				edges[flowEdgeKey{from: source, to: destination, kind: types.FlowKindTransfer, movement: movement}] = transfer
+			}
+			transfer.Amount = roundCurrency(transfer.Amount + amount)
+			transfer.Sources = append(transfer.Sources, outRecords...)
+			transfer.Sources = append(transfer.Sources, inRecords...)
+			if fromNode, ok := nodes[source]; ok {
+				fromNode.Outflow = roundCurrency(fromNode.Outflow + amount)
+			}
+			if toNode, ok := nodes[destination]; ok {
+				toNode.Inflow = roundCurrency(toNode.Inflow + amount)
+			}
+			classTotals := &totals.Actual
+			if movement == types.FlowMovementProjected {
+				classTotals = &totals.Projected
+			}
+			classTotals.Outflow = roundCurrency(classTotals.Outflow - amount)
+			classTotals.Inflow = roundCurrency(classTotals.Inflow - amount)
+			classTotals.Transfer = roundCurrency(classTotals.Transfer + amount)
+			reconciliation.EventsOutflow = roundCurrency(reconciliation.EventsOutflow - amount)
+			reconciliation.EventsInflow = roundCurrency(reconciliation.EventsInflow - amount)
+			reconciliation.EventsTransfer = roundCurrency(reconciliation.EventsTransfer + amount)
+		}
+	}
+}
+
+// legRecords collects one leg's in-window records plus their realized sum.
+func legRecords(edge *types.FlowEdge, transactionID string) ([]types.FlowSourceRecord, float64) {
+	records := []types.FlowSourceRecord{}
+	sum := 0.0
+	for _, record := range edge.Sources {
+		if record.TransactionID != transactionID {
+			continue
+		}
+		records = append(records, record)
+		sum = roundCurrency(sum + record.RealizedAmount)
+	}
+	return records, sum
+}
+
+func hasLegRecord(edge *types.FlowEdge, transactionID string) bool {
+	for _, record := range edge.Sources {
+		if record.TransactionID == transactionID {
+			return true
+		}
+	}
+	return false
+}
+
+// removeLegRecords drops one leg's records from an external edge and backs
+// the realized amounts out of the edge and its nodes.
+func removeLegRecords(edge *types.FlowEdge, transactionID string, nodes map[string]*types.FlowNode) {
+	kept := edge.Sources[:0]
+	for _, record := range edge.Sources {
+		if record.TransactionID != transactionID {
+			kept = append(kept, record)
+			continue
+		}
+		amount := roundCurrency(record.RealizedAmount)
+		edge.Amount = roundCurrency(edge.Amount - amount)
+		if fromNode, ok := nodes[edge.From]; ok {
+			fromNode.Outflow = roundCurrency(fromNode.Outflow - amount)
+		}
+		if toNode, ok := nodes[edge.To]; ok {
+			toNode.Inflow = roundCurrency(toNode.Inflow - amount)
+		}
+	}
+	edge.Sources = kept
 }

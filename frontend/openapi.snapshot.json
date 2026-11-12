@@ -1497,6 +1497,53 @@
 				],
 				"type": "object"
 			},
+			"Confirm-transfer-pairRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Confirm-transfer-pairRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"peerTransactionId": {
+						"maxLength": 100,
+						"type": "string"
+					}
+				},
+				"required": [
+					"peerTransactionId"
+				],
+				"type": "object"
+			},
+			"Confirm-transfer-pairResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Confirm-transfer-pairResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"link": {
+						"$ref": "#/components/schemas/TransferLink"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"link",
+					"revision"
+				],
+				"type": "object"
+			},
 			"Create-pattern-to-new-scheduleResponse": {
 				"additionalProperties": false,
 				"properties": {
@@ -3381,6 +3428,33 @@
 				],
 				"type": "object"
 			},
+			"List-transfer-linksResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/List-transfer-linksResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"links": {
+						"items": {
+							"$ref": "#/components/schemas/TransferLink"
+						},
+						"type": [
+							"array",
+							"null"
+						]
+					}
+				},
+				"required": [
+					"links"
+				],
+				"type": "object"
+			},
 			"LoanTerms": {
 				"additionalProperties": false,
 				"properties": {
@@ -4897,6 +4971,27 @@
 					"producer",
 					"version",
 					"simulated"
+				],
+				"type": "object"
+			},
+			"Remove-transfer-linkResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Remove-transfer-linkResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"revision"
 				],
 				"type": "object"
 			},
@@ -6990,6 +7085,35 @@
 				],
 				"type": "object"
 			},
+			"TransferLink": {
+				"additionalProperties": false,
+				"properties": {
+					"actor": {
+						"type": "string"
+					},
+					"createdAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"findingId": {
+						"type": "string"
+					},
+					"legA": {
+						"type": "string"
+					},
+					"legB": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"legA",
+					"legB",
+					"findingId",
+					"actor",
+					"createdAt"
+				],
+				"type": "object"
+			},
 			"UpcomingNewScheduleOccurrence": {
 				"additionalProperties": false,
 				"properties": {
@@ -8235,6 +8359,54 @@
 					}
 				},
 				"summary": "Preview the schedule a confirmed repeating pattern would create"
+			}
+		},
+		"/v1/analysis-findings/{id}/transfer-pair": {
+			"post": {
+				"operationId": "confirm-transfer-pair",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Confirm-transfer-pairRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Confirm-transfer-pairResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Confirm a detector-ranked pair as one transfer"
 			}
 		},
 		"/v1/auth/change-password": {
@@ -11369,6 +11541,79 @@
 					}
 				},
 				"summary": "List posted charges that could settle a vanished hold"
+			}
+		},
+		"/v1/transfer-links": {
+			"get": {
+				"operationId": "list-transfer-links",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/List-transfer-linksResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List confirmed transfer pairs"
+			}
+		},
+		"/v1/transfer-links/by-leg/{transactionId}": {
+			"delete": {
+				"operationId": "remove-transfer-link",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "transactionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Remove-transfer-linkResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Remove the active transfer link touching one leg"
 			}
 		}
 	}

@@ -1,12 +1,15 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	addPatternToExistingSchedule,
+	confirmTransferPair,
 	createPatternToNewSchedule,
 	dismissAnalysisFinding,
 	listAnalyses,
 	listAnalysisFindings,
+	listTransferLinks,
 	previewPatternToExistingSchedule,
 	previewPatternToNewSchedule,
+	removeTransferLink,
 	reviewAnalysisFinding,
 } from "@/api/generated/endpoints.ts";
 import type { AnalysisFeedbackInput } from "@/api/generated/model/analysisFeedbackInput.ts";
@@ -14,7 +17,7 @@ import { ApiNetworkError } from "@/api/http.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { reloadWorkspace } from "./workspaceResources.ts";
-import { serverQueryClient } from "./serverQuery.ts";
+import { financialQueryFilter, serverQueryClient } from "./serverQuery.ts";
 import { useUserScope } from "./useUserScope.ts";
 
 export const analysisFindingsKey = (scope = getUserScope()) =>
@@ -202,6 +205,99 @@ export function useAddPatternToExistingSchedule() {
 					queryKey: analysisFindingsKey(scope),
 				});
 				await reloadWorkspace();
+			},
+		},
+		cache,
+	);
+}
+
+export const transferLinksKey = (scope = getUserScope()) =>
+	["user-resources", scope.key, "transfer-links"] as const;
+
+export function useTransferLinks() {
+	const scope = useUserScope();
+	return useQuery(
+		{
+			queryKey: transferLinksKey(scope),
+			enabled: scope.status === "ready",
+			queryFn: async ({ signal }) => {
+				const result = (await listTransferLinks({ signal })).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result;
+			},
+			staleTime: 5_000,
+			refetchInterval: 15_000,
+		},
+		serverQueryClient(),
+	);
+}
+
+export function useConfirmTransferPair() {
+	const scope = useUserScope();
+	const cache = serverQueryClient();
+	return useMutation(
+		{
+			mutationKey: ["transfer-pair", scope.key],
+			retry: false,
+			mutationFn: async ({
+				id,
+				peerTransactionId,
+			}: {
+				id: string;
+				peerTransactionId: string;
+			}) => {
+				if (scope !== getUserScope() || scope.status !== "ready")
+					throw new UserScopeError();
+				const result = (
+					await confirmTransferPair(id, { peerTransactionId })
+				).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result;
+			},
+			onSuccess: async () => {
+				if (scope !== getUserScope()) return;
+				await cache.invalidateQueries({
+					queryKey: analysisFindingsKey(scope),
+				});
+				await cache.invalidateQueries({
+					queryKey: transferLinksKey(scope),
+				});
+				await cache.invalidateQueries({
+					queryKey: ["flow-graph", scope.key],
+				});
+				await cache.invalidateQueries(financialQueryFilter(scope.key));
+			},
+		},
+		cache,
+	);
+}
+
+export function useRemoveTransferLinkByLeg() {
+	const scope = useUserScope();
+	const cache = serverQueryClient();
+	return useMutation(
+		{
+			mutationKey: ["transfer-link", scope.key],
+			retry: false,
+			mutationFn: async ({ transactionId }: { transactionId: string }) => {
+				if (scope !== getUserScope() || scope.status !== "ready")
+					throw new UserScopeError();
+				const result = (await removeTransferLink(transactionId)).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result;
+			},
+			onSuccess: async () => {
+				if (scope !== getUserScope()) return;
+				await cache.invalidateQueries({
+					queryKey: analysisFindingsKey(scope),
+				});
+				await cache.invalidateQueries({
+					queryKey: transferLinksKey(scope),
+				});
+				await cache.invalidateQueries({
+					queryKey: ["flow-graph", scope.key],
+				});
+				await cache.invalidateQueries(financialQueryFilter(scope.key));
 			},
 		},
 		cache,

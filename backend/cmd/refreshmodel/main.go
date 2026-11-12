@@ -29,6 +29,7 @@ var financialTables = []string{
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "gmail_credentials", "amount_presets", "safe_spending_settings",
 	"receipts", "email_receipts",
 	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
+	"analysis_transfer_links", "analysis_transfer_link_members",
 	"analysis_fact_dirty", "analysis_payment_streams",
 	"provider_connections", "projection_states", "projection_slices", "monte_carlo_statistics",
 	"projection_rows",

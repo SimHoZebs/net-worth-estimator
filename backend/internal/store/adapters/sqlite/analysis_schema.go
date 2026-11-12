@@ -41,6 +41,8 @@ var analysisSchema = []string{
 		pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
 		PRIMARY KEY(user_id, pattern_key)
 	)`,
+	analysisTransferLinksDDL,
+	analysisTransferLinkMembersDDL,
 	analysisFactDirtyDDL,
 	analysisPaymentStreamsDDL,
 }
@@ -84,5 +86,6 @@ func analysisSchemaStatements() []string {
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`,
-		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('transaction-analysis-v1')`)
+		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('transaction-analysis-v1')`,
+		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('analysis-transfer-links-v1')`)
 }

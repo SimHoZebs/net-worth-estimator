@@ -114,10 +114,11 @@ async function toLegacyCheckpoints(db, stripAnalysis = true) {
     DROP TRIGGER IF EXISTS analysis_facts_insert;
     DROP TRIGGER IF EXISTS analysis_facts_update;
     DROP TRIGGER IF EXISTS analysis_facts_delete;
+    DROP TABLE IF EXISTS analysis_transfer_link_members; DROP TABLE IF EXISTS analysis_transfer_links;
     DROP TABLE IF EXISTS analysis_feedback; DROP TABLE IF EXISTS analysis_findings;
     DROP TABLE IF EXISTS analysis_runs; DROP TABLE IF EXISTS transaction_source_facts;
     DROP TABLE IF EXISTS analysis_inputs; DROP TABLE IF EXISTS analysis_promotions;
-    DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');` : "";
+    DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1','analysis-transfer-links-v1');` : "";
   await sqlite(db, `${analysis}
     DROP TABLE checkpoints;
     CREATE TABLE checkpoints(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id INTEGER NOT NULL, position INTEGER NOT NULL, date TEXT NOT NULL, model_account_id TEXT NOT NULL, balance REAL NOT NULL, source TEXT NOT NULL DEFAULT 'user', PRIMARY KEY(user_id, id), UNIQUE(user_id, model_account_id, date));`);
@@ -241,7 +242,7 @@ test("legacy date checkpoints convert and Analysis provisions on a full base", a
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM analysis_feedback;"), "0");
-  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');"), "2");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1','analysis-transfer-links-v1');"), "3");
 
   const names = await backups(directory);
   assert.equal(names.length, 1);
@@ -269,11 +270,12 @@ test("already-Analysis date source converts with byte-identical Analysis rows", 
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
 });
 
-test("pre-promotion Analysis source gains only the empty promotion link table", async (t) => {
+test("pre-promotion Analysis source gains only the empty promotion and transfer link tables", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-promotions-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
-  await sqlite(db, `DROP TABLE analysis_promotions;`);
+  await sqlite(db, `DROP TABLE analysis_transfer_link_members; DROP TABLE analysis_transfer_links; DROP TABLE analysis_promotions;
+    DELETE FROM schema_migrations WHERE name = 'analysis-transfer-links-v1';`);
   await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
   await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('${owner}',1,0,'checking',100,'user',${DAY_CLOSE_0310});`);
   await sqlite(db, `INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('${owner}','settled-a','Grocer','checking','null','{}',1773140400,1773129600,'simplefin',0,0);`);
@@ -291,6 +293,7 @@ test("pre-promotion Analysis source gains only the empty promotion link table", 
 
   assert.equal(await rows(db, fiveTableSnapshot), analysisBefore);
   assert.equal(await rows(db, "SELECT COUNT(*) FROM analysis_promotions;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM analysis_transfer_links; SELECT COUNT(*) FROM analysis_transfer_link_members;"), "0\n0");
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
 
@@ -1119,6 +1122,7 @@ sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_transaction_lifecycle;
   DROP TRIGGER IF EXISTS analysis_facts_insert;
   DROP TRIGGER IF EXISTS analysis_facts_update;
   DROP TRIGGER IF EXISTS analysis_facts_delete;
+  DROP TABLE analysis_transfer_link_members; DROP TABLE analysis_transfer_links;
   DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
   DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
   DROP INDEX IF EXISTS transactions_projection_slice;
@@ -1140,7 +1144,7 @@ sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_transaction_lifecycle;
   ALTER TABLE transactions DROP COLUMN event_json;
   ALTER TABLE transactions DROP COLUMN applied_amount;
   ALTER TABLE transactions DROP COLUMN outcome;
-  DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');
+  DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1','analysis-transfer-links-v1');
   DROP TABLE checkpoints;
   CREATE TABLE checkpoints(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id INTEGER NOT NULL, position INTEGER NOT NULL, date TEXT NOT NULL, model_account_id TEXT NOT NULL, balance REAL NOT NULL, source TEXT NOT NULL DEFAULT 'user', PRIMARY KEY(user_id, id), UNIQUE(user_id, model_account_id, date));
   INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance, source) VALUES ('$owner', 1, 0, '2026-03-10', 'checking', 100, 'user');

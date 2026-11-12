@@ -47,6 +47,12 @@ var ErrPatternToExistingScheduleInvalid = errors.New("recurring pattern cannot c
 // Handlers map it to 409 and may show its message.
 var ErrPatternToExistingScheduleConflict = errors.New("recurring pattern changed or already claimed")
 
+// ErrTransferLinkInvalid reports a transfer pair that cannot be confirmed:
+// a missing or ineligible finding, an unranked peer, or legs that fail the
+// settled single-sided opposite-leg rule. Handlers map it to 422 and may
+// show its message.
+var ErrTransferLinkInvalid = errors.New("transfer pair cannot be confirmed")
+
 // ErrGroupForbidden reports a group action the caller's role may not perform.
 // It distinguishes denial (403) from unknown groups or members (404,
 // ErrNotFound).

@@ -173,7 +173,11 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 		}
 		return s.persistEvaluationFingerprint(state, evalJSON)
 	}
-	path, base, err := domain.ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
+	storedLinks, err := s.store.ListTransferLinks()
+	if err != nil {
+		return err
+	}
+	path, base, err := domain.ProjectRawFinancialModelWithLinks(model, settings, types.ModelOverrides{}, nil, domain.TransferLinkPairs(storedLinks))
 	if err != nil {
 		return err
 	}
