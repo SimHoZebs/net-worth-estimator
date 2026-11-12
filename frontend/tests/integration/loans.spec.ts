@@ -11,18 +11,18 @@ test("account type changes fields inline and keeps shared identity controls", as
 	const type = dialog.getByLabel("Account type");
 	const name = dialog.getByLabel("Account name");
 	const included = dialog.getByLabel("Include in net worth and projections");
-	await name.fill("Education loan");
+	await name.fill("Education debt");
 	await included.uncheck();
 	await type.click();
 	await expect(
-		dialog.getByRole("option", { name: "Loan", exact: true }).locator("svg"),
+		dialog.getByRole("option", { name: "Debt", exact: true }).locator("svg"),
 	).toBeVisible();
 	await expect(
 		dialog.getByRole("option", { name: "Debt", exact: true }),
-	).toHaveCount(0);
+	).toHaveCount(1);
 	await expect(dialog.getByRole("option")).toHaveCount(4);
-	await dialog.getByRole("option", { name: "Loan", exact: true }).click();
-	await expect(type).toContainText("Loan");
+	await dialog.getByRole("option", { name: "Debt", exact: true }).click();
+	await expect(type).toContainText("Debt");
 	await expect(type.locator("svg").first()).toBeVisible();
 	await expect(
 		dialog.getByLabel("Principal (USD)", { exact: true }),
@@ -38,9 +38,9 @@ test("account type changes fields inline and keeps shared identity controls", as
 	await expect(
 		dialog.getByLabel("Balance (USD)", { exact: true }),
 	).toBeVisible();
-	await expect(name).toHaveValue("Education loan");
+	await expect(name).toHaveValue("Education debt");
 	await type.click();
-	await dialog.getByRole("option", { name: "Loan", exact: true }).click();
+	await dialog.getByRole("option", { name: "Debt", exact: true }).click();
 	await name.fill("");
 	await dialog
 		.getByRole("button", { name: "Add account", exact: true })
@@ -54,20 +54,20 @@ test("account type changes fields inline and keeps shared identity controls", as
 	await expect(dialog).toBeVisible();
 });
 
-test("one loan form creates one visible account and preserves terms on edit", async ({
+test("one debt form creates one visible account and preserves terms on edit", async ({
 	page,
 	request,
 }) => {
 	await page.goto("/accounts");
 	await page.getByRole("button", { name: "Add account", exact: true }).click();
 	const form = page.getByRole("dialog", { name: "Add account", exact: true });
-	await form.getByLabel("Account name").fill("Education loan");
+	await form.getByLabel("Account name").fill("Education debt");
 	const type = form.getByLabel("Account type");
 	await type.click();
-	await form.getByRole("option", { name: "Loan", exact: true }).click();
+	await form.getByRole("option", { name: "Debt", exact: true }).click();
 	await expect(type).toBeFocused();
 	await expect(page.getByRole("dialog")).toHaveCount(1);
-	await expect(form.getByLabel("Account name")).toHaveValue("Education loan");
+	await expect(form.getByLabel("Account name")).toHaveValue("Education debt");
 	await expect(
 		form.getByRole("button", { name: "add a loan", exact: true }),
 	).toHaveCount(0);
@@ -99,12 +99,12 @@ test("one loan form creates one visible account and preserves terms on edit", as
 	await expect(form).toBeHidden();
 	await expect(
 		page.getByRole("button", {
-			name: "Open Education loan transactions",
+			name: "Open Education debt transactions",
 			exact: true,
 		}),
 	).toHaveCount(1);
 	await expect(
-		page.getByText("Education loan (Interest)", { exact: true }),
+		page.getByText("Education debt (Interest)", { exact: true }),
 	).toHaveCount(0);
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	const saved = (await response.json()).model;
@@ -122,7 +122,7 @@ test("one loan form creates one visible account and preserves terms on edit", as
 	});
 	await page
 		.getByRole("button", {
-			name: "Open Education loan transactions",
+			name: "Open Education debt transactions",
 			exact: true,
 		})
 		.click();
@@ -140,14 +140,14 @@ test("one loan form creates one visible account and preserves terms on edit", as
 	);
 	await details.getByRole("tab", { name: "Account details" }).click();
 	await expect(
-		details.getByRole("button", { name: "Edit loan and payment terms" }),
+		details.getByRole("button", { name: "Edit debt and payment terms" }),
 	).toBeEnabled();
 	expect(adjustmentRequests).toEqual([]);
 	await details
-		.getByRole("button", { name: "Edit loan and payment terms" })
+		.getByRole("button", { name: "Edit debt and payment terms" })
 		.click();
 	const edit = page.getByRole("dialog", {
-		name: "Edit Education loan",
+		name: "Edit Education debt",
 		exact: true,
 	});
 	await expect(edit.getByLabel("Annual interest rate (%)")).toHaveValue("3.99");
@@ -170,14 +170,14 @@ test("one loan form creates one visible account and preserves terms on edit", as
 		.getByRole("button", { name: "Accounts" })
 		.click();
 	await page
-		.getByRole("button", { name: "Remove Education loan", exact: true })
+		.getByRole("button", { name: "Remove Education debt", exact: true })
 		.click();
 	await page
 		.getByRole("button", { name: "Remove account", exact: true })
 		.click();
 	await expect(
 		page.getByRole("button", {
-			name: "Open Education loan transactions",
+			name: "Open Education debt transactions",
 			exact: true,
 		}),
 	).toHaveCount(0);

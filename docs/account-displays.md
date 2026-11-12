@@ -12,7 +12,7 @@ interest charge frequency through the existing occurrence-rate provider.
 This is periodic simple interest, not lender-specific daily accrual or
 capitalization. The form states the charge frequency explicitly.
 
-Create a loan through **Add account → Account type → Loan**.
+Create a debt through **Add account → Account type → Debt**.
 The principal, interest, and payment fields appear in that same account dialog.
 
 Loan edits preserve account and schedule IDs and existing observations.

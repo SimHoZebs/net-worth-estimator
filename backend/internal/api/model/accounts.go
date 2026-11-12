@@ -68,6 +68,9 @@ func accountObservation(body accountBody) (*float64, int64, error) {
 }
 
 func (s *handler) createAccount(_ context.Context, input *accountInput) (*accountOutput, error) {
+	if input.Body.Kind == types.AccountKindDebt {
+		return nil, huma.Error422UnprocessableEntity("Create debt through the debt form backed by POST /v1/loans so principal, interest, and rules stay consistent.")
+	}
 	account := input.Body.toAccount("")
 	if account.ID == "" {
 		id, err := uuid.NewV7()
@@ -104,7 +107,25 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	row, issues, saved, revision, err := runFinanceRowWriteGuarded(s, func(model *types.FinancialModel) error { return requireOrdinaryAccount(model, input.ID) }, func(model *types.FinancialModel) {
+	guard := func(model *types.FinancialModel) error {
+		if err := requireOrdinaryAccount(model, input.ID); err != nil {
+			return err
+		}
+		if account.Kind != types.AccountKindDebt {
+			return nil
+		}
+		for _, existing := range model.Accounts {
+			if existing.ID != input.ID {
+				continue
+			}
+			if existing.Kind == types.AccountKindDebt {
+				return nil
+			}
+			return huma.Error422UnprocessableEntity("Convert to debt through the debt form backed by POST /v1/loans so principal, interest, and rules stay consistent.")
+		}
+		return nil
+	}
+	row, issues, saved, revision, err := runFinanceRowWriteGuarded(s, guard, func(model *types.FinancialModel) {
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}

@@ -92,7 +92,7 @@ export function AccountEditor(props: {
 			icon: accountKindIcons[kind],
 		})),
 		...(!item || item?.display
-			? [{ value: "loan", label: "Loan", icon: accountKindIcons.debt }]
+			? [{ value: "loan", label: "Debt", icon: accountKindIcons.debt }]
 			: []),
 	];
 
@@ -107,7 +107,7 @@ export function AccountEditor(props: {
 				label="Account type"
 				labelClassName="w-36 flex-none text-sm font-semibold text-muted"
 				value={type}
-				valueLabel={type === "loan" ? "Loan" : ACCOUNT_TYPE_LABELS[type]}
+				valueLabel={type === "loan" ? "Debt" : ACCOUNT_TYPE_LABELS[type]}
 				ValueIcon={
 					type === "loan" ? accountKindIcons.debt : accountKindIcons[type]
 				}

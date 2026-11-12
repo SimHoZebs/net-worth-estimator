@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -151,5 +152,50 @@ func TestLinkedLoanNameEditPreservesExactRuleAmounts(t *testing.T) {
 		if !reflect.DeepEqual(before.Schedules[i].Amount, after.Schedules[i].Amount) {
 			t.Fatal("name edit changed a linked rule amount")
 		}
+	}
+}
+
+func TestSingleDebtViaAccountsIsRejected(t *testing.T) {
+	st := openAPIStore(t)
+	h := New(st, Config{})
+
+	created := doRowRequest(t, h, http.MethodPost, "/v1/accounts", `{"name":"Card","kind":"debt","enabled":true}`)
+	if created.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("create debt status = %d, want 422: %s", created.Code, created.Body.String())
+	}
+	if !strings.Contains(created.Body.String(), "POST /v1/loans") {
+		t.Fatalf("create debt must direct to POST /v1/loans: %s", created.Body.String())
+	}
+	if model, _ := st.LoadModel(); model != nil && len(model.Accounts) != 0 {
+		t.Fatalf("rejected debt creation persisted: %+v", model.Accounts)
+	}
+
+	ordinary := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPost, "/v1/accounts", `{"name":"Checking","kind":"cash","enabled":true}`))
+	converted := doRowRequest(t, h, http.MethodPatch, "/v1/accounts/"+ordinary.Result.ID, `{"name":"Checking","kind":"debt","enabled":true}`)
+	if converted.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("convert status = %d, want 422: %s", converted.Code, converted.Body.String())
+	}
+	if !strings.Contains(converted.Body.String(), "POST /v1/loans") {
+		t.Fatalf("convert must direct to POST /v1/loans: %s", converted.Body.String())
+	}
+
+	// Legacy single-row debts stay editable when they keep kind=debt and
+	// may leave kind=debt for another kind.
+	legacy, err := st.CreateAccount(types.Account{Name: "Legacy", Kind: types.AccountKindDebt, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPatch, "/v1/accounts/"+legacy.ID, `{"name":"Renamed","kind":"debt","enabled":true}`))
+	if !kept.Saved || kept.Result.Name != "Renamed" {
+		t.Fatalf("legacy debt edit = %+v", kept)
+	}
+	undone := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPatch, "/v1/accounts/"+legacy.ID, `{"name":"Renamed","kind":"cash","enabled":true}`))
+	if !undone.Saved || undone.Result.Kind != types.AccountKindCash {
+		t.Fatalf("debt to cash = %+v", undone)
+	}
+
+	missing := doRowRequest(t, h, http.MethodPatch, "/v1/accounts/missing-debt-id", `{"name":"Ghost","kind":"debt","enabled":true}`)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing debt update status = %d, want 404: %s", missing.Code, missing.Body.String())
 	}
 }

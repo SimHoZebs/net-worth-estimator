@@ -642,9 +642,20 @@ func TestAccountBalancesRejectsPreparationIssuesAsClientInput(t *testing.T) {
 func TestAccountListArchivedDebtUsesExactObservation(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
+	// Single-row debts are legacy fixtures: the debt row is seeded through
+	// the store since POST /v1/accounts rejects kind=debt in favor of
+	// POST /v1/loans. The cash row still exercises the accounts API.
 	kinds := []string{"cash", "debt"}
 	ids := map[string]string{}
 	for _, kind := range kinds {
+		if kind == "debt" {
+			seeded, err := database.CreateAccount(types.Account{Name: kind, Kind: types.AccountKind(kind), Enabled: true})
+			if err != nil {
+				t.Fatalf("seed account: %v", err)
+			}
+			ids[kind] = seeded.ID
+			continue
+		}
 		created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"`+kind+`","kind":"`+kind+`","enabled":true}`)
 		if created.Code != http.StatusOK {
 			t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())

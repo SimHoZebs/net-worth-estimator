@@ -48,7 +48,7 @@ export function LoanDetails({
 				disabled={readOnly || account.readOnly}
 				onClick={() => onEdit({ kind: "account", item: account })}
 			>
-				Edit loan and payment terms
+				Edit debt and payment terms
 			</Button>
 		</section>
 	);

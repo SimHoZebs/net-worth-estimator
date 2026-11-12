@@ -14,20 +14,13 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 
-	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
-		`{"name":"Card","kind":"debt","enabled":true}`)
-	if created.Code != http.StatusOK {
-		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
+	// Single-row debts are legacy fixtures: seed through the store since
+	// POST /v1/accounts rejects kind=debt in favor of POST /v1/loans.
+	seeded, err := database.CreateAccount(types.Account{Name: "Card", Kind: "debt", Enabled: true})
+	if err != nil {
+		t.Fatalf("seed account: %v", err)
 	}
-	var accountPayload struct {
-		Result struct {
-			ID string `json:"id"`
-		} `json:"value"`
-	}
-	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
-		t.Fatalf("decode account: %v", err)
-	}
-	accountID := accountPayload.Result.ID
+	accountID := seeded.ID
 
 	holdTime := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC).Unix()
 	hold := types.Transaction{
