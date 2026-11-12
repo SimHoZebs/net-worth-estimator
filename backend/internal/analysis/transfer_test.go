@@ -172,6 +172,85 @@ func TestTransferSkipsUnusableEvidence(t *testing.T) {
 	}
 }
 
+func TestTransferPrefersClosestByDate(t *testing.T) {
+	items := []types.AnalysisTransaction{
+		transferTransaction("out", "checking-bridge", "simplefin", "TRANSFER OUT", "-100.00", 5),
+		transferTransaction("in-close", "savings-bridge", "simplefin", "TRANSFER IN", "100.00", 6),
+		transferTransaction("in-far", "savings-bridge", "simplefin", "TRANSFER IN", "100.00", 7),
+	}
+	result := analyzeTransfer(t, items)
+	if len(result) != 3 {
+		t.Fatalf("result=%+v", result)
+	}
+	byID := map[string]types.AnalysisDetection{}
+	for _, item := range result {
+		byID[item.TransactionID] = item
+		if item.Strength != "moderate" || item.Evidence[0].Code != "transfer.ambiguous-legs" {
+			t.Fatalf("near-tied dates left review: %+v", item)
+		}
+	}
+	out := byID["out"]
+	if len(out.Evidence[0].TransactionIDs) != 3 || out.Evidence[0].TransactionIDs[1] != "in-close" {
+		t.Fatalf("closest candidate not ranked first: %+v", out)
+	}
+}
+
+func TestTransferRarityBeatsRoundAmount(t *testing.T) {
+	items := []types.AnalysisTransaction{
+		transferTransaction("precise-out", "checking-bridge", "simplefin", "TRANSFER OUT", "-512.37", 5),
+		transferTransaction("precise-in", "savings-bridge", "simplefin", "TRANSFER IN", "512.37", 5),
+		transferTransaction("round-out-one", "checking-bridge", "simplefin", "TRANSFER OUT", "-500.00", 5),
+		transferTransaction("round-out-two", "checking-bridge", "simplefin", "TRANSFER OUT", "-500.00", 5),
+		transferTransaction("round-in-one", "savings-bridge", "simplefin", "TRANSFER IN", "500.00", 5),
+		transferTransaction("round-in-two", "savings-bridge", "simplefin", "TRANSFER IN", "500.00", 6),
+	}
+	result := analyzeTransfer(t, items)
+	if len(result) != 6 {
+		t.Fatalf("result=%+v", result)
+	}
+	byID := map[string]types.AnalysisDetection{}
+	for _, item := range result {
+		byID[item.TransactionID] = item
+	}
+	for _, id := range []string{"precise-out", "precise-in"} {
+		if byID[id].Strength != "strong" || byID[id].Evidence[0].Code != "transfer.exact-leg-match" {
+			t.Fatalf("unique precise pair not strong: %+v", byID[id])
+		}
+	}
+	if byID["precise-out"].Evidence[0].TransactionIDs[1] != "precise-in" ||
+		byID["precise-in"].Evidence[0].TransactionIDs[1] != "precise-out" {
+		t.Fatalf("precise legs do not reference each other: %+v", result)
+	}
+	for _, id := range []string{"round-out-one", "round-out-two", "round-in-one", "round-in-two"} {
+		if byID[id].Strength != "moderate" {
+			t.Fatalf("round duplicate marked strong: %+v", byID[id])
+		}
+	}
+}
+
+func TestTransferSameProviderBonus(t *testing.T) {
+	items := []types.AnalysisTransaction{
+		transferTransaction("out", "checking-bridge", "bank-a", "TRANSFER OUT", "-100.00", 5),
+		transferTransaction("in-same", "savings-bridge", "bank-a", "TRANSFER IN", "100.00", 5),
+		transferTransaction("in-other", "savings-bridge", "bank-b", "TRANSFER IN", "100.00", 5),
+	}
+	result := analyzeTransfer(t, items)
+	if len(result) != 3 {
+		t.Fatalf("result=%+v", result)
+	}
+	byID := map[string]types.AnalysisDetection{}
+	for _, item := range result {
+		byID[item.TransactionID] = item
+		if item.Strength != "moderate" {
+			t.Fatalf("tied providers left review: %+v", item)
+		}
+	}
+	out := byID["out"]
+	if len(out.Evidence[0].TransactionIDs) != 3 || out.Evidence[0].TransactionIDs[1] != "in-same" {
+		t.Fatalf("same-provider candidate not ranked first: %+v", out)
+	}
+}
+
 func TestTransferContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

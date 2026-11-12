@@ -284,9 +284,15 @@ projection stops double-counting and the recorded rows stay intact.
 
 Transfer means one internal money movement observed as two opposite legs on
 different accounts. The detector pairs legs by exact absolute amount, opposite
-direction, and transaction dates within 7 days. A leg with exactly one
-mutual candidate produces a **strong** match; a leg with several candidates
-produces a **moderate** match that lists every candidate for review.
+direction, and transaction dates within 7 days. Every surviving pair scores
+deterministically on date proximity, outflow-before-inflow order, amount
+rarity, descriptive signals (transfer wording, shared account tails or
+reference tokens, card-payoff symmetry), and provider continuity, with a heavy
+penalty for refund and reversal markers. A greedy pass claims the
+highest-scoring pairs first so one leg never matches twice. A matched pair
+with no rival at all, or a clear scoring winner at or above threshold, produces
+a **strong** match; every other leg with candidates produces a **moderate**
+match that lists all candidates ranked best-first for review.
 
 - The 7-day window is decided: both sides of a transfer between owned
   accounts are logged as one movement, but the two records do not arrive in
@@ -299,10 +305,8 @@ produces a **moderate** match that lists every candidate for review.
 - Each leg carries its own finding, so transfer evidence coexists with BNPL
   and other independent claims on one transaction. Dismissal survives
   detector reruns; repeated imports refresh the same findings.
-- Open: whether review stays a candidate list in the findings or becomes a
-  dedicated pair-picker, and whether same-provider legs should score
-  stronger than cross-provider pairs. Both keep current behavior for now:
-  candidates list in findings with equal scoring.
+- Open: whether review stays a ranked candidate list in the findings or
+  becomes a dedicated pair-picker.
 
 ## API and interface
 

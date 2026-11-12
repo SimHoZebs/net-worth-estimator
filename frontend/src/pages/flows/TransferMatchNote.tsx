@@ -3,9 +3,9 @@ import { useAnalysisFindings } from "../../state/analyses.ts";
 
 /** Read-only transfer-pair annotation (VIS-03 consumer). The VIS-03
  * `Transfer` analyzer (backend/internal/analysis/transfer.go) publishes one
- * detection per observed leg with kind "transfer": strength "strong" for an
- * exactly-one mutual opposite-leg pair, "moderate" with every candidate
- * listed when several match. Transfer edges are counted once in transfer
+ * detection per observed leg with kind "transfer": strength "strong" for a
+ * matched pair with no rival or a clear scoring winner, "moderate" with all
+ * candidates ranked best-first when several match. Transfer edges are counted once in transfer
  * totals — never as income plus spending — and this note shows what the
  * matcher observed about the opposite leg. Review actions stay out:
  * ambiguous-match review UX is VIS-03's open decision. */
