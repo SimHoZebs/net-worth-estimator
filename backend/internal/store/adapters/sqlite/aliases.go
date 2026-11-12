@@ -10,6 +10,7 @@ import (
 type (
 	SyncCredential       = store.SyncCredential
 	SyncCheckpoint       = store.SyncCheckpoint
+	SyncCheckpointKey    = store.SyncCheckpointKey
 	SyncApplySummary     = store.SyncApplySummary
 	SyncProvision        = store.SyncProvision
 	SyncTransaction      = store.SyncTransaction

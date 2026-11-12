@@ -156,6 +156,10 @@ type Store interface {
 	// original extraction and provenance are preserved.
 	ReviewEmailReceipt(id string, correction *EmailReceiptCorrection) (EmailReceipt, error)
 	ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
+	// DeleteSyncCheckpoints removes provider-owned checkpoints by account,
+	// instant, and provider. Owner-authored rows and rows from another
+	// provider are never removed. It returns the number of rows deleted.
+	DeleteSyncCheckpoints(keys []SyncCheckpointKey) (int, error)
 	LoadBankTransactions() ([]BankRow, error)
 	// Unified projection state: single dirty date plus slice manifest.
 	GetProjectionState() (types.ProjectionState, error)

@@ -58,3 +58,37 @@ func TestBalanceAdjustmentsOmitZeroDeltaObservation(t *testing.T) {
 		t.Fatalf("15:00 observation must remain the latest observation: %+v", position.Accounts[0])
 	}
 }
+
+// Persistence uses the raw delta, not the rounded display delta: a
+// sub-dollar correction must still be stored even though the activity feed
+// rounds it to a zero adjustment.
+func TestZeroDeltaObservationsUseRawBalance(t *testing.T) {
+	model := observerFixture()
+	zero, err := ZeroDeltaObservations(model, "2026-03-10T16:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := ObservationKey{AccountID: "checking", ObservedAt: unixAt(10, 15)}
+	if _, ok := zero[key]; !ok {
+		t.Fatalf("15:00 observation should be a raw zero delta: %+v", zero)
+	}
+	if _, ok := zero[ObservationKey{AccountID: "checking", ObservedAt: unixAt(10, 9)}]; ok {
+		t.Fatalf("09:00 observation is not a zero delta: %+v", zero)
+	}
+
+	model.Checkpoints[1].Balance = 900.4
+	zero, err = ZeroDeltaObservations(model, "2026-03-10T16:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := zero[key]; ok {
+		t.Fatalf("a sub-dollar correction must not be treated as a no-op: %+v", zero)
+	}
+	rows, err := ResolveBalanceAdjustments(model, "2026-03-10T16:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].ObservedAt != unixAt(10, 9) {
+		t.Fatalf("rounded display should still hide the sub-dollar row: %+v", rows)
+	}
+}

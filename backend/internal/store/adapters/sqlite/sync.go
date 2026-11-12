@@ -439,3 +439,52 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 	}
 	return summary, nil
 }
+
+// DeleteSyncCheckpoints removes provider-owned checkpoints by account,
+// instant, and provider. Owner-authored rows and rows from another provider
+// are never removed. It returns the number of checkpoint rows deleted.
+func (s *sqliteStore) DeleteSyncCheckpoints(keys []SyncCheckpointKey) (int, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	deleted := 0
+	dirty := int64(0)
+	err := withRowTx(s.db, func(tx *userTx) error {
+		for _, key := range keys {
+			result, err := tx.Exec(
+				`DELETE FROM checkpoints WHERE model_account_id = ? AND observed_at = ? AND source != ? AND provider = ? AND user_id = :user_id`,
+				key.AccountID, key.ObservedAt, SourceUser, key.Provider,
+			)
+			if err != nil {
+				return fmt.Errorf("delete sync checkpoint %s %d: %w", key.AccountID, key.ObservedAt, err)
+			}
+			affected, err := result.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if affected == 0 {
+				continue
+			}
+			if _, err := tx.Exec(
+				`DELETE FROM checkpoint_available_balances WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`,
+				key.AccountID, key.ObservedAt,
+			); err != nil {
+				return fmt.Errorf("delete sync checkpoint available balance %s %d: %w", key.AccountID, key.ObservedAt, err)
+			}
+			deleted++
+			if dirty == 0 || key.ObservedAt < dirty {
+				dirty = key.ObservedAt
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if dirty != 0 {
+		if err := s.markDirty(dirty); err != nil {
+			return 0, err
+		}
+	}
+	return deleted, nil
+}

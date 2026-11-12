@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -39,6 +40,11 @@ type historicalReplay struct {
 	includeStartDateEvents bool
 	latestObserved         map[string]types.Checkpoint
 	adjustments            []types.BalanceAdjustment
+	// zeroDeltaObservations holds observations whose raw balance matched the
+	// modeled balance at their instant (within float tolerance). The rounded
+	// adjustment list is a display view; persistence decisions use this exact
+	// set so a sub-dollar correction is never mistaken for a no-op.
+	zeroDeltaObservations map[ObservationKey]struct{}
 }
 
 // replayChronologicalHistory replays through the end of projectionStartDate.
@@ -205,6 +211,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 
 	latestObserved := map[string]types.Checkpoint{}
 	adjustments := []types.BalanceAdjustment{}
+	zeroDeltaObservations := map[ObservationKey]struct{}{}
 	historicalSnapshots := []types.HistoricalObservationSnapshot{}
 	executeOccurrence := func(occurrence DatedTransactionOccurrence, date string, historicalActual bool) error {
 		_, execErr := transitions.ExecuteTransaction(occurrence, date, historicalActual)
@@ -256,6 +263,9 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		if event.isObservation {
 			observation := event.checkpoint
 			modeledBalance := transitions.State.Balances[observation.AccountID]
+			if math.Abs(observation.Balance-modeledBalance) < 1e-9 {
+				zeroDeltaObservations[ObservationKey{AccountID: observation.AccountID, ObservedAt: observation.ObservedAt}] = struct{}{}
+			}
 			adjustments = append(adjustments, types.BalanceAdjustment{
 				AccountID:       observation.AccountID,
 				ObservedAt:      observation.ObservedAt,
@@ -287,6 +297,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		includeStartDateEvents: true,
 		latestObserved:         latestObserved,
 		adjustments:            adjustments,
+		zeroDeltaObservations:  zeroDeltaObservations,
 	}, nil
 }
 

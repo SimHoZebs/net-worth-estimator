@@ -67,6 +67,9 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("ApplySyncKeepsProviderCheckpointIdentity", func(t *testing.T) {
 		testApplySyncKeepsProviderCheckpointIdentity(t, newStore)
 	})
+	t.Run("DeleteSyncCheckpointsRemovesOnlySyncRows", func(t *testing.T) {
+		testDeleteSyncCheckpoints(t, newStore)
+	})
 	t.Run("SettledBankRowRoundTrip", func(t *testing.T) {
 		testSettledBankRowRoundTrip(t, newStore)
 	})
@@ -704,6 +707,59 @@ func testApplySyncSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T) st
 	checkpoint, ok := findCheckpoint(loaded, "checking", 1785974399)
 	if !ok || checkpoint.Balance != 999 {
 		t.Fatalf("user checkpoint overwritten: %+v", checkpoint)
+	}
+}
+
+func testDeleteSyncCheckpoints(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerModel(t, st)
+	first, err := st.ApplySync([]store.SyncCheckpoint{
+		{AccountID: "checking", Balance: 100, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1785974399},
+	}, nil)
+	if err != nil || first.CheckpointsInserted != 1 {
+		t.Fatalf("first apply = %+v, err %v", first, err)
+	}
+	second, err := st.ApplySync([]store.SyncCheckpoint{
+		{AccountID: "checking", Balance: 200, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1786060799},
+	}, nil)
+	if err != nil || second.CheckpointsInserted != 1 {
+		t.Fatalf("second apply = %+v, err %v", second, err)
+	}
+	foreign, err := st.ApplySync([]store.SyncCheckpoint{
+		{AccountID: "checking", Balance: 300, Source: store.SourceBankSync, Provider: "plaid", ObservedAt: 1786147199},
+	}, nil)
+	if err != nil || foreign.CheckpointsInserted != 1 {
+		t.Fatalf("foreign apply = %+v, err %v", foreign, err)
+	}
+
+	deleted, err := st.DeleteSyncCheckpoints([]store.SyncCheckpointKey{
+		{AccountID: "checking", ObservedAt: 1785974399, Provider: store.ProviderSimpleFIN},
+		{AccountID: "checking", ObservedAt: 1786060799, Provider: store.ProviderSimpleFIN},
+		{AccountID: "checking", ObservedAt: 1782950399, Provider: store.ProviderSimpleFIN},
+		{AccountID: "checking", ObservedAt: 1786147199, Provider: store.ProviderSimpleFIN},
+	})
+	if err != nil || deleted != 2 {
+		t.Fatalf("delete = %d, err %v", deleted, err)
+	}
+	loaded, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Checkpoints) != 2 {
+		t.Fatalf("owner and foreign checkpoints must survive: %+v", loaded.Checkpoints)
+	}
+	if owner, ok := findCheckpoint(loaded, "checking", 1782950399); !ok || owner.Balance != 500 {
+		t.Fatalf("owner checkpoint must survive: %+v", loaded.Checkpoints)
+	}
+	if foreignRow, ok := findCheckpoint(loaded, "checking", 1786147199); !ok || foreignRow.Balance != 300 {
+		t.Fatalf("foreign provider checkpoint must survive: %+v", loaded.Checkpoints)
+	}
+	again, err := st.DeleteSyncCheckpoints([]store.SyncCheckpointKey{
+		{AccountID: "checking", ObservedAt: 1785974399, Provider: store.ProviderSimpleFIN},
+	})
+	if err != nil || again != 0 {
+		t.Fatalf("repeat delete = %d, err %v", again, err)
 	}
 }
 

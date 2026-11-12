@@ -78,7 +78,7 @@ func openIngestStore(t *testing.T) store.Store {
 
 func seedIngestLink(t *testing.T, st store.Store, bridgeID, modelID string) {
 	t.Helper()
-	if _, err := st.CreateAccount(types.Account{ID: modelID, Name: modelID}); err != nil {
+	if _, err := st.CreateAccount(types.Account{ID: modelID, Name: modelID, Kind: types.AccountKindCash}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.SaveAccountLink(store.AccountLink{BridgeAccountID: bridgeID, ModelAccountID: modelID, Origin: store.LinkOriginManual}); err != nil {
@@ -125,6 +125,155 @@ func TestSyncAppliesAndMarksDirty(t *testing.T) {
 	}
 	if state.Revision != 1 || state.DirtyFrom != checkpointAt {
 		t.Fatalf("run with writes must mark the earliest instant: %+v", state)
+	}
+}
+
+func TestSyncSkipsForwardNoOpCheckpoints(t *testing.T) {
+	st := openIngestStore(t)
+	seedIngestLink(t, st, "bridge-checking", "checking")
+	checkpoints := []store.SyncCheckpoint{}
+	adapter := &fakeAdapter{
+		key:        "fake",
+		snapshot:   fakeSnapshot{bridges: []string{"bridge-checking"}},
+		provisions: []store.SyncProvision{{BridgeID: "bridge-checking", Name: "Checking", Currency: "USD"}},
+		checkpoints: func(map[string]string) []store.SyncCheckpoint {
+			return checkpoints
+		},
+		skipped: map[string]int{},
+	}
+	now := time.Date(2026, time.August, 4, 0, 0, 0, 0, time.UTC)
+	at := func(day int) int64 {
+		return time.Date(2026, time.August, day, 12, 0, 0, 0, time.UTC).Unix()
+	}
+	syncAt := func(balance float64, observedAt int64) Result {
+		t.Helper()
+		checkpoints = []store.SyncCheckpoint{{
+			AccountID: "checking", Balance: balance,
+			Source: store.SourceBankSync, Provider: "fake", ObservedAt: observedAt,
+		}}
+		out, err := Sync(context.Background(), st, adapter, now)
+		if err != nil {
+			t.Fatalf("sync: %v", err)
+		}
+		return out
+	}
+
+	first := syncAt(100, at(1))
+	if first.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("first observation must be stored: %+v", first.Applied)
+	}
+	noop := syncAt(100, at(2))
+	if noop.Applied.CheckpointsInserted != 0 || noop.Applied.CheckpointsSkipped != 1 {
+		t.Fatalf("forward no-op must not be stored: %+v", noop.Applied)
+	}
+	model, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.Checkpoints) != 1 || model.Checkpoints[0].ObservedAt != at(1) {
+		t.Fatalf("forward no-op left a row: %+v", model.Checkpoints)
+	}
+
+	backdated := syncAt(0, at(0))
+	if backdated.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("backdated observation must be kept: %+v", backdated.Applied)
+	}
+	changed := syncAt(150, at(3))
+	if changed.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("changed balance must be stored: %+v", changed.Applied)
+	}
+	again := syncAt(150, at(4))
+	if again.Applied.CheckpointsInserted != 0 || again.Applied.CheckpointsSkipped != 1 {
+		t.Fatalf("forward no-op after a change must not be stored: %+v", again.Applied)
+	}
+	model, err = st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[int64]float64{}
+	for _, checkpoint := range model.Checkpoints {
+		seen[checkpoint.ObservedAt] = checkpoint.Balance
+	}
+	if len(seen) != 3 || seen[at(0)] != 0 || seen[at(1)] != 100 || seen[at(3)] != 150 {
+		t.Fatalf("unexpected checkpoint history: %+v", model.Checkpoints)
+	}
+}
+
+func TestSyncKeepsFirstZeroObservation(t *testing.T) {
+	st := openIngestStore(t)
+	seedIngestLink(t, st, "bridge-empty", "empty")
+	checkpointAt := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC).Unix()
+	adapter := &fakeAdapter{
+		key:        "fake",
+		snapshot:   fakeSnapshot{bridges: []string{"bridge-empty"}},
+		provisions: []store.SyncProvision{{BridgeID: "bridge-empty", Name: "Empty", Currency: "USD"}},
+		checkpoints: func(resolved map[string]string) []store.SyncCheckpoint {
+			return []store.SyncCheckpoint{{
+				AccountID: resolved["bridge-empty"], Balance: 0,
+				Source: store.SourceBankSync, Provider: "fake", ObservedAt: checkpointAt,
+			}}
+		},
+		skipped: map[string]int{},
+	}
+	out, err := Sync(context.Background(), st, adapter, time.Date(2026, time.August, 3, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if out.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("first observation establishes coverage even at zero: %+v", out.Applied)
+	}
+}
+
+func TestSyncKeepsChangedAvailableBalance(t *testing.T) {
+	st := openIngestStore(t)
+	seedIngestLink(t, st, "bridge-checking", "checking")
+	checkpoints := []store.SyncCheckpoint{}
+	adapter := &fakeAdapter{
+		key:        "fake",
+		snapshot:   fakeSnapshot{bridges: []string{"bridge-checking"}},
+		provisions: []store.SyncProvision{{BridgeID: "bridge-checking", Name: "Checking", Currency: "USD"}},
+		checkpoints: func(map[string]string) []store.SyncCheckpoint {
+			return checkpoints
+		},
+		skipped: map[string]int{},
+	}
+	now := time.Date(2026, time.August, 4, 0, 0, 0, 0, time.UTC)
+	at := func(day int) int64 {
+		return time.Date(2026, time.August, day, 12, 0, 0, 0, time.UTC).Unix()
+	}
+	available := func(value float64) *float64 { return &value }
+	syncAt := func(observedAt int64, availableBalance *float64) Result {
+		t.Helper()
+		checkpoints = []store.SyncCheckpoint{{
+			AccountID: "checking", Balance: 100, AvailableBalance: availableBalance,
+			Source: store.SourceBankSync, Provider: "fake", ObservedAt: observedAt,
+		}}
+		out, err := Sync(context.Background(), st, adapter, now)
+		if err != nil {
+			t.Fatalf("sync: %v", err)
+		}
+		return out
+	}
+
+	if out := syncAt(at(1), available(50)); out.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("first observation = %+v", out.Applied)
+	}
+	if out := syncAt(at(2), available(60)); out.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("changed available balance must be stored: %+v", out.Applied)
+	}
+	if out := syncAt(at(3), available(60)); out.Applied.CheckpointsInserted != 0 || out.Applied.CheckpointsSkipped != 1 {
+		t.Fatalf("identical observation must not be stored: %+v", out.Applied)
+	}
+	model, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.Checkpoints) != 2 {
+		t.Fatalf("checkpoints = %+v", model.Checkpoints)
+	}
+	latest := model.Checkpoints[len(model.Checkpoints)-1]
+	if latest.ObservedAt != at(2) || latest.AvailableBalance == nil || *latest.AvailableBalance != 60 {
+		t.Fatalf("latest checkpoint = %+v", latest)
 	}
 }
 

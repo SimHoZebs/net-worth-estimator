@@ -150,6 +150,14 @@ type SyncCheckpoint struct {
 	ObservedAt int64
 }
 
+// SyncCheckpointKey identifies one provider-owned checkpoint row by account,
+// exact observation instant, and supplying provider.
+type SyncCheckpointKey struct {
+	AccountID  string
+	ObservedAt int64
+	Provider   string
+}
+
 // SyncApplySummary counts applied sync rows.
 type SyncApplySummary struct {
 	CheckpointsInserted int `json:"checkpointsInserted"`
