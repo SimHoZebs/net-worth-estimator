@@ -12,8 +12,20 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// categoryDescriptorSignals matches the keyword classifier's vocabulary against
-// the transaction text. Each entry emits its signal ID when any needle appears.
+// categoryDescriptorSignals extends the keyword classifier's vocabulary for
+// ML hypotheses only. Each entry emits its signal ID when any needle appears.
+//
+// Generic food, fuel, and service words are intentionally broad: a bank
+// descriptor containing FOOD almost always names a food merchant, and fuel
+// wording marks a fuel stop. Spaced needles (" INS ", "DOL ") avoid
+// substrings of unrelated words (INSTACART, DOLLAR). THANK YOU is
+// card-payment confirmation language; ACCTVERIFY marks micro-deposit
+// verification. TST* is Toast restaurant point of sale. Vendor names below
+// extend coverage from reviewed bank rows, the same way the housing-platform
+// list documents researched evidence: QFC and Costco are grocery-heavy,
+// Lime and VanMoof are micromobility, FareHarbor and Recreation.gov book
+// outdoor travel, Rover is pet services. Training resolves conflicts when a
+// row observes several signals.
 var categoryDescriptorSignals = []struct {
 	id      string
 	needles []string
@@ -21,19 +33,19 @@ var categoryDescriptorSignals = []struct {
 	{"payroll-descriptor", []string{"PAYROLL", "DIRECT DEP", "SALARY", "PAYCHECK"}},
 	{"loan-descriptor", []string{"KLARNA", "AFTERPAY", "AFFIRM", "LOAN"}},
 	{"fee-descriptor", []string{"OVERDRAFT", "BANK FEE", "SERVICE FEE", "INTEREST CHARGE", "ATM FEE", "ANNUAL FEE"}},
-	{"transfer-descriptor", []string{"TRANSFER", "XFER", "ZELLE", "WIRE"}},
-	{"travel-descriptor", []string{"AIRLINE", "HOTEL", "AIRBNB", "EXPEDIA", "MARRIOTT", "HILTON", "DELTA"}},
+	{"transfer-descriptor", []string{"TRANSFER", "XFER", "ZELLE", "WIRE", "ACCTVERIFY", "THANK YOU"}},
+	{"travel-descriptor", []string{"AIRLINE", "HOTEL", "AIRBNB", "EXPEDIA", "MARRIOTT", "HILTON", "DELTA", "FAREHARBOR", "RECREATION.GOV"}},
 	{"rent-descriptor", []string{"RENT", "APARTMENT", "LEASE"}},
 	{"utility-descriptor", []string{"ELECTRIC", "WATER", "INTERNET", "COMCAST", "VERIZON", "AT&T", "UTILITY", "UTILITIES"}},
-	{"food-descriptor", []string{"GROCERY", "GROCERIES", "SUPERMARKET", "WHOLE FOODS", "TRADER JOE", "SAFEWAY", "KROGER", "ALDI", "RESTAURANT", "CAFE", "COFFEE", "STARBUCKS", "MCDONALD", "DOORDASH", "GRUBHUB", "UBER EATS"}},
-	{"transport-descriptor", []string{"UBER", "LYFT", "SHELL", "CHEVRON", "EXXON", "GAS STATION", "PARKING", "TOLL", "TRANSIT", "METRO"}},
-	{"entertainment-descriptor", []string{"NETFLIX", "SPOTIFY", "HULU", "DISNEY", "CINEMA", "THEATER", "THEATRE", "STEAM", "PLAYSTATION", "XBOX"}},
+	{"food-descriptor", []string{"GROCERY", "GROCERIES", "SUPERMARKET", "WHOLE FOODS", "TRADER JOE", "SAFEWAY", "KROGER", "ALDI", "RESTAURANT", "CAFE", "COFFEE", "STARBUCKS", "MCDONALD", "DOORDASH", "GRUBHUB", "UBER EATS", "QFC", "COSTCO", "FOOD", "TST*", "CHICKEN", "BURGER", "TACO", "BAGEL", "BAKERY", "GOURMONDO", "PAGLIACCI", "AUNTIE ANNE", "DIN TAI FUNG", "KFC", "TASTY INDIAN", "CHESTNUT", "ARAMARK", "CROISSANT", "PLAID PANTRY", "SUGAR", "TOASTED", "TYGER", "HOT CHICKEN", "OLIVE GARDEN", "GLACIER PUB", "YARD HOUSE"}},
+	{"transport-descriptor", []string{"UBER", "LYFT", "SHELL", "CHEVRON", "EXXON", "GAS STATION", "PARKING", "TOLL", "TRANSIT", "METRO", " LIME", "VANMOOF", "PETROLEUM", "MARTA", "FUEL"}},
+	{"entertainment-descriptor", []string{"NETFLIX", "SPOTIFY", "HULU", "DISNEY", "CINEMA", "THEATER", "THEATRE", "STEAM", "PLAYSTATION", "XBOX", "TICKETMASTER", "PRIME VIDEO", "SHOWBOX", "ROKU", "REGAL"}},
 	{"medical-descriptor", []string{"PHARMACY", "CVS", "WALGREENS", "CLINIC", "HOSPITAL", "DENTAL", "MEDICAL", "DOCTOR"}},
 	{"personal-care-descriptor", []string{"GYM", "SALON", "BARBER", "SPA", "FITNESS"}},
 	{"home-improvement-descriptor", []string{"HOME DEPOT", "LOWES", "IKEA", "HARDWARE", "FURNITURE"}},
-	{"government-descriptor", []string{"IRS", "TAX", "DMV", "CHARITY", "DONATION", "NONPROFIT"}},
-	{"merchandise-descriptor", []string{"AMAZON", "WALMART", "TARGET", "EBAY", "ETSY", "BEST BUY", "COSTCO", "CLOTHING", "BOOKSTORE"}},
-	{"services-descriptor", []string{"INSURANCE", "ACCOUNTING", "TAX PREP", "LAWYER", "SUBSCRIPTION", "SOFTWARE"}},
+	{"government-descriptor", []string{"IRS", "TAX", "DMV", "CHARITY", "DONATION", "NONPROFIT", "DOL "}},
+	{"merchandise-descriptor", []string{"AMAZON", "WALMART", "TARGET", "EBAY", "ETSY", "BEST BUY", "COSTCO", "CLOTHING", "BOOKSTORE", " BOOK", "CAMERA"}},
+	{"services-descriptor", []string{"INSURANCE", "ACCOUNTING", "TAX PREP", "LAWYER", "SUBSCRIPTION", "SOFTWARE", "OPENAI", "OPENCODE", "SUBSCR", "ROVER", "USPS", " INS "}},
 }
 
 // observeCategorySignals returns the sorted signal IDs observed on one

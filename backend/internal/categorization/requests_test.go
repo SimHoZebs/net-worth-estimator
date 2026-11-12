@@ -106,3 +106,31 @@ func TestCategoryJudgmentRequestsAbsNormalizeSignedAmounts(t *testing.T) {
 		t.Fatalf("signed amount kept: %q", requests[0].Pattern.TypicalAmount)
 	}
 }
+
+func TestCategoryJudgmentRequestsReviewedVocabulary(t *testing.T) {
+	cases := []struct {
+		name      string
+		direction string
+		amount    string
+		want      string
+	}{
+		{"QFC #5881", "out", "-33.00", "category:FOOD_AND_DRINK"},
+		{"LIME*PASS 3DTM", "out", "-9.95", "category:TRANSPORTATION"},
+		{"OPENAI *CHATGPT SUBSCR", "out", "-20.00", "category:GENERAL_SERVICES"},
+		{"Payment Thank You-Mobile", "in", "150.00", "category:TRANSFER_IN"},
+		{"BANK OF AMERICA ACCTVERIFY PPD ID: 9088871070", "in", "0.12", "category:TRANSFER_IN"},
+		{"WA DOL LIC & REG 11241", "out", "-45.00", "category:GOVERNMENT_AND_NON_PROFIT"},
+		{"TM *TICKETMASTER", "out", "-60.00", "category:ENTERTAINMENT"},
+	}
+	for _, tc := range cases {
+		requests := CategoryJudgmentRequests(Input{
+			TransactionID: "vocab-" + tc.name,
+			Name:          tc.name,
+			Direction:     tc.direction,
+			Facts:         &types.TransactionFacts{Description: tc.name, Amount: tc.amount, Currency: "USD"},
+		})
+		if kinds := kindsOf(requests); !kinds[tc.want] {
+			t.Fatalf("%s emitted %+v, want %s", tc.name, kinds, tc.want)
+		}
+	}
+}
