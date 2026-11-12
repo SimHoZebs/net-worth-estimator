@@ -225,11 +225,20 @@ export function SafeSpendingPreview({
 				incomeAccountIds: incomeIds,
 				incomeScheduleIds: settings.incomeScheduleIds,
 			}),
-		[transactions, projectionTransactions, savedRules, trackedBillIds, closedCycle.start, cycle.cycleEnd, rules, incomeIds, settings.incomeScheduleIds],
+		[
+			transactions,
+			projectionTransactions,
+			savedRules,
+			trackedBillIds,
+			closedCycle.start,
+			cycle.cycleEnd,
+			rules,
+			incomeIds,
+			settings.incomeScheduleIds,
+		],
 	);
 	const obligationTransactions = useMemo(
-		() =>
-			selectObligationResults(historyResults, settings.transactionIds),
+		() => selectObligationResults(historyResults, settings.transactionIds),
 		[historyResults, settings.transactionIds],
 	);
 	const income = useMemo(
@@ -617,6 +626,11 @@ export function SafeSpendingPreview({
 					/>
 					Safe card spending
 				</h2>
+				{trackedIds.length > 0 && (
+					<TextButton onClick={() => onDetail("configure")}>
+						Configure
+					</TextButton>
+				)}
 			</div>
 			{trackedIds.length > 0 ? (
 				<>
@@ -665,9 +679,6 @@ export function SafeSpendingPreview({
 						>
 							Last cycle transactions
 						</TextButton>
-						<TextButton onClick={() => onDetail("configure")}>
-							Configure
-						</TextButton>
 					</div>
 				</>
 			) : (
@@ -705,7 +716,6 @@ export function SafeSpendingPreview({
 							transactionOrder={transactionOrder}
 							onTransactionOrderChange={setTransactionOrder}
 						/>
-
 					)}
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel
