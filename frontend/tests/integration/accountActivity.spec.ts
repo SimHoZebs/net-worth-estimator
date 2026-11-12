@@ -18,7 +18,9 @@ test("clicking an account opens its recorded history and projected transactions"
 		dialog.getByRole("tab", { name: /Transactions/ }),
 	).toHaveAttribute("aria-selected", "true");
 	// The fixture records two payroll deposits and one take-home deposit before
-	// the projection starts.
+	// the projection starts. Balance adjustments are checkpoint
+	// reconciliation, not transactions, so they stay out of the list and
+	// render in balance history instead.
 	await expect(
 		dialog.getByRole("button", { name: /View Household payroll/ }),
 	).toHaveCount(2);
@@ -29,12 +31,12 @@ test("clicking an account opens its recorded history and projected transactions"
 	).toBeVisible();
 	await dialog.getByLabel("Transaction source").selectOption("historical");
 	await expect(dialog.getByRole("status")).toHaveText(
-		"Showing 1–4 of 4 transactions",
+		"Showing 1–3 of 3 transactions",
 	);
 	// Historical activity is listed newest first by default, and the control
 	// toggles rather than sets.
 	await expect(dialog.locator("tbody tr").first()).toContainText(
-		"Jan 31, 2026",
+		"Jan 29, 2026",
 	);
 	await dialog.getByRole("button", { name: "Newest first" }).click();
 	await expect(
@@ -45,7 +47,7 @@ test("clicking an account opens its recorded history and projected transactions"
 	);
 	await dialog.getByRole("button", { name: "Oldest first" }).click();
 	await expect(dialog.locator("tbody tr").first()).toContainText(
-		"Jan 31, 2026",
+		"Jan 29, 2026",
 	);
 	await dialog
 		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
@@ -319,12 +321,20 @@ test("accounts without transactions show balance history and retain account sett
 		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
 	const dialog = page.getByRole("region", { name: "Account details" });
+	// The transaction list holds only transactions, so an account without
+	// any shows its empty state. Balance adjustments are checkpoint
+	// reconciliation and render separately in balance history.
 	await expect(
 		dialog.getByRole("button", { name: /View balance adjustment/ }),
 	).toBeVisible();
 	await expect(dialog.getByRole("tab")).toHaveCount(3);
 	await expect(
-		dialog.getByRole("searchbox", { name: "Search account transactions" }),
+		dialog.getByRole("heading", {
+			name: "No transactions for this account yet",
+		}),
+	).toBeVisible();
+	await expect(
+		dialog.getByRole("region", { name: "Balance history" }),
 	).toBeVisible();
 	await dialog.getByRole("tab", { name: /Transactions/ }).focus();
 	await page.keyboard.press("ArrowRight");

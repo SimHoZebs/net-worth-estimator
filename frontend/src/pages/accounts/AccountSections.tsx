@@ -245,7 +245,7 @@ function TransactionsView({
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
 			id: "all",
-			label: "All transactions",
+			label: "Transactions",
 			count: savedRowsPending ? null : transactionsCount,
 		},
 		{

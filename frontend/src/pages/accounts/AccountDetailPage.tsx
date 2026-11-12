@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "@tanstack/react-router";
 import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
-import { balanceAdjustmentActivity } from "../../domain/balanceAdjustmentActivity.ts";
 import { useAccountEdit } from "../../components/activity/useAccountEdit.ts";
 import { AccountBalanceValue } from "../../components/activity/AccountBalanceValue.tsx";
 import {
@@ -31,6 +30,7 @@ import {
 } from "../../domain/accountDisplay.ts";
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
 import { Transactions } from "../../components/activity/Transactions.tsx";
+import { BalanceHistory } from "./BalanceHistory.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
 import {
 	useSavedAccounts,
@@ -131,25 +131,19 @@ export function AccountDetailView({
 		forecast.base instanceof Error || forecast.base === null
 			? null
 			: forecast.base;
+	// Balance adjustments are checkpoint reconciliation, not transactions,
+	// so they stay out of the transaction list and render in balance
+	// history instead.
 	const occurrences = useMemo(
-		() => [
-			...accountTransactions({
+		() =>
+			accountTransactions({
 				accountId: account.id,
 				accounts,
 				transactions,
 				startDate,
 				projection,
 			}),
-			...balanceAdjustmentActivity(adjustments.data ?? []),
-		],
-		[
-			account.id,
-			accounts,
-			transactions,
-			startDate,
-			projection,
-			adjustments.data,
-		],
+		[account.id, accounts, transactions, startDate, projection],
 	);
 	const rulesQuery = useSchedules();
 	const rules = rulesQuery.data?.schedules ?? null;
@@ -251,20 +245,6 @@ export function AccountDetailView({
 			>
 				{view === "transactions" ? (
 					<>
-						{!isGroupedDisplay(account) && adjustments.isPending && (
-							<p role="status">Loading balance adjustments…</p>
-						)}
-						{adjustments.isError && (
-							<p role="alert">
-								Balance adjustments could not be loaded.{" "}
-								<button
-									type="button"
-									onClick={() => void adjustments.refetch()}
-								>
-									Retry adjustments
-								</button>
-							</p>
-						)}
 						<Transactions
 							occurrences={occurrences}
 							rows={savedState}
@@ -283,6 +263,14 @@ export function AccountDetailView({
 								retry: forecast.retryProjection,
 							}}
 						/>
+						{!isGroupedDisplay(account) && (
+							<BalanceHistory
+								adjustments={adjustments.data ?? []}
+								isPending={adjustments.isPending}
+								isError={adjustments.isError}
+								onRetry={() => void adjustments.refetch()}
+							/>
+						)}
 					</>
 				) : view === "recurring" ? (
 					rulesQuery.isPending ? (

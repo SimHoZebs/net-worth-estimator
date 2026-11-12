@@ -15,7 +15,6 @@ import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
-import { BalanceAdjustmentRow } from "./BalanceAdjustmentRow.tsx";
 import { Button } from "../Button.tsx";
 import { TransactionAnalysisProvider } from "../analysis/TransactionAnalysis.tsx";
 import { useTransferLinks } from "../../state/analyses.ts";
@@ -168,40 +167,33 @@ export function Transactions({
 			{filtered.length ? (
 				<>
 					<TransactionAnalysisProvider
-						transactionIds={pageRows
-							.filter((transaction) => !transaction.adjustment)
-							.map((transaction) => transaction.transactionId)}
+						transactionIds={pageRows.map(
+							(transaction) => transaction.transactionId,
+						)}
 					>
 						<TransactionTable
 							caption="Transactions involving this account, separated into recorded facts and projected transactions."
 							showHeaders={showHeaders}
 							scrollId={`${id}-table`}
 						>
-							{pageRows.map((transaction) =>
-								transaction.adjustment ? (
-									<BalanceAdjustmentRow
-										key={transaction.id}
-										adjustment={transaction.adjustment}
-									/>
-								) : (
-									<TransactionRow
-										key={transaction.id}
-										transaction={transaction}
-										savedTransaction={
-											savedState.get(transaction.transactionId) ?? null
-										}
-										transferPeer={
-											linkedById.get(transaction.transactionId) ?? null
-										}
-										onEdit={() => {
-											const savedTransaction = savedState.get(
-												transaction.transactionId,
-											);
-											if (savedTransaction) inspect(transaction);
-										}}
-									/>
-								),
-							)}
+							{pageRows.map((transaction) => (
+								<TransactionRow
+									key={transaction.id}
+									transaction={transaction}
+									savedTransaction={
+										savedState.get(transaction.transactionId) ?? null
+									}
+									transferPeer={
+										linkedById.get(transaction.transactionId) ?? null
+									}
+									onEdit={() => {
+										const savedTransaction = savedState.get(
+											transaction.transactionId,
+										);
+										if (savedTransaction) inspect(transaction);
+									}}
+								/>
+							))}
 						</TransactionTable>
 					</TransactionAnalysisProvider>
 					<TablePagination

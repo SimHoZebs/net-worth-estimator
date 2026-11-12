@@ -554,7 +554,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await expect(page.getByRole("tab")).toHaveCount(0);
 	await page.goto("/transactions");
 	await expect(page.getByRole("tab")).toHaveCount(2);
-	await page.getByRole("tab", { name: /All transactions/ }).focus();
+	await page.getByRole("tab", { name: /Transactions/ }).focus();
 	await page.keyboard.press("ArrowRight");
 	await expect(page.getByRole("tab", { name: /Recurring/ })).toBeFocused();
 	await page.getByRole("tab", { name: /Recurring/ }).click();
@@ -563,9 +563,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 		"true",
 	);
 	await page.keyboard.press("ArrowRight");
-	await expect(
-		page.getByRole("tab", { name: /All transactions/ }),
-	).toBeFocused();
+	await expect(page.getByRole("tab", { name: /Transactions/ })).toBeFocused();
 	await expect(
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).not.toBeVisible();

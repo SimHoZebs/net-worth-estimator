@@ -1,6 +1,5 @@
 import { shiftDate } from "./format.ts";
 import { displayAccountId, isGroupedDisplay } from "./accountDisplay.ts";
-import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
 import {
 	isHistoricalTransaction,
 	isPendingTransaction,
@@ -24,8 +23,7 @@ export interface AccountTransaction {
 	name: string;
 	source: "historical" | "projected";
 	direction: "in" | "out";
-	flow: "income" | "expense" | "transfer" | "adjustment";
-	adjustment?: BalanceAdjustment;
+	flow: "income" | "expense" | "transfer";
 	counterparty: string;
 	from: string;
 	to: string;

@@ -93,7 +93,7 @@ export function AccountBalanceValue({
 						</p>
 					)}
 					<p className="m-0 text-xs text-muted md:text-right">
-						Recorded in Transactions as a balance adjustment, not income or
+						Recorded in Balance history as a balance adjustment, not income or
 						spending.
 					</p>
 				</div>
