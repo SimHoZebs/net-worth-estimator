@@ -129,3 +129,55 @@ it("tints an unfulfilled row and names the shortfall", () => {
 	expect(screen.getByText("$142.10 planned")).toBeTruthy();
 	expect(screen.getByText("−$42.10").className).toContain("text-warning-text");
 });
+
+it("names the linked account with a transfer cue instead of hiding the counterparty", () => {
+	const { transaction, savedTransaction } = voidTransaction();
+	const { container } = render(
+		<TransactionRow
+			transaction={{
+				...transaction,
+				void: false,
+				excluded: false,
+				direction: "out",
+				flow: "expense",
+				counterparty: "External spending",
+			}}
+			savedTransaction={savedTransaction}
+			onEdit={() => {}}
+			transferPeer={{
+				peerId: "peer-1",
+				peerName: "Loan payment",
+				accountName: "Home mortgage",
+			}}
+		/>,
+	);
+	expect(screen.getByText("To Home mortgage")).toBeTruthy();
+	expect(container.querySelector(".bg-surface-3")).toBeTruthy();
+	expect(
+		screen.getByRole("button", { name: /money out to Home mortgage/ }),
+	).toBeTruthy();
+});
+
+it("keeps the outflow icon and hides external counterparties without a link", () => {
+	const { transaction, savedTransaction } = voidTransaction();
+	const { container } = render(
+		<TransactionRow
+			transaction={{
+				...transaction,
+				void: false,
+				excluded: false,
+				direction: "out",
+				flow: "expense",
+				counterparty: "External spending",
+			}}
+			savedTransaction={savedTransaction}
+			onEdit={() => {}}
+			transferPeer={null}
+		/>,
+	);
+	expect(screen.queryByText("To Home mortgage")).toBeNull();
+	expect(container.querySelector(".bg-surface-3")).toBeNull();
+	expect(container.querySelector(".bg-warning-bg")).toBeTruthy();
+	const button = screen.getByRole("button", { name: /did not post/i });
+	expect(button.textContent).not.toContain("Home mortgage");
+});

@@ -18,6 +18,12 @@ import { TransactionTable } from "./TransactionTable.tsx";
 import { BalanceAdjustmentRow } from "./BalanceAdjustmentRow.tsx";
 import { Button } from "../Button.tsx";
 import { TransactionAnalysisProvider } from "../analysis/TransactionAnalysis.tsx";
+import { useTransferLinks } from "../../state/analyses.ts";
+import { transferLinkForEdge } from "../../pages/flows/TransferMatchNote.tsx";
+import {
+	resolveTransferPeer,
+	type TransferPeerSummary,
+} from "./TransferLinkSection.tsx";
 
 const PAGE_SIZE = 10;
 export function Transactions({
@@ -76,6 +82,23 @@ export function Transactions({
 		() => new Map(rows.map((transaction) => [transaction.id, transaction])),
 		[rows],
 	);
+	// One cached link query for the list; each row receives its
+	// resolved peer instead of querying per row.
+	const linksQuery = useTransferLinks();
+	const linkedById = useMemo(() => {
+		const links = linksQuery.data?.links ?? [];
+		const resolved = new Map<string, TransferPeerSummary>();
+		for (const row of rows) {
+			const peer = resolveTransferPeer({
+				transactionId: row.id,
+				link: transferLinkForEdge(links, [row.id]),
+				transactions: rows,
+				accounts,
+			});
+			if (peer) resolved.set(row.id, peer);
+		}
+		return resolved;
+	}, [linksQuery.data?.links, rows, accounts]);
 	const { selected, inspect, close } = useTransactionSelection(
 		occurrences,
 		savedState,
@@ -166,6 +189,9 @@ export function Transactions({
 										transaction={transaction}
 										savedTransaction={
 											savedState.get(transaction.transactionId) ?? null
+										}
+										transferPeer={
+											linkedById.get(transaction.transactionId) ?? null
 										}
 										onEdit={() => {
 											const savedTransaction = savedState.get(

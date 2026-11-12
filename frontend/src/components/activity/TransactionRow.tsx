@@ -13,6 +13,16 @@ import { Badge } from "../Badge.tsx";
 import { TextButton } from "../Button.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { useTransactionBNPL } from "../analysis/TransactionAnalysis.tsx";
+import { useTransferLinks } from "../../state/analyses.ts";
+import {
+	useSavedAccounts,
+	useSavedTransactions,
+} from "../../state/savedState.ts";
+import {
+	resolveTransferPeer,
+	type TransferPeerSummary,
+} from "./TransferLinkSection.tsx";
+import { transferLinkForEdge } from "../../pages/flows/TransferMatchNote.tsx";
 import { findingLabel } from "../../domain/analysisFindings.ts";
 import {
 	transactionAmountStyles,
@@ -30,6 +40,7 @@ export function TransactionRow({
 	shortfall,
 	onRemove,
 	removing,
+	transferPeer,
 }: {
 	transaction: AccountTransaction;
 	savedTransaction: Transaction | null;
@@ -40,15 +51,37 @@ export function TransactionRow({
 	/** Direct removal that keeps the row click-through intact. */
 	onRemove?: () => void;
 	removing?: boolean;
+	/**
+	 * Linked transfer peer drilled from the list. Undefined resolves the
+	 * link through the cached transfer-link query; null means unlinked.
+	 */
+	transferPeer?: TransferPeerSummary | null;
 }) {
+	const linksQuery = useTransferLinks();
+	const savedTransactions = useSavedTransactions();
+	const savedAccounts = useSavedAccounts();
+	const resolved =
+		transferPeer !== undefined
+			? transferPeer
+			: savedTransaction
+				? resolveTransferPeer({
+						transactionId: savedTransaction.id,
+						link: transferLinkForEdge(linksQuery.data?.links ?? [], [
+							savedTransaction.id,
+						]),
+						transactions: savedTransactions,
+						accounts: savedAccounts,
+					})
+				: null;
+	const linkedName = resolved?.accountName ?? resolved?.peerName ?? null;
 	const DirectionIcon =
-		transaction.flow === "transfer"
+		resolved || transaction.flow === "transfer"
 			? ArrowRightLeft
 			: transaction.direction === "in"
 				? ArrowDownLeft
 				: ArrowUpRight;
 	const tone =
-		transaction.flow === "transfer"
+		resolved || transaction.flow === "transfer"
 			? ("transfer" as const)
 			: transaction.direction === "in"
 				? ("inflow" as const)
@@ -62,6 +95,9 @@ export function TransactionRow({
 		transaction.counterparty === externalCounterpartyName("out")
 			? null
 			: transaction.counterparty;
+	// A confirmed transfer link names the linked account even though the
+	// counterparty itself is external and normally hidden.
+	const labelCounterparty = linkedName ?? counterparty;
 	const receipts = savedTransaction?.receiptIds ?? [];
 	const finding = useTransactionBNPL(savedTransaction?.id ?? "");
 	const analysisBadge =
@@ -96,9 +132,9 @@ export function TransactionRow({
 			divider={divider?.tone}
 			shortfall={transaction.shortfall > 0.01 && shortfall}
 			slots={{
-				subtitle: counterparty && (
+				subtitle: labelCounterparty && (
 					<span>
-						{transaction.direction === "in" ? "From" : "To"} {counterparty}
+						{transaction.direction === "in" ? "From" : "To"} {labelCounterparty}
 					</span>
 				),
 				mobile: (
@@ -182,7 +218,7 @@ export function TransactionRow({
 					)}
 				</>
 			}
-			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${divider ? `; ${divider.label}` : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}${analysisBadge && finding ? `; ${findingLabel(finding)}` : ""}`}
+			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${labelCounterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${labelCounterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${divider ? `; ${divider.label}` : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}${analysisBadge && finding ? `; ${findingLabel(finding)}` : ""}`}
 			onSelect={() => {
 				if (savedTransaction) onEdit(savedTransaction);
 			}}

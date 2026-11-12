@@ -94,6 +94,7 @@ import {
 import type { Frequency } from "@/api/contracts.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
+import { TransferLinkSection } from "./TransferLinkSection.tsx";
 import { scheduleHistoryTransactions } from "../../domain/scheduleHistory.ts";
 import { ScheduleHistory } from "./ScheduleHistory.tsx";
 import { TransactionCategory } from "./TransactionCategory.tsx";
@@ -1599,6 +1600,12 @@ export function TransactionDetail({
 								</div>
 							</div>
 						</div>
+					)}
+					{once && (
+						<TransferLinkSection
+							transactionId={savedTransaction.id}
+							readOnly={readOnly}
+						/>
 					)}
 					<div id={`${edit.formId}-schedule-section`} className="scroll-mt-4">
 						<ScheduleCapsule
