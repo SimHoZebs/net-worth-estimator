@@ -54,6 +54,54 @@ test("account type changes fields inline and keeps shared identity controls", as
 	await expect(dialog).toBeVisible();
 });
 
+test("ordinary debt accounts edit payment terms with save and remove", async ({
+	page,
+	request,
+}) => {
+	await page.goto("/accounts");
+	await page
+		.getByRole("button", {
+			name: "Open Student loan transactions",
+			exact: true,
+		})
+		.click();
+	const details = page.getByRole("region", { name: "Account details" });
+	await details.getByRole("tab", { name: "Account details" }).click();
+	const terms = details.getByRole("region", { name: "Payment terms" });
+	await expect(terms.getByLabel("Minimum payment in USD")).toBeVisible();
+	await terms.getByLabel("Minimum payment in USD").fill("25");
+	await terms.getByLabel("Minimum percent of the balance").fill("2");
+	await terms.getByLabel("Due day of the month").fill("15");
+	await terms.getByLabel("Statement day of the month, optional").fill("20");
+	await terms.getByRole("button", { name: "Save payment terms" }).click();
+	await expect
+		.poll(
+			async () =>
+				(await (await request.get(`${FIXTURE_API}/v1/financial-model`)).json())
+					.model.paymentTerms ?? [],
+			{ timeout: 10_000 },
+		)
+		.toEqual([
+			{
+				accountId: "loan",
+				minimumFixed: 25,
+				minimumPercent: 0.02,
+				dueDay: 15,
+				statementDay: 20,
+			},
+		]);
+	await terms.getByRole("button", { name: "Remove" }).click();
+	await expect
+		.poll(
+			async () =>
+				(await (await request.get(`${FIXTURE_API}/v1/financial-model`)).json())
+					.model.paymentTerms ?? [],
+			{ timeout: 10_000 },
+		)
+		.toEqual([]);
+	await expect(terms.getByLabel("Minimum payment in USD")).toHaveValue("");
+});
+
 test("one debt form creates one visible account and preserves terms on edit", async ({
 	page,
 	request,

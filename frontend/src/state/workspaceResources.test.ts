@@ -5,6 +5,9 @@ import {
 	checkpointsOptions,
 	getAccountBalances,
 	getCheckpoints,
+	getPaymentTermsForAccount,
+	getPaymentTermsList,
+	paymentTermsOptions,
 	reloadWorkspace,
 	resolversOptions,
 	statusOptions,
@@ -12,6 +15,7 @@ import {
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
+import { fixtureModel } from "../mocks/model.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 
 beforeEach(() => {
@@ -59,11 +63,11 @@ describe("direct Query ownership", () => {
 			serverQueryClient().fetchQuery(options),
 		]);
 		expect(
-			fetcher.mock.calls.filter(([url]) =>
-				String(url).endsWith("/v1/status"),
-			),
+			fetcher.mock.calls.filter(([url]) => String(url).endsWith("/v1/status")),
 		).toHaveLength(1);
-		expect(serverQueryClient().getQueryData(userResourceKey("status"))).toMatchObject({
+		expect(
+			serverQueryClient().getQueryData(userResourceKey("status")),
+		).toMatchObject({
 			hasModel: true,
 		});
 	});
@@ -134,7 +138,9 @@ describe("direct Query ownership", () => {
 			),
 		);
 		await Promise.resolve();
-		expect(serverQueryClient().getQueryData(userResourceKey("status"))).toMatchObject({
+		expect(
+			serverQueryClient().getQueryData(userResourceKey("status")),
+		).toMatchObject({
 			hasModel: true,
 		});
 	});
@@ -143,5 +149,31 @@ describe("direct Query ownership", () => {
 		expect(await reloadWorkspace()).toBe(true);
 		server.failStatusOnce(new Error("boom"));
 		expect(await reloadWorkspace()).toBe(false);
+	});
+	it("loads payment terms from the canonical model read", async () => {
+		const server = stubTestServer(undefined, {
+			...fixtureModel(),
+			paymentTerms: [
+				{
+					accountId: "loan",
+					minimumFixed: 25,
+					minimumPercent: 0.02,
+					dueDay: 15,
+					statementDay: 20,
+				},
+			],
+		});
+		server.setRevision("current");
+		const list = await serverQueryClient().fetchQuery(paymentTermsOptions());
+		expect(list.paymentTerms).toHaveLength(1);
+		expect(list.revision).toBe("current");
+		expect(getPaymentTermsList()?.paymentTerms).toEqual(list.paymentTerms);
+		expect(getPaymentTermsForAccount("loan")).toMatchObject({
+			minimumFixed: 25,
+			minimumPercent: 0.02,
+			dueDay: 15,
+			statementDay: 20,
+		});
+		expect(getPaymentTermsForAccount("checking")).toBeNull();
 	});
 });

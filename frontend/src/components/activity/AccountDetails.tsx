@@ -8,6 +8,7 @@ import { dateLabel } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { Checkbox } from "../Field.tsx";
 import { mergeStyles } from "../mergeStyles.ts";
+import { PaymentTermsSection } from "./PaymentTermsSection.tsx";
 import type { AccountEdit } from "./useAccountEdit.ts";
 import {
 	transactionControlStyles,
@@ -213,6 +214,7 @@ export function AccountDetails({
 				)}
 			</PropertyRow>
 			<BankDetails account={account} />
+			<PaymentTermsSection accountId={account.id} readOnly={locked} />
 		</section>
 	);
 }

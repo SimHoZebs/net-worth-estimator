@@ -83,6 +83,10 @@ export function setServerModelFixture(
 			plannedPurchases: [],
 			revision,
 		});
+		serverQueryClient().setQueryData(userResourceKey("terms"), {
+			paymentTerms: [],
+			revision,
+		});
 		return revision;
 	}
 	const model = effectiveModel;
@@ -130,6 +134,10 @@ export function setServerModelFixture(
 	);
 	serverQueryClient().setQueryData(userResourceKey("purchases"), {
 		plannedPurchases: model.plannedPurchases ?? [],
+		revision,
+	});
+	serverQueryClient().setQueryData(userResourceKey("terms"), {
+		paymentTerms: model.paymentTerms ?? [],
 		revision,
 	});
 	// Presence is a status flag. Keep an explicit fixture when a test has

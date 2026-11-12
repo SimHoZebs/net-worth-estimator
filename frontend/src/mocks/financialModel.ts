@@ -4,6 +4,7 @@ import type {
 	PlannedPurchase,
 	Transaction,
 } from "../domain/model.ts";
+import type { PaymentTerms } from "../api/generated/model/paymentTerms.ts";
 
 /** Convenience data for unit tests, never a runtime editing model. */
 export interface FinancialModelFixture {
@@ -14,6 +15,8 @@ export interface FinancialModelFixture {
 	transactions: Transaction[];
 	plannedPurchases: PlannedPurchase[];
 	evaluations: Evaluation[];
+	/** Saved payment-terms rows keyed to accounts. Empty means none set. */
+	paymentTerms?: PaymentTerms[];
 }
 
 // Small financial-model test data used only by unit tests. Production code

@@ -104,6 +104,7 @@ export function fixtureModel(
 			priority,
 			enabled: row.enabled,
 		})),
+		paymentTerms: data.paymentTerms ?? [],
 		evaluations: {
 			financialIndependence: [],
 			transactionFulfillment: [],

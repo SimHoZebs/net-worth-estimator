@@ -5,6 +5,7 @@ import { notifyError } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import {
 	getAmountResolvers,
+	getFinancialModel,
 	getServerStatus as fetchServerStatus,
 	listAccountBalances,
 	listAmountPresets,
@@ -18,6 +19,7 @@ import {
 import type { AccountBalanceRow } from "@/api/generated/model/accountBalanceRow.ts";
 import type { Checkpoint } from "@/api/generated/model/checkpoint.ts";
 import type { ListCheckpointsParams } from "@/api/generated/model/listCheckpointsParams.ts";
+import type { PaymentTerms } from "@/api/generated/model/paymentTerms.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import type { AmountPreset as GeneratedAmountPreset } from "@/api/generated/model/amountPreset.ts";
@@ -46,6 +48,7 @@ export function userResourceKey(
 		| "transactions"
 		| "rules"
 		| "purchases"
+		| "terms"
 		| "catalog"
 		| "eval-summary"
 		| "checkpoints",
@@ -243,6 +246,7 @@ export async function reloadWorkspace(
 		cache.fetchQuery(schedulesOptions(scope)),
 		cache.fetchQuery(checkpointsOptions(scope)),
 		cache.fetchQuery(purchasesOptions(scope)),
+		cache.fetchQuery(paymentTermsOptions(scope)),
 	]);
 	const requiredIdx = [0, 2, 4, 5, 6, 7, 8] as const;
 	const requiredOk = requiredIdx.every(
@@ -394,6 +398,31 @@ export function catalogOptions(scope = getUserScope()) {
 	});
 }
 
+export interface PaymentTermsList {
+	paymentTerms: PaymentTerms[];
+	revision: string | null;
+}
+
+/**
+ * Payment terms ride the canonical model read: the backend exposes no
+ * narrow terms list, only save and remove row writes. The select keeps
+ * the cache narrow so the editor prefills from one account row.
+ */
+export function paymentTermsOptions(scope = getUserScope()) {
+	return queryOptions({
+		...defaults,
+		queryKey: userResourceKey("terms", scope),
+		queryFn: async ({ signal }): Promise<PaymentTermsList> => {
+			const result = (await getFinancialModel({ signal })).data;
+			current(scope, signal);
+			return {
+				paymentTerms: result.model?.paymentTerms ?? [],
+				revision: result.revision ?? null,
+			};
+		},
+	});
+}
+
 export function useAccountBalances(options: { asOf?: string } = {}) {
 	const scope = useUserScope();
 	return useQuery(
@@ -484,6 +513,38 @@ export function useTransactionCatalog() {
 		},
 		serverQueryClient(),
 	);
+}
+
+export function usePaymentTerms(options: { enabled?: boolean } = {}) {
+	const scope = useUserScope();
+	return useQuery(
+		{
+			...paymentTermsOptions(scope),
+			refetchOnMount: "always",
+			enabled: options.enabled ?? scope.status === "ready",
+		},
+		serverQueryClient(),
+	);
+}
+
+/**
+ * Refresh the payment-terms view after a save or remove: the row
+ * refetches. Marking the row stale is not enough: nothing
+ * refetches it until the next remount.
+ */
+export async function refreshPaymentTerms(): Promise<void> {
+	const scope = getUserScope();
+	const cache = serverQueryClient();
+	await cache.invalidateQueries({
+		queryKey: userResourceKey("terms", scope),
+	});
+	if (scope !== getUserScope() || scope.status !== "ready") return;
+	// Refetch so the new row is visible immediately; failures throw instead of hiding.
+	const settled = await Promise.allSettled([
+		cache.fetchQuery(paymentTermsOptions(scope)),
+	]);
+	for (const result of settled)
+		if (result.status === "rejected") throw result.reason;
 }
 
 /**
@@ -655,4 +716,23 @@ export function getTransactionList(scope = getUserScope()) {
 				"",
 			])
 		: undefined;
+}
+
+export function getPaymentTermsList(scope = getUserScope()) {
+	return scope.status === "ready"
+		? serverQueryClient().getQueryData<PaymentTermsList>(
+				userResourceKey("terms", scope),
+			)
+		: undefined;
+}
+
+export function getPaymentTermsForAccount(
+	accountId: string,
+	scope = getUserScope(),
+) {
+	return (
+		getPaymentTermsList(scope)?.paymentTerms.find(
+			(row) => row.accountId === accountId,
+		) ?? null
+	);
 }

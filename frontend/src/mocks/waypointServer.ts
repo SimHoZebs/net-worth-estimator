@@ -67,6 +67,7 @@ export function modelFixture(): FinancialModel {
 				enabled: true,
 			},
 		],
+		paymentTerms: [],
 	};
 }
 
@@ -825,6 +826,29 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						(body as { beforeId: string | null }).beforeId ?? null,
 					);
 			}, undefined);
+		if (path === "/v1/payment-terms" && method === "POST") {
+			const terms = structuredClone(body) as Record<string, unknown>;
+			return write(() => {
+				const rows = (current.paymentTerms ??= []) as unknown as Record<
+					string,
+					unknown
+				>[];
+				const at = rows.findIndex((row) => row.accountId === terms.accountId);
+				if (at >= 0) rows[at] = terms;
+				else rows.push(terms);
+			}, terms);
+		}
+		match = path.match(/^\/v1\/payment-terms\/([^/]+)$/);
+		if (match && method === "DELETE") {
+			const [, accountId] = match;
+			return write(() => {
+				current.paymentTerms = (
+					(current.paymentTerms ?? []) as unknown as Record<string, unknown>[]
+				).filter(
+					(row) => row.accountId !== decodeURIComponent(accountId!),
+				) as unknown as typeof current.paymentTerms;
+			}, undefined);
+		}
 		throw new Error(`Unexpected test API call: ${method} ${path}`);
 	});
 	vi.stubGlobal("fetch", fetcher);
