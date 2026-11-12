@@ -37,7 +37,7 @@ func (s *handler) updateLoan(_ context.Context, input *struct {
 		return nil, huma.Error404NotFound("Loan not found")
 	}
 	for _, account := range model.Accounts {
-		if account.ID != input.ID || account.Display == nil {
+		if account.ID != input.ID || account.Display == nil || types.IsPassthroughDisplay(account.Display, account.ID) {
 			continue
 		}
 		d := account.Display
@@ -90,16 +90,17 @@ func (s *handler) updateLoan(_ context.Context, input *struct {
 		}
 		return s.saveLoan(bundle, false)
 	}
-	// Adopt a plain existing account as principal when it has no display
-	// and is not already a loan component. The existing account ID stays
-	// the principal/visible ID; fresh UUIDs back the interest account and
-	// the two rules. Existing checkpoints and history survive via upsert;
-	// the display linkage and names follow BuildLoan conventions.
+	// Adopt a plain existing account as principal when it carries a
+	// passthrough display and is not already a loan component. The existing
+	// account ID stays the principal/visible ID; fresh UUIDs back the
+	// interest account and the two rules. Existing checkpoints and history
+	// survive via upsert; the display linkage and names follow BuildLoan
+	// conventions.
 	for _, existing := range model.Accounts {
 		if existing.ID != input.ID {
 			continue
 		}
-		if existing.Display != nil {
+		if existing.Display != nil && !types.IsPassthroughDisplay(existing.Display, existing.ID) {
 			break
 		}
 		if err := requireOrdinaryAccount(model, input.ID); err != nil {
@@ -179,7 +180,7 @@ func requireOrdinaryAccount(model *types.FinancialModel, id string) error {
 		return nil
 	}
 	for _, a := range model.Accounts {
-		if a.Display == nil {
+		if a.Display == nil || types.IsPassthroughDisplay(a.Display, a.ID) {
 			continue
 		}
 		for _, c := range a.Display.Components {

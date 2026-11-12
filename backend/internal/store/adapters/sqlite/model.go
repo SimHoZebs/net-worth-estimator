@@ -225,7 +225,21 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		}
 		position++
 	}
+	claimed := map[string]bool{}
 	for _, account := range accounts {
+		if account.Display != nil && len(account.Display.Components) == 2 {
+			for _, c := range account.Display.Components {
+				claimed[c.AccountID] = true
+			}
+		}
+	}
+	for _, account := range accounts {
+		if account.Display == nil && !claimed[account.ID] {
+			account.Display = types.PassthroughDisplay(account.ID, account.Name)
+		}
+		if account.Display == nil {
+			continue
+		}
 		if err := saveAccountDisplay(tx, account); err != nil {
 			return err
 		}

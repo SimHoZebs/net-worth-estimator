@@ -3,6 +3,7 @@ import type { Account } from "./model.ts";
 import {
 	componentIds,
 	displayBalance,
+	isGroupedDisplay,
 	toDisplayAccounts,
 	toDisplayTransaction,
 } from "./accountDisplay.ts";
@@ -44,7 +45,35 @@ function fixture() {
 	return [principal, account("i", -20), account("unrelated-interest", -30)];
 }
 
+function passthrough(id: string, balance: number): Account {
+	const row = account(id, balance);
+	row.kind = "cash";
+	row.display = {
+		name: id,
+		components: [{ accountId: id, role: "primary" }],
+		interestScheduleId: "",
+		paymentScheduleId: "",
+	};
+	return row;
+}
+
 describe("visible accounts", () => {
+	it("treats only multi-component displays as grouped", () => {
+		expect(isGroupedDisplay(null)).toBe(false);
+		expect(isGroupedDisplay(undefined)).toBe(false);
+		expect(isGroupedDisplay(account("cash", 100))).toBe(false);
+		expect(isGroupedDisplay(passthrough("cash", 100))).toBe(false);
+		expect(isGroupedDisplay(fixture()[0])).toBe(true);
+	});
+	it("leaves stored 1:1 passthrough rows untouched", () => {
+		const ordinary = passthrough("cash", 100);
+		const grouped = toDisplayAccounts([ordinary, ...fixture()]);
+		expect(grouped).toHaveLength(3);
+		expect(grouped[0]).toBe(ordinary);
+		expect(grouped[0]).toMatchObject({ maxBalance: 0 });
+		expect(componentIds(grouped[0]!)).toEqual(["cash"]);
+		expect(isGroupedDisplay(grouped[0])).toBe(false);
+	});
 	it("groups explicit roles once and preserves ordinary accounts", () => {
 		const raw = fixture();
 		const grouped = toDisplayAccounts(raw);

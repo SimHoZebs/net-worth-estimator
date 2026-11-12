@@ -83,6 +83,7 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 	if err != nil {
 		return nil, err
 	}
+	account.Display = types.PassthroughDisplay(account.ID, account.Name)
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
@@ -126,6 +127,7 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 		return nil
 	}
 	row, issues, saved, revision, err := runFinanceRowWriteGuarded(s, guard, func(model *types.FinancialModel) {
+		account.Display = types.PassthroughDisplay(account.ID, account.Name)
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}

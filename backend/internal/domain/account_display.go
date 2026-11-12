@@ -59,6 +59,14 @@ func validateAccountDisplays(issues *[]types.ModelValidationIssue, model *types.
 		if d == nil {
 			continue
 		}
+		if types.IsPassthroughDisplay(d, a.ID) {
+			if claimed[a.ID] {
+				addIssue(issues, types.SeverityError, "account.display.invalid", "An account must belong to exactly one visible account.", "accounts", i, "display")
+				continue
+			}
+			claimed[a.ID] = true
+			continue
+		}
 		invalid := strings.TrimSpace(d.Name) == "" || len(d.Components) != 2
 		roles := map[string]string{}
 		for _, c := range d.Components {
@@ -83,6 +91,11 @@ func validateAccountDisplays(issues *[]types.ModelValidationIssue, model *types.
 		}
 		if invalid {
 			addIssue(issues, types.SeverityError, "account.display.invalid", "A loan needs exclusive principal and interest components, matching inclusion, zero ceilings, and its interest and payment rules.", "accounts", i, "display")
+		}
+	}
+	for i, a := range model.Accounts {
+		if !claimed[a.ID] {
+			addIssue(issues, types.SeverityError, "account.display.invalid", "Every account must belong to exactly one visible account.", "accounts", i, "display")
 		}
 	}
 }

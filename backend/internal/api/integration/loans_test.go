@@ -112,6 +112,26 @@ func TestLoanDeleteRemovesOwnedRows(t *testing.T) {
 	}
 }
 
+func TestLoanDeleteRejectsOrdinaryAccount(t *testing.T) {
+	st := openAPIStore(t)
+	ordinary, err := st.CreateAccount(types.Account{Name: "Checking", Kind: "cash", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	res := doRowRequest(t, h, http.MethodDelete, "/v1/loans/"+ordinary.ID, "")
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("delete ordinary via loans status = %d, want 404: %s", res.Code, res.Body.String())
+	}
+	model, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if model == nil || len(model.Accounts) != 1 {
+		t.Fatalf("ordinary account must survive: %+v", model)
+	}
+}
+
 func TestLinkedLoanNameEditPreservesExactRuleAmounts(t *testing.T) {
 	st := openAPIStore(t)
 	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {

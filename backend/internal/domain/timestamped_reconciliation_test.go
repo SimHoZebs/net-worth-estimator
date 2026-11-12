@@ -12,7 +12,7 @@ func unixAt(day, hour int) int64 {
 }
 
 func cashAccount(id string) types.Account {
-	return types.Account{ID: id, Name: id, Kind: types.AccountKindCash, Enabled: true}
+	return types.Account{ID: id, Name: id, Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay(id, id)}
 }
 
 func expenseAmount(expression string) types.TransactionAmountResolution {

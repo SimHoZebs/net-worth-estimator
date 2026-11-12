@@ -11,7 +11,7 @@ func TestLoanUsesPrincipalOnlyAndPaysInterestFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	accounts := append(b.Accounts, types.Account{ID: "cash", Name: "Cash", Kind: "cash", Enabled: true})
+	accounts := append(b.Accounts, types.Account{ID: "cash", Name: "Cash", Kind: "cash", Enabled: true, Display: types.PassthroughDisplay("cash", "Cash")})
 	model := &types.FinancialModel{Accounts: accounts, Schedules: b.Schedules, Checkpoints: b.Checkpoints, Evaluations: types.EmptyEvaluationTables()}
 	for _, issue := range ValidateFinanceModel(model) {
 		if issue.Severity == types.SeverityError {

@@ -12,7 +12,18 @@
             "enabled": true,
             "id": "checking",
             "kind": "cash",
-            "name": "Checking"
+            "name": "Checking",
+            "display": {
+              "name": "Checking",
+              "components": [
+                {
+                  "accountId": "checking",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           }
         ],
         "checkpoints": [],
@@ -36,7 +47,7 @@
             "destinations": [],
             "enabled": true,
             "id": "72a671f5-b0b2-503b-b9ea-5ce5c665a645",
-            "name": "Café Münchén ☕",
+            "name": "Caf\u00e9 M\u00fcnch\u00e9n \u2615",
             "postedTime": 1781524800,
             "sourceAccountId": "checking",
             "transactionTime": 1781524800
@@ -51,7 +62,7 @@
             "destinations": [],
             "enabled": true,
             "id": "7c42bb55-7a7f-572a-b064-768180f637d9",
-            "name": "東京ラーメン 🍜",
+            "name": "\u6771\u4eac\u30e9\u30fc\u30e1\u30f3 \ud83c\udf5c",
             "postedTime": 1781524800,
             "sourceAccountId": "checking",
             "transactionTime": 1781524800
@@ -66,7 +77,7 @@
             "destinations": [],
             "enabled": true,
             "id": "050610de-cd15-5259-99de-94bd6f1a96b9",
-            "name": "مطعم دمشق 🧆",
+            "name": "\u0645\u0637\u0639\u0645 \u062f\u0645\u0634\u0642 \ud83e\uddc6",
             "postedTime": 1781524800,
             "sourceAccountId": "checking",
             "transactionTime": 1781524800
@@ -81,7 +92,7 @@
             "destinations": [],
             "enabled": true,
             "id": "69550c9e-86e2-5152-87b5-351c9d29e7e9",
-            "name": "Café münster",
+            "name": "Cafe\u0301 mu\u0308nster",
             "postedTime": 1781524800,
             "sourceAccountId": "checking",
             "transactionTime": 1781524800
@@ -96,7 +107,7 @@
             "destinations": [],
             "enabled": true,
             "id": "4acd0d46-a89e-57b0-b2f1-dede5b1c4eb9",
-            "name": "Family deli ‍👨‍👩‍👧",
+            "name": "Family deli \u200d\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67",
             "postedTime": 1781524800,
             "sourceAccountId": "checking",
             "transactionTime": 1781524800

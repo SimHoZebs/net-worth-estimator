@@ -13,6 +13,7 @@ import {
 } from "../../domain/transactionSort.ts";
 import { balanceRowToDisplay } from "../../api/adapter.ts";
 import {
+	isGroupedDisplay,
 	toDisplayAccounts,
 	toDisplayTransaction,
 } from "../../domain/accountDisplay.ts";
@@ -99,7 +100,9 @@ function AccountsView({
 		setRemoveError(null);
 		const ok = await performSave({
 			call: () =>
-				remove.display ? deleteLoan(remove.id) : deleteAccount(remove.id),
+				isGroupedDisplay(remove)
+					? deleteLoan(remove.id)
+					: deleteAccount(remove.id),
 			refresh: refreshAccounts,
 			failureMessage: "The account could not be removed.",
 		});

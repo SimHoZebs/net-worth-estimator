@@ -37,7 +37,7 @@ func purchaseRequest(balance float64, items ...any) types.SimulationRequest {
 	return types.SimulationRequest{
 		StartDate: "2026-02-01", EndDate: "2026-03-10", IncludeStartDateEvents: true,
 		Model: types.SimulationInputs{
-			Accounts:         []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
+			Accounts:         []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true, Display: types.PassthroughDisplay("cash", "Cash")}},
 			Transactions:     transactions,
 			PlannedPurchases: purchases,
 		},
@@ -310,7 +310,7 @@ func TestPurchaseProtectsDownstreamTransferAndLaterRecurringBill(t *testing.T) {
 		establishedTransaction("transfer", "2026-02-02", "900", false),
 		establishedTransaction("pay", "2026-02-04", "1000", true))
 	floor := 0.0
-	request.Model.Accounts = append(request.Model.Accounts, types.Account{ID: "bills", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true})
+	request.Model.Accounts = append(request.Model.Accounts, types.Account{ID: "bills", Name: "bills", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true, Display: types.PassthroughDisplay("bills", "bills")})
 	request.Model.Transactions[0].Destinations = []string{"bills"}
 	account := "bills"
 	end := "2026-02-03"
@@ -334,7 +334,7 @@ func TestPurchaseUsesCanonicalDestinationLimitDistinction(t *testing.T) {
 		plannedPurchase("want", "2026-02-01", "500", 0),
 		establishedTransaction("transfer", "2026-02-02", "900", false))
 	ceiling := 0.0
-	request.Model.Accounts = append(request.Model.Accounts, types.Account{ID: "paid-debt", Kind: types.AccountKindDebt, MaxBalance: &ceiling, Enabled: true})
+	request.Model.Accounts = append(request.Model.Accounts, types.Account{ID: "paid-debt", Name: "paid-debt", Kind: types.AccountKindDebt, MaxBalance: &ceiling, Enabled: true, Display: types.PassthroughDisplay("paid-debt", "paid-debt")})
 	request.Model.Transactions[0].Destinations = []string{"paid-debt"}
 	run, err := simulatePurchases(request)
 	if err != nil {

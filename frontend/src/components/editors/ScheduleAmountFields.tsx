@@ -3,6 +3,7 @@ import {
 	SCHEDULE_AMOUNT_RECIPES,
 	type AmountFields,
 } from "../../domain/scheduleAmounts.ts";
+import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 
 export function ScheduleAmountFields({
 	recipeId,
@@ -16,7 +17,12 @@ export function ScheduleAmountFields({
 	values: AmountFields;
 	onRecipe: (id: string) => void;
 	onChange: (key: string, value: string) => void;
-	accounts: { id: string; name: string; kind: string; display?: unknown }[];
+	accounts: {
+		id: string;
+		name: string;
+		kind: string;
+		display?: { components?: readonly unknown[] | null } | null;
+	}[];
 	schedules: { id: string; name: string }[];
 }) {
 	const recipe = SCHEDULE_AMOUNT_RECIPES.find(
@@ -70,7 +76,7 @@ export function ScheduleAmountFields({
 							? schedules
 							: accounts.filter(
 									(account) =>
-										!account.display &&
+										!isGroupedDisplay(account) &&
 										(field.kind === "debt"
 											? account.kind === "debt"
 											: account.kind !== "debt"),

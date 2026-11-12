@@ -17,6 +17,7 @@ import { Modal } from "../Modal.tsx";
 import { FieldError } from "../ErrorNotice.tsx";
 import { LoanEditor } from "./LoanEditor.tsx";
 import { OrdinaryAccountEditor } from "./OrdinaryAccountEditor.tsx";
+import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 
 /** One stable dialog and identity section; account type owns the detail fields. */
 export function AccountEditor(props: {
@@ -26,7 +27,9 @@ export function AccountEditor(props: {
 }) {
 	const { item, onClose } = props;
 	const initialType =
-		item?.display || item?.kind === "debt" ? "loan" : (item?.kind ?? "cash");
+		isGroupedDisplay(item) || item?.kind === "debt"
+			? "loan"
+			: (item?.kind ?? "cash");
 	const [type, setType] = useState<Account["kind"] | "loan">(initialType);
 	const [name, setName] = useState(item?.name ?? "");
 	const [enabled, setEnabled] = useState(item?.enabled ?? true);
@@ -96,7 +99,9 @@ export function AccountEditor(props: {
 	return (
 		<Modal
 			title={
-				item?.display ? `Edit ${item.name}` : `${item ? "Edit" : "Add"} account`
+				item && isGroupedDisplay(item)
+					? `Edit ${item.name}`
+					: `${item ? "Edit" : "Add"} account`
 			}
 			onClose={onClose}
 		>
@@ -117,7 +122,7 @@ export function AccountEditor(props: {
 						changeType(next as Account["kind"] | "loan");
 					}
 				}}
-				disabled={!!item?.display || saving}
+				disabled={isGroupedDisplay(item) || saving}
 			/>
 			<FieldError message={typeError} />
 			<fieldset

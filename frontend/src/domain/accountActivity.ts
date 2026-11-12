@@ -1,5 +1,5 @@
 import { shiftDate } from "./format.ts";
-import { displayAccountId } from "./accountDisplay.ts";
+import { displayAccountId, isGroupedDisplay } from "./accountDisplay.ts";
 import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
 import {
 	isHistoricalTransaction,
@@ -86,7 +86,7 @@ export function accountTransactions({
 	startDate: string;
 	projection?: Projection | null;
 }): AccountTransaction[] {
-	if (accounts.some((a) => a.display)) {
+	if (accounts.some((a) => isGroupedDisplay(a))) {
 		const resolve = (id: string | null) =>
 			id ? displayAccountId(accounts, id) : null;
 		transactions = transactions.map((t) => ({

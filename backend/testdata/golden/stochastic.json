@@ -12,7 +12,18 @@
         "kind": "cash",
         "maxBalance": 10000000000000,
         "minBalance": -10000000000000,
-        "name": "checking"
+        "name": "checking",
+        "display": {
+          "name": "checking",
+          "components": [
+            {
+              "accountId": "checking",
+              "role": "primary"
+            }
+          ],
+          "interestScheduleId": "",
+          "paymentScheduleId": ""
+        }
       },
       {
         "color": null,
@@ -21,7 +32,18 @@
         "kind": "investment",
         "maxBalance": 10000000000000,
         "minBalance": -10000000000000,
-        "name": "brokerage"
+        "name": "brokerage",
+        "display": {
+          "name": "brokerage",
+          "components": [
+            {
+              "accountId": "brokerage",
+              "role": "primary"
+            }
+          ],
+          "interestScheduleId": "",
+          "paymentScheduleId": ""
+        }
       },
       {
         "color": null,
@@ -30,7 +52,18 @@
         "kind": "debt",
         "maxBalance": 10000000000000,
         "minBalance": -10000000000000,
-        "name": "loan"
+        "name": "loan",
+        "display": {
+          "name": "loan",
+          "components": [
+            {
+              "accountId": "loan",
+              "role": "primary"
+            }
+          ],
+          "interestScheduleId": "",
+          "paymentScheduleId": ""
+        }
       }
     ],
     "checkpoints": [],

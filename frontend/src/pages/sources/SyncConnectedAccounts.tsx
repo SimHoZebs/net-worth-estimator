@@ -13,6 +13,7 @@ import {
 	useAccountBalances,
 } from "../../state/workspaceResources.ts";
 import { SyncLinkAccountDialog } from "./SyncLinkAccountDialog.tsx";
+import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 
 export function SyncConnectedAccounts({
 	onLinked,
@@ -38,7 +39,7 @@ export function SyncConnectedAccounts({
 		() =>
 			(savedAccounts ?? []).filter(
 				(account) =>
-					!account.display &&
+					!isGroupedDisplay(account) &&
 					!account.readOnly &&
 					!linkedAccountIDs.has(account.id),
 			),
@@ -100,7 +101,7 @@ export function SyncConnectedAccounts({
 										menuLabel="Synced account actions"
 										items={
 											account &&
-											!account.display &&
+											!isGroupedDisplay(account) &&
 											!readOnly &&
 											manualAccounts.length > 0
 												? [

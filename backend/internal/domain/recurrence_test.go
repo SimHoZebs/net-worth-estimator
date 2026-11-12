@@ -16,7 +16,7 @@ func claimTestModel() *types.FinancialModel {
 	return &types.FinancialModel{
 		SourcePath: "test",
 		Accounts: []types.Account{
-			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
+			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay(checking, "Checking")},
 		},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: checking, Balance: 10000, ObservedAt: 1764633599},

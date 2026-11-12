@@ -29,6 +29,31 @@ func saveAccountDisplay(tx *userTx, account types.Account) error {
 	return err
 }
 
+func savePassthroughDisplayTx(tx *userTx, accountID, accountName string) error {
+	display := types.PassthroughDisplay(accountID, accountName)
+	data, err := json.Marshal(display)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`INSERT INTO account_displays (account_id, display_json, user_id) VALUES (?, ?, :user_id) ON CONFLICT(user_id, account_id) DO UPDATE SET display_json = excluded.display_json`, accountID, string(data))
+	return err
+}
+
+func existingDisplayIsGrouped(tx *userTx, accountID string) (bool, error) {
+	var data string
+	if err := tx.QueryRow(`SELECT display_json FROM account_displays WHERE account_id = ? AND user_id = :user_id`, accountID).Scan(&data); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	var display types.AccountDisplay
+	if err := json.Unmarshal([]byte(data), &display); err != nil {
+		return false, err
+	}
+	return len(display.Components) == 2, nil
+}
+
 func loadAccountDisplays(q queryer, accounts []types.Account) error {
 	rows, err := q.Query(`SELECT account_id, display_json FROM account_displays WHERE user_id = :user_id`)
 	if err != nil {
@@ -151,7 +176,7 @@ func (s *sqliteStore) DeleteLoan(id string) error {
 			return NotFound(id)
 		}
 		for _, a := range model.Accounts {
-			if a.ID != id || a.Display == nil {
+			if a.ID != id || a.Display == nil || types.IsPassthroughDisplay(a.Display, a.ID) {
 				continue
 			}
 			for _, ruleID := range []string{a.Display.InterestScheduleID, a.Display.PaymentScheduleID} {

@@ -10,7 +10,7 @@ import (
 )
 
 func executionTestAccount(id string, minBalance float64) types.Account {
-	return types.Account{ID: id, Name: id, Kind: types.AccountKindCash, MinBalance: &minBalance, Enabled: true}
+	return types.Account{ID: id, Name: id, Kind: types.AccountKindCash, MinBalance: &minBalance, Enabled: true, Display: types.PassthroughDisplay(id, id)}
 }
 
 func executionTestRuntime(accounts []types.Account, balances map[string]float64) *TransitionRuntime {
@@ -212,7 +212,7 @@ func TestResolveOccurrences(t *testing.T) {
 // path folded into every trial is bit-identical to N identical trials.
 func TestStochasticShortCircuitMatchesFullRun(t *testing.T) {
 	model := &types.FinancialModel{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
+		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")}},
 		Transactions: []types.Transaction{{
 			ID: "bonus", Name: "Bonus", Destinations: []string{"checking"},
 			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},

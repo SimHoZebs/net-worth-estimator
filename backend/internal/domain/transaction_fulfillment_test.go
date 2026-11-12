@@ -33,7 +33,7 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			source := "checking"
 			transaction := types.Transaction{ID: "bill", Name: "Bill", SourceAccountID: &source, Enabled: true}
-			account := types.Account{ID: source, Name: "Checking", Kind: types.AccountKindCash, MinBalance: &tc.floor, Enabled: true}
+			account := types.Account{ID: source, Name: "Checking", Kind: types.AccountKindCash, MinBalance: &tc.floor, Enabled: true, Display: types.PassthroughDisplay(source, "Checking")}
 			event := types.TransactionEvent{
 				Date: "2026-02-05", Sequence: 1,
 				Origin:          types.TransactionOrigin{Type: "transaction", TransactionID: transaction.ID},
@@ -52,7 +52,7 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 			if tc.destinationLimit {
 				ceiling := tc.realized
 				transaction.Destinations = []string{"loan"}
-				model.Accounts = append(model.Accounts, types.Account{ID: "loan", Name: "Loan", MaxBalance: &ceiling, Enabled: true})
+				model.Accounts = append(model.Accounts, types.Account{ID: "loan", Name: "Loan", MaxBalance: &ceiling, Enabled: true, Display: types.PassthroughDisplay("loan", "Loan")})
 				row.AccountSnapshots = append(row.AccountSnapshots, types.AccountSnapshot{AccountID: "loan", Balance: ceiling})
 				event.AccountDeltas = append(event.AccountDeltas, transactionAccountDelta{AccountID: "loan", Delta: tc.realized})
 			}

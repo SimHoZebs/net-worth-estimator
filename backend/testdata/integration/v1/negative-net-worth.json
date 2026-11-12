@@ -13,33 +13,88 @@
             "id": "checking",
             "kind": "cash",
             "name": "Everyday checking",
-            "minBalance": 0
+            "minBalance": 0,
+            "display": {
+              "name": "Everyday checking",
+              "components": [
+                {
+                  "accountId": "checking",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "enabled": true,
             "id": "savings",
             "kind": "investment",
             "name": "Investment portfolio",
-            "minBalance": 0
+            "minBalance": 0,
+            "display": {
+              "name": "Investment portfolio",
+              "components": [
+                {
+                  "accountId": "savings",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "enabled": true,
             "id": "brokerage",
             "kind": "investment",
-            "name": "Brokerage"
+            "name": "Brokerage",
+            "display": {
+              "name": "Brokerage",
+              "components": [
+                {
+                  "accountId": "brokerage",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "enabled": true,
             "id": "loan",
             "kind": "debt",
             "name": "Student loan",
-            "maxBalance": 0
+            "maxBalance": 0,
+            "display": {
+              "name": "Student loan",
+              "components": [
+                {
+                  "accountId": "loan",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "enabled": true,
             "id": "home",
             "kind": "property",
-            "name": "Home value"
+            "name": "Home value",
+            "display": {
+              "name": "Home value",
+              "components": [
+                {
+                  "accountId": "home",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           }
         ],
         "checkpoints": [

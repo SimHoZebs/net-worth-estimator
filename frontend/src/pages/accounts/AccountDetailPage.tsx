@@ -26,6 +26,7 @@ import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
 import { LoanDetails } from "../../components/activity/LoanDetails.tsx";
 import {
 	componentIds,
+	isGroupedDisplay,
 	toDisplayTransaction,
 } from "../../domain/accountDisplay.ts";
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
@@ -66,8 +67,11 @@ export function AccountDetailView({
 }) {
 	const [view, setView] = useTransactionView();
 	// Display accounts keep their atomic loan editor and component balances.
-	const locked = readOnly || account.readOnly || Boolean(account.display);
-	const adjustments = useAccountAdjustments(account.id, !account.display);
+	const locked = readOnly || account.readOnly || isGroupedDisplay(account);
+	const adjustments = useAccountAdjustments(
+		account.id,
+		!isGroupedDisplay(account),
+	);
 	const edit = useAccountEdit(account, locked, adjustments.data ?? []);
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
@@ -247,7 +251,7 @@ export function AccountDetailView({
 			>
 				{view === "transactions" ? (
 					<>
-						{!account.display && adjustments.isPending && (
+						{!isGroupedDisplay(account) && adjustments.isPending && (
 							<p role="status">Loading balance adjustments…</p>
 						)}
 						{adjustments.isError && (
@@ -295,7 +299,7 @@ export function AccountDetailView({
 							onEdit={requestEdit}
 						/>
 					)
-				) : account.display ? (
+				) : isGroupedDisplay(account) ? (
 					<LoanDetails
 						account={account}
 						readOnly={readOnly}

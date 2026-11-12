@@ -149,8 +149,8 @@ func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 	salaryAt, groceriesAt, saveAt := stamp(time.September, 15), stamp(time.September, 16), stamp(time.September, 17)
 	model := &types.FinancialModel{
 		Accounts: []types.Account{
-			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
-			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
+			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")},
+			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("savings", "Savings")},
 		},
 		Transactions: []types.Transaction{
 			{

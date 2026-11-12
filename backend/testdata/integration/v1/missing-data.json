@@ -12,13 +12,35 @@
             "enabled": true,
             "id": "checking",
             "kind": "cash",
-            "name": "Checking"
+            "name": "Checking",
+            "display": {
+              "name": "Checking",
+              "components": [
+                {
+                  "accountId": "checking",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "enabled": true,
             "id": "mystery-card",
             "kind": "debt",
-            "name": "Unknown card"
+            "name": "Unknown card",
+            "display": {
+              "name": "Unknown card",
+              "components": [
+                {
+                  "accountId": "mystery-card",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           }
         ],
         "checkpoints": [],

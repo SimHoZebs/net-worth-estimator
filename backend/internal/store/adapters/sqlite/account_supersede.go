@@ -142,6 +142,9 @@ func supersedeCheckPreconditions(tx *userTx, model *types.FinancialModel, manual
 		if account.Display == nil {
 			continue
 		}
+		if types.IsPassthroughDisplay(account.Display, account.ID) {
+			continue
+		}
 		for _, component := range account.Display.Components {
 			if component.AccountID == manual.ID || component.AccountID == synced.ID {
 				return fmt.Errorf("%w: loan components cannot be merged with bank accounts", store.ErrAccountSupersedeInvalid)
@@ -199,6 +202,12 @@ func supersedeAccountProfile(tx *userTx, manual types.Account, syncedID string) 
 		manual.Name, string(manual.Kind), valueOr(manual.MinBalance, types.NoFloor), valueOr(manual.MaxBalance, types.NoCeiling), nullable(manual.Color), position, syncedID,
 	); err != nil {
 		return fmt.Errorf("move account profile %s to %s: %w", manual.ID, syncedID, err)
+	}
+	// Both sides carry passthrough displays: keep the synced row identity
+	// and rename it to the inherited profile. The manual row cascades on
+	// delete, so no display strands or duplicates.
+	if err := savePassthroughDisplayTx(tx, syncedID, manual.Name); err != nil {
+		return fmt.Errorf("move display %s to %s: %w", manual.ID, syncedID, err)
 	}
 	return nil
 }

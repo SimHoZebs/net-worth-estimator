@@ -33,17 +33,22 @@ managed schedules atomically. Other financial references block deletion.
 
 ## Existing databases
 
-Run the explicit operator upgrade before this release serves an existing
+Run the explicit operator backfill before this release serves an existing
 database. Stop writes and retain the database backup. Runtime and normal
-setup never convert existing loans or infer relationships.
+setup never convert existing accounts or infer relationships.
 
 ```sh
-python3 backend/scripts/one-time/account-displays/upgrade.py --db /path/app.db --backup /path/app.before-displays.db
+python3 backend/scripts/one-time/account-passthroughs/upgrade.py --db /path/app.db --backup /path/app.before-passthroughs.db
 ```
 
-To link an existing pair, use a reviewed JSON file with `userId`,
-`principalId`, `interestId`, `interestScheduleId`, `paymentScheduleId`, and
-`name`. Pass its path through `--link`. It preserves all account and rule
+The backfill writes a stored 1:1 passthrough display row for every account
+that lacks visible coverage and leaves grouped loan displays untouched. Do
+not use the same backup destination twice.
+
+To link an existing loan pair, use the older loan-link tool with a reviewed
+JSON file with `userId`, `principalId`, `interestId`,
+`interestScheduleId`, `paymentScheduleId`, and `name`. Pass its path through
+`--link` to `backend/scripts/one-time/account-displays/upgrade.py`. It preserves all account and rule
 IDs, amounts, and history. Do not use the same backup destination twice.
 The link tool rejects calculated payments, custom interest formulas, volatility,
 annual caps, end dates, and mismatched inclusion. Those rules cannot round-trip
@@ -55,4 +60,7 @@ ordinary account view after deployment.
 
 Future debt products can extend the explicit role mapping and their own
 setup compiler. Capitalization can use a transfer from principal to interest
-under a separate product contract. Ordinary accounts require no metadata.
+under a separate product contract. Ordinary accounts carry a stored 1:1
+passthrough display row written at creation; grouped displays work as before.
+Existing databases gain their passthrough rows through the one-time backfill
+script rather than at runtime.

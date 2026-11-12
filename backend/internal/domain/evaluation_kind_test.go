@@ -80,7 +80,7 @@ func kindTestPath(t *testing.T) *types.ProjectionPath {
 	t.Helper()
 	floor := 0.0
 	model := &types.FinancialModel{
-		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
+		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true, Display: types.PassthroughDisplay("cash", "Cash")}},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-02-01", HorizonYears: 1}
@@ -173,7 +173,7 @@ func TestResimulationGuardToleratesBriefCrossRequestOverlap(t *testing.T) {
 func kindTestModel() (*types.FinancialModel, *types.ProjectionRuntimeSettings) {
 	floor := 0.0
 	model := &types.FinancialModel{
-		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
+		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true, Display: types.PassthroughDisplay("cash", "Cash")}},
 		Evaluations: types.EmptyEvaluationTables(),
 		Transactions: []types.Transaction{{
 			ID: "pay", Name: "Pay", Destinations: []string{"cash"}, Enabled: true,

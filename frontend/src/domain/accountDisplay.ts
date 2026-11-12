@@ -2,6 +2,22 @@ import type { Account, Transaction } from "./model.ts";
 
 type DisplayIdentity = { id: string; display?: Account["display"] };
 
+/**
+ * A display counts as grouped when it owns more than one component
+ * (equivalently both rule IDs are non-empty). Passthrough rows carry a
+ * 1:1 stored display, so display presence alone never means grouped.
+ */
+export function isGroupedDisplay(
+	account:
+		| {
+				display?: { components?: readonly unknown[] | null } | null;
+		  }
+		| null
+		| undefined,
+): boolean {
+	return (account?.display?.components?.length ?? 0) > 1;
+}
+
 export function componentIds(account: DisplayIdentity): string[] {
 	return account.display?.components.map((c) => c.accountId) ?? [account.id];
 }
@@ -30,10 +46,11 @@ export function toDisplayTransaction(
 			transaction.readOnly ||
 			accounts.some(
 				(a) =>
-					a.display &&
-					[a.display.interestScheduleId, a.display.paymentScheduleId].includes(
-						transaction.id,
-					),
+					isGroupedDisplay(a) &&
+					[
+						a.display!.interestScheduleId,
+						a.display!.paymentScheduleId,
+					].includes(transaction.id),
 			),
 		fromId: transaction.fromId
 			? displayAccountId(accounts, transaction.fromId)
@@ -53,8 +70,9 @@ export function toDisplayAccounts(accounts: Account[]): Account[] {
 	return accounts
 		.filter((a) => !hidden.has(a.id))
 		.map((a) => {
-			if (!a.display) return a;
-			const members = a.display.components.map((c) => ({
+			if (!isGroupedDisplay(a)) return a;
+			const display = a.display!;
+			const members = display.components.map((c) => ({
 				...c,
 				account: byId.get(c.accountId),
 			}));
@@ -75,7 +93,7 @@ export function toDisplayAccounts(accounts: Account[]): Account[] {
 			);
 			return {
 				...a,
-				name: a.display.name,
+				name: display.name,
 				maxBalance: null,
 				components,
 				balance: components.reduce((sum, c) => sum + c.balance, 0),

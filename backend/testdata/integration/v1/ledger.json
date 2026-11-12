@@ -12,13 +12,35 @@
             "enabled": true,
             "id": "checking",
             "kind": "cash",
-            "name": "Checking"
+            "name": "Checking",
+            "display": {
+              "name": "Checking",
+              "components": [
+                {
+                  "accountId": "checking",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "enabled": true,
             "id": "card",
             "kind": "cash",
-            "name": "Card"
+            "name": "Card",
+            "display": {
+              "name": "Card",
+              "components": [
+                {
+                  "accountId": "card",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           }
         ],
         "checkpoints": [

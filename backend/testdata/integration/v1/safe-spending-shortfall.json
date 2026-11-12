@@ -17,7 +17,18 @@
             "minBalance": 0,
             "maxBalance": null,
             "color": "#2f6f4f",
-            "enabled": true
+            "enabled": true,
+            "display": {
+              "name": "Everyday checking",
+              "components": [
+                {
+                  "accountId": "checking",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "id": "savings",
@@ -26,7 +37,18 @@
             "minBalance": 0,
             "maxBalance": null,
             "color": "#3d7a5c",
-            "enabled": true
+            "enabled": true,
+            "display": {
+              "name": "Investment portfolio",
+              "components": [
+                {
+                  "accountId": "savings",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "id": "brokerage",
@@ -35,7 +57,18 @@
             "minBalance": null,
             "maxBalance": null,
             "color": "#2b5f8a",
-            "enabled": true
+            "enabled": true,
+            "display": {
+              "name": "Brokerage",
+              "components": [
+                {
+                  "accountId": "brokerage",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "id": "loan",
@@ -44,7 +77,18 @@
             "minBalance": null,
             "maxBalance": 0,
             "color": "#8a4b2b",
-            "enabled": true
+            "enabled": true,
+            "display": {
+              "name": "Student loan",
+              "components": [
+                {
+                  "accountId": "loan",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           },
           {
             "id": "home",
@@ -53,7 +97,18 @@
             "minBalance": null,
             "maxBalance": null,
             "color": "#7a5c2b",
-            "enabled": true
+            "enabled": true,
+            "display": {
+              "name": "Home value",
+              "components": [
+                {
+                  "accountId": "home",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           }
         ],
         "checkpoints": [

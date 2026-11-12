@@ -21,9 +21,9 @@ func flowTestModel() *types.FinancialModel {
 	savings := "savings"
 	return &types.FinancialModel{
 		Accounts: []types.Account{
-			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
-			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
-			{ID: "vault", Name: "Vault", Kind: types.AccountKindCash, Enabled: true},
+			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")},
+			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("savings", "Savings")},
+			{ID: "vault", Name: "Vault", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("vault", "Vault")},
 		},
 		Transactions: []types.Transaction{
 			{
@@ -231,8 +231,8 @@ func settledHistoryTestModel() *types.FinancialModel {
 	savings := "savings"
 	model := &types.FinancialModel{
 		Accounts: []types.Account{
-			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
-			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
+			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")},
+			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("savings", "Savings")},
 		},
 	}
 	stamp := func(year int, month time.Month, day int) int64 {

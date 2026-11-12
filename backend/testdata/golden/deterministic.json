@@ -9,7 +9,18 @@
         "maxBalance": 10000000000000,
         "color": null,
         "enabled": true,
-        "id": "checking"
+        "id": "checking",
+        "display": {
+          "name": "checking",
+          "components": [
+            {
+              "accountId": "checking",
+              "role": "primary"
+            }
+          ],
+          "interestScheduleId": "",
+          "paymentScheduleId": ""
+        }
       },
       {
         "name": "brokerage",
@@ -18,7 +29,18 @@
         "maxBalance": 10000000000000,
         "color": null,
         "enabled": true,
-        "id": "brokerage"
+        "id": "brokerage",
+        "display": {
+          "name": "brokerage",
+          "components": [
+            {
+              "accountId": "brokerage",
+              "role": "primary"
+            }
+          ],
+          "interestScheduleId": "",
+          "paymentScheduleId": ""
+        }
       },
       {
         "name": "loan",
@@ -27,7 +49,18 @@
         "maxBalance": 10000000000000,
         "color": null,
         "enabled": true,
-        "id": "loan"
+        "id": "loan",
+        "display": {
+          "name": "loan",
+          "components": [
+            {
+              "accountId": "loan",
+              "role": "primary"
+            }
+          ],
+          "interestScheduleId": "",
+          "paymentScheduleId": ""
+        }
       }
     ],
     "checkpoints": [],
@@ -40,7 +73,9 @@
       {
         "name": "historical_checking",
         "sourceAccountId": null,
-        "destinations": ["checking"],
+        "destinations": [
+          "checking"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -56,7 +91,9 @@
       {
         "name": "historical_brokerage",
         "sourceAccountId": null,
-        "destinations": ["brokerage"],
+        "destinations": [
+          "brokerage"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -90,7 +127,9 @@
       {
         "name": "salary",
         "sourceAccountId": null,
-        "destinations": ["checking"],
+        "destinations": [
+          "checking"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -128,7 +167,9 @@
       {
         "name": "invest",
         "sourceAccountId": "checking",
-        "destinations": ["brokerage"],
+        "destinations": [
+          "brokerage"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -147,7 +188,9 @@
       {
         "name": "paydown",
         "sourceAccountId": "checking",
-        "destinations": ["loan"],
+        "destinations": [
+          "loan"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -468,7 +511,18 @@
           "maxBalance": 10000000000000,
           "color": null,
           "enabled": true,
-          "id": "checking"
+          "id": "checking",
+          "display": {
+            "name": "checking",
+            "components": [
+              {
+                "accountId": "checking",
+                "role": "primary"
+              }
+            ],
+            "interestScheduleId": "",
+            "paymentScheduleId": ""
+          }
         },
         {
           "name": "brokerage",
@@ -477,7 +531,18 @@
           "maxBalance": 10000000000000,
           "color": null,
           "enabled": true,
-          "id": "brokerage"
+          "id": "brokerage",
+          "display": {
+            "name": "brokerage",
+            "components": [
+              {
+                "accountId": "brokerage",
+                "role": "primary"
+              }
+            ],
+            "interestScheduleId": "",
+            "paymentScheduleId": ""
+          }
         },
         {
           "name": "loan",
@@ -486,7 +551,18 @@
           "maxBalance": 10000000000000,
           "color": null,
           "enabled": true,
-          "id": "loan"
+          "id": "loan",
+          "display": {
+            "name": "loan",
+            "components": [
+              {
+                "accountId": "loan",
+                "role": "primary"
+              }
+            ],
+            "interestScheduleId": "",
+            "paymentScheduleId": ""
+          }
         }
       ],
       "checkpoints": [],
@@ -499,7 +575,9 @@
         {
           "name": "historical_checking",
           "sourceAccountId": null,
-          "destinations": ["checking"],
+          "destinations": [
+            "checking"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -518,7 +596,9 @@
         {
           "name": "historical_brokerage",
           "sourceAccountId": null,
-          "destinations": ["brokerage"],
+          "destinations": [
+            "brokerage"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -556,7 +636,9 @@
         {
           "name": "salary",
           "sourceAccountId": null,
-          "destinations": ["checking"],
+          "destinations": [
+            "checking"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -594,7 +676,9 @@
         {
           "name": "invest",
           "sourceAccountId": "checking",
-          "destinations": ["brokerage"],
+          "destinations": [
+            "brokerage"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -613,7 +697,9 @@
         {
           "name": "paydown",
           "sourceAccountId": "checking",
-          "destinations": ["loan"],
+          "destinations": [
+            "loan"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {

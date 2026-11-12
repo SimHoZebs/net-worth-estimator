@@ -12,7 +12,18 @@
             "enabled": true,
             "id": "checking",
             "kind": "cash",
-            "name": "Checking"
+            "name": "Checking",
+            "display": {
+              "name": "Checking",
+              "components": [
+                {
+                  "accountId": "checking",
+                  "role": "primary"
+                }
+              ],
+              "interestScheduleId": "",
+              "paymentScheduleId": ""
+            }
           }
         ],
         "checkpoints": [],

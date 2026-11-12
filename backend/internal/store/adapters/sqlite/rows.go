@@ -279,8 +279,14 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		}
 		account.ID = id
 	}
+	if account.Display == nil {
+		account.Display = types.PassthroughDisplay(account.ID, account.Name)
+	}
 	err := withRowTx(s.db, func(tx *userTx) error {
-		return insertAccountTx(tx, &account)
+		if err := insertAccountTx(tx, &account); err != nil {
+			return err
+		}
+		return saveAccountDisplay(tx, account)
 	})
 	if err != nil {
 		return types.Account{}, err
@@ -299,8 +305,14 @@ func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *f
 		}
 		account.ID = id
 	}
+	if account.Display == nil {
+		account.Display = types.PassthroughDisplay(account.ID, account.Name)
+	}
 	err := withRowTx(s.db, func(tx *userTx) error {
 		if err := insertAccountTx(tx, &account); err != nil {
+			return err
+		}
+		if err := saveAccountDisplay(tx, account); err != nil {
 			return err
 		}
 		if balance == nil {
@@ -326,12 +338,28 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 		return types.Account{}, NotFound("")
 	}
 	if err := withRowTx(s.db, func(tx *userTx) error {
-		return updateAccountTx(tx, &account)
+		if err := updateAccountTx(tx, &account); err != nil {
+			return err
+		}
+		if account.Display != nil {
+			return saveAccountDisplay(tx, account)
+		}
+		grouped, err := existingDisplayIsGrouped(tx, account.ID)
+		if err != nil {
+			return err
+		}
+		if grouped {
+			return nil
+		}
+		return savePassthroughDisplayTx(tx, account.ID, account.Name)
 	}); err != nil {
 		return types.Account{}, err
 	}
 	if err := s.markDirtyStart(); err != nil {
 		return types.Account{}, err
+	}
+	if account.Display == nil {
+		account.Display = types.PassthroughDisplay(account.ID, account.Name)
 	}
 	return account, nil
 }
@@ -346,6 +374,21 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 		if err := updateAccountTx(tx, &account); err != nil {
 			return err
 		}
+		if account.Display != nil {
+			if err := saveAccountDisplay(tx, account); err != nil {
+				return err
+			}
+		} else {
+			grouped, err := existingDisplayIsGrouped(tx, account.ID)
+			if err != nil {
+				return err
+			}
+			if !grouped {
+				if err := savePassthroughDisplayTx(tx, account.ID, account.Name); err != nil {
+					return err
+				}
+			}
+		}
 		if balance == nil {
 			return nil
 		}
@@ -355,6 +398,9 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 	}
 	if err := s.markDirtyStart(); err != nil {
 		return types.Account{}, err
+	}
+	if account.Display == nil {
+		account.Display = types.PassthroughDisplay(account.ID, account.Name)
 	}
 	return account, nil
 }
@@ -873,6 +919,9 @@ func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, institution, c
 		id, position, name, string(types.AccountKindCash), types.NoFloor, types.NoCeiling, nil, 1,
 	); err != nil {
 		return "", false, fmt.Errorf("provision account for %s: %w", bridgeAccountID, err)
+	}
+	if err := savePassthroughDisplayTx(tx, id, name); err != nil {
+		return "", false, fmt.Errorf("provision display for %s: %w", bridgeAccountID, err)
 	}
 	if _, err := tx.Exec(
 		`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, institution, currency, origin, last_seen_at, user_id) VALUES (?,?,?,?,?,?,?, :user_id)`,

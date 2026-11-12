@@ -108,7 +108,10 @@ test("one debt form creates one visible account and preserves terms on edit", as
 	).toHaveCount(0);
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	const saved = (await response.json()).model;
-	const primary = saved.accounts.find((a: { display?: unknown }) => a.display);
+	const primary = saved.accounts.find(
+		(a: { display?: { components?: unknown[] } }) =>
+			(a.display?.components?.length ?? 0) > 1,
+	);
 	expect(primary.display.components).toHaveLength(2);
 	expect(
 		saved.schedules.find(

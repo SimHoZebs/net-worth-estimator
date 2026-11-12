@@ -1,5 +1,7 @@
 package types
 
+import "strings"
+
 // AccountDisplay identifies one visible account backed by model accounts.
 // Its identity is the primary backing account ID, never an extra balance.
 type AccountDisplay struct {
@@ -9,9 +11,38 @@ type AccountDisplay struct {
 	PaymentScheduleID  string             `json:"paymentScheduleId"`
 }
 
+// AccountComponent is one backing account in a visible account.
 type AccountComponent struct {
 	AccountID string `json:"accountId"`
 	Role      string `json:"role"`
+}
+
+// PassthroughDisplay builds the stored display for an ordinary account:
+// a single self component with the primary role and empty rule IDs.
+func PassthroughDisplay(accountID, name string) *AccountDisplay {
+	return &AccountDisplay{
+		Name:               name,
+		Components:         []AccountComponent{{AccountID: accountID, Role: "primary"}},
+		InterestScheduleID: "",
+		PaymentScheduleID:  "",
+	}
+}
+
+// IsPassthroughDisplay reports whether display is the passthrough shape
+// owned by ownerID: a single self component with the primary role,
+// empty rule IDs, and a non-empty name.
+func IsPassthroughDisplay(display *AccountDisplay, ownerID string) bool {
+	if display == nil || len(display.Components) != 1 {
+		return false
+	}
+	if display.InterestScheduleID != "" || display.PaymentScheduleID != "" {
+		return false
+	}
+	component := display.Components[0]
+	if component.AccountID != ownerID || component.Role != "primary" {
+		return false
+	}
+	return len(strings.TrimSpace(display.Name)) > 0
 }
 
 // LoanTerms owns the account pair, observations, and recurrence rules.

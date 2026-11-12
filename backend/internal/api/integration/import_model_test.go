@@ -11,8 +11,8 @@ import (
 func importTestModel() types.FinancialModel {
 	return types.FinancialModel{
 		Accounts: []types.Account{
-			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
-			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
+			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")},
+			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("savings", "Savings")},
 		},
 		Checkpoints: []types.Checkpoint{},
 		Transactions: []types.Transaction{{

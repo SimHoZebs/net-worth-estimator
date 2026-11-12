@@ -16,6 +16,7 @@ import { Button } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
+import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 
 const frequencies = [
 	"daily",
@@ -79,7 +80,7 @@ function LoanForm({
 	const rateArguments = rateBinding?.arguments as
 		| Record<string, unknown>
 		| undefined;
-	const plain = !!item && !item.display;
+	const plain = !!item && !isGroupedDisplay(item);
 	const principal = Math.abs(
 		item?.components?.find((c) => c.role === "principal")?.balance ??
 			(plain ? (item?.balance ?? 0) : 0),
@@ -132,7 +133,7 @@ function LoanForm({
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving || item?.readOnly) return;
-		if (item?.display && (!charge || !paymentRule)) {
+		if (isGroupedDisplay(item) && (!charge || !paymentRule)) {
 			setError("The loan's account rules are missing.");
 			return;
 		}

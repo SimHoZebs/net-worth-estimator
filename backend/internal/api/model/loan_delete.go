@@ -10,7 +10,7 @@ func (s *handler) deleteLoan(_ context.Context, input *struct {
 }) (*struct{ Body writeResult[string] }, error) {
 	_, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		for _, a := range model.Accounts {
-			if a.ID != input.ID || a.Display == nil {
+			if a.ID != input.ID || a.Display == nil || types.IsPassthroughDisplay(a.Display, a.ID) {
 				continue
 			}
 			members := map[string]bool{}

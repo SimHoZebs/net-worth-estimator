@@ -45,7 +45,7 @@ func TestCurrentPositionRejectsInvalidHistoryAndDate(t *testing.T) {
 
 func TestHistoricalPositionIgnoresLaterObservationsWithoutMutatingModel(t *testing.T) {
 	model := &types.FinancialModel{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}, {ID: "other", Name: "Other", Kind: "cash", Enabled: true}},
+		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")}, {ID: "other", Name: "Other", Kind: "cash", Enabled: true, Display: types.PassthroughDisplay("other", "Other")}},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: "checking", Balance: 100, ObservedAt: 1773133200},
 			{AccountID: "checking", Balance: 900, ObservedAt: 1773306000},

@@ -10,7 +10,7 @@ import (
 func sliceTestModel() *types.FinancialModel {
 	end := "2028-01-01"
 	return &types.FinancialModel{
-		Accounts:     []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
+		Accounts:     []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true, Display: types.PassthroughDisplay("checking", "Checking")}},
 		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{{
 			ID: "salary", Name: "Salary", Destinations: []string{"checking"},
