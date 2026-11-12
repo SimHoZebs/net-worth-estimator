@@ -95,6 +95,103 @@ func withFixturePrincipal(next http.Handler) http.Handler {
 	})
 }
 
+// bankAccountSeed places one bridge account's rows onto one model account,
+// so browser and demo seeding can spread bank rows across more than one
+// bridge account (for example the two legs of a transfer pair).
+type bankAccountSeed struct {
+	BridgeAccountID string                  `json:"bridgeAccountId"`
+	BridgeName      string                  `json:"bridgeName"`
+	ModelAccountID  string                  `json:"modelAccountId"`
+	Transactions    []simplefin.Transaction `json:"transactions"`
+}
+
+// fixtureInputError marks a reset body the harness rejects before touching
+// state. The handler answers it 400 so specs fail fast instead of reseeding.
+type fixtureInputError struct{ msg string }
+
+func (e *fixtureInputError) Error() string { return e.msg }
+
+// activeBankAccountSeeds drops entries with no transactions. An empty
+// transaction list seeds nothing: no bridge account, no mapping, no link.
+func activeBankAccountSeeds(entries []bankAccountSeed) []bankAccountSeed {
+	active := make([]bankAccountSeed, 0, len(entries))
+	for _, entry := range entries {
+		if len(entry.Transactions) == 0 {
+			continue
+		}
+		active = append(active, entry)
+	}
+	return active
+}
+
+// validateBankAccountSeeds rejects a multi-bridge seed before restore clears
+// anything. known names every model account the pack plus bulk baseline
+// provides; legacy names the single bridge the legacy bankTransactions field
+// already claims, empty when that field is absent.
+func validateBankAccountSeeds(entries []bankAccountSeed, known map[string]bool, legacy string) error {
+	seen := map[string]bool{}
+	if legacy != "" {
+		seen[legacy] = true
+	}
+	for _, entry := range entries {
+		if entry.BridgeAccountID == "" {
+			return &fixtureInputError{msg: "bankAccountTransactions requires bridgeAccountId"}
+		}
+		if seen[entry.BridgeAccountID] {
+			return &fixtureInputError{msg: fmt.Sprintf("bankAccountTransactions duplicates bridge account %q", entry.BridgeAccountID)}
+		}
+		seen[entry.BridgeAccountID] = true
+		if !known[entry.ModelAccountID] {
+			return &fixtureInputError{msg: fmt.Sprintf("bankAccountTransactions maps to unknown model account %q", entry.ModelAccountID)}
+		}
+	}
+	return nil
+}
+
+// fixtureBankSnapshot folds the legacy single-bridge rows and the
+// multi-bridge entries into one bridge snapshot: one account per bridge, one
+// bridge-to-model map, and the owned-account set covering every mapped model
+// account. With no multi-bridge entries the legacy shape is unchanged.
+func fixtureBankSnapshot(bankTransactions []simplefin.Transaction, entries []bankAccountSeed) ([]simplefin.Account, map[string]string, map[string]bool) {
+	const connID = "fixture-conn"
+	var accounts []simplefin.Account
+	resolved := map[string]string{}
+	covered := map[string]bool{}
+	if len(bankTransactions) > 0 {
+		accounts = append(accounts, simplefin.Account{ID: "fixture-bank", ConnID: connID, Currency: "USD", Balance: "0", Transactions: bankTransactions})
+		resolved[simplefin.AccountKey(connID, "fixture-bank")] = "checking"
+		covered["checking"] = true
+	}
+	for _, entry := range activeBankAccountSeeds(entries) {
+		accounts = append(accounts, simplefin.Account{ID: entry.BridgeAccountID, ConnID: connID, Currency: "USD", Balance: "0", Transactions: entry.Transactions})
+		resolved[simplefin.AccountKey(connID, entry.BridgeAccountID)] = entry.ModelAccountID
+		covered[entry.ModelAccountID] = true
+	}
+	return accounts, resolved, covered
+}
+
+// fixtureKnownAccounts names every model account the restore baseline
+// provides without touching the database: the pack model seed plus the bulk
+// model when one is requested.
+func fixtureKnownAccounts(pack integrationfixtures.Pack, bulkRaw string) (map[string]bool, error) {
+	known := map[string]bool{}
+	if model, ok := pack.Model(); ok && model != nil {
+		for _, account := range model.Accounts {
+			known[account.ID] = true
+		}
+	}
+	if strings.TrimSpace(bulkRaw) != "" {
+		spec, err := integrationfixtures.ParseBulkSpec(bulkRaw)
+		if err != nil {
+			return nil, fmt.Errorf("bulk seed: %w", err)
+		}
+		for _, account := range integrationfixtures.BuildBulkModel(spec).Accounts {
+			known[account.ID] = true
+		}
+	}
+	return known, nil
+}
+
 // loadFixturePack seeds the harness baseline from one integration fixture
 // pack (backend/testdata/integration/v1), so the browser suite can run its
 // journeys against any edge-case dataset on its own isolated ports and
@@ -145,9 +242,33 @@ func main() {
 	var mu sync.RWMutex
 	live := &switcher{}
 
-	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction, bulkOverride *string) error {
+	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction, bankAccounts []bankAccountSeed, bulkOverride *string) error {
 		mu.Lock()
 		defer mu.Unlock()
+		active := activeBankAccountSeeds(bankAccounts)
+		legacy := ""
+		if len(bankTransactions) > 0 {
+			legacy = "fixture-bank"
+		}
+		if len(active) > 0 {
+			// The multi-bridge mapping is validated before anything is
+			// cleared, so a rejected body leaves current state untouched.
+			bulkRaw := os.Getenv("INTEGRATION_BULK")
+			if bulkOverride != nil {
+				bulkRaw = *bulkOverride
+			}
+			early, err := loadFixturePack()
+			if err != nil {
+				return fmt.Errorf("load fixture: %w", err)
+			}
+			known, err := fixtureKnownAccounts(early, bulkRaw)
+			if err != nil {
+				return err
+			}
+			if err := validateBankAccountSeeds(active, known, legacy); err != nil {
+				return err
+			}
+		}
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
@@ -190,13 +311,14 @@ func main() {
 				return fmt.Errorf("bulk seed: %w", err)
 			}
 		}
-		if len(bankTransactions) > 0 {
-			set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "fixture-bank", ConnID: "fixture-conn", Currency: "USD", Balance: "0", Transactions: bankTransactions}}}
-			translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("fixture-conn", "fixture-bank"): "checking"}, time.Now())
+		bankSnapshot, resolved, covered := fixtureBankSnapshot(bankTransactions, active)
+		if len(bankSnapshot) > 0 {
+			set := &simplefin.AccountSet{Accounts: bankSnapshot}
+			translation, err := simplefin.Translate(set, resolved, time.Now())
 			if err != nil {
 				return err
 			}
-			if _, err := database.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})); err != nil {
+			if _, err := database.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, covered)); err != nil {
 				return err
 			}
 		}
@@ -243,7 +365,7 @@ func main() {
 		return nil
 	}
 
-	if err := restore(readOnly, nil, nil); err != nil {
+	if err := restore(readOnly, nil, nil, nil); err != nil {
 		log.Fatalf("seed fixture: %v", err)
 	}
 	analysisRunner, err := analysis.NewRunner(application, analysis.Definitions()...)
@@ -329,10 +451,11 @@ func main() {
 			return
 		}
 		var body struct {
-			ReadOnly         *bool                   `json:"readOnly"`
-			BankTransactions []simplefin.Transaction `json:"bankTransactions"`
-			Bulk             *string                 `json:"bulk"`
-			SyncLink         *struct {
+			ReadOnly                *bool                   `json:"readOnly"`
+			BankTransactions        []simplefin.Transaction `json:"bankTransactions"`
+			BankAccountTransactions []bankAccountSeed       `json:"bankAccountTransactions"`
+			Bulk                    *string                 `json:"bulk"`
+			SyncLink                *struct {
 				BridgeAccountID string `json:"bridgeAccountId"`
 				ModelAccountID  string `json:"modelAccountId"`
 				BridgeName      string `json:"bridgeName"`
@@ -347,7 +470,12 @@ func main() {
 		if body.ReadOnly != nil {
 			next = *body.ReadOnly
 		}
-		if err := restore(next, body.BankTransactions, body.Bulk); err != nil {
+		if err := restore(next, body.BankTransactions, body.BankAccountTransactions, body.Bulk); err != nil {
+			var inputErr *fixtureInputError
+			if errors.As(err, &inputErr) {
+				http.Error(writer, inputErr.Error(), http.StatusBadRequest)
+				return
+			}
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -357,6 +485,20 @@ func main() {
 				ModelAccountID:  body.SyncLink.ModelAccountID,
 				BridgeName:      body.SyncLink.BridgeName,
 				Currency:        body.SyncLink.Currency,
+				Origin:          store.LinkOriginAuto,
+			}); err != nil {
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		// Per-bridge links mirror the single SyncLink above. They apply
+		// after it, so when both name one bridge the entry wins.
+		for _, entry := range activeBankAccountSeeds(body.BankAccountTransactions) {
+			if _, err := database.SaveAccountLink(store.AccountLink{
+				BridgeAccountID: entry.BridgeAccountID,
+				ModelAccountID:  entry.ModelAccountID,
+				BridgeName:      entry.BridgeName,
+				Currency:        "USD",
 				Origin:          store.LinkOriginAuto,
 			}); err != nil {
 				http.Error(writer, err.Error(), http.StatusInternalServerError)
