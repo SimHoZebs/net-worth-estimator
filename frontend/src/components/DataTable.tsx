@@ -80,6 +80,7 @@ export function DataTable({
 	columns = [],
 	showHeaders = false,
 	scrollId,
+	colgroup,
 	children,
 	...props
 }: Omit<ComponentProps<"table">, "children"> & {
@@ -87,12 +88,14 @@ export function DataTable({
 	columns?: DataTableColumn[];
 	showHeaders?: boolean;
 	scrollId?: string;
+	colgroup?: ReactNode;
 	children: ReactNode;
 }) {
 	return (
 		<TableScroll id={scrollId} tabIndex={0} role="region" aria-label={caption}>
 			<Table {...props} className={className}>
 				<caption className="sr-only">{caption}</caption>
+				{colgroup}
 				{showHeaders && columns.length > 0 && (
 					<TableHead>
 						<TableRow>

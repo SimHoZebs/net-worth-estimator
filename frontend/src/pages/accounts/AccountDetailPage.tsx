@@ -221,7 +221,7 @@ export function AccountDetailView({
 				) : undefined}
 				<form
 					id={edit.formId}
-					className="ml-auto min-w-0"
+					className="min-w-0"
 					onSubmit={(event) => void edit.submit(event)}
 				>
 					<AccountBalanceValue edit={edit} readOnly={locked} />
@@ -240,7 +240,7 @@ export function AccountDetailView({
 				value={view}
 				onChange={setView}
 				label="Account view"
-				className="mb-0 max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-0"
+				className="mb-0"
 				panelClassName="flex min-w-0 flex-col gap-4"
 			>
 				{view === "transactions" ? (

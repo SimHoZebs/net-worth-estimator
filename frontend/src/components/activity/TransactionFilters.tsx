@@ -33,7 +33,7 @@ export function TransactionFilters({
 				<SearchField
 					label="Search account transactions"
 					containerClassName="min-w-0 flex-1 max-sm:basis-full"
-					className="w-full min-w-0 px-1 py-2 text-xs text-ellipsis max-sm:w-32"
+					className="w-full min-w-0 px-1 py-2 text-xs text-ellipsis"
 					type="search"
 					placeholder="Search transactions or accounts…"
 					value={filters.query}

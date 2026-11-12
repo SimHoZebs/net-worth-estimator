@@ -29,10 +29,13 @@ export const transactionRowStyles = cva("hover:bg-surface-2", {
 export const transactionCellStyles = cva("py-3", {
 	variants: {
 		column: {
-			date: "w-[1%] pr-3 pl-0 text-xs whitespace-nowrap text-muted max-sm:hidden",
+			// Fixed-layout widths: the date and amount columns hold their
+			// content while the transaction column takes the remainder, so
+			// long titles truncate instead of widening the table.
+			date: "w-24 pr-3 pl-0 text-xs whitespace-nowrap text-muted max-sm:hidden",
 			name: "w-auto min-w-0 px-5 whitespace-normal max-sm:px-4",
 			amount:
-				"w-auto pr-1 pl-3 text-right whitespace-nowrap tabular-nums max-sm:pr-0 max-sm:pl-2",
+				"w-36 pr-1 pl-3 text-right whitespace-nowrap tabular-nums max-sm:w-28 max-sm:pr-0 max-sm:pl-2",
 		},
 	},
 });
@@ -51,7 +54,7 @@ export const transactionShortfallRowStyles = cva(
 );
 
 export const transactionDividerLabelStyles = cva(
-	"block text-xs font-semibold whitespace-nowrap",
+	"block text-xs font-semibold whitespace-normal",
 	{
 		variants: {
 			tone: {

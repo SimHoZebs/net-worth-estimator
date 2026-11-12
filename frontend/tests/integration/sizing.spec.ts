@@ -232,6 +232,129 @@ for (const width of [320, 390]) {
 	});
 }
 
+test("account header stacks cleanly on a narrow phone", async ({ page }) => {
+	await page.setViewportSize({ width: 320, height: 900 });
+	await page.goto("/accounts");
+	await page
+		.getByRole("button", { name: "Open Everyday checking transactions" })
+		.click();
+	const sheet = page.getByRole("region", { name: "Account details" });
+	await expect(sheet).toBeVisible();
+	// Tabs stay in one scrollable row instead of wrapping onto a second row.
+	const tabs = sheet.getByRole("tab");
+	await expect(tabs).toHaveCount(3);
+	const tabRows = await tabs.evaluateAll(
+		(elements) =>
+			new Set(
+				elements.map((element) =>
+					Math.round(element.getBoundingClientRect().y),
+				),
+			).size,
+	);
+	expect(tabRows).toBe(1);
+	// The balance drops below the account name on the left when there is
+	// no room beside it.
+	const header = await sheet.evaluate((section) => {
+		const row = section.querySelector(":scope > div")!;
+		return [...row.children].map((kid) => {
+			const rect = (kid as HTMLElement).getBoundingClientRect();
+			return { x: rect.x, y: rect.y };
+		});
+	});
+	expect(header.length).toBeGreaterThanOrEqual(2);
+	expect(header[1]!.y).toBeGreaterThan(header[0]!.y);
+	expect(header[1]!.x).toBeLessThanOrEqual(header[0]!.x + 1);
+	// The search takes the full row instead of a capped width.
+	const search = sheet.getByRole("searchbox", {
+		name: "Search account transactions",
+	});
+	await expect(search).toBeVisible();
+	const searchBox = await search.evaluate((element) => {
+		const input = element.getBoundingClientRect();
+		const container = element.parentElement!.getBoundingClientRect();
+		return { input: input.width, container: container.width };
+	});
+	expect(searchBox.input).toBeGreaterThan(searchBox.container - 40);
+});
+
+for (const width of [320, 390, 768, 1440]) {
+	test(`transaction tables fit a ${width}px viewport without horizontal scroll`, async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width, height: 900 });
+		const longTitle =
+			"A very long transaction title that exceeds the phone viewport and must truncate";
+		const created = await page.request.post("/v1/transactions", {
+			data: {
+				name: longTitle,
+				sourceAccountId: "checking",
+				destinations: [],
+				amount: { value: 123.45 },
+				date: "2026-01-20",
+				enabled: true,
+			},
+		});
+		expect(created.ok()).toBe(true);
+		// The global list uses the same table: date, transaction, amount.
+		await page.goto("/transactions");
+		const globalTable = page.getByRole("region", {
+			name: "Transactions with dates and amounts.",
+		});
+		await expect(globalTable).toBeVisible();
+		await expect
+			.poll(async () =>
+				globalTable.evaluate(
+					(element) => element.scrollWidth - element.clientWidth,
+				),
+			)
+			.toBeLessThanOrEqual(0);
+		// Account detail renders the activity table plus the separate
+		// balance history table. Both hold only their own rows and both
+		// must fit without scrolling the region.
+		await page.goto("/accounts");
+		await page
+			.getByRole("button", { name: "Open Everyday checking transactions" })
+			.click();
+		const sheet = page.getByRole("region", { name: "Account details" });
+		await expect(sheet).toBeVisible();
+		for (const name of [
+			/Transactions involving this account/,
+			"Balance history",
+		] as const) {
+			const table = sheet.getByRole("region", { name });
+			await expect(table).toBeVisible();
+			await expect
+				.poll(async () =>
+					table.evaluate(
+						(element) => element.scrollWidth - element.clientWidth,
+					),
+				)
+				.toBeLessThanOrEqual(0);
+		}
+		await expect
+			.poll(
+				async () =>
+					await page.evaluate(
+						() => document.documentElement.scrollWidth - innerWidth,
+					),
+			)
+			.toBeLessThanOrEqual(0);
+		// The overlong title truncates with an ellipsis instead of forcing
+		// the table wider.
+		const title = page.locator(`strong[title="${longTitle}"]`).first();
+		await expect(title).toBeVisible();
+		const truncated = await title.evaluate((element) => ({
+			scrollWidth: element.scrollWidth,
+			clientWidth: element.clientWidth,
+			textOverflow: getComputedStyle(element).textOverflow,
+			whiteSpace: getComputedStyle(element).whiteSpace,
+		}));
+		expect(truncated.textOverflow).toBe("ellipsis");
+		expect(truncated.whiteSpace).toBe("nowrap");
+		expect(truncated.scrollWidth).toBeGreaterThan(truncated.clientWidth);
+	});
+}
+
 for (const width of [320, 390, 768, 1440]) {
 	test(`failed-save forms and notifications remain usable at ${width}px`, async ({
 		page,
