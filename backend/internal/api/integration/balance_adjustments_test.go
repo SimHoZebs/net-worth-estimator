@@ -18,6 +18,7 @@ func TestBalanceAdjustmentsReadIsScopedAndPreservesExactEvidence(t *testing.T) {
 	for _, row := range []types.Checkpoint{
 		{AccountID: "checking", Balance: 1000, ObservedAt: 1773133200},
 		{AccountID: "checking", Balance: 900, ObservedAt: 1773140400},
+		{AccountID: "checking", Balance: 900, ObservedAt: 1773144000},
 		{AccountID: "other", Balance: 50, ObservedAt: 1773140400},
 	} {
 		if _, err := database.SaveCheckpoint(row); err != nil {
@@ -42,6 +43,13 @@ func TestBalanceAdjustmentsReadIsScopedAndPreservesExactEvidence(t *testing.T) {
 	row := payload.Adjustments[1]
 	if row.AccountID != "checking" || row.ObservedAt != 1773140400 || row.PreviousBalance != 1000 || row.Balance != 900 || row.Adjustment != -100 {
 		t.Fatalf("incorrect adjustment: %+v", row)
+	}
+	// The 12:00 observation matches the modeled 900 and reconciles nothing,
+	// so it stays a checkpoint without becoming an adjustment row.
+	for _, adjustment := range payload.Adjustments {
+		if adjustment.ObservedAt == 1773144000 {
+			t.Fatalf("zero-delta observation must not become a row: %+v", adjustment)
+		}
 	}
 	response = doRowRequest(t, handler, http.MethodGet, "/v1/accounts/empty/balance-adjustments", "")
 	if response.Code != http.StatusOK {

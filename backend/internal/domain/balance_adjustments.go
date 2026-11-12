@@ -13,5 +13,14 @@ func ResolveBalanceAdjustments(model *types.FinancialModel, asOf string) ([]type
 	if err != nil {
 		return nil, err
 	}
-	return position.replay.adjustments, nil
+	// A zero-delta observation still applies to state and remains the
+	// account's latest observation, but it reconciles nothing, so it
+	// produces no adjustment row.
+	rows := make([]types.BalanceAdjustment, 0, len(position.replay.adjustments))
+	for _, row := range position.replay.adjustments {
+		if row.Adjustment != 0 {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
 }

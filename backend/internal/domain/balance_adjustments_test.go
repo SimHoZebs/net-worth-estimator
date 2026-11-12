@@ -31,3 +31,30 @@ func TestBalanceAdjustmentsUseExactReplayWithoutForecast(t *testing.T) {
 		t.Fatalf("cut must omit later observations: %+v %v", rows, err)
 	}
 }
+
+// A checkpoint that matches the modeled balance reconciles nothing: it must
+// stay out of the adjustment rows while still applying and remaining the
+// account's latest observation.
+func TestBalanceAdjustmentsOmitZeroDeltaObservation(t *testing.T) {
+	model := observerFixture()
+	rows, err := ResolveBalanceAdjustments(model, "2026-03-10T16:00:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want only the 09:00 adjustment, got %+v", rows)
+	}
+	if rows[0].ObservedAt != unixAt(10, 9) || rows[0].PreviousBalance != 0 || rows[0].Balance != 1000 || rows[0].Adjustment != 1000 {
+		t.Fatalf("incorrect adjustment: %+v", rows[0])
+	}
+	position, err := ResolveCurrentPosition(model, "2026-03-10T16:00:00Z", types.ModelOverrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if position.Accounts[0].Balance != 900 {
+		t.Fatalf("zero-delta observation must still apply: %+v", position.Accounts[0])
+	}
+	if position.Accounts[0].ObservedBalance == nil || *position.Accounts[0].ObservedBalance != 900 || position.Accounts[0].ObservedAt == nil || *position.Accounts[0].ObservedAt != unixAt(10, 15) {
+		t.Fatalf("15:00 observation must remain the latest observation: %+v", position.Accounts[0])
+	}
+}
