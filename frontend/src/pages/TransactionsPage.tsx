@@ -1,4 +1,3 @@
-import type { EditorTarget } from "../domain/accountEdits.ts";
 import { AccountSections } from "./accounts/AccountSections.tsx";
 
 /**
@@ -6,18 +5,6 @@ import { AccountSections } from "./accounts/AccountSections.tsx";
  * `AccountSections view="transactions"`; row-hook migration pending — still
  * reads saved row queries.
  */
-export function TransactionsPage({
-	onEdit,
-	onAccount,
-}: {
-	onEdit: (target: EditorTarget) => void;
-	onAccount: (id: string) => void;
-}) {
-	return (
-		<AccountSections
-			view="transactions"
-			onEdit={onEdit}
-			onAccount={onAccount}
-		/>
-	);
+export function TransactionsPage() {
+	return <AccountSections view="transactions" />;
 }

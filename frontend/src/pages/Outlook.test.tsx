@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
+import { renderRouterSubject } from "../mocks/testRouter.tsx";
 import {
 	setServerModelFixture,
 	setServerStatusFixture,
@@ -13,15 +14,6 @@ const blankData = {
 	accounts: [],
 	transactions: [],
 	evaluations: [],
-};
-const props = {
-	onAddAccount: vi.fn(),
-	onEvidence: vi.fn(),
-	onFailure: vi.fn(),
-	onTransactions: vi.fn(),
-	safeSpendingDetail: null,
-	onSafeSpendingDetail: vi.fn(),
-	onSafeSpendingTab: vi.fn(),
 };
 
 beforeEach(() => {
@@ -38,21 +30,25 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
-	vi.clearAllMocks();
 });
 
-it("opens the first-account editor from an active blank workspace", () => {
-	render(<Outlook {...props} />);
+it("opens the first-account editor from an active blank workspace", async () => {
+	const view = await renderRouterSubject(<Outlook />, "/outlook");
 	expect(
 		screen.getByRole("heading", { name: "Your workspace is ready" }),
 	).toBeTruthy();
 	fireEvent.click(
 		screen.getByRole("button", { name: "Add your first account" }),
 	);
-	expect(props.onAddAccount).toHaveBeenCalledOnce();
+	await waitFor(() =>
+		expect(view.router.state.location.search).toMatchObject({
+			editor: "account",
+			id: "new",
+		}),
+	);
 });
 
-it("honors the server write restriction on a blank workspace", () => {
+it("honors the server write restriction on a blank workspace", async () => {
 	setServerStatusFixture({
 		readOnly: true,
 		hasModel: true,
@@ -60,15 +56,15 @@ it("honors the server write restriction on a blank workspace", () => {
 		syncQuotaUsed: 0,
 		syncQuotaLimit: 0,
 	});
-	render(<Outlook {...props} />);
+	await renderRouterSubject(<Outlook />, "/outlook");
 	expect(
 		screen.queryByRole("button", { name: "Add your first account" }),
 	).toBeNull();
 });
 
-it("does not gate the blank workspace on a model-level flag alone", () => {
+it("does not gate the blank workspace on a model-level flag alone", async () => {
 	setServerModelFixture({ ...blankData, readOnly: true });
-	render(<Outlook {...props} />);
+	await renderRouterSubject(<Outlook />, "/outlook");
 	expect(
 		screen.getByRole("button", { name: "Add your first account" }),
 	).toBeTruthy();

@@ -21,15 +21,15 @@ import {
 } from "@/state/workspaceResources.ts";
 import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
 import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
+import { useWorkspaceOverlays } from "@/workspace/useWorkspaceOverlays.ts";
 
-export function EvaluationsPage({
-	onEdit,
-}: {
-	onEdit: (evaluation: Evaluation | null) => void;
-}) {
-	// The grid subscribes to its own queries; only UI callbacks arrive as
-	// props. Saved-row gates would hide the static add action behind the
-	// async rows, so the page renders immediately.
+export function EvaluationsPage() {
+	const overlays = useWorkspaceOverlays();
+	const onEdit = (evaluation: Evaluation | null) =>
+		overlays.openEditor({ kind: "evaluation", item: evaluation });
+	// The grid subscribes to its own queries. Saved-row gates would hide
+	// the static add action behind the async rows, so the page renders
+	// immediately.
 	const summary = useEvaluationSummary();
 	const savedIds = useMemo(
 		() => summaryInstanceIds(summary.data),

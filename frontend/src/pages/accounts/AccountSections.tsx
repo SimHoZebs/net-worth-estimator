@@ -38,6 +38,8 @@ import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import { deleteAccount, deleteLoan } from "@/api/generated/endpoints.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
+import { useRouter } from "@tanstack/react-router";
+import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
 
@@ -47,17 +49,16 @@ type ScheduleFilter = "all" | "recurring";
 
 const TRANSACTIONS_PAGE_SIZE = 10;
 
-export function AccountSections({
-	view,
-	onEdit,
-	onAccount,
-}: {
-	view: AccountSectionView;
-	onEdit: (target: EditorTarget) => void;
-	onAccount: (id: string) => void;
-}) {
-	// Each view subscribes to its own queries; only the viewed tab and UI
-	// callbacks arrive as props.
+export function AccountSections({ view }: { view: AccountSectionView }) {
+	const overlays = useWorkspaceOverlays();
+	const router = useRouter();
+	const onEdit = overlays.openEditor;
+	const onAccount = (id: string) =>
+		void router.navigate({
+			to: "/accounts/$accountId",
+			params: { accountId: id },
+		});
+	// Each view subscribes to its own queries; only the viewed tab renders.
 	if (view === "accounts") {
 		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;
 	}
