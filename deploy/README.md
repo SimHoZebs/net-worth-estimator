@@ -4,18 +4,22 @@ The frontend and API can use different providers. They share one public browser 
 
 Application and data migrations run through the shared migration SOP in `MIGRATIONS.md`. Every deployment adapter invokes the target image's `/app/migrate.sh` with the API stopped; it is not part of server startup. Stop all API writers and take a verified backup before any migration.
 
+`backend/Dockerfile` has a default Go-only target plus an explicit `northflank` target that adds the Python/River sidecar and its supervisor. `deploy/` owns the host adapters and runtime hooks that wrap either image, including the boot wrapper, the migration body, and the release definitions.
+
 ## Runtime contract
 
 | Component | Contract |
 | --- | --- |
 | Frontend | Static `frontend/dist` assets, built with Node.js 24 or newer |
-| API | `backend/Dockerfile` with repository-root context, or the Go server binary |
+| API | `backend/Dockerfile` with repository-root context, or the Go server binary; the `northflank` target adds the Python/River sidecar and supervisor |
 | Browser API | `/v1/*` on the frontend's HTTPS origin, including `/v1/auth/*` |
 | Process | One always-on API instance, with outbound access to Better Auth and enabled integrations |
 | Listener | `HOST=0.0.0.0`, configurable `PORT` (default `8787`) |
 | Storage | Existing compatible SQLite file on durable, writable local storage at `/data` |
-| Database | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db` |
-| Schema | Explicit `setupdb` operation with the API stopped |
+| Database | `NET_WORTH_ESTIMATOR_DB` on `/data`; the image default is `/data/net-worth-estimator.db` |
+| Schema | Explicit `setupdb` with the API stopped for the default image; hosts using `/app/api-boot.sh` run `setupdb` before `/app/server` |
+| Boot | Default `/app/server`; Northflank `python /app/northflank-runtime.py`, which supervises the ML sidecar and then runs `/app/api-boot.sh` |
+| Policy database | `NET_WORTH_ESTIMATOR_AUTHZ_DB` on durable storage, provisioned once with `authzctl --setup` |
 | Liveness | `GET /healthz` reports process availability |
 | Readiness | `GET /readyz` checks the database connection with a two-second deadline |
 | Probes | No session, proxy secret, or user header required; no private data returned |
@@ -48,7 +52,17 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
   --db /private/application.db --issuer "$ISSUER" --subject "$GUEST_SUBJECT"
 ```
 
-The API never creates a missing database and never repairs schema. Startup stops with an operator error when required tables are missing. Complete any one-time upgrade before the new API starts.
+The policy database is separate. Provision it once before the first API start, from the API image or its maintenance shell. This command creates fresh policy state only; an existing policy database needs the reviewed upgrade path instead.
+
+```bash
+/app/authzctl --setup --db "$NET_WORTH_ESTIMATOR_AUTHZ_DB" \
+  --issuer "$NET_WORTH_ESTIMATOR_AUTH_ISSUER" \
+  --guest "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
+```
+
+See [authorization](../docs/authorization.md) for the policy model and later role assignments.
+
+`/app/server` never creates a missing application database and never adds missing required tables or repairs the required schema. Startup stops with an operator error when required tables are missing. Hosts configured to run `/app/api-boot.sh` provision or validate the shared application database before the server starts; that wrapper does not create the policy database or provision users. Complete any one-time upgrade before the new API starts.
 
 ## Backups
 
@@ -84,6 +98,7 @@ Deliver stochastic POST responses incrementally. Preserve `text/event-stream`, d
 
 - [Vercel frontend](vercel.md) — project settings, env vars, preview isolation, gated production deploy.
 - [API on Render or another container host](render.md) — service settings, disk maintenance, setupdb usage.
+- [Northflank Sandbox](northflank/README.md) — pinned images, release webhook, ML sidecar supervisor, maintenance window.
 - [GHCR container images](images.md) — published images, digest pins, publisher checks.
 - [Shared migration SOP](MIGRATIONS.md) — one-time `/app/migrate.sh` contract every adapter runs.
 - [Deployment watchdog](../.opencode/skills/deployment-watchdog/SKILL.md) — fix a failed release, the failure classes, and the boundaries.
@@ -107,6 +122,8 @@ Never use independent writable database copies as a cutover strategy. After dest
 node --test deploy/vercel.test.mjs scripts/smoke-compose.test.mjs
 docker build -f backend/Dockerfile -t waypoint-deployment-test .
 DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs
+docker build -f backend/Dockerfile --target northflank -t waypoint-northflank-test .
+NORTHFLANK_TEST_IMAGE=waypoint-northflank-test node --test deploy/northflank/container.test.mjs
 FRONTEND_URL=https://app.example.com sh scripts/smoke-compose.sh
 ```
 

@@ -7,7 +7,7 @@ gate of record. A branch run covers the pre-landing content only; after a
 squash or rebase, watch the new `main` run. It also runs the disposable e2e
 gate nightly (`.github/workflows/e2e.yml`). The image workflow runs after that
 `Tests` run. The Northflank workflow starts on the same `Tests` run and requests
-a deployment only after the pinned backend and Better Auth (auth) image tags exist. The
+a deployment only after the pinned backend-northflank and Better Auth (auth) image tags exist. The
 Vercel workflow uses the `Tests` gate directly for production frontend deploys.
 
 ## 1. Automated test gates

@@ -6,23 +6,43 @@ contract. Other deployments can use the default Go-only image and any compatible
 separate provider at `ML_JUDGMENT_URL`, or omit it for deterministic analysis.
 
 The explicit `northflank` target in `backend/Dockerfile` is published as
-`net-worth-estimator-backend-northflank:sha-<commit>`. It adds Python, River, and
+`ghcr.io/simhozebs/net-worth-estimator-backend-northflank:sha-<commit>`. It adds Python, River, and
 a small process supervisor. River runs on loopback port 8766, the API runs on its
 public port, and the supervisor waits for River storage readiness before booting
 the API. A child exit stops both processes, and SIGTERM is forwarded with a
 bounded shutdown grace period.
 
-Use `python /app/northflank-runtime.py` as the API service's custom command;
-`/app/api-boot.sh` remains the Go-only boot command. The release maintenance
-command must bypass the supervisor so all API writers stop before the offline
-migration, and the Northflank command is restored only after a successful
-migration. Do not change the identity provider or issuer as part of adopting
-this packaging.
+Use `python /app/northflank-runtime.py` as the API service's custom command.
+The supervisor runs `/app/api-boot.sh` after the ML provider is healthy, and
+that wrapper provisions or validates the shared application database before
+`/app/server`. The release maintenance command must bypass the supervisor so all
+API writers stop before the offline migration, and the Northflank command is
+restored only after a successful migration. Do not change the identity provider
+or issuer as part of adopting this packaging.
 
-The existing API volume holds two independent databases:
+The existing API volume holds three current application databases whose paths
+come from the service environment:
 
-- `/data/net-worth-estimator.db`: owner-scoped evidence and feedback audit.
-- `/data/ml.sqlite3`: River learner, deduplication receipts, and owner cursors.
+- `$NET_WORTH_ESTIMATOR_DB` (live `/data/waypoint.db`): owner-scoped evidence and
+  feedback audit.
+- `$NET_WORTH_ESTIMATOR_AUTHZ_DB` (live `/data/authorization.db`): embedded
+  Casbin policy assignments and rules.
+- `$ML_MODEL_PATH` (live `/data/ml-v2.sqlite3`): River learner, deduplication
+  receipts, and owner cursors.
+
+The volume also retains older files from earlier revisions, including
+`/data/net-worth-estimator.db` and `/data/ml.sqlite3`. They are not live.
+Backup, verification, and restore must use the environment variables rather
+than those names.
+
+Provision the policy database once before the first API start. The server fails
+closed when the policy database is missing, and `api-boot.sh` does not create it:
+
+```bash
+/app/authzctl --setup --db "$NET_WORTH_ESTIMATOR_AUTHZ_DB" \
+  --issuer "$NET_WORTH_ESTIMATOR_AUTH_ISSUER" \
+  --guest "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
+```
 
 No extra service, database addon, volume, GPU, or external model subscription is
 needed. Keep the existing single API instance and `nf-compute-10` allocation

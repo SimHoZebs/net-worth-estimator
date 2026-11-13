@@ -182,6 +182,9 @@ node --test deploy/vercel.test.mjs scripts/smoke-compose.test.mjs
 node --test deploy/migrations.test.mjs
 docker build -f backend/Dockerfile -t waypoint-deployment-test .
 DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs deploy/migrations.test.mjs deploy/analysis-migration.test.mjs
+docker build -f backend/Dockerfile --target northflank -t waypoint-northflank-test .
+python3 -B -m unittest discover -s deploy/northflank -p 'test_*.py' -v
+NORTHFLANK_TEST_IMAGE=waypoint-northflank-test node --test deploy/northflank/container.test.mjs
 ```
 
 These checks use disposable state, not the dev stack or production database. They cover authenticated and Host-preserving HTTP proxies, real API writes, CSRF denial, incremental streaming, persistent sessions and artifacts, public probes, command overrides, and a provider-assigned API port. See [the Vercel guide](deploy/vercel.md), [the Render/container-host guide](deploy/render.md), and [the deployment index](deploy/README.md). Migration changes also require the [shared SOP](deploy/MIGRATIONS.md) gate on every supported target.

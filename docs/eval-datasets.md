@@ -143,5 +143,5 @@ the baked seed, it is installed as `ML_MODEL_PATH` only if the live
 database is missing or shows zero learning (empty `events` table, no
 pending drift review). A database that recorded feedback is never
 overwritten; a corrupt one fails loud for the operator. `ML_SEED_DISABLE=1`
-skips seeding. The Northflank service env carries `ML_SEED_PATH`; the
-default Go-only image has no learner and is unaffected.
+skips seeding. The Northflank image sets `ML_SEED_PATH=/app/ml/seed.sqlite3`;
+the default Go-only image has no learner and is unaffected.

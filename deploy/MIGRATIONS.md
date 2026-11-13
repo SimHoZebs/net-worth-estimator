@@ -158,7 +158,7 @@ GitHub's manual dispatch instead requests the current `main` commit and its
 published images. Releases stay sequential: one at a time.
 
 `.github/workflows/northflank-release.yml` triggers on the `Tests` workflow for
-the exact `main` push, waits for the pinned backend and Better Auth image manifests,
+the exact `main` push, waits for the pinned backend-northflank and Better Auth image manifests,
 then requests the workflow with those image references. The release job has
 read-only repository access and no Northflank API credential. Its webhook secret
 can only request workflow runs. The GitHub job confirms dispatch, not production
@@ -170,7 +170,10 @@ maintenance process serves only `/tmp/waypoint-maintenance`, never `/data`.
 The API and scheduler are absent. Its `/readyz` body says `maintenance`, not
 `ok`. The workflow deploys the target image and runs `/app/migrate.sh` as
 UID/GID `10001`, with `dispatchOnly: false` to wait for its exit status.
-Only success restores `/app/api-boot.sh` and waits for service health.
+Only success restores `python /app/northflank-runtime.py`, which then runs
+`/app/api-boot.sh` to validate the migrated schema before the server starts. The
+workflow waits for the API container to be running; confirm `/readyz` answers
+`ok` separately before treating the release as complete.
 
 Postgres dumps precede identity-image replacement. They do not back up SQLite.
 A pending migration must take and verify the financial backup in its shared

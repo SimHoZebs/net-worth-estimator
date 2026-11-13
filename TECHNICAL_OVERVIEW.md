@@ -95,7 +95,7 @@ stay with their feature package.
 
 `api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, and optional `simplefin.Runner`. The server wraps user APIs with Better Auth OIDC sessions and embedded Casbin authorization. Only the isolated fixture API omits that boundary. The frontend image serves the SPA and proxies `/v1` to the backend.
 
-The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition.
+The container boundary is split. `backend/Dockerfile` produces the default API-only image and an explicit `northflank` target that adds the Python/River sidecar and supervisor. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition.
 
 Frontend and API hosts can differ while the browser uses one public origin.
 The runtime's optional `internal/ingress` boundary authenticates a proxy with
