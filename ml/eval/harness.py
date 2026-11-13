@@ -91,6 +91,66 @@ CATEGORY_KINDS = [
     "TRANSPORTATION", "TRAVEL", "RENT_AND_UTILITIES",
 ]
 
+# Locked mitul label-to-category mapping (mirrors the Go evalharness table).
+# Shopping & Retail rows matching the home-improvement pattern map to
+# HOME_IMPROVEMENT; Entertainment & Recreation rows matching the gym pattern
+# map to PERSONAL_CARE; Financial Services splits by key words (loan,
+# insurance/tax, withdrawal) and every other Financial Services row DROPs
+# (bare bank/investment names carry no mappable key). "Income" and
+# "Transportation" collide with HF labels but map identically, so the scorer
+# routes by label membership without ambiguity.
+MITUL_HOME_RE = re.compile(r"\b(IKEA|HOME DEPOT|LOWES)\b", re.IGNORECASE)
+MITUL_GYM_RE = re.compile(r"\b(GYM|FITNESS|PLANET FITNESS)\b", re.IGNORECASE)
+MITUL_LOAN_RE = re.compile(r"\b(LOAN|MORTGAGE)\b", re.IGNORECASE)
+MITUL_INS_RE = re.compile(r"\b(INSURANCE|TAX)\b", re.IGNORECASE)
+MITUL_WD_RE = re.compile(r"WITHDRAWAL", re.IGNORECASE)
+
+MITUL_LABELS = {
+    "Food & Dining", "Transportation", "Shopping & Retail",
+    "Entertainment & Recreation", "Healthcare & Medical",
+    "Utilities & Services", "Financial Services", "Income",
+    "Government & Legal", "Charity & Donations",
+}
+
+MITUL_PER_KEY = 4000
+
+
+def resolve_expected_mitul(label: str, description: str) -> str:
+    """Locked mitul label-to-category mapping; "" means DROP or unknown."""
+    if label == "Food & Dining":
+        return "FOOD_AND_DRINK"
+    if label == "Transportation":
+        return "TRANSPORTATION"
+    if label == "Shopping & Retail":
+        return (
+            "HOME_IMPROVEMENT"
+            if MITUL_HOME_RE.search(description)
+            else "GENERAL_MERCHANDISE"
+        )
+    if label == "Entertainment & Recreation":
+        return (
+            "PERSONAL_CARE"
+            if MITUL_GYM_RE.search(description)
+            else "ENTERTAINMENT"
+        )
+    if label == "Healthcare & Medical":
+        return "MEDICAL"
+    if label == "Utilities & Services":
+        return "RENT_AND_UTILITIES"
+    if label == "Financial Services":
+        if MITUL_LOAN_RE.search(description):
+            return "LOAN_PAYMENTS"
+        if MITUL_INS_RE.search(description):
+            return "GENERAL_SERVICES"
+        if MITUL_WD_RE.search(description):
+            return "TRANSFER_OUT"
+        return ""
+    if label == "Income":
+        return "INCOME"
+    if label in ("Government & Legal", "Charity & Donations"):
+        return "GOVERNMENT_AND_NON_PROFIT"
+    return ""
+
 
 def resolve_expected_category(label: str, direction: str) -> str:
     """Locked label-to-category mapping; Transfer follows the row direction."""
@@ -246,6 +306,50 @@ def load_moneydata(xlsx_path: Path) -> list[dict]:
 MONEYDATASET_ID = "Laramee MoneyData (Mendeley dnxtg6n4rv, CC BY 4.0)"
 
 
+def load_mitul(parquet_path: Path, per_key: int = MITUL_PER_KEY,
+                seed: int = SEED) -> list[dict]:
+    """Mitul transaction-categorization rows mapped onto fixture schema.
+
+    Clean merchant-name descriptions (no bank-statement noise, no direction
+    markers, no amounts); the Go harness derives direction from the label
+    (Income inflow, all others outflow) and drops Financial Services rows
+    with no mappable key. Sampling is per mapped key over UNIQUE
+    descriptions (per_key per key, fewer only when a key exhausts uniques),
+    fixed seed, keys in sorted order. Currency rides along as-is.
+    """
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(
+        parquet_path,
+        columns=["transaction_description", "category", "currency"],
+    )
+    pool: dict[str, dict[str, tuple[str, str]]] = defaultdict(dict)
+    for record in table.to_pylist():
+        desc = (record["transaction_description"] or "").strip()
+        if not desc:
+            continue
+        key = resolve_expected_mitul(record["category"], desc)
+        if not key:
+            continue
+        if desc not in pool[key]:
+            pool[key][desc] = (
+                record["category"], record["currency"] or "USD",
+            )
+    rng = random.Random(seed)
+    rows = []
+    for key in sorted(pool):
+        descs = sorted(pool[key])
+        rng.shuffle(descs)
+        for desc in descs[:per_key]:
+            label, currency = pool[key][desc]
+            rows.append({
+                "description": desc,
+                "category": label,
+                "currency": currency,
+            })
+    return rows
+
+
 def run_go_harness(
     fixture_path: Path, out_path: Path, months: int, seed: int
 ) -> dict:
@@ -342,7 +446,10 @@ def score_category_arm(
         row = info.get(stem)
         if row is None:
             raise ValueError(f"category entry links unknown transaction {stem}")
-        locked = resolve_expected_category(row["category"], row["direction"])
+        if row["category"] in MITUL_LABELS:
+            locked = resolve_expected_mitul(row["category"], row["description"])
+        else:
+            locked = resolve_expected_category(row["category"], row["direction"])
         if row.get("expectedCategory") != locked or entry.get("expectedCategory") != locked:
             raise ValueError(
                 f"category mapping drift on {stem}: label={row['category']} "
@@ -873,13 +980,14 @@ def run_seed_recipe(
 
     Trains every source's interleaved payment baseline order in sequence,
     then every source's interleaved category order (HF descriptors, then
-    MoneyData timelines), dismissing the detector and retrying on drift
-    trips so one shift never wipes the seed. Exports a database with ONLY
+    MoneyData timelines, then mitul descriptors), dismissing the detector
+    and retrying on drift trips so one shift never wipes the seed. Exports a database with ONLY
     the model row and fails loudly unless every payment classifier kind
     and every mapped category kind clears the coverage minimum — a seed
     that leaves a kind cold is worse than no seed. HOME_IMPROVEMENT and
-    GOVERNMENT_AND_NON_PROFIT are exempt (no dataset label maps to them;
-    they stay baseline until production feedback).
+    GOVERNMENT_AND_NON_PROFIT are exempt by policy (no HF/MoneyData label
+    maps to them; the mitul arm warms them but they stay baseline until
+    production feedback).
     """
     from seed_export import export_seed, verify_seed
 
@@ -920,6 +1028,10 @@ def run_seed_recipe(
             )
         probe_requests = [request for request, _ in ordered[:200]]
         probe_requests += [request for request, _ in cat_ordered[:200]]
+        for tag, items in cat_ordered_lists:
+            if tag == "mitul":
+                probe_requests += [request for request, _ in items[:200]]
+                break
         in_memory = learner.evaluate_timed(probe_requests)
         with open(probe_path, "w") as handle:
             json.dump(
@@ -982,11 +1094,13 @@ def parse_args() -> argparse.Namespace:
                         help="export a seed learner DB to this path (outside the repo)")
     parser.add_argument("--seed-probe", type=Path, default=None,
                         help="write the seed verification probe set here")
-    parser.add_argument("--source", choices=("hf-v2", "moneydata", "all"),
+    parser.add_argument("--source", choices=("hf-v2", "moneydata", "mitul", "all"),
                         default="hf-v2",
                         help="dataset source (default: hf-v2)")
     parser.add_argument("--moneydata-path", type=Path, default=None,
                         help="Laramee MoneyData xlsx (required for moneydata/all)")
+    parser.add_argument("--mitul-path", type=Path, default=None,
+                        help="mitul transaction-categorization parquet (required for mitul/all)")
     return parser.parse_args()
 
 
@@ -1001,7 +1115,10 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
     """
     suffix = "" if tag == "hf-v2" else f"-{tag}"
     label_counts = Counter(r["category"] for r in rows)
-    if args.full:
+    # The mitul arm is descriptor breadth only: one representative occurrence
+    # per row, no payment-series synthesis.
+    months = 1 if tag == "mitul" else args.months
+    if args.full or tag == "mitul":
         sampled = list(rows)
     else:
         sampled = sample_rows(rows, args.slice, args.seed)
@@ -1015,7 +1132,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
                     "source": source_label,
                     "rows": len(sampled),
                     "seed": args.seed,
-                    "months": args.months,
+                    "months": months,
                     "baseDate": BASE_DATE,
                 },
                 "aliases": aliases,
@@ -1024,7 +1141,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
             handle,
         )
     findings_path = cache / f"findings{suffix}.json"
-    output = run_go_harness(fixture_path, findings_path, args.months, args.seed)
+    output = run_go_harness(fixture_path, findings_path, months, args.seed)
     transactions = output["transactions"]
 
     arms_output = {}
@@ -1095,7 +1212,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
             "sampled_rows": len(sampled),
             "full": bool(args.full),
             "seed": args.seed,
-            "months": args.months,
+            "months": months,
             "base_date": BASE_DATE,
         },
         "go_seconds": output["_go_seconds"],
@@ -1123,7 +1240,7 @@ def main() -> None:
     cache = args.cache_dir
     cache.mkdir(parents=True, exist_ok=True)
 
-    tags = ("hf-v2", "moneydata") if args.source == "all" else (args.source,)
+    tags = ("hf-v2", "moneydata", "mitul") if args.source == "all" else (args.source,)
     seed_inputs: list[tuple[str, list]] = []
     cat_seed_inputs: list[tuple[str, list]] = []
     for tag in tags:
@@ -1132,6 +1249,12 @@ def main() -> None:
             rows = load_rows(parquet_path)
             source_label = "DoDataThings/us-bank-transaction-categories-v2"
             source_license = "MIT"
+        elif tag == "mitul":
+            if args.mitul_path is None:
+                raise SystemExit("--mitul-path is required for mitul/all (gated download, never vendored)")
+            rows = load_mitul(args.mitul_path, seed=args.seed)
+            source_label = "mitulshah/transaction-categorization"
+            source_license = "gated (local copy; see README)"
         else:
             if args.moneydata_path is None:
                 raise SystemExit("--moneydata-path is required for moneydata")
@@ -1140,7 +1263,11 @@ def main() -> None:
             source_license = "CC BY 4.0 (citation required, see README)"
         _, seed_ordered, cat_seed_ordered = run_source(args, cache, tag, rows,
                                      source_label, source_license)
-        seed_inputs.append((tag, seed_ordered))
+        # The mitul arm runs a single representative occurrence per row, so
+        # its payment findings carry no recurrence signal and stay out of
+        # the seed; only its category order trains.
+        if tag != "mitul":
+            seed_inputs.append((tag, seed_ordered))
         cat_seed_inputs.append((tag, cat_seed_ordered))
 
     if args.export_seed is not None:

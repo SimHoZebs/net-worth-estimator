@@ -22,6 +22,22 @@ arms. Timing measurements substantiate the online-learner volume claim.
   names; the labels are provided. Treat results as evidence about
   descriptor handling, not as production precision/recall.
 
+Second category arm:
+
+- Source: `mitulshah/transaction-categorization` (Hugging Face, gated —
+  evaluated from a local copy, never vendored).
+- Content: 4,501,043 rows, four columns
+  (`transaction_description`/`category`/`country`/`currency`), 10 balanced
+  categories (~450k each) of clean merchant-name descriptions (no
+  bank-statement noise, no direction markers, no amounts). It trains
+  descriptor breadth only — it never replaces owner labels as ground truth.
+- Sampling: UNIQUE descriptions per mapped key, 4,000 per key (fewer only
+  when a key exhausts uniques: TRANSFER_OUT has 3), fixed seed 7,
+  stratified — 48,003 rows regardless of `--slice`/`--full`. Currency is
+  carried as-is; amounts are synthesized per-label plausible bases with the
+  same ±5% jitter as the HF arm; `months` is 1 (single representative
+  occurrence, no payment-series synthesis).
+
 ## Category mapping (locked)
 
 HF/MoneyData labels map onto category keys identically in the Go
@@ -33,9 +49,23 @@ Restaurants→FOOD_AND_DRINK, Shopping→GENERAL_MERCHANDISE,
 Transportation→TRANSPORTATION, Entertainment→ENTERTAINMENT,
 Subscription→ENTERTAINMENT, Healthcare→MEDICAL, Travel→TRAVEL,
 Education→GENERAL_SERVICES, Personal Care→PERSONAL_CARE, Fees→BANK_FEES.
-HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT are exempt — no dataset
-label maps to them, so they stay cold-start baseline until production
-feedback arrives.
+HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT stay exempt by policy — no
+HF/MoneyData label maps to them, so they stay cold-start baseline until
+production feedback arrives (the mitul arm warms their weights in the
+meantime).
+
+Mitul labels map identically in Go (`splitMitul`) and Python
+(`resolve_expected_mitul`); a mismatch raises: Food & Dining→FOOD_AND_DRINK,
+Transportation→TRANSPORTATION, Shopping & Retail→GENERAL_MERCHANDISE except
+IKEA/HOME DEPOT/LOWES descriptions→HOME_IMPROVEMENT, Entertainment &
+Recreation→ENTERTAINMENT except gym/fitness descriptions→PERSONAL_CARE,
+Healthcare & Medical→MEDICAL, Utilities & Services→RENT_AND_UTILITIES,
+Financial Services→LOAN_PAYMENTS on loan/mortgage words, GENERAL_SERVICES
+on insurance/tax words, TRANSFER_OUT on withdrawal, else DROP (bare
+bank/investment names carry no mappable key and never reach the fixture),
+Income→INCOME, Government & Legal and Charity & Donations both
+→GOVERNMENT_AND_NON_PROFIT. Direction is label-derived (Income inflow, all
+others outflow); currency rides along as-is.
 
 The data is **never vendored**: the harness downloads the 1.6MB parquet at
 eval time into `ml/eval/.cache/` (gitignored) and reuses it on later runs.
@@ -67,22 +97,27 @@ cd ml && uv run --with pyarrow --with pandas eval/harness.py --slice 5000
 uv run --with pyarrow --with pandas eval/harness.py --full   # all 68k rows
 uv run --with pyarrow --with pandas --with openpyxl eval/harness.py \
   --source all --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
+  --mitul-path <path/to/transaction-categorization/default/train/0000.parquet> \
   --slice 5000 --export-seed /tmp/opencode/seed.sqlite3
 ```
 
 `--source` selects `hf-v2` (default), `moneydata` (needs `--moneydata-path`),
-or `all` (per-source reports plus a combined seed phase).
+`mitul` (needs `--mitul-path`, defaults to the path above), or `all`
+(per-source reports plus a combined seed phase).
 
 Seed export (canonical recipe: per-source interleaved payment baseline
-orders followed by per-source interleaved category orders, manual drift
-mode with dismiss-and-retry, fixed seeds) trains a kept store, then
+orders — mitul excluded, its single occurrences carry no recurrence signal —
+followed by per-source interleaved category orders: HF, then MoneyData, then
+mitul; manual drift mode with dismiss-and-retry, fixed seeds) trains a kept store, then
 writes a seed database containing ONLY the model row (warm weights,
 counts, generation, revision) with events/checkpoints emptied and drift
 counters reset. Export fails loudly unless every payment classifier kind
 and every mapped category kind clears its coverage minimum (50 examples;
-HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT exempt — no dataset label
-maps to them). The harness also writes a probe set (`--seed-probe`)
-covering payment and category requests and verifies that a fresh load of
+HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT stay exempt by policy — the
+mitul arm warms them, but they remain baseline until production feedback).
+The harness also writes a probe set (`--seed-probe`)
+covering payment, HF/MoneyData category, and mitul category requests (200
+each) and verifies that a fresh load of
 the seed evaluates the probe identically to the in-memory trained state. The canonical seed is versioned at `ml/seed.sqlite3` (see
 `docs/eval-datasets.md` for provenance); regenerate with the command
 above rather than hand-editing it. Standalone use:

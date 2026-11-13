@@ -17,6 +17,7 @@ import (
 	"hash/fnv"
 	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -67,6 +68,87 @@ var expectedCategories = map[string]string{
 	"Fees":           "BANK_FEES",
 }
 
+// mitulBaseAmounts are plausible per-label monthly magnitudes for the mitul
+// transaction-categorization arm, in the same style as baseAmounts:
+// realistic magnitudes only, with the jitter below keeping every occurrence
+// inside the detector's amount tolerance.
+var mitulBaseAmounts = map[string]float64{
+	"Food & Dining": 65, "Transportation": 60, "Shopping & Retail": 120,
+	"Entertainment & Recreation": 40, "Healthcare & Medical": 130,
+	"Utilities & Services": 160, "Financial Services": 350,
+	"Income": 3200, "Government & Legal": 200, "Charity & Donations": 75,
+}
+
+var (
+	mitulHomeImprovementRe = regexp.MustCompile(`(?i)\b(IKEA|HOME DEPOT|LOWES)\b`)
+	mitulPersonalCareRe    = regexp.MustCompile(`(?i)\b(GYM|FITNESS|PLANET FITNESS)\b`)
+	mitulLoanRe            = regexp.MustCompile(`(?i)\b(LOAN|MORTGAGE)\b`)
+	mitulInsuranceRe       = regexp.MustCompile(`(?i)\b(INSURANCE|TAX)\b`)
+	mitulWithdrawalRe      = regexp.MustCompile(`(?i)WITHDRAWAL`)
+)
+
+// isMitulLabel reports whether a dataset label belongs to the mitul
+// transaction-categorization arm. "Income" and "Transportation" collide with
+// HF labels but map identically, so routing them here is benign; the caller
+// only takes the mitul path for rows without a [debit]/[credit] marker.
+func isMitulLabel(label string) bool {
+	switch label {
+	case "Food & Dining", "Transportation", "Shopping & Retail",
+		"Entertainment & Recreation", "Healthcare & Medical",
+		"Utilities & Services", "Financial Services", "Income",
+		"Government & Legal", "Charity & Donations":
+		return true
+	default:
+		return false
+	}
+}
+
+// splitMitul resolves a mitul-arm row onto its locked category. Mitul
+// descriptions carry no direction marker, so Income rows are inflow and all
+// others outflow. keep=false means DROP the row: bare bank/investment names
+// under Financial Services carry no mappable key.
+func splitMitul(label, raw string) (description string, inflow bool, expected string, keep bool) {
+	description = strings.TrimSpace(raw)
+	inflow = label == "Income"
+	switch label {
+	case "Food & Dining":
+		return description, inflow, "FOOD_AND_DRINK", true
+	case "Transportation":
+		return description, inflow, "TRANSPORTATION", true
+	case "Shopping & Retail":
+		if mitulHomeImprovementRe.MatchString(description) {
+			return description, inflow, "HOME_IMPROVEMENT", true
+		}
+		return description, inflow, "GENERAL_MERCHANDISE", true
+	case "Entertainment & Recreation":
+		if mitulPersonalCareRe.MatchString(description) {
+			return description, inflow, "PERSONAL_CARE", true
+		}
+		return description, inflow, "ENTERTAINMENT", true
+	case "Healthcare & Medical":
+		return description, inflow, "MEDICAL", true
+	case "Utilities & Services":
+		return description, inflow, "RENT_AND_UTILITIES", true
+	case "Financial Services":
+		switch {
+		case mitulLoanRe.MatchString(description):
+			return description, inflow, "LOAN_PAYMENTS", true
+		case mitulInsuranceRe.MatchString(description):
+			return description, inflow, "GENERAL_SERVICES", true
+		case mitulWithdrawalRe.MatchString(description):
+			return description, inflow, "TRANSFER_OUT", true
+		default:
+			return description, inflow, "", false
+		}
+	case "Income":
+		return description, inflow, "INCOME", true
+	case "Government & Legal", "Charity & Donations":
+		return description, inflow, "GOVERNMENT_AND_NON_PROFIT", true
+	default:
+		return description, inflow, "", true
+	}
+}
+
 type fixtureAlias struct {
 	Match  string `json:"match"`
 	Signal string `json:"signal"`
@@ -75,6 +157,7 @@ type fixtureAlias struct {
 type fixtureRow struct {
 	Description string `json:"description"`
 	Category    string `json:"category"`
+	Currency    string `json:"currency,omitempty"`
 }
 
 type fixture struct {
@@ -124,8 +207,10 @@ func expectedCategoryFor(label string, inflow bool) string {
 
 // categoryEntriesFor builds the categorization judgment requests for one
 // representative occurrence of a descriptor row: the bare description as the
-// name, direction from the dataset sign, and the representative amount.
-func categoryEntriesFor(index int, label, description string, inflow bool, amount string) []categoryRequestEntry {
+// name, direction from the dataset sign, and the representative amount. The
+// locked label-to-category expectation is computed by the caller (HF and
+// mitul arms resolve it differently).
+func categoryEntriesFor(index int, description string, inflow bool, amount, currency, expected string) []categoryRequestEntry {
 	direction := "out"
 	if inflow {
 		direction = "in"
@@ -135,9 +220,8 @@ func categoryEntriesFor(index int, label, description string, inflow bool, amoun
 		TransactionID: transactionID + "-cat",
 		Name:          description,
 		Direction:     direction,
-		Facts:         &types.TransactionFacts{Description: description, Amount: amount, Currency: "USD"},
+		Facts:         &types.TransactionFacts{Description: description, Amount: amount, Currency: currency},
 	})
-	expected := expectedCategoryFor(label, inflow)
 	entries := make([]categoryRequestEntry, 0, len(requests))
 	for _, request := range requests {
 		entries = append(entries, categoryRequestEntry{
@@ -180,8 +264,8 @@ func main() {
 	seed := flag.Int("seed", 7, "fixed synthesis seed")
 	baseDate := flag.String("base-date", "2023-01-15", "first occurrence date (YYYY-MM-DD)")
 	flag.Parse()
-	if *fixturePath == "" || *outPath == "" || *months < 3 {
-		fmt.Fprintln(os.Stderr, "evalharness: -fixture and -out are required; -months must be >= 3")
+	if *fixturePath == "" || *outPath == "" || *months < 1 {
+		fmt.Fprintln(os.Stderr, "evalharness: -fixture and -out are required; -months must be >= 1")
 		os.Exit(2)
 	}
 	if err := run(*fixturePath, *outPath, *months, *seed, *baseDate); err != nil {
@@ -209,19 +293,50 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 	emitted := make([]evalTransaction, 0, len(fix.Rows))
 	categoryEntries := make([]categoryRequestEntry, 0, len(fix.Rows))
 	for i, row := range fix.Rows {
-		description, inflow := splitSign(row.Description)
-		if description == "" {
-			continue
+		// Mitul-arm rows carry no [debit]/[credit] marker; resolve them
+		// onto the locked mitul mapping (Income inflow, all others
+		// outflow, currency as-is) and skip DROP rows entirely.
+		currency := row.Currency
+		if currency == "" {
+			currency = "USD"
+		}
+		raw := row.Description
+		hasMarker := strings.HasPrefix(raw, "[credit]") || strings.HasPrefix(raw, "[debit]")
+		var description string
+		var inflow bool
+		var expectedCategory string
+		var baseAmount float64
+		if !hasMarker && isMitulLabel(row.Category) {
+			var keep bool
+			description, inflow, expectedCategory, keep = splitMitul(row.Category, raw)
+			if !keep {
+				continue
+			}
+			if description == "" {
+				continue
+			}
+			var ok bool
+			baseAmount, ok = mitulBaseAmounts[row.Category]
+			if !ok {
+				baseAmount = 100
+			}
+		} else {
+			description, inflow = splitSign(raw)
+			if description == "" {
+				continue
+			}
+			expectedCategory = expectedCategoryFor(row.Category, inflow)
+			var ok bool
+			baseAmount, ok = baseAmounts[row.Category]
+			if !ok {
+				baseAmount = 100
+			}
 		}
 		direction := "outflow"
 		sign := -1.0
 		if inflow {
 			direction = "inflow"
 			sign = 1.0
-		}
-		baseAmount, ok := baseAmounts[row.Category]
-		if !ok {
-			baseAmount = 100
 		}
 		amount := strconv.FormatFloat(sign*baseAmount, 'f', 2, 64)
 		// The categorization builder carries direction in its own field;
@@ -246,7 +361,7 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 				Facts: types.TransactionFacts{
 					Description: description,
 					Amount:      strconv.FormatFloat(amount, 'f', 2, 64),
-					Currency:    "USD",
+					Currency:    currency,
 					PostedTime:  stamp,
 					Metadata:    map[string]string{"category": row.Category},
 				},
@@ -255,12 +370,12 @@ func run(fixturePath, outPath string, months, seed int, baseDate string) error {
 		}
 		emitted = append(emitted, evalTransaction{
 			ID: fmt.Sprintf("eval-%06d", i), Description: description, Category: row.Category,
-			ExpectedKind: expectedKinds[row.Category], ExpectedCategory: expectedCategoryFor(row.Category, inflow),
+			ExpectedKind: expectedKinds[row.Category], ExpectedCategory: expectedCategory,
 			Direction: direction,
 			Amount:    amount,
 			Dates:     dates,
 		})
-		categoryEntries = append(categoryEntries, categoryEntriesFor(i, row.Category, description, inflow, catAmount)...)
+		categoryEntries = append(categoryEntries, categoryEntriesFor(i, description, inflow, catAmount, currency, expectedCategory)...)
 	}
 
 	ctx := context.Background()
