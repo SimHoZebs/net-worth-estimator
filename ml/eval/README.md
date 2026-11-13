@@ -55,7 +55,7 @@ production feedback arrives (the mitul arm warms their weights in the
 meantime).
 
 Mitul labels map identically in Go (`splitMitul`) and Python
-(`resolve_expected_mitul`); a mismatch raises: Food & Dining→FOOD_AND_DRINK,
+(`datasets.resolve_expected_mitul`); a mismatch raises: Food & Dining→FOOD_AND_DRINK,
 Transportation→TRANSPORTATION, Shopping & Retail→GENERAL_MERCHANDISE except
 IKEA/HOME DEPOT/LOWES descriptions→HOME_IMPROVEMENT, Entertainment &
 Recreation→ENTERTAINMENT except gym/fitness descriptions→PERSONAL_CARE,
