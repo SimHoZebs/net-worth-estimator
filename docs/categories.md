@@ -69,23 +69,24 @@ uses protocol version 2 and keeps `extra.category` as provider evidence.
 `backend/internal/categorization` owns the classifier seam. The current
 implementation is a deterministic keyword mock, versioned as `keyword-v1`.
 
-When `ML_JUDGMENT_URL` names a judgment endpoint and `ML_CATEGORIES=1` is
-set, both mains compose a composite classifier instead: the learner
-(`ml-categories-v1`) judges each direction-eligible category hypothesis and
-the keyword mock backfills whatever the learner skips. A learner error falls
-back to keywords for the whole batch. Without `ML_CATEGORIES=1` the worker
-stays keyword-only even with a judgment endpoint configured. The learner
-fills only uncategorized rows, never bank or user assignments, the same as
-keywords. Each stored assignment records the producer that made it, while the
-worker version names the composition.
+When `ML_JUDGMENT_URL` names a judgment endpoint, both mains compose a
+composite classifier: keywords answer first and the learner
+(`ml-categories-v1`) backfills only what keywords skip, so the model can
+add labels but never replace a keyword answer. `ML_CATEGORIES=0` forces
+keyword-only. A learner error keeps the keyword answers and leaves the
+rest uncategorized. The learner fills only uncategorized rows, never bank
+or user assignments, the same as keywords. Each stored assignment records
+the producer that made it, while the worker version names the composition.
 
-The v1 learner is evaluation-only and deliberately conservative. Judgment
-sessions open with no training feedback, so user overrides do not train the
-learner yet; warm weights come from the regenerated seed. On the public
-descriptor set the warm seed claims few rows (about 6%) at 0.64 confident
-precision against 0.77 for keywords, so keyword stays the default. Flip the
-gate only after a harness run shows warm confident precision at or above
-keyword on the held-out probe.
+The v1 learner is evaluation-only. Judgment sessions open with no training
+feedback, so user overrides do not train the learner yet; warm weights come
+from the regenerated seed. Measured on 282 owner-reviewed prod rows (266
+emitting requests; 16 emit none and stay uncategorized) with the real
+components: keyword alone labels 84 correctly with zero wrong; with
+learner backfill 232 are correct with 6 new errors on rows that would
+otherwise stay uncategorized. Held-out public descriptors score 0.91
+confident precision on unseen merchants, so the model generalizes rather
+than memorizing training rows.
 
 A periodic worker scans uncategorized bank transactions, newest first, and writes
 inferred assignments. It never blocks sync and keeps no queue table: an

@@ -68,15 +68,18 @@ func parseReadOnly(value string) bool {
 	}
 }
 
-// categoryClassifier prefers the learner-backed composite only when the
-// operator explicitly enables it. The warm category seed is deliberately
-// conservative: on held-out descriptors the learner claims few rows and its
-// confident judgments trail keyword precision, so keyword stays the default
-// until a measured flip condition is met. ML_JUDGMENT_URL alone keeps the
-// keyword mock.
+// categoryClassifier composes the keyword classifier with the learner-backed
+// composite whenever a judgment endpoint is configured. Keyword runs first
+// and the learner backfills only what keywords skip, so the model can add
+// labels but never replace a keyword answer. ML_CATEGORIES=0 forces
+// keyword-only for operators who want the model out of the path entirely.
+// Measured on 282 owner-reviewed prod rows (266 emitting requests; 16 emit
+// none and stay uncategorized): keyword alone 84 correct with zero wrong;
+// with backfill 232 correct and 6 new errors on rows that would otherwise
+// stay uncategorized.
 func categoryClassifier() categorization.Classifier {
 	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
-	if endpoint == "" || strings.TrimSpace(os.Getenv("ML_CATEGORIES")) != "1" {
+	if endpoint == "" || strings.TrimSpace(os.Getenv("ML_CATEGORIES")) == "0" {
 		return categorization.KeywordClassifier{}
 	}
 	return categorization.CompositeClassifier{

@@ -91,6 +91,24 @@ respectively, so their weights are warm but thinly evidenced). Probe of
 600 requests (200 payment + 200 HF/MoneyData category + 200 mitul
 category) evaluates identically in-memory vs fresh load (600/600).
 
+## Prod-label fine-tune and the keyword-first default
+
+A read-only copy of the prod app database (17MB, owner-only handling, never
+committed) supplied 282 owner-reviewed labels across 12 keys (12 answers
+given directly by the owner, 262 confident assistant proposals the owner
+delegated, 8 flagged guesses; 16 rows emit no request and stay
+uncategorized). Training on 80% with the warm seed reproduces the known
+small-volume hedge (train set itself scores mostly uncertain), so the seed
+was deliberately not re-exported from prod labels and no prod data entered
+the repo. The enable decision was measured instead, with real components on
+all 266 emitting groups: keyword alone 84 correct with zero wrong;
+keyword-first with learner backfill 232 correct with 6 new errors on rows
+that would otherwise stay uncategorized (joint correct 87.2%). Held-out
+public merchants never trained on score 0.91 confident precision with 85%
+production-outcome correct, so the model generalizes rather than
+memorizing. Keyword-first ordering (learner can add, never replace) plus
+the ML_CATEGORIES=0 kill switch is the shipped default on that evidence.
+
 Regenerate (deterministic):
 
 ```bash

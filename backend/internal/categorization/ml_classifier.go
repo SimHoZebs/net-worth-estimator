@@ -95,9 +95,12 @@ func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string
 	return results, nil
 }
 
-// CompositeClassifier prefers the learner and fills the gaps it leaves with
-// the deterministic keyword classifier. The version names the composition;
-// each stored assignment still records the producer that made it.
+// CompositeClassifier runs the deterministic keyword classifier first and
+// backfills only what keywords skip with the learner. Keyword-first is
+// deliberate: the learner may only add labels, never replace a keyword
+// answer, so a confident-but-wrong model judgment cannot flip a correct
+// keyword assignment. The version names the composition; each stored
+// assignment still records the producer that made it.
 type CompositeClassifier struct {
 	ML      *MLClassifier
 	Keyword KeywordClassifier
@@ -106,29 +109,32 @@ type CompositeClassifier struct {
 // Version identifies the classifier composition in stored assignments.
 func (c CompositeClassifier) Version() string { return "composite/ml-categories-v1+keyword-v1" }
 
-// Classify tries the learner first and backfills skipped transactions with
-// keywords. A learner error falls back to keywords for the whole batch.
+// Classify fills keyword answers first, then judges the skipped
+// transactions with the learner. A learner error keeps the keyword answers
+// and leaves the rest uncategorized instead of failing the batch.
 func (c CompositeClassifier) Classify(ctx context.Context, inputs []Input) (map[string]Classified, error) {
-	if c.ML != nil {
-		if results, err := c.ML.Classify(ctx, inputs); err == nil {
-			remaining := make([]Input, 0, len(inputs))
-			for _, input := range inputs {
-				if _, ok := results[input.TransactionID]; !ok {
-					remaining = append(remaining, input)
-				}
-			}
-			if len(remaining) == 0 {
-				return results, nil
-			}
-			backfill, err := c.Keyword.Classify(ctx, remaining)
-			if err != nil {
-				return nil, err
-			}
-			for transactionID, classified := range backfill {
-				results[transactionID] = classified
-			}
-			return results, nil
+	results, err := c.Keyword.Classify(ctx, inputs)
+	if err != nil {
+		return nil, err
+	}
+	if c.ML == nil {
+		return results, nil
+	}
+	remaining := make([]Input, 0, len(inputs))
+	for _, input := range inputs {
+		if _, ok := results[input.TransactionID]; !ok {
+			remaining = append(remaining, input)
 		}
 	}
-	return c.Keyword.Classify(ctx, inputs)
+	if len(remaining) == 0 {
+		return results, nil
+	}
+	backfill, err := c.ML.Classify(ctx, remaining)
+	if err != nil {
+		return results, nil
+	}
+	for transactionID, classified := range backfill {
+		results[transactionID] = classified
+	}
+	return results, nil
 }

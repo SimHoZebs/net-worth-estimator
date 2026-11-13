@@ -111,21 +111,13 @@ func TestCompositeClassifierFallsBackOnMLError(t *testing.T) {
 
 func TestCompositeClassifierBackfillsSkippedTransactions(t *testing.T) {
 	inputs := []Input{
-		{TransactionID: "txn-ml", Name: "SHELL OIL", Direction: "out"},
-		{TransactionID: "txn-kw", Name: "WHOLE FOODS", Direction: "out"},
+		{TransactionID: "txn-kw", Name: "SHELL OIL", Direction: "out"},
+		{TransactionID: "txn-ml", Name: "QFC #5881", Direction: "out"},
 	}
-	requests := CategoryJudgmentRequests(inputs[0])
-	mlOnly := map[string]bool{}
-	for _, request := range requests {
-		mlOnly[request.ID] = true
-	}
+	requests := CategoryJudgmentRequests(inputs[1])
 	var judgments []types.AnalysisJudgment
-	for _, input := range inputs {
-		for _, request := range CategoryJudgmentRequests(input) {
-			if mlOnly[request.ID] {
-				judgments = append(judgments, types.AnalysisJudgment{RequestID: request.ID, Status: "ready", Decision: "supported", Strength: "strong"})
-			}
-		}
+	for _, request := range requests {
+		judgments = append(judgments, types.AnalysisJudgment{RequestID: request.ID, Status: "ready", Decision: "supported", Strength: "strong"})
 	}
 	composite := CompositeClassifier{
 		ML:      NewMLClassifier(stubProvider{session: stubSession{judgments: judgments}}),
@@ -135,10 +127,34 @@ func TestCompositeClassifierBackfillsSkippedTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if results["txn-ml"].Producer != "ml-categories-v1" {
-		t.Fatalf("ml result=%+v", results)
+	if got := results["txn-kw"]; got.Category != types.CategoryTransportation || got.Producer != "keyword-v1" {
+		t.Fatalf("keyword answer=%+v", results)
 	}
-	if got := results["txn-kw"]; got.Category != types.CategoryFoodAndDrink || got.Producer != "keyword-v1" {
-		t.Fatalf("keyword backfill=%+v", results)
+	if got := results["txn-ml"]; got.Category != types.CategoryFoodAndDrink || got.Producer != "ml-categories-v1" {
+		t.Fatalf("ml backfill=%+v", results)
+	}
+}
+
+func TestCompositeClassifierNeverReplacesKeywordAnswers(t *testing.T) {
+	// NETFLIX WHOLE FOODS is claimed by both sides with different answers:
+	// keywords match WHOLE FOODS before the entertainment branch, while the
+	// learner with all-supported judgments picks ENTERTAINMENT first in
+	// CategoryKeys order. Only keyword-first keeps FOOD_AND_DRINK here; the
+	// old ML-first order returns ENTERTAINMENT and fails this test.
+	input := Input{TransactionID: "txn-both", Name: "NETFLIX WHOLE FOODS", Direction: "out"}
+	var judgments []types.AnalysisJudgment
+	for _, request := range CategoryJudgmentRequests(input) {
+		judgments = append(judgments, types.AnalysisJudgment{RequestID: request.ID, Status: "ready", Decision: "supported", Strength: "strong"})
+	}
+	composite := CompositeClassifier{
+		ML:      NewMLClassifier(stubProvider{session: stubSession{judgments: judgments}}),
+		Keyword: KeywordClassifier{},
+	}
+	results, err := composite.Classify(context.Background(), []Input{input})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := results["txn-both"]; got.Category != types.CategoryFoodAndDrink || got.Producer != "keyword-v1" {
+		t.Fatalf("keyword answer replaced=%+v", results)
 	}
 }
