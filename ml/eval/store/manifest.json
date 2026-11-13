@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "note": "Manifest only. No raw rows are vendored. Gated mitul subset stays out of git until license confirmed.",
+  "entries": [
+    {
+      "id": "hf-v2",
+      "source": "DoDataThings/us-bank-transaction-categories-v2 (Hugging Face)",
+      "rows_total": 68000,
+      "rows_used": 68000,
+      "license": "MIT",
+      "local_path_hint": "ml/eval/.cache/us-bank-txn-cats-v2.parquet (gitignored cache; never committed)",
+      "content_pointer": "https://huggingface.co/datasets/DoDataThings/us-bank-transaction-categories-v2/resolve/refs%2Fconvert%2Fparquet/default/train/0000.parquet",
+      "sampling": "Seed trains full set; eval slices use datasets.sample_rows stratified per category, seed 7.",
+      "mapping": "datasets.EXPECTED_KIND, datasets.EXPECTED_CATEGORY, datasets.resolve_expected_category",
+      "alias": "datasets.build_aliases + datasets.merchant_token first-token heuristic; ALIAS_SIGNAL Utilities/Insurance.",
+      "seed_contribution": "Payment interleaved order first, then category interleaved order first (24,925 of 51,269 category events).",
+      "regenerate": "cd ml && uv run --with pyarrow --with pandas eval/harness.py --source hf-v2 --full"
+    },
+    {
+      "id": "moneydata",
+      "source": "Laramee MoneyData (Mendeley dnxtg6n4rv, CC BY 4.0)",
+      "rows_total": 6567,
+      "rows_used": 6567,
+      "license": "CC BY 4.0 — cite Firat et al., MoneyVis, EuroVis Short Papers 2023",
+      "local_path_hint": "<path/to/laramee26openBankTransactionData.xlsx> via --moneydata-path (never committed)",
+      "content_pointer": "datasets.MONEYDATASET_ID = Laramee MoneyData (Mendeley dnxtg6n4rv, CC BY 4.0)",
+      "sampling": "All 6,567 rows; no sampling.",
+      "mapping": "datasets.load_moneydata keyword-hint table; datasets.MONEYDATASET_ID",
+      "alias": "Same build_aliases path; UK descriptors often miss first-token keys (VIRGIN MEDIA); hit rate reported.",
+      "seed_contribution": "Payment interleaved order second, then category interleaved order second (1,223 category events).",
+      "regenerate": "cd ml && uv run --with pyarrow --with pandas --with openpyxl eval/harness.py --source moneydata --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> --full"
+    },
+    {
+      "id": "mitul-sample",
+      "source": "mitulshah/transaction-categorization (Hugging Face, gated)",
+      "rows_total": 4501043,
+      "rows_used": 48003,
+      "license": "Gated, license unconfirmed — eval-use only, never committed",
+      "local_path_hint": "<path/to/transaction-categorization/default/train/0000.parquet> via --mitul-path (gated; never committed)",
+      "content_pointer": "No hash: gated local copy has no stable public digest; sampled deterministically from local parquet.",
+      "sampling": "UNIQUE descriptions per mapped key, per_key 4000, seed 7, keys sorted; TRANSFER_OUT exhausts at 3 uniques.",
+      "mapping": "datasets.resolve_expected_mitul; datasets.MITUL_HOME_RE/GYM_RE/LOAN_RE/INS_RE/WD_RE; datasets.load_mitul; datasets.MITUL_PER_KEY; datasets.SEED",
+      "alias": "build_aliases runs but yields ~no entries (no mitul label in ALIAS_SIGNAL); descriptor breadth only.",
+      "seed_contribution": "Payment excluded (single occurrences carry no recurrence signal); category interleaved order third (25,121 events).",
+      "regenerate": "cd ml && uv run --with pyarrow --with pandas -- python3 -c \"from pathlib import Path; from eval.datasets import load_mitul; print(len(load_mitul(Path('<path/to/0000.parquet>'))))\" # expect 48003"
+    },
+    {
+      "id": "seed",
+      "source": "Derived seed trained on hf-v2 + moneydata + mitul-sample",
+      "rows_total": 55425,
+      "rows_used": 55425,
+      "license": "Derived artifact (MIT + CC BY 4.0 sources; mitul gated eval-use only)",
+      "local_path_hint": "ml/seed.sqlite3 (versioned seed)",
+      "content_pointer": "sha256 51df0d5bf66b921d9711dc35cab3edd40c99a47cdc3bf910fbdd7c988f6c812f, 1024000 bytes, model row only",
+      "sampling": "Deterministic concatenation with fixed seeds; see training.run_seed_recipe.",
+      "mapping": "training.run_seed_recipe; seed_export.export_seed/verify_seed; training.order_requests interleaved mode",
+      "alias": "N/A: seed stores weights only; alias tables are rebuilt per eval run.",
+      "seed_contribution": "4,156 payment events then 51,269 category events (HF, MoneyData, mitul); manual drift mode dismiss-and-retry; coverage gate >= 50 per kind (HOME_IMPROVEMENT, GOVERNMENT_AND_NON_PROFIT exempt).",
+      "regenerate": "cd ml && uv run --with pyarrow --with pandas --with openpyxl eval/harness.py --source all --moneydata-path <xlsx> --mitul-path <parquet> --full --cache-dir /tmp/opencode/evalboth --export-seed ml/seed.sqlite3"
+    },
+    {
+      "id": "prod-labels-note",
+      "source": "Owner prod database copy (owner-only, read-only)",
+      "rows_total": 282,
+      "rows_used": 0,
+      "license": "Owner-private; never committed",
+      "local_path_hint": "No repo path; owner-only 17MB read-only copy, never committed",
+      "content_pointer": "Counts only: 282 labels across 12 keys (12 direct, 262 delegated, 8 flagged); 266 emitting groups; 16 rows emit no request.",
+      "sampling": "No sampling; 80% trained experimentally, seed deliberately not re-exported.",
+      "mapping": "No mapping pointer; keyword-first default evidence recorded in docs/eval-datasets.md.",
+      "alias": "N/A.",
+      "seed_contribution": "Zero events: measured only (keyword 84 correct/0 wrong; keyword-first backfill 232 correct/6 new errors, joint 87.2%).",
+      "regenerate": "Not regenerable in repo; owner-only labels, counts recorded here only."
+    }
+  ]
+}

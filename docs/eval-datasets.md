@@ -6,6 +6,11 @@ what data, what is real versus synthesized, and how the deployable seed
 was produced. No dataset is vendored into the repo; the harness downloads
 at eval time into a gitignored cache.
 
+Machine-readable registry: `ml/eval/store/manifest.json` records each
+source with row counts, sampling recipes, mapping pointers, seed hashes,
+and regeneration commands; `ml/eval/store/README.md` covers verification.
+No raw rows live there.
+
 ## Sources
 
 | Source | Rows | License / attribution | Use |
