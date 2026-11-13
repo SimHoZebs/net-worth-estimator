@@ -69,7 +69,10 @@ class _DriftTripped(Exception):
 class PaymentModelStore:
     def __init__(self, model_path: str | None = None):
         self._threshold_low, self._threshold_high = _thresholds_from_env()
-        path = Path(model_path or os.environ.get("ML_MODEL_PATH", "/tmp/ml.sqlite3"))
+        raw = model_path or os.environ.get("ML_MODEL_PATH", "")
+        if not raw or not raw.strip():
+            raise ValueError("ML_MODEL_PATH or model_path must name persistent storage; refusing to start without explicit persistent storage (set ML_MODEL_PATH)")
+        path = Path(raw.strip())
         path.parent.mkdir(parents=True, exist_ok=True)
         mode = (os.environ.get("ML_DRIFT_MODE") or "auto").strip()
         if mode not in ("auto", "manual"):

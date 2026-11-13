@@ -34,7 +34,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/integrationfixtures"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
@@ -375,7 +374,7 @@ func main() {
 	}
 	stopAnalyses := analysisRunner.Start(context.Background(), time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
 	defer stopAnalyses()
-	categoryWorker, err := categorization.NewWorker(application, categoryClassifier())
+	categoryWorker, err := categorization.NewWorker(application, categorization.NewClassifierFromEnv(os.Getenv))
 	if err != nil {
 		log.Fatalf("configure categorization: %v", err)
 	}
@@ -751,25 +750,5 @@ func parseBool(value string) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-// categoryClassifier composes the keyword classifier with the learner-backed
-// composite whenever a judgment endpoint is configured. Keyword runs first
-// and the learner backfills only what keywords skip, so the model can add
-// labels but never replace a keyword answer. ML_CATEGORIES=0 forces
-// keyword-only for operators who want the model out of the path entirely.
-// Measured on 282 owner-reviewed prod rows (266 emitting requests; 16 emit
-// none and stay uncategorized): keyword alone 84 correct with zero wrong;
-// with backfill 232 correct and 6 new errors on rows that would otherwise
-// stay uncategorized.
-func categoryClassifier() categorization.Classifier {
-	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
-	if endpoint == "" || strings.TrimSpace(os.Getenv("ML_CATEGORIES")) == "0" {
-		return categorization.KeywordClassifier{}
-	}
-	return categorization.CompositeClassifier{
-		ML:      categorization.NewMLClassifier(judgment.NewHTTPProvider(endpoint, 5*time.Second)),
-		Keyword: categorization.KeywordClassifier{},
 	}
 }

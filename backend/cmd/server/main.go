@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -19,7 +18,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
@@ -36,19 +34,6 @@ func envOr(key, fallback string) string {
 func bootFatalf(message string, err error) {
 	slog.Error(message, "error", err)
 	os.Exit(1)
-}
-
-// defaultDBPath prefers a durable per-user data directory over os.TempDir,
-// which the OS may wipe between reboots.
-func defaultDBPath() string {
-	if base, err := os.UserConfigDir(); err == nil && base != "" {
-		return filepath.Join(base, "net-worth-estimator", "net-worth-estimator.db")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return filepath.Join(os.TempDir(), "net-worth-estimator.db")
-	}
-	return filepath.Join(home, ".local", "share", "net-worth-estimator", "net-worth-estimator.db")
 }
 
 // parseAllowedOrigins delegates to the api package so origin validation
@@ -68,26 +53,6 @@ func parseReadOnly(value string) bool {
 	}
 }
 
-// categoryClassifier composes the keyword classifier with the learner-backed
-// composite whenever a judgment endpoint is configured. Keyword runs first
-// and the learner backfills only what keywords skip, so the model can add
-// labels but never replace a keyword answer. ML_CATEGORIES=0 forces
-// keyword-only for operators who want the model out of the path entirely.
-// Measured on 282 owner-reviewed prod rows (266 emitting requests; 16 emit
-// none and stay uncategorized): keyword alone 84 correct with zero wrong;
-// with backfill 232 correct and 6 new errors on rows that would otherwise
-// stay uncategorized.
-func categoryClassifier() categorization.Classifier {
-	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
-	if endpoint == "" || strings.TrimSpace(os.Getenv("ML_CATEGORIES")) == "0" {
-		return categorization.KeywordClassifier{}
-	}
-	return categorization.CompositeClassifier{
-		ML:      categorization.NewMLClassifier(judgment.NewHTTPProvider(endpoint, 5*time.Second)),
-		Keyword: categorization.KeywordClassifier{},
-	}
-}
-
 func main() {
 	obs.Init(os.Getenv)
 	port := 8787
@@ -95,7 +60,10 @@ func main() {
 		port = parsed
 	}
 	host := envOr("HOST", "127.0.0.1")
-	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", defaultDBPath())
+	dbPath := strings.TrimSpace(os.Getenv("NET_WORTH_ESTIMATOR_DB"))
+	if dbPath == "" {
+		bootFatalf("configure persistent storage: NET_WORTH_ESTIMATOR_DB is required", errors.New("NET_WORTH_ESTIMATOR_DB is not set"))
+	}
 	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
 		bootFatalf("configure allowed origins", err)
@@ -122,7 +90,7 @@ func main() {
 	}
 	stopAnalyses := analysisRunner.Start(context.Background(), 15*time.Second, func(error) { slog.Warn("background analysis temporarily unavailable") })
 	defer stopAnalyses()
-	categoryWorker, err := categorization.NewWorker(database, categoryClassifier())
+	categoryWorker, err := categorization.NewWorker(database, categorization.NewClassifierFromEnv(os.Getenv))
 	if err != nil {
 		bootFatalf("configure categorization", err)
 	}
