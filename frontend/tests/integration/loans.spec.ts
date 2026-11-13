@@ -210,11 +210,19 @@ test("one debt form creates one visible account and preserves terms on edit", as
 	).model;
 	expect(after.checkpoints).toEqual(saved.checkpoints);
 	await details.getByRole("tab", { name: "Account details" }).click();
+	// The cards show the current modeled balance up top; the recorded
+	// creation figures live in the "Recorded ..." sub-lines. Same-day
+	// schedule occurrences execute after the observation anchor, so the
+	// current interest drifts from the recorded $237.54 by design.
+	await expect(details.getByText("principal", { exact: true })).toBeVisible();
 	await expect(
-		details.getByText("$12,000.00", { exact: true }).first(),
+		details.getByText("Accrued interest", { exact: true }),
 	).toBeVisible();
 	await expect(
-		details.getByText("$237.54", { exact: true }).first(),
+		details.getByText("Recorded $12,000.00 on"),
+	).toBeVisible();
+	await expect(
+		details.getByText("Recorded $237.54 on"),
 	).toBeVisible();
 	await page
 		.getByRole("navigation", { name: "Breadcrumb" })
