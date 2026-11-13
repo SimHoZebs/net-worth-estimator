@@ -88,7 +88,7 @@ export function NotificationCenter() {
 		<div
 			ref={stackRef}
 			{...(supportsPopover() ? { popover: "manual" as const } : {})}
-			className="pointer-events-none fixed right-3 bottom-3 z-(--z-toast) m-0 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 border-0 bg-transparent p-0 sm:right-6 sm:bottom-5 xl:right-8 print:hidden"
+			className="pointer-events-none fixed top-auto right-3 bottom-3 left-auto z-(--z-toast) m-0 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 border-0 bg-transparent p-0 sm:right-6 sm:bottom-5 xl:right-8 print:hidden"
 		>
 			{items.map((toast) => (
 				<ToastCard key={toast.id} toast={toast} />
