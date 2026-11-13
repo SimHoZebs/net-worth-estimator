@@ -103,11 +103,10 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			client := edge.Client()
 			client.Jar, _ = cookiejar.New(nil)
 			client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-			request := func(method, path, body, origin string) (*http.Response, string) {
-				t.Helper()
+			requestOnce := func(method, path, body, origin string) (*http.Response, string, error) {
 				r, err := http.NewRequest(method, publicURL+path, strings.NewReader(body))
 				if err != nil {
-					t.Fatal(err)
+					return nil, "", err
 				}
 				r.Header.Set("Content-Type", "application/json")
 				r.Header.Set(ResourceHeader, resource.ID)
@@ -119,14 +118,22 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 				r.Header.Set(ingress.OriginHeader, "https://attacker.test")
 				response, err := client.Do(r)
 				if err != nil {
-					t.Fatal(err)
+					return nil, "", err
 				}
 				defer response.Body.Close()
 				data, err := io.ReadAll(response.Body)
 				if err != nil {
+					return response, "", err
+				}
+				return response, string(data), nil
+			}
+			request := func(method, path, body, origin string) (*http.Response, string) {
+				t.Helper()
+				response, body, err := requestOnce(method, path, body, origin)
+				if err != nil {
 					t.Fatal(err)
 				}
-				return response, string(data)
+				return response, body
 			}
 			response, body := request("GET", prefix+"login", "", "")
 			if response.StatusCode != http.StatusFound {
@@ -169,7 +176,20 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			const projection = `{"settings":{"fallbackProjectionStartDate":"2026-10-27","horizonYears":1},"config":{"runCount":1,"seed":42}}`
 			checkStream := func(source string) {
 				t.Helper()
-				response, body := request("POST", "/v1/projections/stochastic", projection, publicURL)
+				// Retry once on unexpected EOF from the proxy teardown race
+				// closing the backend connection mid-copy; the seeded recompute is idempotent.
+				var response *http.Response
+				var body string
+				for attempt := 0; attempt < 2; attempt++ {
+					var err error
+					response, body, err = requestOnce("POST", "/v1/projections/stochastic", projection, publicURL)
+					if err == nil {
+						break
+					}
+					if !strings.Contains(err.Error(), "unexpected EOF") || attempt == 1 {
+						t.Fatal(err)
+					}
+				}
 				if response.StatusCode != 200 || response.Header.Get("Content-Type") != "text/event-stream" || response.Header.Get("Projection-Source") != source || !strings.Contains(body, "event: result") || strings.Contains(body, "event: error") {
 					t.Fatalf("stream=%d source=%s %s", response.StatusCode, response.Header.Get("Projection-Source"), body)
 				}
