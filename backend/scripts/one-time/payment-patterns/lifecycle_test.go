@@ -164,6 +164,32 @@ func TestUpgradeCannotPoisonFeedbackBeforeOrAfterWithdrawal(t *testing.T) {
 	if _, err = s.ReviewAnalysisFinding(findings[0].ID, answer(findings[0])); err != nil {
 		t.Fatal(err)
 	}
+	// The quarantine holds fresh reviews, so age this one past it the same
+	// way the runner E2E does: both the column and the payload carry the
+	// creation time, so both move together. Delivery is about matured
+	// answers, not day-zero reviews.
+	if err = db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = raw.Exec(`UPDATE analysis_feedback SET created_at = ?, payload_json = json_set(payload_json, '$.createdAt', ?)`, time.Now().Add(-15*24*time.Hour).Unix(), time.Now().Add(-15*24*time.Hour).Unix()); err != nil {
+		raw.Close()
+		t.Fatal(err)
+	}
+	raw.Close()
+	db, err = sqlite.SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s, err = db.User("owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, _ = analysis.NewRunner(db, analysis.NewPaymentPatterns(provider))
 	if err = runner.RunOnce(ctx); err != nil {
 		t.Fatal(err)
 	}
