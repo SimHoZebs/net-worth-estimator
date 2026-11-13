@@ -14,7 +14,11 @@ import {
 	clearPersistedMemory,
 } from "./persisted.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
-import { useThemeStore } from "./useTheme.ts";
+import {
+	getThemePreference,
+	rehydrateThemeFromStorage,
+	setThemePreference,
+} from "./useTheme.ts";
 import {
 	resetSafeSpendingSettings,
 	sanitizeSafeSpendingSettings,
@@ -113,7 +117,7 @@ beforeEach(async () => {
 		name: UI_PREFS_STORAGE_KEY,
 	});
 	resetUiStore();
-	useThemeStore.setState({ preference: "system" });
+	setThemePreference("system");
 	resetSafeSpendingSettings();
 	server.backend.clear();
 	server.putStatus = 0;
@@ -195,25 +199,19 @@ describe("unified persisted prefs", () => {
 		expect(useUiStore.getState().ranges).toBe(true);
 	});
 
-	it("reads the current theme envelope and keeps corrupt data safe", async () => {
-		window.localStorage.setItem(
-			THEME_STORAGE_KEY,
-			JSON.stringify({ state: { preference: "dark" }, version: 1 }),
-		);
-		await useThemeStore.persist.rehydrate();
-		expect(useThemeStore.getState().preference).toBe("dark");
+	it("reads the stored plain-string preference and keeps corrupt data safe", async () => {
+		window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+		rehydrateThemeFromStorage();
+		expect(getThemePreference()).toBe("dark");
 
-		window.localStorage.setItem(
-			THEME_STORAGE_KEY,
-			JSON.stringify({ state: { preference: "light" }, version: 1 }),
-		);
-		await useThemeStore.persist.rehydrate();
-		expect(useThemeStore.getState().preference).toBe("light");
+		window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+		rehydrateThemeFromStorage();
+		expect(getThemePreference()).toBe("light");
 
-		useThemeStore.setState({ preference: "system" });
+		setThemePreference("system");
 		window.localStorage.setItem(THEME_STORAGE_KEY, "{bad");
-		await useThemeStore.persist.rehydrate();
-		expect(useThemeStore.getState().preference).toBe("system");
+		rehydrateThemeFromStorage();
+		expect(getThemePreference()).toBe("system");
 	});
 
 	it("persists explicit income sources and an empty selection across reloads", async () => {
@@ -344,7 +342,7 @@ describe("financial preference owner isolation", () => {
 	});
 
 	it("isolates the sample and API origins without changing global display preferences", async () => {
-		useThemeStore.getState().setPreference("dark");
+		setThemePreference("dark");
 		useUiStore.getState().setYears(30);
 		useUiStore.getState().setRanges(false);
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 100 });
@@ -371,9 +369,9 @@ describe("financial preference owner isolation", () => {
 			incomeScheduleIds: ["sample-income"],
 		});
 		suspendUserScope();
-		expect(useThemeStore.getState().preference).toBe("dark");
+		expect(getThemePreference()).toBe("dark");
 		expect(useUiStore.getState()).toMatchObject({ years: 30, ranges: false });
-		expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toContain("dark");
+		expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
 		expect(window.localStorage.getItem(UI_PREFS_STORAGE_KEY)).toContain(
 			'"years":30',
 		);

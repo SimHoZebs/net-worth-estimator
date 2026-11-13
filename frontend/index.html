@@ -15,34 +15,8 @@
 			try {
 				var stored = "system";
 				var raw = localStorage.getItem("waypoint-theme");
-				if (raw) {
-					var parsed;
-					try {
-						parsed = JSON.parse(raw);
-					} catch (e) {
-						parsed = raw;
-					}
-					if (typeof parsed === "string") {
-						if (
-							parsed === "light" ||
-							parsed === "dark" ||
-							parsed === "system"
-						)
-							stored = parsed;
-					} else if (parsed && typeof parsed === "object") {
-						var state = parsed.state;
-						var candidate =
-							state && typeof state === "object"
-								? state.preference
-								: parsed.preference;
-						if (
-							candidate === "light" ||
-							candidate === "dark" ||
-							candidate === "system"
-						)
-							stored = candidate;
-					}
-				}
+				if (raw === "light" || raw === "dark" || raw === "system")
+					stored = raw;
 				var dark =
 					stored === "dark" ||
 					(stored === "system" &&

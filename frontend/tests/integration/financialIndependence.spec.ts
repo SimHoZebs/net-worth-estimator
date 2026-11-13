@@ -340,11 +340,7 @@ for (const theme of ["light", "dark"]) {
 			await addIndependence(request);
 			await page.setViewportSize({ width, height: 844 });
 			await page.addInitScript(
-				(theme) =>
-					localStorage.setItem(
-						"waypoint-theme",
-						JSON.stringify({ state: { preference: theme }, version: 1 }),
-					),
+				(theme) => localStorage.setItem("waypoint-theme", theme),
 				theme,
 			);
 			// The card and modal assertions below are structural (layout,

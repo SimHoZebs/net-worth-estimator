@@ -2,17 +2,17 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { runInteractions } from "../mocks/interactions.ts";
 import { stubMatchMedia } from "../mocks/testScope.tsx";
-import { useThemeStore } from "../state/useTheme.ts";
+import { setThemePreference } from "../state/useTheme.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 
 beforeEach(() => {
 	stubMatchMedia(false);
-	useThemeStore.setState({ preference: "system" });
+	setThemePreference("system");
 });
 
 afterEach(() => {
 	cleanup();
-	useThemeStore.setState({ preference: "system" });
+	setThemePreference("system");
 });
 
 it("cycles system, light, dark, and back to system", async () => {
