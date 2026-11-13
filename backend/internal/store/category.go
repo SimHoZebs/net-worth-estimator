@@ -20,4 +20,13 @@ type CategoryStore interface {
 	// ListTransactionCategoryCandidates returns bank transactions with no assignment,
 	// newest first, so a classifier can fill them without blocking sync.
 	ListTransactionCategoryCandidates(limit int) ([]types.TransactionCategoryCandidate, error)
+	// ListCategoryFeedback returns journal rows in sequence order with stable
+	// zero-padded string IDs. after names the last delivered item ID
+	// (empty for the head); rows at or below it are excluded. The source,
+	// not the store, applies quarantine and latest-per-transaction-wins.
+	ListCategoryFeedback(after string, limit int) ([]types.CategoryFeedback, error)
+	// ListRecentUserCategories returns transactions whose current intent is
+	// a user assignment, newest first, with bank evidence joined. It bounds
+	// the disagree monitor sample; it never trains the learner directly.
+	ListRecentUserCategories(limit int) ([]types.UserCategoryLabel, error)
 }

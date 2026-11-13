@@ -144,3 +144,41 @@ type TransactionCategoryCandidate struct {
 	Direction     string
 	Facts         *TransactionFacts
 }
+
+// CategoryFeedbackAction names the user intent behind one journal row.
+const (
+	// CategoryFeedbackAssign records a user assignment to the named category.
+	CategoryFeedbackAssign = "assign"
+	// CategoryFeedbackClear records a user clear; Category names the removed key.
+	CategoryFeedbackClear = "clear"
+)
+
+// CategoryFeedback is one immutable row of the append-only category journal.
+// Every user assign and clear appends exactly one row in the same
+// transaction as the sidecar write. Action is assign or clear; Category is
+// the assigned key for assigns and the removed key for clears (nil when a
+// clear removed nothing). Name, Direction, and Facts snapshot the bank row
+// at review time so training rebuilds the exact serving request later.
+// CreatedAt is unix seconds. ID is the zero-padded sequence: fixed width
+// so lexicographic order matches sequence order.
+type CategoryFeedback struct {
+	Seq           int64             `json:"seq"`
+	ID            string            `json:"id"`
+	TransactionID string            `json:"transactionId"`
+	Action        string            `json:"action"`
+	Category      *string           `json:"category,omitempty"`
+	Name          string            `json:"name"`
+	Direction     string            `json:"direction"`
+	Facts         *TransactionFacts `json:"facts,omitempty"`
+	CreatedAt     int64             `json:"createdAt"`
+}
+
+// UserCategoryLabel is one transaction whose current intent is a user
+// assignment, with the bank evidence joined. Newest first.
+type UserCategoryLabel struct {
+	TransactionID string
+	Category      string
+	Name          string
+	Direction     string
+	Facts         *TransactionFacts
+}

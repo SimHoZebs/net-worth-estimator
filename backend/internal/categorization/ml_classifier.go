@@ -21,8 +21,28 @@ func (categoryFeedbackSource) Page(after string, limit int) (judgment.FeedbackPa
 // MLClassifier judges category hypotheses through a judgment provider. It
 // returns an entry only for a ready, strong, supported judgment; anything
 // else leaves the transaction uncategorized for the keyword fallback.
+//
+// Feedback is an optional journal-backed training source, set per tick by
+// the worker from the scoped store. Nil keeps the original behavior: the
+// session opens with an immediately-complete empty source and user labels
+// never train.
 type MLClassifier struct {
 	provider judgment.Provider
+	Feedback judgment.FeedbackSource
+}
+
+// SetFeedbackSource replaces the training source for subsequent Classify
+// calls. The worker owns the classifier and calls Classify
+// single-threaded, so per-tick replacement is safe.
+func (m *MLClassifier) SetFeedbackSource(source judgment.FeedbackSource) {
+	m.Feedback = source
+}
+
+// FeedbackSetter is the per-tick training-source wiring. Both the learner
+// and the keyword-first composite satisfy it; keyword-only compositions
+// simply do not implement it and never train.
+type FeedbackSetter interface {
+	SetFeedbackSource(judgment.FeedbackSource)
 }
 
 // NewMLClassifier composes the learner-backed classifier over a provider.
@@ -55,7 +75,11 @@ func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string
 	if len(batch) == 0 {
 		return map[string]Classified{}, nil
 	}
-	session, err := m.provider.Open(ctx, categoryFeedbackSource{})
+	source := m.Feedback
+	if source == nil {
+		source = categoryFeedbackSource{}
+	}
+	session, err := m.provider.Open(ctx, source)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +132,14 @@ type CompositeClassifier struct {
 
 // Version identifies the classifier composition in stored assignments.
 func (c CompositeClassifier) Version() string { return "composite/ml-categories-v1+keyword-v1" }
+
+// SetFeedbackSource wires the training source into the learner half. A nil
+// learner keeps keyword-only behavior: there is nothing to train.
+func (c CompositeClassifier) SetFeedbackSource(source judgment.FeedbackSource) {
+	if c.ML != nil {
+		c.ML.SetFeedbackSource(source)
+	}
+}
 
 // Classify fills keyword answers first, then judges the skipped
 // transactions with the learner. A learner error keeps the keyword answers

@@ -2,6 +2,7 @@ package analysis_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -94,8 +95,25 @@ func incomeFindings(t *testing.T, scoped store.Store) []types.AnalysisFinding {
 	return findings
 }
 
+// ageAnalysisFeedback backdates one review event so the feedback quarantine
+// treats it as matured. Tests open a second handle to the same file; the
+// driver is already linked by the sqlite package. Both the column and the
+// payload carry the creation time, so both move together.
+func ageAnalysisFeedback(t *testing.T, dbPath, userID, eventID string, createdAt int64) {
+	t.Helper()
+	handle, err := sql.Open("sqlite", "file:"+dbPath+"?mode=rw&_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handle.Close()
+	if _, err := handle.Exec(`UPDATE analysis_feedback SET created_at = ?, payload_json = json_set(payload_json, '$.createdAt', ?) WHERE id = ? AND user_id = ?`, createdAt, createdAt, eventID, userID); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestIncomeSharedLearningRescoresAllOwnersWithoutBankChanges(t *testing.T) {
-	db, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	dbPath := filepath.Join(t.TempDir(), "app.db")
+	db, err := sqlite.SetupDatabase(dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,6 +148,12 @@ func TestIncomeSharedLearningRescoresAllOwnersWithoutBankChanges(t *testing.T) {
 	}
 	scorer.failFeedback = false
 	run()
+	if len(scorer.batches) != 0 {
+		t.Fatalf("fresh review trained: %+v", scorer.batches)
+	}
+	// The quarantine holds day-zero reviews; an aged review trains.
+	ageAnalysisFeedback(t, dbPath, "alice", event.ID, time.Now().Add(-judgment.FeedbackQuarantine).Unix())
+	run()
 	if len(scorer.batches) != 1 || len(scorer.batches[0].Feedback) != 1 {
 		t.Fatalf("batches=%+v", scorer.batches)
 	}
@@ -150,9 +174,11 @@ func TestIncomeSharedLearningRescoresAllOwnersWithoutBankChanges(t *testing.T) {
 	}
 	// Bob also contributes to the exact same model revision.
 	b = incomeFindings(t, bob)[0]
-	if _, err := bob.ReviewAnalysisFinding(b.ID, types.AnalysisFeedbackInput{RequestID: uuid.NewString(), RunID: b.RunID, Revision: b.FeedbackRevision, Action: "reject"}); err != nil {
+	bobEvent, err := bob.ReviewAnalysisFinding(b.ID, types.AnalysisFeedbackInput{RequestID: uuid.NewString(), RunID: b.RunID, Revision: b.FeedbackRevision, Action: "reject"})
+	if err != nil {
 		t.Fatal(err)
 	}
+	ageAnalysisFeedback(t, dbPath, "bob", bobEvent.ID, time.Now().Add(-judgment.FeedbackQuarantine).Unix())
 	run()
 	run() // Alice is visited before Bob, so sees Bob's new revision next pass.
 	if scorer.revision != 2 || len(scorer.batches) != 2 {

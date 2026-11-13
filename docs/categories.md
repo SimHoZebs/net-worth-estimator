@@ -78,9 +78,10 @@ rest uncategorized. The learner fills only uncategorized rows, never bank
 or user assignments, the same as keywords. Each stored assignment records
 the producer that made it, while the worker version names the composition.
 
-The v1 learner is evaluation-only. Judgment sessions open with no training
-feedback, so user overrides do not train the learner yet; warm weights come
-from the regenerated seed. Measured on 282 owner-reviewed prod rows (266
+The learner previously opened judgment sessions with no training feedback, so
+user overrides did not train the learner yet; warm weights came from the
+regenerated seed. Matured owner labels now train through the journal below.
+Measured on 282 owner-reviewed prod rows (266
 emitting requests; 16 emit none and stay uncategorized) with the real
 components: keyword alone labels 84 correctly with zero wrong; with
 learner backfill 232 are correct with 6 new errors on rows that would
@@ -125,3 +126,113 @@ separate from the transaction form.
 - The classifier does not retroactively reclassify rows after a version
   change; `producer` records the version that made the current assignment.
 - An explicit "uncategorized, do not suggest" state is not implemented.
+
+## Journal
+
+Every owner assign and clear appends one row to `category_feedback` in the
+same SQLite transaction as the sidecar write: a journal failure rolls the
+sidecar write back, so the two never diverge. The row records `action`
+(`assign` or `clear`), the assigned key (for a clear, the removed key, or
+null when the clear removed nothing), plus a snapshot of the bank row at
+review time (`name`, `direction`, `facts_json`) and `created_at` unix
+seconds. The table is additive and self-heals like `transaction_categories`:
+fresh and existing databases both create it on first journal read or
+write, with no migration file. Deletes cascade
+exactly like the sidecar: removing a transaction or a user drops its
+journal rows. Normal paths never update or delete journal rows. Bank and
+inferred writes are not journaled; only owner choices train.
+
+Row IDs are the zero-padded sequence (`%020d`), so lexicographic order is
+sequence order.
+
+## Quarantine and supersession
+
+Maturation and expansion live in the journal-backed `judgment.FeedbackSource`
+in the categorization package; the store stays dumb and returns rows only.
+Two gates apply at `Page` time:
+
+- Quarantine: only rows created at least 14 days ago are eligible. Fresh
+  rows stop the page with the cursor held behind them, so a hasty
+  correction, duplicate tap, or mislabeled row never becomes a weight before
+  the owner has lived with it. Journal sequence order matches creation
+  order, so unmatured rows are always the tail.
+- Latest wins: only the newest row per transaction expands. Older rows are
+  absorbed by advancing past them, so a changed mind never trains the label
+  it replaced.
+
+Each matured, latest row expands to one training item per request the
+rebuilt serving request set emits: a confirm for the assigned kind, rejects
+for every other kind. A clear expands to rejects only, since the owner
+endorsed nothing. When the assigned kind emits no request (direction-gated
+or signal-free), the row contributes rejects only; a clear that removed
+nothing contributes nothing. The expansion rebuilds requests with
+`CategoryJudgmentRequests` on the stored snapshot: deterministic, and the
+same builder as serving.
+
+Item event IDs share the row's sequence prefix as `f"{seq:020d}:{slot:02d}"`
+(slot 00 is the confirm when the assigned kind emits a request; otherwise
+rejects start at 00), so IDs are unique
+and strictly ordered within `(after, cursor]`, and the page cursor is the
+last emitted item ID. Every item carries run ID `category-feedback`.
+Unmatured tail rows stop the page with the cursor behind them; superseded
+rows advance the cursor past them without emitting.
+
+No seed change ships in this chunk: the journal only records. The first
+production-label promotion happens once matured volume exists.
+
+## Delivery
+
+`MLClassifier` carries an optional `Feedback` training source, set per tick
+by the worker from the scoped store and the owner. The next per-`Classify`
+session open delivers the matured journal rows and judges in the same call:
+no new goroutines, no signature changes. Nil keeps the original behavior
+(immediately-complete empty source), and keyword-only compositions never
+implement the setter, so they never train. The source owner is
+`categorization:<user>`: payment checkpoints use the bare user ID against
+the same deployment-wide learner, and sharing one would interleave two
+unrelated event-ID streams under one checkpoint.
+
+## Disagree monitor
+
+Each tick samples up to 20 newest user-assigned rows with evidence joined
+(`ListRecentUserCategories`) and compares them with the keyword baseline.
+`DisagreeRate` is the fraction the baseline would not reproduce; an
+abstention counts as disagreement, since an unanswerable row is coverage the
+labels could teach. On samples of at least 10 with a rate above 0.30 the
+worker warn-logs. The signal names when to promote matured labels into
+training or to review the serving vocabulary. Monitoring never fails the
+tick: an unreadable sample logs and classification proceeds.
+
+## Promotion loop
+
+Matured labels promote through the existing seed recipe, not through a live
+write path:
+
+1. Export matured journal labels (quarantined, latest-per-transaction).
+2. Train a candidate model off-deployment.
+3. Verify the gates (quarantine, supersession, disagree rate).
+4. Seed swap with a backup of the replaced database, pointing at the
+   existing recipe (`ml/eval/seed_export.py`, canonical seed
+   `ml/seed.sqlite3`, provenance as documented in `ml/README.md`).
+
+The learner never writes its own seed; an operator performs the swap.
+
+## Training gates
+
+Two levers, never confused:
+
+- `ML_CATEGORIES=0` forces keyword-only judging. It controls judging: the
+  learner stops answering, while delivery is moot.
+- `ML_TRAINING=0` pauses all matured-feedback delivery. It controls
+  learning: both the payment and the category paths behave as
+  immediately-complete empty sources while the gate is off. The default
+  (unset or any other value) trains.
+
+## Payment parity
+
+`paymentFeedbackSource` enforces the same 14-day quarantine and
+latest-wins per judgment request. Payment answers are single-shot
+immutable, so latest-wins is a no-op safeguard; the quarantine is the
+behavior change: fresh payment answers wait out the quarantine instead of
+training on day zero, and the page holds its cursor behind them. Existing
+learned databases keep their weights; only new feedback is gated.

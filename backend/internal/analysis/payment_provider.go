@@ -43,7 +43,7 @@ type paymentProviderDefinition struct {
 }
 
 func (d paymentProviderDefinition) Prepare(ctx context.Context, scoped store.AnalysisStore, owner string) (Definition, error) {
-	session, err := d.provider.Open(ctx, paymentFeedbackSource{scoped, owner})
+	session, err := d.provider.Open(ctx, paymentFeedbackSource{scoped: scoped, owner: owner, now: time.Now})
 	var base PaymentPatterns
 	if err != nil || session == nil {
 		if ctx.Err() != nil {
@@ -73,24 +73,86 @@ func (d paymentProviderDefinition) Prepare(ctx context.Context, scoped store.Ana
 type paymentFeedbackSource struct {
 	scoped store.AnalysisStore
 	owner  string
+	now    func() time.Time
 }
 
 func (s paymentFeedbackSource) Owner() string { return s.owner }
+
+// Page delivers reviewed payments answers as training feedback. Fresh
+// answers wait out the shared feedback quarantine: the page holds its
+// cursor behind them instead of training on day-zero reviews. When several
+// reviews name the same judgment request, only the newest trains; payment
+// answers are single-shot immutable, so that rule is a safeguard, not a
+// behavior change. Reviews of other analysis types, hides, and restores
+// are never labels: the cursor advances past them exactly like before.
+// While ML_TRAINING=0 the page is an immediately-complete empty source.
 func (s paymentFeedbackSource) Page(after string, limit int) (judgment.FeedbackPage, error) {
-	events, err := s.scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{Cursor: after, Limit: limit})
-	if err != nil {
-		return judgment.FeedbackPage{}, err
-	}
 	page := judgment.FeedbackPage{Cursor: after, Feedback: []judgment.Feedback{}}
+	if !judgment.TrainingEnabled() {
+		return page, nil
+	}
+	if limit <= 0 {
+		limit = 200
+	}
+	// Latest-wins needs the tail past the page, so collect everything
+	// after the cursor first. Review volume is small; chunk the read.
+	var events []types.AnalysisFeedback
+	cursor := after
+	for {
+		batch, err := s.scoped.ListAnalysisFeedback(types.AnalysisFeedbackFilter{Cursor: cursor, Limit: 200})
+		if err != nil {
+			return judgment.FeedbackPage{}, err
+		}
+		events = append(events, batch...)
+		if len(batch) < 200 {
+			break
+		}
+		cursor = batch[len(batch)-1].ID
+	}
+	now := time.Now()
+	if s.now != nil {
+		now = s.now()
+	}
+	cutoff := now.Add(-judgment.FeedbackQuarantine).Unix()
 	for _, event := range events {
-		page.Cursor = event.ID
 		if event.AnalysisType != "payments" || (event.Request.Action != "confirm" && event.Request.Action != "reject") {
+			page.Cursor = event.ID
 			continue
 		}
 		if event.Prediction.JudgmentInput == nil {
 			return page, fmt.Errorf("payment feedback %s is missing its reviewed evidence", event.ID)
 		}
+	}
+	latest := map[string]string{}
+	for _, event := range events {
+		if event.AnalysisType != "payments" || (event.Request.Action != "confirm" && event.Request.Action != "reject") {
+			continue
+		}
+		key := event.Prediction.JudgmentInput.ID
+		if event.ID > latest[key] {
+			latest[key] = event.ID
+		}
+	}
+	for _, event := range events {
+		if event.AnalysisType != "payments" || (event.Request.Action != "confirm" && event.Request.Action != "reject") {
+			continue
+		}
+		if event.ID != latest[event.Prediction.JudgmentInput.ID] {
+			// Superseded by a newer review of the same request.
+			page.Cursor = event.ID
+			continue
+		}
+		if event.CreatedAt > cutoff {
+			// Fresh answers hold here: event IDs and creation times
+			// both grow at review time, so everything after this is
+			// fresh too and the cursor must stay behind it.
+			break
+		}
 		page.Feedback = append(page.Feedback, judgment.Feedback{EventID: event.ID, RunID: event.RunID, Action: event.Request.Action, Request: *event.Prediction.JudgmentInput})
+		page.Cursor = event.ID
+		if len(page.Feedback) >= limit {
+			break
+		}
 	}
 	return page, nil
 }

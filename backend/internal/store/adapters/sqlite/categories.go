@@ -128,19 +128,43 @@ func (s *sqliteStore) SetUserTransactionCategory(transactionID string, category 
 		if err := ensureCategorySchema(tx); err != nil {
 			return fmt.Errorf("ensure transaction categories: %w", err)
 		}
+		if err := ensureCategoryFeedbackSchema(tx); err != nil {
+			return fmt.Errorf("ensure category feedback: %w", err)
+		}
 		var present int
-		if err := tx.QueryRow(`SELECT 1 FROM transactions WHERE id = ? AND user_id = :user_id`, transactionID).Scan(&present); err != nil {
+		var name, direction string
+		if err := tx.QueryRow(`SELECT 1, name, CASE WHEN source_account_id IS NULL THEN 'in' ELSE 'out' END FROM transactions WHERE id = ? AND user_id = :user_id`, transactionID).Scan(&present, &name, &direction); err != nil {
 			if err == sql.ErrNoRows {
 				return store.NotFound(transactionID)
 			}
 			return fmt.Errorf("read transaction %s: %w", transactionID, err)
 		}
+		var factsRaw sql.NullString
+		if err := tx.QueryRow(`SELECT facts_json FROM transaction_source_facts WHERE transaction_id = ? AND user_id = :user_id`, transactionID).Scan(&factsRaw); err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("read transaction facts %s: %w", transactionID, err)
+		}
 		if category != nil {
 			if err := writeTransactionCategory(tx, transactionID, *category, types.CategorySourceUser, ""); err != nil {
 				return err
 			}
+			// The journal row shares this transaction: a journal failure
+			// rolls the sidecar write back with it, so the two never diverge.
+			if err := insertCategoryFeedback(tx, transactionID, types.CategoryFeedbackAssign, category, name, direction, factsRaw, time.Now().Unix()); err != nil {
+				return err
+			}
 			result.Category, result.Source = *category, types.CategorySourceUser
 			return nil
+		}
+		// Clearing an override records the removed key: the sidecar row the
+		// clear replaces or deletes is the owner's rejected label.
+		var removed sql.NullString
+		if err := tx.QueryRow(`SELECT category FROM transaction_categories WHERE transaction_id = ? AND user_id = :user_id`, transactionID).Scan(&removed); err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("read transaction category %s: %w", transactionID, err)
+		}
+		var removedKey *string
+		if removed.Valid {
+			value := removed.String
+			removedKey = &value
 		}
 		// Clearing an override returns to the last supported bank value.
 		var raw string
@@ -153,6 +177,9 @@ func (s *sqliteStore) SetUserTransactionCategory(transactionID string, category 
 					if err := writeTransactionCategory(tx, transactionID, bankCategory, types.CategorySourceBank, provider); err != nil {
 						return err
 					}
+					if err := insertCategoryFeedback(tx, transactionID, types.CategoryFeedbackClear, removedKey, name, direction, factsRaw, time.Now().Unix()); err != nil {
+						return err
+					}
 					result.Category, result.Source, result.Producer = bankCategory, types.CategorySourceBank, provider
 					return nil
 				}
@@ -162,6 +189,9 @@ func (s *sqliteStore) SetUserTransactionCategory(transactionID string, category 
 		}
 		if _, err := tx.Exec(`DELETE FROM transaction_categories WHERE transaction_id = ? AND user_id = :user_id`, transactionID); err != nil {
 			return fmt.Errorf("clear transaction category %s: %w", transactionID, err)
+		}
+		if err := insertCategoryFeedback(tx, transactionID, types.CategoryFeedbackClear, removedKey, name, direction, factsRaw, time.Now().Unix()); err != nil {
+			return err
 		}
 		return nil
 	})
