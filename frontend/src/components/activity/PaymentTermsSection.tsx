@@ -49,8 +49,8 @@ function parseDay(raw: string): number | null {
 }
 
 /**
- * Minimums and due dates for one ordinary account. Terms attach to any
- * account kind and stay editable here; grouped loan accounts keep their
+ * Minimums and due dates for one debt account. Terms render only for debt
+ * accounts and stay editable here; grouped loan accounts keep their
  * fixed payment schedules instead, so this section never renders for them.
  * Saving writes through POST /v1/payment-terms, clearing the minimum or
  * removing deletes through DELETE /v1/payment-terms/{accountId}.

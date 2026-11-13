@@ -214,7 +214,9 @@ export function AccountDetails({
 				)}
 			</PropertyRow>
 			<BankDetails account={account} />
-			<PaymentTermsSection accountId={account.id} readOnly={locked} />
+			{draft.kind === "debt" && (
+				<PaymentTermsSection accountId={account.id} readOnly={locked} />
+			)}
 		</section>
 	);
 }

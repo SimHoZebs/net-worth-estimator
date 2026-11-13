@@ -35,7 +35,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 const savedTerms = {
-	accountId: "checking",
+	accountId: "mortgage",
 	minimumFixed: 25,
 	minimumPercent: 0.02,
 	dueDay: 15,
@@ -97,7 +97,7 @@ async function fillTerms(
 it("prefills saved terms and saves edits through the payment-terms endpoint", async () => {
 	const server = stubTermsServer([savedTerms]);
 	const user = userEvent.setup();
-	render(<PaymentTermsSection accountId="checking" readOnly={false} />, {
+	render(<PaymentTermsSection accountId="mortgage" readOnly={false} />, {
 		wrapper,
 	});
 	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
@@ -134,14 +134,14 @@ it("prefills saved terms and saves edits through the payment-terms endpoint", as
 		(call) => call.method === "POST" && call.url === "/v1/payment-terms",
 	)!.body as Record<string, unknown>;
 	expect(body).toEqual({
-		accountId: "checking",
+		accountId: "mortgage",
 		minimumFixed: 30,
 		minimumPercent: 0.02,
 		dueDay: 15,
 		statementDay: 20,
 	});
 	await waitFor(() =>
-		expect(getPaymentTermsForAccount("checking")).toMatchObject({
+		expect(getPaymentTermsForAccount("mortgage")).toMatchObject({
 			minimumFixed: 30,
 		}),
 	);
@@ -157,7 +157,7 @@ it("prefills saved terms and saves edits through the payment-terms endpoint", as
 it("omits empty optional fields from the save body", async () => {
 	const server = stubTermsServer();
 	const user = userEvent.setup();
-	render(<PaymentTermsSection accountId="checking" readOnly={false} />, {
+	render(<PaymentTermsSection accountId="mortgage" readOnly={false} />, {
 		wrapper,
 	});
 	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
@@ -174,7 +174,7 @@ it("omits empty optional fields from the save body", async () => {
 		(call) => call.method === "POST" && call.url === "/v1/payment-terms",
 	)!.body as Record<string, unknown>;
 	expect(body).toEqual({
-		accountId: "checking",
+		accountId: "mortgage",
 		minimumFixed: 25,
 		dueDay: 15,
 	});
@@ -184,7 +184,7 @@ it("rejects missing minimums and out-of-range days before saving", async () => {
 	const server = stubTermsServer();
 	const user = userEvent.setup();
 	const view = render(
-		<PaymentTermsSection accountId="checking" readOnly={false} />,
+		<PaymentTermsSection accountId="mortgage" readOnly={false} />,
 		{
 			wrapper,
 		},
@@ -228,7 +228,7 @@ it("rejects missing minimums and out-of-range days before saving", async () => {
 it("removes terms through Remove and through clearing the minimum", async () => {
 	const server = stubTermsServer([savedTerms]);
 	const user = userEvent.setup();
-	render(<PaymentTermsSection accountId="checking" readOnly={false} />, {
+	render(<PaymentTermsSection accountId="mortgage" readOnly={false} />, {
 		wrapper,
 	});
 	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
@@ -237,11 +237,11 @@ it("removes terms through Remove and through clearing the minimum", async () => 
 		expect(
 			server.calls.some(
 				(call) =>
-					call.method === "DELETE" && call.url === "/v1/payment-terms/checking",
+					call.method === "DELETE" && call.url === "/v1/payment-terms/mortgage",
 			),
 		).toBe(true),
 	);
-	await waitFor(() => expect(getPaymentTermsForAccount("checking")).toBeNull());
+	await waitFor(() => expect(getPaymentTermsForAccount("mortgage")).toBeNull());
 	expect(
 		(screen.getByLabelText("Minimum payment in USD") as HTMLInputElement).value,
 	).toBe("");
@@ -250,7 +250,7 @@ it("removes terms through Remove and through clearing the minimum", async () => 
 	await fillTerms({ minimum: "25", due: "15" }, user);
 	await user.click(screen.getByRole("button", { name: "Save payment terms" }));
 	await waitFor(() =>
-		expect(getPaymentTermsForAccount("checking")).toMatchObject({
+		expect(getPaymentTermsForAccount("mortgage")).toMatchObject({
 			minimumFixed: 25,
 		}),
 	);
@@ -269,11 +269,11 @@ it("removes terms through Remove and through clearing the minimum", async () => 
 		expect(
 			server.calls.filter(
 				(call) =>
-					call.method === "DELETE" && call.url === "/v1/payment-terms/checking",
+					call.method === "DELETE" && call.url === "/v1/payment-terms/mortgage",
 			),
 		).toHaveLength(2),
 	);
-	expect(getPaymentTermsForAccount("checking")).toBeNull();
+	expect(getPaymentTermsForAccount("mortgage")).toBeNull();
 });
 
 it("surfaces server failures inline and keeps the draft", async () => {
@@ -282,7 +282,7 @@ it("surfaces server failures inline and keeps the draft", async () => {
 		(method, path) => method === "POST" && path === "/v1/payment-terms",
 		{
 			value: {
-				accountId: "checking",
+				accountId: "mortgage",
 				minimumFixed: 25,
 				dueDay: 99,
 			},
@@ -291,7 +291,7 @@ it("surfaces server failures inline and keeps the draft", async () => {
 					severity: "error",
 					code: "terms.dueDay.invalid",
 					message:
-						"Payment terms for 'checking' need a due day between 1 and 28.",
+						"Payment terms for 'mortgage' need a due day between 1 and 28.",
 					path: ["paymentTerms", 0, "dueDay"],
 				},
 			],
@@ -300,7 +300,7 @@ it("surfaces server failures inline and keeps the draft", async () => {
 		},
 	);
 	const user = userEvent.setup();
-	render(<PaymentTermsSection accountId="checking" readOnly={false} />, {
+	render(<PaymentTermsSection accountId="mortgage" readOnly={false} />, {
 		wrapper,
 	});
 	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
@@ -308,18 +308,18 @@ it("surfaces server failures inline and keeps the draft", async () => {
 	await user.click(screen.getByRole("button", { name: "Save payment terms" }));
 	expect(
 		await screen.findByText(
-			"Payment terms for 'checking' need a due day between 1 and 28.",
+			"Payment terms for 'mortgage' need a due day between 1 and 28.",
 		),
 	).toBeTruthy();
 	expect(
 		(screen.getByLabelText("Minimum payment in USD") as HTMLInputElement).value,
 	).toBe("25");
-	expect(getPaymentTermsForAccount("checking")).toBeNull();
+	expect(getPaymentTermsForAccount("mortgage")).toBeNull();
 });
 
 it("locks the form when read-only", async () => {
 	stubTermsServer([savedTerms]);
-	render(<PaymentTermsSection accountId="checking" readOnly />, {
+	render(<PaymentTermsSection accountId="mortgage" readOnly />, {
 		wrapper,
 	});
 	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();

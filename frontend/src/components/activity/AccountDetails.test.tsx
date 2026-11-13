@@ -272,3 +272,33 @@ it("shows the linked bank identity as definition rows for synced accounts", () =
 	expect(screen.queryByText("Bank account")).toBeNull();
 	expect(screen.queryByText("Balance & limits")).toBeNull();
 });
+
+it("hides payment terms for a non-debt account", () => {
+	stubTestServer();
+	render(<Settings />, { wrapper });
+	expect(screen.queryByText("Payment terms")).toBeNull();
+	expect(screen.queryByLabelText("Minimum payment in USD")).toBeNull();
+});
+
+it("shows payment terms for a debt account", async () => {
+	stubTestServer();
+	const mortgage = financialModelFixture.accounts.find(
+		(account) => account.id === "mortgage",
+	)!;
+	render(<Settings account={mortgage} />, { wrapper });
+	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
+	expect(screen.getByText("Payment terms")).toBeTruthy();
+});
+
+it("toggles payment terms immediately when the account type changes", async () => {
+	stubTestServer();
+	const user = userEvent.setup();
+	render(<Settings />, { wrapper });
+	expect(screen.queryByLabelText("Minimum payment in USD")).toBeNull();
+	await user.click(screen.getByLabelText("Account type"));
+	await user.click(screen.getByRole("option", { name: "Debt" }));
+	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
+	await user.click(screen.getByLabelText("Account type"));
+	await user.click(screen.getByRole("option", { name: "Cash & savings" }));
+	expect(screen.queryByLabelText("Minimum payment in USD")).toBeNull();
+});
