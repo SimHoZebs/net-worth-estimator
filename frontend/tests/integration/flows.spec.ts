@@ -183,6 +183,8 @@ test("date and account filters re-render the graph", async ({ page }) => {
 	const thisMonthStart = `${year}-${pad(month + 1)}-01`;
 	const last3StartDate = new Date(Date.UTC(year, month - 2, 1));
 	const last3Start = `${last3StartDate.getUTCFullYear()}-${pad(last3StartDate.getUTCMonth() + 1)}-01`;
+	const last12StartDate = new Date(Date.UTC(year, month - 11, 1));
+	const last12Start = `${last12StartDate.getUTCFullYear()}-${pad(last12StartDate.getUTCMonth() + 1)}-01`;
 	await page.getByRole("button", { name: /^Date range:/ }).click();
 	const rangeDialog = page.getByRole("dialog", { name: "Choose date range" });
 	await expect(rangeDialog).toBeVisible();
@@ -201,6 +203,18 @@ test("date and account filters re-render the graph", async ({ page }) => {
 	).toBeVisible();
 	await expect(status).toContainText(
 		`from ${thisMonthStart} through ${monthEnd}`,
+	);
+	// The fixture holds no recorded flows in the current month, so
+	// widen to twelve months before narrowing to recorded money: the
+	// historic recorded lanes then render the table.
+	await page.getByRole("button", { name: /^Date range:/ }).click();
+	await expect(rangeDialog).toBeVisible();
+	await rangeDialog.getByRole("button", { name: "Last 12 months" }).click();
+	await expect(
+		page.getByRole("button", { name: "Date range: Last 12 months" }),
+	).toBeVisible();
+	await expect(status).toContainText(
+		`from ${last12Start} through ${monthEnd}`,
 	);
 	// Narrowing to recorded money drops the planned lanes: the table view
 	// carries the exact per-lane evidence.
