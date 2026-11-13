@@ -9,7 +9,7 @@ Financial row endpoints are scope-relative (`/v1/accounts/checking`).
 The intended user travels in the `Waypoint-Resource` header, asserted
 per request against the session-derived scope. Mismatch returns 409
 `RESOURCE_CHANGED` before any store opens. This was challenged: why not
-put the user in the URL path and let the per-call Casdoor permission
+put the user in the URL path and let the per-call policy permission
 check reject cross-user writes?
 
 ## Assessment
@@ -28,11 +28,11 @@ more client logic, not less.
 ## Sketch if ever revived
 
 - Path form: `/v1/accounts/{ref}/...`, ref = `<64hex>` or `sample`.
-  Server maps to `accounts/<ref>` (Casdoor) and `user:<ref>`/`sample`
+  Server maps to `accounts/<ref>` (policy) and `user:<ref>`/`sample`
   (store). `GET /v1/auth/session`, `/v1/auth/*`, `/v1/groups/*`,
   `/healthz`, `/v1/status` stay top-level.
 - Middleware parses the ref, validates shape, authorizes
-  (session actor, path resource, action) via Casdoor. No session-equals
+  (session actor, path resource, action) via the policy check. No session-equals
   shortcut, or the purity argument collapses.
 - Delete `Waypoint-Resource` request/response headers, 409 machinery,
   `RequireResourceHeader`. Client: on 403, reverify session once; if the

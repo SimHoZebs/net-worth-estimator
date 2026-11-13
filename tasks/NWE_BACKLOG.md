@@ -252,7 +252,7 @@ Extend existing group/invite implementation rather than create another subsystem
 
 #### Implementation notes and boundaries
 
-Do not assume any broad Casdoor cross-user model permission.
+Do not assume any broad provider cross-user model permission.
 
 **Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.
 

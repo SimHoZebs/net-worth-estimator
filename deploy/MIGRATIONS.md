@@ -189,6 +189,3 @@ and command. Pause the release trigger during a migration window.
 - [Northflank workflows](https://northflank.com/docs/v1/application/release/configure-workflows)
 - [CI/CD override](https://northflank.com/docs/v1/application/release/manage-ci-cd)
 - [Volume access](https://northflank.com/docs/v1/application/databases-and-persistence/add-a-volume)
-
-The ordinary-guest cutover predates this shared contract. Never replay that
-host-specific script against Northflank's independent issuer or database.
