@@ -171,11 +171,37 @@ test("touch tap selects a flow through the same inspector", async ({
 test("date and account filters re-render the graph", async ({ page }) => {
 	await openFlows(page);
 	const status = page.getByRole("status");
-	// Shortening the window refetches from the engine.
-	await page.getByLabel("Through date", { exact: true }).fill("2026-02-28");
-	await expect(status).toContainText(/through 2026-02-28/);
-	await page.getByLabel("Through date", { exact: true }).fill("2026-11-01");
-	await expect(status).toContainText(/through 2026-11-01/);
+	// Shortening the window refetches from the engine: the range picker
+	// preset applies immediately and the status names the applied window.
+	// Both presets below end on the last day of the current month.
+	const now = new Date();
+	const year = now.getUTCFullYear();
+	const month = now.getUTCMonth();
+	const pad = (value: number) => String(value).padStart(2, "0");
+	const lastOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+	const monthEnd = `${year}-${pad(month + 1)}-${pad(lastOfMonth)}`;
+	const thisMonthStart = `${year}-${pad(month + 1)}-01`;
+	const last3StartDate = new Date(Date.UTC(year, month - 2, 1));
+	const last3Start = `${last3StartDate.getUTCFullYear()}-${pad(last3StartDate.getUTCMonth() + 1)}-01`;
+	await page.getByRole("button", { name: /^Date range:/ }).click();
+	const rangeDialog = page.getByRole("dialog", { name: "Choose date range" });
+	await expect(rangeDialog).toBeVisible();
+	await rangeDialog.getByRole("button", { name: "Last 3 months" }).click();
+	await expect(
+		page.getByRole("button", { name: "Date range: Last 3 months" }),
+	).toBeVisible();
+	await expect(status).toContainText(`from ${last3Start} through ${monthEnd}`);
+	// Returning to this month restores the default window, which shares the
+	// same month end but starts on the first of the current month.
+	await page.getByRole("button", { name: /^Date range:/ }).click();
+	await expect(rangeDialog).toBeVisible();
+	await rangeDialog.getByRole("button", { name: "This month" }).click();
+	await expect(
+		page.getByRole("button", { name: "Date range: This month" }),
+	).toBeVisible();
+	await expect(status).toContainText(
+		`from ${thisMonthStart} through ${monthEnd}`,
+	);
 	// Narrowing to recorded money drops the planned lanes: the table view
 	// carries the exact per-lane evidence.
 	await page

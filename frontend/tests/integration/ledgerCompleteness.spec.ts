@@ -35,8 +35,44 @@ test("ledger diagram table shows every seeded flow with exact sums", async ({
 	await expect(
 		page.getByRole("img", { name: /Money-flow diagram/ }),
 	).toBeVisible();
-	await page.getByLabel("From date", { exact: true }).fill("2026-01-01");
-	await page.getByLabel("Through date", { exact: true }).fill("2026-04-30");
+	// The shared range picker stages the window across two independently
+	// navigated month grids: walk each grid back to its target month, pick
+	// the boundary days by their full-date names, then Apply to commit.
+	// Day buttons carry the picker's short-month labels; grids expose their
+	// long-month titles as regions.
+	await page.getByRole("button", { name: /^Date range:/ }).click();
+	const rangeDialog = page.getByRole("dialog", {
+		name: "Choose date range",
+	});
+	await expect(rangeDialog).toBeVisible();
+	for (const [calendar, title, visibleCount] of [
+		[0, "January 2026", 1],
+		[1, "April 2026", 1],
+	] as const) {
+		const previous = rangeDialog
+			.getByRole("button", { name: /^Previous month/ })
+			.nth(calendar);
+		for (let step = 0; step < 72; step++) {
+			if (
+				(await rangeDialog.getByRole("region", { name: title }).count()) >=
+				visibleCount
+			)
+				break;
+			await previous.click();
+		}
+		await expect(
+			rangeDialog.getByRole("region", { name: title }).nth(visibleCount - 1),
+		).toBeVisible();
+	}
+	await rangeDialog
+		.getByRole("region", { name: "January 2026" })
+		.getByRole("button", { name: "Jan 1, 2026" })
+		.click();
+	await rangeDialog
+		.getByRole("region", { name: "April 2026" })
+		.getByRole("button", { name: "Apr 30, 2026" })
+		.click();
+	await rangeDialog.getByRole("button", { name: "Apply" }).click();
 	await page
 		.getByRole("group", { name: "Diagram or table view" })
 		.getByRole("button", { name: "Table" })
