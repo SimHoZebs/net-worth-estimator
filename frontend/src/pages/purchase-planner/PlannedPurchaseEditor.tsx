@@ -113,11 +113,9 @@ export function PlannedPurchaseEditor({
 			? await savePurchaseEdit(parsed.data, priority)
 			: await saveNewPurchase(parsed.data, priority);
 		setSaving(false);
+		// A failure reaches the toast from the purchase write; the form stays
+		// open with its values for retry. Only validation stays inline.
 		if (ok) onSaved();
-		else
-			setError(
-				"The purchase could not be saved. Review the workspace notice and try again.",
-			);
 	};
 
 	return (

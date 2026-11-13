@@ -2,14 +2,16 @@ import { useState } from "react";
 import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.ts";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
+import { UserScopeError } from "../../api/scopedRequest.ts";
 import { Button } from "../../components/Button.tsx";
-import { ErrorNotice, FieldError } from "../../components/ErrorNotice.tsx";
+import { FieldError } from "../../components/ErrorNotice.tsx";
 import {
 	useAnalysisFindings,
 	useConfirmTransferPair,
 	useRemoveTransferLinkByLeg,
 	useTransferLinks,
 } from "../../state/analyses.ts";
+import { dismissKey, notifyError } from "../../state/notifications.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
 /** Read-only transfer-pair annotation (VIS-03 consumer) with confirm actions.
@@ -89,9 +91,7 @@ export function TransferMatchNote({
 		.sort((a, b) => a.peers.length - b.peers.length)[0];
 	const peers = actionable?.peers ?? [];
 	const peer =
-		selectedPeer && peers.includes(selectedPeer)
-			? selectedPeer
-			: peers[0];
+		selectedPeer && peers.includes(selectedPeer) ? selectedPeer : peers[0];
 	const link = transferLinkForEdge(
 		linksQuery.data?.links ?? [],
 		transactionIds,
@@ -111,19 +111,32 @@ export function TransferMatchNote({
 			? (failure.detail ??
 				"These two transactions cannot be linked as one transfer.")
 			: null;
-	const noticeError =
-		failure && !inlineError
-			? failure instanceof Error
-				? failure.message
-				: "The transfer pair could not be saved."
-			: null;
+	// Non-validation link failures reach the decoupled toast: the note fires
+	// one keyed toast from the mutation callbacks instead of mirroring the
+	// outcome inline. The 422 reason above stays with its control. Retired
+	// scopes stay silent: the mutation already threw a UserScopeError.
+	function reportLinkFailure(cause: unknown, fallback: string): void {
+		if (cause instanceof UserScopeError) return;
+		if (cause instanceof ApiHttpError && cause.status === 422) return;
+		notifyError(
+			"transfer-link",
+			cause instanceof Error ? cause.message : fallback,
+		);
+	}
 	const matcherDetail = actionable?.finding.evidence?.[0]?.reason ?? null;
 	const confirmPair = () => {
 		if (!actionable || !peer || busy) return;
-		confirm.mutate({
-			id: actionable.finding.id,
-			peerTransactionId: peer,
-		});
+		confirm.mutate(
+			{
+				id: actionable.finding.id,
+				peerTransactionId: peer,
+			},
+			{
+				onError: (cause) =>
+					reportLinkFailure(cause, "The transfer pair could not be saved."),
+				onSuccess: () => dismissKey("transfer-link"),
+			},
+		);
 	};
 	return (
 		<div className="mt-3 border-t border-line pt-3">
@@ -161,7 +174,19 @@ export function TransferMatchNote({
 						variant="secondary"
 						disabled={busy}
 						aria-label={`Unlink the confirmed transfer touching ${unlinkLeg}`}
-						onClick={() => unlink.mutate({ transactionId: unlinkLeg })}
+						onClick={() =>
+							unlink.mutate(
+								{ transactionId: unlinkLeg },
+								{
+									onError: (cause) =>
+										reportLinkFailure(
+											cause,
+											"The transfer link could not be removed.",
+										),
+									onSuccess: () => dismissKey("transfer-link"),
+								},
+							)
+						}
 					>
 						{unlink.isPending ? "Unlinking…" : "Unlink"}
 					</Button>
@@ -181,19 +206,13 @@ export function TransferMatchNote({
 				</div>
 			)}
 			{!readOnly && !link && actionable && actionable.peers.length > 1 && (
-				<fieldset
-					disabled={busy}
-					className="mt-2 space-y-2 border-0 p-0"
-				>
+				<fieldset disabled={busy} className="mt-2 space-y-2 border-0 p-0">
 					<legend className="text-xs font-semibold">
 						Which transaction is the opposite side?
 					</legend>
 					<div className="space-y-1">
 						{actionable.peers.map((peerId) => (
-							<label
-								key={peerId}
-								className="flex items-center gap-2 text-xs"
-							>
+							<label key={peerId} className="flex items-center gap-2 text-xs">
 								<input
 									type="radio"
 									name={`transfer-peer-${actionable.finding.id}`}
@@ -225,7 +244,6 @@ export function TransferMatchNote({
 				</details>
 			)}
 			<FieldError message={inlineError} />
-			<ErrorNotice message={noticeError} />
 		</div>
 	);
 }

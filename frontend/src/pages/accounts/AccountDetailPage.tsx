@@ -276,7 +276,17 @@ export function AccountDetailView({
 					rulesQuery.isPending ? (
 						<p role="status">Loading recurring transactions…</p>
 					) : rulesQuery.isError ? (
-						<p role="alert">Recurring transactions could not be loaded.</p>
+						<p role="alert">
+							Recurring transactions could not be loaded.{" "}
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								onClick={() => void rulesQuery.refetch()}
+							>
+								Retry
+							</Button>
+						</p>
 					) : (
 						<RecurringRules
 							account={account}

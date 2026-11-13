@@ -167,7 +167,9 @@ describe("PlannedPurchaseEditor", () => {
 		submitForm();
 		await waitFor(() => expect(mockedSaveNew).toHaveBeenCalledOnce());
 		expect(onSaved).not.toHaveBeenCalled();
-		expect(screen.getByRole("alert")).toBeTruthy();
+		// The failure reaches the toast from the purchase write; the form
+		// keeps its values with no inline mirror (validation alone stays inline).
+		expect(screen.queryByText(/could not be saved/i)).toBeNull();
 		expect(
 			(screen.getByLabelText("Purchase name") as HTMLInputElement).value,
 		).toBe("Desk");

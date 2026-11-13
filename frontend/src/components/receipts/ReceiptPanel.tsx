@@ -4,6 +4,9 @@ import { receiptReviewLabel } from "@/domain/receipt.ts";
 import type { Transaction } from "@/domain/model.ts";
 import { useServerStatus } from "@/state/workspaceResources.ts";
 import { useReceiptActions, useReceipts } from "@/state/receipts.ts";
+import { UserScopeError } from "@/api/scopedRequest.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
+import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
@@ -42,9 +45,23 @@ export function ReceiptPanel({
 		void actions.attach
 			.mutateAsync(file)
 			.then((result) => {
-				if (result) setSelection({ scope: scope.key, id: result.receipt.id });
+				if (result) {
+					dismissKey("receipt-attach");
+					setSelection({ scope: scope.key, id: result.receipt.id });
+				}
 			})
-			.catch(() => {});
+			.catch((cause: unknown) => {
+				// A retired scope owns no notice: the write already threw a
+				// UserScopeError and the new resource starts with a clean stack.
+				if (cause instanceof UserScopeError) return;
+				if (scope !== getUserScope()) return;
+				notifyError(
+					"receipt-attach",
+					cause instanceof Error
+						? cause.message
+						: "The receipt could not be attached.",
+				);
+			});
 	};
 	const receipts = collection.data?.receipts ?? [];
 	return (
@@ -108,7 +125,7 @@ export function ReceiptPanel({
 					</p>
 				)}
 				<ErrorNotice
-					message={collection.error?.message ?? actions.attach.error?.message}
+					message={collection.error?.message}
 					action={collection.error ? "Retry receipts" : undefined}
 					onAction={() => void collection.refetch()}
 				/>

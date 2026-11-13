@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { resetNotifications, useNotifications } from "@/state/notifications.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	acceptUserScope,
@@ -79,6 +80,7 @@ vi.mock("@/api/generated/endpoints.ts", async (importOriginal) => {
 });
 
 afterEach(() => {
+	resetNotifications();
 	cleanup();
 	summaryState.summary = null;
 	summaryState.pending = false;
@@ -203,6 +205,15 @@ describe("buildFiConfig", () => {
 	});
 });
 
+async function waitForToast() {
+	for (let attempt = 0; attempt < 50; attempt += 1) {
+		if (useNotifications.getState().items.some((item) => item.kind === "error"))
+			return;
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
+	throw new Error("expected an error toast");
+}
+
 describe("IndependenceConfigure", () => {
 	it("shows unavailable state without a server evaluation", () => {
 		const view = render(<IndependenceConfigure instanceId="fi-1" />);
@@ -280,26 +291,32 @@ describe("IndependenceConfigure", () => {
 		]);
 	});
 
-	it("shows an error when the row write fails", async () => {
+	it("routes a row write failure to the toast without an inline mirror", async () => {
 		seedServerState();
 		writesState.result = false;
+		resetNotifications();
 		const view = render(<IndependenceConfigure instanceId="fi-1" />);
 		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
-		await view.findByText("The configuration could not be saved. Try again.");
+		await waitForToast();
 		expect(view.queryByText("Saved. Updating projection…")).toBeNull();
+		expect(view.queryByText(/could not be saved/i)).toBeNull();
+		const items = useNotifications.getState().items;
+		expect(items.some((item) => item.kind === "error")).toBe(true);
 	});
 
 	it("retains dirty fields when the row write fails", async () => {
 		seedServerState();
 		writesState.result = false;
+		resetNotifications();
 		const view = render(<IndependenceConfigure instanceId="fi-1" />);
 		const minimum = view.getByLabelText(
 			"Minimum net worth ($)",
 		) as HTMLInputElement;
 		fireEvent.change(minimum, { target: { value: "5000" } });
 		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
-		await view.findByText("The configuration could not be saved. Try again.");
+		await waitForToast();
 		expect(minimum.value).toBe("5000");
+		expect(view.queryByText(/could not be saved/i)).toBeNull();
 	});
 
 	it("keeps dirty fields during unrelated background refreshes", () => {

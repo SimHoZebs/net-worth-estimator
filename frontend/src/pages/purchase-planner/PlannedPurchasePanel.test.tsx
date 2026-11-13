@@ -168,7 +168,7 @@ describe("PlannedPurchasePanel", () => {
 		);
 	});
 
-	it("keeps the remove dialog open with an error after a failure", async () => {
+	it("keeps the remove dialog open without an inline mirror after a failure", async () => {
 		mockedRemove.mockResolvedValue(false);
 		renderPanel();
 		fireEvent.click(
@@ -177,12 +177,11 @@ describe("PlannedPurchasePanel", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 		fireEvent.click(screen.getByRole("button", { name: "Remove and save" }));
 		await waitFor(() => expect(mockedRemove).toHaveBeenCalledWith("laptop"));
+		// The failure reaches the toast from the purchase write; the dialog
+		// stays open for retry with no inline mirror.
 		await waitFor(() =>
-			expect(screen.getByRole("alert").textContent).toMatch(
-				/could not be removed/i,
-			),
+			expect(screen.queryByText(/could not be removed/i)).toBeNull(),
 		);
-		// The failure stays visible: the dialog does not close.
 		expect(
 			screen.getByRole("button", { name: "Remove and save" }),
 		).toBeTruthy();

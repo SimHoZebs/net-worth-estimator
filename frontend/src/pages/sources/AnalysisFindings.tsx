@@ -15,6 +15,8 @@ import { useAllAnalysisFindings } from "@/state/allAnalysisFindings.ts";
 import { Badge } from "@/components/Badge.tsx";
 import { Button } from "@/components/Button.tsx";
 import { PatternReview } from "@/components/analysis/PatternReview.tsx";
+import { UserScopeError } from "@/api/scopedRequest.ts";
+import { dismissKey, notifyError } from "@/state/notifications.ts";
 import {
 	DataTable,
 	TableCell,
@@ -60,13 +62,11 @@ export function AnalysisFindings() {
 				)}
 				<ErrorNotice
 					message={
-						review.isError
-							? "The finding could not be updated. Try again."
-							: query.isError || analyses.isError
-								? "Analysis results could not be loaded."
-								: state === "failed"
-									? "Analysis could not finish. The background worker will retry. Account sync is unaffected."
-									: null
+						query.isError || analyses.isError
+							? "Analysis results could not be loaded."
+							: state === "failed"
+								? "Analysis could not finish. The background worker will retry. Account sync is unaffected."
+								: null
 					}
 				/>
 				{query.isPending ? (
@@ -110,10 +110,27 @@ export function AnalysisFindings() {
 											aria-label={`${finding.dismissed ? "Restore" : "Dismiss"} flag for ${names.get(finding.transactionId) ?? finding.transactionId}`}
 											disabled={review.isPending}
 											onClick={() =>
-												review.mutate({
-													id: finding.id,
-													dismissed: !finding.dismissed,
-												})
+												review.mutate(
+													{
+														id: finding.id,
+														dismissed: !finding.dismissed,
+													},
+													{
+														// Failures reach the toast from here. The panel never
+														// mirrors them inline so one event keeps one place to find.
+														// Retired scopes stay silent.
+														onError: (error) => {
+															if (error instanceof UserScopeError) return;
+															notifyError(
+																"analysis-review",
+																error instanceof Error
+																	? error.message
+																	: "The finding could not be updated. Try again.",
+															);
+														},
+														onSuccess: () => dismissKey("analysis-review"),
+													},
+												)
 											}
 										>
 											{finding.dismissed ? "Restore" : "Dismiss"}

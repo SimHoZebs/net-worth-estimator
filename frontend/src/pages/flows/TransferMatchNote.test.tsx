@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	notifyError,
+	resetNotifications,
+	useNotifications,
+} from "../../state/notifications.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.ts";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
@@ -120,6 +125,7 @@ function mockNote({
 afterEach(() => {
 	cleanup();
 	vi.resetAllMocks();
+	resetNotifications();
 });
 
 describe("transferFindingsForEdge", () => {
@@ -174,9 +180,7 @@ describe("transferPeers", () => {
 describe("transferLinkForEdge", () => {
 	it("matches a link touching either leg", () => {
 		const links = [link({ legA: "peer-9", legB: "leg-2" })];
-		expect(transferLinkForEdge(links, ["leg-1", "leg-2"])?.legB).toBe(
-			"leg-2",
-		);
+		expect(transferLinkForEdge(links, ["leg-1", "leg-2"])?.legB).toBe("leg-2");
 		expect(transferLinkForEdge(links, ["leg-1"])).toBeUndefined();
 	});
 });
@@ -194,28 +198,27 @@ describe("TransferMatchNote", () => {
 	});
 	it("links a strong single-peer finding to its peer", () => {
 		mockNote({
-			findings: [
-				findingWithPeers("finding", "leg-1", ["peer-1"], "strong"),
-			],
+			findings: [findingWithPeers("finding", "leg-1", ["peer-1"], "strong")],
 		});
 		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
 		);
-		expect(confirmMutate).toHaveBeenCalledWith({
-			id: "finding",
-			peerTransactionId: "peer-1",
-		});
+		expect(confirmMutate).toHaveBeenCalledWith(
+			{
+				id: "finding",
+				peerTransactionId: "peer-1",
+			},
+			expect.objectContaining({
+				onError: expect.any(Function),
+				onSuccess: expect.any(Function),
+			}),
+		);
 	});
 	it("lists ambiguous candidates best-first and confirms the selection", () => {
 		mockNote({
 			findings: [
-				findingWithPeers(
-					"finding",
-					"leg-1",
-					["peer-1", "peer-2"],
-					"moderate",
-				),
+				findingWithPeers("finding", "leg-1", ["peer-1", "peer-2"], "moderate"),
 			],
 		});
 		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />);
@@ -227,25 +230,35 @@ describe("TransferMatchNote", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
 		);
-		expect(confirmMutate).toHaveBeenCalledWith({
-			id: "finding",
-			peerTransactionId: "peer-1",
-		});
+		expect(confirmMutate).toHaveBeenCalledWith(
+			{
+				id: "finding",
+				peerTransactionId: "peer-1",
+			},
+			expect.objectContaining({
+				onError: expect.any(Function),
+				onSuccess: expect.any(Function),
+			}),
+		);
 		confirmMutate.mockClear();
 		fireEvent.click(screen.getByRole("radio", { name: "peer-2" }));
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link as transfer with peer-2" }),
 		);
-		expect(confirmMutate).toHaveBeenCalledWith({
-			id: "finding",
-			peerTransactionId: "peer-2",
-		});
+		expect(confirmMutate).toHaveBeenCalledWith(
+			{
+				id: "finding",
+				peerTransactionId: "peer-2",
+			},
+			expect.objectContaining({
+				onError: expect.any(Function),
+				onSuccess: expect.any(Function),
+			}),
+		);
 	});
 	it("unlinks the confirmed leg by its edge transaction", () => {
 		mockNote({
-			findings: [
-				findingWithPeers("finding", "leg-1", ["peer-1"], "strong"),
-			],
+			findings: [findingWithPeers("finding", "leg-1", ["peer-1"], "strong")],
 			links: [link()],
 		});
 		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />);
@@ -258,13 +271,17 @@ describe("TransferMatchNote", () => {
 				name: "Unlink the confirmed transfer touching leg-1",
 			}),
 		);
-		expect(removeMutate).toHaveBeenCalledWith({ transactionId: "leg-1" });
+		expect(removeMutate).toHaveBeenCalledWith(
+			{ transactionId: "leg-1" },
+			expect.objectContaining({
+				onError: expect.any(Function),
+				onSuccess: expect.any(Function),
+			}),
+		);
 	});
 	it("renders a 422 reason inline without dismissing the finding", () => {
 		mockNote({
-			findings: [
-				findingWithPeers("finding", "leg-1", ["peer-1"], "strong"),
-			],
+			findings: [findingWithPeers("finding", "leg-1", ["peer-1"], "strong")],
 			confirm: {
 				isError: true,
 				error: new ApiHttpError({
@@ -282,32 +299,61 @@ describe("TransferMatchNote", () => {
 			screen.getByText(/Both sides of this transfer are observed/),
 		).toBeTruthy();
 	});
-	it("renders a 403 denial as a notice", () => {
+	it("reports a 403 denial through the keyed error toast", () => {
+		resetNotifications();
 		mockNote({
-			findings: [
-				findingWithPeers("finding", "leg-1", ["peer-1"], "strong"),
-			],
-			confirm: {
-				isError: true,
-				error: new ApiHttpError({
-					message:
-						"Saving is blocked while the server is read-only. Viewing is still available.",
-					status: 403,
-				}),
-			},
+			findings: [findingWithPeers("finding", "leg-1", ["peer-1"], "strong")],
 		});
+		confirmMutate.mockImplementation(
+			(_args: unknown, options?: { onError?: (cause: unknown) => void }) => {
+				options?.onError?.(
+					new ApiHttpError({
+						message:
+							"Saving is blocked while the server is read-only. Viewing is still available.",
+						status: 403,
+					}),
+				);
+			},
+		);
 		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />);
-		expect(screen.getByText(/Saving is blocked/)).toBeTruthy();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
+		);
+		// The matcher state stays inline; the mutation outcome owns the toast.
+		expect(
+			screen.getByText(/Both sides of this transfer are observed/),
+		).toBeTruthy();
+		expect(screen.queryByText(/Saving is blocked/)).toBeNull();
+		const toast = useNotifications
+			.getState()
+			.items.find((item) => item.key === "transfer-link");
+		expect(toast?.kind).toBe("error");
+		expect(toast?.message).toContain("Saving is blocked");
+	});
+	it("clears the transfer toast when the link succeeds", () => {
+		mockNote({
+			findings: [findingWithPeers("finding", "leg-1", ["peer-1"], "strong")],
+		});
+		confirmMutate.mockImplementation(
+			(_args: unknown, options?: { onSuccess?: () => void }) => {
+				options?.onSuccess?.();
+			},
+		);
+		notifyError("transfer-link", "stale failure");
+		render(<TransferMatchNote transactionIds={["leg-1"]} transferCount={1} />);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
+		);
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.key === "transfer-link"),
+		).toBe(false);
 	});
 	it("hides actions in read-only mode", () => {
 		mockNote({
 			findings: [
-				findingWithPeers(
-					"finding",
-					"leg-1",
-					["peer-1", "peer-2"],
-					"moderate",
-				),
+				findingWithPeers("finding", "leg-1", ["peer-1", "peer-2"], "moderate"),
 			],
 			readOnly: true,
 		});

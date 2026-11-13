@@ -38,26 +38,13 @@ function credentialOptions(scope = getUserScope()) {
 		queryKey: gmailCredentialKey(scope),
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
-			try {
-				const data: GmailCredentialBody = (await getGmailCredential({ signal }))
-					.data;
-				current(scope, signal);
-				dismissKey("gmail-credential");
-				return data;
-			} catch (error) {
-				if (scope === getUserScope() && !signal.aborted)
-					notifyError(
-						"gmail-credential",
-						error instanceof Error
-							? error.message
-							: "The Gmail connection could not be loaded.",
-						{
-							label: "Reload Gmail",
-							onAction: () => void refreshGmailSettings(true),
-						},
-					);
-				throw error;
-			}
+			// The Gmail panel owns load failures inline. The query stays
+			// silent so one failure keeps one place to find.
+			const data: GmailCredentialBody = (await getGmailCredential({ signal }))
+				.data;
+			current(scope, signal);
+			dismissKey("gmail-credential");
+			return data;
 		},
 	};
 }
@@ -180,27 +167,14 @@ function receiptsOptions(scope = getUserScope()) {
 		queryKey: gmailReceiptsKey(scope),
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
-			try {
-				const data = (
-					await listGmailReceipts({ verdict: "receipt,refund" }, { signal })
-				).data;
-				current(scope, signal);
-				dismissKey("gmail-receipts");
-				return data.receipts as EmailReceipt[];
-			} catch (error) {
-				if (scope === getUserScope() && !signal.aborted)
-					notifyError(
-						"gmail-receipts",
-						error instanceof Error
-							? error.message
-							: "The extracted receipts could not be loaded.",
-						{
-							label: "Reload receipts",
-							onAction: () => void refreshGmailReceipts(true),
-						},
-					);
-				throw error;
-			}
+			// The receipts section owns load failures inline. The query stays
+			// silent so one failure keeps one place to find.
+			const data = (
+				await listGmailReceipts({ verdict: "receipt,refund" }, { signal })
+			).data;
+			current(scope, signal);
+			dismissKey("gmail-receipts");
+			return data.receipts as EmailReceipt[];
 		},
 	};
 }

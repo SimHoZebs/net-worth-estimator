@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Link2 } from "lucide-react";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
+import { UserScopeError } from "../../api/scopedRequest.ts";
 import { Button } from "../Button.tsx";
-import { ErrorNotice, FieldError } from "../ErrorNotice.tsx";
+import { FieldError } from "../ErrorNotice.tsx";
+import { dismissKey, notifyError } from "../../state/notifications.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import {
 	useAnalysisFindings,
@@ -125,12 +127,18 @@ export function TransferLinkSection({
 			? (failure.detail ??
 				"These two transactions cannot be linked as one transfer.")
 			: null;
-	const noticeError =
-		failure && !inlineError
-			? failure instanceof Error
-				? failure.message
-				: "The transfer pair could not be saved."
-			: null;
+
+	// Non-validation link failures surface through the decoupled toast
+	// stack; the 422 validation reason stays inline beside the peer choice.
+	// Retired scopes stay silent: the mutation already threw a UserScopeError.
+	function reportLinkFailure(cause: unknown, fallback: string): void {
+		if (cause instanceof UserScopeError) return;
+		if (cause instanceof ApiHttpError && cause.status === 422) return;
+		notifyError(
+			"transfer-link",
+			cause instanceof Error ? cause.message : fallback,
+		);
+	}
 
 	if (!link && !actionable) return null;
 
@@ -180,14 +188,25 @@ export function TransferLinkSection({
 							variant="secondary"
 							disabled={busy}
 							aria-label={`Unlink the confirmed transfer touching ${transactionId}`}
-							onClick={() => unlink.mutate({ transactionId })}
+							onClick={() =>
+								unlink.mutate(
+									{ transactionId },
+									{
+										onError: (cause) =>
+											reportLinkFailure(
+												cause,
+												"The transfer link could not be removed.",
+											),
+										onSuccess: () => dismissKey("transfer-link"),
+									},
+								)
+							}
 						>
 							{unlink.isPending ? "Unlinking…" : "Unlink"}
 						</Button>
 					</div>
 				)}
 				<FieldError message={inlineError} />
-				<ErrorNotice message={noticeError} />
 			</section>
 		);
 	}
@@ -208,10 +227,17 @@ export function TransferLinkSection({
 	});
 	const confirmPair = () => {
 		if (!actionable || !peer || busy) return;
-		confirm.mutate({
-			id: actionable.finding.id,
-			peerTransactionId: peer,
-		});
+		confirm.mutate(
+			{
+				id: actionable.finding.id,
+				peerTransactionId: peer,
+			},
+			{
+				onError: (cause) =>
+					reportLinkFailure(cause, "The transfer pair could not be saved."),
+				onSuccess: () => dismissKey("transfer-link"),
+			},
+		);
 	};
 	return (
 		<section
@@ -275,7 +301,6 @@ export function TransferLinkSection({
 				</fieldset>
 			)}
 			<FieldError message={inlineError} />
-			<ErrorNotice message={noticeError} />
 		</section>
 	);
 }

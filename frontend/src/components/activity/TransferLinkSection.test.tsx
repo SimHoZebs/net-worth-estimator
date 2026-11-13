@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.ts";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import { ApiHttpError } from "../../api/http.ts";
+import {
+	resetNotifications,
+	useNotifications,
+} from "../../state/notifications.ts";
 import {
 	resolveTransferPeer,
 	TransferLinkSection,
@@ -173,6 +177,11 @@ function outflowPair() {
 afterEach(() => {
 	cleanup();
 	vi.resetAllMocks();
+	resetNotifications();
+});
+
+beforeEach(() => {
+	resetNotifications();
 });
 
 describe("resolveTransferPeer", () => {
@@ -238,7 +247,10 @@ describe("TransferLinkSection", () => {
 				name: "Unlink the confirmed transfer touching leg-1",
 			}),
 		);
-		expect(removeMutate).toHaveBeenCalledWith({ transactionId: "leg-1" });
+		expect(removeMutate).toHaveBeenCalledWith(
+			{ transactionId: "leg-1" },
+			expect.objectContaining({ onError: expect.any(Function) }),
+		);
 	});
 
 	it("names the source account on inflow legs", () => {
@@ -276,10 +288,13 @@ describe("TransferLinkSection", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
 		);
-		expect(confirmMutate).toHaveBeenCalledWith({
-			id: "finding",
-			peerTransactionId: "peer-1",
-		});
+		expect(confirmMutate).toHaveBeenCalledWith(
+			{
+				id: "finding",
+				peerTransactionId: "peer-1",
+			},
+			expect.objectContaining({ onError: expect.any(Function) }),
+		);
 	});
 
 	it("picks the best-ranked peer first and confirms the reselection", () => {
@@ -305,19 +320,25 @@ describe("TransferLinkSection", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
 		);
-		expect(confirmMutate).toHaveBeenCalledWith({
-			id: "finding",
-			peerTransactionId: "peer-1",
-		});
+		expect(confirmMutate).toHaveBeenCalledWith(
+			{
+				id: "finding",
+				peerTransactionId: "peer-1",
+			},
+			expect.objectContaining({ onError: expect.any(Function) }),
+		);
 		confirmMutate.mockClear();
 		fireEvent.click(screen.getByRole("radio", { name: /Card payment/ }));
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link as transfer with peer-2" }),
 		);
-		expect(confirmMutate).toHaveBeenCalledWith({
-			id: "finding",
-			peerTransactionId: "peer-2",
-		});
+		expect(confirmMutate).toHaveBeenCalledWith(
+			{
+				id: "finding",
+				peerTransactionId: "peer-2",
+			},
+			expect.objectContaining({ onError: expect.any(Function) }),
+		);
 	});
 
 	it("renders a 422 reason inline", () => {
@@ -342,21 +363,30 @@ describe("TransferLinkSection", () => {
 		).toBeTruthy();
 	});
 
-	it("renders other failures as a notice", () => {
+	it("reports other failures through the error toast", () => {
 		const { self, peer, accounts } = outflowPair();
 		mockSection({
 			findings: [findingWithPeers("finding", "leg-1", ["peer-1"], "strong")],
 			transactions: [self, peer],
 			accounts,
-			confirm: {
-				isError: true,
-				error: new Error("The transfer pair could not be saved."),
-			},
 		});
+		confirmMutate.mockImplementation(
+			(_args: unknown, options?: { onError?: (cause: unknown) => void }) => {
+				options?.onError?.(new Error("The transfer pair could not be saved."));
+			},
+		);
 		render(<TransferLinkSection transactionId="leg-1" />);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Link as transfer with peer-1" }),
+		);
+		const toast = useNotifications
+			.getState()
+			.items.find((item) => item.key === "transfer-link");
+		expect(toast?.kind).toBe("error");
+		expect(toast?.message).toBe("The transfer pair could not be saved.");
 		expect(
-			screen.getByText("The transfer pair could not be saved."),
-		).toBeTruthy();
+			screen.queryByText("The transfer pair could not be saved."),
+		).toBeNull();
 	});
 
 	it("hides actions in read-only mode but keeps the status", () => {

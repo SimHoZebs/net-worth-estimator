@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
 import { InputField } from "@/components/Field.tsx";
-import { FieldError } from "@/components/ErrorNotice.tsx";
 import { finite, isRecord, parseUnion } from "@/domain/guards.ts";
 import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
 import { updateEvaluation } from "@/api/generated/endpoints.ts";
@@ -218,7 +217,6 @@ function IndependenceForm({
 	const [assets, setAssets] = useState(initial.assets);
 	const [income, setIncome] = useState(initial.income);
 	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [saved, setSaved] = useState(false);
 
 	const toggleAsset = (accountId: string) => {
@@ -242,7 +240,6 @@ function IndependenceForm({
 
 	const onSave = async () => {
 		setSaving(true);
-		setError(null);
 		setSaved(false);
 		const config = buildFiConfig(initial.raw, {
 			minimum: Math.max(0, minimum),
@@ -263,8 +260,9 @@ function IndependenceForm({
 			failureMessage: "The configuration could not be saved.",
 		});
 		setSaving(false);
+		// A failure reaches the toast from the evaluation write; the form
+		// keeps its dirty values for retry with no inline mirror.
 		if (ok) setSaved(true);
-		else setError("The configuration could not be saved. Try again.");
 	};
 
 	return (
@@ -360,7 +358,6 @@ function IndependenceForm({
 					</p>
 				)}
 			</div>
-			<FieldError message={error} />
 		</div>
 	);
 }

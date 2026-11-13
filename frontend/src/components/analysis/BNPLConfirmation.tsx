@@ -3,9 +3,11 @@ import type { AnalysisDuration } from "@/api/generated/model/analysisDuration.ts
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { findingLabel, providerLabel } from "@/domain/analysisFindings.ts";
 import { useReviewAnalysisFinding } from "@/state/analyses.ts";
+import { ApiHttpError } from "@/api/http.ts";
+import { UserScopeError } from "@/api/scopedRequest.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
+import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { InputField, SelectField } from "../Field.tsx";
 
 // useReviewAnalysisFinding awaits its finding refetch before action completion.
@@ -34,6 +36,15 @@ export function BNPLConfirmation({
 	const confirmed = review?.decision === "confirmed";
 	const duration = review?.duration;
 	const provider = providerLabel(review?.provider ?? finding.provider);
+	function reportAnswerFailure(cause: unknown): void {
+		if (cause instanceof UserScopeError) return;
+		notifyError(
+			"analysis-answer",
+			cause instanceof ApiHttpError && cause.status === 409
+				? "This finding changed."
+				: "Your answer could not be saved.",
+		);
+	}
 	const answer = (action: "confirm" | "reject") => {
 		feedback.mutate(
 			{
@@ -47,10 +58,12 @@ export function BNPLConfirmation({
 			},
 			{
 				onSuccess: () => {
+					dismissKey("analysis-answer");
 					setChangeAnswer(false);
 					if (action === "confirm")
 						focusAfterCommit(() => durationInput.current);
 				},
+				onError: reportAnswerFailure,
 			},
 		);
 	};
@@ -124,24 +137,17 @@ export function BNPLConfirmation({
 							},
 							{
 								onSuccess: () => {
+									dismissKey("analysis-answer");
 									setEditDuration(false);
 									setChangeAnswer(false);
 									focusAfterCommit(() => changeButton.current);
 								},
+								onError: reportAnswerFailure,
 							},
 						);
 					}}
 				/>
 			)}
-			<FieldError
-				message={
-					!feedback.isError
-						? null
-						: "status" in feedback.error && feedback.error.status === 409
-							? "This finding changed."
-							: "Your answer could not be saved."
-				}
-			/>
 		</div>
 	);
 }

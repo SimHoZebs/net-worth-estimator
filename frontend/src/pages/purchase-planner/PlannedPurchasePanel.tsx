@@ -43,7 +43,6 @@ export function PlannedPurchasePanel() {
 	);
 	const [remove, setRemove] = useState<PlannedPurchase | null>(null);
 	const [removing, setRemoving] = useState(false);
-	const [removeError, setRemoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
 	// Keep saved rows visible while their dates are calculated.
 	const savedPending = !accounts || !purchases || !startDate;
@@ -69,11 +68,11 @@ export function PlannedPurchasePanel() {
 	const confirmRemove = async () => {
 		if (!remove || removing) return;
 		setRemoving(true);
-		setRemoveError(null);
 		const ok = await removeSavedPurchase(remove.id);
 		setRemoving(false);
+		// A failure reaches the toast from the purchase write; the dialog
+		// stays open for retry with no inline mirror.
 		if (ok) setRemove(null);
-		else setRemoveError("The purchase could not be removed.");
 	};
 
 	const editorPriority = editor?.item
@@ -113,10 +112,8 @@ export function PlannedPurchasePanel() {
 					confirmLabel="Remove and save"
 					busyLabel="Removing…"
 					busy={removing}
-					error={removeError}
 					onCancel={() => {
 						setRemove(null);
-						setRemoveError(null);
 					}}
 					onConfirm={() => void confirmRemove()}
 				>

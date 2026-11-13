@@ -267,7 +267,11 @@ export function InboxPage() {
 				</p>
 			</div>
 			{inboxQuery.isError ? (
-				<ErrorNotice message="Inbox could not be loaded." />
+				<ErrorNotice
+					message="Inbox could not be loaded."
+					action="Retry"
+					onAction={() => void inboxQuery.refetch()}
+				/>
 			) : (
 				<>
 					<Tabs

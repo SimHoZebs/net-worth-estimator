@@ -108,8 +108,10 @@ function AccountsView({
 			failureMessage: "The account could not be removed.",
 		});
 		setRemoving(false);
+		// Success closes the dialog. A failure reaches the toast from the
+		// account write; the dialog stays open with the validation slot for
+		// retry. The only inline error here is the single-account guard below.
 		if (ok) setRemove(null);
-		else setRemoveError("The account could not be removed.");
 	};
 	return (
 		<>

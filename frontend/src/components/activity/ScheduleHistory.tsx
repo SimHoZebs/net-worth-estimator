@@ -6,7 +6,6 @@ import type { Account, Transaction } from "../../domain/model.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { Badge } from "../Badge.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
 
@@ -42,18 +41,17 @@ export function ScheduleHistory({
 	readOnly?: boolean;
 }) {
 	const [removingId, setRemovingId] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
 	const remove = async (transaction: Transaction) => {
 		if (removingId !== null || readOnly) return;
 		setRemovingId(transaction.id);
-		setError(null);
-		const ok = await performSave({
+		// Failures reach the workspace toast from the save; the section
+		// keeps no inline mirror so one event has one channel.
+		await performSave({
 			call: () => releaseOccurrence(transaction.id),
 			refresh: refreshTransactions,
 			failureMessage: "The occurrence could not be removed.",
 		});
 		setRemovingId(null);
-		if (!ok) setError("The occurrence could not be removed.");
 	};
 	return (
 		<section
@@ -98,7 +96,6 @@ export function ScheduleHistory({
 					))}
 				</TransactionTable>
 			)}
-			<FieldError message={error} />
 		</section>
 	);
 }
