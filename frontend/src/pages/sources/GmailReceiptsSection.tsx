@@ -5,6 +5,7 @@ import { Button, TextButton } from "../../components/Button.tsx";
 import { ErrorNotice, FieldError } from "../../components/ErrorNotice.tsx";
 import { InputField } from "../../components/Field.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
+import { notifySuccess } from "../../state/notifications.ts";
 import {
 	confirmGmailReceipt,
 	scanGmailReceiptsNow,
@@ -18,7 +19,6 @@ import {
 export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 	const receipts = useGmailReceipts();
 	const [busy, setBusy] = useState(false);
-	const [message, setMessage] = useState("");
 	const [editingId, setEditingId] = useState<string | null>(null);
 
 	async function handleScan() {
@@ -37,7 +37,7 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 			parts.push(`${summary.needsReview} need review`);
 		if (summary.failed > 0) parts.push(`${summary.failed} could not be read`);
 		if (summary.truncated) parts.push("more mail remains for the next scan");
-		setMessage(`Scan complete: ${parts.join(", ")}.`);
+		notifySuccess("gmail-scan", `Scan complete: ${parts.join(", ")}.`);
 	}
 
 	const items = receipts.data ?? [];
@@ -68,14 +68,6 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 						{busy ? "Scanning…" : "Scan now"}
 					</Button>
 				</div>
-				<p
-					role="status"
-					className={
-						message ? "mt-3 mb-0 text-sm text-success-text" : "sr-only"
-					}
-				>
-					{message}
-				</p>
 				{receipts.isPending ? (
 					<div aria-busy="true" className="mt-4">
 						<Skeleton className="h-16 w-full" />

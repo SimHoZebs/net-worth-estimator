@@ -223,9 +223,12 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 		.click();
 	await expect(bankSync.getByText(/Future imports will stop/)).toBeVisible();
 	await bankSync.getByRole("button", { name: "Confirm disconnect" }).click();
-	await expect(simplefin.getByRole("status")).toContainText(
+	await expect(page.getByRole("status")).toContainText(
 		"Your accounts and imported history are kept",
 	);
+	await expect(
+		bankSync.getByText("Your accounts and imported history are kept"),
+	).toHaveCount(0);
 	await expect(bankSync.getByLabel("Setup token", { exact: true })).toHaveValue(
 		"",
 	);
@@ -262,8 +265,11 @@ test("links a manual account and retires its duplicate", async ({ page }) => {
 	await dialog.getByRole("button", { name: "Link account" }).click();
 	await expect(dialog).toBeHidden();
 	await expect(
-		bankSync.getByText(/Brokerage is linked to the bank account/),
+		page.getByText(/Brokerage is linked to the bank account/),
 	).toBeVisible();
+	await expect(
+		bankSync.getByText(/Brokerage is linked to the bank account/),
+	).toHaveCount(0);
 	await expect(synced).toContainText("Brokerage");
 });
 
@@ -325,10 +331,6 @@ test("explains sync limits without retrying the provider automatically", async (
 	});
 	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
-	const simplefin = bankSync.getByRole("region", {
-		name: "SimpleFIN",
-		exact: true,
-	});
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
 	// One event, one channel: the toast carries the server message and the
 	// bank sync panel stays free of a mirrored banner.
@@ -337,9 +339,7 @@ test("explains sync limits without retrying the provider automatically", async (
 	);
 	await expect(bankSync.getByRole("alert")).toHaveCount(0);
 	expect(provider.syncCalls()).toBe(1);
-	await expect(simplefin.getByRole("status")).not.toContainText(
-		"Sync complete",
-	);
+	await expect(bankSync.getByText("Sync complete")).toHaveCount(0);
 });
 
 test("connected accounts and sync feedback stay accessible in dark mode on mobile", async ({
@@ -350,16 +350,13 @@ test("connected accounts and sync feedback stay accessible in dark mode on mobil
 	await page.setViewportSize({ width: 390, height: 900 });
 	await page.goto("/sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
-	const simplefin = bankSync.getByRole("region", {
-		name: "SimpleFIN",
-		exact: true,
-	});
 	await expect(
 		bankSync.getByRole("list", { name: "Synced accounts" }),
 	).toContainText("Everyday checking");
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
-	await expect(simplefin.getByRole("status")).toContainText("Sync complete");
+	await expect(page.getByRole("status")).toContainText("Sync complete");
+	await expect(bankSync.getByText("Sync complete")).toHaveCount(0);
 	expect(
 		await page.evaluate(
 			() => document.documentElement.scrollWidth <= window.innerWidth,

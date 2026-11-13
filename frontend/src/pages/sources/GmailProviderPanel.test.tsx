@@ -4,6 +4,10 @@ import { statusOptions } from "../../state/workspaceResources.ts";
 import { setupQueryScope, teardownQueryScope } from "../../mocks/testScope.tsx";
 import { serverQueryClient } from "../../state/serverQuery.ts";
 import { resetGmailClient } from "../../state/gmail.ts";
+import {
+	resetNotifications,
+	useNotifications,
+} from "../../state/notifications.ts";
 import { GmailProviderPanel } from "./GmailProviderPanel.tsx";
 
 function renderPanel() {
@@ -186,11 +190,13 @@ function stubGmailApi(state: {
 
 beforeEach(() => {
 	setupQueryScope();
+	resetNotifications();
 });
 
 afterEach(() => {
 	teardownQueryScope();
 	resetGmailClient();
+	resetNotifications();
 	vi.restoreAllMocks();
 });
 
@@ -251,8 +257,15 @@ it("shows the connected account and saves the scan window", async () => {
 	fireEvent.click(screen.getByRole("button", { name: "Save scan window" }));
 	await waitFor(() => {
 		expect(
-			screen.getByText("Initial scan window set to 45 days."),
-		).toBeTruthy();
+			useNotifications
+				.getState()
+				.items.some(
+					(item) =>
+						item.key === "gmail-notice" &&
+						item.kind === "success" &&
+						item.message === "Initial scan window set to 45 days.",
+				),
+		).toBe(true);
 	});
 	expect(
 		requests.some(
@@ -289,9 +302,18 @@ it("disconnects after confirmation and keeps the lookback", async () => {
 	await screen.findByText(/reader@example\.com/);
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	fireEvent.click(screen.getByRole("button", { name: "Yes, disconnect" }));
-	expect(
-		await screen.findByText(/Saved tokens are revoked and forgotten/),
-	).toBeTruthy();
+	await waitFor(() => {
+		expect(
+			useNotifications
+				.getState()
+				.items.some(
+					(item) =>
+						item.key === "gmail-notice" &&
+						item.kind === "success" &&
+						/Saved tokens are revoked and forgotten/.test(item.message),
+				),
+		).toBe(true);
+	});
 	expect(
 		requests.some(
 			(request) =>
@@ -354,9 +376,18 @@ it("scans and lists extracted receipts with review standing", async () => {
 	expect(screen.getByText("Needs review")).toBeTruthy();
 	expect(screen.getByText(/2026-10-20/)).toBeTruthy();
 	fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
-	expect(
-		await screen.findByText(/Scan complete: 2 new, 1 receipt, 1 need review/),
-	).toBeTruthy();
+	await waitFor(() => {
+		expect(
+			useNotifications
+				.getState()
+				.items.some(
+					(item) =>
+						item.key === "gmail-scan" &&
+						item.kind === "success" &&
+						/Scan complete: 2 new, 1 receipt, 1 need review/.test(item.message),
+				),
+		).toBe(true);
+	});
 	expect(
 		requests.some(
 			(request) =>

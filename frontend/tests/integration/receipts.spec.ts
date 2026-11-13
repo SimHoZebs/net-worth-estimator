@@ -125,7 +125,8 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	await receipt
 		.getByRole("button", { name: "Confirm receipt", exact: true })
 		.click();
-	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
+	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await expect(
 		receipt.getByText("Simulated data", { exact: true }).first(),
 	).toHaveCount(0);
@@ -159,7 +160,8 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	await receipt
 		.getByRole("button", { name: "Save draft", exact: true })
 		.click();
-	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
+	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await expect(receipt.getByText("Reviewed", { exact: true })).toHaveCount(0);
 	await page.reload();
 	const withDraft = await openExpense(page);
@@ -338,7 +340,8 @@ test("unknown images recover through manual review and drafts survive reload", a
 	await receipt
 		.getByRole("button", { name: "Save draft", exact: true })
 		.click();
-	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
+	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await page.reload();
 	const again = await openExpense(page);
 	await again.getByRole("button", { name: /Manual draft/ }).click();
@@ -350,7 +353,8 @@ test("unknown images recover through manual review and drafts survive reload", a
 	await receipt
 		.getByRole("button", { name: "Confirm receipt", exact: true })
 		.click();
-	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
+	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await receipt
 		.getByRole("button", { name: "Delete receipt", exact: true })
 		.click();
@@ -452,7 +456,8 @@ test("image controls replace all receipt content and delete it without changing 
 	await receipt
 		.getByRole("button", { name: "Confirm receipt", exact: true })
 		.click();
-	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
+	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	const original = await (
 		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
 	).json();

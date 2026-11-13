@@ -6,6 +6,7 @@ import { Button, TextButton } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { InputField } from "../../components/Field.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
+import { notifySuccess } from "../../state/notifications.ts";
 import {
 	disconnectGmail,
 	setGmailLookbackDays,
@@ -22,7 +23,6 @@ export function GmailProviderPanel() {
 	const credential = useGmailCredential();
 	const readOnly = useUserReadOnly();
 	const [busy, setBusy] = useState(false);
-	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [lookback, setLookback] = useState<string | null>(null);
 
@@ -96,7 +96,10 @@ export function GmailProviderPanel() {
 		setConfirmingDisconnect(false);
 		if (ok) {
 			setLookback(null);
-			setMessage("Gmail disconnected. Saved tokens are revoked and forgotten.");
+			notifySuccess(
+				"gmail-notice",
+				"Gmail disconnected. Saved tokens are revoked and forgotten.",
+			);
 		}
 	}
 
@@ -107,7 +110,7 @@ export function GmailProviderPanel() {
 		setBusy(false);
 		if (ok) {
 			setLookback(null);
-			setMessage(`Initial scan window set to ${days} days.`);
+			notifySuccess("gmail-notice", `Initial scan window set to ${days} days.`);
 		}
 	}
 
@@ -129,12 +132,6 @@ export function GmailProviderPanel() {
 					window.
 				</p>
 			)}
-			<p
-				role="status"
-				className={message ? "m-0 text-sm text-success-text" : "sr-only"}
-			>
-				{message}
-			</p>
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{connected ? (

@@ -539,7 +539,11 @@ it("reconnects with a replacement token without disconnecting first", async () =
 	fireEvent.change(token, { target: { value: "bmV3LXRva2Vu" } });
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	await waitFor(() => {
-		expect(screen.getByText("SimpleFIN reconnected.")).toBeTruthy();
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.message === "SimpleFIN reconnected."),
+		).toBe(true);
 	});
 	expect(screen.queryByPlaceholderText("Paste your setup token")).toBeNull();
 	expect(
@@ -783,9 +787,15 @@ it("links a manual account to a synced account", async () => {
 			candidate.path === "/v1/sync/simplefin/accounts/bridge-0/supersede",
 	);
 	expect(request?.body).toEqual({ manualAccountId: "brokerage" });
-	expect(
-		await screen.findByText(/Brokerage is linked to the bank account/),
-	).toBeTruthy();
+	await waitFor(() => {
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) =>
+					item.message.includes("Brokerage is linked to the bank account"),
+				),
+		).toBe(true);
+	});
 });
 
 it("keeps the link dialog open when validation rejects the merge", async () => {
@@ -1075,7 +1085,11 @@ it("syncs now through the Sync now button", async () => {
 		).toBe(true);
 	});
 	await waitFor(() =>
-		expect(screen.getByRole("status").textContent).toMatch(/Sync complete/),
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.message.includes("Sync complete")),
+		).toBe(true),
 	);
 	expect(screen.getByRole("button", { name: "Sync now" })).toBeTruthy();
 });
@@ -1094,9 +1108,9 @@ it("reports a throttled sync through the toast", async () => {
 	// One event, one channel: no inline banner mirrors the toast.
 	expect(screen.queryByText(/Could not sync now/)).toBeNull();
 	// A failed trigger refreshes nothing.
-	expect(
-		requests.some((request) => request.path === "/v1/checkpoints"),
-	).toBe(false);
+	expect(requests.some((request) => request.path === "/v1/checkpoints")).toBe(
+		false,
+	);
 });
 
 it("disables Sync now when read-only", async () => {
@@ -1116,14 +1130,18 @@ it("refreshes the workspace after a successful manual sync", async () => {
 	render(<SyncSettings />);
 	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
 	await waitFor(() =>
-		expect(screen.getByRole("status").textContent).toMatch(/Sync complete/),
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.message.includes("Sync complete")),
+		).toBe(true),
 	);
 	// The manual action owns the workspace refresh: it must not wait for the
 	// scheduled monitor to notice the already-refreshed status.
 	await waitFor(() => {
-		expect(
-			requests.some((request) => request.path === "/v1/checkpoints"),
-		).toBe(true);
+		expect(requests.some((request) => request.path === "/v1/checkpoints")).toBe(
+			true,
+		);
 	});
 });
 
@@ -1160,7 +1178,11 @@ it("awaits the manual status refresh before applying its sync stamp", async () =
 	expect(getAppliedSyncStamp(getUserScope())).not.toBe("after");
 	finishStatus();
 	await waitFor(() =>
-		expect(screen.getByRole("status").textContent).toMatch(/Sync complete/),
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.message.includes("Sync complete")),
+		).toBe(true),
 	);
 	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
 });

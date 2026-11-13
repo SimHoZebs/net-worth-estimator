@@ -8,6 +8,7 @@ import {
 } from "@/domain/receipt.ts";
 import { useBeforeUnload } from "@/state/useBeforeUnload.ts";
 import { useReceipt, useReceiptActions } from "@/state/receipts.ts";
+import { notifySuccess } from "../../state/notifications.ts";
 import { Button } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { InputField, SelectField } from "../Field.tsx";
@@ -116,6 +117,7 @@ function ReceiptEditor({
 			setEdit(null);
 			setError(null);
 			setAskDiscard(false);
+			notifySuccess("receipt-notice", "Receipt details saved.");
 		} catch (cause) {
 			setError(
 				cause instanceof Error
@@ -354,11 +356,6 @@ function ReceiptEditor({
 					</form>
 					{receipt.extraction && (
 						<ReceiptExtractionEvidence extraction={receipt.extraction} />
-					)}
-					{actions.review.isSuccess && !dirty && (
-						<p className="text-sm text-success-text" role="status">
-							Receipt details saved.
-						</p>
 					)}
 				</div>
 			</div>

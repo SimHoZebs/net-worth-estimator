@@ -12,6 +12,7 @@ import {
 	triggerSyncNow,
 	useSyncCredential,
 } from "../../state/syncSettings.ts";
+import { notifySuccess } from "../../state/notifications.ts";
 import { useServerStatus } from "../../state/workspaceResources.ts";
 import { useUserReadOnly, useUserScope } from "../../state/useUserScope.ts";
 import { SyncConnectedAccounts } from "./SyncConnectedAccounts.tsx";
@@ -42,7 +43,6 @@ export function SyncProviderPanel() {
 	const readOnly = useUserReadOnly();
 	const [busy, setBusy] = useState(false);
 	const [syncing, setSyncing] = useState(false);
-	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [reconnecting, setReconnecting] = useState(false);
 	const reconnectInputRef = useRef<HTMLInputElement>(null);
@@ -128,24 +128,23 @@ export function SyncProviderPanel() {
 
 	async function handleSyncNow() {
 		setSyncing(true);
-		setMessage("");
 		const ok = await triggerSyncNow();
 		setSyncing(false);
 		// Failures reach the toast from the sync mutation. The panel never
 		// mirrors them inline so one event keeps one place to find.
-		if (ok) setMessage("Sync complete.");
+		if (ok) notifySuccess("sync-notice", "Sync complete.");
 	}
 
 	async function handleDisconnect() {
 		setBusy(true);
-		setMessage("");
 		const ok = await disconnectSyncKey();
 		setBusy(false);
 		setConfirmingDisconnect(false);
 		// Failures reach the toast from the sync mutation.
 		if (ok) {
 			claimSyncFocus("connect");
-			setMessage(
+			notifySuccess(
+				"sync-connection",
 				"SimpleFIN disconnected. Your accounts and imported history are kept.",
 			);
 		}
@@ -153,7 +152,7 @@ export function SyncProviderPanel() {
 
 	function handleReconnected() {
 		setReconnecting(false);
-		setMessage("SimpleFIN reconnected.");
+		notifySuccess("sync-connection", "SimpleFIN reconnected.");
 	}
 
 	return (
@@ -178,12 +177,6 @@ export function SyncProviderPanel() {
 					or sync.
 				</p>
 			)}
-			<p
-				role="status"
-				className={message ? "m-0 text-sm text-success-text" : "sr-only"}
-			>
-				{message}
-			</p>
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{configured ? (
@@ -282,7 +275,7 @@ export function SyncProviderPanel() {
 							</div>
 							<SyncConnectedAccounts
 								onLinked={(linkedMessage) => {
-									setMessage(linkedMessage);
+									notifySuccess("sync-connection", linkedMessage);
 								}}
 							/>
 							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
@@ -358,7 +351,7 @@ export function SyncProviderPanel() {
 						<SyncOnboarding
 							onConnected={() => {
 								claimSyncFocus("connected");
-								setMessage("SimpleFIN connected.");
+								notifySuccess("sync-connection", "SimpleFIN connected.");
 							}}
 						/>
 					)}
