@@ -29,7 +29,7 @@ import (
 // A direct-share inbox leg (accept, decline, dismiss) rides the same two
 // users. Every hop runs over production HTTP handlers with the same
 // principal-in-context seam the browser harness uses; the only stand-in is
-// identity itself (no OIDC round trip — real Google/Casdoor login is out of
+// identity itself (no OIDC round trip — real Google/provider login is out of
 // scope and covered up to the consent start elsewhere).
 
 const qa03Issuer = "https://issuer.test"

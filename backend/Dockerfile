@@ -23,8 +23,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/prune-noop-checkpoints ./scripts/one-time/noop-checkpoints
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/upgrade-transaction-rename ./scripts/one-time/transaction-rename
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
-    -o /out/import-casdoor-authz ./scripts/one-time/casdoor-authz
 
 FROM alpine:3.22 AS standalone
 

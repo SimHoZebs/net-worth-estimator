@@ -83,9 +83,7 @@ For Compose, merge `docker-compose.yml` and `auth/compose.auth.yml`, and set `AU
 
 ## Existing installations
 
-Follow the [one-time cutover](better-auth/one-time/README.md). It preserves the
-issuer and every immutable subject. It imports bcrypt credentials and reviewed
-effective permissions. Old sessions end. Users enroll fresh passkeys.
+Existing installations need no cutover action. Fresh installs follow the guide above.
 
 ## Verification
 

@@ -136,8 +136,8 @@ policy database are required. Missing state fails closed at startup.
 
 Before an existing authenticated deployment starts the new code:
 
-Follow the [one-time identity and policy cutover](../auth/better-auth/one-time/README.md).
-Retain the exact issuer and subjects. Import reviewed effective action decisions,
+Better Auth is the current provider and no import path remains.
+Retain the exact issuer and subjects. Grant reviewed effective action decisions,
 not inferred username ownership. Verify guest, member, second-user, denial,
 revocation, and provider-outage cases before release.
 

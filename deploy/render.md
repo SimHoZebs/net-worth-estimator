@@ -49,7 +49,7 @@ For a fresh installation, choose a unique reserved guest subject, such as
 `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` for API startup and authorization setup.
 Before guest-data publication, provision the destination row with that subject
 and the configured identity issuer. Existing installations retain their exact
-issuer and guest subject through the separate one-time import procedure.
+issuer and guest subject with Better Auth as the only provider and no import path.
 Otherwise, the first authorized access creates its empty workspace through the
 same path as other users. Persisted Casbin viewer permissions limit guest access.
 Repeat setup preserves existing database and user rows:

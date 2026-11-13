@@ -12,8 +12,8 @@ var defaultRoles = map[string][]string{
 	"none":   {},
 }
 
-// Setup creates fresh policy state only. Existing databases require the
-// explicit one-time import tool, never an upgrade in normal setup or startup.
+// Setup creates fresh policy state only. The policy database is provisioned
+// explicitly; runtime and setup never migrate or import policy.
 func Setup(config Config) error {
 	if config.Issuer == "" || config.Path == "" || !validSubject(config.GuestSubject) {
 		return errors.New("authorization issuer, database and guest subject are required")

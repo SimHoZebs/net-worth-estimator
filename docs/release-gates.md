@@ -67,12 +67,10 @@ the QA-03 test files' headers and in section 4 below.
   the actual-provider checklist in [the deployment index](../deploy/README.md)
   stays manual. Vercel deploys after the `Tests` run for the pushed `main`
   commit succeeds. Northflank deploys after the pinned images for that commit
-   are published and the operator-owned `AUTH_CUTOVER_READY` guard is enabled;
-   the image workflow itself runs only after `Tests` succeeds. Landing and
-   release are distinct. A disabled guard must be reported as deployment
-   not requested, not as a successful deployment. An actual Northflank release
+   are published; the image workflow itself runs only after `Tests` succeeds. Landing and
+   release are distinct. An actual Northflank release
    requires its workflow run ID, successful migration step, backup hash,
-   and an `ok` readiness response. Do not enable live cutover as a test step.
+   and an `ok` readiness response.
    A release that stops at the migration leaves the API in maintenance with the
    database unchanged. Request the release again. A GitHub dispatch of the
    release workflow requests the current `main` commit, so it releases the

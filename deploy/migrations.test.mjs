@@ -1012,7 +1012,10 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   assert.match(workflow, /types: \[completed\]/);
   assert.match(workflow, /branches: \[main\]/);
   assert.match(workflow, /actions: read/);
-  assert.match(workflow, /vars\.AUTH_CUTOVER_READY == 'true'/);
+  assert.doesNotMatch(workflow, /AUTH_CUTOVER_READY/);
+  assert.match(workflow, /IDENTITY_SERVICE_ID/);
+  assert.match(workflow, /IDENTITY_DATABASE_ADDON_ID/);
+  assert.match(workflow, /Prepared identity service and database IDs are required/);
   assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
   assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);

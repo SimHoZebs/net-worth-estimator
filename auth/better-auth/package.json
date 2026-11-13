@@ -7,7 +7,7 @@
     "setup": "bun run src/setup.ts",
     "build": "bun run build.ts",
     "typecheck": "bun check -p tsconfig.json",
-    "lint": "../../frontend/node_modules/.bin/oxlint src one-time test-support.ts build.ts && ../../frontend/node_modules/.bin/oxfmt --check src one-time test-support.ts build.ts",
+    "lint": "../../frontend/node_modules/.bin/oxlint src test-support.ts build.ts && ../../frontend/node_modules/.bin/oxfmt --check src test-support.ts build.ts",
     "test": "bun test"
   },
   "dependencies": {

@@ -10,7 +10,7 @@
 // provides, with no provider round trip. Each test name states the real
 // boundary crossed. This suite is integration-tier, one below the
 // disposable provider-backed e2e gate: no Docker, no credentials, seconds
-// per run. Real Casdoor login, real bank sync, and receipt OCR stay out of
+// per run. Real provider login, real bank sync, and receipt OCR stay out of
 // scope and are listed as uncovered in the companion integration-gates
 // document, never faked green.
 //
