@@ -14,7 +14,8 @@ import {
 	hasFlowCycle,
 	type AggregatedEdge,
 } from "../../domain/flowDiagram.ts";
-import { money, shiftDate, todayIso } from "../../domain/format.ts";
+import { money, todayIso } from "../../domain/format.ts";
+import { defaultFlowWindow } from "../../domain/flowWindow.ts";
 import { useFlowGraph } from "../../state/useFlowGraph.ts";
 import { FlowEdgePanel } from "./FlowEdgePanel.tsx";
 import { FlowFilters, type FlowFilterState } from "./FlowFilters.tsx";
@@ -23,11 +24,9 @@ import { FlowTable } from "./FlowTable.tsx";
 
 type FlowView = "diagram" | "table";
 
-// PROVISIONAL default window (VIS-01 leaves window defaults open): the
-// twelve months through today. Change only with that decision.
+// The default window is the current calendar month.
 function defaultWindow(): { startDate: string; endDate: string } {
-	const endDate = todayIso();
-	return { startDate: shiftDate({ date: endDate, days: -365 }), endDate };
+	return defaultFlowWindow(todayIso());
 }
 
 function TotalsSummary({ graph }: { graph: FlowGraph }) {

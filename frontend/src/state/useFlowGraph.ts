@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { FlowGraph } from "../api/flows.ts";
 import { requestFlowGraph } from "../api/flows.ts";
+import type { FlowWindow } from "../domain/flowWindow.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import { projectionStartDateFromRows } from "./projectionSource.ts";
 import {
@@ -13,11 +14,6 @@ import {
 } from "./workspaceResources.ts";
 import { normalizedEvaluations } from "./projectionSource.ts";
 import { useUserScope } from "./useUserScope.ts";
-
-export interface FlowWindow {
-	startDate: string;
-	endDate: string;
-}
 
 /** Horizon years covering the window end from the projection start. The
  * range selects response dates; the horizon must still reach the window
