@@ -26,7 +26,7 @@ test("reuses the last immutable image when a component did not change", () => {
   assert.match(workflow, /git diff --name-only/);
   assert.match(workflow, /docker buildx imagetools create --tag/);
   assert.match(workflow, /steps\.reuse\.outputs\.reuse != 'true'/);
-  assert.match(workflow, /paths=\(backend deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
+  assert.match(workflow, /paths=\(backend deploy\/migrate\.sh deploy\/analysis-schema\.sql deploy\/api-boot\.sh\)/);
   assert.match(workflow, /paths=\(frontend package\.json bun\.lock extension\/package\.json\)/);
   // Auth reuse paths derive from auth/better-auth/Dockerfile COPY sources.
   // Dockerfile is the single source; the workflow list must include every
@@ -96,6 +96,6 @@ test("Northflank co-location is an explicit image target, not the default backen
   assert.match(backend, /FROM python:3\.12-slim AS northflank/);
   assert.match(backend, /FROM standalone AS default\s*$/);
   assert.match(workflow, /image: backend-northflank[\s\S]*?target: northflank/);
-  assert.match(workflow, /paths=\(backend ml deploy\/northflank deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
+  assert.match(workflow, /paths=\(backend ml deploy\/northflank deploy\/migrate\.sh deploy\/analysis-schema\.sql deploy\/api-boot\.sh\)/);
   assert.match(release, /repository\}-backend-northflank:sha-/);
 });

@@ -38,7 +38,7 @@ RUN apk add --no-cache ca-certificates busybox-extras sqlite \
 WORKDIR /app
 
 COPY --from=build --chown=app:app /out/ /app/
-COPY --chown=app:app backend/api-boot.sh /app/api-boot.sh
+COPY --chown=app:app deploy/api-boot.sh /app/api-boot.sh
 COPY --chown=app:app deploy/migrate.sh /app/migrate.sh
 COPY --chown=app:app deploy/analysis-schema.sql /app/analysis-schema.sql
 RUN chmod 0555 /app/api-boot.sh /app/migrate.sh

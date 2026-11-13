@@ -939,7 +939,7 @@ test("shared hook stays shell plus setupdb/sqlite3 and outside server startup", 
     assert.doesNotMatch(body, new RegExp(runtime));
   }
   assert.doesNotMatch(body, /rm .*pending|rm "\$pending"/);
-  const startup = await readFile(new URL("../backend/api-boot.sh", import.meta.url), "utf8");
+  const startup = await readFile(new URL("./api-boot.sh", import.meta.url), "utf8");
   assert.doesNotMatch(startup, /migrate\.sh/);
 });
 

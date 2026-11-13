@@ -76,10 +76,10 @@ jobs:
           set -euo pipefail
           case "$COMPONENT" in
             backend)
-              paths=(backend deploy/migrate.sh deploy/analysis-schema.sql)
+              paths=(backend deploy/migrate.sh deploy/analysis-schema.sql deploy/api-boot.sh)
               ;;
             backend-northflank)
-              paths=(backend ml deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql)
+              paths=(backend ml deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql deploy/api-boot.sh)
               ;;
             frontend)
               paths=(frontend package.json bun.lock extension/package.json)
