@@ -1,9 +1,27 @@
 import { act, cleanup, render } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useTheme, useThemeStore, useThemeSync } from "./useTheme.ts";
+
+function addThemeMeta() {
+	const colorScheme = document.createElement("meta");
+	colorScheme.id = "color-scheme";
+	colorScheme.name = "color-scheme";
+	colorScheme.content = "light dark";
+	const themeColor = document.createElement("meta");
+	themeColor.id = "theme-color";
+	themeColor.name = "theme-color";
+	themeColor.content = "#214c3d";
+	document.head.append(colorScheme, themeColor);
+}
+
+beforeEach(() => {
+	addThemeMeta();
+});
 
 afterEach(() => {
 	cleanup();
+	document.getElementById("color-scheme")?.remove();
+	document.getElementById("theme-color")?.remove();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
@@ -37,9 +55,13 @@ it("gives multiple controls one application-level listener owner", () => {
 	expect(
 		addWindow.mock.calls.filter(([event]) => event === "storage"),
 	).toHaveLength(1);
-	expect(document.documentElement.dataset.theme).toBe("light");
+	expect(
+		document.getElementById("color-scheme")?.getAttribute("content"),
+	).toBe("light dark");
 	act(() => useThemeStore.getState().setPreference("dark"));
-	expect(document.documentElement.dataset.theme).toBe("dark");
+	expect(
+		document.getElementById("color-scheme")?.getAttribute("content"),
+	).toBe("dark");
 	expect(removeEventListener).toHaveBeenCalledOnce();
 	view.unmount();
 });

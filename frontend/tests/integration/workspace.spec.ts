@@ -332,7 +332,31 @@ for (const width of [1440, 390]) {
 		]) {
 			await page.goto(`/${route}`);
 			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-			await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+			// System preference stays untouched: the meta override remains
+			// the two-value opt-in, so CSS follows the emulated OS scheme.
+			await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute(
+				"content",
+				"light dark",
+			);
+			// The resolved root background must equal the dark paper token,
+			// compared through the same engine so color serialization cannot
+			// drift. A bare "dark" substring check would also match the
+			// "light dark" base and prove nothing.
+			await expect
+				.poll(() =>
+					page.evaluate(() => {
+						const probe = document.createElement("div");
+						probe.style.color = "var(--color-stone-950)";
+						document.body.append(probe);
+						const expected = getComputedStyle(probe).color;
+						probe.remove();
+						return (
+							getComputedStyle(document.documentElement).backgroundColor ===
+							expected
+						);
+					}),
+				)
+				.toBe(true);
 			expect(
 				await page.evaluate(() => document.documentElement.scrollWidth),
 				route,

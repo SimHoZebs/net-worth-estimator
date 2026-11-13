@@ -4,6 +4,7 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta id="theme-color" name="theme-color" content="#214c3d" />
+		<meta id="color-scheme" name="color-scheme" content="light dark" />
 		<meta
 			name="description"
 			content="Understand your household's financial trajectory. Explore your plan, inspect the evidence, and make considered changes."
@@ -15,25 +16,52 @@
 				var stored = "system";
 				var raw = localStorage.getItem("waypoint-theme");
 				if (raw) {
-					var parsed = JSON.parse(raw);
-					var preference =
-						parsed && parsed.state ? parsed.state.preference : null;
-					if (
-						preference === "light" ||
-						preference === "dark" ||
-						preference === "system"
-					) {
-						stored = preference;
+					var parsed;
+					try {
+						parsed = JSON.parse(raw);
+					} catch (e) {
+						parsed = raw;
+					}
+					if (typeof parsed === "string") {
+						if (
+							parsed === "light" ||
+							parsed === "dark" ||
+							parsed === "system"
+						)
+							stored = parsed;
+					} else if (parsed && typeof parsed === "object") {
+						var state = parsed.state;
+						var candidate =
+							state && typeof state === "object"
+								? state.preference
+								: parsed.preference;
+						if (
+							candidate === "light" ||
+							candidate === "dark" ||
+							candidate === "system"
+						)
+							stored = candidate;
 					}
 				}
 				var dark =
 					stored === "dark" ||
 					(stored === "system" &&
 						window.matchMedia("(prefers-color-scheme: dark)").matches);
-				document.documentElement.dataset.theme = dark ? "dark" : "light";
-				document.documentElement.style.colorScheme = dark ? "dark" : "light";
+				var colorScheme = document.getElementById("color-scheme");
+				if (colorScheme)
+					colorScheme.setAttribute(
+						"content",
+						stored === "system" ? "light dark" : stored,
+					);
+				var themeColor = document.getElementById("theme-color");
+				if (themeColor)
+					themeColor.setAttribute(
+						"content",
+						dark ? "#0f1411" : "#214c3d",
+					);
 			} catch (e) {
-				document.documentElement.dataset.theme = "light";
+				var fallback = document.getElementById("color-scheme");
+				if (fallback) fallback.setAttribute("content", "light dark");
 			}
 		</script>
 	</head>

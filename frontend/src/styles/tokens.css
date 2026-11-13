@@ -1,48 +1,72 @@
 /* Semantic roles reference Tailwind's stock palette and spacing scale.
-   Theme overrides live in themes.css. Runtime charts share these variables. */
+   Both theme values live in light-dark() tokens. Runtime charts share these variables. */
 @layer base {
 	:root {
-		color-scheme: light;
+		color-scheme: light dark;
 		color: var(--ink);
 		background: var(--paper);
 		font-synthesis: none;
 		--font-ui: "Manrope Variable", sans-serif;
 		--font-display: var(--font-ui);
 		--font-code: ui-monospace, monospace;
-		--primary: var(--color-emerald-700);
-		--primary-hover: var(--color-emerald-800);
-		--on-primary: var(--color-white);
-		--ink: var(--color-stone-800);
-		--muted: var(--color-stone-600);
+		--primary: light-dark(var(--color-emerald-700), var(--color-emerald-300));
+		--primary-hover: light-dark(
+			var(--color-emerald-800),
+			var(--color-emerald-200)
+		);
+		--on-primary: light-dark(var(--color-white), var(--color-emerald-950));
+		--ink: light-dark(var(--color-stone-800), var(--color-stone-100));
+		--muted: light-dark(var(--color-stone-600), var(--color-stone-400));
 		--subtle: var(--color-stone-500);
-		--line: var(--color-stone-200);
-		--line-strong: var(--color-stone-300);
-		--paper: var(--color-stone-50);
-		--surface: var(--color-white);
-		--surface-2: var(--color-stone-50);
-		--surface-3: var(--color-stone-100);
-		--input-bg: var(--color-white);
-		--hover: var(--color-stone-100);
-		--active: var(--color-emerald-50);
-		--success-bg: var(--color-emerald-50);
-		--success-text: var(--color-emerald-800);
-		--success-border: var(--color-emerald-200);
-		--warning-bg: var(--color-amber-50);
-		--warning-text: var(--color-amber-800);
-		--warning-border: var(--color-amber-200);
-		--danger-bg: var(--color-red-50);
-		--danger-text: var(--color-red-800);
-		--danger-border: var(--color-red-200);
+		--line: light-dark(var(--color-stone-200), var(--color-stone-700));
+		--line-strong: light-dark(var(--color-stone-300), var(--color-stone-600));
+		--paper: light-dark(var(--color-stone-50), var(--color-stone-950));
+		--surface: light-dark(var(--color-white), var(--color-stone-900));
+		--surface-2: light-dark(var(--color-stone-50), var(--color-stone-800));
+		--surface-3: light-dark(var(--color-stone-100), var(--color-stone-800));
+		--input-bg: light-dark(var(--color-white), var(--color-stone-800));
+		--hover: light-dark(var(--color-stone-100), var(--color-stone-800));
+		--active: light-dark(var(--color-emerald-50), var(--color-emerald-950));
+		--success-bg: light-dark(var(--color-emerald-50), var(--color-emerald-950));
+		--success-text: light-dark(
+			var(--color-emerald-800),
+			var(--color-emerald-300)
+		);
+		--success-border: light-dark(
+			var(--color-emerald-200),
+			var(--color-emerald-800)
+		);
+		--warning-bg: light-dark(var(--color-amber-50), var(--color-amber-950));
+		--warning-text: light-dark(var(--color-amber-800), var(--color-amber-300));
+		--warning-border: light-dark(
+			var(--color-amber-200),
+			var(--color-amber-800)
+		);
+		--danger-bg: light-dark(var(--color-red-50), var(--color-red-950));
+		--danger-text: light-dark(var(--color-red-800), var(--color-red-300));
+		--danger-border: light-dark(var(--color-red-200), var(--color-red-800));
 		--danger-solid: var(--color-red-700);
 		--on-danger: var(--color-white);
-		--guest: var(--color-orange-700);
-		--on-guest: var(--color-white);
-		--chart-band: var(--color-emerald-200);
+		--guest: light-dark(var(--color-orange-700), var(--color-orange-400));
+		--on-guest: light-dark(var(--color-white), var(--color-orange-950));
+		--chart-band: light-dark(
+			var(--color-emerald-200),
+			var(--color-emerald-900)
+		);
 		--chart-median: var(--color-stone-500);
-		--chart-series-1: var(--color-emerald-600);
-		--chart-series-2: var(--color-amber-600);
-		--chart-series-3: var(--color-sky-600);
-		--chart-series-4: var(--color-violet-500);
+		--chart-series-1: light-dark(
+			var(--color-emerald-600),
+			var(--color-emerald-400)
+		);
+		--chart-series-2: light-dark(
+			var(--color-amber-600),
+			var(--color-amber-400)
+		);
+		--chart-series-3: light-dark(var(--color-sky-600), var(--color-sky-400));
+		--chart-series-4: light-dark(
+			var(--color-violet-500),
+			var(--color-violet-400)
+		);
 		--backdrop-film: color-mix(
 			in oklab,
 			var(--color-stone-950) 40%,
@@ -58,6 +82,12 @@
 		--z-skip: 45;
 		--z-menu: 50;
 		--z-toast: 60;
+		&:has(> head > meta[name="color-scheme"][content="dark"]) {
+			color-scheme: dark;
+		}
+		&:has(> head > meta[name="color-scheme"][content="light"]) {
+			color-scheme: light;
+		}
 	}
 	@media (width >= theme(--breakpoint-md)) {
 		:root {
@@ -114,5 +144,3 @@
 	--color-chart-series-4: var(--chart-series-4);
 	--color-backdrop-film: var(--backdrop-film);
 }
-
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

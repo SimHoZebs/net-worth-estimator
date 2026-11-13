@@ -4,12 +4,6 @@ import { registerPasskey, signInPasskey } from "./passkeys";
 import { buttonStyles } from "../../../frontend/src/components/buttonStyles";
 
 const client = createAuthClient({ plugins: [oauthProviderClient()] });
-const colorScheme = matchMedia("(prefers-color-scheme: dark)");
-const applyTheme = () => {
-  document.documentElement.dataset.theme = colorScheme.matches ? "dark" : "light";
-};
-applyTheme();
-colorScheme.addEventListener("change", applyTheme);
 const feedback = document.querySelector("#feedback")!;
 const report = (message: string, tone = "error") => {
   feedback.textContent = message;

@@ -353,7 +353,29 @@ test("connected accounts and sync feedback stay accessible in dark mode on mobil
 	await expect(
 		bankSync.getByRole("list", { name: "Synced accounts" }),
 	).toContainText("Everyday checking");
-	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+	// System preference stays untouched: the meta override remains the
+	// two-value opt-in, so CSS follows the emulated OS scheme.
+	await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute(
+		"content",
+		"light dark",
+	);
+	// The resolved root background must equal the dark paper token, compared
+	// through the same engine so color serialization cannot drift.
+	await expect
+		.poll(() =>
+			page.evaluate(() => {
+				const probe = document.createElement("div");
+				probe.style.color = "var(--color-stone-950)";
+				document.body.append(probe);
+				const expected = getComputedStyle(probe).color;
+				probe.remove();
+				return (
+					getComputedStyle(document.documentElement).backgroundColor ===
+					expected
+				);
+			}),
+		)
+		.toBe(true);
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
 	await expect(page.getByRole("status")).toContainText("Sync complete");
 	await expect(bankSync.getByText("Sync complete")).toHaveCount(0);
