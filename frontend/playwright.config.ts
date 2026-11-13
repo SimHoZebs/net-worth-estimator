@@ -87,7 +87,7 @@ export default defineConfig({
 	],
 	webServer: [
 		{
-			command: "go -C backend run ./cmd/fixtureapi",
+			command: "go -C backend run ./cmd/testing/fixtureapi",
 			cwd: "..",
 			env: {
 				// The backend uses the pure-Go SQLite driver, matching

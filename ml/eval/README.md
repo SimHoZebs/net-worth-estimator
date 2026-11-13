@@ -77,7 +77,7 @@ eval time into `ml/eval/.cache/` (gitignored) and reuses it on later runs.
 | Descriptor strings, dataset labels | Real (dataset) |
 | `[debit]`/`[credit]` marker | Dataset artifact; stripped by the Go harness, direction only |
 | Occurrence dates (monthly series) | Synthesized: fixed base date `2023-01-15`, exact 30-day spacing, deterministic ±1-day wobble, fixed seed 7 |
-| Amounts | Synthesized: plausible per-category bases (documented in `backend/cmd/evalharness/main.go`), deterministic ±5% jitter inside detector tolerance |
+| Amounts | Synthesized: plausible per-category bases (documented in `backend/cmd/testing/evalharness/main.go`), deterministic ±5% jitter inside detector tolerance |
 | Provider alias table | Derived from the dataset's own merchant strings (first-token heuristic mirroring `recurringKey`); hit rate is reported so mismatch is visible |
 | Bank-category metadata | Dataset label reused as the bank-category stand-in (drives source-income/source-rent hints; see the `signal_support` split) |
 | Shift-probe contradict labels | Synthetic by construction (flipped), never dataset evidence |

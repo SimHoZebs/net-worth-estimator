@@ -356,7 +356,7 @@ def run_go_harness(
     cmd = [
         "go",
         "run",
-        "./cmd/evalharness",
+        "./cmd/testing/evalharness",
         "-fixture",
         str(fixture_path),
         "-out",

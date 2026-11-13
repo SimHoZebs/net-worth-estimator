@@ -72,7 +72,7 @@ export async function run(values, positionals) {
     const backupDir = resolve(stateDir, "backups");
     await mkdir(backupDir, { recursive: true, mode: 0o700 });
     const helper = resolve(stateDir, "seedtest");
-    runCommand("go", ["-C", "backend", "build", "-o", helper, "./cmd/seedtest"]);
+    runCommand("go", ["-C", "backend", "build", "-o", helper, "./cmd/testing/seedtest"]);
     await snapshotFile(
       destination,
       resolve(backupDir, `application-${Date.now()}-${randomUUID()}.db`),
