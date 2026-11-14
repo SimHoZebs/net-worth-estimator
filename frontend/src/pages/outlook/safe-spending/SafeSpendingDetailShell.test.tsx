@@ -391,6 +391,9 @@ describe("SafeSpendingBillsPanel decision rows", () => {
 	});
 
 	it("leads with the pace chart when a trend is present", async () => {
+		// The panel lazy-loads the chart; preload the chunk so the Suspense
+		// skeleton cannot outlast the query under full-suite parallel load.
+		await import("./SafeSpendingTrendChart.tsx");
 		const trend = safeSpendingTrend({
 			transactions: [charge("2026-09-21", 100)],
 			cycleStart: "2026-09-20",
@@ -414,9 +417,13 @@ describe("SafeSpendingBillsPanel decision rows", () => {
 				onTransactionOrderChange={noop}
 			/>,
 		);
-		const chart = await screen.findByRole("img", {
-			name: labels.spendingPace,
-		});
+		const chart = await screen.findByRole(
+			"img",
+			{
+				name: labels.spendingPace,
+			},
+			{ timeout: 5000 },
+		);
 		const rows = screen.getByText("Left at end of month");
 		expect(
 			Boolean(
