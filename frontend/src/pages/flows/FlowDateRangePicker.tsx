@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { buttonStyles } from "../../components/buttonStyles.ts";
+import { Button, IconButton } from "../../components/Button.tsx";
 import { controlStyles } from "../../components/fieldStyles.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
 import { Modal } from "../../components/Modal.tsx";
@@ -80,25 +80,23 @@ function MonthCalendar({
 	return (
 		<section aria-label={title} className="min-w-0 flex-1">
 			<div className="mb-2 flex items-center justify-between gap-2">
-				<button
-					type="button"
-					aria-label={`Previous month (${title})`}
+				<IconButton
+					icon={ChevronLeft}
+					label={`Previous month (${title})`}
+					size="sm"
+					iconSize={16}
 					onClick={onPrev}
-					className="inline-grid size-7 flex-none place-items-center rounded-control border-0 bg-transparent text-muted hover:bg-hover hover:text-ink"
-				>
-					<ChevronLeft size={16} aria-hidden="true" />
-				</button>
+				/>
 				<h3 className="m-0 min-w-0 flex-1 truncate text-center text-xs font-semibold text-ink">
 					{title}
 				</h3>
-				<button
-					type="button"
-					aria-label={`Next month (${title})`}
+				<IconButton
+					icon={ChevronRight}
+					label={`Next month (${title})`}
+					size="sm"
+					iconSize={16}
 					onClick={onNext}
-					className="inline-grid size-7 flex-none place-items-center rounded-control border-0 bg-transparent text-muted hover:bg-hover hover:text-ink"
-				>
-					<ChevronRight size={16} aria-hidden="true" />
-				</button>
+				/>
 			</div>
 			<div className="grid grid-cols-7 gap-1">
 				{WEEKDAYS.map((day) => (
@@ -287,20 +285,12 @@ export function FlowDateRangePicker({
 				</div>
 			</div>
 			<div className="mt-4 flex justify-end gap-2">
-				<button
-					type="button"
-					onClick={closeToTrigger}
-					className={buttonStyles({ variant: "secondary", size: "sm" })}
-				>
+				<Button variant="secondary" size="sm" onClick={closeToTrigger}>
 					Cancel
-				</button>
-				<button
-					type="button"
-					onClick={applyDraft}
-					className={buttonStyles({ variant: "primary", size: "sm" })}
-				>
+				</Button>
+				<Button variant="primary" size="sm" onClick={applyDraft}>
 					Apply
-				</button>
+				</Button>
 			</div>
 		</>
 	);
@@ -333,7 +323,11 @@ export function FlowDateRangePicker({
 				/>
 			</button>
 			{open && compact && (
-				<Modal title="Choose date range" onClose={closeToTrigger}>
+				<Modal
+					title="Choose date range"
+					titleSize="plain"
+					onClose={closeToTrigger}
+				>
 					{panel}
 				</Modal>
 			)}
