@@ -1,9 +1,13 @@
+import type { ReactNode } from "react";
 import {
-	DataTable,
+	Table,
+	TableBody,
+	TableCaption,
 	TableCell,
+	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/DataTable.tsx";
+} from "@/components/ui/table.tsx";
 import type {
 	FinancialIndependenceAnalysis,
 	IndependenceCandidate,
@@ -21,6 +25,71 @@ const constraints: Record<string, string> = {
 	"action-limit": "Annual withdrawal limit",
 	"destination-ceiling": "Account ceiling",
 };
+
+function EvidenceTable({
+	caption,
+	columns,
+	children,
+}: {
+	caption: string;
+	columns: string[];
+	children: ReactNode;
+}) {
+	return (
+		<div
+			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the table.
+			tabIndex={0}
+			role="region"
+			aria-label={caption}
+			className="relative max-w-full overflow-x-auto"
+		>
+			<Table className="w-full border-collapse text-left text-sm">
+				<TableCaption className="sr-only">{caption}</TableCaption>
+				<TableHeader className="border-b border-line bg-surface-2 text-muted">
+					<TableRow className="border-b border-line last:border-b-0 hover:bg-transparent">
+						{columns.map((column) => (
+							<TableHead
+								key={column}
+								scope="col"
+								className="h-auto border-0 px-5 py-4 font-medium whitespace-nowrap text-xs text-muted"
+							>
+								{column}
+							</TableHead>
+						))}
+					</TableRow>
+				</TableHeader>
+				<TableBody>{children}</TableBody>
+			</Table>
+		</div>
+	);
+}
+
+function EvidenceRow({ children }: { children: ReactNode }) {
+	return (
+		<TableRow className="border-b border-line last:border-b-0 hover:bg-transparent">
+			{children}
+		</TableRow>
+	);
+}
+
+function EvidenceRowHeader({ children }: { children: ReactNode }) {
+	return (
+		<TableHead
+			scope="row"
+			className="h-auto border-0 px-5 py-4 font-medium whitespace-nowrap text-sm text-inherit"
+		>
+			{children}
+		</TableHead>
+	);
+}
+
+function EvidenceCell({ children }: { children: ReactNode }) {
+	return (
+		<TableCell className="border-0 px-5 py-4 whitespace-nowrap">
+			{children}
+		</TableCell>
+	);
+}
 
 /** Financial amounts and cash-flow evidence, without the engine's screening gates. */
 export function IndependenceEvidence({
@@ -53,25 +122,19 @@ export function IndependenceEvidence({
 				<h3 className="m-0 text-xs font-semibold text-ink">
 					Funding sources · {dateLabel(candidate.date)}
 				</h3>
-				<DataTable
+				<EvidenceTable
 					caption="Selected financial independence funding sources"
-					showHeaders
-					columns={[
-						{ label: "Source" },
-						{ label: "Balance" },
-						{ label: "Withdrawal rate" },
-						{ label: "Available / year" },
-					]}
+					columns={["Source", "Balance", "Withdrawal rate", "Available / year"]}
 				>
-					<TableRow>
-						<TableHeader scope="row">Selected income</TableHeader>
-						<TableCell>—</TableCell>
-						<TableCell>—</TableCell>
-						<TableCell>{amount(candidate.annualIncome)}</TableCell>
-					</TableRow>
+					<EvidenceRow>
+						<EvidenceRowHeader>Selected income</EvidenceRowHeader>
+						<EvidenceCell>—</EvidenceCell>
+						<EvidenceCell>—</EvidenceCell>
+						<EvidenceCell>{amount(candidate.annualIncome)}</EvidenceCell>
+					</EvidenceRow>
 					{candidate.assets.map((asset) => (
-						<TableRow key={asset.accountId}>
-							<TableHeader scope="row">
+						<EvidenceRow key={asset.accountId}>
+							<EvidenceRowHeader>
 								<button
 									type="button"
 									className="cursor-pointer border-0 bg-transparent p-0 text-left text-success-text underline underline-offset-4"
@@ -79,21 +142,21 @@ export function IndependenceEvidence({
 								>
 									{analysis.accountNames[asset.accountId] ?? asset.accountId}
 								</button>
-							</TableHeader>
-							<TableCell>{money(asset.balance)}</TableCell>
-							<TableCell>{percent(asset.rate)}</TableCell>
-							<TableCell>{money(asset.capacity)}</TableCell>
-						</TableRow>
+							</EvidenceRowHeader>
+							<EvidenceCell>{money(asset.balance)}</EvidenceCell>
+							<EvidenceCell>{percent(asset.rate)}</EvidenceCell>
+							<EvidenceCell>{money(asset.capacity)}</EvidenceCell>
+						</EvidenceRow>
 					))}
 					{!candidate.assets.length && (
-						<TableRow>
-							<TableHeader scope="row">Asset withdrawals</TableHeader>
-							<TableCell>—</TableCell>
-							<TableCell>—</TableCell>
-							<TableCell>{amount(candidate.annualWithdrawals)}</TableCell>
-						</TableRow>
+						<EvidenceRow>
+							<EvidenceRowHeader>Asset withdrawals</EvidenceRowHeader>
+							<EvidenceCell>—</EvidenceCell>
+							<EvidenceCell>—</EvidenceCell>
+							<EvidenceCell>{amount(candidate.annualWithdrawals)}</EvidenceCell>
+						</EvidenceRow>
 					)}
-				</DataTable>
+				</EvidenceTable>
 				{!!analysis.incomeNames.length && (
 					<p className="m-0 text-xs text-muted">
 						Income sources: {analysis.incomeNames.join(", ")}
@@ -112,21 +175,16 @@ export function IndependenceEvidence({
 					</h3>
 					{failure ? (
 						<>
-							<DataTable
+							<EvidenceTable
 								caption="First spending shortfall amounts"
-								showHeaders
-								columns={[
-									{ label: "Required withdrawal" },
-									{ label: "Withdrawn" },
-									{ label: "Unfunded" },
-								]}
+								columns={["Required withdrawal", "Withdrawn", "Unfunded"]}
 							>
-								<TableRow>
-									<TableCell>{exactAmount(failure.requested)}</TableCell>
-									<TableCell>{exactAmount(failure.realized)}</TableCell>
-									<TableCell>{exactAmount(failure.shortfall)}</TableCell>
-								</TableRow>
-							</DataTable>
+								<EvidenceRow>
+									<EvidenceCell>{exactAmount(failure.requested)}</EvidenceCell>
+									<EvidenceCell>{exactAmount(failure.realized)}</EvidenceCell>
+									<EvidenceCell>{exactAmount(failure.shortfall)}</EvidenceCell>
+								</EvidenceRow>
+							</EvidenceTable>
 							{!!failure.constraints.length && (
 								<p className="m-0 text-xs text-muted">
 									{failure.constraints
@@ -164,18 +222,17 @@ export function IndependenceEvidence({
 						<h3 className="m-0 text-xs font-semibold text-ink">
 							Assets after the projected independence start
 						</h3>
-						<DataTable
+						<EvidenceTable
 							caption="Projected asset values"
-							showHeaders
-							columns={[{ label: "Measure" }, { label: "Amount" }]}
+							columns={["Measure", "Amount"]}
 						>
 							{assetValues.map(([label, value]) => (
-								<TableRow key={label}>
-									<TableHeader scope="row">{label}</TableHeader>
-									<TableCell>{amount(value)}</TableCell>
-								</TableRow>
+								<EvidenceRow key={label}>
+									<EvidenceRowHeader>{label}</EvidenceRowHeader>
+									<EvidenceCell>{amount(value)}</EvidenceCell>
+								</EvidenceRow>
 							))}
-						</DataTable>
+						</EvidenceTable>
 						<p className="m-0 text-xs text-muted">
 							Start-date dollars adjust the ending value for configured spending
 							growth.

@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { AccountToggle } from "../../../components/AccountToggle.tsx";
-import { InputField } from "../../../components/Field.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import type { Account } from "../../../domain/model.ts";
 import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
 import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
@@ -40,33 +42,41 @@ export function SafeSpendingConfigurePanel({
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
+	const cycleStartId = useId();
+	const reserveId = useId();
 	return (
 		<div className="grid content-start gap-3">
-			<InputField
-				label={`${labels.cycleStart} (1–28)`}
-				type="number"
-				min={1}
-				max={28}
-				value={config.statementDay}
-				onChange={(event) =>
-					onUpdateConfig({
-						statementDay: clampStatementDay(event.target.value),
-						statementDaySet: true,
-					})
-				}
-			/>
-			<InputField
-				label={`${labels.reserve} ($)`}
-				type="number"
-				min={0}
-				step="0.01"
-				value={config.reserve}
-				onChange={(event) =>
-					onUpdateConfig({
-						reserve: Math.max(0, Number(event.target.value) || 0),
-					})
-				}
-			/>
+			<Field>
+				<Label htmlFor={cycleStartId}>{`${labels.cycleStart} (1–28)`}</Label>
+				<Input
+					id={cycleStartId}
+					type="number"
+					min={1}
+					max={28}
+					value={config.statementDay}
+					onChange={(event) =>
+						onUpdateConfig({
+							statementDay: clampStatementDay(event.target.value),
+							statementDaySet: true,
+						})
+					}
+				/>
+			</Field>
+			<Field>
+				<Label htmlFor={reserveId}>{`${labels.reserve} ($)`}</Label>
+				<Input
+					id={reserveId}
+					type="number"
+					min={0}
+					step="0.01"
+					value={config.reserve}
+					onChange={(event) =>
+						onUpdateConfig({
+							reserve: Math.max(0, Number(event.target.value) || 0),
+						})
+					}
+				/>
+			</Field>
 			<fieldset className="grid gap-3">
 				<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted">
 					Income accounts

@@ -15,7 +15,6 @@ import {
 } from "@/state/workspaceResources.ts";
 import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
-import { resetNotifications } from "@/state/notifications.ts";
 import { getUserScope, suspendUserScope } from "@/auth/resourceScope.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import { ok } from "@/mocks/fetch.ts";
@@ -29,6 +28,12 @@ import { safeSpendingSettingsObserver } from "@/mocks/safeSpendingSettings.ts";
 import { canonicalApiBaseUrl } from "@/auth/resourceScope.ts";
 import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
 import { acceptTestResource } from "@/mocks/resource.ts";
+import { toast } from "sonner";
+
+vi.mock("sonner", () => ({
+	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+	Toaster: () => null,
+}));
 
 const A = `users/${"a".repeat(64)}`;
 const B = `users/${"b".repeat(64)}`;
@@ -130,6 +135,7 @@ function renderWorkspace() {
 
 beforeEach(() => {
 	vi.stubGlobal("BroadcastChannel", undefined);
+	vi.clearAllMocks();
 	settingsByResource.clear();
 	suspendUserScope();
 	clearPersistedMemory();
@@ -138,7 +144,6 @@ afterEach(() => {
 	cleanup();
 	delete window.__WAYPOINT_CONFIG__;
 	resetServerQueryCache();
-	resetNotifications();
 	clearPersistedMemory();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
@@ -452,7 +457,12 @@ describe("authentication resource isolation", () => {
 				async () => new Response("", { status: 503 }),
 			);
 			act(() => window.dispatchEvent(new Event("focus")));
-			await screen.findByRole("alert");
+			await waitFor(() =>
+				expect(toast.error).toHaveBeenCalledWith(
+					expect.any(String),
+					expect.objectContaining({ id: "session" }),
+				),
+			);
 			// Transient outages keep the verified workspace mounted with a
 			// retry toast instead of wiping the UI.
 			expect(screen.getByTestId("active-workspace")).toBeTruthy();
@@ -593,9 +603,9 @@ describe("authentication resource isolation", () => {
 		renderWorkspace();
 		await waitFor(() =>
 			expect(
-				screen.getByTestId("session-status").textContent?.startsWith(
-					"unavailable:",
-				),
+				screen
+					.getByTestId("session-status")
+					.textContent?.startsWith("unavailable:"),
 			).toBe(true),
 		);
 		expect(screen.getByTestId("active-workspace").textContent).toBe(":empty");

@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { Badge } from "../Badge.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { money } from "../../domain/format.ts";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 
@@ -39,7 +39,11 @@ export function AccountCard({
 			</span>
 			<span className="flex flex-wrap gap-2">
 				{card.roles.map((role) => (
-					<Badge key={role} tone="neutral">
+					<Badge
+						key={role}
+						variant="secondary"
+						className="h-auto bg-surface-3 text-muted"
+					>
 						{role}
 					</Badge>
 				))}

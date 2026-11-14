@@ -34,6 +34,7 @@ afterEach(() => {
 	cleanup();
 	document.getElementById("color-scheme")?.remove();
 	document.getElementById("theme-color")?.remove();
+	document.documentElement.classList.remove("dark");
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
@@ -70,7 +71,35 @@ it("gives multiple controls one application-level listener owner", () => {
 	expect(metaContent("color-scheme")).toBe("light dark");
 	act(() => setThemePreference("dark"));
 	expect(metaContent("color-scheme")).toBe("dark");
+	expect(document.documentElement.classList.contains("dark")).toBe(true);
 	expect(removeEventListener).toHaveBeenCalledOnce();
+	view.unmount();
+});
+
+it("drives the shadcn dark class from the resolved theme", () => {
+	vi.stubGlobal("matchMedia", () => ({
+		matches: false,
+		addEventListener: () => {},
+		removeEventListener: () => {},
+	}));
+	const view = render(<AppTheme />);
+	expect(document.documentElement.classList.contains("dark")).toBe(false);
+	act(() => setThemePreference("dark"));
+	expect(document.documentElement.classList.contains("dark")).toBe(true);
+	act(() => setThemePreference("light"));
+	expect(document.documentElement.classList.contains("dark")).toBe(false);
+	view.unmount();
+});
+
+it("resolves a system preference through the OS scheme", () => {
+	vi.stubGlobal("matchMedia", () => ({
+		matches: true,
+		addEventListener: () => {},
+		removeEventListener: () => {},
+	}));
+	const view = render(<AppTheme />);
+	expect(document.documentElement.classList.contains("dark")).toBe(true);
+	expect(metaContent("color-scheme")).toBe("light dark");
 	view.unmount();
 });
 

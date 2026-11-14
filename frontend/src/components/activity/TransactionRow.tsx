@@ -9,8 +9,8 @@ import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Transaction } from "../../domain/model.ts";
-import { Badge } from "../Badge.tsx";
-import { TextButton } from "../Button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { useTransactionBNPL } from "../analysis/TransactionAnalysis.tsx";
 import { useTransferLinks } from "../../state/analyses.ts";
@@ -29,7 +29,7 @@ import {
 	transactionBadgeStyles,
 	transactionDividerLabelStyles,
 } from "./activityStyles.ts";
-import { mergeStyles } from "../mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 
 export function TransactionRow({
 	transaction,
@@ -105,13 +105,13 @@ export function TransactionRow({
 		savedTransaction?.kind === "transaction" &&
 		!transaction.pending &&
 		!transaction.void ? (
-			<Badge tone="neutral" className={transactionBadgeStyles()}>
+			<Badge variant="secondary" className={transactionBadgeStyles()}>
 				{findingLabel(finding)}
 			</Badge>
 		) : null;
 	const receiptBadge =
 		savedTransaction && receipts.length > 0 ? (
-			<Badge tone="neutral" className={transactionBadgeStyles()}>
+			<Badge variant="secondary" className={transactionBadgeStyles()}>
 				<ReceiptText size={10} aria-hidden="true" />
 				{receipts.length}
 				<span className="sr-only">
@@ -151,19 +151,29 @@ export function TransactionRow({
 						{analysisBadge}
 						{receiptBadge}{" "}
 						{transaction.void ? (
-							<Badge tone="neutral" className={transactionBadgeStyles()}>
+							<Badge variant="secondary" className={transactionBadgeStyles()}>
 								Did not post
 								<span className="sr-only">bank hold that did not post</span>
 							</Badge>
 						) : (
 							transaction.excluded && (
-								<Badge tone="warning" className={transactionBadgeStyles()}>
+								<Badge
+									className={cn(
+										transactionBadgeStyles(),
+										"bg-warning-bg text-warning-text",
+									)}
+								>
 									Excluded from account
 								</Badge>
 							)
 						)}
 						{transaction.shortfall > 0.01 && (
-							<Badge tone="warning" className={transactionBadgeStyles()}>
+							<Badge
+								className={cn(
+									transactionBadgeStyles(),
+									"bg-warning-bg text-warning-text",
+								)}
+							>
 								<TriangleAlert size={10} />
 								{shortfallLabel ?? "Shortfall"}
 							</Badge>
@@ -174,7 +184,7 @@ export function TransactionRow({
 			amount={
 				<>
 					<strong
-						className={mergeStyles(
+						className={cn(
 							transactionAmountStyles({
 								positive: transaction.direction === "in",
 							}),
@@ -186,7 +196,7 @@ export function TransactionRow({
 							: `${transaction.direction === "in" ? "+" : "−"}${exactMoney(transaction.amount)}`}
 					</strong>
 					{transaction.pending ? (
-						<Badge tone="neutral" className={transactionBadgeStyles()}>
+						<Badge variant="secondary" className={transactionBadgeStyles()}>
 							Pending
 						</Badge>
 					) : null}
@@ -203,9 +213,10 @@ export function TransactionRow({
 						</small>
 					)}
 					{onRemove && (
-						<TextButton
+						<Button
 							type="button"
-							tone="danger"
+							variant="link"
+							className="text-danger-text"
 							disabled={removing}
 							onClick={(event) => {
 								event.stopPropagation();
@@ -214,7 +225,7 @@ export function TransactionRow({
 							aria-label={`Remove ${transaction.name} from history`}
 						>
 							{removing ? "Removing…" : "Remove"}
-						</TextButton>
+						</Button>
 					)}
 				</>
 			}

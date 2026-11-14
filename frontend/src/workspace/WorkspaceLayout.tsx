@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Drawer } from "../components/Drawer.tsx";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet.tsx";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { useModalRegistration } from "../state/modalPresence.ts";
 import { BreadcrumbSlotProvider } from "./breadcrumbSlot.tsx";
 import { useMobileNavigation } from "./useMobileNavigation.ts";
 
@@ -14,6 +15,9 @@ export function WorkspaceLayout({
 	children: ReactNode;
 }) {
 	const { open, mobile, close, show } = useMobileNavigation();
+	// The mobile sheet is modal: it must block the window swipe gesture from
+	// stacking navigation above an open dialog, same as the dialogs do.
+	useModalRegistration(open && mobile);
 	return (
 		<BreadcrumbSlotProvider>
 			<div className="min-h-screen">
@@ -23,16 +27,31 @@ export function WorkspaceLayout({
 				>
 					Skip to main content
 				</a>
-				<Drawer
-					side="left"
-					open={open || !mobile}
-					onClose={close}
-					label="Workspace navigation"
-					behavior={{ modal: mobile, swipeClose: mobile }}
-				>
-					{navigation(close)}
-				</Drawer>
-				<div className="relative ml-(--sidebar) flex min-h-dvh flex-col print:ml-0">
+				{mobile ? (
+					<Sheet
+						open={open}
+						onOpenChange={(next) => {
+							if (!next) close();
+						}}
+					>
+						<SheetContent
+							side="left"
+							showCloseButton={false}
+							className="w-60 max-w-[calc(100vw-3rem)] px-5 pt-6 pb-0"
+						>
+							<SheetTitle className="sr-only">Workspace navigation</SheetTitle>
+							{navigation(close)}
+						</SheetContent>
+					</Sheet>
+				) : (
+					<aside
+						aria-label="Workspace navigation"
+						className="fixed inset-y-0 left-0 z-(--z-sheet) flex w-(--sidebar-width) flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 pb-0 text-ink max-xl:px-3 print:hidden"
+					>
+						{navigation(close)}
+					</aside>
+				)}
+				<div className="relative ml-(--sidebar-width) flex min-h-dvh flex-col print:ml-0">
 					{header(show)}
 					<main
 						id="main-content"

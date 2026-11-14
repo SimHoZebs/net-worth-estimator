@@ -1,13 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { LogOut } from "lucide-react";
-import { Button } from "../components/Button.tsx";
-import { ErrorNotice } from "../components/ErrorNotice.tsx";
-import { InputField } from "../components/Field.tsx";
-import {
-	dismissKey,
-	notifyError,
-	notifySuccess,
-} from "../state/notifications.ts";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
 import { useUserResources } from "./userApi.ts";
@@ -31,6 +29,9 @@ export function AccountPage() {
 			: (profile?.displayName ?? "");
 	const [oldPassword, setOldPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
+	const displayNameId = useId();
+	const currentPasswordId = useId();
+	const newPasswordId = useId();
 	const loading = resources.details.isPending;
 	const detailsError =
 		resources.details.isError && profile === null
@@ -48,74 +49,72 @@ export function AccountPage() {
 			<section aria-labelledby="account-heading">
 				<h2 id="account-heading">Account</h2>
 				<p className="text-sm text-muted">Sign in to manage your data.</p>
-				<Button variant="primary" onClick={redirectToSignIn}>
-					Sign in
-				</Button>
+				<Button onClick={redirectToSignIn}>Sign in</Button>
 			</section>
 		);
 	}
 
 	async function onSaveProfile(event: React.FormEvent) {
 		event.preventDefault();
-		dismissKey("account");
-		dismissKey("account-notice");
+		toast.dismiss("account");
+		toast.dismiss("account-notice");
 		try {
 			await resources.profile.mutateAsync({
 				displayName: displayName.trim(),
 			});
 			setNameDraft(null);
-			notifySuccess("account-notice", "Display name updated.");
+			toast.success("Display name updated.", { id: "account-notice" });
 		} catch (cause) {
-			notifyError(
-				"account",
+			toast.error(
 				cause instanceof Error
 					? cause.message
 					: "The account update was rejected.",
+				{ id: "account" },
 			);
 		}
 	}
 
 	async function onChangePassword(event: React.FormEvent) {
 		event.preventDefault();
-		dismissKey("account");
-		dismissKey("account-notice");
+		toast.dismiss("account");
+		toast.dismiss("account-notice");
 		try {
 			await resources.password.mutateAsync({ oldPassword, newPassword });
 			redirectToSignIn();
 		} catch (cause) {
-			notifyError(
-				"account",
+			toast.error(
 				cause instanceof Error
 					? cause.message
 					: "The password change was rejected.",
+				{ id: "account" },
 			);
 		}
 	}
 
 	async function onRevoke(id: string) {
-		dismissKey("account");
-		dismissKey("account-notice");
+		toast.dismiss("account");
+		toast.dismiss("account-notice");
 		try {
 			await resources.revoke.mutateAsync(id);
 		} catch (cause) {
-			notifyError(
-				"account",
+			toast.error(
 				cause instanceof Error
 					? cause.message
 					: "That session could not be revoked.",
+				{ id: "account" },
 			);
 			return;
 		}
 		try {
 			await resources.reload();
-			notifySuccess("account-notice", "Session revoked.");
+			toast.success("Session revoked.", { id: "account-notice" });
 		} catch (cause) {
-			notifySuccess("account-notice", "Session revoked.");
-			notifyError(
-				"account",
+			toast.success("Session revoked.", { id: "account-notice" });
+			toast.error(
 				cause instanceof Error
 					? cause.message
 					: "The session list could not be refreshed.",
+				{ id: "account" },
 			);
 		}
 	}
@@ -144,32 +143,41 @@ export function AccountPage() {
 				</Button>
 			</div>
 
-			<ErrorNotice
-				message={detailsError}
-				action="Retry"
-				onAction={() => {
-					void resources.details.refetch();
-				}}
-			/>
+			{detailsError && (
+				<Alert variant="destructive">
+					<AlertDescription>{detailsError}</AlertDescription>
+					<Button
+						variant="link"
+						onClick={() => {
+							void resources.details.refetch();
+						}}
+					>
+						Retry
+					</Button>
+				</Alert>
+			)}
 
 			<form onSubmit={onSaveProfile} className="grid gap-3">
 				<h3 className="m-0 text-base">Profile</h3>
-				<InputField
-					label="Display name"
-					value={displayName}
-					maxLength={128}
-					disabled={loading || profile === null}
-					onChange={(event) =>
-						setNameDraft({
-							scopeKey: resources.scopeKey,
-							profile,
-							value: event.target.value,
-						})
-					}
-					autoComplete="name"
-				/>
+				<Field>
+					<Label htmlFor={displayNameId}>Display name</Label>
+					<Input
+						id={displayNameId}
+						value={displayName}
+						maxLength={128}
+						disabled={loading || profile === null}
+						onChange={(event) =>
+							setNameDraft({
+								scopeKey: resources.scopeKey,
+								profile,
+								value: event.target.value,
+							})
+						}
+						autoComplete="name"
+					/>
+				</Field>
 				<div>
-					<Button type="submit" variant="primary" disabled={saveBlocked}>
+					<Button type="submit" disabled={saveBlocked}>
 						{savingProfile ? "Saving…" : "Save display name"}
 					</Button>
 				</div>
@@ -177,22 +185,28 @@ export function AccountPage() {
 
 			<form onSubmit={onChangePassword} className="grid gap-3">
 				<h3 className="m-0 text-base">Password</h3>
-				<InputField
-					label="Current password"
-					type="password"
-					value={oldPassword}
-					onChange={(event) => setOldPassword(event.target.value)}
-					autoComplete="current-password"
-				/>
-				<InputField
-					label="New password"
-					type="password"
-					value={newPassword}
-					onChange={(event) => setNewPassword(event.target.value)}
-					autoComplete="new-password"
-				/>
+				<Field>
+					<Label htmlFor={currentPasswordId}>Current password</Label>
+					<Input
+						id={currentPasswordId}
+						type="password"
+						value={oldPassword}
+						onChange={(event) => setOldPassword(event.target.value)}
+						autoComplete="current-password"
+					/>
+				</Field>
+				<Field>
+					<Label htmlFor={newPasswordId}>New password</Label>
+					<Input
+						id={newPasswordId}
+						type="password"
+						value={newPassword}
+						onChange={(event) => setNewPassword(event.target.value)}
+						autoComplete="new-password"
+					/>
+				</Field>
 				<div>
-					<Button type="submit" disabled={savingPassword}>
+					<Button type="submit" variant="secondary" disabled={savingPassword}>
 						{savingPassword ? "Changing…" : "Change password"}
 					</Button>
 				</div>

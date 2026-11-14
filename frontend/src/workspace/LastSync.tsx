@@ -1,7 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 import { useRouter } from "@tanstack/react-router";
+import { toast } from "sonner";
 import type { ServerStatus } from "../api/index.ts";
-import { notifyError } from "../state/notifications.ts";
 
 // An instant uses the viewer's time zone, not the server's UTC display.
 const syncTimeFormat = new Intl.DateTimeFormat(undefined, {
@@ -49,10 +49,13 @@ export function LastSync({
 				<button
 					type="button"
 					onClick={() =>
-						notifyError("sync-stale", staleSyncMessage(), {
-							label: "Open bank sync",
-							onAction: () => {
-								void router.navigate({ to: "/sources" });
+						toast.error(staleSyncMessage(), {
+							id: "sync-stale",
+							action: {
+								label: "Open bank sync",
+								onClick: () => {
+									void router.navigate({ to: "/sources" });
+								},
 							},
 						})
 					}

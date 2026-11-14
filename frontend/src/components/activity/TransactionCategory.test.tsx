@@ -26,7 +26,7 @@ function categoryCalls(server: ReturnType<typeof stubTestServer>) {
 }
 
 function trigger() {
-	return screen.getByRole("button", { name: /Category/ });
+	return screen.getByRole("combobox", { name: /Category/ });
 }
 
 it("keeps the picker closed until the row is pressed", async () => {
@@ -39,9 +39,9 @@ it("keeps the picker closed until the row is pressed", async () => {
 			source="bank"
 		/>,
 	);
-	expect(screen.queryByRole("listbox", { name: "Category" })).toBeNull();
+	expect(screen.queryByRole("listbox")).toBeNull();
 	await user.click(trigger());
-	expect(screen.getByRole("listbox", { name: "Category" })).toBeTruthy();
+	expect(screen.getByRole("listbox")).toBeTruthy();
 });
 
 it("renders one row and saves a category chosen from the icon list", async () => {
@@ -57,7 +57,7 @@ it("renders one row and saves a category chosen from the icon list", async () =>
 	expect(trigger().textContent).toContain("Food & drink");
 	expect(screen.getByText("From your bank")).toBeTruthy();
 	await user.click(trigger());
-	expect(screen.getByRole("listbox", { name: "Category" })).toBeTruthy();
+	expect(screen.getByRole("listbox")).toBeTruthy();
 	expect(
 		screen
 			.getByRole("option", { name: "Food & drink" })

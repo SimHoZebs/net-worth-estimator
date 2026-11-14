@@ -14,6 +14,7 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "../state/serverQuery.ts";
+import { stubMatchMedia } from "../mocks/testScope.tsx";
 import {
 	acceptOwnerResource,
 	acceptTestResource,
@@ -113,6 +114,7 @@ vi.mock("../workspace/WorkspaceDialogs.tsx", () => ({
 
 beforeEach(() => {
 	vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
+	stubMatchMedia(false);
 	acceptTestResource();
 	resetServerQueryCache();
 	vi.clearAllMocks();

@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<meta id="theme-color" name="theme-color" content="#214c3d" />
+		<meta id="theme-color" name="theme-color" content="#ffffff" />
 		<meta id="color-scheme" name="color-scheme" content="light dark" />
 		<meta
 			name="description"
@@ -21,6 +21,7 @@
 					stored === "dark" ||
 					(stored === "system" &&
 						window.matchMedia("(prefers-color-scheme: dark)").matches);
+				document.documentElement.classList.toggle("dark", dark);
 				var colorScheme = document.getElementById("color-scheme");
 				if (colorScheme)
 					colorScheme.setAttribute(
@@ -31,7 +32,7 @@
 				if (themeColor)
 					themeColor.setAttribute(
 						"content",
-						dark ? "#0f1411" : "#214c3d",
+						dark ? "#0c0a09" : "#ffffff",
 					);
 			} catch (e) {
 				var fallback = document.getElementById("color-scheme");

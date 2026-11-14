@@ -12,7 +12,7 @@ import {
 	monthDay,
 } from "../../../domain/format.ts";
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
-import { mergeStyles } from "../../../components/mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 function paceLabel(
@@ -46,7 +46,7 @@ function legendSwatch(dashed: boolean, tone: string) {
 	return (
 		<span
 			aria-hidden="true"
-			className={mergeStyles(
+			className={cn(
 				"inline-block w-4 shrink-0",
 				dashed
 					? `border-t-2 [border-top-style:dashed] ${tone}`
@@ -267,7 +267,7 @@ export function SafeSpendingTrendChart({
 				<h3 className="m-0 text-sm text-ink">{labels.spendingPace}</h3>
 				{pace.text !== null && (
 					<span
-						className={mergeStyles(
+						className={cn(
 							"text-xs whitespace-nowrap",
 							pace.tone === "danger"
 								? "text-danger-text"

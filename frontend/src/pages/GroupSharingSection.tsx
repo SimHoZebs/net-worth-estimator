@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { ApiError } from "../api/http.ts";
 import { AccountToggle } from "../components/AccountToggle.tsx";
-import { Button } from "../components/Button.tsx";
-import { ErrorNotice } from "../components/ErrorNotice.tsx";
-import { InputField } from "../components/Field.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { useSavedAccounts } from "../state/savedState.ts";
 import {
@@ -27,6 +30,29 @@ function serverMessage(cause: unknown, fallback: string): string {
 	return cause instanceof Error && cause.message ? cause.message : fallback;
 }
 
+function InlineError({
+	message,
+	action,
+	onAction,
+}: {
+	message: string | null;
+	action: string;
+	onAction: () => void;
+}) {
+	if (!message) return null;
+	return (
+		<Alert variant="destructive">
+			<AlertCircle size={16} aria-hidden="true" />
+			<AlertDescription>
+				{message}{" "}
+				<Button variant="link" onClick={onAction}>
+					{action}
+				</Button>
+			</AlertDescription>
+		</Alert>
+	);
+}
+
 /**
  * One member's own automatic-sharing consent for one group (GRP-04).
  * Sharing stays off until this member opts in; nobody else can change it.
@@ -40,6 +66,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	const accounts = useSavedAccounts();
 	const grantsQuery = useSharingGrants();
 	const setPolicy = useSetSharingPolicy();
+	const shareFromId = useId();
+	const shareUntilId = useId();
 
 	const [accountIds, setAccountIds] = useState<string[] | null>(null);
 	const [startDate, setStartDate] = useState<string | null>(null);
@@ -247,7 +275,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 	if (policyQuery.isError) {
 		return (
-			<ErrorNotice
+			<InlineError
 				message="Sharing could not be loaded."
 				action="Retry"
 				onAction={() => void policyQuery.refetch()}
@@ -313,24 +341,32 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			)}
 
 			<div className="grid max-w-md gap-2">
-				<InputField
-					label="Share from"
-					type="date"
-					value={draftStart}
-					maxLength={10}
-					onChange={(event) => {
-						setStartDate(event.target.value);
-					}}
-				/>
-				<InputField
-					label="Share until (leave empty for no end)"
-					type="date"
-					value={draftEnd}
-					maxLength={10}
-					onChange={(event) => {
-						setEndDate(event.target.value);
-					}}
-				/>
+				<Field>
+					<Label htmlFor={shareFromId}>Share from</Label>
+					<Input
+						id={shareFromId}
+						type="date"
+						value={draftStart}
+						maxLength={10}
+						onChange={(event) => {
+							setStartDate(event.target.value);
+						}}
+					/>
+				</Field>
+				<Field>
+					<Label htmlFor={shareUntilId}>
+						Share until (leave empty for no end)
+					</Label>
+					<Input
+						id={shareUntilId}
+						type="date"
+						value={draftEnd}
+						maxLength={10}
+						onChange={(event) => {
+							setEndDate(event.target.value);
+						}}
+					/>
+				</Field>
 			</div>
 
 			{draftAccounts.length > 0 && (
@@ -378,12 +414,17 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 			<div className="flex flex-wrap gap-2">
 				{policy?.enabled ? (
-					<Button size="sm" disabled={saving || stopping} onClick={onDisable}>
+					<Button
+						variant="secondary"
+						size="sm"
+						disabled={saving || stopping}
+						onClick={onDisable}
+					>
 						{saving ? "Turning off…" : "Turn off automatic sharing"}
 					</Button>
 				) : (
 					<Button
-						variant="primary"
+						variant="default"
 						size="sm"
 						disabled={
 							saving || stopping || draftAccounts.length === 0 || !draftStart

@@ -48,8 +48,8 @@ export function useMobileNavigation() {
 		return () => window.removeEventListener("popstate", close);
 	}, []);
 	// Opening gesture only: a mostly-horizontal rightward swipe opens the
-	// drawer. Closing (leftward swipe, Escape, backdrop, focus) is owned by
-	// the shared Drawer component. Listeners are passive and act only on
+	// sheet. Closing (leftward swipe, Escape, backdrop, focus) is owned by
+	// the shared Sheet component. Listeners are passive and act only on
 	// touchend, so vertical scrolling is never intercepted.
 	// The hamburger is unreachable while a modal dialog holds the top layer
 	// because the page is inert. The window swipe listener bypasses

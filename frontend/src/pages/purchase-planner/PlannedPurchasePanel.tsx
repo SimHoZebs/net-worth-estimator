@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
 import {
@@ -105,20 +114,38 @@ export function PlannedPurchasePanel() {
 				/>
 			)}
 			{remove && (
-				<ConfirmDialog
-					title={`Remove ${remove.name}?`}
-					eyebrow="Planned purchases"
-					cancelLabel="Keep item"
-					confirmLabel="Remove and save"
-					busyLabel="Removing…"
-					busy={removing}
-					onCancel={() => {
-						setRemove(null);
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open && !removing) {
+							setRemove(null);
+						}
 					}}
-					onConfirm={() => void confirmRemove()}
 				>
-					<p>This removes the item and saves immediately.</p>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+								Planned purchases
+							</p>
+							<AlertDialogTitle>Remove {remove.name}?</AlertDialogTitle>
+							<AlertDialogDescription>
+								This removes the item and saves immediately.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={removing}>
+								Keep item
+							</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								disabled={removing}
+								onClick={() => void confirmRemove()}
+							>
+								{removing ? "Removing…" : "Remove and save"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 		</>
 	);

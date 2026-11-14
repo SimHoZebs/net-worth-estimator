@@ -1,11 +1,20 @@
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
-import { DataTable, TableCell, TableRow } from "../../components/DataTable.tsx";
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table.tsx";
 import {
 	describeFlowEdge,
 	type AggregatedEdge,
 } from "../../domain/flowDiagram.ts";
 import { dateLabel, money } from "../../domain/format.ts";
+import { cn } from "@/lib/utils.ts";
 import { TransferMatchNote } from "./TransferMatchNote.tsx";
 
 /** Selected-edge inspector: the edge's route and amount plus every source
@@ -66,25 +75,37 @@ export function FlowEdgePanel({
 						{member.sources.length === 1 ? "transaction" : "transactions"}
 					</p>
 				))}
-			<DataTable
-				caption="Transactions behind the selected flow."
-				showHeaders
-				columns={[
-					{ label: "Date" },
-					{ label: "Requested" },
-					{ label: "Realized" },
-				]}
+			{/* oxlint-disable jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the table. */}
+			<div
+				tabIndex={0}
+				role="region"
+				aria-label="Transactions behind the selected flow."
+				className="relative max-w-full overflow-x-auto"
 			>
-				{edge.sources.map((source) => (
-					<TableRow
-						key={`${source.transactionId} ${source.date} ${source.sequence}`}
-					>
-						<TableCell>{dateLabel(source.date)}</TableCell>
-						<TableCell>{money(source.requestedAmount)}</TableCell>
-						<TableCell>{money(source.realizedAmount)}</TableCell>
-					</TableRow>
-				))}
-			</DataTable>
+				<Table className={cn("border-collapse text-left")}>
+					<TableCaption className="sr-only">
+						Transactions behind the selected flow.
+					</TableCaption>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Date</TableHead>
+							<TableHead>Requested</TableHead>
+							<TableHead>Realized</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{edge.sources.map((source) => (
+							<TableRow
+								key={`${source.transactionId} ${source.date} ${source.sequence}`}
+							>
+								<TableCell>{dateLabel(source.date)}</TableCell>
+								<TableCell>{money(source.requestedAmount)}</TableCell>
+								<TableCell>{money(source.realizedAmount)}</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
+			</div>
 			{edge.kind === "transfer" && (
 				<TransferMatchNote
 					transactionIds={transactionIds}

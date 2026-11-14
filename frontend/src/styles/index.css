@@ -19,11 +19,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn preset tokens. `--primary`, `--muted`, and `--sidebar` are owned by
-   tokens.css (semantic roles plus the sidebar spacing scale), so they stay
-   omitted here: the `--color-*` mappings below resolve through `var(--...)`
-   to the application tokens instead of forking a second palette. Unlayered
-   `:root` would otherwise override the layered application tokens. */
+/* shadcn preset b4Wzni02SI (base-nova, taupe baseColor/theme, radius medium,
+   Geist body, Merriweather heading, amber charts) owns these tokens.
+   `--muted` stays omitted: the application secondary-text role (text-muted
+   plus chart data strokes/fills on var(--muted)) predates the preset, so the
+   surface tone keeps living on preset-adjacent names instead. Deleting the
+   exception means migrating those consumers to text-muted-foreground first. */
 :root {
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.147 0.004 49.3);
@@ -31,6 +32,7 @@
 	--card-foreground: oklch(0.147 0.004 49.3);
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.147 0.004 49.3);
+	--primary: oklch(0.214 0.009 43.1);
 	--primary-foreground: oklch(0.986 0.002 67.8);
 	--secondary: oklch(0.96 0.002 17.2);
 	--secondary-foreground: oklch(0.214 0.009 43.1);
@@ -47,6 +49,7 @@
 	--chart-4: oklch(0.555 0.163 48.998);
 	--chart-5: oklch(0.473 0.137 46.201);
 	--radius: 0.625rem;
+	--sidebar: oklch(0.986 0.002 67.8);
 	--sidebar-foreground: oklch(0.147 0.004 49.3);
 	--sidebar-primary: oklch(0.214 0.009 43.1);
 	--sidebar-primary-foreground: oklch(0.986 0.002 67.8);
@@ -67,7 +70,6 @@
 	--primary-foreground: oklch(0.214 0.009 43.1);
 	--secondary: oklch(0.268 0.011 36.5);
 	--secondary-foreground: oklch(0.986 0.002 67.8);
-	--muted: oklch(0.268 0.011 36.5);
 	--muted-foreground: oklch(0.714 0.014 41.2);
 	--accent: oklch(0.268 0.011 36.5);
 	--accent-foreground: oklch(0.986 0.002 67.8);
@@ -91,13 +93,18 @@
 }
 
 @theme inline {
-	/* Geist and Merriweather arrive with the preset but stay opt-in:
-       Manrope remains the UI font in typography.css until a deliberate type
-       migration. The radius scale below the preset derives is deferred for
-       the same reason, so rounded-control and rounded-surface keep their
-       current values in Phase 1. */
+	/* The preset owns body type (Geist) and display type (Merriweather).
+       tokens.css points --font-ui at Geist and --font-display at Merriweather
+       so the single-family rule in typography.css follows the preset. */
 	--font-sans: "Geist Variable", sans-serif;
 	--font-heading: "Merriweather Variable", serif;
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -131,7 +138,11 @@
 	--color-background: var(--background);
 }
 
-/* The preset's base layer (global border color, body background and text,
-   html font) stays deferred to the Phase 2 visual adoption. Page chrome
-   remains owned by reset.css, typography.css, and tokens.css, so existing
-   pages render exactly as before while the tokens above stay available. */
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+}

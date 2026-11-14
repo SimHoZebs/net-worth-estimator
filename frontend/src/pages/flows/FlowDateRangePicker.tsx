@@ -1,14 +1,23 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, IconButton } from "../../components/Button.tsx";
-import { controlStyles } from "../../components/fieldStyles.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
-import { Modal } from "../../components/Modal.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import {
 	supportsPopover,
 	useAnchoredPopover,
 } from "../../components/popoverAnchor.ts";
-import { SegmentedControl, segmentedPillStyles } from "../../components/SegmentedControl.tsx";
+const presetPillClassName =
+	"rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted pointer-coarse:min-h-12 aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs";
+
+const compactPillClassName =
+	"rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted pointer-coarse:min-h-12 aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs h-auto focus-visible:outline-solid focus-visible:ring-0 data-[state=on]:bg-surface";
 import {
 	FLOW_RANGE_PRESETS,
 	flowPresetRange,
@@ -16,10 +25,7 @@ import {
 	type FlowRangePresetId,
 } from "../../domain/flowWindow.ts";
 import { dateLabel, isoDate, todayIso, utcDate } from "../../domain/format.ts";
-import {
-	useMediaQuery,
-	viewportQueries,
-} from "../../state/useMediaQuery.ts";
+import { useMediaQuery, viewportQueries } from "../../state/useMediaQuery.ts";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -71,32 +77,32 @@ function MonthCalendar({
 	const title = monthTitle(year, monthIndex);
 	const totalDays = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 	const leadBlanks = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
-	const cells: (string | null)[] = [
-		...Array<null>(leadBlanks).fill(null),
-	];
+	const cells: (string | null)[] = [...Array<null>(leadBlanks).fill(null)];
 	for (let day = 1; day <= totalDays; day++)
 		cells.push(toDayIso(year, monthIndex, day));
 	while (cells.length % 7 !== 0) cells.push(null);
 	return (
 		<section aria-label={title} className="min-w-0 flex-1">
 			<div className="mb-2 flex items-center justify-between gap-2">
-				<IconButton
-					icon={ChevronLeft}
-					label={`Previous month (${title})`}
-					size="sm"
-					iconSize={16}
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					aria-label={`Previous month (${title})`}
 					onClick={onPrev}
-				/>
+				>
+					<ChevronLeft aria-hidden="true" />
+				</Button>
 				<h3 className="m-0 min-w-0 flex-1 truncate text-center text-xs font-semibold text-ink">
 					{title}
 				</h3>
-				<IconButton
-					icon={ChevronRight}
-					label={`Next month (${title})`}
-					size="sm"
-					iconSize={16}
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					aria-label={`Next month (${title})`}
 					onClick={onNext}
-				/>
+				>
+					<ChevronRight aria-hidden="true" />
+				</Button>
 			</div>
 			<div className="grid grid-cols-7 gap-1">
 				{WEEKDAYS.map((day) => (
@@ -261,7 +267,7 @@ export function FlowDateRangePicker({
 							type="button"
 							aria-pressed={draftMatched === preset.id}
 							onClick={() => choosePreset(preset.id)}
-							className={segmentedPillStyles}
+							className={presetPillClassName}
 						>
 							{preset.label}
 						</button>
@@ -270,15 +276,35 @@ export function FlowDateRangePicker({
 				<div className="flex min-w-0 flex-1 gap-4 max-sm:flex-col">
 					{compact ? (
 						<div className="flex min-w-0 flex-1 flex-col gap-2">
-							<SegmentedControl
-								items={[
-									{ value: "start", label: "Start" },
-									{ value: "end", label: "End" },
-								]}
-								value={compactMonth}
-								onChange={setCompactMonth}
-								ariaLabel="Start or end month"
-							/>
+							<ToggleGroup
+								aria-label="Start or end month"
+								value={[compactMonth]}
+								onValueChange={(next) => {
+									const nextValue = next.find(
+										(candidate) => candidate !== compactMonth,
+									);
+									if (nextValue !== undefined)
+										setCompactMonth(nextValue as "start" | "end");
+								}}
+								className={cn(
+									"inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1",
+								)}
+							>
+								<ToggleGroupItem
+									type="button"
+									value="start"
+									className={cn(compactPillClassName)}
+								>
+									Start
+								</ToggleGroupItem>
+								<ToggleGroupItem
+									type="button"
+									value="end"
+									className={cn(compactPillClassName)}
+								>
+									End
+								</ToggleGroupItem>
+							</ToggleGroup>
 							{compactMonth === "start" ? (
 								<MonthCalendar
 									year={leftMonth.year}
@@ -329,7 +355,7 @@ export function FlowDateRangePicker({
 				<Button variant="secondary" size="sm" onClick={closeToTrigger}>
 					Cancel
 				</Button>
-				<Button variant="primary" size="sm" onClick={applyDraft}>
+				<Button variant="default" size="sm" onClick={applyDraft}>
 					Apply
 				</Button>
 			</div>
@@ -351,8 +377,8 @@ export function FlowDateRangePicker({
 				aria-expanded={open}
 				aria-controls={open && !compact ? panelId : undefined}
 				onClick={() => (open ? closeToTrigger() : openPanel())}
-				className={mergeStyles(
-					controlStyles({ kind: "select" }),
+				className={cn(
+					"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60",
 					"flex items-center gap-2 text-left",
 				)}
 			>
@@ -364,13 +390,19 @@ export function FlowDateRangePicker({
 				/>
 			</button>
 			{open && compact && (
-				<Modal
-					title="Choose date range"
-					titleSize="plain"
-					onClose={closeToTrigger}
+				<Dialog
+					open={open}
+					onOpenChange={(next) => {
+						if (!next) closeToTrigger();
+					}}
 				>
-					{panel}
-				</Modal>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Choose date range</DialogTitle>
+						</DialogHeader>
+						{panel}
+					</DialogContent>
+				</Dialog>
 			)}
 			{open && !compact && (
 				<div

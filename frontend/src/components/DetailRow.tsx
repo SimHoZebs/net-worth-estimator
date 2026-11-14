@@ -1,6 +1,6 @@
 import { cva } from "class-variance-authority";
 import type { ComponentProps, ReactNode } from "react";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 
 export const detailListStyles = cva("my-5");
 export const detailRowStyles = cva(
@@ -12,9 +12,7 @@ export const detailValueStyles = cva(
 );
 
 export function DetailList({ className, ...props }: ComponentProps<"dl">) {
-	return (
-		<dl {...props} className={mergeStyles(detailListStyles(), className)} />
-	);
+	return <dl {...props} className={cn(detailListStyles(), className)} />;
 }
 
 export function DetailRow({
@@ -30,12 +28,8 @@ export function DetailRow({
 }) {
 	return (
 		<div className={detailRowStyles()}>
-			<dt className={mergeStyles(detailTermStyles(), labelClassName)}>
-				{label}
-			</dt>
-			<dd className={mergeStyles(detailValueStyles(), className)}>
-				{children}
-			</dd>
+			<dt className={cn(detailTermStyles(), labelClassName)}>{label}</dt>
+			<dd className={cn(detailValueStyles(), className)}>{children}</dd>
 		</div>
 	);
 }

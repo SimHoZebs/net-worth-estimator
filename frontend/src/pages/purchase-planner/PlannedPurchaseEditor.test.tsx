@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 import {
-	act,
 	cleanup,
 	fireEvent,
 	render,
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Account, PlannedPurchase } from "../../domain/model.ts";
 import { plannedPurchaseSchema } from "../../domain/modelSchemas.ts";
@@ -16,28 +14,6 @@ import {
 	savePurchaseEdit,
 } from "../../state/purchaseWrites.ts";
 import { PlannedPurchaseEditor } from "./PlannedPurchaseEditor.tsx";
-
-const modalProbe = vi.hoisted(() => ({
-	current: null as null | {
-		onClose?: () => void;
-		onCloseRequest?: () => boolean;
-	},
-}));
-
-vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../../components/Modal.tsx")>()),
-	Modal: ({
-		children,
-		...props
-	}: {
-		children: ReactNode;
-		onClose?: () => void;
-		onCloseRequest?: () => boolean;
-	}) => {
-		modalProbe.current = props;
-		return <section>{children}</section>;
-	},
-}));
 
 vi.mock("../../state/purchaseWrites.ts", () => ({
 	saveNewPurchase: vi.fn(),
@@ -289,7 +265,7 @@ describe("PlannedPurchaseEditor", () => {
 		expect(onClose).toHaveBeenCalledOnce();
 	});
 
-	it("routes dialog close requests through the dirty guard", () => {
+	it("lets the native dialog close a clean form", () => {
 		const onClose = vi.fn();
 		render(
 			<PlannedPurchaseEditor
@@ -301,17 +277,29 @@ describe("PlannedPurchaseEditor", () => {
 				onClose={onClose}
 			/>,
 		);
-		// A clean form lets the dialog close (Close button, Escape, backdrop).
-		expect(modalProbe.current?.onCloseRequest?.()).toBe(true);
+		// A clean form lets the dialog close through its native close button.
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		expect(onClose).toHaveBeenCalledOnce();
+	});
+
+	it("routes native dialog dismissal through the dirty guard", () => {
+		const onClose = vi.fn();
+		render(
+			<PlannedPurchaseEditor
+				accounts={accounts}
+				startDate="2026-09-24"
+				item={null}
+				priority={0}
+				onSaved={() => {}}
+				onClose={onClose}
+			/>,
+		);
 		fireEvent.change(screen.getByLabelText("Purchase name"), {
 			target: { value: "Unsaved desk" },
 		});
-		// A dirty form blocks the dialog close and shows the inline confirm.
-		let blocked: boolean | undefined;
-		act(() => {
-			blocked = modalProbe.current?.onCloseRequest?.();
-		});
-		expect(blocked).toBe(false);
+		// A dirty form blocks the native dialog close and shows the inline confirm.
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		expect(onClose).not.toHaveBeenCalled();
 		expect(screen.getByRole("alert").textContent).toContain(
 			"Discard the changes in this form?",
 		);

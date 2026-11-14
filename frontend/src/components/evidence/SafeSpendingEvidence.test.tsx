@@ -1,20 +1,11 @@
 import { fireEvent, render, within } from "@testing-library/react";
-import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import {
 	transactionFixture,
 	projectionFixture,
 } from "../../mocks/projection.ts";
 import { SafeSpendingEvidence } from "./SafeSpendingEvidence.tsx";
-
-// This test covers evidence content rather than the native modal lifecycle.
-vi.mock("../Modal.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../Modal.tsx")>()),
-	Modal: ({ children }: { children: ReactNode }) => (
-		<section>{children}</section>
-	),
-}));
 
 describe("SafeSpendingEvidence", () => {
 	it("retains table headings, shortfall evidence, and date sorting", () => {

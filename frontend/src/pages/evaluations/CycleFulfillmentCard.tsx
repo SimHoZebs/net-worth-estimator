@@ -1,10 +1,11 @@
 import { Check, Flag, Pin } from "lucide-react";
 import { useId } from "react";
-import { Badge } from "@/components/Badge.tsx";
-import { IconButton } from "@/components/Button.tsx";
-import { Card, cardHeadingStyles } from "@/components/Card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { Progress } from "@/components/Progress.tsx";
+import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
+import { cn } from "@/lib/utils.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
 
 export function CycleFulfillmentCard({
@@ -30,13 +31,17 @@ export function CycleFulfillmentCard({
 					: "neutral";
 	return (
 		<Card
-			tone={item.enabled ? "default" : "subtle"}
+			role="region"
 			aria-labelledby={headingId}
+			className={cn(
+				"flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 overflow-visible rounded-surface border p-5 text-base text-ink ring-0 print:break-inside-avoid",
+				item.enabled ? "border-line bg-surface" : "border-line bg-surface-2",
+			)}
 		>
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
 				<h2
 					id={headingId}
-					className={cardHeadingStyles}
+					className="m-0 flex min-h-8 items-center gap-2 text-sm leading-[1.5] font-semibold [overflow-wrap:anywhere]"
 				>
 					<StateIcon
 						size={16}
@@ -47,12 +52,16 @@ export function CycleFulfillmentCard({
 				</h2>
 				{onPinChange && (
 					<div className="flex justify-end gap-1">
-						<IconButton
-							icon={Pin}
-							size="sm"
-							iconSize={16}
-							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
-							label={
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							title={
+								pinned
+									? `Unpin ${item.name} from Outlook`
+									: `Pin ${item.name} to Outlook`
+							}
+							aria-label={
 								pinned
 									? `Unpin ${item.name} from Outlook`
 									: `Pin ${item.name} to Outlook`
@@ -60,12 +69,15 @@ export function CycleFulfillmentCard({
 							onClick={onPinChange}
 							disabled={pinDisabled}
 							aria-pressed={pinned}
-						/>
+							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
+						>
+							<Pin size={16} aria-hidden="true" />
+						</Button>
 					</div>
 				)}
 			</div>
 			<div>
-				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-tight [overflow-wrap:anywhere]">
+				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl leading-[1.2] font-medium tracking-tight [overflow-wrap:anywhere]">
 					{!item.enabled ? "Paused" : item.outcomeText}
 				</div>
 				{item.enabled && item.qualifier && (
@@ -76,7 +88,15 @@ export function CycleFulfillmentCard({
 			</div>
 			<div className="mt-auto flex flex-col gap-4">
 				<div>
-					<Badge tone={tone}>
+					<Badge
+						variant={tone === "neutral" ? "secondary" : "default"}
+						className={cn(
+							"inline-flex h-auto w-fit items-center gap-1 rounded-control px-2 py-1 text-xs leading-snug font-medium whitespace-nowrap capitalize",
+							tone === "neutral" && "bg-surface-3 text-muted",
+							tone === "success" && "bg-success-bg text-success-text",
+							tone === "warning" && "bg-warning-bg text-warning-text",
+						)}
+					>
 						{!item.enabled
 							? "Excluded from evaluation"
 							: item.status === "satisfied"
@@ -94,7 +114,14 @@ export function CycleFulfillmentCard({
 							<span>{item.progress.current}</span>
 							{item.progress.share && <span>{item.progress.share}</span>}
 						</div>
-						<Progress value={item.progress.fraction * 100} label={item.name} />
+						<Progress
+							value={Math.min(
+								100,
+								Math.max(0, Math.round(item.progress.fraction * 100)),
+							)}
+						>
+							<ProgressLabel className="sr-only">{item.name}</ProgressLabel>
+						</Progress>
 					</div>
 				)}
 			</div>

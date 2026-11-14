@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import {
 	createEvaluation,
 	updateEvaluation,
@@ -14,11 +14,22 @@ import {
 } from "../../state/workspaceResources.ts";
 import { isRecord } from "../../domain/guards.ts";
 import { parseDisplayNumber } from "./formValues.ts";
-import { InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+const fieldLabelClassName = "text-sm leading-normal font-semibold text-muted";
+const fieldInputClassName =
+	"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0";
+const fieldSelectClassName =
+	"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
 import { balanceRowToDisplay } from "../../api/adapter.ts";
 import { toDisplayAccounts } from "../../domain/accountDisplay.ts";
 
@@ -60,6 +71,10 @@ export function EvaluationEditor({
 	const [accountId, setAccountId] = useState(item?.accountId ?? "");
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const nameId = useId();
+	const kindId = useId();
+	const targetId = useId();
+	const accountIdInput = useId();
 	const balances = useAccountBalances();
 	const accounts = toDisplayAccounts(
 		(balances.data?.accounts ?? []).map(balanceRowToDisplay),
@@ -133,77 +148,126 @@ export function EvaluationEditor({
 	};
 
 	return (
-		<Modal title={`${item ? "Edit" : "Add"} evaluation`} onClose={onClose}>
-			<form
-				className="flex flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
-			>
-				<fieldset
-					disabled={saving}
-					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
+		>
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<DialogTitle>{`${item ? "Edit" : "Add"} evaluation`}</DialogTitle>
+				</DialogHeader>
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => void submit(event)}
 				>
-					<InputField
-						label="Evaluation name"
-						wide
-						required
-						maxLength={100}
-						value={name}
-						onChange={(event) => setName(event.target.value)}
-						placeholder="e.g. A comfortable cash cushion"
-					/>
-					<SelectField
-						label="Measure"
-						value={kind}
-						onChange={(event) => {
-							const next = parseUnion(event.target.value, [
-								"net-worth",
-								"reserve",
-							] as const);
-							if (next) setKind(next);
-						}}
+					<fieldset
+						disabled={saving}
+						className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
 					>
-						<option value="net-worth">Household net worth</option>
-						<option value="reserve">An account balance</option>
-					</SelectField>
-					<InputField
-						label="Target (USD)"
-						type="number"
-						required
-						min="1"
-						max="10000000000"
-						step="1"
-						value={target}
-						onChange={(event) => setTarget(event.target.value)}
-					/>
-					{kind === "reserve" && (
-						<SelectField
-							label="Account"
-							wide
-							required
-							value={accountId}
-							onChange={(event) => setAccountId(event.target.value)}
+						<Field className="col-span-full flex min-w-0 flex-col gap-2">
+							<Label htmlFor={nameId} className={fieldLabelClassName}>
+								Evaluation name
+							</Label>
+							<Input
+								id={nameId}
+								required
+								maxLength={100}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+								placeholder="e.g. A comfortable cash cushion"
+								className={fieldInputClassName}
+							/>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={kindId} className={fieldLabelClassName}>
+								Measure
+							</Label>
+							<select
+								id={kindId}
+								value={kind}
+								onChange={(event) => {
+									const next = parseUnion(event.target.value, [
+										"net-worth",
+										"reserve",
+									] as const);
+									if (next) setKind(next);
+								}}
+								className={fieldSelectClassName}
+							>
+								<option value="net-worth">Household net worth</option>
+								<option value="reserve">An account balance</option>
+							</select>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={targetId} className={fieldLabelClassName}>
+								Target (USD)
+							</Label>
+							<Input
+								id={targetId}
+								type="number"
+								required
+								min="1"
+								max="10000000000"
+								step="1"
+								value={target}
+								onChange={(event) => setTarget(event.target.value)}
+								className={fieldInputClassName}
+							/>
+						</Field>
+						{kind === "reserve" && (
+							<Field className="col-span-full flex min-w-0 flex-col gap-2">
+								<Label htmlFor={accountIdInput} className={fieldLabelClassName}>
+									Account
+								</Label>
+								<select
+									id={accountIdInput}
+									required
+									value={accountId}
+									onChange={(event) => setAccountId(event.target.value)}
+									className={fieldSelectClassName}
+								>
+									<option value="" disabled>
+										Select an account
+									</option>
+									{accounts.map((account) => (
+										<option key={account.id} value={account.id}>
+											{account.name}
+										</option>
+									))}
+								</select>
+							</Field>
+						)}
+					</fieldset>
+					{error && (
+						<p
+							role="alert"
+							className="m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text"
 						>
-							<option value="" disabled>
-								Select an account
-							</option>
-							{accounts.map((account) => (
-								<option key={account.id} value={account.id}>
-									{account.name}
-								</option>
-							))}
-						</SelectField>
+							{error}
+						</p>
 					)}
-				</fieldset>
-				<FieldError message={error} />
-				<div className={dialogActionsStyles}>
-					<Button type="button" variant="secondary" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={saving || !dirty}>
-						{saving ? "Saving…" : item ? "Save evaluation" : "Add evaluation"}
-					</Button>
-				</div>
-			</form>
-		</Modal>
+					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-line pt-5">
+						<Button
+							type="button"
+							variant="secondary"
+							className="min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
+							onClick={onClose}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							variant="secondary"
+							className="min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
+							disabled={saving || !dirty}
+						>
+							{saving ? "Saving…" : item ? "Save evaluation" : "Add evaluation"}
+						</Button>
+					</div>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }

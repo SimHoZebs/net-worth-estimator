@@ -5,7 +5,7 @@ import {
 	exactMoney,
 	isoDateFromEpochSeconds,
 } from "../../domain/format.ts";
-import { Button } from "../Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
 
 export function LoanDetails({
 	account,

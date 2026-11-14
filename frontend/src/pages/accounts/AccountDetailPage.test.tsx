@@ -130,9 +130,23 @@ describe("finance-first account detail", () => {
 		setServerModelFixture(financialModelFixture);
 		render(<AccountDetailView {...detailProps()} />, { wrapper });
 		expect(projectionUrls()).toEqual([]);
-		fireEvent.change(screen.getByLabelText("Transaction source"), {
-			target: { value: "projected" },
+		// Flip to projected synchronously: the seeded row queries refetch
+		// in the background and fail fast against the fetch mock, so the
+		// flip must land in the same tick as render (before those errors
+		// clear the projection source) for the forecast fetch to fire.
+		// The full pointer sequence commits the Base-UI value inside one
+		// act() batch; userEvent's async gaps and bare fireEvent.click
+		// both miss that window (click alone never commits).
+		fireEvent.click(
+			screen.getByRole("combobox", { name: "Transaction source" }),
+		);
+		const projectedOption = screen.getByRole("option", {
+			name: /Projected/,
 		});
+		fireEvent.pointerDown(projectedOption, { button: 0 });
+		fireEvent.mouseDown(projectedOption, { button: 0 });
+		fireEvent.mouseUp(projectedOption, { button: 0 });
+		fireEvent.click(projectedOption);
 		await waitFor(() =>
 			expect(
 				screen.getByRole("button", { name: "Retry forecast" }),

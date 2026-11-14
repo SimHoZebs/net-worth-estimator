@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { createElement, useId, useState, type FormEvent } from "react";
 import { createLoan, updateLoan } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
 import { literalAmountOf } from "../../domain/transactionRows.ts";
@@ -11,10 +11,18 @@ import {
 } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { cn } from "@/lib/utils.ts";
+
+const fieldLabelClassName = "text-sm leading-normal font-semibold text-muted";
+const fieldInputClassName =
+	"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0";
+const fieldSelectClassName =
+	"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 
@@ -44,7 +52,11 @@ export function LoanEditor(props: LoanEditorProps) {
 	if (!accounts || (item && schedules.isPending))
 		return <p role="status">Loading loan terms…</p>;
 	if (item && schedules.isError)
-		return <ErrorNotice message="Loan terms could not be loaded." />;
+		return (
+			<Alert variant="destructive">
+				<AlertDescription>Loan terms could not be loaded.</AlertDescription>
+			</Alert>
+		);
 	return (
 		<LoanForm
 			{...props}
@@ -121,6 +133,15 @@ function LoanForm({
 	const [values, setValues] = useState(initial);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const principalId = useId();
+	const interestId = useId();
+	const rateId = useId();
+	const paymentId = useId();
+	const fundingId = useId();
+	const interestFrequencyId = useId();
+	const paymentFrequencyId = useId();
+	const interestStartId = useId();
+	const paymentStartId = useId();
 	const dirty = JSON.stringify(values) !== JSON.stringify(baseline);
 	useBeforeUnload(dirty && !saving);
 	const change = <K extends keyof typeof values>(
@@ -191,30 +212,42 @@ function LoanForm({
 				<legend className="sr-only">Loan terms</legend>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 rounded-control border border-line p-4 max-sm:grid-cols-1">
 					<legend className="px-2 text-sm font-semibold">Amount owed</legend>
-					<InputField
-						label="Principal (USD)"
-						name="principal"
-						type="number"
-						inputMode="decimal"
-						required
-						min="0"
-						max="10000000000"
-						step="0.01"
-						value={values.principal}
-						onChange={(e) => change("principal", e.target.value)}
-					/>
-					<InputField
-						label="Accrued interest (USD)"
-						name="interest"
-						type="number"
-						inputMode="decimal"
-						required
-						min="0"
-						max="10000000000"
-						step="0.01"
-						value={values.interest}
-						onChange={(e) => change("interest", e.target.value)}
-					/>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={principalId} className={fieldLabelClassName}>
+							Principal (USD)
+						</Label>
+						<Input
+							id={principalId}
+							name="principal"
+							type="number"
+							inputMode="decimal"
+							required
+							min="0"
+							max="10000000000"
+							step="0.01"
+							value={values.principal}
+							onChange={(e) => change("principal", e.target.value)}
+							className={fieldInputClassName}
+						/>
+					</Field>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={interestId} className={fieldLabelClassName}>
+							Accrued interest (USD)
+						</Label>
+						<Input
+							id={interestId}
+							name="interest"
+							type="number"
+							inputMode="decimal"
+							required
+							min="0"
+							max="10000000000"
+							step="0.01"
+							value={values.interest}
+							onChange={(e) => change("interest", e.target.value)}
+							className={fieldInputClassName}
+						/>
+					</Field>
 					<p className="col-span-full m-0 flex justify-between text-sm text-muted">
 						Total owed{" "}
 						<strong className="type-value text-ink">
@@ -224,102 +257,166 @@ function LoanForm({
 				</fieldset>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 border-0 p-0 max-sm:grid-cols-1">
 					<legend className="mb-3 text-sm font-semibold">Interest</legend>
-					<InputField
-						label="Annual interest rate (%)"
-						name="rate"
-						type="number"
-						required
-						min="0"
-						max="100"
-						step="0.0001"
-						value={values.rate}
-						onChange={(e) => change("rate", e.target.value)}
-					/>
-					<SelectField
-						label="Interest charge frequency"
-						name="interestFrequency"
-						value={values.interestFrequency}
-						onChange={(e) =>
-							change("interestFrequency", e.target.value as Frequency)
-						}
-					>
-						{frequencies.map((f) => (
-							<option key={f} value={f}>
-								{f}
-							</option>
-						))}
-					</SelectField>
-					<InputField
-						label="First interest charge"
-						name="interestStart"
-						type="date"
-						required
-						value={values.interestStart}
-						onChange={(e) => change("interestStart", e.target.value)}
-					/>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={rateId} className={fieldLabelClassName}>
+							Annual interest rate (%)
+						</Label>
+						<Input
+							id={rateId}
+							name="rate"
+							type="number"
+							required
+							min="0"
+							max="100"
+							step="0.0001"
+							value={values.rate}
+							onChange={(e) => change("rate", e.target.value)}
+							className={fieldInputClassName}
+						/>
+					</Field>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label
+							htmlFor={interestFrequencyId}
+							className={fieldLabelClassName}
+						>
+							Interest charge frequency
+						</Label>
+						<select
+							id={interestFrequencyId}
+							name="interestFrequency"
+							value={values.interestFrequency}
+							onChange={(e) =>
+								change("interestFrequency", e.target.value as Frequency)
+							}
+							className={fieldSelectClassName}
+						>
+							{frequencies.map((f) => (
+								<option key={f} value={f}>
+									{f}
+								</option>
+							))}
+						</select>
+					</Field>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={interestStartId} className={fieldLabelClassName}>
+							First interest charge
+						</Label>
+						<Input
+							id={interestStartId}
+							name="interestStart"
+							type="date"
+							required
+							value={values.interestStart}
+							onChange={(e) => change("interestStart", e.target.value)}
+							className={fieldInputClassName}
+						/>
+					</Field>
 				</fieldset>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 border-0 p-0 max-sm:grid-cols-1">
 					<legend className="mb-3 text-sm font-semibold">Payments</legend>
-					<InputField
-						label="Payment amount (USD)"
-						name="payment"
-						type="number"
-						required
-						min="0"
-						max="10000000000"
-						step="0.01"
-						value={values.payment}
-						onChange={(e) => change("payment", e.target.value)}
-					/>
-					<SelectField
-						label="Pay from"
-						rich
-						name="funding"
-						value={values.funding}
-						onChange={(e) => change("funding", e.target.value)}
-					>
-						<option value="">Select funding account</option>
-						{accounts
-							.filter(
-								(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
-							)
-							.map((a) => (
-								<option key={a.id} value={a.id} aria-label={a.name}>
-									<AccountIcon account={a} size="sm" className="size-6" />
-									<span>{a.name}</span>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={paymentId} className={fieldLabelClassName}>
+							Payment amount (USD)
+						</Label>
+						<Input
+							id={paymentId}
+							name="payment"
+							type="number"
+							required
+							min="0"
+							max="10000000000"
+							step="0.01"
+							value={values.payment}
+							onChange={(e) => change("payment", e.target.value)}
+							className={fieldInputClassName}
+						/>
+					</Field>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={fundingId} className={fieldLabelClassName}>
+							Pay from
+						</Label>
+						<select
+							id={fundingId}
+							name="funding"
+							value={values.funding}
+							onChange={(e) => change("funding", e.target.value)}
+							className={cn(
+								fieldSelectClassName,
+								"supports-[appearance:base-select]:[appearance:base-select] supports-[appearance:base-select]:[&::picker(select)]:[appearance:base-select] [&::picker(select)]:rounded-control [&::picker(select)]:border [&::picker(select)]:border-line-strong [&::picker(select)]:bg-surface [&::picker(select)]:p-1 [&::picker(select)]:text-ink [&_option]:flex [&_option]:items-center [&_option]:gap-3 [&_option]:rounded-control [&_option]:p-2 [&_option:checked]:bg-surface-3 [&_option:checked]:font-semibold [&_option:hover]:bg-surface-3 [&_selectedcontent]:flex [&_selectedcontent]:items-center [&_selectedcontent]:gap-3",
+							)}
+						>
+							<button type="button" className="min-w-0">
+								{createElement("selectedcontent")}
+							</button>
+							<option value="">Select funding account</option>
+							{accounts
+								.filter(
+									(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
+								)
+								.map((a) => (
+									<option key={a.id} value={a.id} aria-label={a.name}>
+										<AccountIcon account={a} size="sm" className="size-6" />
+										<span>{a.name}</span>
+									</option>
+								))}
+						</select>
+					</Field>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={paymentFrequencyId} className={fieldLabelClassName}>
+							Payment frequency
+						</Label>
+						<select
+							id={paymentFrequencyId}
+							name="paymentFrequency"
+							value={values.paymentFrequency}
+							onChange={(e) =>
+								change("paymentFrequency", e.target.value as Frequency)
+							}
+							className={fieldSelectClassName}
+						>
+							{frequencies.map((f) => (
+								<option key={f} value={f}>
+									{f}
 								</option>
 							))}
-					</SelectField>
-					<SelectField
-						label="Payment frequency"
-						name="paymentFrequency"
-						value={values.paymentFrequency}
-						onChange={(e) =>
-							change("paymentFrequency", e.target.value as Frequency)
-						}
-					>
-						{frequencies.map((f) => (
-							<option key={f} value={f}>
-								{f}
-							</option>
-						))}
-					</SelectField>
-					<InputField
-						label="First payment"
-						name="paymentStart"
-						type="date"
-						required
-						value={values.paymentStart}
-						onChange={(e) => change("paymentStart", e.target.value)}
-					/>
+						</select>
+					</Field>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label htmlFor={paymentStartId} className={fieldLabelClassName}>
+							First payment
+						</Label>
+						<Input
+							id={paymentStartId}
+							name="paymentStart"
+							type="date"
+							required
+							value={values.paymentStart}
+							onChange={(e) => change("paymentStart", e.target.value)}
+							className={fieldInputClassName}
+						/>
+					</Field>
 				</fieldset>
 			</fieldset>
-			<ErrorNotice message={error} />
-			<div className={dialogActionsStyles}>
-				<Button type="button" variant="secondary" onClick={onClose}>
+			{error && (
+				<Alert variant="destructive">
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
+			)}
+			<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-line pt-5">
+				<Button
+					type="button"
+					variant="secondary"
+					className="min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
+					onClick={onClose}
+				>
 					Cancel
 				</Button>
-				<Button type="submit" disabled={saving || item?.readOnly}>
+				<Button
+					type="submit"
+					variant="secondary"
+					className="min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
+					disabled={saving || item?.readOnly}
+				>
 					{saving ? "Saving…" : item ? "Save account" : "Add account"}
 				</Button>
 			</div>

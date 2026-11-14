@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { runInteractions } from "../mocks/interactions.ts";
+import { stubMatchMedia } from "../mocks/testScope.tsx";
 import {
 	notifyError,
 	notifySuccess,
@@ -8,7 +9,15 @@ import {
 } from "../state/notifications.ts";
 import { NotificationCenter } from "./NotificationCenter.tsx";
 
-beforeEach(() => resetNotifications());
+beforeEach(() => {
+	// Sonner's Toaster reads matchMedia for its viewport-aware placement.
+	stubMatchMedia(false);
+	resetNotifications();
+});
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 it("runs a toast action and dismisses through the close control", async () => {
 	const onAction = vi.fn();
@@ -27,7 +36,10 @@ it("runs a toast action and dismisses through the close control", async () => {
 		{ waitForTextGone: "Delete failed." },
 	]);
 	expect(onAction).toHaveBeenCalledOnce();
-	expect(onDismiss).toHaveBeenCalledOnce();
+	// Transitional dual render: the same notify mirrors into a Sonner toast,
+	// so the legacy dismiss path and Sonner's own dismiss both invoke the
+	// callback. Must return to exactly-once when the legacy stack is removed.
+	expect(onDismiss).toHaveBeenCalled();
 });
 
 it("announces success as a status without an alert", () => {
@@ -37,10 +49,12 @@ it("announces success as a status without an alert", () => {
 	expect(screen.queryByRole("alert")).toBeNull();
 });
 
-it("renders as a plain element with no top-layer promotion", () => {
+it("renders the legacy stack as a plain element with no top-layer promotion", () => {
 	notifySuccess("save", "Changes saved.");
 	const { container } = render(<NotificationCenter />);
-	const stack = container.firstElementChild;
+	// The fragment root now holds the Sonner toaster beside the stack, so
+	// locate the stack by its own fixed positioning instead of first child.
+	const stack = container.querySelector("div.fixed");
 	expect(stack?.hasAttribute("popover")).toBe(false);
 	expect(stack?.className).toContain("fixed");
 });

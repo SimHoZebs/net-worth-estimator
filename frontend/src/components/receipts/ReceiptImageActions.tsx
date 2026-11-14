@@ -1,7 +1,17 @@
 import { ImageUp, Trash2 } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
-import { Button } from "../Button.tsx";
-import { ConfirmDialog } from "../ConfirmDialog.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 
 export function ReceiptImageActions({
 	revision,
@@ -40,6 +50,7 @@ export function ReceiptImageActions({
 			<Button
 				variant="secondary"
 				size="sm"
+				className="min-h-9 border-line-strong bg-surface px-3 py-2 text-xs leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
 				disabled={busy}
 				onClick={() => picker.current?.click()}
 			>
@@ -58,8 +69,9 @@ export function ReceiptImageActions({
 				onChange={select}
 			/>
 			<Button
-				variant="danger"
+				variant="destructive"
 				size="sm"
+				className="min-h-9 bg-danger-solid px-3 py-2 text-xs leading-snug text-on-danger enabled:hover:brightness-90 focus-visible:outline-solid focus-visible:ring-0"
 				disabled={busy}
 				onClick={() => {
 					setError(null);
@@ -70,46 +82,67 @@ export function ReceiptImageActions({
 				Delete receipt
 			</Button>
 			{prompt && (
-				<ConfirmDialog
-					title={
-						prompt.kind === "replace"
-							? "Replace this receipt?"
-							: "Delete this receipt?"
-					}
-					onCancel={() => {
-						if (!busy) setPrompt(null);
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open && !busy) setPrompt(null);
 					}}
-					onConfirm={() => {
-						if (busy) return;
-						const operation =
-							prompt.kind === "replace"
-								? onReplace(prompt.image, prompt.revision)
-								: onDelete();
-						void operation
-							.then(() => setPrompt(null))
-							.catch((cause: unknown) =>
-								setError(
-									cause instanceof Error
-										? cause.message
-										: "The receipt could not be changed.",
-								),
-							);
-					}}
-					cancelLabel="Keep receipt"
-					confirmLabel={
-						prompt.kind === "replace" ? "Replace receipt" : "Delete receipt"
-					}
-					busyLabel={replacing ? "Replacing receipt…" : "Deleting receipt…"}
-					busy={busy || replacing || deleting}
-					error={error}
 				>
-					<p className="text-sm text-muted">
-						{prompt.kind === "replace"
-							? "This replaces the image and clears extracted details, saved drafts, confirmed content, and unsaved receipt edits."
-							: "This deletes the image and all extracted, draft, and confirmed receipt content."}{" "}
-						The transaction stays unchanged.
-					</p>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{prompt.kind === "replace"
+									? "Replace this receipt?"
+									: "Delete this receipt?"}
+							</AlertDialogTitle>
+						</AlertDialogHeader>
+						<AlertDialogDescription>
+							{prompt.kind === "replace"
+								? "This replaces the image and clears extracted details, saved drafts, confirmed content, and unsaved receipt edits."
+								: "This deletes the image and all extracted, draft, and confirmed receipt content."}{" "}
+							The transaction stays unchanged.
+						</AlertDialogDescription>
+						{error && (
+							<Alert variant="destructive">
+								<AlertDescription>{error}</AlertDescription>
+							</Alert>
+						)}
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={busy}>
+								Keep receipt
+							</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								disabled={busy || replacing || deleting}
+								className="bg-danger-solid text-on-danger enabled:hover:brightness-90 focus-visible:outline-solid focus-visible:ring-0"
+								onClick={() => {
+									if (busy) return;
+									const operation =
+										prompt.kind === "replace"
+											? onReplace(prompt.image, prompt.revision)
+											: onDelete();
+									void operation
+										.then(() => setPrompt(null))
+										.catch((cause: unknown) =>
+											setError(
+												cause instanceof Error
+													? cause.message
+													: "The receipt could not be changed.",
+											),
+										);
+								}}
+							>
+								{busy || replacing || deleting
+									? replacing
+										? "Replacing receipt…"
+										: "Deleting receipt…"
+									: prompt.kind === "replace"
+										? "Replace receipt"
+										: "Delete receipt"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 		</>
 	);

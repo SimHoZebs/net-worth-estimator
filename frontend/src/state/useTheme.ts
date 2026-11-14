@@ -4,8 +4,8 @@ import { appLocalStorage, THEME_STORAGE_KEY } from "./persisted.ts";
 export type ThemePreference = "system" | "light" | "dark";
 type ResolvedTheme = "light" | "dark";
 
-const DARK_META = "#0f1411";
-const LIGHT_META = "#214c3d";
+const DARK_META = "#0c0a09";
+const LIGHT_META = "#ffffff";
 
 function isPreference(value: unknown): value is ThemePreference {
 	return value === "light" || value === "dark" || value === "system";
@@ -86,6 +86,11 @@ function resolvePreference(preference: ThemePreference): ResolvedTheme {
 
 function applyTheme(preference: ThemePreference) {
 	if (typeof document === "undefined") return;
+	/* The `.dark` class is the single source of truth: shadcn `dark:`
+	   variants key off it, and tokens.css derives color-scheme from it so
+	   light-dark() tokens follow the same resolution. */
+	const resolved = resolvePreference(preference);
+	document.documentElement.classList.toggle("dark", resolved === "dark");
 	const colorScheme = document.getElementById("color-scheme");
 	if (colorScheme)
 		colorScheme.setAttribute(
@@ -96,7 +101,7 @@ function applyTheme(preference: ThemePreference) {
 	if (themeColor)
 		themeColor.setAttribute(
 			"content",
-			resolvePreference(preference) === "dark" ? DARK_META : LIGHT_META,
+			resolved === "dark" ? DARK_META : LIGHT_META,
 		);
 }
 

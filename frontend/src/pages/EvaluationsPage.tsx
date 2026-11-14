@@ -1,7 +1,13 @@
 import { Flag, Plus } from "lucide-react";
 import { useMemo } from "react";
-import { Button } from "@/components/Button.tsx";
-import { EmptyState } from "@/components/EmptyState.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Empty,
+	EmptyContent,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
 import { ProjectionUpdating } from "@/components/ProjectionUpdating.tsx";
 import type { Evaluation } from "@/domain/model.ts";
 import { deleteEvaluation } from "@/api/generated/endpoints.ts";
@@ -93,13 +99,25 @@ export function EvaluationsPage() {
 		<>
 			{projectionQuery.loading && projection && <ProjectionUpdating />}
 			<div className="mb-6 flex items-center justify-between gap-4 max-sm:flex-wrap">
-				<Button type="button" variant="primary" onClick={() => onEdit(null)}>
+				<Button type="button" variant="default" onClick={() => onEdit(null)}>
 					<Plus size={16} />
 					Add evaluation
 				</Button>
 			</div>
 			{!pending && !visible.length && !others.length && (
-				<EmptyState icon={Flag} title="What are you working toward?" />
+				<Empty className="flex-initial gap-0 px-6 py-12">
+					<EmptyHeader>
+						<EmptyMedia>
+							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+								<Flag size={28} />
+							</span>
+						</EmptyMedia>
+						<EmptyTitle>
+							<h3 className="text-lg">What are you working toward?</h3>
+						</EmptyTitle>
+					</EmptyHeader>
+					<EmptyContent />
+				</Empty>
 			)}
 			{pending && (
 				<p className="sr-only" role="status">

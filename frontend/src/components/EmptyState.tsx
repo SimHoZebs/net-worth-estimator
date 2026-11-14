@@ -1,13 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import { Button } from "./Button.tsx";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import {
 	Empty as ShadcnEmpty,
 	EmptyContent as ShadcnEmptyContent,
 	EmptyDescription as ShadcnEmptyDescription,
 	EmptyHeader as ShadcnEmptyHeader,
 	EmptyMedia as ShadcnEmptyMedia,
-} from "./ui/empty.tsx";
+} from "@/components/ui/empty.tsx";
 
 /**
  * Empty state on shadcn empty parts. The legacy recipe stays the visual
@@ -30,7 +30,7 @@ export function EmptyState({
 }) {
 	return (
 		<ShadcnEmpty
-			className={mergeStyles(
+			className={cn(
 				"flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center",
 			)}
 		>

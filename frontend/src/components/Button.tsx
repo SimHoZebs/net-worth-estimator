@@ -1,8 +1,8 @@
 import type { VariantProps } from "class-variance-authority";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps } from "react";
-import { mergeStyles } from "./mergeStyles.ts";
-import { Button as ShadcnButton } from "./ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
+import { Button as ShadcnButton } from "@/components/ui/button.tsx";
 import {
 	buttonStyles,
 	iconButtonStyles,
@@ -38,7 +38,7 @@ export function Button({
 						: (variant ?? "secondary")
 			}
 			size={size === "sm" ? "sm" : "default"}
-			className={mergeStyles(
+			className={cn(
 				buttonStyles({ variant, size }),
 				focusVisibleStyles,
 				className,
@@ -58,7 +58,7 @@ export function TextButton({
 			{...props}
 			type={type}
 			variant="link"
-			className={mergeStyles(
+			className={cn(
 				textButtonStyles({ tone }),
 				focusVisibleStyles,
 				className,
@@ -88,7 +88,7 @@ export function IconButton({
 			type={type}
 			variant="ghost"
 			size={size === "sm" ? "icon-sm" : "icon"}
-			className={mergeStyles(
+			className={cn(
 				iconButtonStyles({ size }),
 				focusVisibleStyles,
 				className,

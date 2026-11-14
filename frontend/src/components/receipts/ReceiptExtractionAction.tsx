@@ -1,5 +1,10 @@
 import { Check, ScanLine } from "lucide-react";
-import { Button } from "../Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+const idleTriggerClassName =
+	"min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover enabled:active:bg-active enabled:active:inset-shadow-sm focus-visible:outline-solid focus-visible:ring-0";
+const pendingTriggerClassName =
+	"min-h-10 border-primary bg-primary px-4 py-2 text-sm leading-snug text-on-primary enabled:hover:bg-primary-hover enabled:hover:shadow-sm focus-visible:outline-solid focus-visible:ring-0";
 
 export function ReceiptExtractionAction({
 	available,
@@ -17,10 +22,10 @@ export function ReceiptExtractionAction({
 	return (
 		<div className="flex flex-col gap-2">
 			<Button
-				variant={pending ? "primary" : "secondary"}
+				variant={pending ? "default" : "secondary"}
 				disabled={!available || disabled || pending}
 				aria-busy={pending}
-				className="enabled:active:bg-active enabled:active:inset-shadow-sm"
+				className={pending ? pendingTriggerClassName : idleTriggerClassName}
 				onClick={onExtract}
 			>
 				{pending ? (

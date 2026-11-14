@@ -1,10 +1,11 @@
 import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
-import { IconButton } from "@/components/Button.tsx";
-import { Card, cardHeadingStyles } from "@/components/Card.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { Progress } from "@/components/Progress.tsx";
-import { Skeleton } from "@/components/Skeleton.tsx";
+import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { cn } from "@/lib/utils.ts";
 import { dateLabel, money } from "@/domain/format.ts";
 import type { Evaluation } from "@/domain/model.ts";
 import type { EvaluationResult } from "@/domain/result.ts";
@@ -37,14 +38,20 @@ export function EvaluationCard({
 	const StateIcon = evaluation.enabled && met ? Check : Flag;
 	return (
 		<Card
-			tone={evaluation.enabled ? "default" : "subtle"}
+			role="region"
 			aria-labelledby={headingId}
 			aria-busy={outcomePending}
+			className={cn(
+				"flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 overflow-visible rounded-surface border p-5 text-base text-ink ring-0 print:break-inside-avoid",
+				evaluation.enabled
+					? "border-line bg-surface"
+					: "border-line bg-surface-2",
+			)}
 		>
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
 				<h2
 					id={headingId}
-					className={cardHeadingStyles}
+					className="m-0 flex min-h-8 items-center gap-2 text-sm leading-[1.5] font-semibold [overflow-wrap:anywhere]"
 				>
 					<StateIcon
 						size={16}
@@ -55,12 +62,16 @@ export function EvaluationCard({
 				</h2>
 				<div className="flex justify-end gap-1">
 					{onPinChange && (
-						<IconButton
-							icon={Pin}
-							size="sm"
-							iconSize={16}
-							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
-							label={
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							title={
+								pinned
+									? `Unpin ${evaluation.name} from Outlook`
+									: `Pin ${evaluation.name} to Outlook`
+							}
+							aria-label={
 								pinned
 									? `Unpin ${evaluation.name} from Outlook`
 									: `Pin ${evaluation.name} to Outlook`
@@ -68,25 +79,34 @@ export function EvaluationCard({
 							onClick={onPinChange}
 							disabled={pinDisabled}
 							aria-pressed={pinned}
-						/>
+							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
+						>
+							<Pin size={16} aria-hidden="true" />
+						</Button>
 					)}
 					{onEdit && (
-						<IconButton
-							icon={Pencil}
-							size="sm"
-							iconSize={16}
-							label={`Edit ${evaluation.name}`}
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							title={`Edit ${evaluation.name}`}
+							aria-label={`Edit ${evaluation.name}`}
 							onClick={onEdit}
-						/>
+						>
+							<Pencil size={16} aria-hidden="true" />
+						</Button>
 					)}
 					{onRemove && (
-						<IconButton
-							icon={Trash2}
-							size="sm"
-							iconSize={16}
-							label={`Remove ${evaluation.name}`}
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							title={`Remove ${evaluation.name}`}
+							aria-label={`Remove ${evaluation.name}`}
 							onClick={onRemove}
-						/>
+						>
+							<Trash2 size={16} aria-hidden="true" />
+						</Button>
 					)}
 				</div>
 			</div>
@@ -95,7 +115,7 @@ export function EvaluationCard({
 					{!evaluation.enabled ? (
 						"Paused"
 					) : outcomePending ? (
-						<Skeleton className="h-7 w-36" />
+						<Skeleton className="h-7 w-36" role="status" />
 					) : met ? (
 						"Already reached"
 					) : result?.firstDate ? (
@@ -104,9 +124,9 @@ export function EvaluationCard({
 						"Beyond this horizon"
 					)}
 				</div>
-				<p className="m-0 text-sm leading-relaxed text-muted">
+				<div className="m-0 text-sm leading-relaxed text-muted">
 					{outcomePending ? (
-						<Skeleton className="h-4 w-44" />
+						<Skeleton className="h-4 w-44" role="status" />
 					) : !evaluation.enabled ? (
 						"Excluded from evaluation"
 					) : met ? (
@@ -116,12 +136,12 @@ export function EvaluationCard({
 					) : (
 						"Not reached in the evaluated period"
 					)}
-				</p>
+				</div>
 			</div>
 			<div className="mt-auto flex flex-col gap-4">
 				{evaluation.enabled &&
 					(outcomePending ? (
-						<Skeleton className="h-8 w-full" />
+						<Skeleton className="h-8 w-full" role="status" />
 					) : (
 						result && (
 							<div className="m-0">
@@ -130,9 +150,18 @@ export function EvaluationCard({
 									<span>{money(evaluation.target)} target</span>
 								</div>
 								<Progress
-									value={(result.current / evaluation.target) * 100}
-									label={evaluation.name}
-								/>
+									value={Math.min(
+										100,
+										Math.max(
+											0,
+											Math.round((result.current / evaluation.target) * 100),
+										),
+									)}
+								>
+									<ProgressLabel className="sr-only">
+										{evaluation.name}
+									</ProgressLabel>
+								</Progress>
 							</div>
 						)
 					))}

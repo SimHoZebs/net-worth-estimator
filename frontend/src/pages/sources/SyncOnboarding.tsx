@@ -1,8 +1,7 @@
 import { ArrowRight, ExternalLink, KeyRound } from "lucide-react";
 import { useRef, type ReactNode } from "react";
-import { TextButton } from "../../components/Button.tsx";
-import { buttonStyles } from "../../components/buttonStyles.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
+import { Button, buttonVariants } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
 import { simplefinLinks } from "./simplefinLinks.ts";
@@ -38,13 +37,14 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 	return (
 		<div className="rounded-surface border border-line bg-surface p-5 sm:p-6">
 			<div className="mb-4 flex justify-end">
-				<TextButton
+				<Button
+					variant="link"
 					className="min-h-6 text-sm"
 					disabled={readOnly}
 					onClick={() => inputRef.current?.focus()}
 				>
 					I already have a token <ArrowRight size={14} aria-hidden="true" />
-				</TextButton>
+				</Button>
 			</div>
 			<ol
 				// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
@@ -67,10 +67,7 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 							href={simplefinLinks.home}
 							target="_blank"
 							rel="noopener noreferrer"
-							className={mergeStyles(
-								buttonStyles({ variant: "secondary" }),
-								"hover:bg-hover",
-							)}
+							className={cn(buttonVariants({ variant: "secondary" }))}
 						>
 							Open SimpleFIN <ExternalLink size={14} aria-hidden="true" />
 							<span className="sr-only"> (opens in a new tab)</span>
@@ -97,10 +94,7 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 						href={simplefinLinks.createToken}
 						target="_blank"
 						rel="noopener noreferrer"
-						className={mergeStyles(
-							buttonStyles({ variant: "secondary" }),
-							"hover:bg-hover",
-						)}
+						className={cn(buttonVariants({ variant: "secondary" }))}
 					>
 						<KeyRound size={16} aria-hidden="true" /> Create a setup token{" "}
 						<ExternalLink size={14} aria-hidden="true" />

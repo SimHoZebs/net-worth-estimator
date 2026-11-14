@@ -1,6 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Table, TableBody, TableCell, TableRow } from "../DataTable.tsx";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableRow,
+} from "@/components/ui/table.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
 

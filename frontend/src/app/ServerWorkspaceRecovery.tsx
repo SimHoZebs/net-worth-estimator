@@ -1,11 +1,11 @@
 import { FileUp, LockKeyhole, RotateCcw } from "lucide-react";
 import { type RefObject, useRef } from "react";
+import { toast } from "sonner";
 import type { FinancialModel } from "../api/index.ts";
 import { parseFinancialModel } from "../api/modelImport.ts";
-import { Button } from "../components/Button.tsx";
-import { Notice } from "../components/Notice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
-import { dismissKey, notifyError } from "../state/notifications.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
@@ -44,17 +44,17 @@ export function ServerWorkspaceRecovery() {
 				}),
 			oversizedMessage:
 				"The model file is larger than 2 MB. Choose a smaller JSON file.",
-			onError: (message) => notifyError("model-import", message),
+			onError: (message) => toast.error(message, { id: "model-import" }),
 		});
 	const inputRef = useRef<HTMLInputElement>(null);
 	const failImport = (message: string) => {
-		notifyError("model-import", message);
+		toast.error(message, { id: "model-import" });
 	};
 	const missingModel = status !== undefined && status.hasModel === false;
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();
-		dismissKey("model-import");
+		toast.dismiss("model-import");
 		const imported = await importModel(candidate);
 		if (!imported)
 			failImport(
@@ -77,13 +77,14 @@ export function ServerWorkspaceRecovery() {
 						inputRef={inputRef}
 						onChoose={() => inputRef.current?.click()}
 						onFile={(file) => {
-							dismissKey("model-import");
+							toast.dismiss("model-import");
 							void readFile(file);
 						}}
 					/>
 				)}
 				<div className="flex flex-wrap gap-3">
 					<Button
+						variant="secondary"
 						onClick={() => {
 							void retry();
 						}}
@@ -100,9 +101,10 @@ export function ServerWorkspaceRecovery() {
 					onClose={clearCandidate}
 					footer={
 						<>
-							<Button onClick={clearCandidate}>Cancel</Button>
+							<Button variant="secondary" onClick={clearCandidate}>
+								Cancel
+							</Button>
 							<Button
-								variant="primary"
 								onClick={() => {
 									void importCandidate();
 								}}
@@ -112,12 +114,12 @@ export function ServerWorkspaceRecovery() {
 						</>
 					}
 				>
-					<Notice>
+					<Alert>
 						<LockKeyhole size={18} />
-						<span>
+						<AlertDescription>
 							Validated before activation. Nothing is sent until you confirm.
-						</span>
-					</Notice>
+						</AlertDescription>
+					</Alert>
 				</ModelImportPreview>
 			)}
 		</>
@@ -151,11 +153,7 @@ function ServerModelImport({
 					if (file) onFile(file);
 				}}
 			/>
-			<Button
-				variant="primary"
-				onClick={onChoose}
-				disabled={readOnly || reading}
-			>
+			<Button onClick={onChoose} disabled={readOnly || reading}>
 				<FileUp size={17} />
 				{reading ? "Reading model…" : "Choose server model JSON"}
 			</Button>

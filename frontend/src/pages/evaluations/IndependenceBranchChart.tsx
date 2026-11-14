@@ -3,11 +3,14 @@ import { Chart } from "@tanstack/charts/react";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { useMemo } from "react";
 import {
-	DataTable,
+	Table,
+	TableBody,
+	TableCaption,
 	TableCell,
+	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/DataTable.tsx";
+} from "@/components/ui/table.tsx";
 import type { IndependenceCandidate } from "@/domain/financialIndependence.ts";
 import { dateLabel, isoDate, money, utcDate } from "@/domain/format.ts";
 
@@ -96,6 +99,7 @@ export function IndependenceBranchChart({
 		`${dateLabel(first.date, true)} to ${dateLabel(last.date, true)}. ` +
 		`${money(first.balance)} to ${money(last.balance)}.` +
 		(failure ? ` First spending shortfall: ${dateLabel(failure, true)}.` : "");
+	const caption = "Projected financial independence asset balances";
 	return (
 		<figure className="m-0 mt-3">
 			<figcaption className="text-xs text-muted">
@@ -110,18 +114,48 @@ export function IndependenceBranchChart({
 			/>
 			<details className="mt-2 text-xs text-muted">
 				<summary className="cursor-pointer py-2">Projected balances</summary>
-				<DataTable
-					caption="Projected financial independence asset balances"
-					showHeaders
-					columns={[{ label: "Date" }, { label: "Selected assets" }]}
+				<div
+					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the table.
+					tabIndex={0}
+					role="region"
+					aria-label={caption}
+					className="relative max-w-full overflow-x-auto"
 				>
-					{rows.map((row) => (
-						<TableRow key={row.date}>
-							<TableHeader scope="row">{dateLabel(row.date, true)}</TableHeader>
-							<TableCell>{money(row.balance)}</TableCell>
-						</TableRow>
-					))}
-				</DataTable>
+					<Table className="w-full border-collapse text-left text-sm">
+						<TableCaption className="sr-only">{caption}</TableCaption>
+						<TableHeader className="border-b border-line bg-surface-2 text-muted">
+							<TableRow className="border-b border-line last:border-b-0 hover:bg-transparent">
+								{["Date", "Selected assets"].map((column) => (
+									<TableHead
+										key={column}
+										scope="col"
+										className="h-auto border-0 px-5 py-4 font-medium whitespace-nowrap text-xs text-muted"
+									>
+										{column}
+									</TableHead>
+								))}
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{rows.map((row) => (
+								<TableRow
+									key={row.date}
+									className="border-b border-line last:border-b-0 hover:bg-transparent"
+								>
+									<TableHead
+										scope="row"
+										className="h-auto border-0 px-5 py-4 font-medium whitespace-nowrap text-sm text-inherit"
+									>
+										{dateLabel(row.date, true)}
+									</TableHead>
+									<TableCell className="border-0 px-5 py-4 whitespace-nowrap">
+										{money(row.balance)}
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</div>
 			</details>
 		</figure>
 	);

@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
-import { mergeStyles } from "../mergeStyles.ts";
-import { TableCell, TableHeader, TableRow } from "../DataTable.tsx";
+import { cn } from "@/lib/utils.ts";
+import {
+	TableCell,
+	TableHead,
+	TableRow,
+} from "@/components/ui/table.tsx";
 import {
 	transactionIconStyles,
 	transactionCellStyles,
@@ -51,7 +55,7 @@ export function TransactionItemRow({
 }) {
 	return (
 		<TableRow
-			className={mergeStyles(
+			className={cn(
 				transactionRowStyles({ dimmed, divider }),
 				shortfall && transactionShortfallRowStyles(),
 			)}
@@ -59,7 +63,7 @@ export function TransactionItemRow({
 			<TableCell className={transactionCellStyles({ column: "date" })}>
 				{date}
 			</TableCell>
-			<TableHeader
+			<TableHead
 				scope="row"
 				className={transactionCellStyles({ column: "name" })}
 			>
@@ -71,7 +75,7 @@ export function TransactionItemRow({
 					disabled={selectDisabled}
 				>
 					<span
-						className={mergeStyles(
+						className={cn(
 							transactionIconStyles({ tone }),
 							"max-sm:hidden",
 						)}
@@ -100,7 +104,7 @@ export function TransactionItemRow({
 						)}
 					</span>
 				</button>
-			</TableHeader>
+			</TableHead>
 			<TableCell className={transactionCellStyles({ column: "amount" })}>
 				<span className="flex flex-col items-end gap-0.5">{amount}</span>
 			</TableCell>

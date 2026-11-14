@@ -5,7 +5,6 @@ import {
 	within,
 	waitFor,
 } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	detailedIndependenceOutcome,
@@ -18,25 +17,8 @@ import { FinancialIndependenceCard } from "./FinancialIndependenceCard.tsx";
 import { renderRouterSubject } from "../../mocks/testRouter.tsx";
 import { stubMatchMedia } from "@/mocks/testScope.tsx";
 
-// Focus, dismissal, and responsive framing use the real shared Drawer in browser tests.
-vi.mock("@/components/Drawer.tsx", () => ({
-	Drawer: ({
-		label,
-		children,
-		onClose,
-	}: {
-		label: string;
-		children: ReactNode;
-		onClose: () => void;
-	}) => (
-		<section role="dialog" aria-label={label}>
-			<button type="button" onClick={onClose}>
-				Close dialog
-			</button>
-			{children}
-		</section>
-	),
-}));
+// The inspector renders through the real nova Sheet: dismissal and focus
+// framing come from the shared sheet, not a test double.
 
 beforeEach(() => {
 	stubMatchMedia(false);
@@ -144,7 +126,7 @@ describe("FinancialIndependenceCard", () => {
 			expect(view.router.state.location.pathname).toBe("/accounts/cash"),
 		);
 		expect(view.router.state.location.search).toEqual({});
-		fireEvent.click(dialog.getByRole("button", { name: "Close dialog" }));
+		fireEvent.click(dialog.getByRole("button", { name: "Close" }));
 		expect(view.queryByRole("dialog")).toBeNull();
 		expect(view.queryByRole("table")).toBeNull();
 	});
@@ -251,7 +233,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(
 			view
 				.getByRole("progressbar", { name: "Available projection horizon" })
-				.getAttribute("value"),
+				.getAttribute("aria-valuenow"),
 		).toBe("67");
 		const dialog = await openInspector(view);
 		expect(
@@ -329,7 +311,7 @@ describe("FinancialIndependenceCard", () => {
 		);
 		expect(recalculated.getByText("Funding as of Feb 2036")).toBeTruthy();
 		// Explicit close still owns dismissal.
-		fireEvent.click(view.getByRole("button", { name: "Close dialog" }));
+		fireEvent.click(view.getByRole("button", { name: "Close" }));
 		expect(view.queryByRole("dialog")).toBeNull();
 	});
 });

@@ -6,7 +6,8 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Drawer } from "../components/Drawer.tsx";
+import { Sheet, SheetContent, SheetTitle } from "../components/ui/sheet.tsx";
+import { useModalRegistration } from "../state/modalPresence.ts";
 import { stubMatchMedia } from "../mocks/testScope.tsx";
 import {
 	resetMobileNavigationState,
@@ -27,7 +28,7 @@ function Harness() {
 	const { open, show } = useMobileNavigation();
 	return (
 		<>
-			<button type="button" onClick={show}>
+			<button type="button" data-testid="open-nav-button" onClick={show}>
 				Open nav
 			</button>
 			<span data-testid="nav-open">{String(open)}</span>
@@ -35,23 +36,30 @@ function Harness() {
 	);
 }
 
+/** Any modal dialog registers presence; the Sheet below stands in for one. */
+function UpperSheet() {
+	useModalRegistration(true);
+	return (
+		<Sheet open onOpenChange={() => {}}>
+			<SheetContent side="right">
+				<SheetTitle>Upper sheet</SheetTitle>
+				<p>Upper content</p>
+			</SheetContent>
+		</Sheet>
+	);
+}
+
 describe("mobile navigation guard", () => {
 	it("refuses to open above an open dialog", () => {
 		render(
 			<>
-				<Drawer
-					side="right"
-					open
-					label="Upper sheet"
-					onClose={() => {}}
-					appearance={{ title: "Upper" }}
-				>
-					<p>Upper content</p>
-				</Drawer>
+				<UpperSheet />
 				<Harness />
 			</>,
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Open nav" }));
+		// The open Sheet makes the background inert, so the role query
+		// cannot see the hamburger; the test id still dispatches show().
+		fireEvent.click(screen.getByTestId("open-nav-button"));
 		expect(screen.getByTestId("nav-open").textContent).toBe("false");
 	});
 

@@ -3,8 +3,8 @@ import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
 import { UserScopeError } from "../../api/scopedRequest.ts";
-import { Button } from "../../components/Button.tsx";
-import { FieldError } from "../../components/ErrorNotice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { toast } from "sonner";
 import {
 	useAnalysisFindings,
 	useConfirmTransferPair,
@@ -12,6 +12,7 @@ import {
 	useTransferLinks,
 } from "../../state/analyses.ts";
 import { dismissKey, notifyError } from "../../state/notifications.ts";
+import { cn } from "@/lib/utils.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
 /** Read-only transfer-pair annotation (VIS-03 consumer) with confirm actions.
@@ -118,10 +119,8 @@ export function TransferMatchNote({
 	function reportLinkFailure(cause: unknown, fallback: string): void {
 		if (cause instanceof UserScopeError) return;
 		if (cause instanceof ApiHttpError && cause.status === 422) return;
-		notifyError(
-			"transfer-link",
-			cause instanceof Error ? cause.message : fallback,
-		);
+		const message = cause instanceof Error ? cause.message : fallback;
+		notifyError("transfer-link", message);
 	}
 	const matcherDetail = actionable?.finding.evidence?.[0]?.reason ?? null;
 	const confirmPair = () => {
@@ -134,7 +133,10 @@ export function TransferMatchNote({
 			{
 				onError: (cause) =>
 					reportLinkFailure(cause, "The transfer pair could not be saved."),
-				onSuccess: () => dismissKey("transfer-link"),
+				onSuccess: () => {
+					dismissKey("transfer-link");
+					toast.success("The transfer pair was saved.");
+				},
 			},
 		);
 	};
@@ -183,7 +185,10 @@ export function TransferMatchNote({
 											cause,
 											"The transfer link could not be removed.",
 										),
-									onSuccess: () => dismissKey("transfer-link"),
+									onSuccess: () => {
+										dismissKey("transfer-link");
+										toast.success("The transfer link was removed.");
+									},
 								},
 							)
 						}
@@ -196,6 +201,7 @@ export function TransferMatchNote({
 				<div className="mt-2">
 					<Button
 						type="button"
+						variant="secondary"
 						size="sm"
 						disabled={busy || !peer}
 						aria-label={`Link as transfer with ${peer}`}
@@ -226,6 +232,7 @@ export function TransferMatchNote({
 					</div>
 					<Button
 						type="button"
+						variant="secondary"
 						size="sm"
 						disabled={busy || !peer}
 						aria-label={`Link as transfer with ${peer}`}
@@ -243,7 +250,11 @@ export function TransferMatchNote({
 					<p className="m-0 mt-1 text-xs text-muted">{matcherDetail}</p>
 				</details>
 			)}
-			<FieldError message={inlineError} />
+			{inlineError && (
+				<p role="alert" className={cn("mt-2 text-sm text-danger-text")}>
+					{inlineError}
+				</p>
+			)}
 		</div>
 	);
 }

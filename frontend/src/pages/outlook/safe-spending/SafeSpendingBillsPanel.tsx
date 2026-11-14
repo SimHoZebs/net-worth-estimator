@@ -2,7 +2,7 @@ import {
 	ShieldCheck,
 } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
-import { Skeleton } from "../../../components/Skeleton.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
@@ -32,11 +32,8 @@ const SafeSpendingTrendChart = lazy(() =>
 		default: module.SafeSpendingTrendChart,
 	})),
 );
+import { cn } from "@/lib/utils.ts";
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
-import {
-	householdValueStyles,
-	type HouseholdValueStyleProps,
-} from "./householdStyles.ts";
 
 /**
  * One compact decision row: plain label on the left, base-size value on
@@ -52,7 +49,7 @@ function StatRow({
 }: {
 	label: string;
 	value: string;
-	tone?: HouseholdValueStyleProps["tone"];
+	tone?: "normal" | "positive" | "negative";
 	testId: string;
 	meter?: React.ReactNode;
 	qualifier?: string;
@@ -63,7 +60,14 @@ function StatRow({
 				<span className="text-sm text-muted">{label}</span>
 				<strong
 					data-testid={testId}
-					className={householdValueStyles({ size: "base", tone }) + " whitespace-nowrap"}
+					className={cn(
+						"m-0 text-base font-bold whitespace-nowrap tabular-nums [overflow-wrap:anywhere]",
+						tone === "positive"
+							? "text-success-text"
+							: tone === "negative"
+								? "text-danger-text"
+								: "text-ink",
+					)}
 				>
 					{value}
 				</strong>

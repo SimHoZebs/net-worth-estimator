@@ -7,6 +7,7 @@ import {
 	CalendarDays,
 	Check,
 	Clock3,
+	Ellipsis,
 	Eye,
 	EyeOff,
 	Link2,
@@ -15,6 +16,7 @@ import {
 	Trash2,
 	TriangleAlert,
 	UsersRound,
+	type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -42,14 +44,45 @@ import {
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { serverQueryClient } from "../../state/serverQuery.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { ActionMenu, type ActionMenuItem } from "../ActionMenu.tsx";
-import { Badge } from "../Badge.tsx";
-import { ConfirmDialog } from "../ConfirmDialog.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
-import { TextButton } from "../Button.tsx";
-import { Notice } from "../Notice.tsx";
-import { Checkbox, Input, InputField, Select } from "../Field.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { TransactionDateModal } from "./TransactionDateModal.tsx";
 import {
@@ -59,6 +92,7 @@ import {
 	detailFooterClassName,
 } from "./transactionDetailStyles.ts";
 import { DetailEditActions, DiscardConfirm } from "./DetailEditActions.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	amendSchedule,
 	amendTransaction,
@@ -82,7 +116,6 @@ import {
 	schedulesOptions,
 	useSchedules,
 } from "../../state/workspaceResources.ts";
-import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
 	claimUpdate,
 	detailTransactionValues,
@@ -226,16 +259,14 @@ function MoreOptions({
 				{schedule && (
 					<>
 						<div className={detailPropertyRowClassName}>
-							<label htmlFor={frequencyId} className={rowLabel}>
+							<Label htmlFor={frequencyId} className={rowLabel}>
 								Frequency
-							</label>
+							</Label>
 							<Select
-								id={frequencyId}
-								name="frequency"
 								disabled={locked}
 								value={draft.frequency ?? "monthly"}
-								onChange={(event) => {
-									const next = parseUnion(event.target.value, [
+								onValueChange={(value) => {
+									const next = parseUnion(value, [
 										"daily",
 										"weekly",
 										"monthly",
@@ -244,19 +275,27 @@ function MoreOptions({
 									] as const);
 									if (next) updateDraft({ frequency: next }, "schedule");
 								}}
-								className="min-w-0 flex-1"
 							>
-								<option value="daily">Daily</option>
-								<option value="weekly">Weekly</option>
-								<option value="monthly">Monthly</option>
-								<option value="quarterly">Every 3 months</option>
-								<option value="annual">Yearly</option>
+								<SelectTrigger
+									id={frequencyId}
+									aria-label="Frequency"
+									className="min-w-0 flex-1"
+								>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="daily">Daily</SelectItem>
+									<SelectItem value="weekly">Weekly</SelectItem>
+									<SelectItem value="monthly">Monthly</SelectItem>
+									<SelectItem value="quarterly">Every 3 months</SelectItem>
+									<SelectItem value="annual">Yearly</SelectItem>
+								</SelectContent>
 							</Select>
 						</div>
 						<div className={detailPropertyRowClassName}>
-							<label htmlFor={annualIncreaseId} className={rowLabel}>
+							<Label htmlFor={annualIncreaseId} className={rowLabel}>
 								Annual amount increase (%)
-							</label>
+							</Label>
 							<Input
 								id={annualIncreaseId}
 								name="annualIncrease"
@@ -284,25 +323,30 @@ function MoreOptions({
 							<span className={rowLabel}>Records an occurrence of</span>
 							<div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
 								<Select
-									id={claimScheduleId}
-									aria-label="Records an occurrence of"
-									name="claimScheduleId"
 									disabled={!claimEditable}
-									value={draft.claimScheduleId}
-									onChange={(event) =>
+									value={draft.claimScheduleId ?? ""}
+									onValueChange={(value) =>
 										updateDraft(
-											{ claimScheduleId: event.target.value },
+											{ claimScheduleId: value ?? "" },
 											"schedule",
 										)
 									}
-									className="min-w-0 flex-1"
 								>
-									<option value="">No link — standalone record</option>
-									{claimSchedules.map((rule) => (
-										<option key={rule.id} value={rule.id}>
-											{rule.name}
-										</option>
-									))}
+									<SelectTrigger
+										id={claimScheduleId}
+										aria-label="Records an occurrence of"
+										className="min-w-0 flex-1"
+									>
+										<SelectValue placeholder="No link — standalone record" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="">No link — standalone record</SelectItem>
+										{claimSchedules.map((rule) => (
+											<SelectItem key={rule.id} value={rule.id}>
+												{rule.name}
+											</SelectItem>
+										))}
+									</SelectContent>
 								</Select>
 								<span
 									className="text-xs font-semibold text-muted"
@@ -311,31 +355,44 @@ function MoreOptions({
 									on
 								</span>
 								<Select
-									id={claimOccurrenceId}
-									aria-label="Replaces occurrence on"
-									name="claimOccurrenceDate"
 									disabled={!claimEditable || !draft.claimScheduleId}
-									value={draft.claimOccurrenceDate}
-									onChange={(event) =>
+									value={draft.claimOccurrenceDate ?? ""}
+									onValueChange={(value) =>
 										updateDraft(
-											{ claimOccurrenceDate: event.target.value },
+											{ claimOccurrenceDate: value ?? "" },
 											"schedule",
 										)
 									}
-									className="min-w-0 flex-1"
 								>
-									<option value="">
-										{!draft.claimScheduleId
-											? "Choose a schedule first"
-											: occurrenceOptions.length === 0
-												? "No claimable occurrences"
-												: "Choose the occurrence"}
-									</option>
-									{occurrenceOptions.map((date) => (
-										<option key={date} value={date}>
-											{dateLabel(date, true)}
-										</option>
-									))}
+									<SelectTrigger
+										id={claimOccurrenceId}
+										aria-label="Replaces occurrence on"
+										className="min-w-0 flex-1"
+									>
+										<SelectValue
+											placeholder={
+												!draft.claimScheduleId
+													? "Choose a schedule first"
+													: occurrenceOptions.length === 0
+														? "No claimable occurrences"
+														: "Choose the occurrence"
+											}
+										/>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="">
+											{!draft.claimScheduleId
+												? "Choose a schedule first"
+												: occurrenceOptions.length === 0
+													? "No claimable occurrences"
+													: "Choose the occurrence"}
+										</SelectItem>
+										{occurrenceOptions.map((date) => (
+											<SelectItem key={date} value={date}>
+												{dateLabel(date, true)}
+											</SelectItem>
+										))}
+									</SelectContent>
 								</Select>
 							</div>
 						</div>
@@ -393,62 +450,70 @@ function ScheduleCapsule({
 					<Link2 size={15} aria-hidden="true" />
 					<span>
 						Replaces{" "}
-						<select
-							className={transactionControlStyles({
-								element: "select",
-								shape: "compact",
-							})}
-							aria-label="Records an occurrence of"
-							name="claimScheduleId"
+						<Select
 							disabled={!claimEditable}
-							value={draft.claimScheduleId}
-							onChange={(event) =>
-								updateDraft({ claimScheduleId: event.target.value }, "schedule")
-							}
-						>
-							<option value="">No link</option>
-							{draft.claimScheduleId && (
-								<option value={draft.claimScheduleId}>
-									{claimScheduleName ?? draft.claimScheduleId}
-								</option>
-							)}
-						</select>{" "}
-						on{" "}
-						<select
-							className={transactionControlStyles({
-								element: "select",
-								shape: "compact",
-							})}
-							aria-label="Replaces occurrence on"
-							name="claimOccurrenceDate"
-							disabled={!claimEditable}
-							value={draft.claimOccurrenceDate}
-							onChange={(event) =>
+							value={draft.claimScheduleId ?? ""}
+							onValueChange={(value) =>
 								updateDraft(
-									{ claimOccurrenceDate: event.target.value },
+									{ claimScheduleId: value ?? "" },
 									"schedule",
 								)
 							}
 						>
-							<option value="">Choose a date</option>
-							{occurrenceOptions.map((date) => (
-								<option key={date} value={date}>
-									{dateLabel(date, true)}
-								</option>
-							))}
-						</select>
+							<SelectTrigger
+								aria-label="Records an occurrence of"
+								className={cn(transactionControlStyles({ shape: "compact" }))}
+							>
+								<SelectValue placeholder="No link" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="">No link</SelectItem>
+								{draft.claimScheduleId && (
+									<SelectItem value={draft.claimScheduleId ?? ""}>
+										{claimScheduleName ?? draft.claimScheduleId}
+									</SelectItem>
+								)}
+							</SelectContent>
+						</Select>{" "}
+						on{" "}
+						<Select
+							disabled={!claimEditable}
+							value={draft.claimOccurrenceDate ?? ""}
+							onValueChange={(value) =>
+								updateDraft(
+									{ claimOccurrenceDate: value ?? "" },
+									"schedule",
+								)
+							}
+						>
+							<SelectTrigger
+								aria-label="Replaces occurrence on"
+								className={cn(transactionControlStyles({ shape: "compact" }))}
+							>
+								<SelectValue placeholder="Choose a date" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="">Choose a date</SelectItem>
+								{occurrenceOptions.map((date) => (
+									<SelectItem key={date} value={date}>
+										{dateLabel(date, true)}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</span>
 				</p>
 				{onRemoveOccurrence && claimEditable && (
-					<TextButton
+					<Button
 						type="button"
-						tone="danger"
+						variant="link"
+						className="text-danger-text"
 						disabled={removingOccurrence}
 						onClick={onRemoveOccurrence}
 						aria-label={`Remove occurrence recorded by ${savedTransaction.name}`}
 					>
 						{removingOccurrence ? "Removing…" : "Remove"}
-					</TextButton>
+					</Button>
 				)}
 			</div>
 		);
@@ -473,8 +538,8 @@ function ScheduleCapsule({
 				</div>
 			</div>
 			<div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-				<input
-					className={transactionControlStyles()}
+				<Input
+					className={cn(transactionControlStyles())}
 					id={scheduleControlId}
 					aria-label="First occurrence"
 					type="date"
@@ -490,8 +555,8 @@ function ScheduleCapsule({
 				{draft.noEndDate && !editing ? (
 					"ongoing"
 				) : (
-					<input
-						className={transactionControlStyles()}
+					<Input
+						className={cn(transactionControlStyles())}
 						aria-label="Last occurrence"
 						type="date"
 						name="endDate"
@@ -504,7 +569,7 @@ function ScheduleCapsule({
 					/>
 				)}{" "}
 				{editing && (
-					<label
+					<Label
 						htmlFor={`${id}-no-end-date`}
 						className="inline-flex items-center gap-1 whitespace-nowrap"
 					>
@@ -513,12 +578,12 @@ function ScheduleCapsule({
 							name="noEndDate"
 							disabled={locked}
 							checked={draft.noEndDate}
-							onChange={(event) =>
-								updateDraft({ noEndDate: event.target.checked }, "schedule")
+							onCheckedChange={(checked) =>
+								updateDraft({ noEndDate: checked === true }, "schedule")
 							}
 						/>
 						No end date
-					</label>
+					</Label>
 				)}
 			</div>
 		</div>
@@ -536,13 +601,15 @@ function ReadOnlyNotice({
 	// charge. The row is editable and can be restored.
 	if (!savedTransaction.void) return null;
 	return (
-		<Notice className="my-4">
+		<Alert role="note" className="my-4">
 			<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
-			This hold vanished without a posted charge. You can edit it or
-			restore it as a settled record.
-			{!appReadOnly &&
-				" If it posted after all, pick the posted charge below and remove this record."}
-		</Notice>
+			<AlertDescription>
+				This hold vanished without a posted charge. You can edit it or
+				restore it as a settled record.
+				{!appReadOnly &&
+					" If it posted after all, pick the posted charge below and remove this record."}
+			</AlertDescription>
+		</Alert>
 	);
 }
 function readOnlyReasonFor(savedTransaction: Transaction): string | undefined {
@@ -1286,7 +1353,7 @@ export function TransactionDetail({
 			>
 				<DirectionIcon kind={kind} size={22} />
 			</span>
-			<input
+			<Input
 				id={`${edit.formId}-name`}
 				aria-label="Transaction name"
 				name="name"
@@ -1298,7 +1365,7 @@ export function TransactionDetail({
 				}
 				readOnly={!canEdit}
 				form={edit.formId}
-				className={transactionControlStyles({ shape: "name" })}
+				className={cn(transactionControlStyles({ shape: "name" }))}
 			/>
 			{savedTransaction.kind === "schedule" && (
 				<span
@@ -1312,7 +1379,17 @@ export function TransactionDetail({
 			)}
 		</span>
 	);
-	const menuItems: ActionMenuItem[] = [];
+	type DetailMenuItem = {
+		id: string;
+		label: string;
+		icon?: LucideIcon;
+		onSelect: () => void;
+		checked?: boolean;
+		tone?: "default" | "danger";
+		disabled?: boolean;
+		restoreFocus?: boolean;
+	};
+	const menuItems: DetailMenuItem[] = [];
 	if (canEdit) {
 		menuItems.push({
 			id: "toggle-enabled",
@@ -1363,29 +1440,87 @@ export function TransactionDetail({
 	}
 	return (
 		<DetailPortal>
-			<Modal
-				title={editHeading}
-				titleSize="plain"
-				headerClassName="border-b-0 pb-0"
-				className={`${detailSheetBaseStyles} max-w-xl`}
-				onCloseRequest={edit.requestClose}
-				actions={
-					<>
-						<ActionMenu
-							label="More options"
-							menuLabel={
-								savedTransaction.kind === "schedule"
-									? "Schedule actions"
-									: "Transaction actions"
-							}
-							items={menuItems}
-						/>
-						{edit.actions}
-					</>
-				}
-				onClose={onClose}
-				focusPanelOnOpen
+			<Sheet
+				open
+				onOpenChange={(open) => {
+					if (!open && edit.requestClose()) onClose();
+				}}
 			>
+				<SheetContent
+					side="right"
+					className={`${detailSheetBaseStyles} max-w-xl`}
+				>
+					<SheetHeader className="border-b-0 p-4 pb-0">
+						<div className="flex items-start justify-between gap-2 pr-8">
+							<SheetTitle>{editHeading}</SheetTitle>
+							<div className="flex flex-none items-center gap-1">
+								{menuItems.length > 0 && (
+									<DropdownMenu>
+										<DropdownMenuTrigger
+											render={
+												<Button
+													variant="ghost"
+													size="icon"
+													aria-label="More options"
+													title="More options"
+												>
+													<Ellipsis aria-hidden="true" />
+												</Button>
+											}
+										/>
+										<DropdownMenuContent
+											align="end"
+											aria-label={
+												savedTransaction.kind === "schedule"
+													? "Schedule actions"
+													: "Transaction actions"
+											}
+										>
+											{menuItems.map((item) => {
+												const Icon = item.icon;
+												const label = (
+													<>
+														{Icon && (
+															<Icon size={14} aria-hidden="true" />
+														)}
+														<span>{item.label}</span>
+													</>
+												);
+												return item.checked === undefined ? (
+													<DropdownMenuItem
+														key={item.id}
+														disabled={item.disabled}
+														variant={
+															item.tone === "danger"
+																? "destructive"
+																: "default"
+														}
+														onClick={() => item.onSelect()}
+													>
+														{label}
+													</DropdownMenuItem>
+												) : (
+													<DropdownMenuCheckboxItem
+														key={item.id}
+														checked={item.checked}
+														disabled={item.disabled}
+														onCheckedChange={() => item.onSelect()}
+													>
+														{label}
+													</DropdownMenuCheckboxItem>
+												);
+											})}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								)}
+								{edit.actions}
+							</div>
+						</div>
+						<SheetDescription className="sr-only">
+							{edit.draft.name}
+						</SheetDescription>
+					</SheetHeader>
+					<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
 				<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
 					<div className="flex flex-col gap-3 pt-1 pb-2">
 						<div className="flex min-w-0 flex-col gap-2">
@@ -1401,7 +1536,7 @@ export function TransactionDetail({
 											? "$"
 											: `${transaction.direction === "in" ? "+" : "−"}$`}
 									</span>
-									<input
+									<Input
 										id={`${edit.formId}-amount`}
 										aria-label="Amount (USD)"
 										name="amount"
@@ -1421,35 +1556,39 @@ export function TransactionDetail({
 										readOnly={
 											!canEdit || savedTransaction.amountKnown === false
 										}
-										className={transactionControlStyles({
-											shape: "amount",
-											positive: transaction.direction === "in",
-										})}
+										className={cn(
+											transactionControlStyles({
+												shape: "amount",
+												positive: transaction.direction === "in",
+											}),
+										)}
 									/>
 								</span>
 							)}
 							<div className="flex flex-wrap items-center gap-2">
 								{transaction.void ? (
-									<Badge tone="neutral">
+									<Badge variant="secondary">
 										Did not post
 										<span className="sr-only">bank hold that did not post</span>
 									</Badge>
 								) : transaction.pending ? (
-									<Badge tone="warning">
+									<Badge className="bg-warning-bg text-warning-text">
 										<Clock3 size={10} aria-hidden="true" />
 										Pending
 									</Badge>
 								) : showPosted ? (
-									<Badge tone="success">
+									<Badge className="bg-success-bg text-success-text">
 										<Check size={10} aria-hidden="true" />
 										Posted
 									</Badge>
 								) : null}
 								{showExcluded && (
-									<Badge tone="warning">Excluded from account</Badge>
+									<Badge className="bg-warning-bg text-warning-text">
+										Excluded from account
+									</Badge>
 								)}
 								{showShortfall && (
-									<Badge tone="warning">
+									<Badge className="bg-warning-bg text-warning-text">
 										<TriangleAlert size={10} aria-hidden="true" />
 										{shortfallLabel ?? "Shortfall"}
 									</Badge>
@@ -1457,9 +1596,13 @@ export function TransactionDetail({
 								{!savedTransaction.enabled &&
 									!transaction.pending &&
 									!transaction.void &&
-									!showExcluded && <Badge tone="warning">Excluded</Badge>}
+									!showExcluded && (
+										<Badge className="bg-warning-bg text-warning-text">
+											Excluded
+										</Badge>
+									)}
 								{savedTransaction.amountKnown === false && (
-									<Badge tone="neutral">Calculated</Badge>
+									<Badge variant="secondary">Calculated</Badge>
 								)}
 								{accountRoute && (
 									<>
@@ -1532,27 +1675,31 @@ export function TransactionDetail({
 										>
 											FROM ACCOUNT
 										</span>
-										<select
-											id={`${edit.formId}-from`}
-											aria-label="From"
-											name="fromId"
-											value={edit.draft.fromId}
-											onChange={(event) =>
-												edit.updateDraft({ fromId: event.target.value }, "from")
-											}
+										<Select
 											disabled={!canEdit}
-											className={transactionControlStyles({
-												element: "select",
-												shape: "account",
-												appearance:
-													edit.activeField === "from" ? "native" : "plain",
-											})}
+											value={edit.draft.fromId ?? ""}
+											onValueChange={(value) =>
+												edit.updateDraft({ fromId: value ?? "" }, "from")
+											}
 										>
-											<option value="">External income</option>
-											<AccountOptions
-												accounts={fromAccountOptions(fullAccounts)}
-											/>
-										</select>
+											<SelectTrigger
+												id={`${edit.formId}-from`}
+												aria-label="From"
+												className={cn(
+													transactionControlStyles({ shape: "account" }),
+												)}
+											>
+												<SelectValue placeholder="External income" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="">External income</SelectItem>
+												{fromAccountOptions(fullAccounts).map((account) => (
+													<SelectItem key={account.id} value={account.id}>
+														{account.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
 									</div>
 								</div>
 								<div
@@ -1575,27 +1722,31 @@ export function TransactionDetail({
 										>
 											TO ACCOUNT
 										</span>
-										<select
-											id={`${edit.formId}-to`}
-											aria-label="To"
-											name="toId"
-											value={edit.draft.toId}
-											onChange={(event) =>
-												edit.updateDraft({ toId: event.target.value }, "to")
-											}
+										<Select
 											disabled={!canEdit}
-											className={transactionControlStyles({
-												element: "select",
-												shape: "account",
-												appearance:
-													edit.activeField === "to" ? "native" : "plain",
-											})}
+											value={edit.draft.toId ?? ""}
+											onValueChange={(value) =>
+												edit.updateDraft({ toId: value ?? "" }, "to")
+											}
 										>
-											<option value="">External spending</option>
-											<AccountOptions
-												accounts={visibleAccounts(fullAccounts)}
-											/>
-										</select>
+											<SelectTrigger
+												id={`${edit.formId}-to`}
+												aria-label="To"
+												className={cn(
+													transactionControlStyles({ shape: "account" }),
+												)}
+											>
+												<SelectValue placeholder="External spending" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="">External spending</SelectItem>
+												{visibleAccounts(fullAccounts).map((account) => (
+													<SelectItem key={account.id} value={account.id}>
+														{account.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
 									</div>
 								</div>
 							</div>
@@ -1648,11 +1799,15 @@ export function TransactionDetail({
 							readOnly={Boolean(readOnly)}
 						/>
 					)}
-					<FieldError
-						message={[subscription.error, edit.error, claimRemoveError]
-							.filter(Boolean)
-							.join(" ")}
-					/>
+					{[subscription.error, edit.error, claimRemoveError]
+						.filter(Boolean)
+						.join(" ") && (
+						<p role="alert" className="m-0 text-sm text-danger-text">
+							{[subscription.error, edit.error, claimRemoveError]
+								.filter(Boolean)
+								.join(" ")}
+						</p>
+					)}
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">
 							Saving…
@@ -1688,9 +1843,9 @@ export function TransactionDetail({
 						<>
 							<div className="flex flex-wrap items-center gap-4">
 								{once && (
-									<TextButton
+									<Button
 										type="button"
-										tone="default"
+										variant="link"
 										onClick={() => setSharingOpen(true)}
 										aria-label={`Sharing status: ${sharingLabel}. Open sharing settings`}
 										aria-haspopup="dialog"
@@ -1701,12 +1856,12 @@ export function TransactionDetail({
 											<LockKeyhole size={14} aria-hidden="true" />
 										)}
 										<span>{sharingLabel}</span>
-									</TextButton>
+									</Button>
 								)}
 								{savedTransaction.kind === "schedule" && (
-									<TextButton
+									<Button
 										type="button"
-										tone="default"
+										variant="link"
 										onClick={() => {
 											scrollToSection(`${edit.formId}-schedule-section`);
 											document
@@ -1721,7 +1876,7 @@ export function TransactionDetail({
 									>
 										<Repeat size={14} aria-hidden="true" />
 										<span>{scheduleCadence ?? "Recurring schedule"}</span>
-									</TextButton>
+									</Button>
 								)}
 							</div>
 							<div className="flex flex-wrap items-center gap-4">
@@ -1735,13 +1890,27 @@ export function TransactionDetail({
 						</>
 					)}
 				</div>
-			</Modal>
+				</div>
+			</SheetContent>
+		</Sheet>
 			{once && insightsOpen && (
-				<Modal
-					title="Suggestions"
-					onClose={() => setInsightsOpen(false)}
-					className={`${detailSheetBaseStyles} max-w-md`}
+				<Sheet
+					open
+					onOpenChange={(open) => {
+						if (!open) setInsightsOpen(false);
+					}}
 				>
+					<SheetContent
+						side="right"
+						className={`${detailSheetBaseStyles} max-w-md`}
+					>
+						<SheetHeader className="border-b-0 p-4 pb-0">
+							<SheetTitle>Suggestions</SheetTitle>
+							<SheetDescription className="sr-only">
+								Small checks to improve future estimates
+							</SheetDescription>
+						</SheetHeader>
+						<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
 					<p className="mt-0 mb-6 text-xs text-muted">
 						Small checks to improve future estimates
 					</p>
@@ -1752,19 +1921,35 @@ export function TransactionDetail({
 						onDone={() => setInsightsOpen(false)}
 						onMergeVoid={savedTransaction.void ? mergeVoidHold : undefined}
 					/>
-				</Modal>
+						</div>
+					</SheetContent>
+				</Sheet>
 			)}
 			{once && sharingOpen && (
-				<Modal
-					title="Sharing"
-					onClose={() => setSharingOpen(false)}
-					className={`${detailSheetBaseStyles} max-w-md`}
+				<Sheet
+					open
+					onOpenChange={(open) => {
+						if (!open) setSharingOpen(false);
+					}}
 				>
+					<SheetContent
+						side="right"
+						className={`${detailSheetBaseStyles} max-w-md`}
+					>
+						<SheetHeader className="border-b-0 p-4 pb-0">
+							<SheetTitle>Sharing</SheetTitle>
+							<SheetDescription className="sr-only">
+								Sharing settings for this transaction
+							</SheetDescription>
+						</SheetHeader>
+						<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
 					<TransactionSharing
 						transactionId={savedTransaction.id}
 						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 					/>
-				</Modal>
+						</div>
+					</SheetContent>
+				</Sheet>
 			)}
 			{historySelection && (
 				<TransactionDetail
@@ -1808,70 +1993,111 @@ export function TransactionDetail({
 				/>
 			)}
 			{confirmingDelete && (
-				<ConfirmDialog
-					title={`Delete ${savedTransaction.name}?`}
-					eyebrow="Changes"
-					onCancel={() => {
-						if (!deleting) {
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open && !deleting) {
 							setConfirmingDelete(false);
 							setDeleteError(null);
 						}
 					}}
-					onConfirm={() => void removeTransaction()}
-					cancelLabel={
-						savedTransaction.kind === "schedule"
-							? "Keep schedule"
-							: "Keep transaction"
-					}
-					confirmLabel={
-						savedTransaction.kind === "schedule"
-							? "Delete schedule"
-							: "Delete transaction"
-					}
-					busyLabel="Deleting…"
-					busy={deleting}
-					error={deleteError}
 				>
-					<p>
-						{savedTransaction.kind === "schedule"
-							? "This deletes the schedule immediately. Its recorded transactions stay."
-							: "This deletes the transaction immediately. It is removed from the saved model."}
-					</p>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+								Changes
+							</p>
+							<AlertDialogTitle>
+								{`Delete ${savedTransaction.name}?`}
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								{savedTransaction.kind === "schedule"
+									? "This deletes the schedule immediately. Its recorded transactions stay."
+									: "This deletes the transaction immediately. It is removed from the saved model."}
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						{deleteError && (
+							<p role="alert" className="m-0 text-sm text-danger-text">
+								{deleteError}
+							</p>
+						)}
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={deleting}>
+								{savedTransaction.kind === "schedule"
+									? "Keep schedule"
+									: "Keep transaction"}
+							</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								disabled={deleting}
+								onClick={() => void removeTransaction()}
+							>
+								{deleting
+									? "Deleting…"
+									: savedTransaction.kind === "schedule"
+										? "Delete schedule"
+										: "Delete transaction"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 			{confirmingEndSchedule && (
-				<ConfirmDialog
-					title={`End ${savedTransaction.name} with a transaction?`}
-					eyebrow="Changes"
-					onCancel={() => {
-						if (!endingSchedule) {
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open && !endingSchedule) {
 							setConfirmingEndSchedule(false);
 							setEndScheduleError(null);
 						}
 					}}
-					onConfirm={() => void endSchedule()}
-					cancelLabel="Keep schedule"
-					confirmLabel="Record transaction"
-					confirmVariant="primary"
-					busyLabel="Recording…"
-					busy={endingSchedule}
-					error={endScheduleError}
 				>
-					<p>
-						This records one transaction with the schedule amount and accounts.
-						The schedule ends and no further occurrences are planned.
-					</p>
-					<InputField
-						label="Transaction date"
-						containerClassName="mt-3"
-						type="date"
-						name="endScheduleDate"
-						required
-						disabled={endingSchedule}
-						value={endScheduleDate}
-						onChange={(event) => setEndScheduleDate(event.target.value)}
-					/>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+								Changes
+							</p>
+							<AlertDialogTitle>
+								{`End ${savedTransaction.name} with a transaction?`}
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								This records one transaction with the schedule amount and
+								accounts. The schedule ends and no further occurrences are
+								planned.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<Field className="mt-3">
+							<FieldLabel htmlFor="end-schedule-date">
+								Transaction date
+							</FieldLabel>
+							<Input
+								id="end-schedule-date"
+								type="date"
+								name="endScheduleDate"
+								required
+								disabled={endingSchedule}
+								value={endScheduleDate}
+								onChange={(event) => setEndScheduleDate(event.target.value)}
+							/>
+						</Field>
+						{endScheduleError && (
+							<p role="alert" className="m-0 text-sm text-danger-text">
+								{endScheduleError}
+							</p>
+						)}
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={endingSchedule}>
+								Keep schedule
+							</AlertDialogCancel>
+							<AlertDialogAction
+								disabled={endingSchedule}
+								onClick={() => void endSchedule()}
+							>
+								{endingSchedule ? "Recording…" : "Record transaction"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 		</DetailPortal>
 	);

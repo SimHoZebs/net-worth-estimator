@@ -6,6 +6,7 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { dialogScope, runInteractions } from "../../mocks/interactions.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
@@ -208,7 +209,7 @@ it("deletes the transaction through the row endpoint", async () => {
 	);
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
 	fireEvent.click(screen.getByRole("menuitem", { name: "Delete transaction" }));
-	const confirm = screen.getByRole("dialog", {
+	const confirm = screen.getByRole("alertdialog", {
 		name: "Delete Home renovation?",
 	});
 	fireEvent.click(
@@ -382,17 +383,21 @@ it("lets a pending bank row record an occurrence while editable", async () => {
 		(screen.getByLabelText("Amount (USD)") as HTMLInputElement).readOnly,
 	).toBe(false);
 	// But the occurrence claim is editable, with rules from the saved query.
-	const claim = screen.getByLabelText(
-		"Records an occurrence of",
-	) as HTMLSelectElement;
-	expect(claim.disabled).toBe(false);
-	await screen.findByRole("option", { name: "Salary" });
-	fireEvent.change(claim, { target: { value: "salary" } });
-	for (const control of screen.getAllByLabelText(
-		"Records an occurrence of",
-	) as HTMLSelectElement[]) {
-		expect(control.value).toBe("salary");
-		expect(control.disabled).toBe(false);
+	const claimUser = userEvent.setup();
+	const [claim] = screen.getAllByRole("combobox", {
+		name: "Records an occurrence of",
+	});
+	if (!claim) throw new Error("Expected the occurrence claim control");
+	expect((claim as HTMLButtonElement).disabled).toBe(false);
+	await claimUser.click(claim);
+	await claimUser.click(await screen.findByRole("option", { name: "Salary" }));
+	const controls = await screen.findAllByRole("combobox", {
+		name: "Records an occurrence of",
+	});
+	expect(controls).toHaveLength(2);
+	for (const control of controls) {
+		expect(control.textContent).toMatch(/salary/i);
+		expect((control as HTMLButtonElement).disabled).toBe(false);
 	}
 	await waitFor(() =>
 		expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy(),
@@ -421,23 +426,22 @@ it("asks before closing a touched edit and keeps the dialog responsive", async (
 	fireEvent.change(screen.getByLabelText("Transaction name"), {
 		target: { value: "Home renovation updated" },
 	});
-	const panel = screen.getByRole("dialog").firstElementChild as HTMLElement;
-	await waitFor(() => expect(panel.dataset.state).toBe("open"));
-	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	await screen.findByRole("dialog");
+	fireEvent.click(screen.getByRole("button", { name: "Close" }));
 	const prompt = screen
 		.getByText("Discard the changes in this form?")
 		.closest("[role='alert']") as HTMLElement;
 	expect(prompt).toBeTruthy();
 	expect(onClose).not.toHaveBeenCalled();
-	// The veto runs before the exit animation, so the prompt stays visible.
-	expect(panel.dataset.state).not.toBe("closed");
+	// The veto keeps the dialog mounted, so the prompt stays visible.
+	expect(screen.getByRole("dialog")).toBeTruthy();
 	// Continue clears the prompt; the next close asks again instead of
 	// being latched off by the first request.
 	fireEvent.click(within(prompt).getByRole("button", { name: "Continue" }));
 	await waitFor(() =>
 		expect(screen.queryByText("Discard the changes in this form?")).toBeNull(),
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	fireEvent.click(screen.getByRole("button", { name: "Close" }));
 	const secondPrompt = await screen.findByText(
 		"Discard the changes in this form?",
 	);
@@ -466,20 +470,22 @@ it("keeps the discard confirmation after a failed occurrence claim", async () =>
 			onClose={onClose}
 		/>,
 	);
-	await screen.findByRole("option", { name: "Salary" });
-	fireEvent.change(screen.getByLabelText("Records an occurrence of"), {
-		target: { value: "salary" },
+	const claimUser = userEvent.setup();
+	const [firstClaim] = screen.getAllByRole("combobox", {
+		name: "Records an occurrence of",
 	});
+	if (!firstClaim) throw new Error("Expected the occurrence claim control");
+	await claimUser.click(firstClaim);
+	await claimUser.click(await screen.findByRole("option", { name: "Salary" }));
 	fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
 	await screen.findByText("Choose which occurrence this replaces.");
-	const panel = screen.getByRole("dialog").firstElementChild as HTMLElement;
-	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	fireEvent.click(screen.getByRole("button", { name: "Close" }));
 	await screen.findByText("Discard the changes in this form?");
 	expect(onClose).not.toHaveBeenCalled();
-	// A failed save must not make closing fade the panel and strand the user.
-	expect(panel.dataset.state).not.toBe("closed");
+	// A failed save must not unmount the dialog and strand the user.
+	expect(screen.getByRole("dialog")).toBeTruthy();
 	// Close requests keep the prompt visible; only its Discard button closes.
-	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	fireEvent.click(screen.getByRole("button", { name: "Close" }));
 	expect(onClose).not.toHaveBeenCalled();
 	const prompt = screen
 		.getByText("Discard the changes in this form?")
@@ -505,15 +511,18 @@ it("toggles projections from the options menu and saves", async () => {
 			onClose={() => {}}
 		/>,
 	);
+	// The menu paints in a body-level portal, so only the trigger click
+	// scopes to the dialog; the item clicks run against the body.
 	await runInteractions(
-		[
-			{ click: ["button", "More options"] },
-			{ click: ["menuitemcheckbox", "Exclude from projections"] },
-			{ expectPresent: ["button", "Save changes"] },
-			{ click: ["button", "Save changes"] },
-		],
+		[{ click: ["button", "More options"] }],
 		dialogScope(/Home renovation/),
 	);
+	await runInteractions([
+		{ waitForText: "Exclude from projections" },
+		{ click: ["menuitemcheckbox", "Exclude from projections"] },
+		{ expectPresent: ["button", "Save changes"] },
+		{ click: ["button", "Save changes"] },
+	]);
 	await waitFor(() =>
 		expect(
 			server.calls.some(
@@ -551,7 +560,7 @@ it("opens and closes the sharing sheet without closing the detail", async () => 
 	);
 	expect(screen.getByRole("dialog", { name: "Sharing" })).toBeTruthy();
 	await runInteractions(
-		[{ click: ["button", "Close dialog"] }],
+		[{ click: ["button", "Close"] }],
 		dialogScope("Sharing"),
 	);
 	await waitFor(() =>
@@ -1077,7 +1086,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.getByRole("button", { name: /Category/ })).toBeTruthy();
+	expect(screen.getByRole("combobox", { name: /Category/ })).toBeTruthy();
 	cleanup();
 	const rule = {
 		...transaction,
@@ -1093,7 +1102,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
+	expect(screen.queryByRole("combobox", { name: /Category/ })).toBeNull();
 	cleanup();
 	const voided = {
 		...transaction,
@@ -1110,7 +1119,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.getByRole("button", { name: /Category/ })).toBeTruthy();
+	expect(screen.getByRole("combobox", { name: /Category/ })).toBeTruthy();
 });
 
 it("keeps category edits enabled on a pending bank row", () => {
@@ -1134,7 +1143,7 @@ it("keeps category edits enabled on a pending bank row", () => {
 		/>,
 	);
 	expect(
-		(screen.getByRole("button", { name: /Category/ }) as HTMLButtonElement)
+		(screen.getByRole("combobox", { name: /Category/ }) as HTMLButtonElement)
 			.disabled,
 	).toBe(false);
 });
@@ -1495,7 +1504,7 @@ it("ends a schedule by recording one transaction", async () => {
 			name: "End schedule with this transaction",
 		}),
 	);
-	const confirm = screen.getByRole("dialog", {
+	const confirm = screen.getByRole("alertdialog", {
 		name: "End Monthly investing with a transaction?",
 	});
 	fireEvent.change(within(confirm).getByLabelText("Transaction date"), {

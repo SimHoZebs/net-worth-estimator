@@ -1,9 +1,16 @@
-import { Landmark, Link2 } from "lucide-react";
+import { Ellipsis, Landmark, Link2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
-import { ActionMenu } from "../../components/ActionMenu.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import type { Account } from "../../domain/model.ts";
 import { useSavedAccounts } from "../../state/savedState.ts";
 import { refreshSyncSettings, useSyncLinks } from "../../state/syncSettings.ts";
@@ -49,20 +56,34 @@ export function SyncConnectedAccounts({
 		<div className="border-t border-line p-5 sm:p-6">
 			<h3 className="mt-0 mb-4 text-base">Synced accounts</h3>
 			{balancesQuery.isError ? (
-				<ErrorNotice
-					message="The manual accounts could not be loaded."
-					action="Reload"
-					onAction={() => void refreshAccounts().catch(() => {})}
-				/>
+				<Alert variant="destructive">
+					<AlertCircle size={16} aria-hidden="true" />
+					<AlertDescription>
+						The manual accounts could not be loaded.{" "}
+						<Button
+							variant="link"
+							onClick={() => void refreshAccounts().catch(() => {})}
+						>
+							Reload
+						</Button>
+					</AlertDescription>
+				</Alert>
 			) : null}
 			{links.isPending ? (
 				<Skeleton className="h-16 w-full" />
 			) : links.isError ? (
-				<ErrorNotice
-					message="The synced accounts could not be loaded."
-					action="Reload"
-					onAction={() => void refreshSyncSettings(true)}
-				/>
+				<Alert variant="destructive">
+					<AlertCircle size={16} aria-hidden="true" />
+					<AlertDescription>
+						The synced accounts could not be loaded.{" "}
+						<Button
+							variant="link"
+							onClick={() => void refreshSyncSettings(true)}
+						>
+							Reload
+						</Button>
+					</AlertDescription>
+				</Alert>
 			) : links.data.length > 0 ? (
 				<ul
 					// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
@@ -72,6 +93,12 @@ export function SyncConnectedAccounts({
 				>
 					{links.data.map((link) => {
 						const account = byId.get(link.modelAccountId);
+						// A synced loan can never absorb a manual account: the server rejects loan components on both sides.
+						const canLink =
+							account &&
+							!isGroupedDisplay(account) &&
+							!readOnly &&
+							manualAccounts.length > 0;
 						return (
 							<li
 								key={link.bridgeAccountId}
@@ -91,35 +118,41 @@ export function SyncConnectedAccounts({
 											</small>
 										) : null}
 									</div>
-									{/* A synced loan can never absorb a manual account: the server rejects loan components on both sides. */}
-									<ActionMenu
-										label={
-											account
-												? `More options for ${account.name}`
-												: "More options"
-										}
-										menuLabel="Synced account actions"
-										items={
-											account &&
-											!isGroupedDisplay(account) &&
-											!readOnly &&
-											manualAccounts.length > 0
-												? [
-														{
-															id: "link-existing-account",
-															label: "Link existing account",
-															icon: Link2,
-															restoreFocus: false,
-															onSelect: () =>
-																setLinking({
-																	bridgeAccountId: link.bridgeAccountId,
-																	syncedAccount: account,
-																}),
-														},
-													]
-												: []
-										}
-									/>
+									{canLink ? (
+										<DropdownMenu>
+											<DropdownMenuTrigger
+												render={
+													<Button
+														variant="ghost"
+														size="icon"
+														aria-label={
+															account
+																? `More options for ${account.name}`
+																: "More options"
+														}
+													>
+														<Ellipsis size={16} aria-hidden="true" />
+													</Button>
+												}
+											/>
+											<DropdownMenuContent
+												align="end"
+												aria-label="Synced account actions"
+											>
+												<DropdownMenuItem
+													onClick={() =>
+														setLinking({
+															bridgeAccountId: link.bridgeAccountId,
+															syncedAccount: account,
+														})
+													}
+												>
+													<Link2 size={14} aria-hidden="true" />
+													Link existing account
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									) : null}
 								</div>
 							</li>
 						);

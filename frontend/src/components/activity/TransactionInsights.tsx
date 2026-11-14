@@ -16,11 +16,19 @@ import {
 	useDismissAnalysisFinding,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
-import { Badge } from "../Badge.tsx";
-import { Button, TextButton } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { InputField, SelectField } from "../Field.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
+import { cn } from "@/lib/utils.ts";
 import { detailFooterClassName } from "./transactionDetailStyles.ts";
 import {
 	ExistingScheduleDialog,
@@ -128,15 +136,16 @@ export function TransactionInsightsTrigger({
 }) {
 	if (!count) return null;
 	return (
-		<TextButton
+		<Button
 			type="button"
+			variant="link"
 			onClick={onClick}
 			aria-label={`Review ${count} suggestion${count === 1 ? "" : "s"}`}
 		>
 			<Sparkles size={14} aria-hidden="true" />
 			<span>Review suggestions</span>
-			<Badge tone="neutral">{count}</Badge>
-		</TextButton>
+			<Badge variant="secondary">{count}</Badge>
+		</Button>
 	);
 }
 
@@ -261,7 +270,7 @@ export function TransactionInsightsPanel({
 				<h3 className="m-0 mb-6 text-lg font-semibold tracking-tight">
 					All caught up
 				</h3>
-				<Button type="button" variant="primary" onClick={onDone}>
+				<Button type="button" variant="default" onClick={onDone}>
 					Done
 				</Button>
 			</div>
@@ -441,22 +450,35 @@ export function TransactionInsightsPanel({
 			{shown.kind === "void" ? (
 				<div className="grid gap-3">
 					{shown.candidates.length > 1 && (
-						<SelectField
-							label="Posted as"
-							name="suggestedPostedCharge"
-							value={voidCandidateId}
-							onChange={(event) => setVoidCandidateId(event.target.value)}
-						>
-							{shown.candidates.map((candidate) => (
-								<option
-									key={candidate.transactionId}
-									value={candidate.transactionId}
+						<Field>
+							<FieldLabel htmlFor="suggestedPostedCharge">
+								Posted as
+							</FieldLabel>
+							<Select
+								value={voidCandidateId}
+								onValueChange={(next) => {
+									if (next !== null) setVoidCandidateId(next);
+								}}
+							>
+								<SelectTrigger
+									id="suggestedPostedCharge"
+									aria-label="Posted as"
 								>
-									{candidate.name} — {money(candidate.amount)} on{" "}
-									{dateLabel(candidate.date, true)}
-								</option>
-							))}
-						</SelectField>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{shown.candidates.map((candidate) => (
+										<SelectItem
+											key={candidate.transactionId}
+											value={candidate.transactionId}
+										>
+											{candidate.name} — {money(candidate.amount)} on{" "}
+											{dateLabel(candidate.date, true)}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</Field>
 					)}
 					{movesVoidClaim && shown.voidRow.claimScheduleId && (
 						<p className="m-0 text-xs leading-relaxed text-muted">
@@ -490,7 +512,7 @@ export function TransactionInsightsPanel({
 					</Button>
 					<Button
 						type="button"
-						variant="primary"
+						variant="default"
 						disabled={busy || readOnly}
 						onClick={() => answer("confirm")}
 					>
@@ -500,29 +522,38 @@ export function TransactionInsightsPanel({
 			) : isBnpl && !recurringSnapshot ? (
 				<form onSubmit={(event) => saveDuration(event)} className="grid gap-4">
 					<div className="grid grid-cols-2 gap-3">
-						<InputField
-							label="Plan length"
-							ref={durationRef}
-							type="number"
-							inputMode="numeric"
-							min={1}
-							max={5200}
-							step={1}
-							required
-							value={durationCount}
-							onChange={(event) => setDurationCount(event.target.value)}
-							containerClassName="min-w-0"
-						/>
-						<SelectField
-							label="Unit"
-							value={durationUnit}
-							onChange={(event) =>
-								setDurationUnit(event.target.value as "weeks" | "months")
-							}
-						>
-							<option value="weeks">Weeks</option>
-							<option value="months">Months</option>
-						</SelectField>
+						<Field className="min-w-0">
+							<FieldLabel htmlFor="plan-length">Plan length</FieldLabel>
+							<Input
+								id="plan-length"
+								ref={durationRef}
+								type="number"
+								inputMode="numeric"
+								min={1}
+								max={5200}
+								step={1}
+								required
+								value={durationCount}
+								onChange={(event) => setDurationCount(event.target.value)}
+							/>
+						</Field>
+						<Field>
+							<FieldLabel htmlFor="plan-unit">Unit</FieldLabel>
+							<Select
+								value={durationUnit}
+								onValueChange={(value) =>
+									setDurationUnit(value as "weeks" | "months")
+								}
+							>
+								<SelectTrigger id="plan-unit" aria-label="Unit">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="weeks">Weeks</SelectItem>
+									<SelectItem value="months">Months</SelectItem>
+								</SelectContent>
+							</Select>
+						</Field>
 					</div>
 					<p className="m-0 text-xs leading-relaxed text-muted">
 						Enter the full plan length. The bank charge alone does not establish
@@ -539,7 +570,7 @@ export function TransactionInsightsPanel({
 					<div className="flex flex-wrap gap-2">
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							aria-label={`Create forecast schedule for ${patternTitleText}`}
 							onClick={() => {
@@ -574,18 +605,18 @@ export function TransactionInsightsPanel({
 				</div>
 			)}
 
-			<FieldError
-				message={
-					error ??
-					voidError ??
-					(review.isError || dismiss.isError
-						? "Your answer could not be saved."
-						: null)
-				}
-			/>
+			{(error ?? voidError ?? (review.isError || dismiss.isError ? "Your answer could not be saved." : null)) && (
+				<p role="alert" className="m-0 text-sm text-danger-text">
+					{error ??
+						voidError ??
+						(review.isError || dismiss.isError
+							? "Your answer could not be saved."
+							: null)}
+				</p>
+			)}
 
 			<div
-				className={mergeStyles(
+				className={cn(
 					detailFooterClassName,
 					"mt-8 max-sm:sticky max-sm:mx-0 max-sm:px-5",
 				)}
@@ -603,7 +634,7 @@ export function TransactionInsightsPanel({
 						</Button>
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							disabled={busy || readOnly || !selectedVoid}
 							onClick={() => void mergeVoid()}
@@ -633,7 +664,7 @@ export function TransactionInsightsPanel({
 						</span>
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							disabled={busy || readOnly || !durationCount}
 							onClick={() => saveDuration()}

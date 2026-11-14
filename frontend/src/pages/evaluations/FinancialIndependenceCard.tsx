@@ -1,12 +1,13 @@
 import { Check, Flag, Pin, TriangleAlert } from "lucide-react";
 import { lazy, Suspense, useId } from "react";
-import { Badge } from "@/components/Badge.tsx";
-import { IconButton } from "@/components/Button.tsx";
-import { Card, cardHeadingStyles } from "@/components/Card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
 import { useSelectedEntry } from "@/components/entrySelection.ts";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { Progress } from "@/components/Progress.tsx";
+import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	independenceFunding,
 	independenceHorizon,
@@ -86,9 +87,12 @@ export function FinancialIndependenceCard({
 	return (
 		<>
 			<Card
-				tone={item.enabled ? "default" : "subtle"}
+				role="region"
 				aria-labelledby={headingId}
-				className="relative"
+				className={cn(
+					"relative flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 overflow-visible rounded-surface border p-5 text-base text-ink ring-0 print:break-inside-avoid",
+					item.enabled ? "border-line bg-surface" : "border-line bg-surface-2",
+				)}
 			>
 				{item.enabled && analysis && (
 					<button
@@ -102,7 +106,7 @@ export function FinancialIndependenceCard({
 				<div className="relative flex items-start justify-between gap-3">
 					<h2
 						id={headingId}
-						className={cardHeadingStyles}
+						className="m-0 flex min-h-8 items-center gap-2 text-sm leading-[1.5] font-semibold [overflow-wrap:anywhere]"
 					>
 						<StateIcon
 							size={16}
@@ -112,16 +116,19 @@ export function FinancialIndependenceCard({
 						{item.name}
 					</h2>
 					{pin?.onPinChange && (
-						<IconButton
-							icon={Pin}
-							size="sm"
-							iconSize={16}
-							label={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							title={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
+							aria-label={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
 							onClick={pin.onPinChange}
 							disabled={pin.disabled}
 							aria-pressed={pin.pinned}
 							className="relative z-(--z-local) aria-pressed:bg-success-bg aria-pressed:text-success-text"
-						/>
+						>
+							<Pin size={16} aria-hidden="true" />
+						</Button>
 					)}
 				</div>
 				<IndependenceVerdict item={item} />
@@ -134,12 +141,22 @@ export function FinancialIndependenceCard({
 									<span>{horizon.requiredYears}y required</span>
 								</div>
 								<Progress
-									label="Available projection horizon"
-									value={
-										(horizon.availableYears! / horizon.requiredYears!) * 100
-									}
-									tone="warning"
-								/>
+									value={Math.min(
+										100,
+										Math.max(
+											0,
+											Math.round(
+												(horizon.availableYears! / horizon.requiredYears!) *
+													100,
+											),
+										),
+									)}
+									className="[&_[data-slot=progress-indicator]]:bg-warning-text [&_[data-slot=progress-track]]:bg-warning-bg"
+								>
+									<ProgressLabel className="sr-only">
+										Available projection horizon
+									</ProgressLabel>
+								</Progress>
 							</div>
 						) : (
 							candidate && <CoveragePreview candidate={candidate} />
@@ -164,7 +181,15 @@ export function FinancialIndependenceCard({
 								{item.goal && (
 									<p className="m-0 text-xs text-muted">{item.goal}</p>
 								)}
-								<Badge tone={reached ? "success" : "neutral"}>
+								<Badge
+									variant={reached ? "default" : "secondary"}
+									className={cn(
+										"inline-flex h-auto w-fit items-center gap-1 rounded-control px-2 py-1 text-xs leading-snug font-medium whitespace-nowrap capitalize",
+										reached
+											? "bg-success-bg text-success-text"
+											: "bg-surface-3 text-muted",
+									)}
+								>
 									{reached ? "Satisfied" : "Evidence unavailable"}
 								</Badge>
 							</>

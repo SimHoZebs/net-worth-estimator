@@ -20,7 +20,7 @@ import {
 } from "./sessionChanges.ts";
 import type { Session } from "./sessionContext.ts";
 import { discoverSession, sessionScopeInput } from "./sessionDiscovery.ts";
-import { dismissKey, notifyError } from "../state/notifications.ts";
+import { toast } from "sonner";
 
 interface SessionOwner {
 	session: Session;
@@ -121,7 +121,7 @@ export function useResourceSession() {
 					owner.current = next;
 					setSession(next.session);
 					setStatus({ phase: "ready", error: "" });
-					dismissKey("session");
+					toast.dismiss("session");
 					if (changed) announceSessionChange();
 					return;
 				}
@@ -145,7 +145,7 @@ export function useResourceSession() {
 					owner.current = next;
 					setSession(next.session);
 					setStatus({ phase: "ready", error: "" });
-					dismissKey("session");
+					toast.dismiss("session");
 					return;
 				}
 				const hardPending = suspendUserScope();
@@ -167,7 +167,7 @@ export function useResourceSession() {
 				owner.current = next;
 				setSession(next.session);
 				setStatus({ phase: "ready", error: "" });
-				dismissKey("session");
+				toast.dismiss("session");
 				if (changed) announceSessionChange();
 			} catch (cause) {
 				if (signal.aborted) return;
@@ -179,10 +179,13 @@ export function useResourceSession() {
 				// First-load outages render in the layout body; only a
 				// revalidation floats, since a verified account is mounted.
 				if (previous)
-					notifyError("session", check.error, {
-						label: "Retry access check",
-						onAction: () => {
-							void verifySession();
+					toast.error(check.error, {
+						id: "session",
+						action: {
+							label: "Retry access check",
+							onClick: () => {
+								void verifySession();
+							},
 						},
 					});
 			}
@@ -206,7 +209,7 @@ export function useResourceSession() {
 		signingOut.current = attempt;
 		setLogoutPending(true);
 		setStatus((previous) => ({ ...previous, error: "" }));
-		dismissKey("session-logout");
+		toast.dismiss("session-logout");
 		try {
 			const cache = serverQueryClient();
 			const response = await cache
@@ -264,7 +267,7 @@ export function useResourceSession() {
 			if (mounted.current) setStatus((previous) => ({ ...previous, error }));
 			// Notify last: the refresh above can drive a scope transition
 			// that clears the stack, which must not swallow this failure.
-			notifyError("session-logout", error);
+			toast.error(error, { id: "session-logout" });
 		} finally {
 			if (
 				mounted.current &&

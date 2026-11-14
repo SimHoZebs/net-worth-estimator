@@ -1,5 +1,5 @@
-import { inspectionPanelStyles } from "@/components/inspectionStyles.ts";
-import { Progress } from "@/components/Progress.tsx";
+import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	independenceHorizon,
 	type FinancialIndependenceAnalysis,
@@ -19,7 +19,9 @@ function HorizonComparison({
 	const { availableYears, requiredYears } = independenceHorizon(analysis);
 	return (
 		<section
-			className={inspectionPanelStyles()}
+			className={cn(
+				"flex min-w-0 flex-col gap-3 rounded-surface border border-line bg-surface p-4",
+			)}
 			aria-label="Projection horizon"
 		>
 			<div>
@@ -28,17 +30,27 @@ function HorizonComparison({
 					<strong>{availableYears}y</strong>
 				</div>
 				<Progress
-					label="Available projection horizon"
-					value={(availableYears! / requiredYears!) * 100}
-					tone="warning"
-				/>
+					value={Math.min(
+						100,
+						Math.max(0, Math.round((availableYears! / requiredYears!) * 100)),
+					)}
+					className="[&_[data-slot=progress-indicator]]:bg-warning-text [&_[data-slot=progress-track]]:bg-warning-bg"
+				>
+					<ProgressLabel className="sr-only">
+						Available projection horizon
+					</ProgressLabel>
+				</Progress>
 			</div>
 			<div>
 				<div className="mb-2 flex justify-between text-xs text-muted">
 					<span>Assessment period</span>
 					<strong>{requiredYears}y</strong>
 				</div>
-				<Progress label="Required assessment period" value={100} />
+				<Progress value={100}>
+					<ProgressLabel className="sr-only">
+						Required assessment period
+					</ProgressLabel>
+				</Progress>
 			</div>
 			<p className="m-0 text-xs text-muted">
 				Extend the projection to assess whether spending stays funded for{" "}
@@ -64,7 +76,9 @@ export function IndependenceOverview({
 			) : candidate ? (
 				<>
 					<section
-						className={inspectionPanelStyles()}
+						className={cn(
+							"flex min-w-0 flex-col gap-3 rounded-surface border border-line bg-surface p-4",
+						)}
 						aria-label="Spending coverage"
 					>
 						<p className="m-0 text-xs text-muted">
@@ -77,7 +91,11 @@ export function IndependenceOverview({
 						)}
 						<IndependenceSpending candidate={candidate} />
 					</section>
-					<details className={inspectionPanelStyles()}>
+					<details
+						className={cn(
+							"flex min-w-0 flex-col gap-3 rounded-surface border border-line bg-surface p-4",
+						)}
+					>
 						<summary className="cursor-pointer text-xs font-semibold text-ink">
 							Compare start dates
 						</summary>
@@ -94,7 +112,9 @@ export function IndependenceOverview({
 				</p>
 			)}
 			<section
-				className={inspectionPanelStyles()}
+				className={cn(
+					"flex min-w-0 flex-col gap-3 rounded-surface border border-line bg-surface p-4",
+				)}
 				aria-label="Independence across scenarios"
 			>
 				<h3 className="m-0 text-xs font-semibold text-ink">

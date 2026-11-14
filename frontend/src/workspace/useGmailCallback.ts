@@ -10,7 +10,7 @@ import { useUserScope } from "../state/useUserScope.ts";
 import { gmailCredentialKey } from "../state/gmail.ts";
 import { integrationsKey } from "../state/integrations.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
-import { notifyError, notifySuccess } from "../state/notifications.ts";
+import { toast } from "sonner";
 
 /** One callback owner for the router runtime, outside route/error remounts. */
 export function WorkspaceCallbacks({ children }: { children: ReactNode }) {
@@ -46,12 +46,11 @@ export function useGmailCallback() {
 		if (consumed.current) return;
 		consumed.current = true;
 		if (outcome === "connected")
-			notifySuccess("gmail-callback", "Gmail connected.");
+			toast.success("Gmail connected.", { id: "gmail-callback" });
 		else
-			notifyError(
-				"gmail-callback",
-				"Gmail connection failed. Try connecting again.",
-			);
+			toast.error("Gmail connection failed. Try connecting again.", {
+				id: "gmail-callback",
+			});
 		// Refresh active provider panels, or mark their caches stale for the
 		// next visit. An unrelated page must not fetch provider settings.
 		const cache = serverQueryClient();

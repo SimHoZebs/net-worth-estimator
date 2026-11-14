@@ -1,4 +1,4 @@
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 
 /**
  * Loading placeholder with the legacy recipe as the visual owner
@@ -16,7 +16,7 @@ export function Skeleton({
 	return (
 		<span
 			data-slot="skeleton"
-			className={mergeStyles(
+			className={cn(
 				"block h-4 w-full max-w-full animate-[skeleton-pulse_1.2s_ease-in-out_infinite] rounded-control bg-line-strong opacity-55",
 				className,
 			)}

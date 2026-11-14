@@ -3,8 +3,7 @@ import { Link2 } from "lucide-react";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
 import { UserScopeError } from "../../api/scopedRequest.ts";
-import { Button } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { dismissKey, notifyError } from "../../state/notifications.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import {
@@ -134,10 +133,8 @@ export function TransferLinkSection({
 	function reportLinkFailure(cause: unknown, fallback: string): void {
 		if (cause instanceof UserScopeError) return;
 		if (cause instanceof ApiHttpError && cause.status === 422) return;
-		notifyError(
-			"transfer-link",
-			cause instanceof Error ? cause.message : fallback,
-		);
+		const message = cause instanceof Error ? cause.message : fallback;
+		notifyError("transfer-link", message);
 	}
 
 	if (!link && !actionable) return null;
@@ -206,7 +203,11 @@ export function TransferLinkSection({
 						</Button>
 					</div>
 				)}
-				<FieldError message={inlineError} />
+				{inlineError && (
+					<p role="alert" className="m-0 text-sm text-danger-text">
+						{inlineError}
+					</p>
+				)}
 			</section>
 		);
 	}
@@ -300,7 +301,11 @@ export function TransferLinkSection({
 					</Button>
 				</fieldset>
 			)}
-			<FieldError message={inlineError} />
+			{inlineError && (
+				<p role="alert" className="m-0 text-sm text-danger-text">
+					{inlineError}
+				</p>
+			)}
 		</section>
 	);
 }

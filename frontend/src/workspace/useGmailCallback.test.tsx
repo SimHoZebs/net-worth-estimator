@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import {
 	createMemoryHistory,
 	createRootRoute,
@@ -8,6 +8,7 @@ import {
 	retainSearchParams,
 } from "@tanstack/react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { setupQueryScope, teardownQueryScope } from "../mocks/testScope.tsx";
 import { acceptTestResource } from "../mocks/resource.ts";
@@ -16,23 +17,24 @@ import { gmailCredentialKey } from "../state/gmail.ts";
 import { integrationsKey } from "../state/integrations.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
 import {
-	resetNotifications,
-	useNotifications,
-} from "../state/notifications.ts";
-import {
 	parseWorkspaceSearch,
 	stringifyWorkspaceSearch,
 	validateWorkspaceSearch,
 } from "./overlaySearch.ts";
 import { WorkspaceCallbacks } from "./useGmailCallback.ts";
 
+vi.mock("sonner", () => ({
+	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+	Toaster: () => null,
+}));
+
 beforeEach(() => {
 	setupQueryScope();
-	resetNotifications();
+	vi.clearAllMocks();
 });
 afterEach(() => {
 	teardownQueryScope();
-	resetNotifications();
+	vi.clearAllMocks();
 });
 
 async function renderCallback(entry: string) {
@@ -68,7 +70,12 @@ it("consumes a successful callback on Accounts and invalidates inactive caches w
 	const router = await renderCallback(
 		"/accounts?editor=account&id=new&returnEvidence=position&gmail=connected",
 	);
-	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
+	await waitFor(() =>
+		expect(toast.success).toHaveBeenCalledWith(
+			"Gmail connected.",
+			expect.objectContaining({ id: "gmail-callback" }),
+		),
+	);
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
@@ -83,38 +90,36 @@ it("consumes a successful callback on Accounts and invalidates inactive caches w
 	await act(async () => {
 		await router.navigate({ to: "/transactions" });
 	});
-	expect(
-		useNotifications
-			.getState()
-			.items.filter((item) => item.key === "gmail-callback"),
-	).toHaveLength(1);
+	expect(toast.success).toHaveBeenCalledTimes(1);
 });
 
 it("reports a failed callback once and preserves invalid dialog input for its error state", async () => {
 	const router = await renderCallback(
 		"/accounts?editor=account&id=a&id=b&gmail=error",
 	);
-	expect(await screen.findByRole("alert")).toHaveProperty(
-		"textContent",
-		expect.stringContaining("Gmail connection failed"),
+	await waitFor(() =>
+		expect(toast.error).toHaveBeenCalledWith(
+			"Gmail connection failed. Try connecting again.",
+			expect.objectContaining({ id: "gmail-callback" }),
+		),
 	);
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
 	expect(router.state.location.search.id).toEqual(["a", "b"]);
-	expect(useNotifications.getState().items).toHaveLength(1);
+	expect(toast.error).toHaveBeenCalledTimes(1);
 });
 
 it("retains the callback through navigation during scope verification, then consumes it once", async () => {
 	suspendUserScope();
 	const router = await renderCallback("/accounts?gmail=connected");
-	expect(useNotifications.getState().items).toHaveLength(0);
+	expect(toast.success).not.toHaveBeenCalled();
 	expect(router.state.location.search.gmail).toBe("connected");
 	await act(async () => {
 		await router.navigate({ to: "/transactions" });
 	});
 	expect(router.state.location.search.gmail).toBe("connected");
-	expect(useNotifications.getState().items).toHaveLength(0);
+	expect(toast.success).not.toHaveBeenCalled();
 	await act(async () => {
 		acceptTestResource();
 		serverQueryClient().setQueryData(gmailCredentialKey(), {
@@ -122,19 +127,24 @@ it("retains the callback through navigation during scope verification, then cons
 		});
 		serverQueryClient().setQueryData(integrationsKey(), []);
 	});
-	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
+	await waitFor(() =>
+		expect(toast.success).toHaveBeenCalledWith(
+			"Gmail connected.",
+			expect.objectContaining({ id: "gmail-callback" }),
+		),
+	);
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
 	expect(router.state.location.pathname).toBe("/transactions");
-	expect(useNotifications.getState().items).toHaveLength(1);
+	expect(toast.success).toHaveBeenCalledTimes(1);
 	expect(
 		serverQueryClient().getQueryState(gmailCredentialKey())?.isInvalidated,
 	).toBe(true);
 	expect(
 		serverQueryClient().getQueryState(integrationsKey())?.isInvalidated,
 	).toBe(true);
-	resetNotifications();
+	vi.clearAllMocks();
 	serverQueryClient().setQueryData(gmailCredentialKey(), { connected: true });
 	serverQueryClient().setQueryData(integrationsKey(), []);
 	await act(async () => {
@@ -144,7 +154,7 @@ it("retains the callback through navigation during scope verification, then cons
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
-	expect(useNotifications.getState().items).toHaveLength(0);
+	expect(toast.success).not.toHaveBeenCalled();
 	expect(
 		serverQueryClient().getQueryState(gmailCredentialKey())?.isInvalidated,
 	).toBe(false);

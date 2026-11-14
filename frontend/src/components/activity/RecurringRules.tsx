@@ -24,9 +24,16 @@ import {
 } from "../../state/workspaceResources.ts";
 import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
-import { Badge } from "../Badge.tsx";
-import { EmptyState } from "../EmptyState.tsx";
-import { Button, IconButton, TextButton } from "../Button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import {
+	Empty,
+	EmptyContent,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	transactionIconStyles,
 	transactionBadgeStyles,
@@ -233,12 +240,26 @@ export function RecurringRules({
 
 	if (!rows.length)
 		return (
-			<EmptyState
-				icon={Repeat}
-				title="No recurring transactions for this account yet"
-				action="Add a schedule"
-				onAction={() => onEdit({ kind: "schedule", item: null })}
-			/>
+			<Empty className="px-6 py-12">
+				<EmptyHeader>
+					<EmptyMedia>
+						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+							<Repeat size={28} aria-hidden="true" />
+						</span>
+					</EmptyMedia>
+					<EmptyTitle className="text-lg">
+						No recurring transactions for this account yet
+					</EmptyTitle>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button
+						type="button"
+						onClick={() => onEdit({ kind: "schedule", item: null })}
+					>
+						Add a schedule
+					</Button>
+				</EmptyContent>
+			</Empty>
 		);
 
 	const rowContent = (
@@ -283,7 +304,7 @@ export function RecurringRules({
 					</span>
 					{!transaction.enabled && (
 						<span className="m-0 flex flex-wrap gap-1">
-							<Badge tone="warning" className={transactionBadgeStyles()}>
+							<Badge className={cn(transactionBadgeStyles(), "bg-warning-bg text-warning-text")}>
 								Excluded from account
 							</Badge>
 						</span>
@@ -350,20 +371,31 @@ export function RecurringRules({
 							onDrop={handleDrop}
 							controls={
 								<span className="ml-auto flex items-center gap-1 max-sm:gap-0.5">
-									<IconButton
-										icon={ChevronUp}
-										label={`Move ${transaction.name} up`}
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Move ${transaction.name} up`}
+										title={`Move ${transaction.name} up`}
 										disabled={index === 0}
 										onClick={() => moveBy(transaction.id, -1)}
-									/>
-									<IconButton
-										icon={ChevronDown}
-										label={`Move ${transaction.name} down`}
+									>
+										<ChevronUp aria-hidden="true" />
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Move ${transaction.name} down`}
+										title={`Move ${transaction.name} down`}
 										disabled={index === orderedRules.length - 1}
 										onClick={() => moveBy(transaction.id, 1)}
-									/>
-									<TextButton
+									>
+										<ChevronDown aria-hidden="true" />
+									</Button>
+									<Button
 										type="button"
+										variant="link"
 										aria-label={`Edit ${transaction.name}`}
 										onClick={() => {
 											setDraft(null);
@@ -372,7 +404,7 @@ export function RecurringRules({
 										}}
 									>
 										Edit
-									</TextButton>
+									</Button>
 								</span>
 							}
 						>

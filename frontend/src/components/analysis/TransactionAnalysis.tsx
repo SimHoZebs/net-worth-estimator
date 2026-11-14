@@ -2,7 +2,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { activeBNPLFinding } from "@/domain/analysisFindings.ts";
 import { useAnalysisFindings } from "@/state/analyses.ts";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { BNPLConfirmation } from "./BNPLConfirmation.tsx";
 
 export const AnalysisFindingsContext = createContext<AnalysisFinding[]>([]);
@@ -55,11 +55,13 @@ export function TransactionAnalysisPanel({
 			className="mt-4 border-t border-line pt-4"
 			aria-label="Transaction analysis"
 		>
-			<ErrorNotice
-				message={
-					query.isError ? "Transaction findings could not be loaded." : null
-				}
-			/>
+			{query.isError && (
+				<Alert variant="destructive">
+					<AlertDescription>
+						Transaction findings could not be loaded.
+					</AlertDescription>
+				</Alert>
+			)}
 			{visible.map((finding) => (
 				<BNPLConfirmation
 					key={finding.id}

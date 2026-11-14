@@ -1,4 +1,5 @@
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -11,11 +12,16 @@ import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
 import { redirectToSignIn } from "@/auth/navigation.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
-import { resetNotifications } from "@/state/notifications.ts";
 import { resetServerQueryCache } from "@/state/serverQuery.ts";
 import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
+import { toast } from "sonner";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
+
+vi.mock("sonner", () => ({
+	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+	Toaster: () => null,
+}));
 
 function StatusProbe() {
 	const account = useSession();
@@ -79,9 +85,8 @@ beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
-	resetNotifications();
-	vi.unstubAllGlobals();
 	vi.clearAllMocks();
+	vi.unstubAllGlobals();
 });
 
 function status(body: unknown, code = 200) {
@@ -351,11 +356,16 @@ describe("provider-independent authentication boundary", () => {
 		expect(await screen.findByText("Private workspace")).toBeTruthy();
 		fetcher.mockImplementationOnce(async () => status({}, 503));
 		fireEvent(window, new Event("focus"));
-		expect(await screen.findByRole("alert")).toBeTruthy();
+		await waitFor(() =>
+			expect(toast.error).toHaveBeenCalledWith(
+				expect.any(String),
+				expect.objectContaining({
+					id: "session",
+					action: expect.objectContaining({ label: "Retry access check" }),
+				}),
+			),
+		);
 		expect(screen.getByText("Private workspace")).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: "Retry access check" }),
-		).toBeTruthy();
 		expect(
 			screen.queryByRole("heading", { name: "Session access is unavailable" }),
 		).toBeNull();
@@ -368,8 +378,16 @@ describe("provider-independent authentication boundary", () => {
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
-		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+		const retry = (
+			vi.mocked(toast.error).mock.calls.at(-1)?.[1] as unknown as {
+				action?: { label: string; onClick: () => void };
+			}
+		)?.action;
+		expect(retry?.label).toBe("Retry access check");
+		act(() => {
+			retry?.onClick();
+		});
+		await waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith("session"));
 		expect(screen.getByText("Private workspace")).toBeTruthy();
 	});
 	it("exposes denied phase when a later check denies a previously allowed guest while children stay", async () => {
@@ -510,7 +528,12 @@ describe("provider-independent authentication boundary", () => {
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 		fetcher.mockImplementationOnce(async () => status({}, 503));
 		fireEvent(window, new Event("focus"));
-		expect(await screen.findByRole("alert")).toBeTruthy();
+		await waitFor(() =>
+			expect(toast.error).toHaveBeenCalledWith(
+				expect.any(String),
+				expect.objectContaining({ id: "session" }),
+			),
+		);
 		expect(screen.getByText("Private workspace")).toBeTruthy();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});

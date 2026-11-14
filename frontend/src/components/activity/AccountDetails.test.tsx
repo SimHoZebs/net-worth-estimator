@@ -22,7 +22,7 @@ import { NO_CEILING_SENTINEL } from "../../api/contracts.ts";
 import { AccountDetails } from "./AccountDetails.tsx";
 import { useAccountEdit } from "./useAccountEdit.ts";
 import { DetailEditActions } from "./DetailEditActions.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 
 afterEach(() => {
 	cleanup();
@@ -53,7 +53,11 @@ function Settings({ account = home }: { account?: Account }) {
 					disabled={edit.saveBlocked}
 				/>
 			)}
-			<ErrorNotice message={edit.error} />
+			{edit.error && (
+				<Alert variant="destructive">
+					<AlertDescription>{edit.error}</AlertDescription>
+				</Alert>
+			)}
 		</>
 	);
 }
@@ -150,12 +154,10 @@ it("keeps read-only property controls locked", () => {
 			.readOnly,
 	).toBe(true);
 	expect(
-		(
-			screen.getByLabelText(
-				"Include in net worth and projections",
-			) as HTMLInputElement
-		).disabled,
-	).toBe(true);
+		screen
+			.getByLabelText("Include in net worth and projections")
+			.getAttribute("aria-disabled"),
+	).toBe("true");
 	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });
 
@@ -168,7 +170,7 @@ it("offers every account type on the read-only kind selector", async () => {
 	expect(
 		screen.getAllByRole("option").map((option) => option.textContent),
 	).toEqual(["Cash & savings", "Investments", "Property", "Debt"]);
-	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(await screen.findByRole("option", { name: "Debt" }));
 	expect(
 		await screen.findByRole("button", { name: "Save changes" }),
 	).toBeTruthy();
@@ -179,7 +181,7 @@ it("returns focus to the type picker when a kind change is discarded", async () 
 	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
 	const trigger = screen.getByLabelText("Account type");
 	await user.click(trigger);
-	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(await screen.findByRole("option", { name: "Debt" }));
 	await user.click(screen.getByRole("button", { name: "Discard changes" }));
 	expect(document.activeElement).toBe(trigger);
 	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
@@ -196,7 +198,7 @@ it("saves a synced account kind with its current bounds verbatim", async () => {
 		wrapper,
 	});
 	await user.click(screen.getByLabelText("Account type"));
-	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(await screen.findByRole("option", { name: "Debt" }));
 	await user.click(screen.getByRole("button", { name: "Save changes" }));
 	await waitFor(() =>
 		expect(server.calls.some((call) => call.method === "PATCH")).toBe(true),
@@ -217,7 +219,7 @@ it("refuses a synced kind that contradicts the bank balance", async () => {
 	const user = userEvent.setup();
 	render(<Settings account={{ ...home, readOnly: true }} />, { wrapper });
 	await user.click(screen.getByLabelText("Account type"));
-	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(await screen.findByRole("option", { name: "Debt" }));
 	await user.click(screen.getByRole("button", { name: "Save changes" }));
 	expect(
 		await screen.findByText(
@@ -238,7 +240,7 @@ it("fails closed when the current bounds cannot be read", async () => {
 		wrapper,
 	});
 	await user.click(screen.getByLabelText("Account type"));
-	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(await screen.findByRole("option", { name: "Debt" }));
 	// The synced-kind write carries the saved bounds verbatim, so an
 	// unreadable bounds cache must block the save instead of clearing
 	// real bounds to open.
@@ -296,9 +298,9 @@ it("toggles payment terms immediately when the account type changes", async () =
 	render(<Settings />, { wrapper });
 	expect(screen.queryByLabelText("Minimum payment in USD")).toBeNull();
 	await user.click(screen.getByLabelText("Account type"));
-	await user.click(screen.getByRole("option", { name: "Debt" }));
+	await user.click(await screen.findByRole("option", { name: "Debt" }));
 	expect(await screen.findByLabelText("Minimum payment in USD")).toBeTruthy();
 	await user.click(screen.getByLabelText("Account type"));
-	await user.click(screen.getByRole("option", { name: "Cash & savings" }));
+	await user.click(await screen.findByRole("option", { name: "Cash & savings" }));
 	expect(screen.queryByLabelText("Minimum payment in USD")).toBeNull();
 });

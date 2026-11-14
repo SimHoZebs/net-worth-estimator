@@ -6,15 +6,28 @@ import {
 } from "../../domain/accountKinds.ts";
 import type { AccountKind } from "../../api/contracts.ts";
 import { accountKindIcons } from "../AccountIcon.tsx";
-import { OptionPicker } from "../OptionPicker.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	persistSyncedAccountKind,
 	syncedKindError,
 } from "../../state/accountKind.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { Checkbox, InputField } from "../Field.tsx";
-import { Modal } from "../Modal.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
 import { LoanEditor } from "./LoanEditor.tsx";
 import { OrdinaryAccountEditor } from "./OrdinaryAccountEditor.tsx";
 import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
@@ -37,6 +50,7 @@ export function AccountEditor(props: {
 	const [typeError, setTypeError] = useState<string | null>(null);
 	const formId = useId();
 	const enabledId = useId();
+	const nameId = useId();
 	const readOnly = item?.readOnly ?? false;
 	useBeforeUnload(
 		!saving &&
@@ -95,85 +109,142 @@ export function AccountEditor(props: {
 		})),
 		{ value: "loan", label: "Debt", icon: accountKindIcons.debt },
 	];
+	const ValueIcon =
+		type === "loan" ? accountKindIcons.debt : accountKindIcons[type];
 
 	return (
-		<Modal
-			title={
-				item && isGroupedDisplay(item)
-					? `Edit ${item.name}`
-					: `${item ? "Edit" : "Add"} account`
-			}
-			onClose={onClose}
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
 		>
-			<OptionPicker
-				label="Account type"
-				labelClassName="w-36 flex-none text-sm font-semibold text-muted"
-				value={type}
-				valueLabel={type === "loan" ? "Debt" : ACCOUNT_TYPE_LABELS[type]}
-				ValueIcon={
-					type === "loan" ? accountKindIcons.debt : accountKindIcons[type]
-				}
-				options={typeOptions}
-				onSelect={(next) => {
-					if (
-						next === "loan" ||
-						(ACCOUNT_KINDS as readonly string[]).includes(next)
-					) {
-						changeType(next as Account["kind"] | "loan");
-					}
-				}}
-				disabled={isGroupedDisplay(item) || saving}
-			/>
-			<FieldError message={typeError} />
-			<fieldset
-				disabled={readOnly || saving}
-				className="m-0 mb-5 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
-			>
-				<legend className="sr-only">Account</legend>
-				<InputField
-					label="Account name"
-					name="name"
-					form={formId}
-					required
-					maxLength={100}
-					value={name}
-					onChange={(event) => setName(event.target.value)}
-					placeholder={
-						type === "loan" ? "e.g. Sallie Mae" : "e.g. Savings account"
-					}
-				/>
-				<label
-					htmlFor={enabledId}
-					className="col-span-full flex min-h-11 items-center gap-3 text-sm text-muted"
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<DialogTitle>
+						{item && isGroupedDisplay(item)
+							? `Edit ${item.name}`
+							: `${item ? "Edit" : "Add"} account`}
+					</DialogTitle>
+				</DialogHeader>
+				<Field orientation="horizontal" className="items-center gap-4">
+					<Label
+						htmlFor={`${formId}-kind`}
+						className="w-36 flex-none text-sm font-semibold text-muted"
+					>
+						Account type
+					</Label>
+					<Select
+						value={type}
+						onValueChange={(next) => {
+							if (
+								next === "loan" ||
+								(ACCOUNT_KINDS as readonly string[]).includes(next ?? "")
+							) {
+								changeType(next as Account["kind"] | "loan");
+							}
+						}}
+						disabled={isGroupedDisplay(item) || saving}
+					>
+						<SelectTrigger id={`${formId}-kind`} className="min-w-0 flex-1">
+							<span className="flex min-w-0 flex-1 items-center gap-2">
+								<ValueIcon
+									size={16}
+									aria-hidden="true"
+									className="flex-none text-muted"
+								/>
+								<SelectValue>
+									{type === "loan" ? "Debt" : ACCOUNT_TYPE_LABELS[type]}
+								</SelectValue>
+							</span>
+						</SelectTrigger>
+						<SelectContent>
+							{typeOptions.map((option) => (
+								<SelectItem key={option.value} value={option.value}>
+									<option.icon
+										size={16}
+										aria-hidden="true"
+										className="flex-none text-muted"
+									/>
+									{option.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
+				{typeError && (
+					<p
+						role="alert"
+						className="m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text"
+					>
+						{typeError}
+					</p>
+				)}
+				<fieldset
+					disabled={readOnly || saving}
+					className="m-0 mb-5 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
 				>
-					<Checkbox
-						id={enabledId}
-						name="enabled"
-						form={formId}
-						checked={enabled}
-						onChange={(event) => setEnabled(event.target.checked)}
+					<legend className="sr-only">Account</legend>
+					<Field className="flex min-w-0 flex-col gap-2">
+						<Label
+							htmlFor={nameId}
+							className="text-sm leading-normal font-semibold text-muted"
+						>
+							Account name
+						</Label>
+						<Input
+							id={nameId}
+							name="name"
+							form={formId}
+							required
+							maxLength={100}
+							value={name}
+							onChange={(event) => setName(event.target.value)}
+							placeholder={
+								type === "loan" ? "e.g. Sallie Mae" : "e.g. Savings account"
+							}
+							className={cn(
+								"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle",
+								"disabled:bg-transparent",
+								"focus-visible:outline-solid focus-visible:ring-0",
+							)}
+						/>
+					</Field>
+					<label
+						htmlFor={enabledId}
+						className="col-span-full flex min-h-11 items-center gap-3 text-sm text-muted"
+					>
+						<input
+							id={enabledId}
+							name="enabled"
+							form={formId}
+							type="checkbox"
+							checked={enabled}
+							onChange={(event) => setEnabled(event.target.checked)}
+							className="m-0 size-5 flex-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+						/>
+						Include in net worth and projections
+					</label>
+				</fieldset>
+				{type === "loan" ? (
+					<LoanEditor
+						{...props}
+						formId={formId}
+						name={name}
+						enabled={enabled}
+						onSavingChange={setSaving}
 					/>
-					Include in net worth and projections
-				</label>
-			</fieldset>
-			{type === "loan" ? (
-				<LoanEditor
-					{...props}
-					formId={formId}
-					name={name}
-					enabled={enabled}
-					onSavingChange={setSaving}
-				/>
-			) : (
-				<OrdinaryAccountEditor
-					{...props}
-					formId={formId}
-					name={name}
-					kind={type}
-					enabled={enabled}
-					onSavingChange={setSaving}
-				/>
-			)}
-		</Modal>
+				) : (
+					<OrdinaryAccountEditor
+						{...props}
+						formId={formId}
+						name={name}
+						kind={type}
+						enabled={enabled}
+						onSavingChange={setSaving}
+					/>
+				)}
+			</DialogContent>
+		</Dialog>
 	);
 }

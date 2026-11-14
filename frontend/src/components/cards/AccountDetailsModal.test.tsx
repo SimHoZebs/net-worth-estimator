@@ -1,5 +1,4 @@
 import { fireEvent, render, within } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toAccountCard } from "../../domain/accountCards.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
@@ -9,14 +8,6 @@ import {
 	projectionFixture,
 } from "../../mocks/projection.ts";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
-
-// Native modal focus and dismissal belong to Modal's browser coverage.
-vi.mock("../Modal.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../Modal.tsx")>()),
-	Modal: ({ title, children }: { title: string; children: ReactNode }) => (
-		<section aria-label={title}>{children}</section>
-	),
-}));
 
 // Selection assertions use a marker detail; editors keep browser coverage.
 vi.mock("../activity/TransactionDetail.tsx", () => ({
@@ -66,9 +57,9 @@ describe("AccountDetailsModal", () => {
 			/>,
 		);
 		const term = view.getByText("Protected balance");
-		expect(term.tagName).toBe("DT");
-		expect(term.nextElementSibling?.tagName).toBe("DD");
-		expect(term.closest("dl")).toBeTruthy();
+		const item = term.closest('[data-slot="item"]');
+		expect(item).toBeTruthy();
+		expect(item?.querySelector('[data-slot="item-content"]')).toBeTruthy();
 		const search = view.getByLabelText("Search account transactions");
 		expect(search.tagName).toBe("INPUT");
 		fireEvent.change(search, { target: { value: "Everyday living" } });

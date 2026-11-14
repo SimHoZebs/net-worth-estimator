@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { IconButton } from "../../components/Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { money } from "../../domain/format.ts";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
@@ -58,22 +59,34 @@ export function PurchaseRow({
 			</div>
 			{onMove ? (
 				<div className="flex flex-wrap gap-1 @max-xl/wish-list:col-[2/-1]">
-					<IconButton
-						icon={ArrowUp}
-						iconSize={16}
-						className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
-						label={`Move ${item.purchase.name} up`}
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						title={`Move ${item.purchase.name} up`}
+						aria-label={`Move ${item.purchase.name} up`}
 						disabled={disabledMove || !canMoveUp}
 						onClick={() => onMove(item.purchase, -1)}
-					/>
-					<IconButton
-						icon={ArrowDown}
-						iconSize={16}
-						className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
-						label={`Move ${item.purchase.name} down`}
+						className={cn(
+							"min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12",
+						)}
+					>
+						<ArrowUp size={16} aria-hidden="true" />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						title={`Move ${item.purchase.name} down`}
+						aria-label={`Move ${item.purchase.name} down`}
 						disabled={disabledMove || !canMoveDown}
 						onClick={() => onMove(item.purchase, 1)}
-					/>
+						className={cn(
+							"min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12",
+						)}
+					>
+						<ArrowDown size={16} aria-hidden="true" />
+					</Button>
 				</div>
 			) : (
 				<span aria-hidden="true" />

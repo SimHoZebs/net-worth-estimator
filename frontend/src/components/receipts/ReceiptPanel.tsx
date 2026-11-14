@@ -8,9 +8,9 @@ import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
-import { Badge } from "../Badge.tsx";
-import { Button } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { ReceiptReviewDialog } from "./ReceiptReviewDialog.tsx";
 
 export function ReceiptPanel({
@@ -55,12 +55,11 @@ export function ReceiptPanel({
 				// UserScopeError and the new resource starts with a clean stack.
 				if (cause instanceof UserScopeError) return;
 				if (scope !== getUserScope()) return;
-				notifyError(
-					"receipt-attach",
+				const message =
 					cause instanceof Error
 						? cause.message
-						: "The receipt could not be attached.",
-				);
+						: "The receipt could not be attached.";
+				notifyError("receipt-attach", message);
 			});
 	};
 	const receipts = collection.data?.receipts ?? [];
@@ -71,7 +70,12 @@ export function ReceiptPanel({
 					<ReceiptText size={17} aria-hidden="true" />
 					<h3 className="text-sm font-semibold">Receipts</h3>
 					{receipts.length > 0 && (
-						<Badge tone="neutral">{receipts.length}</Badge>
+						<Badge
+							variant="secondary"
+							className="h-auto bg-surface-3 text-muted"
+						>
+							{receipts.length}
+						</Badge>
 					)}
 				</div>
 				{!locked && eligible && (
@@ -79,6 +83,7 @@ export function ReceiptPanel({
 						<Button
 							variant="secondary"
 							size="sm"
+							className="min-h-9 border-line-strong bg-surface px-3 py-2 text-xs leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
 							disabled={actions.attach.isPending}
 							onClick={() => upload.current?.click()}
 						>
@@ -98,6 +103,7 @@ export function ReceiptPanel({
 						<Button
 							variant="secondary"
 							size="sm"
+							className="min-h-9 border-line-strong bg-surface px-3 py-2 text-xs leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
 							disabled={actions.attach.isPending}
 							onClick={() => camera.current?.click()}
 						>
@@ -124,11 +130,22 @@ export function ReceiptPanel({
 						Loading receipts…
 					</p>
 				)}
-				<ErrorNotice
-					message={collection.error?.message}
-					action={collection.error ? "Retry receipts" : undefined}
-					onAction={() => void collection.refetch()}
-				/>
+				{collection.error?.message && (
+					<Alert variant="destructive">
+						<AlertDescription className="min-w-0 break-words">
+							<p className="my-1 whitespace-pre-line">
+								{collection.error.message}
+							</p>
+							<Button
+								variant="link"
+								className="mt-2 px-0 py-0.5 text-xs font-semibold"
+								onClick={() => void collection.refetch()}
+							>
+								Retry receipts
+							</Button>
+						</AlertDescription>
+					</Alert>
+				)}
 				{receipts.map((receipt) => (
 					<button
 						key={receipt.id}

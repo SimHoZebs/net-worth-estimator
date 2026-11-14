@@ -7,14 +7,22 @@ import {
 	saveNewPurchase,
 	savePurchaseEdit,
 } from "../../state/purchaseWrites.ts";
-import { Checkbox, InputField, SelectField } from "../../components/Field.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
 import { parseDisplayNumber } from "../../components/editors/formValues.ts";
-import { Button } from "../../components/Button.tsx";
-import { dialogActionsStyles } from "../../components/dialogStyles.ts";
-import { FieldError } from "../../components/ErrorNotice.tsx";
-import { Modal } from "../../components/Modal.tsx";
-import { Notice } from "../../components/Notice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { cn } from "@/lib/utils.ts";
 
 /**
  * Row-first planned-purchase editor. Saves one planned purchase straight to
@@ -40,6 +48,10 @@ export function PlannedPurchaseEditor({
 	onClose: () => void;
 }) {
 	const includeId = useId();
+	const nameId = useId();
+	const costId = useId();
+	const accountId = useId();
+	const earliestId = useId();
 	const fundable = visibleAccounts(accounts).filter(
 		(account) => account.enabled && account.kind !== "debt",
 	);
@@ -119,111 +131,173 @@ export function PlannedPurchaseEditor({
 	};
 
 	return (
-		<Modal
-			title={item ? "Edit purchase" : "Add purchase"}
-			onClose={onClose}
-			onCloseRequest={requestClose}
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) close();
+			}}
 		>
-			{readOnly && <Notice>These planned purchases are read-only.</Notice>}
-			<form
-				className="flex flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
+			<DialogContent
+				className={cn("max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl")}
 			>
-				<fieldset
-					disabled={readOnly || saving}
-					className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
+				<DialogHeader>
+					<DialogTitle>{item ? "Edit purchase" : "Add purchase"}</DialogTitle>
+					<DialogDescription className="sr-only">
+						Planned purchase details
+					</DialogDescription>
+				</DialogHeader>
+				{readOnly && (
+					<Alert variant="default" role="note">
+						<AlertDescription>
+							These planned purchases are read-only.
+						</AlertDescription>
+					</Alert>
+				)}
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => void submit(event)}
 				>
-					<InputField
-						label="Purchase name"
-						required
-						maxLength={100}
-						value={name}
-						onChange={(event) => setName(event.target.value)}
-						wide
-					/>
-					<InputField
-						label="Cost (USD)"
-						type="number"
-						inputMode="decimal"
-						min="0.01"
-						max="10000000000"
-						step="0.01"
-						required
-						value={amount}
-						onChange={(event) => setAmount(event.target.value)}
-					/>
-					<SelectField
-						label="Funding account"
-						required
-						value={fromId}
-						onChange={(event) => setFromId(event.target.value)}
+					<fieldset
+						disabled={readOnly || saving}
+						className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
 					>
-						<option value="" disabled>
-							Choose an account
-						</option>
-						<AccountOptions accounts={fundable} />
-					</SelectField>
-					<InputField
-						label="Earliest purchase date"
-						type="date"
-						required
-						value={earliest}
-						onChange={(event) => setEarliest(event.target.value)}
-						wide
-					/>
-					<p className="col-span-full text-xs text-muted">
-						The forecast defers this item until its full cost fits, after all
-						established payments. It never buys anything for you.
-					</p>
-					<label
-						className="col-span-full flex cursor-pointer items-center gap-2 text-sm text-muted"
-						htmlFor={includeId}
-					>
-						<Checkbox
-							id={includeId}
-							checked={enabled}
-							onChange={(event) => setEnabled(event.target.checked)}
-						/>{" "}
-						Include in purchase queue
-					</label>
-				</fieldset>
-				<FieldError message={error} />
-				{confirmCancel ? (
-					<div
-						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"
-						role="alert"
-					>
-						<p className="mb-3 text-sm text-danger-text">
-							Discard the changes in this form?
-						</p>
-						<div className="flex flex-wrap gap-2">
-							<Button
-								type="button"
-								variant="secondary"
-								onClick={() => setConfirmCancel(false)}
+						<Field className={cn("flex min-w-0 flex-col gap-2 col-span-full")}>
+							<Label
+								htmlFor={nameId}
+								className="text-sm leading-normal font-semibold text-muted"
 							>
-								Continue
+								Purchase name
+							</Label>
+							<Input
+								id={nameId}
+								required
+								maxLength={100}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+							/>
+						</Field>
+						<Field className={cn("flex min-w-0 flex-col gap-2")}>
+							<Label
+								htmlFor={costId}
+								className="text-sm leading-normal font-semibold text-muted"
+							>
+								Cost (USD)
+							</Label>
+							<Input
+								id={costId}
+								type="number"
+								inputMode="decimal"
+								min="0.01"
+								max="10000000000"
+								step="0.01"
+								required
+								value={amount}
+								onChange={(event) => setAmount(event.target.value)}
+							/>
+						</Field>
+						<Field className={cn("flex min-w-0 flex-col gap-2")}>
+							<Label
+								htmlFor={accountId}
+								className="text-sm leading-normal font-semibold text-muted"
+							>
+								Funding account
+							</Label>
+							<select
+								id={accountId}
+								required
+								value={fromId}
+								onChange={(event) => setFromId(event.target.value)}
+								className={cn(
+									"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60",
+								)}
+							>
+								<option value="" disabled>
+									Choose an account
+								</option>
+								<AccountOptions accounts={fundable} />
+							</select>
+						</Field>
+						<Field className={cn("flex min-w-0 flex-col gap-2 col-span-full")}>
+							<Label
+								htmlFor={earliestId}
+								className="text-sm leading-normal font-semibold text-muted"
+							>
+								Earliest purchase date
+							</Label>
+							<Input
+								id={earliestId}
+								type="date"
+								required
+								value={earliest}
+								onChange={(event) => setEarliest(event.target.value)}
+							/>
+						</Field>
+						<p className="col-span-full text-xs text-muted">
+							The forecast defers this item until its full cost fits, after all
+							established payments. It never buys anything for you.
+						</p>
+						<Label
+							className="col-span-full flex cursor-pointer items-center gap-2 text-sm text-muted"
+							htmlFor={includeId}
+						>
+							<Checkbox
+								id={includeId}
+								checked={enabled}
+								disabled={readOnly || saving}
+								onCheckedChange={(checked) => setEnabled(checked === true)}
+							/>{" "}
+							Include in purchase queue
+						</Label>
+					</fieldset>
+					{error && (
+						<p
+							role="alert"
+							className="m-0 text-sm leading-relaxed text-danger-text"
+						>
+							{error}
+						</p>
+					)}
+					{confirmCancel ? (
+						<div
+							className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"
+							role="alert"
+						>
+							<p className="mb-3 text-sm text-danger-text">
+								Discard the changes in this form?
+							</p>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => setConfirmCancel(false)}
+								>
+									Continue
+								</Button>
+								<Button type="button" variant="destructive" onClick={onClose}>
+									Discard changes
+								</Button>
+							</div>
+						</div>
+					) : (
+						<div
+							className={cn(
+								"mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-line pt-5",
+							)}
+						>
+							<Button type="button" variant="secondary" onClick={close}>
+								Cancel
 							</Button>
-							<Button type="button" variant="danger" onClick={onClose}>
-								Discard changes
+							<Button
+								type="submit"
+								variant="default"
+								disabled={readOnly || saving || !dirty}
+							>
+								{saving ? "Saving…" : item ? "Save purchase" : "Add purchase"}
 							</Button>
 						</div>
-					</div>
-				) : (
-					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={close}>
-							Cancel
-						</Button>
-						<Button
-							type="submit"
-							variant="primary"
-							disabled={readOnly || saving || !dirty}
-						>
-							{saving ? "Saving…" : item ? "Save purchase" : "Add purchase"}
-						</Button>
-					</div>
-				)}
-			</form>
-		</Modal>
+					)}
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }

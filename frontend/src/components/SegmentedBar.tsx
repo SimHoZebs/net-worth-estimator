@@ -1,6 +1,6 @@
 import { money } from "../domain/format.ts";
 import { cssVariables } from "./cssVariables.ts";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import {
 	TONE_BACKGROUNDS,
 	type TexturePattern,
@@ -50,10 +50,10 @@ export function SegmentedBar({
 	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
 	// oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists.
 	return (
-		<div className={mergeStyles("grid gap-2", className)}>
+		<div className={cn("grid gap-2", className)}>
 			{showDetails && (
 				<p
-					className={mergeStyles(
+					className={cn(
 						"m-0 text-sm leading-relaxed text-muted",
 						captionClassName,
 					)}
@@ -70,7 +70,7 @@ export function SegmentedBar({
 					segment.amount > 0 ? (
 						<span
 							key={segment.label}
-							className={mergeStyles(
+							className={cn(
 								"block h-full min-w-1 w-(--segment-width) not-first:border-l-2 not-first:border-surface",
 								toneClasses[segment.tone],
 							)}
@@ -92,7 +92,7 @@ export function SegmentedBar({
 					{segments.map((segment) => (
 						<li key={segment.label} className="flex items-center gap-2">
 							<span
-								className={mergeStyles(
+								className={cn(
 									"inline-block h-2.5 w-3.5 flex-none rounded-control",
 									toneClasses[segment.tone],
 								)}

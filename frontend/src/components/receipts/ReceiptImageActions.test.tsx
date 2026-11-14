@@ -52,7 +52,9 @@ it("keeps a failed replacement open and exposes delete beside the image", async 
 	fireEvent.click(screen.getByRole("button", { name: "Keep receipt" }));
 	fireEvent.click(screen.getByRole("button", { name: "Delete receipt" }));
 	expect(screen.getByText(/all extracted, draft, and confirmed/)).toBeTruthy();
-	const dialog = screen.getByRole("dialog", { name: "Delete this receipt?" });
+	const dialog = screen.getByRole("alertdialog", {
+		name: "Delete this receipt?",
+	});
 	fireEvent.click(
 		within(dialog).getByRole("button", { name: "Delete receipt" }),
 	);

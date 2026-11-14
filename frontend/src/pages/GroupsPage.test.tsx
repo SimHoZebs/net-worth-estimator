@@ -11,6 +11,7 @@ import { ok } from "../mocks/fetch.ts";
 import {
 	ServerQueryWrapper,
 	setupQueryScope,
+	stubMatchMedia,
 	teardownQueryScope,
 } from "../mocks/testScope.tsx";
 import { createWorkspaceTestRouter } from "../mocks/testRouter.tsx";
@@ -89,6 +90,7 @@ function stubGroups(
 
 beforeEach(() => {
 	setupQueryScope();
+	stubMatchMedia(false);
 });
 
 afterEach(() => {

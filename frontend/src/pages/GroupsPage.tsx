@@ -1,12 +1,27 @@
 import { ArrowLeft, Plus, Users } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "../components/Button.tsx";
-import { EmptyState } from "../components/EmptyState.tsx";
-import { ErrorNotice } from "../components/ErrorNotice.tsx";
-import { InputField } from "../components/Field.tsx";
-import { Modal } from "../components/Modal.tsx";
-import { dialogActionsStyles } from "../components/dialogStyles.ts";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { GroupSharingSection } from "./GroupSharingSection.tsx";
 import {
 	useCreateGroup,
@@ -26,6 +41,29 @@ import { useBreadcrumbSlot } from "../workspace/breadcrumbSlot.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { SharedFeed } from "./groups/SharedFeed.tsx";
 
+function InlineError({
+	message,
+	action,
+	onAction,
+}: {
+	message: string | null;
+	action: string;
+	onAction: () => void;
+}) {
+	if (!message) return null;
+	return (
+		<Alert variant="destructive">
+			<AlertCircle size={16} aria-hidden="true" />
+			<AlertDescription>
+				{message}{" "}
+				<Button variant="link" onClick={onAction}>
+					{action}
+				</Button>
+			</AlertDescription>
+		</Alert>
+	);
+}
+
 export function GroupsPage({
 	selectedGroupId,
 }: {
@@ -42,6 +80,8 @@ export function GroupsPage({
 	const [code, setCode] = useState("");
 	const [creating, setCreating] = useState(false);
 	const [joining, setJoining] = useState(false);
+	const inviteCodeId = useId();
+	const groupNameId = useId();
 
 	// Server state lives in TanStack Query, keyed by user scope and selected
 	// group. A late response for group A resolves into A's cache entry and
@@ -200,11 +240,9 @@ export function GroupsPage({
 		);
 		return (
 			<section aria-label="Group details" className="grid gap-6">
-				{breadcrumbSlot
-					? createPortal(breadcrumb, breadcrumbSlot)
-					: null}
+				{breadcrumbSlot ? createPortal(breadcrumb, breadcrumbSlot) : null}
 				{detailError ? (
-					<ErrorNotice
+					<InlineError
 						message={detailError}
 						action="Back to groups"
 						onAction={() => goToGroups()}
@@ -223,7 +261,11 @@ export function GroupsPage({
 
 						{detail && (detail.role === "owner" || detail.role === "admin") && (
 							<div>
-								<Button size="sm" onClick={() => void onInvite(detail.id)}>
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={() => void onInvite(detail.id)}
+								>
 									New invite code
 								</Button>
 							</div>
@@ -283,7 +325,7 @@ export function GroupsPage({
 						)}
 
 						{canManageInvites && (
-							<ErrorNotice
+							<InlineError
 								message={
 									invitesQuery.isError ? "Invites could not be loaded." : null
 								}
@@ -346,15 +388,15 @@ export function GroupsPage({
 			<div className="flex items-center justify-end gap-4">
 				<Button
 					type="button"
-					variant="primary"
+					variant="default"
 					onClick={() => setShowCreate(true)}
 				>
-					<Plus size={16} />
+					<Plus size={16} aria-hidden="true" />
 					Create group
 				</Button>
 			</div>
 
-			<ErrorNotice
+			<InlineError
 				message={groupsQuery.isError ? "Groups could not be loaded." : null}
 				action="Retry"
 				onAction={() => void groupsQuery.refetch()}
@@ -366,13 +408,22 @@ export function GroupsPage({
 						Loading groups…
 					</p>
 				) : groups.length === 0 ? (
-					<EmptyState
-						icon={Users}
-						title="No groups yet"
-						description="Create a group to get started, or join one with an invite code."
-						action="Create group"
-						onAction={() => setShowCreate(true)}
-					/>
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<Users aria-hidden="true" />
+							</EmptyMedia>
+							<EmptyTitle>No groups yet</EmptyTitle>
+							<EmptyDescription>
+								Create a group to get started, or join one with an invite code.
+							</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Button variant="default" onClick={() => setShowCreate(true)}>
+								Create group
+							</Button>
+						</EmptyContent>
+					</Empty>
 				) : (
 					<ul className="grid list-none gap-2 p-0">
 						{groups.map((group) => (
@@ -420,45 +471,65 @@ export function GroupsPage({
 
 			<form onSubmit={onJoin} className="grid max-w-md gap-2">
 				<h2 className="m-0 text-base">Join with a code</h2>
-				<InputField
-					label="Invite code"
-					value={code}
-					onChange={(event) => setCode(event.target.value)}
-				/>
+				<Field>
+					<Label htmlFor={inviteCodeId}>Invite code</Label>
+					<Input
+						id={inviteCodeId}
+						value={code}
+						onChange={(event) => setCode(event.target.value)}
+					/>
+				</Field>
 				<div>
-					<Button type="submit" disabled={joining || !code.trim()}>
+					<Button
+						type="submit"
+						variant="secondary"
+						disabled={joining || !code.trim()}
+					>
 						{joining ? "Joining…" : "Join group"}
 					</Button>
 				</div>
 			</form>
 
 			{showCreate && (
-				<Modal title="Create group" onClose={() => setShowCreate(false)}>
-					<form onSubmit={onCreate} className="grid gap-4">
-						<InputField
-							label="Group name"
-							value={name}
-							maxLength={100}
-							onChange={(event) => setName(event.target.value)}
-						/>
-						<div className={dialogActionsStyles}>
-							<Button
-								type="button"
-								variant="secondary"
-								onClick={() => setShowCreate(false)}
-							>
-								Cancel
-							</Button>
-							<Button
-								type="submit"
-								variant="primary"
-								disabled={creating || !name.trim()}
-							>
-								{creating ? "Creating…" : "Create group"}
-							</Button>
-						</div>
-					</form>
-				</Modal>
+				<Dialog
+					open
+					onOpenChange={(open) => {
+						if (!open) setShowCreate(false);
+					}}
+				>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Create group</DialogTitle>
+						</DialogHeader>
+						<form onSubmit={onCreate} className="grid gap-4">
+							<Field>
+								<Label htmlFor={groupNameId}>Group name</Label>
+								<Input
+									id={groupNameId}
+									value={name}
+									maxLength={100}
+									onChange={(event) => setName(event.target.value)}
+								/>
+							</Field>
+							<DialogFooter>
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => setShowCreate(false)}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="submit"
+									variant="default"
+									disabled={creating || !name.trim()}
+								>
+									{creating ? "Creating…" : "Create group"}
+								</Button>
+							</DialogFooter>
+						</form>
+					</DialogContent>
+				</Dialog>
 			)}
 		</section>
 	);

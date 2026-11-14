@@ -1,6 +1,13 @@
-import type { ComponentProps } from "react";
-import { DataTable } from "../DataTable.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
+import type { ComponentProps, ReactNode } from "react";
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table.tsx";
+import { cn } from "@/lib/utils.ts";
 import { transactionCellStyles } from "./activityStyles.ts";
 
 /**
@@ -20,43 +27,60 @@ export function TransactionTable({
 	children,
 	className,
 	...props
-}: Omit<ComponentProps<typeof DataTable>, "columns" | "colgroup">) {
+}: {
+	caption: string;
+	showHeaders?: boolean;
+	scrollId?: string;
+	children: ReactNode;
+	className?: string;
+} & Omit<ComponentProps<"table">, "children">) {
 	return (
-		<DataTable
-			{...props}
-			className={mergeStyles("border-t border-line table-fixed", className)}
-			caption={caption}
-			showHeaders={showHeaders}
-			scrollId={scrollId}
-			// Fixed column widths keep the table at its container width:
-			// the date and amount columns hold their content while the
-			// transaction column takes the remainder, so long titles
-			// truncate instead of forcing horizontal scrolling. Hiding the
-			// date column (not just its cells) keeps the remaining columns
-			// aligned with their cells on small screens.
-			colgroup={
+		<div
+			id={scrollId}
+			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the table.
+			tabIndex={0}
+			role="region"
+			aria-label={caption}
+			className="relative max-w-full overflow-x-auto"
+		>
+			<Table
+				{...props}
+				className={cn("border-t border-line table-fixed", className)}
+			>
+				<TableCaption className={showHeaders ? undefined : "sr-only"}>
+					{caption}
+				</TableCaption>
 				<colgroup>
 					<col className="w-24 max-sm:hidden" />
 					<col />
 					<col className="w-36 max-sm:w-28" />
 				</colgroup>
-			}
-			columns={[
-				{
-					label: "Date",
-					className: `${transactionCellStyles({ column: "date" })} pl-3`,
-				},
-				{
-					label: "Transaction",
-					className: transactionCellStyles({ column: "name" }),
-				},
-				{
-					label: "Amount",
-					className: transactionCellStyles({ column: "amount" }),
-				},
-			]}
-		>
-			{children}
-		</DataTable>
+				{showHeaders && (
+					<TableHeader>
+						<TableRow>
+							<TableHead
+								scope="col"
+								className={cn(transactionCellStyles({ column: "date" }), "pl-3")}
+							>
+								Date
+							</TableHead>
+							<TableHead
+								scope="col"
+								className={transactionCellStyles({ column: "name" })}
+							>
+								Transaction
+							</TableHead>
+							<TableHead
+								scope="col"
+								className={transactionCellStyles({ column: "amount" })}
+							>
+								Amount
+							</TableHead>
+						</TableRow>
+					</TableHeader>
+				)}
+				<TableBody>{children}</TableBody>
+			</Table>
+		</div>
 	);
 }

@@ -1,14 +1,24 @@
-import { useRef, useState, type Ref } from "react";
+import { useId, useRef, useState, type Ref } from "react";
 import type { AnalysisDuration } from "@/api/generated/model/analysisDuration.ts";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { findingLabel, providerLabel } from "@/domain/analysisFindings.ts";
 import { useReviewAnalysisFinding } from "@/state/analyses.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { Badge } from "../Badge.tsx";
-import { Button } from "../Button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
-import { InputField, SelectField } from "../Field.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+
+const fieldLabelClassName = "text-sm leading-normal font-semibold text-muted";
+const fieldInputClassName =
+	"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0";
+const fieldSelectClassName =
+	"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60";
+const secondaryButtonClassName =
+	"min-h-9 border-line-strong bg-surface px-3 py-2 text-xs leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0";
 
 // useReviewAnalysisFinding awaits its finding refetch before action completion.
 // Schedule the action's focus handoff after React commits its new controls, without
@@ -38,12 +48,11 @@ export function BNPLConfirmation({
 	const provider = providerLabel(review?.provider ?? finding.provider);
 	function reportAnswerFailure(cause: unknown): void {
 		if (cause instanceof UserScopeError) return;
-		notifyError(
-			"analysis-answer",
+		const message =
 			cause instanceof ApiHttpError && cause.status === 409
 				? "This finding changed."
-				: "Your answer could not be saved.",
-		);
+				: "Your answer could not be saved.";
+		notifyError("analysis-answer", message);
 	}
 	const answer = (action: "confirm" | "reject") => {
 		feedback.mutate(
@@ -78,12 +87,18 @@ export function BNPLConfirmation({
 						Is this a buy now, pay later payment from {provider}?
 					</legend>
 					<div className="flex gap-2">
-						<Button size="sm" onClick={() => answer("confirm")}>
+						<Button
+							size="sm"
+							variant="secondary"
+							className={secondaryButtonClassName}
+							onClick={() => answer("confirm")}
+						>
 							Yes
 						</Button>
 						<Button
 							size="sm"
 							variant="secondary"
+							className={secondaryButtonClassName}
 							onClick={() => answer("reject")}
 						>
 							No
@@ -92,8 +107,17 @@ export function BNPLConfirmation({
 				</fieldset>
 			) : (
 				<div className="flex flex-wrap items-center gap-2">
-					<Badge tone="neutral">{findingLabel(finding)}</Badge>
-					{finding.stale && <Badge tone="warning">Awaiting analysis</Badge>}
+					<Badge variant="secondary" className="h-auto bg-surface-3 text-muted">
+						{findingLabel(finding)}
+					</Badge>
+					{finding.stale && (
+						<Badge
+							variant="default"
+							className="h-auto bg-warning-bg text-warning-text"
+						>
+							Awaiting analysis
+						</Badge>
+					)}
 					<span className="text-sm">
 						{provider}
 						{duration
@@ -105,6 +129,7 @@ export function BNPLConfirmation({
 							ref={changeButton}
 							size="sm"
 							variant="secondary"
+							className={secondaryButtonClassName}
 							disabled={finding.stale || feedback.isPending}
 							onClick={() => {
 								setChangeAnswer(true);
@@ -152,6 +177,66 @@ export function BNPLConfirmation({
 	);
 }
 
+function PlanDurationField({
+	inputRef,
+	count,
+	onCount,
+}: {
+	inputRef: Ref<HTMLInputElement>;
+	count: string;
+	onCount: (value: string) => void;
+}) {
+	const id = useId();
+	return (
+		<Field className="flex w-24 min-w-0 flex-col gap-2">
+			<Label htmlFor={id} className={fieldLabelClassName}>
+				Duration
+			</Label>
+			<Input
+				ref={inputRef}
+				id={id}
+				type="number"
+				inputMode="numeric"
+				min={1}
+				max={5200}
+				step={1}
+				required
+				value={count}
+				onChange={(event) => onCount(event.target.value)}
+				className={fieldInputClassName}
+			/>
+		</Field>
+	);
+}
+
+function PlanDurationUnit({
+	unit,
+	onUnit,
+}: {
+	unit: AnalysisDuration["unit"];
+	onUnit: (unit: AnalysisDuration["unit"]) => void;
+}) {
+	const id = useId();
+	return (
+		<Field className="flex min-w-0 flex-col gap-2">
+			<Label htmlFor={id} className={fieldLabelClassName}>
+				Unit
+			</Label>
+			<select
+				id={id}
+				value={unit}
+				onChange={(event) =>
+					onUnit(event.target.value as AnalysisDuration["unit"])
+				}
+				className={fieldSelectClassName}
+			>
+				<option value="weeks">Weeks</option>
+				<option value="months">Months</option>
+			</select>
+		</Field>
+	);
+}
+
 function PlanDuration({
 	duration,
 	inputRef,
@@ -179,30 +264,18 @@ function PlanDuration({
 			<fieldset disabled={busy} className="m-0 space-y-3 border-0 p-0">
 				<legend className="text-sm font-semibold">How long is the plan?</legend>
 				<div className="flex flex-wrap items-end gap-2">
-					<InputField
-						ref={inputRef}
-						label="Duration"
-						type="number"
-						inputMode="numeric"
-						min={1}
-						max={5200}
-						step={1}
-						required
-						value={count}
-						onChange={(event) => setCount(event.target.value)}
-						containerClassName="w-24"
+					<PlanDurationField
+						inputRef={inputRef}
+						count={count}
+						onCount={setCount}
 					/>
-					<SelectField
-						label="Unit"
-						value={unit}
-						onChange={(event) =>
-							setUnit(event.target.value as AnalysisDuration["unit"])
-						}
+					<PlanDurationUnit unit={unit} onUnit={setUnit} />
+					<Button
+						type="submit"
+						size="sm"
+						variant="secondary"
+						className={secondaryButtonClassName}
 					>
-						<option value="weeks">Weeks</option>
-						<option value="months">Months</option>
-					</SelectField>
-					<Button type="submit" size="sm">
 						Save
 					</Button>
 				</div>

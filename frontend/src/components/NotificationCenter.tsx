@@ -1,8 +1,9 @@
 import { AlertCircle, Check, X } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { useNotifications, type Toast } from "../state/notifications.ts";
 import { IconButton, TextButton } from "./Button.tsx";
-import { mergeStyles } from "./mergeStyles.ts";
-import { Alert as ShadcnAlert } from "./ui/alert.tsx";
+import { cn } from "@/lib/utils.ts";
+import { Alert as ShadcnAlert } from "@/components/ui/alert.tsx";
 
 const toastToneStyles: Record<Toast["kind"], string> = {
 	error: "border-danger-border bg-danger-bg text-danger-text",
@@ -20,7 +21,7 @@ function ToastCard({ toast }: { toast: Toast }) {
 	return (
 		<ShadcnAlert
 			role={toast.kind === "error" ? "alert" : "status"}
-			className={mergeStyles(
+			className={cn(
 				"pointer-events-auto flex max-w-lg items-center gap-2 rounded-surface border border-solid py-3 pr-3 pl-4 text-xs shadow-overlay",
 				toastToneStyles[toast.kind],
 			)}
@@ -61,16 +62,25 @@ function ToastCard({ toast }: { toast: Toast }) {
  * A plain fixed element, so what the classes say is what renders: no
  * top-layer promotion, no browser geometry to override the corner. An open
  * native dialog covers it; errors that gate a dialog stay inline inside it.
+ *
+ * Sonner owns new toasts (see state/notifications.ts: legacy helpers mirror
+ * into `toast.*`, new code calls it directly). The legacy stack below stays
+ * until every notification reader migrates; until then one
+ * legacy call renders twice (card plus Sonner toast) during the transition.
  */
 export function NotificationCenter() {
 	const items = useNotifications((state) => state.items);
 
-	if (!items.length) return null;
 	return (
-		<div className="pointer-events-none fixed right-3 bottom-3 z-(--z-toast) flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 sm:right-6 sm:bottom-5 xl:right-8 print:hidden">
-			{items.map((toast) => (
-				<ToastCard key={toast.id} toast={toast} />
-			))}
-		</div>
+		<>
+			<Toaster position="bottom-right" />
+			{items.length > 0 && (
+				<div className="pointer-events-none fixed right-3 bottom-3 z-(--z-toast) flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 sm:right-6 sm:bottom-5 xl:right-8 print:hidden">
+					{items.map((toast) => (
+						<ToastCard key={toast.id} toast={toast} />
+					))}
+				</div>
+			)}
+		</>
 	);
 }

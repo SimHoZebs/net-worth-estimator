@@ -1,9 +1,9 @@
 import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BackendCheckpoint } from "@/api/contracts.ts";
-import { SegmentedControl } from "@/components/SegmentedControl.tsx";
-import { TextButton } from "@/components/Button.tsx";
-import { Notice } from "@/components/Notice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -16,8 +16,8 @@ import {
 	sum,
 	todayIso,
 } from "@/domain/format.ts";
-import { Skeleton } from "@/components/Skeleton.tsx";
-import { Card, cardHeadingStyles } from "@/components/Card.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Card, CardTitle } from "@/components/ui/card.tsx";
 import {
 	checkingAccountId,
 	mandatoryTransactions,
@@ -543,10 +543,12 @@ export function SafeSpendingPreview({
 		!accounts || !transactions || savedRules === null || !startDate;
 	if (settingsState.error)
 		return (
-			<Notice tone="danger" aria-label="Safe card spending settings">
-				<span>Budget settings could not be loaded.</span>
-				<TextButton onClick={settingsState.retry}>Retry</TextButton>
-			</Notice>
+			<Alert variant="destructive" aria-label="Safe card spending settings">
+				<AlertDescription>Budget settings could not be loaded.</AlertDescription>
+				<Button variant="link" onClick={settingsState.retry}>
+					Retry
+				</Button>
+			</Alert>
 		);
 	if (!projection && !pending) return null;
 
@@ -604,14 +606,14 @@ export function SafeSpendingPreview({
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
-					<h2 className={cardHeadingStyles}>
+					<CardTitle className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
 						<CalendarDays
 							size={16}
 							className="shrink-0 text-muted"
 							aria-hidden="true"
 						/>
 						Safe card spending
-					</h2>
+					</CardTitle>
 				</div>
 				<p className="m-0 text-xs">
 					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
@@ -629,18 +631,18 @@ export function SafeSpendingPreview({
 	return (
 		<Card aria-label="Safe card spending" className="relative">
 			<div className="flex items-center justify-between gap-4">
-				<h2 className={cardHeadingStyles}>
+				<CardTitle className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
 					<CalendarDays
 						size={16}
 						className="shrink-0 text-muted"
 						aria-hidden="true"
 					/>
 					Safe card spending
-				</h2>
+				</CardTitle>
 				{trackedIds.length > 0 && (
-					<TextButton onClick={() => onDetail("configure")}>
+					<Button variant="link" onClick={() => onDetail("configure")}>
 						Configure
-					</TextButton>
+					</Button>
 				)}
 			</div>
 			{trackedIds.length > 0 ? (
@@ -652,20 +654,35 @@ export function SafeSpendingPreview({
 							? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
 							: ""}
 					</p>
-					<SegmentedControl
-						className="mb-4"
-						ariaLabel="Safe card spending cycle view"
-						value={cycleViewTab}
-						onChange={setCycleViewTab}
-						items={SAFE_SPENDING_DETAIL_TABS.filter(
+					<ToggleGroup
+						aria-label="Safe card spending cycle view"
+						value={[cycleViewTab]}
+						onValueChange={(next) => {
+							const nextValue = next.find(
+								(candidate) => candidate !== cycleViewTab,
+							);
+							if (nextValue !== undefined)
+								setCycleViewTab(nextValue as SafeSpendingCycleTab);
+						}}
+						className="mb-4 inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
+					>
+						{SAFE_SPENDING_DETAIL_TABS.filter(
 							(
 								item,
 							): item is Extract<
 								(typeof SAFE_SPENDING_DETAIL_TABS)[number],
 								{ view: "charges" }
 							> => isSafeSpendingCycleTab(item.id),
-						).map((item) => ({ value: item.id, label: item.label }))}
-					/>
+						).map((item) => (
+							<ToggleGroupItem
+								key={item.id}
+								value={item.id}
+								className="h-auto rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted pointer-coarse:min-h-12 aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs focus-visible:outline-solid focus-visible:ring-0 data-[state=on]:bg-surface"
+							>
+								{item.label}
+							</ToggleGroupItem>
+						))}
+					</ToggleGroup>
 					<SafeSpendingBillsPanel
 						heroes={inlineView.view.heroes}
 						cashNow={inlineView.view.cashNow}
@@ -681,15 +698,16 @@ export function SafeSpendingPreview({
 						onTransactionOrderChange={setTransactionOrder}
 					/>
 					<div className="flex flex-wrap items-center gap-4 border-t border-line pt-4">
-						<TextButton onClick={() => onDetail("cycle")}>
+						<Button variant="link" onClick={() => onDetail("cycle")}>
 							This cycle transactions
-						</TextButton>
-						<TextButton
+						</Button>
+						<Button
+							variant="link"
 							className="ml-auto"
 							onClick={() => onDetail("last-cycle")}
 						>
 							Last cycle transactions
-						</TextButton>
+						</Button>
 					</div>
 				</>
 			) : (
@@ -697,9 +715,9 @@ export function SafeSpendingPreview({
 					<p className="m-0 text-sm leading-relaxed text-muted">
 						Its statement cycle, spending, and balance settle here.
 					</p>
-					<TextButton onClick={() => onDetail("configure")}>
+					<Button variant="link" onClick={() => onDetail("configure")}>
 						Choose a card
-					</TextButton>
+					</Button>
 				</div>
 			)}
 			{detail && (

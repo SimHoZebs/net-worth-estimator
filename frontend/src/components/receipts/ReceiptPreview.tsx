@@ -1,8 +1,8 @@
 import { Download } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useReceiptImage } from "@/state/receipts.ts";
-import { ErrorNotice } from "../ErrorNotice.tsx";
-import { Button } from "../Button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
 
 export function ReceiptPreview({
 	id,
@@ -41,11 +41,18 @@ export function ReceiptPreview({
 						className="max-h-[60dvh] w-full object-contain"
 					/>
 				) : image.error ? (
-					<ErrorNotice
-						message={image.error.message}
-						action="Retry image"
-						onAction={() => void image.refetch()}
-					/>
+					<Alert variant="destructive">
+						<AlertDescription className="min-w-0 break-words">
+							<p className="my-1 whitespace-pre-line">{image.error.message}</p>
+							<Button
+								variant="link"
+								className="mt-2 px-0 py-0.5 text-xs font-semibold"
+								onClick={() => void image.refetch()}
+							>
+								Retry image
+							</Button>
+						</AlertDescription>
+					</Alert>
 				) : (
 					<p className="p-4 text-sm text-muted" role="status">
 						{image.isError ? "Image unavailable" : "Loading private image…"}
@@ -57,7 +64,7 @@ export function ReceiptPreview({
 					<Button
 						variant="secondary"
 						size="sm"
-						className="w-fit"
+						className="w-fit min-h-9 border-line-strong bg-surface px-3 py-2 text-xs leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
 						onClick={() => {
 							const link = document.createElement("a");
 							link.href = url;

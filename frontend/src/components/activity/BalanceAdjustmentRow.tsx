@@ -1,11 +1,22 @@
 import { Scale } from "lucide-react";
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import { TransactionItemRow } from "./TransactionItem.tsx";
-import { Modal } from "../Modal.tsx";
-import { DetailList, DetailRow } from "../DetailRow.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
 
 export function BalanceAdjustmentRow({
 	adjustment,
@@ -14,6 +25,26 @@ export function BalanceAdjustmentRow({
 }) {
 	const [open, setOpen] = useState(false);
 	const date = new Date(adjustment.observedAt * 1000).toISOString();
+	const rows = [
+		{
+			label: "Recorded at (UTC)",
+			value: (
+				<time dateTime={date}>
+					{date.replace("T", " ").replace(".000Z", " UTC")}
+				</time>
+			),
+		},
+		{ label: "Previous balance", value: exactMoney(adjustment.previousBalance) },
+		{ label: "New balance", value: exactMoney(adjustment.balance) },
+		{ label: "Adjustment", value: exactMoney(adjustment.adjustment) },
+		{
+			label: "Source",
+			value:
+				adjustment.source === "user" || adjustment.source === ""
+					? "Manual adjustment"
+					: "Bank balance",
+		},
+	];
 	return (
 		<>
 			<TransactionItemRow
@@ -37,37 +68,36 @@ export function BalanceAdjustmentRow({
 					mobile: dateLabel(date, true),
 				}}
 			/>
-			{open &&
-				createPortal(
-					<Modal title="Balance adjustment" onClose={() => setOpen(false)}>
-						<DetailList>
-							<DetailRow label="Recorded at (UTC)">
-								<time dateTime={date}>
-									{date.replace("T", " ").replace(".000Z", " UTC")}
-								</time>
-							</DetailRow>
-							<DetailRow label="Previous balance">
-								{exactMoney(adjustment.previousBalance)}
-							</DetailRow>
-							<DetailRow label="New balance">
-								{exactMoney(adjustment.balance)}
-							</DetailRow>
-							<DetailRow label="Adjustment">
-								{exactMoney(adjustment.adjustment)}
-							</DetailRow>
-							<DetailRow label="Source">
-								{adjustment.source === "user" || adjustment.source === ""
-									? "Manual adjustment"
-									: "Bank balance"}
-							</DetailRow>
-						</DetailList>
-						<p className="text-sm text-muted">
-							This entry reconciles the account balance. It does not count as
-							income or spending.
-						</p>
-					</Modal>,
-					document.body,
-				)}
+			<Dialog
+				open={open}
+				onOpenChange={(next) => {
+					if (!next) setOpen(false);
+				}}
+			>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Balance adjustment</DialogTitle>
+						<DialogDescription className="sr-only">
+							Details of the balance adjustment recorded at{" "}
+							{dateLabel(date, true)}
+						</DialogDescription>
+					</DialogHeader>
+					<ItemGroup>
+						{rows.map((row) => (
+							<Item key={row.label} variant="outline" size="sm">
+								<ItemContent>
+									<ItemTitle>{row.label}</ItemTitle>
+									<ItemDescription>{row.value}</ItemDescription>
+								</ItemContent>
+							</Item>
+						))}
+					</ItemGroup>
+					<p className="text-sm text-muted">
+						This entry reconciles the account balance. It does not count as
+						income or spending.
+					</p>
+				</DialogContent>
+			</Dialog>
 		</>
 	);
 }

@@ -1,10 +1,10 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { PositionEvidence } from "./PositionEvidence.tsx";
 
 it("does not report a missing account balance as zero", () => {
-	const html = renderToStaticMarkup(
+	render(
 		<PositionEvidence
 			accounts={[financialModelFixture.accounts[0]!]}
 			position={{
@@ -15,12 +15,12 @@ it("does not report a missing account balance as zero", () => {
 			onClose={() => {}}
 		/>,
 	);
-	expect(html).toContain("Unavailable");
-	expect(html).not.toContain("$0");
+	expect(screen.getByText("Unavailable")).toBeTruthy();
+	expect(screen.queryByText(/\$0/)).toBeNull();
 });
 
 it("reports a real zero balance as zero", () => {
-	const html = renderToStaticMarkup(
+	render(
 		<PositionEvidence
 			accounts={[financialModelFixture.accounts[0]!]}
 			position={{
@@ -33,6 +33,6 @@ it("reports a real zero balance as zero", () => {
 			onClose={() => {}}
 		/>,
 	);
-	expect(html).toContain("$0");
-	expect(html).not.toContain("Unavailable");
+	expect(screen.getAllByText(/\$0/)).toHaveLength(2);
+	expect(screen.queryByText("Unavailable")).toBeNull();
 });

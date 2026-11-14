@@ -131,7 +131,7 @@ it("hides dismissed shares until the toggle reveals them", async () => {
 	stubInbox([item({ dismissed: true })]);
 	render(<InboxPage />, { wrapper });
 	await waitFor(() => expect(screen.getByText("Nothing waiting")).toBeTruthy());
-	fireEvent.click(screen.getByLabelText("Show hidden items"));
+	fireEvent.click(screen.getByRole("checkbox", { name: "Show hidden items" }));
 	await waitFor(() => expect(screen.getByText("Dinner bill")).toBeTruthy());
 	expect(screen.getByText("Hidden")).toBeTruthy();
 });

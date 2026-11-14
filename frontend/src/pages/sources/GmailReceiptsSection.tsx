@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useId, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import type { EmailReceipt } from "../../api/generated/model/index.ts";
-import { Badge } from "../../components/Badge.tsx";
-import { Button, TextButton } from "../../components/Button.tsx";
-import { ErrorNotice, FieldError } from "../../components/ErrorNotice.tsx";
-import { InputField } from "../../components/Field.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { notifySuccess } from "../../state/notifications.ts";
 import {
 	confirmGmailReceipt,
@@ -74,11 +77,15 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 					</div>
 				) : receipts.isError ? (
 					<div className="mt-4">
-						<ErrorNotice
-							message="The extracted receipts could not be loaded."
-							action="Retry"
-							onAction={() => void receipts.refetch()}
-						/>
+						<Alert variant="destructive">
+							<AlertCircle size={16} aria-hidden="true" />
+							<AlertDescription>
+								The extracted receipts could not be loaded.{" "}
+								<Button variant="link" onClick={() => void receipts.refetch()}>
+									Retry
+								</Button>
+							</AlertDescription>
+						</Alert>
 					</div>
 				) : items.length === 0 ? (
 					<p className="mt-4 mb-0 text-sm leading-relaxed text-muted">
@@ -155,13 +162,17 @@ function ReceiptRow({
 		<li className="rounded-control border border-line bg-surface-2 p-4">
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="font-medium">{shown.merchant}</span>
-				<Badge tone="neutral">
+				<Badge variant="secondary">
 					{item.verdict === "refund" ? "Refund" : "Receipt"}
 				</Badge>
 				{needsReview ? (
-					<Badge tone="warning">Needs review</Badge>
+					<Badge variant="default" className="bg-warning-bg text-warning-text">
+						Needs review
+					</Badge>
 				) : (
-					<Badge tone="success">Reviewed</Badge>
+					<Badge variant="default" className="bg-success-bg text-success-text">
+						Reviewed
+					</Badge>
 				)}
 			</div>
 			<p className="mt-2 mb-0 text-sm leading-relaxed text-muted">
@@ -170,16 +181,22 @@ function ReceiptRow({
 			</p>
 			{needsReview && !readOnly && (
 				<div className="mt-3 flex flex-wrap gap-4">
-					<TextButton
+					<Button
+						variant="link"
 						className="min-h-6"
 						disabled={busy}
 						onClick={() => void handleConfirm()}
 					>
 						{busy ? "Confirming…" : "Confirm"}
-					</TextButton>
-					<TextButton className="min-h-6" disabled={busy} onClick={onEdit}>
+					</Button>
+					<Button
+						variant="link"
+						className="min-h-6"
+						disabled={busy}
+						onClick={onEdit}
+					>
 						{editing ? "Close correction" : "Correct"}
-					</TextButton>
+					</Button>
 				</div>
 			)}
 			{editing && needsReview && (
@@ -202,6 +219,11 @@ function CorrectionForm({
 	disabled: boolean;
 	onDone: () => void;
 }) {
+	const merchantId = useId();
+	const dateId = useId();
+	const amountId = useId();
+	const currencyId = useId();
+	const referenceId = useId();
 	const [merchant, setMerchant] = useState(item.merchant ?? "");
 	const [date, setDate] = useState(item.receiptDate ?? "");
 	const [amount, setAmount] = useState(
@@ -245,42 +267,57 @@ function CorrectionForm({
 			onSubmit={handleSave}
 			className="mt-3 grid gap-3"
 		>
-			<InputField
-				name="merchant"
-				label="Merchant"
-				disabled={disabled || busy}
-				value={merchant}
-				onChange={(event) => setMerchant(event.target.value)}
-			/>
-			<InputField
-				name="receiptDate"
-				label="Receipt date (YYYY-MM-DD)"
-				disabled={disabled || busy}
-				value={date}
-				onChange={(event) => setDate(event.target.value)}
-			/>
-			<InputField
-				name="amount"
-				label="Amount"
-				disabled={disabled || busy}
-				value={amount}
-				onChange={(event) => setAmount(event.target.value)}
-			/>
-			<InputField
-				name="currency"
-				label="Currency"
-				disabled={disabled || busy}
-				value={currency}
-				onChange={(event) => setCurrency(event.target.value)}
-			/>
-			<InputField
-				name="reference"
-				label="Order reference"
-				disabled={disabled || busy}
-				value={reference}
-				onChange={(event) => setReference(event.target.value)}
-			/>
-			<FieldError message={error} />
+			<Field>
+				<Label htmlFor={merchantId}>Merchant</Label>
+				<Input
+					id={merchantId}
+					name="merchant"
+					disabled={disabled || busy}
+					value={merchant}
+					onChange={(event) => setMerchant(event.target.value)}
+				/>
+			</Field>
+			<Field>
+				<Label htmlFor={dateId}>Receipt date (YYYY-MM-DD)</Label>
+				<Input
+					id={dateId}
+					name="receiptDate"
+					disabled={disabled || busy}
+					value={date}
+					onChange={(event) => setDate(event.target.value)}
+				/>
+			</Field>
+			<Field>
+				<Label htmlFor={amountId}>Amount</Label>
+				<Input
+					id={amountId}
+					name="amount"
+					disabled={disabled || busy}
+					value={amount}
+					onChange={(event) => setAmount(event.target.value)}
+				/>
+			</Field>
+			<Field>
+				<Label htmlFor={currencyId}>Currency</Label>
+				<Input
+					id={currencyId}
+					name="currency"
+					disabled={disabled || busy}
+					value={currency}
+					onChange={(event) => setCurrency(event.target.value)}
+				/>
+			</Field>
+			<Field>
+				<Label htmlFor={referenceId}>Order reference</Label>
+				<Input
+					id={referenceId}
+					name="reference"
+					disabled={disabled || busy}
+					value={reference}
+					onChange={(event) => setReference(event.target.value)}
+				/>
+			</Field>
+			{error ? <p role="alert">{error}</p> : null}
 			<div>
 				<Button variant="secondary" type="submit" disabled={disabled || busy}>
 					{busy ? "Saving…" : "Save correction"}

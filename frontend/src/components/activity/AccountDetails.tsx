@@ -3,11 +3,19 @@ import type { Account } from "../../domain/model.ts";
 import { ACCOUNT_TYPE_LABELS } from "../../domain/accountKinds.ts";
 import type { AccountKind } from "../../api/contracts.ts";
 import { accountKindIcons } from "../AccountIcon.tsx";
-import { OptionPicker } from "../OptionPicker.tsx";
 import { dateLabel } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { Checkbox } from "../Field.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
+import { cn } from "@/lib/utils.ts";
 import { PaymentTermsSection } from "./PaymentTermsSection.tsx";
 import type { AccountEdit } from "./useAccountEdit.ts";
 import {
@@ -30,9 +38,9 @@ function PropertyRow({
 	return (
 		<div className={accountPropertyRowClassName}>
 			{htmlFor ? (
-				<label htmlFor={htmlFor} className={detailPropertyLabelClassName}>
+				<Label htmlFor={htmlFor} className={detailPropertyLabelClassName}>
 					{label}
-				</label>
+				</Label>
 			) : (
 				<span className={detailPropertyLabelClassName}>{label}</span>
 			)}
@@ -85,62 +93,82 @@ export function AccountDetails({
 			icon: accountKindIcons[kind],
 		}),
 	);
+	const KindIcon = accountKindIcons[draft.kind];
 	return (
 		<section aria-label="Account settings" className="grid gap-4">
-			<OptionPicker
-				label="Account type"
-				labelClassName={detailPropertyLabelClassName}
-				triggerId={`${formId}-kind`}
-				value={draft.kind}
-				valueLabel={ACCOUNT_TYPE_LABELS[draft.kind]}
-				ValueIcon={accountKindIcons[draft.kind]}
-				options={kindOptions}
-				onSelect={(kind) =>
-					edit.update(
-						{
-							kind:
-								parseUnion(kind, [
-									"cash",
-									"investment",
-									"property",
-									"debt",
-								] as const) ?? "cash",
-						},
-						"kind",
-					)
-				}
-				disabled={edit.saving}
-			/>
+			<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+				<Label htmlFor={`${formId}-kind`} className={detailPropertyLabelClassName}>
+					Account type
+				</Label>
+				<div className="min-w-0 flex-1">
+					<Select
+						value={draft.kind}
+						disabled={edit.saving}
+						onValueChange={(kind) =>
+							edit.update(
+								{
+									kind:
+										parseUnion(kind, [
+											"cash",
+											"investment",
+											"property",
+											"debt",
+										] as const) ?? "cash",
+								},
+								"kind",
+							)
+						}
+					>
+						<SelectTrigger id={`${formId}-kind`} aria-label="Account type">
+							<KindIcon
+								size={16}
+								aria-hidden="true"
+								className="flex-none text-muted"
+							/>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{kindOptions.map((option) => (
+								<SelectItem key={option.value} value={option.value}>
+									<option.icon
+										size={16}
+										aria-hidden="true"
+										className="flex-none text-muted"
+									/>
+									<span className="min-w-0 flex-1 truncate">
+										{option.label}
+									</span>
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</div>
+			</div>
 			{readOnly && (
 				<p className="m-0 text-xs text-muted">
 					Synced balances stay bank-owned; the type is yours to set.
 				</p>
 			)}
 			<PropertyRow label="Included">
-				<label
-					htmlFor={`${formId}-enabled`}
-					className="inline-flex min-w-0 items-center gap-2 text-sm"
-				>
+				<span className="inline-flex min-w-0 items-center gap-2 text-sm">
 					<Checkbox
-						form={formId}
 						id={`${formId}-enabled`}
 						aria-label="Include in net worth and projections"
 						name="enabled"
 						checked={draft.enabled}
 						disabled={locked}
-						onChange={(event) =>
-							edit.update({ enabled: event.target.checked }, "enabled")
+						onCheckedChange={(checked) =>
+							edit.update({ enabled: checked === true }, "enabled")
 						}
 					/>
 					<span>Net worth and projections</span>
-				</label>
+				</span>
 			</PropertyRow>
 			<PropertyRow label="Protected balance" htmlFor={`${formId}-protected`}>
 				<span className="text-sm" aria-hidden="true">
 					$
 				</span>
-				<input
-					form={formId}
+				<Input
 					id={`${formId}-protected`}
 					aria-label="Protected balance in USD"
 					name="minBalance"
@@ -151,7 +179,7 @@ export function AccountDetails({
 					step="0.01"
 					value={draft.minBalance}
 					readOnly={locked}
-					className={mergeStyles(
+					className={cn(
 						transactionControlStyles({ shape: "inline" }),
 						"w-16 min-w-0 flex-1 text-sm",
 					)}
@@ -161,21 +189,18 @@ export function AccountDetails({
 				/>
 			</PropertyRow>
 			<PropertyRow label="Ceiling">
-				<label
-					htmlFor={`${formId}-no-ceiling`}
-					className="inline-flex items-center gap-2 text-sm"
-				>
+				<span className="inline-flex items-center gap-2 text-sm">
 					<Checkbox
-						form={formId}
 						id={`${formId}-no-ceiling`}
+						aria-label="No ceiling"
 						name="noCeiling"
 						checked={draft.noCeiling}
 						disabled={locked}
-						onChange={(event) =>
+						onCheckedChange={(checked) =>
 							edit.update(
 								{
-									noCeiling: event.target.checked,
-									...(!event.target.checked && draft.maxBalance === ""
+									noCeiling: checked === true,
+									...(!checked && draft.maxBalance === ""
 										? { maxBalance: draft.minBalance }
 										: {}),
 								},
@@ -183,15 +208,14 @@ export function AccountDetails({
 							)
 						}
 					/>
-					No ceiling
-				</label>
+					<span>No ceiling</span>
+				</span>
 				{!draft.noCeiling && (
 					<>
 						<span className="text-sm" aria-hidden="true">
 							$
 						</span>
-						<input
-							form={formId}
+						<Input
 							id={`${formId}-ceiling`}
 							aria-label="Maximum balance in USD"
 							name="maxBalance"
@@ -202,7 +226,7 @@ export function AccountDetails({
 							step="0.01"
 							value={draft.maxBalance}
 							readOnly={locked}
-							className={mergeStyles(
+							className={cn(
 								transactionControlStyles({ shape: "inline" }),
 								"w-16 min-w-0 flex-1 text-sm",
 							)}

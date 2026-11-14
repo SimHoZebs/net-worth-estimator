@@ -1,32 +1,40 @@
-/* Semantic roles reference Tailwind's stock palette and spacing scale.
-   Both theme values live in light-dark() tokens. Runtime charts share these variables. */
+/* Semantic roles resolve against the shadcn preset (taupe neutrals, amber
+   charts) wherever it has an opinion; light-dark() remains only for
+   state roles the preset does not define (success, warning, danger, guest).
+   The preset owns --primary/--sidebar colors in index.css, so the retired
+   emerald primary and stone neutrals below are taupe/amber/beige now.
+   --muted keeps the application secondary-text role (text-muted plus chart
+   data strokes on var(--muted)) instead of the preset surface tone; the
+   surface tone is reachable through --surface-2/--secondary. */
 @layer base {
 	:root {
-		color-scheme: light dark;
-		color: var(--ink);
-		background: var(--paper);
+		color-scheme: light;
 		font-synthesis: none;
-		--font-ui: "Manrope Variable", sans-serif;
-		--font-display: var(--font-ui);
+		--font-ui: "Geist Variable", sans-serif;
+		--font-display: "Merriweather Variable", serif;
 		--font-code: ui-monospace, monospace;
-		--primary: light-dark(var(--color-emerald-700), var(--color-emerald-300));
+		/* Primary hover deepens the preset primary toward the page edge in
+		   each mode; the resting and foreground tones are preset-owned. */
 		--primary-hover: light-dark(
-			var(--color-emerald-800),
-			var(--color-emerald-200)
+			color-mix(in oklab, var(--primary) 88%, black),
+			color-mix(in oklab, var(--primary) 88%, white)
 		);
-		--on-primary: light-dark(var(--color-white), var(--color-emerald-950));
-		--ink: light-dark(var(--color-stone-800), var(--color-stone-100));
-		--muted: light-dark(var(--color-stone-600), var(--color-stone-400));
-		--subtle: var(--color-stone-500);
-		--line: light-dark(var(--color-stone-200), var(--color-stone-700));
-		--line-strong: light-dark(var(--color-stone-300), var(--color-stone-600));
-		--paper: light-dark(var(--color-stone-50), var(--color-stone-950));
-		--surface: light-dark(var(--color-white), var(--color-stone-900));
-		--surface-2: light-dark(var(--color-stone-50), var(--color-stone-800));
-		--surface-3: light-dark(var(--color-stone-100), var(--color-stone-800));
-		--input-bg: light-dark(var(--color-white), var(--color-stone-800));
-		--hover: light-dark(var(--color-stone-100), var(--color-stone-800));
-		--active: light-dark(var(--color-emerald-50), var(--color-emerald-950));
+		--on-primary: var(--primary-foreground);
+		--ink: var(--foreground);
+		--muted: var(--muted-foreground);
+		--subtle: var(--muted-foreground);
+		--line: var(--border);
+		/* The preset collapses border and input edges to one tone; the
+		   application keeps a stronger level for field and modal frames. */
+		--line-strong: color-mix(in oklab, var(--foreground) 18%, transparent);
+		--paper: var(--background);
+		--surface: var(--card);
+		/* The preset muted surface shares --secondary values in this theme. */
+		--surface-2: var(--secondary);
+		--surface-3: var(--accent);
+		--input-bg: var(--card);
+		--hover: var(--accent);
+		--active: color-mix(in oklab, var(--primary) 8%, transparent);
 		--success-bg: light-dark(var(--color-emerald-50), var(--color-emerald-950));
 		--success-text: light-dark(
 			var(--color-emerald-800),
@@ -50,17 +58,21 @@
 		--guest: light-dark(var(--color-orange-700), var(--color-orange-400));
 		--on-guest: light-dark(var(--color-white), var(--color-orange-950));
 		--chart-band: light-dark(
-			var(--color-emerald-200),
-			var(--color-emerald-900)
+			color-mix(in oklch, var(--chart-1) 55%, white),
+			color-mix(in oklch, var(--chart-1) 45%, black)
 		);
-		--chart-median: var(--color-stone-500);
+		--chart-median: var(--muted-foreground);
+		/* Amber-led series: the lead tone takes the amber slot the emerald
+		   used to hold, the second tone steps deeper/lighter along the amber
+		   ramp, and sky plus violet keep carrying the third and fourth
+		   series so pattern-paired segments stay distinguishable. */
 		--chart-series-1: light-dark(
-			var(--color-emerald-600),
-			var(--color-emerald-400)
-		);
-		--chart-series-2: light-dark(
 			var(--color-amber-600),
 			var(--color-amber-400)
+		);
+		--chart-series-2: light-dark(
+			var(--color-amber-800),
+			var(--color-amber-200)
 		);
 		--chart-series-3: light-dark(var(--color-sky-600), var(--color-sky-400));
 		--chart-series-4: light-dark(
@@ -73,7 +85,11 @@
 			transparent
 		);
 		--backdrop-blur: var(--blur-xs);
-		--sidebar: 0;
+		/* Layout sidebar width. The preset owns the --sidebar color name, so
+		   the spacing scale moves here. Consumers read --sidebar-width:
+		   workspace/WorkspaceLayout.tsx (ml-(--sidebar-width)) and the
+		   sheet-based navigation (w-(--sidebar-width)) both use the new name. */
+		--sidebar-width: 0;
 		/* Layer scale. Native dialogs, popovers, and pickers paint in the
 		   top layer and ignore this scale. Open order decides there. */
 		--z-local: 10;
@@ -82,21 +98,18 @@
 		--z-skip: 45;
 		--z-menu: 50;
 		--z-toast: 60;
-		&:has(> head > meta[name="color-scheme"][content="dark"]) {
-			color-scheme: dark;
-		}
-		&:has(> head > meta[name="color-scheme"][content="light"]) {
-			color-scheme: light;
-		}
+	}
+	:root.dark {
+		color-scheme: dark;
 	}
 	@media (width >= theme(--breakpoint-md)) {
 		:root {
-			--sidebar: --spacing(48);
+			--sidebar-width: --spacing(48);
 		}
 	}
 	@media (width >= theme(--breakpoint-xl)) {
 		:root {
-			--sidebar: --spacing(56);
+			--sidebar-width: --spacing(56);
 		}
 	}
 }

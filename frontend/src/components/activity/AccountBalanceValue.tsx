@@ -2,6 +2,10 @@ import type { AccountEdit } from "./useAccountEdit.ts";
 import { exactMoney } from "../../domain/format.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
+import { Input } from "@/components/ui/input.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { cn } from "@/lib/utils.ts";
 
 export function AccountBalanceValue({
 	edit,
@@ -18,7 +22,7 @@ export function AccountBalanceValue({
 			<span className="text-xs text-muted">Balance</span>
 			<span className="type-value inline-flex min-w-0 items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight">
 				<span aria-hidden="true">$</span>
-				<input
+				<Input
 					id={`${edit.formId}-balance`}
 					aria-label="Balance (USD)"
 					name="balance"
@@ -45,7 +49,7 @@ export function AccountBalanceValue({
 					step="0.01"
 					value={edit.draft.balance}
 					readOnly={readOnly || edit.saving}
-					className={transactionControlStyles({ shape: "amount" })}
+					className={cn(transactionControlStyles({ shape: "amount" }))}
 					onChange={(event) =>
 						edit.update({ balance: event.target.value }, "balance")
 					}
@@ -53,12 +57,12 @@ export function AccountBalanceValue({
 			</span>
 			{edit.observedAt !== null && (
 				<div className="flex flex-col items-start gap-2 md:items-end">
-					<label
+					<Label
 						htmlFor={`${edit.formId}-time`}
 						className="inline-flex max-w-full flex-wrap items-center gap-2 text-sm text-muted"
 					>
 						Adjustment time (UTC)
-						<input
+						<Input
 							id={`${edit.formId}-time`}
 							type="datetime-local"
 							step="1"
@@ -66,10 +70,10 @@ export function AccountBalanceValue({
 							required
 							readOnly={readOnly || edit.saving}
 							value={edit.observedAt}
-							className={transactionControlStyles({ shape: "date" })}
+							className={cn(transactionControlStyles({ shape: "date" }))}
 							onChange={(event) => edit.setObservedAt(event.target.value)}
 						/>
-					</label>
+					</Label>
 					{edit.previous.isFetching || edit.previous.isPending ? (
 						<p role="status" className="m-0 text-xs text-muted md:text-right">
 							Loading balance at this time…
@@ -77,12 +81,13 @@ export function AccountBalanceValue({
 					) : edit.previous.isError ? (
 						<p role="alert" className="m-0 text-sm text-danger-text">
 							The balance could not be loaded.{" "}
-							<button
+							<Button
 								type="button"
+								variant="link"
 								onClick={() => void edit.previous.refetch()}
 							>
 								Retry balance
-							</button>
+							</Button>
 						</p>
 					) : (
 						<p className="m-0 text-xs text-muted md:text-right">

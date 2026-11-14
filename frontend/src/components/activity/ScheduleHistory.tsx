@@ -5,7 +5,7 @@ import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { Badge } from "../Badge.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
 
@@ -62,7 +62,7 @@ export function ScheduleHistory({
 				<History size={17} aria-hidden="true" />
 				<h3 className="text-sm font-semibold">Recorded transactions</h3>
 				{transactions.length > 0 && (
-					<Badge tone="neutral">{transactions.length}</Badge>
+					<Badge variant="secondary">{transactions.length}</Badge>
 				)}
 			</div>
 			{transactions.length === 0 ? (

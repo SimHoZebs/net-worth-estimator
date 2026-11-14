@@ -482,6 +482,9 @@ describe("pattern review visibility", () => {
 			id: "one",
 			dismissed: true,
 		});
+		// The review dialog stays open over the queue, and the nova dialog
+		// hides the queue behind it. Close it before asserting queue state.
+		await runInteractions([{ click: ["button", "Close"] }]);
 		view.rerender(ui(items.map((item) => ({ ...item, dismissed: true }))));
 		expect(screen.getByRole("tab", { name: "Review (0)" })).toBeDefined();
 		expect(screen.getByRole("tab", { name: "Dismissed (1)" })).toBeDefined();

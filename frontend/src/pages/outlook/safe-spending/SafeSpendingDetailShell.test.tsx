@@ -155,28 +155,31 @@ describe("SafeSpendingDetailShell", () => {
 	);
 	it("switches tabs through the shell", () => {
 		const onTabChange = vi.fn();
-		render(
-			<SafeSpendingDetailShell
-				tab="cycle"
-				onTabChange={onTabChange}
-				cycleCounts={{ cycle: 3, "last-cycle": 2 }}
-				range={{ start: heroes.cycleStart, end: heroes.cycleEnd }}
-				onClose={noop}
-			>
-				<SafeSpendingBillsPanel
-					heroes={heroes}
-					cashNow={cashNow}
-					allocation={allocation}
-					funding={currentFunding}
-					section={section}
-					accounts={financialModelFixture.accounts}
-					transactions={financialModelFixture.transactions}
-					readOnly={financialModelFixture.readOnly}
-					transactionOrder="newest"
-					onTransactionOrderChange={noop}
-				/>
-			</SafeSpendingDetailShell>,
-		);
+		function show(tab: "cycle" | "last-cycle" | "configure") {
+			return (
+				<SafeSpendingDetailShell
+					tab={tab}
+					onTabChange={onTabChange}
+					cycleCounts={{ cycle: 3, "last-cycle": 2 }}
+					range={{ start: heroes.cycleStart, end: heroes.cycleEnd }}
+					onClose={noop}
+				>
+					<SafeSpendingBillsPanel
+						heroes={heroes}
+						cashNow={cashNow}
+						allocation={allocation}
+						funding={currentFunding}
+						section={section}
+						accounts={financialModelFixture.accounts}
+						transactions={financialModelFixture.transactions}
+						readOnly={financialModelFixture.readOnly}
+						transactionOrder="newest"
+						onTransactionOrderChange={noop}
+					/>
+				</SafeSpendingDetailShell>
+			);
+		}
+		const { rerender } = render(show("cycle"));
 		expect(screen.getByText(labels.leftAtEndOfMonth)).toBeTruthy();
 		expect(screen.getAllByText("Sep 20, 2026 – Oct 19, 2026")).toHaveLength(1);
 		expect(screen.getAllByText("No bills due in this period.")).toHaveLength(1);
@@ -190,6 +193,9 @@ describe("SafeSpendingDetailShell", () => {
 		).toBe("true");
 		fireEvent.click(screen.getByRole("tab", { name: /Last cycle/ }));
 		expect(onTabChange).toHaveBeenCalledWith("last-cycle");
+		// A controlled parent applies the new tab before the next switch, so
+		// the way back is a real value change the native primitive reports.
+		rerender(show("last-cycle"));
 		fireEvent.click(screen.getByRole("tab", { name: /This cycle/ }));
 		expect(onTabChange).toHaveBeenCalledWith("cycle");
 	});

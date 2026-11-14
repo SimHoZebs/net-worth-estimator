@@ -18,10 +18,31 @@ import {
 	deletePreset,
 	movePreset,
 } from "../../state/workspaceWrites.ts";
-import { Button, TextButton } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { Checkbox, InputField } from "../Field.tsx";
-import { ConfirmDialog } from "../ConfirmDialog.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { cn } from "@/lib/utils.ts";
+
+const fieldLabelClassName = "text-sm leading-normal font-semibold text-muted";
+const fieldInputClassName =
+	"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0";
+const secondaryButtonClassName =
+	"min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0";
+const primaryButtonClassName =
+	"min-h-10 border-primary bg-primary px-4 py-2 text-sm leading-snug text-on-primary enabled:hover:bg-primary-hover enabled:hover:shadow-sm focus-visible:outline-solid focus-visible:ring-0";
+const textButtonClassName =
+	"px-0 py-0.5 text-xs font-semibold text-success-text enabled:hover:text-ink";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import { textValue } from "./formValues.ts";
 import { AmountBuilder } from "./AmountBuilder.tsx";
 import { useAmountTemplates } from "./amountTemplates.ts";
@@ -82,6 +103,55 @@ function slugify(value: string): string {
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
+}
+
+function CatalogField({
+	id,
+	label,
+	name,
+	wide,
+	required,
+	maxLength,
+	placeholder,
+	hint,
+	hintId,
+	defaultValue,
+}: {
+	id: string;
+	label: string;
+	name: string;
+	wide?: boolean;
+	required?: boolean;
+	maxLength?: number;
+	placeholder?: string;
+	hint?: string;
+	hintId?: string;
+	defaultValue?: string;
+}) {
+	return (
+		<Field
+			className={cn("flex min-w-0 flex-col gap-2", wide && "col-span-full")}
+		>
+			<Label htmlFor={id} className={fieldLabelClassName}>
+				{label}
+			</Label>
+			<Input
+				id={id}
+				name={name}
+				required={required}
+				maxLength={maxLength}
+				placeholder={placeholder}
+				defaultValue={defaultValue}
+				aria-describedby={hint ? hintId : undefined}
+				className={fieldInputClassName}
+			/>
+			{hint && (
+				<p id={hintId} className="text-xs leading-relaxed text-muted">
+					{hint}
+				</p>
+			)}
+		</Field>
+	);
 }
 
 export function AmountCatalog() {
@@ -199,6 +269,7 @@ export function AmountCatalog() {
 					<Button
 						type="button"
 						variant="secondary"
+						className={secondaryButtonClassName}
 						onClick={() => {
 							closeForms();
 							setCreating(true);
@@ -208,17 +279,21 @@ export function AmountCatalog() {
 					</Button>
 					{selectedPreset && (
 						<>
-							<TextButton
+							<Button
 								type="button"
+								variant="link"
+								className={textButtonClassName}
 								onClick={() => {
 									closeForms();
 									setEditing(true);
 								}}
 							>
 								Rename
-							</TextButton>
-							<TextButton
+							</Button>
+							<Button
 								type="button"
+								variant="link"
+								className={textButtonClassName}
 								disabled={!canMoveUp}
 								onClick={() => {
 									const previous = serverPresets[index - 1];
@@ -226,9 +301,11 @@ export function AmountCatalog() {
 								}}
 							>
 								Move up
-							</TextButton>
-							<TextButton
+							</Button>
+							<Button
 								type="button"
+								variant="link"
+								className={textButtonClassName}
 								disabled={!canMoveDown}
 								onClick={() => {
 									const after = serverPresets[index + 2];
@@ -236,10 +313,15 @@ export function AmountCatalog() {
 								}}
 							>
 								Move down
-							</TextButton>
-							<TextButton type="button" onClick={() => setDeleting(true)}>
+							</Button>
+							<Button
+								type="button"
+								variant="link"
+								className={textButtonClassName}
+								onClick={() => setDeleting(true)}
+							>
 								Delete
-							</TextButton>
+							</Button>
 						</>
 					)}
 				</div>
@@ -251,29 +333,34 @@ export function AmountCatalog() {
 				>
 					<h4>New recipe</h4>
 					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
-						<InputField
+						<CatalogField
+							id={`${id}-create-name`}
 							label="Name"
 							name="name"
 							required
 							maxLength={100}
 							placeholder="e.g. yearly-bonus"
 							hint="Lowercase letters, numbers, and dashes."
+							hintId={`${id}-create-name-hint`}
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-create-label`}
 							label="Label"
 							name="label"
 							required
 							maxLength={100}
 							placeholder="e.g. Yearly bonus"
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-create-summary`}
 							label="Summary"
 							name="summary"
 							wide
 							maxLength={280}
 							placeholder="e.g. Same bonus every December."
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-create-when-use`}
 							label="When to use"
 							name="whenUse"
 							wide
@@ -285,10 +372,12 @@ export function AmountCatalog() {
 						htmlFor={`${id}-create-enabled`}
 						className="flex min-h-11 items-center gap-3 text-sm text-muted"
 					>
-						<Checkbox
+						<input
 							id={`${id}-create-enabled`}
 							name="enabled"
+							type="checkbox"
 							defaultChecked
+							className="m-0 size-5 flex-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
 						/>
 						Enabled
 					</label>
@@ -300,11 +389,21 @@ export function AmountCatalog() {
 						onChange={setStagedAmount}
 					/>
 					{stagedAmount && <p className="text-muted">Amount ready to save.</p>}
-					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={closeForms}>
+					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-line pt-5">
+						<Button
+							type="button"
+							variant="secondary"
+							className={secondaryButtonClassName}
+							onClick={closeForms}
+						>
 							Cancel
 						</Button>
-						<Button type="submit" variant="primary" disabled={!stagedAmount}>
+						<Button
+							type="submit"
+							variant="default"
+							className={primaryButtonClassName}
+							disabled={!stagedAmount}
+						>
 							Save recipe
 						</Button>
 					</div>
@@ -317,21 +416,24 @@ export function AmountCatalog() {
 				>
 					<h4>Rename recipe</h4>
 					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
-						<InputField
+						<CatalogField
+							id={`${id}-edit-label`}
 							label="Label"
 							name="label"
 							required
 							maxLength={100}
 							defaultValue={selectedPreset.label}
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-edit-summary`}
 							label="Summary"
 							name="summary"
 							wide
 							maxLength={280}
 							defaultValue={selectedPreset.summary ?? ""}
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-edit-when-use`}
 							label="When to use"
 							name="whenUse"
 							wide
@@ -343,10 +445,12 @@ export function AmountCatalog() {
 						htmlFor={`${id}-edit-enabled`}
 						className="flex min-h-11 items-center gap-3 text-sm text-muted"
 					>
-						<Checkbox
+						<input
 							id={`${id}-edit-enabled`}
 							name="enabled"
+							type="checkbox"
 							defaultChecked={selectedPreset.enabled}
+							className="m-0 size-5 flex-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
 						/>
 						Enabled
 					</label>
@@ -364,36 +468,60 @@ export function AmountCatalog() {
 							onChange={setStagedAmount}
 						/>
 					</details>
-					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={closeForms}>
+					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-line pt-5">
+						<Button
+							type="button"
+							variant="secondary"
+							className={secondaryButtonClassName}
+							onClick={closeForms}
+						>
 							Cancel
 						</Button>
-						<Button type="submit" variant="primary">
+						<Button
+							type="submit"
+							variant="default"
+							className={primaryButtonClassName}
+						>
 							Save changes
 						</Button>
 					</div>
 				</form>
 			)}
 			{deleting && selectedPreset && (
-				<ConfirmDialog
-					title={`Delete ${selectedPreset.label}?`}
-					cancelLabel="Keep recipe"
-					confirmLabel="Delete recipe"
-					onCancel={() => setDeleting(false)}
-					onConfirm={() => {
-						void deletePreset(selectedPreset.id).then((ok) => {
-							if (ok) {
-								setDeleting(false);
-								setSelectedId(templates[0]?.id ?? "fixed");
-							}
-						});
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open) setDeleting(false);
 					}}
 				>
-					<p>
-						The recipe stops appearing as a starting point. Transactions already
-						using its amounts are unaffected.
-					</p>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{`Delete ${selectedPreset.label}?`}
+							</AlertDialogTitle>
+						</AlertDialogHeader>
+						<AlertDialogDescription>
+							The recipe stops appearing as a starting point. Transactions
+							already using its amounts are unaffected.
+						</AlertDialogDescription>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Keep recipe</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								onClick={() => {
+									void deletePreset(selectedPreset.id).then((ok) => {
+										if (ok) {
+											setDeleting(false);
+											setSelectedId(templates[0]?.id ?? "fixed");
+										}
+									});
+								}}
+							>
+								Delete recipe
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 			{selected && !creating && !editing && (
 				<AmountBuilder

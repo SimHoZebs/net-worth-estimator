@@ -1,11 +1,33 @@
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
-import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
-import { TablePagination } from "../../components/DataTable.tsx";
-import { Button } from "../../components/Button.tsx";
-import { SearchField } from "../../components/Field.tsx";
-import { type TabItem, Tabs } from "../../components/Tabs.tsx";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Pagination,
+	PaginationContent,
+	PaginationItem,
+	PaginationNext,
+	PaginationPrevious,
+} from "@/components/ui/pagination.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -42,8 +64,15 @@ import { useRouter } from "@tanstack/react-router";
 import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
+import { cn } from "@/lib/utils.ts";
 
 export type AccountSectionView = "accounts" | "transactions";
+
+type TabItem<T extends string> = {
+	id: T;
+	label: string;
+	count?: number | null;
+};
 
 type ScheduleFilter = "all" | "recurring";
 
@@ -77,6 +106,7 @@ function AccountsView({
 	const [removing, setRemoving] = useState(false);
 	const [removeError, setRemoveError] = useState<string | null>(null);
 	const balances = useAccountBalances();
+	const searchId = useId();
 	const visible = useMemo(
 		() =>
 			visibleAccounts(
@@ -117,15 +147,26 @@ function AccountsView({
 		<>
 			<section>
 				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
-					<SearchField
-						label="Search accounts"
-						value={query}
-						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Find an account…"
-					/>
+					<Label
+						htmlFor={searchId}
+						className="inline-flex items-center gap-2 text-subtle"
+					>
+						<Search size={16} aria-hidden="true" />
+						<span className="sr-only">Search accounts</span>
+						<Input
+							id={searchId}
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							placeholder="Find an account…"
+							className={cn(
+								"h-11 w-32 rounded-none border-0 bg-transparent px-1 py-2 text-sm font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60 sm:w-48 focus-visible:outline-solid focus-visible:ring-0",
+								"disabled:bg-transparent",
+							)}
+						/>
+					</Label>
 					<Button
 						type="button"
-						variant="primary"
+						variant="default"
 						size="sm"
 						className="max-sm:px-3 max-sm:py-2"
 						onClick={() => onEdit({ kind: "account", item: null })}
@@ -158,25 +199,52 @@ function AccountsView({
 				)}
 			</section>
 			{remove && (
-				<ConfirmDialog
-					title={`Remove ${remove.name}?`}
-					eyebrow="Changes"
-					onCancel={() => {
-						setRemove(null);
-						setRemoveError(null);
+				<AlertDialog
+					open={true}
+					onOpenChange={(next) => {
+						if (!next && !removing) {
+							setRemove(null);
+							setRemoveError(null);
+						}
 					}}
-					onConfirm={() => void deleteItem()}
-					cancelLabel="Keep account"
-					confirmLabel="Remove account"
-					busyLabel="Removing…"
-					busy={removing}
-					error={removeError}
 				>
-					<p>
-						This deletes the account immediately. Balance history for this
-						account goes with it.
-					</p>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<p className="text-xs font-bold tracking-widest text-muted">
+								Changes
+							</p>
+							<AlertDialogTitle>Remove {remove.name}?</AlertDialogTitle>
+							<AlertDialogDescription>
+								This deletes the account immediately. Balance history for this
+								account goes with it.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						{removeError && (
+							<Alert variant="destructive">
+								<AlertDescription>{removeError}</AlertDescription>
+							</Alert>
+						)}
+						<AlertDialogFooter>
+							<AlertDialogCancel
+								variant="secondary"
+								disabled={removing}
+								onClick={() => {
+									setRemove(null);
+									setRemoveError(null);
+								}}
+							>
+								Keep account
+							</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								disabled={removing}
+								onClick={() => void deleteItem()}
+							>
+								{removing ? "Removing…" : "Remove account"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 		</>
 	);
@@ -301,85 +369,160 @@ function TransactionsView({
 	};
 	return (
 		<Tabs
-			items={tabs}
 			value={schedule}
-			onChange={resetFilters}
-			label="Transactions sections"
-			panelAs="section"
+			onValueChange={(next) => {
+				if (next) resetFilters(next as ScheduleFilter);
+			}}
+			className="gap-0"
 		>
-			<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 max-sm:pb-4">
-				<SearchField
-					label="Search transactions"
-					value={query}
-					onChange={(event) => search(event.target.value)}
-					placeholder="Find a transaction…"
-				/>
-				<div className="flex shrink-0 flex-wrap items-center gap-3">
-					<TransactionSortButton order={order} onChange={changeOrder} />
-					{schedule === "recurring" ? (
-						<Button
-							type="button"
-							variant="primary"
-							size="sm"
-							onClick={() => onEdit({ kind: "schedule", item: null })}
-						>
-							<Plus size={16} />
-							Add schedule
-						</Button>
+			<TabsList
+				variant="line"
+				aria-label="Transactions sections"
+				className={cn(
+					"mb-6 flex w-full gap-6 overflow-x-auto border-0 border-b border-solid border-line p-0 max-sm:gap-5",
+				)}
+			>
+				{tabs.map((item) => (
+					<TabsTrigger
+						key={item.id}
+						value={item.id}
+						className={cn(
+							"flex flex-none items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm font-normal whitespace-nowrap text-muted after:hidden hover:text-ink aria-selected:font-semibold aria-selected:text-ink",
+							"h-auto focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-primary focus-visible:ring-0",
+						)}
+					>
+						{item.label}
+						{item.count != null && (
+							<span className="min-w-5 rounded-control bg-active px-1 py-px text-xs text-success-text">
+								{item.count}
+							</span>
+						)}
+					</TabsTrigger>
+				))}
+			</TabsList>
+			<TabsContent value={schedule}>
+				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 max-sm:pb-4">
+					<Label
+						htmlFor={`${listId}-search`}
+						className="inline-flex items-center gap-2 text-subtle"
+					>
+						<Search size={16} aria-hidden="true" />
+						<span className="sr-only">Search transactions</span>
+						<Input
+							id={`${listId}-search`}
+							value={query}
+							onChange={(event) => search(event.target.value)}
+							placeholder="Find a transaction…"
+							className={cn(
+								"h-11 w-32 rounded-none border-0 bg-transparent px-1 py-2 text-sm font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60 sm:w-48 focus-visible:outline-solid focus-visible:ring-0",
+								"disabled:bg-transparent",
+							)}
+						/>
+					</Label>
+					<div className="flex shrink-0 flex-wrap items-center gap-3">
+						<TransactionSortButton order={order} onChange={changeOrder} />
+						{schedule === "recurring" ? (
+							<Button
+								type="button"
+								variant="default"
+								size="sm"
+								onClick={() => onEdit({ kind: "schedule", item: null })}
+							>
+								<Plus size={16} />
+								Add schedule
+							</Button>
+						) : (
+							<Button
+								type="button"
+								variant="default"
+								size="sm"
+								onClick={() => onEdit({ kind: "transaction", item: null })}
+							>
+								<Plus size={16} />
+								Add transaction
+							</Button>
+						)}
+					</div>
+				</div>
+				<div id={listId}>
+					{savedRowsPending ||
+					transactionsQuery.isPending ||
+					rulesQuery.isPending ? (
+						<p role="status">Loading transactions…</p>
+					) : transactionsQuery.isError || rulesQuery.isError ? (
+						<p role="alert">
+							Transactions could not be loaded.{" "}
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								onClick={() => {
+									void transactionsQuery.refetch();
+									void rulesQuery.refetch();
+								}}
+							>
+								Retry
+							</Button>
+						</p>
 					) : (
-						<Button
-							type="button"
-							variant="primary"
-							size="sm"
-							onClick={() => onEdit({ kind: "transaction", item: null })}
-						>
-							<Plus size={16} />
-							Add transaction
-						</Button>
+						<TransactionsPanel
+							transactions={pagedTransactions}
+							accounts={visibleAccounts(accounts ?? [])}
+							startDate={startDate ?? ""}
+							readOnly={readOnly}
+							ruleCadence={ruleCadence}
+						/>
 					)}
 				</div>
-			</div>
-			<div id={listId}>
-				{savedRowsPending ||
-				transactionsQuery.isPending ||
-				rulesQuery.isPending ? (
-					<p role="status">Loading transactions…</p>
-				) : transactionsQuery.isError || rulesQuery.isError ? (
-					<p role="alert">
-						Transactions could not be loaded.{" "}
-						<Button
-							type="button"
-							variant="secondary"
-							size="sm"
-							onClick={() => {
-								void transactionsQuery.refetch();
-								void rulesQuery.refetch();
-							}}
-						>
-							Retry
-						</Button>
-					</p>
-				) : (
-					<TransactionsPanel
-						transactions={pagedTransactions}
-						accounts={visibleAccounts(accounts ?? [])}
-						startDate={startDate ?? ""}
-						readOnly={readOnly}
-						ruleCadence={ruleCadence}
-					/>
+				{pageCount > 1 && (
+					<div
+						className={cn(
+							"flex items-center justify-between gap-4 border-b border-line py-4 max-sm:gap-2",
+							"border-t",
+							"px-0.5",
+						)}
+					>
+						<span className="text-xs text-muted" role="status">
+							Showing {currentPage * TRANSACTIONS_PAGE_SIZE + 1}–
+							{Math.min(
+								(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
+								sortedTransactions.length,
+							)}{" "}
+							of {sortedTransactions.length} transactions
+						</span>
+						<Pagination className="mx-0 w-auto justify-end">
+							<PaginationContent>
+								<PaginationItem>
+									<PaginationPrevious
+										aria-label="Previous transaction page"
+										aria-disabled={currentPage === 0}
+										className={cn(
+											currentPage === 0 && "pointer-events-none opacity-50",
+										)}
+										onClick={() => turnPage(Math.max(currentPage - 1, 0))}
+									/>
+								</PaginationItem>
+								<span className="text-xs text-muted tabular-nums">
+									{currentPage + 1} / {pageCount}
+								</span>
+								<PaginationItem>
+									<PaginationNext
+										aria-label="Next transaction page"
+										aria-disabled={currentPage >= pageCount - 1}
+										className={cn(
+											currentPage >= pageCount - 1 &&
+												"pointer-events-none opacity-50",
+										)}
+										onClick={() =>
+											turnPage(Math.min(currentPage + 1, pageCount - 1))
+										}
+									/>
+								</PaginationItem>
+							</PaginationContent>
+						</Pagination>
+					</div>
 				)}
-			</div>
-			{pageCount > 1 && (
-				<TablePagination
-					topBorder
-					className="px-0.5"
-					page={currentPage}
-					pageCount={pageCount}
-					total={sortedTransactions.length}
-					pageSize={TRANSACTIONS_PAGE_SIZE}
-					onPage={turnPage}
-				/>
-			)}
+			</TabsContent>
 		</Tabs>
 	);
 }

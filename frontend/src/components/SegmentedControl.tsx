@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import {
 	ToggleGroup as ShadcnToggleGroup,
 	ToggleGroupItem as ShadcnToggleGroupItem,
-} from "./ui/toggle-group.tsx";
+} from "@/components/ui/toggle-group.tsx";
 
 type SegmentedControlItem<T extends string> = {
 	value: T;
@@ -47,7 +47,7 @@ export function SegmentedControl<T extends string>({
 				const nextValue = next.find((candidate) => candidate !== value);
 				if (nextValue !== undefined) onChange(nextValue as T);
 			}}
-			className={mergeStyles(
+			className={cn(
 				"inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1",
 				className,
 			)}
@@ -59,7 +59,7 @@ export function SegmentedControl<T extends string>({
 						type="button"
 						value={item.value}
 						aria-label={item.ariaLabel}
-						className={mergeStyles(
+						className={cn(
 							segmentedPillStyles,
 							"h-auto focus-visible:outline-solid focus-visible:ring-0 data-[state=on]:bg-surface",
 						)}

@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
@@ -38,11 +39,18 @@ function recordedProps() {
 	};
 }
 
-function sourceSelect(): HTMLSelectElement {
-	const select = screen.getByLabelText("Transaction source");
-	if (!(select instanceof HTMLSelectElement))
-		throw new Error("Expected the activity source select");
-	return select;
+async function chooseSource(value: "all" | "historical" | "projected") {
+	const user = userEvent.setup();
+	await user.click(
+		screen.getByRole("combobox", { name: "Transaction source" }),
+	);
+	const name =
+		value === "all"
+			? "All transactions"
+			: value === "historical"
+				? /Historical/
+				: /Projected/;
+	await user.click(await screen.findByRole("option", { name }));
 }
 
 describe("finance-first transaction activity", () => {
@@ -56,7 +64,7 @@ describe("finance-first transaction activity", () => {
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
-	it("shows loading only for projected activity", () => {
+	it("shows loading only for projected activity", async () => {
 		render(
 			<Transactions
 				{...recordedProps()}
@@ -69,13 +77,13 @@ describe("finance-first transaction activity", () => {
 			/>,
 		);
 		expect(screen.queryByText("Loading projected activity…")).toBeNull();
-		fireEvent.change(sourceSelect(), { target: { value: "projected" } });
+		await chooseSource("projected");
 		expect(screen.getByText("Loading projected activity…").textContent).toBe(
 			"Loading projected activity…",
 		);
 	});
 
-	it("recovers projected activity with retry without blocking recorded history", () => {
+	it("recovers projected activity with retry without blocking recorded history", async () => {
 		const retry = vi.fn();
 		render(
 			<Transactions
@@ -92,13 +100,14 @@ describe("finance-first transaction activity", () => {
 		expect(
 			screen.getAllByRole("button", { name: /View Household payroll/ }),
 		).toHaveLength(3);
-		fireEvent.change(sourceSelect(), { target: { value: "projected" } });
+		await chooseSource("projected");
 		const alert = screen.getByRole("alert");
 		expect(alert.textContent).toContain("Forecast unavailable for test");
-		fireEvent.click(screen.getByRole("button", { name: "Retry forecast" }));
+		const retryUser = userEvent.setup();
+		await retryUser.click(screen.getByRole("button", { name: "Retry forecast" }));
 		expect(retry).toHaveBeenCalledTimes(1);
 		// Switching back restores recorded rows and clears recovery UI.
-		fireEvent.change(sourceSelect(), { target: { value: "historical" } });
+		await chooseSource("historical");
 		expect(
 			screen.getAllByRole("button", { name: /View Household payroll/ }),
 		).toHaveLength(3);
@@ -106,12 +115,12 @@ describe("finance-first transaction activity", () => {
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
-	it("notifies when the viewer asks for projected activity", () => {
+	it("notifies when the viewer asks for projected activity", async () => {
 		const onSourceChange = vi.fn();
 		render(
 			<Transactions {...recordedProps()} onSourceChange={onSourceChange} />,
 		);
-		fireEvent.change(sourceSelect(), { target: { value: "all" } });
+		await chooseSource("all");
 		expect(onSourceChange).toHaveBeenCalledWith("all");
 		expect(defaultAccountViewFilters.source).toBe("historical");
 
@@ -131,7 +140,7 @@ describe("finance-first transaction activity", () => {
 		expect(
 			screen.getByRole("button", { name: "Add transaction" }),
 		).toBeTruthy();
-		fireEvent.change(sourceSelect(), { target: { value: "projected" } });
+		await chooseSource("projected");
 		expect(onSourceChange).toHaveBeenCalledWith("projected");
 	});
 

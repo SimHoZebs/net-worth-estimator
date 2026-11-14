@@ -12,9 +12,10 @@ import {
 	refreshPaymentTerms,
 	usePaymentTerms,
 } from "../../state/workspaceResources.ts";
-import { Button } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	detailPropertyLabelClassName,
 	transactionControlStyles,
@@ -229,17 +230,17 @@ export function PaymentTermsSection({
 					onSubmit={(event) => void submit(event)}
 				>
 					<div className="flex items-center gap-4 border-t-0">
-						<label
+						<Label
 							htmlFor={`${formId}-minimum`}
 							className={detailPropertyLabelClassName}
 						>
 							Minimum
-						</label>
+						</Label>
 						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
 							<span className="text-sm" aria-hidden="true">
 								$
 							</span>
-							<input
+							<Input
 								id={`${formId}-minimum`}
 								aria-label="Minimum payment in USD"
 								name="minimumFixed"
@@ -252,7 +253,7 @@ export function PaymentTermsSection({
 								onChange={(event) =>
 									update({ minimumFixed: event.target.value })
 								}
-								className={mergeStyles(
+								className={cn(
 									transactionControlStyles({ shape: "inline" }),
 									"w-16 min-w-0 flex-1 text-sm",
 								)}
@@ -260,14 +261,14 @@ export function PaymentTermsSection({
 						</div>
 					</div>
 					<div className="flex items-center gap-4 border-t border-line">
-						<label
+						<Label
 							htmlFor={`${formId}-percent`}
 							className={detailPropertyLabelClassName}
 						>
 							Minimum percent
-						</label>
+						</Label>
 						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<input
+							<Input
 								id={`${formId}-percent`}
 								aria-label="Minimum percent of the balance"
 								name="minimumPercent"
@@ -281,7 +282,7 @@ export function PaymentTermsSection({
 								onChange={(event) =>
 									update({ minimumPercent: event.target.value })
 								}
-								className={mergeStyles(
+								className={cn(
 									transactionControlStyles({ shape: "inline" }),
 									"w-16 min-w-0 flex-1 text-sm",
 								)}
@@ -292,14 +293,11 @@ export function PaymentTermsSection({
 						</div>
 					</div>
 					<div className="flex items-center gap-4 border-t border-line">
-						<label
-							htmlFor={`${formId}-due`}
-							className={detailPropertyLabelClassName}
-						>
+						<Label htmlFor={`${formId}-due`} className={detailPropertyLabelClassName}>
 							Due day
-						</label>
+						</Label>
 						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<input
+							<Input
 								id={`${formId}-due`}
 								aria-label="Due day of the month"
 								name="dueDay"
@@ -310,7 +308,7 @@ export function PaymentTermsSection({
 								value={draft.dueDay}
 								readOnly={locked}
 								onChange={(event) => update({ dueDay: event.target.value })}
-								className={mergeStyles(
+								className={cn(
 									transactionControlStyles({ shape: "inline" }),
 									"w-16 min-w-0 flex-1 text-sm",
 								)}
@@ -318,14 +316,14 @@ export function PaymentTermsSection({
 						</div>
 					</div>
 					<div className="flex items-center gap-4 border-t border-line">
-						<label
+						<Label
 							htmlFor={`${formId}-statement`}
 							className={detailPropertyLabelClassName}
 						>
 							Statement day
-						</label>
+						</Label>
 						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<input
+							<Input
 								id={`${formId}-statement`}
 								aria-label="Statement day of the month, optional"
 								name="statementDay"
@@ -339,19 +337,22 @@ export function PaymentTermsSection({
 								onChange={(event) =>
 									update({ statementDay: event.target.value })
 								}
-								className={mergeStyles(
+								className={cn(
 									transactionControlStyles({ shape: "inline" }),
 									"w-16 min-w-0 flex-1 text-sm",
 								)}
 							/>
 						</div>
 					</div>
-					<FieldError message={error} />
+					{error && (
+						<p role="alert" className="m-0 text-sm text-danger-text">
+							{error}
+						</p>
+					)}
 					{!readOnly && (
 						<div className="flex flex-wrap items-center gap-2">
 							<Button
 								type="submit"
-								variant="primary"
 								size="sm"
 								disabled={saving || (!edit.dirty && !removeIntent)}
 							>

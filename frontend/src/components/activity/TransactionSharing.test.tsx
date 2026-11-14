@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ok } from "../../mocks/fetch.ts";
 import {
@@ -115,6 +116,12 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 	return { requested };
 }
 
+async function chooseAudience(label: RegExp, optionName: string | RegExp) {
+	const user = userEvent.setup();
+	await user.click(screen.getByLabelText(label));
+	await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
 function renderSharing(transactionId = "p1", readOnly = false) {
 	render(
 		<TransactionSharing transactionId={transactionId} readOnly={readOnly} />,
@@ -138,9 +145,7 @@ it("shares one transaction with one group", async () => {
 	const { requested } = stubSharing([]);
 	renderSharing();
 	await screen.findByRole("heading", { name: "Sharing" });
-	fireEvent.change(screen.getByLabelText(/Share with a group/), {
-		target: { value: "g1" },
-	});
+	await chooseAudience(/Share with a group/, "Household");
 	fireEvent.click(screen.getByText("Share"));
 	await waitFor(() => expect(screen.getByText("Household")).toBeTruthy());
 	expect(
@@ -158,9 +163,7 @@ it("hides one transaction from everyone including future groups", async () => {
 	const { requested } = stubSharing([]);
 	renderSharing();
 	await screen.findByRole("heading", { name: "Sharing" });
-	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
-		target: { value: "all" },
-	});
+	await chooseAudience(/Hide from a group or everyone/, "Everyone, including future groups");
 	fireEvent.click(screen.getByText("Hide"));
 	await waitFor(() =>
 		expect(screen.getByText("everyone, including future groups")).toBeTruthy(),
@@ -186,16 +189,17 @@ it("surfaces the server conflict instead of double intents", async () => {
 	]);
 	renderSharing();
 	await screen.findByText("Household");
-	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
-		target: { value: "g1" },
-	});
 	// g1 is already shared, so it is not offered as a hide target; the
 	// conflict path stays server-enforced. Revoking clears the way.
+	const user = userEvent.setup();
+	await user.click(screen.getByLabelText(/Hide from a group or everyone/));
+	expect(
+		screen.queryByRole("option", { name: "Household" }),
+	).toBeNull();
+	await user.keyboard("{Escape}");
 	fireEvent.click(screen.getByText("Stop sharing"));
 	await waitFor(() => expect(screen.queryByText("Stop sharing")).toBeNull());
-	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
-		target: { value: "g1" },
-	});
+	await chooseAudience(/Hide from a group or everyone/, "Household");
 	fireEvent.click(screen.getByText("Hide"));
 	await waitFor(() => expect(screen.getByText("Household")).toBeTruthy());
 	expect(screen.getByText("Hidden from")).toBeTruthy();
@@ -213,9 +217,7 @@ it("pauses sharing while hidden from everyone", async () => {
 	stubSharing([]);
 	renderSharing();
 	await screen.findByRole("heading", { name: "Sharing" });
-	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
-		target: { value: "all" },
-	});
+	await chooseAudience(/Hide from a group or everyone/, "Everyone, including future groups");
 	fireEvent.click(screen.getByText("Hide"));
 	await waitFor(() =>
 		expect(screen.getByText("everyone, including future groups")).toBeTruthy(),
@@ -232,14 +234,10 @@ it("marks shares suppressed once hidden from everyone", async () => {
 	stubSharing([]);
 	renderSharing();
 	await screen.findByRole("heading", { name: "Sharing" });
-	fireEvent.change(screen.getByLabelText(/Share with a group/), {
-		target: { value: "g1" },
-	});
+	await chooseAudience(/Share with a group/, "Household");
 	fireEvent.click(screen.getByText("Share"));
 	await waitFor(() => expect(screen.getByText("Household")).toBeTruthy());
-	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
-		target: { value: "all" },
-	});
+	await chooseAudience(/Hide from a group or everyone/, "Everyone, including future groups");
 	fireEvent.click(screen.getByText("Hide"));
 	await waitFor(() =>
 		expect(

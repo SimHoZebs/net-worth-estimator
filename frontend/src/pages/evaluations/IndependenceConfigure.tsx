@@ -1,7 +1,11 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
-import { InputField } from "@/components/Field.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { finite, isRecord, parseUnion } from "@/domain/guards.ts";
 import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
 import { updateEvaluation } from "@/api/generated/endpoints.ts";
@@ -218,6 +222,8 @@ function IndependenceForm({
 	const [income, setIncome] = useState(initial.income);
 	const [saving, setSaving] = useState(false);
 	const [saved, setSaved] = useState(false);
+	const minimumId = useId();
+	const yearsId = useId();
 
 	const toggleAsset = (accountId: string) => {
 		setSaved(false);
@@ -268,31 +274,47 @@ function IndependenceForm({
 	return (
 		<div className="grid gap-3">
 			<div className="grid gap-3 sm:grid-cols-2">
-				<InputField
-					label="Minimum net worth ($)"
-					type="number"
-					min={0}
-					step="1000"
-					value={minimum}
-					disabled={saving || readOnly}
-					onChange={(event) => {
-						setSaved(false);
-						setMinimum(Math.max(0, Number(event.target.value) || 0));
-					}}
-				/>
-				<InputField
-					label="Spending test duration (years)"
-					type="number"
-					min={1}
-					max={50}
-					step="1"
-					value={years}
-					disabled={saving || readOnly}
-					onChange={(event) => {
-						setSaved(false);
-						setYears(Number(event.target.value) || 1);
-					}}
-				/>
+				<Field className={cn("flex min-w-0 flex-col gap-2")}>
+					<Label
+						htmlFor={minimumId}
+						className="text-sm leading-normal font-semibold text-muted"
+					>
+						Minimum net worth ($)
+					</Label>
+					<Input
+						id={minimumId}
+						type="number"
+						min={0}
+						step="1000"
+						value={minimum}
+						disabled={saving || readOnly}
+						onChange={(event) => {
+							setSaved(false);
+							setMinimum(Math.max(0, Number(event.target.value) || 0));
+						}}
+					/>
+				</Field>
+				<Field className={cn("flex min-w-0 flex-col gap-2")}>
+					<Label
+						htmlFor={yearsId}
+						className="text-sm leading-normal font-semibold text-muted"
+					>
+						Spending test duration (years)
+					</Label>
+					<Input
+						id={yearsId}
+						type="number"
+						min={1}
+						max={50}
+						step="1"
+						value={years}
+						disabled={saving || readOnly}
+						onChange={(event) => {
+							setSaved(false);
+							setYears(Number(event.target.value) || 1);
+						}}
+					/>
+				</Field>
 			</div>
 			<fieldset className="grid gap-2">
 				<legend className="m-0 p-0 text-xs font-semibold text-muted">
@@ -338,15 +360,14 @@ function IndependenceForm({
 					<p className="m-0 text-xs text-muted">No income sources available.</p>
 				)}
 			</fieldset>
-			<div className="flex flex-wrap items-center gap-3">
-				<button
-					type="button"
-					disabled={saving || readOnly}
-					onClick={onSave}
-					className="rounded-control border border-line-strong bg-surface px-3 py-2 text-xs font-semibold text-success-text hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50"
-				>
+			<div
+				className={cn(
+					"mt-6 flex flex-wrap items-center gap-3 border-0 border-t border-solid border-line pt-5",
+				)}
+			>
+				<Button type="button" disabled={saving || readOnly} onClick={onSave}>
 					{saving ? "Saving…" : "Save configuration"}
-				</button>
+				</Button>
 				{saved && (
 					<p className="m-0 text-xs text-success-text" role="status">
 						Saved. Updating projection…

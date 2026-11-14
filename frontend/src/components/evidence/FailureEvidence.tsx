@@ -3,7 +3,12 @@ import { dateLabel } from "../../domain/format.ts";
 import { failureLedger } from "../../domain/constraintSnapshot.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { TransactionResult, Projection } from "../../domain/result.ts";
-import { Modal } from "../Modal.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
 import { ConstraintSnapshot } from "./ConstraintSnapshot.tsx";
 
 export function FailureEvidence({
@@ -25,9 +30,19 @@ export function FailureEvidence({
 }) {
 	if (!failure)
 		return (
-			<Modal title="All transactions funded" onClose={onClose}>
-				<p>No underfunded transactions occur in this projection horizon.</p>
-			</Modal>
+			<Dialog
+				open
+				onOpenChange={(open) => {
+					if (!open) onClose();
+				}}
+			>
+				<DialogContent className="sm:max-w-3xl">
+					<DialogHeader>
+						<DialogTitle>All transactions funded</DialogTitle>
+					</DialogHeader>
+					<p>No underfunded transactions occur in this projection horizon.</p>
+				</DialogContent>
+			</Dialog>
 		);
 	const ledger = failureLedger({
 		accounts,
@@ -39,22 +54,32 @@ export function FailureEvidence({
 	// The table names the transaction, so the heading names the event instead
 	// of repeating it.
 	return (
-		<Modal title="First underfunded transaction" onClose={onClose}>
-			{!ledger && (
-				<div className="flex items-center gap-2 text-xs text-warning-text">
-					<TriangleAlert size={18} />
-					{dateLabel(failure.date, true)}
-				</div>
-			)}
-			{ledger && (
-				<ConstraintSnapshot
-					ledger={ledger}
-					failure={failure}
-					accounts={accounts}
-					transactions={transactions}
-					readOnly={readOnly}
-				/>
-			)}
-		</Modal>
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
+		>
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<DialogTitle>First underfunded transaction</DialogTitle>
+				</DialogHeader>
+				{!ledger && (
+					<div className="flex items-center gap-2 text-xs text-warning-text">
+						<TriangleAlert size={18} />
+						{dateLabel(failure.date, true)}
+					</div>
+				)}
+				{ledger && (
+					<ConstraintSnapshot
+						ledger={ledger}
+						failure={failure}
+						accounts={accounts}
+						transactions={transactions}
+						readOnly={readOnly}
+					/>
+				)}
+			</DialogContent>
+		</Dialog>
 	);
 }

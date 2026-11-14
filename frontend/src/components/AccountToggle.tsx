@@ -1,6 +1,6 @@
 import type { Account } from "../domain/model.ts";
 import { AccountLabel } from "./AccountIcon.tsx";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 
 /** Shared press-toggle button recipe so account and pill toggles share states. */
 export const pressToggleStyles =
@@ -24,7 +24,7 @@ export function AccountToggle({
 	return (
 		<button
 			type="button"
-			className={mergeStyles(pressToggleStyles, className)}
+			className={cn(pressToggleStyles, className)}
 			aria-pressed={checked}
 			disabled={disabled}
 			onClick={onToggle}

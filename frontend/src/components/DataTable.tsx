@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type { ComponentProps, ReactNode } from "react";
 import { useMemo } from "react";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import { IconButton } from "./Button.tsx";
 import {
 	TableBody as ShadcnTableBody,
@@ -18,7 +18,7 @@ import {
 	TableHead as ShadcnTableHead,
 	TableHeader as ShadcnTableHeader,
 	TableRow as ShadcnTableRow,
-} from "./ui/table.tsx";
+} from "@/components/ui/table.tsx";
 
 /**
  * shadcn table shells with the application table tokens layered on top.
@@ -48,7 +48,7 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
 		<table
 			data-slot="table"
 			{...props}
-			className={mergeStyles(
+			className={cn(
 				"w-full caption-bottom text-sm",
 				tableBaseClassName,
 				className,
@@ -61,7 +61,7 @@ export function TableHead({ className, ...props }: ComponentProps<"thead">) {
 	return (
 		<ShadcnTableHeader
 			{...props}
-			className={mergeStyles(tableHeadBaseClassName, className)}
+			className={cn(tableHeadBaseClassName, className)}
 		/>
 	);
 }
@@ -74,7 +74,7 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
 	return (
 		<ShadcnTableRow
 			{...props}
-			className={mergeStyles(tableRowBaseClassName, className)}
+			className={cn(tableRowBaseClassName, className)}
 		/>
 	);
 }
@@ -89,7 +89,7 @@ export function TableHeader({
 		<ShadcnTableHead
 			{...props}
 			scope={scope}
-			className={mergeStyles(
+			className={cn(
 				tableHeaderBaseClassName,
 				rowScope ? tableHeaderRowClassName : tableHeaderColumnClassName,
 				className,
@@ -102,7 +102,7 @@ export function TableCell({ className, ...props }: ComponentProps<"td">) {
 	return (
 		<ShadcnTableCell
 			{...props}
-			className={mergeStyles(tableCellBaseClassName, className)}
+			className={cn(tableCellBaseClassName, className)}
 		/>
 	);
 }
@@ -112,7 +112,7 @@ export function TableScroll({ className, ...props }: ComponentProps<"div">) {
 	return (
 		<div
 			{...props}
-			className={mergeStyles(tableScrollBaseClassName, className)}
+			className={cn(tableScrollBaseClassName, className)}
 		/>
 	);
 }
@@ -267,7 +267,7 @@ export function TablePagination({
 	});
 	return (
 		<div
-			className={mergeStyles(
+			className={cn(
 				tablePaginationBaseClassName,
 				topBorder ? "border-t" : "",
 				className,

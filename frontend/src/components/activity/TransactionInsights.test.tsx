@@ -5,6 +5,7 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runInteractions } from "@/mocks/interactions.ts";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
@@ -36,7 +37,7 @@ it("offers schedule actions for repeating payments without a Yes step", async ()
 	await runInteractions([
 		{ click: ["button", "Create forecast schedule for Grocer"] },
 		{ expectText: "The forecast plan could not be loaded. Try again." },
-		{ click: ["button", "Close dialog"] },
+		{ click: ["button", "Close"] },
 		{ click: ["button", "Not repeating"] },
 	]);
 	expect(reviewMutate).toHaveBeenCalledWith(
@@ -419,9 +420,11 @@ describe("TransactionInsightsPanel", () => {
 				onMergeVoid={onMergeVoid}
 			/>,
 		);
-		fireEvent.change(screen.getByLabelText("Posted as"), {
-			target: { value: second.transactionId },
-		});
+		const postedAsUser = userEvent.setup();
+		await postedAsUser.click(screen.getByRole("combobox", { name: "Posted as" }));
+		await postedAsUser.click(
+			await screen.findByRole("option", { name: /Bistro lunch/ }),
+		);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Merge and remove hold" }),
 		);

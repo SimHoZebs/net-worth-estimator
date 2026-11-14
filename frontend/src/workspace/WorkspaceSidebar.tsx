@@ -3,9 +3,9 @@ import { PanelLeftClose, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
-import { IconButton } from "../components/Button.tsx";
-import { Skeleton } from "../components/Skeleton.tsx";
-import { mergeStyles } from "../components/mergeStyles.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { cn } from "@/lib/utils.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
 import { useInboxUnreadCount } from "../state/inbox.ts";
 import { LastSync } from "./LastSync.tsx";
@@ -27,12 +27,9 @@ function SidebarNavLink({
 		<Link
 			to={to}
 			preload="intent"
-			className={mergeStyles(
-				navigationLinkClassName,
-				active ? "bg-active" : undefined,
-			)}
+			className={cn(navigationLinkClassName, active ? "bg-active" : undefined)}
 			onClick={(event) => {
-				// Plain clicks close the mobile drawer; modifier and middle
+				// Plain clicks close the mobile sheet; modifier and middle
 				// clicks keep the native new-tab behavior.
 				if (
 					event.metaKey ||
@@ -70,12 +67,16 @@ export function WorkspaceSidebar({
 		<>
 			<div className="flex items-center justify-between px-2">
 				<Brand />
-				<IconButton
-					icon={PanelLeftClose}
-					label="Close navigation"
-					className="hidden max-md:inline-grid"
+				<Button
+					variant="ghost"
+					size="icon"
+					aria-label="Close navigation"
+					title="Close navigation"
+					className="hidden max-md:inline-flex"
 					onClick={onClose}
-				/>
+				>
+					<PanelLeftClose aria-hidden="true" />
+				</Button>
 			</div>
 			<div className="mt-12">
 				<nav aria-label="Main navigation">

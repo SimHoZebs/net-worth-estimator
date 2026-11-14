@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
 	patchTemplateAmount,
 	templateFieldsFromAmount,
@@ -12,9 +13,20 @@ import {
 	FALLBACK_TEMPLATES,
 	plainLanguageForAmount,
 } from "../../domain/amountCatalog.ts";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { InputField, SelectField, TextAreaField } from "../Field.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { cn } from "@/lib/utils.ts";
+
+const fieldLabelClassName = "text-sm leading-normal font-semibold text-muted";
+const fieldInputClassName =
+	"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0";
+const fieldSelectClassName =
+	"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60";
+const fieldTextareaClassName =
+	"w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle min-h-[6lh] resize-y disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0 field-sizing-fixed";
 
 function numberOr(fallback: number, value: string): number {
 	const parsed = Number(value);
@@ -184,6 +196,28 @@ export function buildTemplateAmount(
 	}
 }
 
+function TemplateControl({
+	label,
+	inputKey,
+	prefix,
+	children,
+}: {
+	label: string;
+	inputKey: string;
+	prefix: string;
+	children: (id: string) => ReactNode;
+}) {
+	const id = `${prefix}-${inputKey}`;
+	return (
+		<Field className="flex min-w-0 flex-col gap-2">
+			<Label htmlFor={id} className={fieldLabelClassName}>
+				{label}
+			</Label>
+			{children(id)}
+		</Field>
+	);
+}
+
 function TemplateFields({
 	templateId,
 	accounts,
@@ -197,6 +231,7 @@ function TemplateFields({
 	fields: Record<string, string>;
 	onField: (key: string, value: string) => void;
 }) {
+	const prefix = useId();
 	const set = (key: string) => ({
 		value: fields[key] ?? "",
 		onChange: (
@@ -208,170 +243,336 @@ function TemplateFields({
 	switch (templateId) {
 		case "fixed":
 			return (
-				<InputField
+				<TemplateControl
 					label="Dollars each time"
-					name="amount"
-					type="number"
-					step="0.01"
-					placeholder="e.g. 500"
-					{...set("amount")}
-				/>
+					inputKey="amount"
+					prefix={prefix}
+				>
+					{(id) => (
+						<Input
+							id={id}
+							name="amount"
+							type="number"
+							step="0.01"
+							placeholder="e.g. 500"
+							{...set("amount")}
+							className={fieldInputClassName}
+						/>
+					)}
+				</TemplateControl>
 			);
 		case "growth":
 			return (
 				<>
-					<InputField
+					<TemplateControl
 						label="Starting dollars"
-						name="base"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 500"
-						{...set("base")}
-					/>
-					<InputField
+						inputKey="base"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="base"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 500"
+								{...set("base")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Yearly growth (0.03 = 3%)"
-						name="annualGrowthRate"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.03"
-						{...set("annualGrowthRate")}
-					/>
+						inputKey="annualGrowthRate"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="annualGrowthRate"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.03"
+								{...set("annualGrowthRate")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "account-percent":
 			return (
 				<>
-					<SelectField label="Account" name="accountId" {...set("accountId")}>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
+					<TemplateControl label="Account" inputKey="accountId" prefix={prefix}>
+						{(id) => (
+							<select
+								id={id}
+								name="accountId"
+								{...set("accountId")}
+								className={fieldSelectClassName}
+							>
+								{accountOptions("Pick an account")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Percent (0.04 = 4%)"
-						name="pct"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.04"
-						{...set("pct")}
-					/>
+						inputKey="pct"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="pct"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.04"
+								{...set("pct")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "investment-growth":
 			return (
 				<>
-					<SelectField label="Balance to grow" name="refId" {...set("refId")}>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
+					<TemplateControl
+						label="Balance to grow"
+						inputKey="refId"
+						prefix={prefix}
+					>
+						{(id) => (
+							<select
+								id={id}
+								name="refId"
+								{...set("refId")}
+								className={fieldSelectClassName}
+							>
+								{accountOptions("Pick an account")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Yearly rate (0.07 = 7%)"
-						name="annualRate"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.07"
-						{...set("annualRate")}
-					/>
-					<InputField
+						inputKey="annualRate"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="annualRate"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.07"
+								{...set("annualRate")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Wobble (0 = exact, 0.12 = bumpy)"
-						name="volatility"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 0.12"
-						{...set("volatility")}
-					/>
+						inputKey="volatility"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="volatility"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 0.12"
+								{...set("volatility")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "debt-minimum":
 			return (
-				<SelectField
+				<TemplateControl
 					label="Card account"
-					name="accountId"
-					{...set("accountId")}
+					inputKey="accountId"
+					prefix={prefix}
 				>
-					{accountOptions("Pick an account")}
-				</SelectField>
+					{(id) => (
+						<select
+							id={id}
+							name="accountId"
+							{...set("accountId")}
+							className={fieldSelectClassName}
+						>
+							{accountOptions("Pick an account")}
+						</select>
+					)}
+				</TemplateControl>
 			);
 		case "late-fee":
 			return (
 				<>
-					<SelectField
+					<TemplateControl
 						label="Payment to check"
-						name="paymentId"
-						{...set("paymentId")}
+						inputKey="paymentId"
+						prefix={prefix}
 					>
-						{optionsFor(transactions, "Pick a transaction")}
-					</SelectField>
-					<SelectField
+						{(id) => (
+							<select
+								id={id}
+								name="paymentId"
+								{...set("paymentId")}
+								className={fieldSelectClassName}
+							>
+								{optionsFor(transactions, "Pick a transaction")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Card account"
-						name="accountId"
-						{...set("accountId")}
+						inputKey="accountId"
+						prefix={prefix}
 					>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
-						label="Fee dollars"
-						name="fee"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 30"
-						{...set("fee")}
-					/>
+						{(id) => (
+							<select
+								id={id}
+								name="accountId"
+								{...set("accountId")}
+								className={fieldSelectClassName}
+							>
+								{accountOptions("Pick an account")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl label="Fee dollars" inputKey="fee" prefix={prefix}>
+						{(id) => (
+							<Input
+								id={id}
+								name="fee"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 30"
+								{...set("fee")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "low-balance-fee":
 			return (
 				<>
-					<SelectField label="Account" name="accountId" {...set("accountId")}>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
+					<TemplateControl label="Account" inputKey="accountId" prefix={prefix}>
+						{(id) => (
+							<select
+								id={id}
+								name="accountId"
+								{...set("accountId")}
+								className={fieldSelectClassName}
+							>
+								{accountOptions("Pick an account")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Balance limit"
-						name="threshold"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 1500"
-						{...set("threshold")}
-					/>
-					<InputField
-						label="Fee dollars"
-						name="fee"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 12"
-						{...set("fee")}
-					/>
+						inputKey="threshold"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="threshold"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 1500"
+								{...set("threshold")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl label="Fee dollars" inputKey="fee" prefix={prefix}>
+						{(id) => (
+							<Input
+								id={id}
+								name="fee"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 12"
+								{...set("fee")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "federal-tax":
 			return (
 				<>
-					<SelectField
+					<TemplateControl
 						label="Gross pay transaction"
-						name="grossId"
-						{...set("grossId")}
+						inputKey="grossId"
+						prefix={prefix}
 					>
-						{optionsFor(transactions, "Pick gross pay")}
-					</SelectField>
-					<SelectField
+						{(id) => (
+							<select
+								id={id}
+								name="grossId"
+								{...set("grossId")}
+								className={fieldSelectClassName}
+							>
+								{optionsFor(transactions, "Pick gross pay")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Pre-tax slice transaction"
-						name="pretaxId"
-						{...set("pretaxId")}
+						inputKey="pretaxId"
+						prefix={prefix}
 					>
-						{optionsFor(transactions, "Pick pre-tax slice")}
-					</SelectField>
-					<InputField
+						{(id) => (
+							<select
+								id={id}
+								name="pretaxId"
+								{...set("pretaxId")}
+								className={fieldSelectClassName}
+							>
+								{optionsFor(transactions, "Pick pre-tax slice")}
+							</select>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Deduction per paycheck"
-						name="deduction"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 1341.67"
-						{...set("deduction")}
-					/>
-					<TextAreaField
+						inputKey="deduction"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="deduction"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 1341.67"
+								{...set("deduction")}
+								className={fieldInputClassName}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Brackets (JSON: upTo per paycheck, rate 0–1)"
-						className="type-code"
-						name="brackets"
-						rows={4}
-						defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
-						onChange={(event) => onField("brackets", event.target.value)}
-					/>
+						inputKey="brackets"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Textarea
+								id={id}
+								className={cn("type-code", fieldTextareaClassName)}
+								name="brackets"
+								rows={4}
+								defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
+								onChange={(event) => onField("brackets", event.target.value)}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		default:
@@ -420,26 +621,33 @@ export function AmountBuilder({
 	}, [fixedAmount, source, template.id, fields, accounts]);
 	const plain = plainLanguageForAmount(amount);
 	const wire = JSON.stringify(amount, null, 2);
+	const templatePickerId = useId();
 	return (
 		<div className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4">
 			{!hidePicker && (
 				<>
 					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
-						<SelectField
-							label="What kind of amount?"
-							name="amountTemplate"
-							value={template.id}
-							onChange={(event) => {
-								setTemplateId(event.target.value);
-								setFields({});
-							}}
-						>
-							{list.map((item) => (
-								<option key={item.id} value={item.id}>
-									{item.label}
-								</option>
-							))}
-						</SelectField>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={templatePickerId} className={fieldLabelClassName}>
+								What kind of amount?
+							</Label>
+							<select
+								id={templatePickerId}
+								name="amountTemplate"
+								value={template.id}
+								onChange={(event) => {
+									setTemplateId(event.target.value);
+									setFields({});
+								}}
+								className={fieldSelectClassName}
+							>
+								{list.map((item) => (
+									<option key={item.id} value={item.id}>
+										{item.label}
+									</option>
+								))}
+							</select>
+						</Field>
 					</div>
 					<p className="text-muted">
 						<strong>{template.label}.</strong> {template.summary}{" "}
@@ -468,10 +676,11 @@ export function AmountBuilder({
 				</pre>
 			</details>
 			{onChange && (
-				<div className={dialogActionsStyles}>
+				<div className="mt-6 flex flex-wrap items-center justify-end gap-3">
 					<Button
 						type="button"
-						variant="primary"
+						variant="default"
+						className="min-h-10 border-primary bg-primary px-4 py-2 text-sm leading-snug text-on-primary enabled:hover:bg-primary-hover enabled:hover:shadow-sm focus-visible:outline-solid focus-visible:ring-0"
 						onClick={() => onChange(amount)}
 					>
 						Use this amount

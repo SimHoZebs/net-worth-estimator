@@ -1,11 +1,14 @@
 import { Check, ExternalLink, Mail } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { ApiError } from "../../api/http.ts";
-import { Badge } from "../../components/Badge.tsx";
-import { Button, TextButton } from "../../components/Button.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import { InputField } from "../../components/Field.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { notifySuccess } from "../../state/notifications.ts";
 import {
 	disconnectGmail,
@@ -49,7 +52,7 @@ export function GmailProviderPanel() {
 								<div className="min-w-0">
 									<h3 className="m-0 flex items-center gap-2 text-lg">
 										Gmail
-										<Badge tone="neutral">Unavailable</Badge>
+										<Badge variant="secondary">Unavailable</Badge>
 									</h3>
 								</div>
 							</div>
@@ -65,11 +68,15 @@ export function GmailProviderPanel() {
 		}
 		return (
 			<div className="grid gap-6">
-				<ErrorNotice
-					message="The Gmail connection could not be loaded."
-					action="Retry"
-					onAction={() => void credential.refetch()}
-				/>
+				<Alert variant="destructive">
+					<AlertCircle size={16} aria-hidden="true" />
+					<AlertDescription>
+						The Gmail connection could not be loaded.{" "}
+						<Button variant="link" onClick={() => void credential.refetch()}>
+							Retry
+						</Button>
+					</AlertDescription>
+				</Alert>
 			</div>
 		);
 	}
@@ -121,7 +128,7 @@ export function GmailProviderPanel() {
 					<h2 className="m-0 text-xl font-semibold sm:text-2xl">
 						Connect Gmail for receipt discovery
 					</h2>
-					<Badge tone="neutral">Not connected</Badge>
+					<Badge variant="secondary">Not connected</Badge>
 				</header>
 			)}
 
@@ -144,7 +151,10 @@ export function GmailProviderPanel() {
 									<div className="min-w-0">
 										<h3 className="m-0 flex items-center gap-2 text-lg">
 											Gmail
-											<Badge tone="success">
+											<Badge
+												variant="default"
+												className="bg-success-bg text-success-text"
+											>
 												<Check size={14} aria-hidden="true" />
 												Connected
 											</Badge>
@@ -194,32 +204,33 @@ export function GmailProviderPanel() {
 											grant is revoked. Your financial records stay in Waypoint.
 										</p>
 										<div className="flex flex-wrap gap-4">
-											<TextButton
-												tone="danger"
-												className="min-h-6"
+											<Button
+												variant="link"
+												className="min-h-6 text-danger-text"
 												disabled={readOnly || busy}
 												onClick={() => void handleDisconnect()}
 											>
 												{busy ? "Disconnecting…" : "Yes, disconnect"}
-											</TextButton>
-											<TextButton
+											</Button>
+											<Button
+												variant="link"
 												className="min-h-6"
 												disabled={busy}
 												onClick={() => setConfirmingDisconnect(false)}
 											>
 												Keep connected
-											</TextButton>
+											</Button>
 										</div>
 									</div>
 								) : (
-									<TextButton
-										tone="danger"
-										className="min-h-6"
+									<Button
+										variant="link"
+										className="min-h-6 text-danger-text"
 										disabled={readOnly || busy}
 										onClick={() => setConfirmingDisconnect(true)}
 									>
 										Disconnect
-									</TextButton>
+									</Button>
 								)}
 							</div>
 						</div>
@@ -242,7 +253,7 @@ export function GmailProviderPanel() {
 								</div>
 								<div className="mt-5 flex flex-wrap gap-3">
 									<Button
-										variant="primary"
+										variant="default"
 										disabled={readOnly || busy}
 										onClick={() => void handleConnect()}
 									>
@@ -272,6 +283,7 @@ function GmailLookbackEditor({
 	disabled: boolean;
 	onSave: (days: number) => void;
 }) {
+	const lookbackId = useId();
 	const shown = draft ?? String(lookbackDays);
 	const parsed = Number.parseInt(shown, 10);
 	const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 365;
@@ -284,17 +296,20 @@ function GmailLookbackEditor({
 				if (valid && parsed !== lookbackDays) onSave(parsed);
 			}}
 		>
-			<InputField
-				name="lookbackDays"
-				label="Initial scan window (days)"
-				type="number"
-				min={1}
-				max={365}
-				required
-				disabled={disabled}
-				value={shown}
-				onChange={(event) => onDraft(event.target.value)}
-			/>
+			<Field>
+				<Label htmlFor={lookbackId}>Initial scan window (days)</Label>
+				<Input
+					id={lookbackId}
+					name="lookbackDays"
+					type="number"
+					min={1}
+					max={365}
+					required
+					disabled={disabled}
+					value={shown}
+					onChange={(event) => onDraft(event.target.value)}
+				/>
+			</Field>
 			<p className="mt-1 mb-3 text-sm leading-relaxed text-muted">
 				How far back the first receipt scan looks, from 1 to 365 days.
 			</p>

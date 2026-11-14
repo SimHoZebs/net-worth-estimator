@@ -1,5 +1,5 @@
-import { inspectionValueStyles } from "@/components/inspectionStyles.ts";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	independenceFunding,
 	type IndependenceCandidate,
@@ -35,10 +35,10 @@ export function IndependenceSpending({
 				<div>
 					<dt className="text-xs text-muted">Annual spending</dt>
 					<dd
-						className={inspectionValueStyles({
-							size: "hero",
-							className: "mt-1 text-2xl max-sm:text-xl",
-						})}
+						className={cn(
+							"m-0 mt-1 text-2xl leading-tight font-bold tabular-nums [overflow-wrap:anywhere] max-sm:text-xl",
+							"text-ink",
+						)}
 					>
 						{amount(spending)}
 						<span className="text-sm font-normal text-muted">/yr</span>
@@ -47,11 +47,10 @@ export function IndependenceSpending({
 				<div>
 					<dt className="text-xs text-muted">Unfunded</dt>
 					<dd
-						className={inspectionValueStyles({
-							size: "hero",
-							tone: gap > 0 ? "negative" : "positive",
-							className: "mt-1 text-2xl max-sm:text-xl",
-						})}
+						className={cn(
+							"m-0 mt-1 text-2xl leading-tight font-bold tabular-nums [overflow-wrap:anywhere] max-sm:text-xl",
+							gap > 0 ? "text-danger-text" : "text-success-text",
+						)}
 					>
 						{amount(gap)}
 						<span className="text-sm font-normal">/yr</span>

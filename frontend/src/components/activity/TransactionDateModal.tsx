@@ -1,9 +1,15 @@
 import { useId, useState } from "react";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { FieldError } from "../ErrorNotice.tsx";
-import { InputField } from "../Field.tsx";
-import { Modal } from "../Modal.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
 
 /**
  * Small dialog for the pair of transaction dates. The detail keeps the
@@ -45,54 +51,69 @@ export function TransactionDateModal({
 		onApply(occurredDate, postedDate);
 	};
 	return (
-		<Modal
-			title="Transaction dates"
-			titleSize="plain"
-			label="Transaction dates"
-			className="max-w-sm"
-			onClose={onClose}
+		<Dialog
+			open={true}
+			onOpenChange={(next) => {
+				if (!next) onClose();
+			}}
 		>
-			<div className="flex flex-col gap-4">
-				<InputField
-					id={occurredId}
-					label="Occurred"
-					hint="The day the transaction happened."
-					type="date"
-					required
-					value={occurredDate}
-					disabled={locked}
-					onChange={(event) => {
-						setOccurredDate(event.target.value);
-						setError(null);
-					}}
-				/>
-				<InputField
-					id={postedId}
-					label="Posted"
-					hint={
-						pending
-							? "Not yet posted — set a date to mark as posted."
-							: "The day the bank posted the transaction."
-					}
-					type="date"
-					required={false}
-					value={postedDate}
-					disabled={locked}
-					onChange={(event) => {
-						setPostedDate(event.target.value);
-						setError(null);
-					}}
-				/>
-			</div>
-			<FieldError message={error} />
-			<div className={dialogActionsStyles}>
-				<Button type="button" variant="secondary" onClick={onClose}>
-					Cancel
-				</Button>
-				<Button type="button" variant="primary" onClick={apply}>
-					Apply
-				</Button>
-			</div>
-		</Modal>
+			<DialogContent className="max-w-sm">
+				<DialogHeader>
+					<DialogTitle>Transaction dates</DialogTitle>
+					<DialogDescription className="sr-only">
+						Edit the occurred and posted dates for this transaction
+					</DialogDescription>
+				</DialogHeader>
+				<div className="flex flex-col gap-4">
+					<Field>
+						<FieldLabel htmlFor={occurredId}>Occurred</FieldLabel>
+						<Input
+							id={occurredId}
+							type="date"
+							required
+							value={occurredDate}
+							disabled={locked}
+							onChange={(event) => {
+								setOccurredDate(event.target.value);
+								setError(null);
+							}}
+						/>
+						<FieldDescription>The day the transaction happened.</FieldDescription>
+					</Field>
+					<Field>
+						<FieldLabel htmlFor={postedId}>Posted</FieldLabel>
+						<Input
+							id={postedId}
+							type="date"
+							required={false}
+							value={postedDate}
+							disabled={locked}
+							onChange={(event) => {
+								setPostedDate(event.target.value);
+								setError(null);
+							}}
+						/>
+						<FieldDescription>
+							{pending
+								? "Not yet posted — set a date to mark as posted."
+								: "The day the bank posted the transaction."}
+						</FieldDescription>
+					</Field>
+				</div>
+				{error && (
+					<p role="alert" className="m-0 text-sm text-danger-text">
+						{error}
+					</p>
+				)}
+				<DialogFooter>
+					<Button type="button" variant="secondary" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button type="button" onClick={apply}>
+						Apply
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }

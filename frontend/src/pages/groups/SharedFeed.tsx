@@ -5,15 +5,25 @@ import {
 	ArrowUpRight,
 	Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
-import { Badge } from "../../components/Badge.tsx";
-import { Button } from "../../components/Button.tsx";
-import { EmptyState } from "../../components/EmptyState.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import { InputField, SelectField } from "../../components/Field.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { cn } from "@/lib/utils.ts";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import {
@@ -48,6 +58,11 @@ const DIRECTION_LABELS: Record<FeedDirection, string> = {
 	transfer: "Transfer",
 };
 
+// Native select keeps form participation so filter changes dispatch native
+// change events; the shared nova select is a custom popup instead.
+const selectClassName =
+	"h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
+
 function useFeedScope() {
 	return useUserScope();
 }
@@ -79,6 +94,10 @@ export function SharedFeed({
 	const [direction, setDirection] = useState("" as "" | FeedDirection);
 	const [saving, setSaving] = useState<string | null>(null);
 	const [saved, setSaved] = useState<Record<string, boolean>>({});
+	const fromDateId = useId();
+	const toDateId = useId();
+	const memberId = useId();
+	const movementId = useId();
 
 	const filtersKey = { startDate, endDate, member, direction };
 	const feedQuery = useInfiniteQuery(
@@ -151,60 +170,84 @@ export function SharedFeed({
 				className="grid gap-2 sm:grid-cols-2"
 				onSubmit={(event) => event.preventDefault()}
 			>
-				<InputField
-					label="From date"
-					type="date"
-					value={startDate}
-					onChange={(event) => setStartDate(event.target.value)}
-				/>
-				<InputField
-					label="To date"
-					type="date"
-					value={endDate}
-					onChange={(event) => setEndDate(event.target.value)}
-				/>
-				<SelectField
-					label="Member"
-					value={member}
-					onChange={(event) => setMember(event.target.value)}
-				>
-					<option value="">Everyone</option>
-					{members.map((entry) => (
-						<option key={entry.accountId} value={entry.accountId}>
-							{entry.displayName || entry.accountId}
-						</option>
-					))}
-				</SelectField>
-				<SelectField
-					label="Movement"
-					value={direction}
-					onChange={(event) =>
-						setDirection(event.target.value as "" | FeedDirection)
-					}
-				>
-					<option value="">All movements</option>
-					{(Object.keys(DIRECTION_LABELS) as FeedDirection[]).map((value) => (
-						<option key={value} value={value}>
-							{DIRECTION_LABELS[value]}
-						</option>
-					))}
-				</SelectField>
+				<Field>
+					<Label htmlFor={fromDateId}>From date</Label>
+					<Input
+						id={fromDateId}
+						type="date"
+						value={startDate}
+						onChange={(event) => setStartDate(event.target.value)}
+					/>
+				</Field>
+				<Field>
+					<Label htmlFor={toDateId}>To date</Label>
+					<Input
+						id={toDateId}
+						type="date"
+						value={endDate}
+						onChange={(event) => setEndDate(event.target.value)}
+					/>
+				</Field>
+				<Field>
+					<Label htmlFor={memberId}>Member</Label>
+					<select
+						id={memberId}
+						value={member}
+						onChange={(event) => setMember(event.target.value)}
+						className={cn(selectClassName)}
+					>
+						<option value="">Everyone</option>
+						{members.map((entry) => (
+							<option key={entry.accountId} value={entry.accountId}>
+								{entry.displayName || entry.accountId}
+							</option>
+						))}
+					</select>
+				</Field>
+				<Field>
+					<Label htmlFor={movementId}>Movement</Label>
+					<select
+						id={movementId}
+						value={direction}
+						onChange={(event) =>
+							setDirection(event.target.value as "" | FeedDirection)
+						}
+						className={cn(selectClassName)}
+					>
+						<option value="">All movements</option>
+						{(Object.keys(DIRECTION_LABELS) as FeedDirection[]).map((value) => (
+							<option key={value} value={value}>
+								{DIRECTION_LABELS[value]}
+							</option>
+						))}
+					</select>
+				</Field>
 			</form>
 
-			<ErrorNotice
-				message={
-					feedQuery.isError ? "Shared transactions could not be loaded." : null
-				}
-				action="Retry"
-				onAction={() => void feedQuery.refetch()}
-			/>
+			{feedQuery.isError ? (
+				<Alert variant="destructive">
+					<AlertCircle size={16} aria-hidden="true" />
+					<AlertDescription>
+						Shared transactions could not be loaded.{" "}
+						<Button variant="link" onClick={() => void feedQuery.refetch()}>
+							Retry
+						</Button>
+					</AlertDescription>
+				</Alert>
+			) : null}
 
 			{!feedQuery.isError && items.length === 0 && !feedQuery.isPending && (
-				<EmptyState
-					icon={Users}
-					title="No shared transactions"
-					description="Nothing shared in this group matches these filters."
-				/>
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<Users aria-hidden="true" />
+						</EmptyMedia>
+						<EmptyTitle>No shared transactions</EmptyTitle>
+						<EmptyDescription>
+							Nothing shared in this group matches these filters.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
 			)}
 
 			{items.length > 0 && (
@@ -246,7 +289,7 @@ export function SharedFeed({
 									mobile: <time dateTime={day}>{dateLabel(day, true)}</time>,
 									badges: isSaved ? (
 										<Badge
-											tone="neutral"
+											variant="secondary"
 											className={transactionBadgeStyles()}
 										>
 											Saved
@@ -277,7 +320,7 @@ export function SharedFeed({
 										)}
 										{item.transaction.pending ? (
 											<Badge
-												tone="neutral"
+												variant="secondary"
 												className={transactionBadgeStyles()}
 											>
 												Pending

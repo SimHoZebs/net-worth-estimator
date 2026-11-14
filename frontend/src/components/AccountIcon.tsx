@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import type { Account } from "../domain/model.ts";
 import { cssVariables } from "./cssVariables.ts";
 
@@ -59,7 +59,7 @@ export function AccountIcon({
 	return (
 		<span
 			{...props}
-			className={mergeStyles(
+			className={cn(
 				accountIconStyles({
 					kind: account.color ? undefined : account.kind,
 					size,
@@ -102,7 +102,7 @@ export function AccountLabel({
 	nameClassName?: string;
 } & ComponentProps<"span">) {
 	return (
-		<span {...props} className={mergeStyles(accountLabelStyles(), className)}>
+		<span {...props} className={cn(accountLabelStyles(), className)}>
 			<AccountIcon account={account} />
 			<span className="flex min-w-0 flex-col gap-1">
 				<strong className={nameClassName}>{account.name}</strong>

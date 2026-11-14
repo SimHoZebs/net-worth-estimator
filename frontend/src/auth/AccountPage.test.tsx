@@ -8,9 +8,9 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { AccountPage } from "./AccountPage.tsx";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { resetNotifications } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionContext, type Session } from "./sessionContext.ts";
 import {
@@ -21,6 +21,11 @@ import { acceptUserScope, suspendUserScope } from "./resourceScope.ts";
 import { sessionScopeInput } from "./sessionDiscovery.ts";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
+
+vi.mock("sonner", () => ({
+	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+	Toaster: () => null,
+}));
 
 const session: Session = {
 	enabled: true,
@@ -68,9 +73,8 @@ afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
 	suspendUserScope();
-	resetNotifications();
-	vi.unstubAllGlobals();
 	vi.clearAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe("account page", () => {
@@ -233,7 +237,12 @@ describe("account page", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save display name" }));
 		await waitFor(() => expect(seen.length).toBe(1));
 		expect(seen[0]).toContain("Samuel Lee");
-		await screen.findByText("Display name updated.");
+		await waitFor(() =>
+			expect(toast.success).toHaveBeenCalledWith(
+				"Display name updated.",
+				expect.objectContaining({ id: "account-notice" }),
+			),
+		);
 	});
 
 	it("revokes another session through the proxy", async () => {
@@ -349,7 +358,12 @@ describe("account page", () => {
 			target: { value: "password" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Change password" }));
-		await screen.findByText("Password is too common.");
+		await waitFor(() =>
+			expect(toast.error).toHaveBeenCalledWith(
+				"Password is too common.",
+				expect.objectContaining({ id: "account" }),
+			),
+		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 
@@ -468,8 +482,18 @@ describe("account page", () => {
 		});
 		await screen.findByRole("button", { name: "Revoke" });
 		fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
-		await screen.findByText("Session revoked.");
-		await screen.findByText("The session list is unavailable.");
+		await waitFor(() =>
+			expect(toast.success).toHaveBeenCalledWith(
+				"Session revoked.",
+				expect.objectContaining({ id: "account-notice" }),
+			),
+		);
+		await waitFor(() =>
+			expect(toast.error).toHaveBeenCalledWith(
+				"The session list is unavailable.",
+				expect.objectContaining({ id: "account" }),
+			),
+		);
 		expect(screen.getByRole("button", { name: "Revoke" })).toBeTruthy();
 	});
 });

@@ -1,7 +1,12 @@
 import { useCurrentPosition } from "../../state/useCurrentPosition.ts";
 import { useSavedAccounts } from "../../state/savedState.ts";
-import { TextButton } from "../Button.tsx";
-import { Modal } from "../Modal.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
 import { Skeleton } from "../Skeleton.tsx";
 import { PositionEvidence } from "./PositionEvidence.tsx";
 
@@ -17,23 +22,32 @@ export function CurrentPositionDialog({ onClose }: { onClose: () => void }) {
 			/>
 		);
 	return (
-		<Modal
-			title="The basis of your net worth"
-			eyebrow="Current position"
-			onClose={onClose}
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
 		>
-			{position.status === "error" ? (
-				<div role="status">
-					Could not load current position.{" "}
-					<TextButton onClick={position.retry}>
-						Retry current position
-					</TextButton>
-				</div>
-			) : (
-				<div aria-busy="true">
-					<Skeleton className="h-32 w-full" />
-				</div>
-			)}
-		</Modal>
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+						Current position
+					</p>
+					<DialogTitle>The basis of your net worth</DialogTitle>
+				</DialogHeader>
+				{position.status === "error" ? (
+					<div role="status">
+						Could not load current position.{" "}
+						<Button variant="link" onClick={position.retry}>
+							Retry current position
+						</Button>
+					</div>
+				) : (
+					<div aria-busy="true">
+						<Skeleton className="h-32 w-full" />
+					</div>
+				)}
+			</DialogContent>
+		</Dialog>
 	);
 }

@@ -9,7 +9,7 @@ import {
 	DiscardConfirm,
 } from "../../components/activity/DetailEditActions.tsx";
 import { transactionControlStyles } from "../../components/activity/transactionDetailStyles.ts";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
 	isHistoricalTransaction,
@@ -31,7 +31,12 @@ import {
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
 import { Transactions } from "../../components/activity/Transactions.tsx";
 import { BalanceHistory } from "./BalanceHistory.tsx";
-import { Tabs } from "../../components/Tabs.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 import {
 	useSavedAccounts,
 	useSavedStartDate,
@@ -40,8 +45,9 @@ import {
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { useBreadcrumbSlot } from "../../workspace/breadcrumbSlot.tsx";
-import { Button } from "../../components/Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 
 /**
  * Presentational account detail. Renders the transaction, recurring,
@@ -228,91 +234,132 @@ export function AccountDetailView({
 				</form>
 			</div>
 			<Tabs
-				items={[
-					{
-						id: "transactions",
-						label: "Transactions",
-						count: occurrences.length,
-					},
-					{ id: "recurring", label: "Recurring", count: recurring.length },
-					{ id: "details", label: "Account details" },
-				]}
 				value={view}
-				onChange={setView}
-				label="Account view"
-				className="mb-0"
-				panelClassName="flex min-w-0 flex-col gap-4"
+				onValueChange={(next) => {
+					if (next) setView(next as "transactions" | "details" | "recurring");
+				}}
+				className="gap-0"
 			>
-				{view === "transactions" ? (
-					<>
-						<Transactions
-							occurrences={occurrences}
-							rows={savedState}
-							accounts={accounts}
-							startDate={startDate}
-							readOnly={readOnly}
-							onEdit={requestEdit}
-							onSourceChange={(source) => {
-								if (source !== "historical") setForecastRequested(true);
-							}}
-							canRequestForecast={canRequestForecast}
-							projected={{
-								loading: forecastRequested && forecast.loading,
-								error: forecastRequested ? (forecast.baseError ?? null) : null,
-								requested: forecastRequested,
-								retry: forecast.retryProjection,
-							}}
-						/>
-						{!isGroupedDisplay(account) && (
-							<BalanceHistory
-								adjustments={adjustments.data ?? []}
-								isPending={adjustments.isPending}
-								isError={adjustments.isError}
-								onRetry={() => void adjustments.refetch()}
-							/>
+				<TabsList
+					variant="line"
+					aria-label="Account view"
+					className={cn(
+						"mb-6 flex w-full gap-6 overflow-x-auto border-0 border-b border-solid border-line p-0 max-sm:gap-5",
+						"mb-0",
+					)}
+				>
+					<TabsTrigger
+						value="transactions"
+						className={cn(
+							"flex flex-none items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm font-normal whitespace-nowrap text-muted after:hidden hover:text-ink aria-selected:font-semibold aria-selected:text-ink",
+							"h-auto focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-primary focus-visible:ring-0",
 						)}
-					</>
-				) : view === "recurring" ? (
-					rulesQuery.isPending ? (
-						<p role="status">Loading recurring transactions…</p>
-					) : rulesQuery.isError ? (
-						<p role="alert">
-							Recurring transactions could not be loaded.{" "}
-							<Button
-								type="button"
-								variant="secondary"
-								size="sm"
-								onClick={() => void rulesQuery.refetch()}
-							>
-								Retry
-							</Button>
-						</p>
-					) : (
-						<RecurringRules
+					>
+						Transactions
+						<span className="min-w-5 rounded-control bg-active px-1 py-px text-xs text-success-text">
+							{occurrences.length}
+						</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="recurring"
+						className={cn(
+							"flex flex-none items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm font-normal whitespace-nowrap text-muted after:hidden hover:text-ink aria-selected:font-semibold aria-selected:text-ink",
+							"h-auto focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-primary focus-visible:ring-0",
+						)}
+					>
+						Recurring
+						<span className="min-w-5 rounded-control bg-active px-1 py-px text-xs text-success-text">
+							{recurring.length}
+						</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="details"
+						className={cn(
+							"flex flex-none items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm font-normal whitespace-nowrap text-muted after:hidden hover:text-ink aria-selected:font-semibold aria-selected:text-ink",
+							"h-auto focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-primary focus-visible:ring-0",
+						)}
+					>
+						Account details
+					</TabsTrigger>
+				</TabsList>
+				<TabsContent value={view} className="flex min-w-0 flex-col gap-4">
+					{view === "transactions" ? (
+						<>
+							<Transactions
+								occurrences={occurrences}
+								rows={savedState}
+								accounts={accounts}
+								startDate={startDate}
+								readOnly={readOnly}
+								onEdit={requestEdit}
+								onSourceChange={(source) => {
+									if (source !== "historical") setForecastRequested(true);
+								}}
+								canRequestForecast={canRequestForecast}
+								projected={{
+									loading: forecastRequested && forecast.loading,
+									error: forecastRequested
+										? (forecast.baseError ?? null)
+										: null,
+									requested: forecastRequested,
+									retry: forecast.retryProjection,
+								}}
+							/>
+							{!isGroupedDisplay(account) && (
+								<BalanceHistory
+									adjustments={adjustments.data ?? []}
+									isPending={adjustments.isPending}
+									isError={adjustments.isError}
+									onRetry={() => void adjustments.refetch()}
+								/>
+							)}
+						</>
+					) : view === "recurring" ? (
+						rulesQuery.isPending ? (
+							<p role="status">Loading recurring transactions…</p>
+						) : rulesQuery.isError ? (
+							<p role="alert">
+								Recurring transactions could not be loaded.{" "}
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => void rulesQuery.refetch()}
+								>
+									Retry
+								</Button>
+							</p>
+						) : (
+							<RecurringRules
+								account={account}
+								accounts={accounts}
+								rules={accountRules}
+								startDate={startDate}
+								readOnly={readOnly}
+								onEdit={requestEdit}
+							/>
+						)
+					) : isGroupedDisplay(account) ? (
+						<LoanDetails
 							account={account}
-							accounts={accounts}
-							rules={accountRules}
-							startDate={startDate}
 							readOnly={readOnly}
 							onEdit={requestEdit}
 						/>
-					)
-				) : isGroupedDisplay(account) ? (
-					<LoanDetails
-						account={account}
-						readOnly={readOnly}
-						onEdit={requestEdit}
-					/>
-				) : (
-					<AccountDetails
-						key={account.id}
-						account={account}
-						edit={edit}
-						readOnly={locked}
-					/>
-				)}
+					) : (
+						<AccountDetails
+							key={account.id}
+							account={account}
+							edit={edit}
+							readOnly={locked}
+						/>
+					)}
+				</TabsContent>
 			</Tabs>
-			<ErrorNotice message={edit.error} />
+			{edit.error && (
+				<Alert variant="destructive">
+					<AlertDescription>{edit.error}</AlertDescription>
+				</Alert>
+			)}
 			{edit.saving && (
 				<p role="status" className="text-xs text-muted">
 					Saving…
@@ -369,7 +416,10 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
 					This account does not exist or is not available in this workspace.
 				</p>
 				<div>
-					<Button onClick={() => void router.navigate({ to: "/accounts" })}>
+					<Button
+						variant="secondary"
+						onClick={() => void router.navigate({ to: "/accounts" })}
+					>
 						<ArrowLeft size={16} aria-hidden="true" />
 						Back to accounts
 					</Button>

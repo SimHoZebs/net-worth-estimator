@@ -1,5 +1,5 @@
 import { pressToggleStyles } from "../../../components/AccountToggle.tsx";
-import { mergeStyles } from "../../../components/mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import { exactMoney } from "../../../domain/format.ts";
 
 /**
@@ -37,7 +37,7 @@ export function TogglePill({
 			type="button"
 			aria-pressed={checked}
 			onClick={onToggle}
-			className={mergeStyles(pressToggleStyles, "pl-3")}
+			className={cn(pressToggleStyles, "pl-3")}
 		>
 			<TogglePillLabel name={name} detail={detail} />
 		</button>

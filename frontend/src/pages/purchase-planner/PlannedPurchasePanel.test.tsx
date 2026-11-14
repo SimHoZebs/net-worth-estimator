@@ -7,7 +7,6 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	moveSavedPurchase,
@@ -15,13 +14,6 @@ import {
 	saveNewPurchase,
 } from "../../state/purchaseWrites.ts";
 import { PlannedPurchasePanel } from "./PlannedPurchasePanel.tsx";
-
-vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../../components/Modal.tsx")>()),
-	Modal: ({ children }: { children: ReactNode }) => (
-		<section>{children}</section>
-	),
-}));
 
 vi.mock("../../state/purchaseWrites.ts", () => ({
 	moveSavedPurchase: vi.fn(),

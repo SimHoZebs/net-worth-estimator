@@ -22,11 +22,23 @@ import {
 	validateTransactionValues,
 	type TransactionFormValues,
 } from "./transactionBodies.ts";
-import { Checkbox, InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
+import { Field, FieldDescription } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+const fieldLabelClassName = "text-sm leading-normal font-semibold text-muted";
+const fieldHintClassName = "text-xs leading-relaxed text-muted";
+const fieldInputClassName =
+	"h-11 bg-input-bg px-3 text-base text-ink placeholder:text-subtle disabled:bg-transparent focus-visible:outline-solid focus-visible:ring-0";
+const fieldSelectClassName =
+	"h-11 w-full rounded-control border border-solid border-line-strong bg-input-bg px-3 py-2 text-base font-normal text-ink placeholder:text-subtle disabled:cursor-not-allowed disabled:opacity-60";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
 
 /**
  * Create-only transaction form. A transaction is one fact: it has a date and
@@ -101,6 +113,15 @@ export function AddTransactionDialog({
 		transactionTime !== "" &&
 		!Number.isFinite(combineDayTime(startDate, transactionTime));
 	const enabledId = useId();
+	const nameId = useId();
+	const amountId = useId();
+	const fromIdInput = useId();
+	const toIdInput = useId();
+	const dateId = useId();
+	const timeId = useId();
+	const claimScheduleIdInput = useId();
+	const claimOccurrenceId = useId();
+	const timeHintId = timeInvalid ? `${timeId}-hint` : undefined;
 
 	const dirty =
 		name !== "" ||
@@ -161,128 +182,218 @@ export function AddTransactionDialog({
 	};
 
 	return (
-		<Modal title="Add transaction" onClose={onClose}>
-			<form
-				className="flex flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
-			>
-				<fieldset
-					disabled={saving}
-					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
+		>
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<DialogTitle>Add transaction</DialogTitle>
+				</DialogHeader>
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => void submit(event)}
 				>
-					<InputField
-						label="Transaction name"
-						wide
-						required
-						maxLength={100}
-						value={name}
-						onChange={(event) => setName(event.target.value)}
-						placeholder="e.g. Annual insurance"
-					/>
-					<InputField
-						label="Amount (USD)"
-						type="number"
-						required
-						min="0"
-						max="10000000000"
-						step="0.01"
-						value={amount}
-						onChange={(event) => setAmount(event.target.value)}
-					/>
-					<SelectField
-						label="From"
-						value={fromId}
-						onChange={(event) => setFromId(event.target.value)}
+					<fieldset
+						disabled={saving}
+						className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
 					>
-						<option value="">External income</option>
-						{savedAccounts
-							.filter((account) => account.kind !== "debt")
-							.map((account) => (
-								<option key={account.id} value={account.id}>
-									{account.name}
+						<Field className="col-span-full flex min-w-0 flex-col gap-2">
+							<Label htmlFor={nameId} className={fieldLabelClassName}>
+								Transaction name
+							</Label>
+							<Input
+								id={nameId}
+								required
+								maxLength={100}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+								placeholder="e.g. Annual insurance"
+								className={fieldInputClassName}
+							/>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={amountId} className={fieldLabelClassName}>
+								Amount (USD)
+							</Label>
+							<Input
+								id={amountId}
+								type="number"
+								required
+								min="0"
+								max="10000000000"
+								step="0.01"
+								value={amount}
+								onChange={(event) => setAmount(event.target.value)}
+								className={fieldInputClassName}
+							/>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={fromIdInput} className={fieldLabelClassName}>
+								From
+							</Label>
+							<select
+								id={fromIdInput}
+								value={fromId}
+								onChange={(event) => setFromId(event.target.value)}
+								className={fieldSelectClassName}
+							>
+								<option value="">External income</option>
+								{savedAccounts
+									.filter((account) => account.kind !== "debt")
+									.map((account) => (
+										<option key={account.id} value={account.id}>
+											{account.name}
+										</option>
+									))}
+							</select>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={toIdInput} className={fieldLabelClassName}>
+								To
+							</Label>
+							<select
+								id={toIdInput}
+								value={toId}
+								onChange={(event) => setToId(event.target.value)}
+								className={fieldSelectClassName}
+							>
+								<option value="">External expense</option>
+								{savedAccounts.map((account) => (
+									<option key={account.id} value={account.id}>
+										{account.name}
+									</option>
+								))}
+							</select>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={dateId} className={fieldLabelClassName}>
+								Date
+							</Label>
+							<Input
+								id={dateId}
+								type="date"
+								required
+								value={startDate}
+								onChange={(event) => setStartDate(event.target.value)}
+								className={fieldInputClassName}
+							/>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label htmlFor={timeId} className={fieldLabelClassName}>
+								Time (UTC, optional)
+							</Label>
+							<Input
+								id={timeId}
+								type="time"
+								step="1"
+								aria-describedby={timeHintId}
+								value={transactionTime}
+								onChange={(event) => setTransactionTime(event.target.value)}
+								className={fieldInputClassName}
+							/>
+							{timeInvalid && (
+								<FieldDescription
+									id={timeHintId}
+									className={fieldHintClassName}
+								>
+									Choose a valid time.
+								</FieldDescription>
+							)}
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label
+								htmlFor={claimScheduleIdInput}
+								className={fieldLabelClassName}
+							>
+								Records an occurrence of
+							</Label>
+							<select
+								id={claimScheduleIdInput}
+								value={claimScheduleId}
+								onChange={(event) => setClaimRuleId(event.target.value)}
+								className={fieldSelectClassName}
+							>
+								<option value="">No link — standalone record</option>
+								{claimSchedules.map((rule) => (
+									<option key={rule.id} value={rule.id}>
+										{rule.name}
+									</option>
+								))}
+							</select>
+						</Field>
+						<Field className="flex min-w-0 flex-col gap-2">
+							<Label
+								htmlFor={claimOccurrenceId}
+								className={fieldLabelClassName}
+							>
+								Replaces occurrence on
+							</Label>
+							<select
+								id={claimOccurrenceId}
+								value={claimOccurrenceDate}
+								onChange={(event) => setClaimOccurrenceDate(event.target.value)}
+								disabled={!claimScheduleId}
+								className={fieldSelectClassName}
+							>
+								<option value="">
+									{!claimScheduleId
+										? "Choose a schedule first"
+										: occurrenceOptions.length === 0
+											? "No claimable occurrences"
+											: "Choose the occurrence"}
 								</option>
-							))}
-					</SelectField>
-					<SelectField
-						label="To"
-						value={toId}
-						onChange={(event) => setToId(event.target.value)}
-					>
-						<option value="">External expense</option>
-						{savedAccounts.map((account) => (
-							<option key={account.id} value={account.id}>
-								{account.name}
-							</option>
-						))}
-					</SelectField>
-					<InputField
-						label="Date"
-						type="date"
-						required
-						value={startDate}
-						onChange={(event) => setStartDate(event.target.value)}
-					/>
-					<InputField
-						label="Time (UTC, optional)"
-						type="time"
-						step="1"
-						hint={timeInvalid ? "Choose a valid time." : undefined}
-						value={transactionTime}
-						onChange={(event) => setTransactionTime(event.target.value)}
-					/>
-					<SelectField
-						label="Records an occurrence of"
-						value={claimScheduleId}
-						onChange={(event) => setClaimRuleId(event.target.value)}
-					>
-						<option value="">No link — standalone record</option>
-						{claimSchedules.map((rule) => (
-							<option key={rule.id} value={rule.id}>
-								{rule.name}
-							</option>
-						))}
-					</SelectField>
-					<SelectField
-						label="Replaces occurrence on"
-						value={claimOccurrenceDate}
-						onChange={(event) => setClaimOccurrenceDate(event.target.value)}
-						disabled={!claimScheduleId}
-					>
-						<option value="">
-							{!claimScheduleId
-								? "Choose a schedule first"
-								: occurrenceOptions.length === 0
-									? "No claimable occurrences"
-									: "Choose the occurrence"}
-						</option>
-						{occurrenceOptions.map((date) => (
-							<option key={date} value={date}>
-								{dateLabel(date, true)}
-							</option>
-						))}
-					</SelectField>
-					<label
-						htmlFor={enabledId}
-						className="flex min-h-11 items-center gap-3 text-sm text-muted"
-					>
-						<Checkbox
-							id={enabledId}
-							checked={enabled}
-							onChange={(event) => setEnabled(event.target.checked)}
-						/>
-						Include in projections
-					</label>
-				</fieldset>
-				<FieldError message={error} />
-				<div className={dialogActionsStyles}>
-					<Button type="button" variant="secondary" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={saving || !dirty}>
-						{saving ? "Saving…" : "Add transaction"}
-					</Button>
-				</div>
-			</form>
-		</Modal>
+								{occurrenceOptions.map((date) => (
+									<option key={date} value={date}>
+										{dateLabel(date, true)}
+									</option>
+								))}
+							</select>
+						</Field>
+						<label
+							htmlFor={enabledId}
+							className="flex min-h-11 items-center gap-3 text-sm text-muted"
+						>
+							<input
+								id={enabledId}
+								type="checkbox"
+								checked={enabled}
+								onChange={(event) => setEnabled(event.target.checked)}
+								className="m-0 size-5 flex-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+							/>
+							Include in projections
+						</label>
+					</fieldset>
+					{error && (
+						<p
+							role="alert"
+							className="m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text"
+						>
+							{error}
+						</p>
+					)}
+					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-line pt-5">
+						<Button
+							type="button"
+							variant="secondary"
+							className="min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
+							onClick={onClose}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							variant="secondary"
+							className="min-h-10 border-line-strong bg-surface px-4 py-2 text-sm leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0"
+							disabled={saving || !dirty}
+						>
+							{saving ? "Saving…" : "Add transaction"}
+						</Button>
+					</div>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }

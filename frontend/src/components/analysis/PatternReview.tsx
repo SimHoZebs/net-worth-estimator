@@ -23,10 +23,22 @@ import {
 	useDismissAnalysisFinding,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
-import { Badge } from "../Badge.tsx";
-import { Button } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { cn } from "@/lib/utils.ts";
+
+const errorClassName =
+	"m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text";
+const secondarySmallButtonClassName =
+	"min-h-9 border-line-strong bg-surface px-3 py-2 text-xs leading-snug text-ink enabled:hover:bg-hover focus-visible:outline-solid focus-visible:ring-0";
+const primarySmallButtonClassName =
+	"min-h-9 border-primary bg-primary px-3 py-2 text-xs leading-snug text-on-primary enabled:hover:bg-primary-hover enabled:hover:shadow-sm focus-visible:outline-solid focus-visible:ring-0";
 import {
 	ExistingScheduleDialog,
 	NewScheduleDialog,
@@ -71,19 +83,30 @@ function ClassificationAnswers({
 		<div className="space-y-2">
 			<p className="m-0 text-xs font-semibold">{kindLabel}</p>
 			<div className="flex flex-wrap items-center gap-2">
-				<Badge tone={confirmed ? "success" : "neutral"}>
+				<Badge
+					variant={confirmed ? "default" : "secondary"}
+					className={cn(
+						"h-auto",
+						confirmed
+							? "bg-success-bg text-success-text"
+							: "bg-surface-3 text-muted",
+					)}
+				>
 					{paymentStatus(finding)}
 				</Badge>
 			</div>
-			<FieldError
-				message={review.isError ? "The answer could not be saved." : null}
-			/>
+			{review.isError && (
+				<p role="alert" className={errorClassName}>
+					The answer could not be saved.
+				</p>
+			)}
 			{!readOnly && (
 				<div className="flex flex-wrap gap-2">
 					<Button
 						type="button"
 						size="sm"
-						variant="primary"
+						variant="default"
+						className={primarySmallButtonClassName}
 						disabled={busy || inactive || confirmed}
 						aria-pressed={confirmed}
 						aria-label={`Confirm ${finding.kind} for ${title}`}
@@ -95,6 +118,7 @@ function ClassificationAnswers({
 						type="button"
 						size="sm"
 						variant="secondary"
+						className={secondarySmallButtonClassName}
 						disabled={busy || inactive || rejected}
 						aria-pressed={rejected}
 						aria-label={`Not ${finding.kind} for ${title}`}
@@ -130,23 +154,30 @@ function RepetitionActions({
 		<div className="space-y-2">
 			<p className="m-0 text-xs font-semibold">Repeating</p>
 			<div className="flex flex-wrap items-center gap-2">
-				<Badge tone={confirmed ? "success" : "neutral"}>
+				<Badge
+					variant={confirmed ? "default" : "secondary"}
+					className={cn(
+						"h-auto",
+						confirmed
+							? "bg-success-bg text-success-text"
+							: "bg-surface-3 text-muted",
+					)}
+				>
 					{recurringPatternStatus(pattern)}
 				</Badge>
 			</div>
-			<FieldError
-				message={
-					feedback.isError || dismiss.isError
-						? "The answer could not be saved."
-						: null
-				}
-			/>
+			{(feedback.isError || dismiss.isError) && (
+				<p role="alert" className={errorClassName}>
+					The answer could not be saved.
+				</p>
+			)}
 			<div className="flex flex-wrap gap-2">
 				{!readOnly && rejected && (
 					<Button
 						type="button"
 						size="sm"
 						variant="secondary"
+						className={secondarySmallButtonClassName}
 						disabled={dismiss.isPending}
 						aria-label={`Review repeating pattern for ${title} again`}
 						onClick={() =>
@@ -159,7 +190,12 @@ function RepetitionActions({
 				<Button
 					type="button"
 					size="sm"
-					variant={readOnly ? "secondary" : "primary"}
+					variant={readOnly ? "secondary" : "default"}
+					className={
+						readOnly
+							? secondarySmallButtonClassName
+							: primarySmallButtonClassName
+					}
 					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
 					onClick={() => setPlanOpen(true)}
 				>
@@ -169,6 +205,7 @@ function RepetitionActions({
 					type="button"
 					size="sm"
 					variant="secondary"
+					className={secondarySmallButtonClassName}
 					aria-label={`Link repeating pattern for ${title} to an existing schedule`}
 					onClick={() => setLinkOpen(true)}
 				>
@@ -179,6 +216,7 @@ function RepetitionActions({
 						type="button"
 						size="sm"
 						variant="secondary"
+						className={secondarySmallButtonClassName}
 						disabled={feedback.isPending}
 						aria-label={`Reject repeating pattern for ${title}`}
 						onClick={() =>
@@ -231,7 +269,12 @@ function PaymentForecastActions({
 				<Button
 					type="button"
 					size="sm"
-					variant={readOnly ? "secondary" : "primary"}
+					variant={readOnly ? "secondary" : "default"}
+					className={
+						readOnly
+							? secondarySmallButtonClassName
+							: primarySmallButtonClassName
+					}
 					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
 					onClick={() => setPlanOpen(true)}
 				>
@@ -241,6 +284,7 @@ function PaymentForecastActions({
 					type="button"
 					size="sm"
 					variant="secondary"
+					className={secondarySmallButtonClassName}
 					aria-label={`Link to existing schedule for ${title}`}
 					onClick={() => setLinkOpen(true)}
 				>
@@ -287,90 +331,107 @@ function PatternReviewDialog({
 	const findings = row.findings.filter((finding) => !finding.dismissed);
 	const dismissed = row.findings.filter((finding) => finding.dismissed);
 	return (
-		<Modal title={title} eyebrow="Pattern review" onClose={onClose}>
-			<div className="space-y-4">
-				<div className="space-y-1">
-					<p className="m-0 text-xs text-muted">
-						{reviewCadenceLabel(row)} · {reviewRecordedCount(row)} recorded
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
+		>
+			<DialogContent className="sm:max-w-3xl">
+				<DialogHeader>
+					<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+						Pattern review
 					</p>
-					{amount && (
-						<p
-							className={
-								amount.inflow
-									? "m-0 text-xs font-semibold text-success-text"
-									: "m-0 text-xs font-semibold"
-							}
-						>
-							{amount.text} · {amount.direction}
+					<DialogTitle>{title}</DialogTitle>
+				</DialogHeader>
+				<div className="space-y-4">
+					<div className="space-y-1">
+						<p className="m-0 text-xs text-muted">
+							{reviewCadenceLabel(row)} · {reviewRecordedCount(row)} recorded
 						</p>
-					)}
-				</div>
-				{row.payments.map((pattern) => (
-					<ClassificationAnswers
-						key={pattern.key}
-						pattern={pattern}
-						title={title}
-						readOnly={readOnly}
-					/>
-				))}
-				{row.repetition.map((pattern, index) => (
-					<RepetitionActions
-						key={`${pattern.key}:${index}`}
-						pattern={pattern}
-						title={title}
-						names={names}
-						readOnly={readOnly}
-					/>
-				))}
-				{row.repetition.length === 0 &&
-					row.payments.map((pattern) => (
-						<PaymentForecastActions
-							key={`forecast:${pattern.key}`}
-							finding={pattern.anchor}
+						{amount && (
+							<p
+								className={
+									amount.inflow
+										? "m-0 text-xs font-semibold text-success-text"
+										: "m-0 text-xs font-semibold"
+								}
+							>
+								{amount.text} · {amount.direction}
+							</p>
+						)}
+					</div>
+					{row.payments.map((pattern) => (
+						<ClassificationAnswers
+							key={pattern.key}
+							pattern={pattern}
+							title={title}
+							readOnly={readOnly}
+						/>
+					))}
+					{row.repetition.map((pattern, index) => (
+						<RepetitionActions
+							key={`${pattern.key}:${index}`}
+							pattern={pattern}
 							title={title}
 							names={names}
 							readOnly={readOnly}
 						/>
 					))}
-				<FieldError
-					message={visibility.isError ? "The answer could not be saved." : null}
-				/>
-				{!readOnly && (
-					<div className="flex flex-wrap gap-2">
-						{findings.length > 0 && (
-							<Button
-								type="button"
-								size="sm"
-								variant="secondary"
-								disabled={visibility.isPending}
-								aria-label={`Dismiss pattern for ${title}`}
-								onClick={() => {
-									for (const finding of findings)
-										visibility.mutate({ id: finding.id, dismissed: true });
-								}}
-							>
-								Dismiss
-							</Button>
-						)}
-						{dismissed.length > 0 && (
-							<Button
-								type="button"
-								size="sm"
-								variant="secondary"
-								disabled={visibility.isPending}
-								aria-label={`Restore pattern for ${title}`}
-								onClick={() => {
-									for (const finding of dismissed)
-										visibility.mutate({ id: finding.id, dismissed: false });
-								}}
-							>
-								Restore
-							</Button>
-						)}
-					</div>
-				)}
-			</div>
-		</Modal>
+					{row.repetition.length === 0 &&
+						row.payments.map((pattern) => (
+							<PaymentForecastActions
+								key={`forecast:${pattern.key}`}
+								finding={pattern.anchor}
+								title={title}
+								names={names}
+								readOnly={readOnly}
+							/>
+						))}
+					{visibility.isError && (
+						<p role="alert" className={errorClassName}>
+							The answer could not be saved.
+						</p>
+					)}
+					{!readOnly && (
+						<div className="flex flex-wrap gap-2">
+							{findings.length > 0 && (
+								<Button
+									type="button"
+									size="sm"
+									variant="secondary"
+									className={secondarySmallButtonClassName}
+									disabled={visibility.isPending}
+									aria-label={`Dismiss pattern for ${title}`}
+									onClick={() => {
+										for (const finding of findings)
+											visibility.mutate({ id: finding.id, dismissed: true });
+									}}
+								>
+									Dismiss
+								</Button>
+							)}
+							{dismissed.length > 0 && (
+								<Button
+									type="button"
+									size="sm"
+									variant="secondary"
+									className={secondarySmallButtonClassName}
+									disabled={visibility.isPending}
+									aria-label={`Restore pattern for ${title}`}
+									onClick={() => {
+										for (const finding of dismissed)
+											visibility.mutate({ id: finding.id, dismissed: false });
+									}}
+								>
+									Restore
+								</Button>
+							)}
+						</div>
+					)}
+				</div>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -414,7 +475,12 @@ export function PatternReview({
 						type="button"
 						role="tab"
 						aria-selected={tab === entry.id}
-						variant={tab === entry.id ? "primary" : "secondary"}
+						variant={tab === entry.id ? "default" : "secondary"}
+						className={
+							tab === entry.id
+								? primarySmallButtonClassName
+								: secondarySmallButtonClassName
+						}
 						size="sm"
 						onClick={() => {
 							setTab(entry.id);
@@ -460,7 +526,18 @@ export function PatternReview({
 										)}
 										<span className="flex flex-wrap gap-1 pt-1">
 											{reviewChips(row).map((chip) => (
-												<Badge key={chip.key} tone={chip.tone}>
+												<Badge
+													key={chip.key}
+													variant={
+														chip.tone === "success" ? "default" : "secondary"
+													}
+													className={cn(
+														"h-auto",
+														chip.tone === "success"
+															? "bg-success-bg text-success-text"
+															: "bg-surface-3 text-muted",
+													)}
+												>
 													{chip.label}
 												</Badge>
 											))}
@@ -481,6 +558,7 @@ export function PatternReview({
 				<Button
 					type="button"
 					variant="secondary"
+					className={secondarySmallButtonClassName}
 					size="sm"
 					onClick={() => setRows((value) => value + 10)}
 				>

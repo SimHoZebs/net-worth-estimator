@@ -1,12 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import type { ServerStatus } from "../api/index.ts";
 import { SessionContext, type Session } from "../auth/sessionContext.ts";
-import {
-	resetNotifications,
-	useNotifications,
-} from "../state/notifications.ts";
 import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
 import { renderRouterSubject } from "../mocks/testRouter.tsx";
 import { isSyncStale, LastSync, SYNC_STALE_AFTER_MS } from "./LastSync.tsx";
@@ -15,6 +12,11 @@ import { setServerStatusFixture } from "../mocks/workspace.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
+
+vi.mock("sonner", () => ({
+	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+	Toaster: () => null,
+}));
 
 const baseStatus: ServerStatus = {
 	readOnly: false,
@@ -47,11 +49,11 @@ describe("sidebar sync signals", () => {
 	beforeEach(() => {
 		acceptTestResource();
 		resetServerQueryCache();
-		resetNotifications();
+		vi.clearAllMocks();
 	});
 	afterEach(() => {
 		cleanup();
-		resetNotifications();
+		vi.clearAllMocks();
 	});
 
 	it("shows the server's last successful sync in browser-local time, including read-only mode", async () => {
@@ -131,13 +133,22 @@ describe("sidebar sync signals", () => {
 		});
 		const view = await renderSidebar();
 		fireEvent.click(view.getByRole("button", { name: /sync stale/i }));
-		const toast = useNotifications
-			.getState()
-			.items.find((item) => item.key === "sync-stale");
-		expect(toast?.kind).toBe("error");
-		expect(toast?.message).toBe("Bank sync is stale.");
-		expect(toast?.action?.label).toBe("Open bank sync");
-		toast?.action?.onAction();
+		expect(toast.error).toHaveBeenCalledWith(
+			"Bank sync is stale.",
+			expect.objectContaining({
+				id: "sync-stale",
+				action: expect.objectContaining({ label: "Open bank sync" }),
+			}),
+		);
+		const action = (
+			vi.mocked(toast.error).mock.calls.at(-1)?.[1] as unknown as {
+				action?: { label: string; onClick: () => void };
+			}
+		)?.action;
+		expect(action?.label).toBe("Open bank sync");
+		await act(async () => {
+			action?.onClick();
+		});
 		await waitFor(() =>
 			expect(view.router.state.location.pathname).toBe("/sources"),
 		);
