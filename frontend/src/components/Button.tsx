@@ -2,11 +2,22 @@ import type { VariantProps } from "class-variance-authority";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { mergeStyles } from "./mergeStyles.ts";
+import { Button as ShadcnButton } from "./ui/button.tsx";
 import {
 	buttonStyles,
 	iconButtonStyles,
 	textButtonStyles,
 } from "./buttonStyles.ts";
+
+/**
+ * Application actions on the shadcn button primitive. The legacy recipes
+ * stay the visual owner (dark-mode-safe application tokens); the primitive
+ * contributes native behavior, data slots, and focus handling. Nova focus
+ * rings stay off so the global :focus-visible owner in typography.css paints
+ * the single keyboard indicator.
+ */
+const focusVisibleStyles =
+	"focus-visible:outline-solid focus-visible:ring-0";
 
 export function Button({
 	variant,
@@ -16,10 +27,22 @@ export function Button({
 	...props
 }: ComponentProps<"button"> & VariantProps<typeof buttonStyles>) {
 	return (
-		<button
+		<ShadcnButton
 			{...props}
 			type={type}
-			className={mergeStyles(buttonStyles({ variant, size }), className)}
+			variant={
+				variant === "primary"
+					? "default"
+					: variant === "danger"
+						? "destructive"
+						: (variant ?? "secondary")
+			}
+			size={size === "sm" ? "sm" : "default"}
+			className={mergeStyles(
+				buttonStyles({ variant, size }),
+				focusVisibleStyles,
+				className,
+			)}
 		/>
 	);
 }
@@ -31,10 +54,15 @@ export function TextButton({
 	...props
 }: ComponentProps<"button"> & VariantProps<typeof textButtonStyles>) {
 	return (
-		<button
+		<ShadcnButton
 			{...props}
 			type={type}
-			className={mergeStyles(textButtonStyles({ tone }), className)}
+			variant="link"
+			className={mergeStyles(
+				textButtonStyles({ tone }),
+				focusVisibleStyles,
+				className,
+			)}
 		/>
 	);
 }
@@ -54,14 +82,20 @@ export function IconButton({
 		iconSize?: number;
 	}) {
 	return (
-		<button
+		<ShadcnButton
 			title={label}
 			{...props}
 			type={type}
-			className={mergeStyles(iconButtonStyles({ size }), className)}
+			variant="ghost"
+			size={size === "sm" ? "icon-sm" : "icon"}
+			className={mergeStyles(
+				iconButtonStyles({ size }),
+				focusVisibleStyles,
+				className,
+			)}
 			aria-label={label}
 		>
 			<Icon size={iconSize} aria-hidden="true" />
-		</button>
+		</ShadcnButton>
 	);
 }

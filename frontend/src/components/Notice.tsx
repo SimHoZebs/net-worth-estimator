@@ -3,7 +3,14 @@ import type { ComponentProps } from "react";
 import { mergeStyles } from "./mergeStyles.ts";
 
 import { noticeStyles } from "./noticeStyles.ts";
+import { Alert as ShadcnAlert } from "./ui/alert.tsx";
 
+/**
+ * Inline notice on the shadcn alert primitive. The legacy tone recipe stays
+ * the visual owner (dark-mode-safe application tokens); the primitive
+ * contributes the data slot. Alert bakes in role="alert", so the
+ * informational tone passes role="note" explicitly.
+ */
 export function Notice({
 	tone,
 	className,
@@ -11,9 +18,10 @@ export function Notice({
 	...props
 }: ComponentProps<"div"> & VariantProps<typeof noticeStyles>) {
 	return (
-		<div
+		<ShadcnAlert
 			{...props}
 			role={role}
+			variant={tone === "danger" ? "destructive" : "default"}
 			className={mergeStyles(noticeStyles({ tone }), className)}
 		/>
 	);

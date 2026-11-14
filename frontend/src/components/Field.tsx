@@ -7,6 +7,22 @@ import {
 } from "react";
 import { mergeStyles } from "./mergeStyles.ts";
 import { checkboxStyles, controlStyles, fieldStyles } from "./fieldStyles.ts";
+import { Field as ShadcnField, FieldDescription } from "./ui/field.tsx";
+import { Input as ShadcnInput } from "./ui/input.tsx";
+import { Label as ShadcnLabel } from "./ui/label.tsx";
+import { Textarea as ShadcnTextarea } from "./ui/textarea.tsx";
+
+/**
+ * Form fields on shadcn field, label, input, and textarea primitives. Native
+ * controls stay native (form participation, FormData, and picker behavior
+ * are load-bearing), and the legacy recipes stay the visual owner
+ * (dark-mode-safe application tokens). Nova focus rings stay off so the
+ * global :focus-visible owner in typography.css paints the single keyboard
+ * indicator; the outline style is restored because the primitive's
+ * outline-none would otherwise suppress it.
+ */
+const focusVisibleStyles =
+	"focus-visible:outline-solid focus-visible:ring-0";
 
 type FieldProps = {
 	label: string;
@@ -34,23 +50,36 @@ export function Field({
 	const description =
 		[describedBy, hintId].filter(Boolean).join(" ") || undefined;
 	return (
-		<div className={mergeStyles(fieldStyles({ wide }), containerClassName)}>
-			<label htmlFor={id} className="text-sm font-semibold text-muted">
+		<ShadcnField
+			className={mergeStyles(fieldStyles({ wide }), containerClassName)}
+		>
+			<ShadcnLabel
+				htmlFor={id}
+				className="text-sm leading-normal font-semibold text-muted"
+			>
 				{label}
-			</label>
+			</ShadcnLabel>
 			{children({ id, "aria-describedby": description })}
 			{hint && (
-				<small id={hintId} className="text-xs leading-relaxed text-muted">
+				<FieldDescription id={hintId} className="text-xs leading-relaxed text-muted">
 					{hint}
-				</small>
+				</FieldDescription>
 			)}
-		</div>
+		</ShadcnField>
 	);
 }
 
 export function Input({ className, ...input }: ComponentProps<"input">) {
 	return (
-		<input {...input} className={mergeStyles(controlStyles(), className)} />
+		<ShadcnInput
+			{...input}
+			className={mergeStyles(
+				controlStyles(),
+				"disabled:bg-transparent",
+				focusVisibleStyles,
+				className,
+			)}
+		/>
 	);
 }
 
@@ -83,9 +112,14 @@ export function TextArea({
 	...textarea
 }: ComponentProps<"textarea">) {
 	return (
-		<textarea
+		<ShadcnTextarea
 			{...textarea}
-			className={mergeStyles(controlStyles({ kind: "textarea" }), className)}
+			className={mergeStyles(
+				controlStyles({ kind: "textarea" }),
+				"disabled:bg-transparent field-sizing-fixed",
+				focusVisibleStyles,
+				className,
+			)}
 		/>
 	);
 }
@@ -191,10 +225,15 @@ export function SearchField({
 		>
 			<Search size={16} aria-hidden="true" />
 			<span className="sr-only">{label}</span>
-			<input
+			<ShadcnInput
 				{...input}
 				id={id}
-				className={mergeStyles(controlStyles({ kind: "search" }), className)}
+				className={mergeStyles(
+					controlStyles({ kind: "search" }),
+					"rounded-none disabled:bg-transparent",
+					focusVisibleStyles,
+					className,
+				)}
 			/>
 		</label>
 	);

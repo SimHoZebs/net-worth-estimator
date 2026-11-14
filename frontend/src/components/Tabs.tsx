@@ -1,5 +1,10 @@
 import { type ReactNode, useId } from "react";
 import { mergeStyles } from "./mergeStyles.ts";
+import {
+	Tabs as ShadcnTabs,
+	TabsList as ShadcnTabsList,
+	TabsTrigger as ShadcnTabsTrigger,
+} from "./ui/tabs.tsx";
 
 export interface TabItem<T extends string> {
 	id: T;
@@ -7,6 +12,15 @@ export interface TabItem<T extends string> {
 	count?: number | null;
 }
 
+/**
+ * Underline tabs on the shadcn tabs primitive (line variant). The legacy
+ * tab recipe stays the visual owner; flex-none, h-auto, font-normal,
+ * hover:text-ink, after:hidden, and p-0 neutralize the primitive's
+ * equal-width, fixed-height, and double-underline defaults. Nova focus rings
+ * stay off so the global :focus-visible owner in typography.css paints the
+ * single keyboard indicator. The shared panel keeps its wiring (one panel
+ * for every tab, custom section support) outside the primitive.
+ */
 export function Tabs<T extends string>({
 	items,
 	value,
@@ -28,44 +42,28 @@ export function Tabs<T extends string>({
 }) {
 	const id = useId();
 	return (
-		<>
-			<div
+		<ShadcnTabs value={value} className="gap-0">
+			<ShadcnTabsList
+				variant="line"
+				aria-label={label}
 				className={mergeStyles(
-					"mb-6 flex gap-6 overflow-x-auto border-0 border-b border-solid border-line max-sm:gap-5",
+					"mb-6 flex w-full gap-6 overflow-x-auto border-0 border-b border-solid border-line p-0 max-sm:gap-5",
 					className,
 				)}
-				role="tablist"
-				aria-label={label}
 			>
-				{items.map((item, index) => (
-					<button
-						type="button"
+				{items.map((item) => (
+					<ShadcnTabsTrigger
 						key={item.id}
 						id={`${id}-${item.id}`}
-						role="tab"
-						className="flex items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm whitespace-nowrap text-muted aria-selected:border-primary aria-selected:font-semibold aria-selected:text-ink"
-						aria-selected={value === item.id}
-						aria-controls={`${id}-panel`}
-						tabIndex={value === item.id ? 0 : -1}
+						value={item.id}
 						onClick={() => onChange(item.id)}
-						onKeyDown={(event) => {
-							const nextIndex =
-								event.key === "ArrowRight"
-									? (index + 1) % items.length
-									: event.key === "ArrowLeft"
-										? (index + items.length - 1) % items.length
-										: event.key === "Home"
-											? 0
-											: event.key === "End"
-												? items.length - 1
-												: null;
-							if (nextIndex === null) return;
-							const next = items[nextIndex];
-							if (!next) return;
-							event.preventDefault();
-							onChange(next.id);
-							document.getElementById(`${id}-${next.id}`)?.focus();
+						onFocus={() => {
+							if (item.id !== value) onChange(item.id);
 						}}
+						className={mergeStyles(
+							"flex flex-none items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm font-normal whitespace-nowrap text-muted after:hidden hover:text-ink aria-selected:font-semibold aria-selected:text-ink",
+							"h-auto focus-visible:outline-solid focus-visible:outline-3 focus-visible:outline-primary focus-visible:ring-0",
+						)}
 					>
 						{item.label}
 						{item.count != null && (
@@ -73,9 +71,9 @@ export function Tabs<T extends string>({
 								{item.count}
 							</span>
 						)}
-					</button>
+					</ShadcnTabsTrigger>
 				))}
-			</div>
+			</ShadcnTabsList>
 			<Panel
 				className={panelClassName}
 				id={`${id}-panel`}
@@ -84,6 +82,6 @@ export function Tabs<T extends string>({
 			>
 				{children}
 			</Panel>
-		</>
+		</ShadcnTabs>
 	);
 }

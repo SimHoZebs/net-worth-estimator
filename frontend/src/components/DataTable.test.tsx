@@ -99,7 +99,10 @@ describe("native table ownership", () => {
 		rerender(
 			<DataTable
 				caption="Account balances"
-				columns={[{ label: "Account" }, { label: "Actions", srOnly: true }]}
+				columns={[
+					{ label: "Account", className: "text-left" },
+					{ label: "Actions", srOnly: true },
+				]}
 				showHeaders
 			>
 				<TableRow>
@@ -107,7 +110,11 @@ describe("native table ownership", () => {
 				</TableRow>
 			</DataTable>,
 		);
-		expect(screen.getAllByRole("columnheader")).toHaveLength(2);
+		const headers = screen.getAllByRole("columnheader");
+		expect(headers).toHaveLength(2);
+		// TanStack column defs carry the header labels and column classes.
+		expect(headers[0]!.textContent).toBe("Account");
+		expect(headers[0]!.classList.contains("text-left")).toBe(true);
 		expect(
 			screen.getByRole("columnheader", { name: "Actions" }).firstElementChild
 				?.className,
@@ -159,6 +166,55 @@ describe("native table ownership", () => {
 		expect(screen.getByRole("status").textContent).toBe(
 			"Showing 21–25 of 25 transactions",
 		);
+	});
+
+	it("derives pager state from the TanStack pagination model", () => {
+		const onPage = vi.fn();
+		const { rerender } = render(
+			<TablePagination
+				page={5}
+				pageCount={3}
+				total={25}
+				pageSize={10}
+				onPage={onPage}
+			/>,
+		);
+		// Pages stay zero-based: an out-of-range page clamps to the last page.
+		expect(screen.getByRole("status").textContent).toBe(
+			"Showing 21–25 of 25 transactions",
+		);
+		expect(screen.getByText("3 / 3")).toBeDefined();
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Next transaction page",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Previous transaction page" }),
+		);
+		expect(onPage).toHaveBeenCalledWith(1);
+		rerender(
+			<TablePagination
+				page={1}
+				pageCount={3}
+				total={25}
+				pageSize={10}
+				itemNoun="accounts"
+				onPage={onPage}
+			/>,
+		);
+		expect(screen.getByRole("status").textContent).toBe(
+			"Showing 11–20 of 25 accounts",
+		);
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Previous transaction page",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(false);
 	});
 });
 
