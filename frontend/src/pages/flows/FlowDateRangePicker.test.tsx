@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	FLOW_RANGE_PRESETS,
 	flowPresetRange,
@@ -135,5 +135,44 @@ describe("FlowDateRangePicker", () => {
 		expect(
 			screen.getByRole("region", { name: "December 2026" }),
 		).toBeTruthy();
+	});
+
+	it("opens the modal sheet with presets, calendars, and Apply on small screens", () => {
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			matches: true,
+			media: query,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			addListener: () => {},
+			removeListener: () => {},
+			dispatchEvent: () => false,
+		}));
+		const onApply = vi.fn();
+		openDialog("2026-03-10", "2026-04-20", onApply);
+		expect(
+			screen.getByRole("dialog", { name: "Choose date range" }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("group", { name: "Date range presets" }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("region", { name: "March 2026" }),
+		).toBeTruthy();
+		expect(screen.getByRole("region", { name: "April 2026" })).toBeTruthy();
+		fireEvent.click(
+			screen.getByRole("button", { name: dateLabel("2026-03-15", true) }),
+		);
+		fireEvent.click(
+			screen.getByRole("button", { name: dateLabel("2026-03-20", true) }),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+		expect(onApply).toHaveBeenCalledWith({
+			startDate: "2026-03-15",
+			endDate: "2026-03-20",
+		});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
 	});
 });

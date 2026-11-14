@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { buttonStyles } from "../../components/buttonStyles.ts";
 import { controlStyles } from "../../components/fieldStyles.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
+import { Modal } from "../../components/Modal.tsx";
 import {
 	supportsPopover,
 	useAnchoredPopover,
@@ -15,6 +16,10 @@ import {
 	type FlowRangePresetId,
 } from "../../domain/flowWindow.ts";
 import { dateLabel, isoDate, todayIso, utcDate } from "../../domain/format.ts";
+import {
+	useMediaQuery,
+	viewportQueries,
+} from "../../state/useMediaQuery.ts";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -150,6 +155,7 @@ export function FlowDateRangePicker({
 	const [awaitingSecond, setAwaitingSecond] = useState(false);
 	const [leftMonth, setLeftMonth] = useState(() => monthOf(startDate));
 	const [rightMonth, setRightMonth] = useState(() => monthOf(endDate));
+	const compact = useMediaQuery(viewportQueries.belowSm);
 
 	const today = todayIso();
 	const matched = matchFlowPreset({ startDate, endDate }, today);
@@ -239,6 +245,66 @@ export function FlowDateRangePicker({
 		closeToTrigger();
 	};
 
+	const panel = (
+		<>
+			<div className="flex gap-4 max-sm:flex-col">
+				<div
+					role="group"
+					aria-label="Date range presets"
+					className="flex w-36 flex-none flex-col gap-1 max-sm:w-auto max-sm:flex-row max-sm:flex-wrap"
+				>
+					{FLOW_RANGE_PRESETS.map((preset) => (
+						<button
+							key={preset.id}
+							type="button"
+							aria-pressed={draftMatched === preset.id}
+							onClick={() => choosePreset(preset.id)}
+							className={segmentedPillStyles}
+						>
+							{preset.label}
+						</button>
+					))}
+				</div>
+				<div className="flex min-w-0 flex-1 gap-4 max-sm:flex-col">
+					<MonthCalendar
+						year={leftMonth.year}
+						monthIndex={leftMonth.month}
+						draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
+						draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
+						onPrev={() => setLeftMonth((value) => shiftMonth(value, -1))}
+						onNext={() => setLeftMonth((value) => shiftMonth(value, 1))}
+						onDay={clickDay}
+					/>
+					<MonthCalendar
+						year={rightMonth.year}
+						monthIndex={rightMonth.month}
+						draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
+						draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
+						onPrev={() => setRightMonth((value) => shiftMonth(value, -1))}
+						onNext={() => setRightMonth((value) => shiftMonth(value, 1))}
+						onDay={clickDay}
+					/>
+				</div>
+			</div>
+			<div className="mt-4 flex justify-end gap-2">
+				<button
+					type="button"
+					onClick={closeToTrigger}
+					className={buttonStyles({ variant: "secondary", size: "sm" })}
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					onClick={applyDraft}
+					className={buttonStyles({ variant: "primary", size: "sm" })}
+				>
+					Apply
+				</button>
+			</div>
+		</>
+	);
+
 	return (
 		<div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
 			<span id={captionId} className="text-xs text-muted">
@@ -252,7 +318,7 @@ export function FlowDateRangePicker({
 				aria-describedby={captionId}
 				aria-haspopup="dialog"
 				aria-expanded={open}
-				aria-controls={panelId}
+				aria-controls={open && !compact ? panelId : undefined}
 				onClick={() => (open ? closeToTrigger() : openPanel())}
 				className={mergeStyles(
 					controlStyles({ kind: "select" }),
@@ -266,7 +332,12 @@ export function FlowDateRangePicker({
 					className="flex-none text-muted"
 				/>
 			</button>
-			{open && (
+			{open && compact && (
+				<Modal title="Choose date range" onClose={closeToTrigger}>
+					{panel}
+				</Modal>
+			)}
+			{open && !compact && (
 				<div
 					ref={popoverRef}
 					id={panelId}
@@ -281,61 +352,7 @@ export function FlowDateRangePicker({
 					}}
 					className="m-0 z-(--z-menu) rounded-surface border border-solid border-line bg-surface p-4 shadow-overlay"
 				>
-					<div className="flex gap-4 max-sm:flex-col">
-						<div
-							role="group"
-							aria-label="Date range presets"
-							className="flex w-36 flex-none flex-col gap-1 max-sm:w-auto max-sm:flex-row max-sm:flex-wrap"
-						>
-							{FLOW_RANGE_PRESETS.map((preset) => (
-								<button
-									key={preset.id}
-									type="button"
-									aria-pressed={draftMatched === preset.id}
-									onClick={() => choosePreset(preset.id)}
-									className={segmentedPillStyles}
-								>
-									{preset.label}
-								</button>
-							))}
-						</div>
-						<div className="flex min-w-0 flex-1 gap-4 max-sm:flex-col">
-							<MonthCalendar
-								year={leftMonth.year}
-								monthIndex={leftMonth.month}
-								draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
-								draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
-								onPrev={() => setLeftMonth((value) => shiftMonth(value, -1))}
-								onNext={() => setLeftMonth((value) => shiftMonth(value, 1))}
-								onDay={clickDay}
-							/>
-							<MonthCalendar
-								year={rightMonth.year}
-								monthIndex={rightMonth.month}
-								draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
-								draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
-								onPrev={() => setRightMonth((value) => shiftMonth(value, -1))}
-								onNext={() => setRightMonth((value) => shiftMonth(value, 1))}
-								onDay={clickDay}
-							/>
-						</div>
-					</div>
-					<div className="mt-4 flex justify-end gap-2">
-						<button
-							type="button"
-							onClick={closeToTrigger}
-							className={buttonStyles({ variant: "secondary", size: "sm" })}
-						>
-							Cancel
-						</button>
-						<button
-							type="button"
-							onClick={applyDraft}
-							className={buttonStyles({ variant: "primary", size: "sm" })}
-						>
-							Apply
-						</button>
-					</div>
+					{panel}
 				</div>
 			)}
 		</div>
