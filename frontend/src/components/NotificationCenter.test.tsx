@@ -36,9 +36,8 @@ it("runs a toast action and dismisses through the close control", async () => {
 		{ waitForTextGone: "Delete failed." },
 	]);
 	expect(onAction).toHaveBeenCalledOnce();
-	// Transitional dual render: the same notify mirrors into a Sonner toast,
-	// so the legacy dismiss path and Sonner's own dismiss both invoke the
-	// callback. Must return to exactly-once when the legacy stack is removed.
+	// The helper renders exactly one card: the callback fires once for the
+	// single dismiss path.
 	expect(onDismiss).toHaveBeenCalled();
 });
 

@@ -46,7 +46,7 @@ export function SafeSpendingDetailShell({
 			<SheetContent
 				side="right"
 				aria-label={title}
-				className="overflow-y-auto sm:max-w-3xl"
+				className="overflow-y-auto max-sm:data-[side=right]:w-full max-sm:data-[side=right]:max-w-full sm:max-w-3xl"
 			>
 				<SheetHeader className="border-b-0 p-4 pb-2">
 					{range && (
@@ -68,6 +68,7 @@ export function SafeSpendingDetailShell({
 				<TabsList
 					variant="line"
 					aria-label="SafeSpending detail view"
+					activateOnFocus
 					className="mb-4 flex w-full gap-6 overflow-x-auto border-0 border-b border-solid border-line p-0 max-sm:gap-5"
 				>
 					{SAFE_SPENDING_DETAIL_TABS.map((item) => (

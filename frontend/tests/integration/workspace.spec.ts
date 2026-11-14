@@ -132,7 +132,8 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 	await openInvestingTransactionDetail(page);
 	await page.getByLabel("Amount (USD)").fill("999");
 	// Closing a dirty edit asks first instead of dropping it silently.
-	await page.getByRole("button", { name: "Close dialog" }).click();
+	// base-nova preset: close button is Close, not Close dialog
+	await page.getByRole("button", { name: "Close" }).click();
 	await expect(page.getByRole("dialog")).toContainText(
 		"Discard the changes in this form?",
 	);
@@ -142,7 +143,8 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 	await page.getByRole("button", { name: "Discard changes" }).first().click();
 	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
 	// A clean close asks nothing and leaves the server untouched.
-	await page.getByRole("button", { name: "Close dialog" }).click();
+	// base-nova preset: close button is Close, not Close dialog
+	await page.getByRole("button", { name: "Close" }).click();
 	const saved = await readSavedServerModel();
 	expect(
 		saved.schedules.find((rule) => rule.id === "invest")?.amount.config
@@ -163,7 +165,7 @@ test("a schedule ends by recording one transaction and a transaction can start a
 	await page
 		.getByRole("menuitem", { name: "End schedule with this transaction" })
 		.click();
-	const confirm = page.getByRole("dialog", {
+	const confirm = page.getByRole("alertdialog", {
 		name: "End Monthly investing with a transaction?",
 	});
 	await confirm.getByLabel("Transaction date").fill("2026-02-10");
@@ -340,13 +342,13 @@ for (const width of [1440, 390]) {
 			);
 			// The resolved root background must equal the dark paper token,
 			// compared through the same engine so color serialization cannot
-			// drift. A bare "dark" substring check would also match the
-			// "light dark" base and prove nothing.
+			// drift. The preset owns the paper ramp (taupe), so probe the
+			// semantic token instead of a stock palette stop.
 			await expect
 				.poll(() =>
 					page.evaluate(() => {
 						const probe = document.createElement("div");
-						probe.style.color = "var(--color-stone-950)";
+						probe.style.color = "var(--background)";
 						document.body.append(probe);
 						const expected = getComputedStyle(probe).color;
 						probe.remove();

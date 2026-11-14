@@ -139,7 +139,9 @@ test("account names in the model open incoming transfers with the correct other 
 	);
 	await page
 		.getByRole("dialog", { name: "Retirement contribution" })
-		.getByRole("button", { name: "Close dialog" })
+		// Base-nova preset: the sheet close control is named "Close" (the
+		// unit suite was renamed the same way); it is not "Close dialog".
+		.getByRole("button", { name: "Close" })
 		.click();
 	await expect(
 		page.getByRole("region", { name: "Account details" }),
@@ -517,19 +519,27 @@ test("category is a field row with an icon picker and bank provenance", async ({
 	const dialog = await openChecking(page);
 	await dialog.getByRole("button", { name: /View WHOLE FOODS MARKET/ }).click();
 	const detail = page.getByRole("dialog", { name: "WHOLE FOODS MARKET" });
-	const bankCategory = detail.getByRole("button", {
+	// Base-nova preset: the category field is a Select combobox (not the old
+	// OptionPicker button), and its popup listbox carries no accessible name.
+	const bankCategory = detail.getByRole("combobox", {
 		name: "Category Food & drink From your bank",
 	});
 	await expect(bankCategory).toBeVisible();
 	await bankCategory.click();
-	const menu = page.getByRole("listbox", { name: "Category" });
+	const menu = page.getByRole("listbox");
 	await expect(menu).toBeVisible();
 	await menu.getByRole("option", { name: "Medical" }).click();
-	const userCategory = detail.getByRole("button", {
+	const userCategory = detail.getByRole("combobox", {
 		name: "Category Medical Set by you",
 	});
 	await expect(userCategory).toBeVisible();
 	await userCategory.click();
+	// Dismiss the popup without choosing: Escape closes only the topmost
+	// Base UI layer, so the detail sheet stays open and the reset row below
+	// the popup becomes clickable again.
+	await expect(page.getByRole("listbox")).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page.getByRole("listbox")).toBeHidden();
 	await detail.getByRole("button", { name: "Use automatic" }).click();
 	await expect(bankCategory).toBeVisible();
 });

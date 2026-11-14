@@ -30,6 +30,11 @@
 	}
 	button {
 		cursor: pointer;
+		/* Tailwind preflight is not in the split-layer manifest (theme plus
+		   utilities only), so restore its transparent button face here.
+		   Without it the UA ButtonFace (#6b6b6b in dark color-scheme)
+		   shows through the link/ghost variants and fails contrast. */
+		background-color: transparent;
 	}
 	button,
 	a {

@@ -6,6 +6,8 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the table.
+      tabIndex={0}
     >
       <table
         data-slot="table"

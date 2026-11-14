@@ -37,6 +37,11 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
   )
 }
 
+function usePopupInitialFocus() {
+  const popupRef = React.useRef<HTMLDivElement | null>(null);
+  return popupRef;
+}
+
 function SheetContent({
   className,
   children,
@@ -47,10 +52,13 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const popupRef = usePopupInitialFocus();
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Popup
+        ref={popupRef}
+        initialFocus={popupRef}
         data-slot="sheet-content"
         data-side={side}
         className={cn(
@@ -71,7 +79,7 @@ function SheetContent({
               />
             }
           >
-            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden="true" />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>
         )}

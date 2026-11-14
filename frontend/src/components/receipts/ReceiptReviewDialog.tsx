@@ -84,7 +84,7 @@ export function ReceiptReviewDialog({
 					if (!open) onClose();
 				}}
 			>
-				<DialogContent className="sm:max-w-3xl">
+				<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
 					<DialogHeader>
 						<DialogTitle>Receipt details</DialogTitle>
 					</DialogHeader>
@@ -196,7 +196,7 @@ function ReceiptEditor({
 				onClose();
 			}}
 		>
-			<DialogContent className="sm:max-w-3xl">
+			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Receipt details</DialogTitle>
 				</DialogHeader>

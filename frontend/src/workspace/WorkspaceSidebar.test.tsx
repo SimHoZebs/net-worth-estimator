@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "sonner";
+import { notifyError } from "../state/notifications.ts";
 import type { ServerStatus } from "../api/index.ts";
 import { SessionContext, type Session } from "../auth/sessionContext.ts";
 import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
@@ -13,9 +13,10 @@ import { resetServerQueryCache } from "../state/serverQuery.ts";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
 
-vi.mock("sonner", () => ({
-	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
-	Toaster: () => null,
+vi.mock("../state/notifications.ts", () => ({
+	notifyError: vi.fn(),
+	notifySuccess: vi.fn(),
+	dismissKey: vi.fn(),
 }));
 
 const baseStatus: ServerStatus = {
@@ -133,21 +134,19 @@ describe("sidebar sync signals", () => {
 		});
 		const view = await renderSidebar();
 		fireEvent.click(view.getByRole("button", { name: /sync stale/i }));
-		expect(toast.error).toHaveBeenCalledWith(
+		expect(notifyError).toHaveBeenCalledWith(
+			"sync-stale",
 			"Bank sync is stale.",
-			expect.objectContaining({
-				id: "sync-stale",
-				action: expect.objectContaining({ label: "Open bank sync" }),
-			}),
+			expect.objectContaining({ label: "Open bank sync" }),
 		);
 		const action = (
-			vi.mocked(toast.error).mock.calls.at(-1)?.[1] as unknown as {
-				action?: { label: string; onClick: () => void };
+			vi.mocked(notifyError).mock.calls.at(-1)?.[2] as unknown as {
+				onAction?: () => void;
 			}
-		)?.action;
-		expect(action?.label).toBe("Open bank sync");
+		)?.onAction;
+		expect(action).toBeTypeOf("function");
 		await act(async () => {
-			action?.onClick();
+			action?.();
 		});
 		await waitFor(() =>
 			expect(view.router.state.location.pathname).toBe("/sources"),

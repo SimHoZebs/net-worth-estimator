@@ -48,7 +48,7 @@ export function FinancialIndependenceModal({
 				if (!open) onClose();
 			}}
 		>
-			<SheetContent side="right" className="overflow-y-auto sm:max-w-3xl">
+			<SheetContent side="right" className="overflow-y-auto data-[side=right]:w-full sm:max-w-3xl">
 				<SheetHeader className="border-b-0 p-4 pb-2">
 					<SheetTitle>{item.name}</SheetTitle>
 					<SheetDescription className="sr-only">
@@ -63,6 +63,7 @@ export function FinancialIndependenceModal({
 						<TabsList
 							variant="line"
 							aria-label="Financial independence detail view"
+							activateOnFocus
 							className={cn(
 								"mb-6 flex w-full gap-6 overflow-x-auto border-0 border-b border-solid border-line p-0 max-sm:gap-5",
 							)}
@@ -86,34 +87,31 @@ export function FinancialIndependenceModal({
 								Configure
 							</TabsTrigger>
 						</TabsList>
-						{tab === "overview" ? (
-							<TabsContent value="overview">
-								<div className="grid content-start gap-6">
-									<IndependenceOverview
-										analysis={analysis}
-										range={range}
+						<TabsContent value="overview">
+							<div className="grid content-start gap-6">
+								<IndependenceOverview
+									analysis={analysis}
+									range={range}
+									candidate={candidate}
+								/>
+								{candidate && (
+									<IndependenceEvidence
 										candidate={candidate}
+										analysis={analysis}
 									/>
-									{candidate && (
-										<IndependenceEvidence
-											candidate={candidate}
-											analysis={analysis}
-										/>
-									)}
-									<IndependenceDataTable analysis={analysis} />
-								</div>
-							</TabsContent>
-						) : (
-							<TabsContent value="configure">
-								<div className="grid content-start gap-3">
-									<p className="m-0 text-xs text-muted">
-										Minimum net worth, spending test duration, and funding
-										sources. Saving recalculates the projection.
-									</p>
-									<IndependenceConfigure instanceId={item.id} />
-								</div>
-							</TabsContent>
-						)}
+								)}
+								<IndependenceDataTable analysis={analysis} />
+							</div>
+						</TabsContent>
+						<TabsContent value="configure">
+							<div className="grid content-start gap-3">
+								<p className="m-0 text-xs text-muted">
+									Minimum net worth, spending test duration, and funding
+									sources. Saving recalculates the projection.
+								</p>
+								<IndependenceConfigure instanceId={item.id} />
+							</div>
+						</TabsContent>
 					</Tabs>
 					{!!analysis.diagnostics.length && (
 						<details

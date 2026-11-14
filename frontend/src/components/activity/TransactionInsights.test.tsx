@@ -421,9 +421,9 @@ describe("TransactionInsightsPanel", () => {
 			/>,
 		);
 		const postedAsUser = userEvent.setup();
-		await postedAsUser.click(screen.getByRole("combobox", { name: "Posted as" }));
-		await postedAsUser.click(
-			await screen.findByRole("option", { name: /Bistro lunch/ }),
+		await postedAsUser.selectOptions(
+			screen.getByLabelText("Posted as"),
+			second.transactionId,
 		);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Merge and remove hold" }),

@@ -93,6 +93,7 @@ import {
 } from "./transactionDetailStyles.ts";
 import { DetailEditActions, DiscardConfirm } from "./DetailEditActions.tsx";
 import { cn } from "@/lib/utils.ts";
+import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
 	amendSchedule,
 	amendTransaction,
@@ -151,7 +152,7 @@ type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 const EMPTY_SETTLE_CANDIDATES: SettleCandidateRow[] = [];
 
 const detailSheetBaseStyles =
-	"m-0 ml-auto h-dvh max-h-dvh w-full rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t";
+	"m-0 ml-auto h-dvh max-h-dvh w-full rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full! max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t";
 
 /**
  * The detail opens above drawers that portal to document.body. Rendering the
@@ -1338,7 +1339,7 @@ export function TransactionDetail({
 		document.getElementById(id)?.scrollIntoView({ block: "start" });
 	};
 	const editHeading = (
-		<span className="flex items-center gap-3">
+		<span className="flex min-w-0 items-center gap-3">
 			<span className="sr-only">{edit.draft.name}</span>
 			<span
 				className={transactionIconStyles({
@@ -1440,19 +1441,28 @@ export function TransactionDetail({
 	}
 	return (
 		<DetailPortal>
+			{/* Modeless without pointer dismissal: the native dialog this
+				replaces never aria-hid the background, so the account list
+				behind the detail stays in the accessibility tree and list
+				assertions keep working while the detail is open. Pointer
+				dismissal stays off so menu and confirm portals never close
+				the sheet underneath (that double-fired onClose). Escape
+				and the close control still run the touched-edit guard. */}
 			<Sheet
 				open
+				modal={false}
+				disablePointerDismissal
 				onOpenChange={(open) => {
 					if (!open && edit.requestClose()) onClose();
 				}}
 			>
 				<SheetContent
 					side="right"
-					className={`${detailSheetBaseStyles} max-w-xl`}
+					className={`${detailSheetBaseStyles} max-w-xl sm:max-w-xl!`}
 				>
 					<SheetHeader className="border-b-0 p-4 pb-0">
-						<div className="flex items-start justify-between gap-2 pr-8">
-							<SheetTitle>{editHeading}</SheetTitle>
+						<div className="flex min-w-0 items-start justify-between gap-2 pr-8">
+							<SheetTitle className="min-w-0">{editHeading}</SheetTitle>
 							<div className="flex flex-none items-center gap-1">
 								{menuItems.length > 0 && (
 									<DropdownMenu>
@@ -1675,31 +1685,29 @@ export function TransactionDetail({
 										>
 											FROM ACCOUNT
 										</span>
-										<Select
-											disabled={!canEdit}
-											value={edit.draft.fromId ?? ""}
-											onValueChange={(value) =>
-												edit.updateDraft({ fromId: value ?? "" }, "from")
+										<select
+											id={`${edit.formId}-from`}
+											aria-label="From"
+											name="fromId"
+											value={edit.draft.fromId}
+											onChange={(event) =>
+												edit.updateDraft({ fromId: event.target.value }, "from")
 											}
+											disabled={!canEdit}
+											className={cn(
+												transactionControlStyles({
+													element: "select",
+													shape: "account",
+													appearance:
+														edit.activeField === "from" ? "native" : "plain",
+												}),
+											)}
 										>
-											<SelectTrigger
-												id={`${edit.formId}-from`}
-												aria-label="From"
-												className={cn(
-													transactionControlStyles({ shape: "account" }),
-												)}
-											>
-												<SelectValue placeholder="External income" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="">External income</SelectItem>
-												{fromAccountOptions(fullAccounts).map((account) => (
-													<SelectItem key={account.id} value={account.id}>
-														{account.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
+											<option value="">External income</option>
+											<AccountOptions
+												accounts={fromAccountOptions(fullAccounts)}
+											/>
+										</select>
 									</div>
 								</div>
 								<div
@@ -1722,31 +1730,29 @@ export function TransactionDetail({
 										>
 											TO ACCOUNT
 										</span>
-										<Select
-											disabled={!canEdit}
-											value={edit.draft.toId ?? ""}
-											onValueChange={(value) =>
-												edit.updateDraft({ toId: value ?? "" }, "to")
+										<select
+											id={`${edit.formId}-to`}
+											aria-label="To"
+											name="toId"
+											value={edit.draft.toId}
+											onChange={(event) =>
+												edit.updateDraft({ toId: event.target.value }, "to")
 											}
+											disabled={!canEdit}
+											className={cn(
+												transactionControlStyles({
+													element: "select",
+													shape: "account",
+													appearance:
+														edit.activeField === "to" ? "native" : "plain",
+												}),
+											)}
 										>
-											<SelectTrigger
-												id={`${edit.formId}-to`}
-												aria-label="To"
-												className={cn(
-													transactionControlStyles({ shape: "account" }),
-												)}
-											>
-												<SelectValue placeholder="External spending" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="">External spending</SelectItem>
-												{visibleAccounts(fullAccounts).map((account) => (
-													<SelectItem key={account.id} value={account.id}>
-														{account.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
+											<option value="">External spending</option>
+											<AccountOptions
+												accounts={visibleAccounts(fullAccounts)}
+											/>
+										</select>
 									</div>
 								</div>
 							</div>

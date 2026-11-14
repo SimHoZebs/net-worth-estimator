@@ -63,10 +63,10 @@ function ToastCard({ toast }: { toast: Toast }) {
  * top-layer promotion, no browser geometry to override the corner. An open
  * native dialog covers it; errors that gate a dialog stay inline inside it.
  *
- * Sonner owns new toasts (see state/notifications.ts: legacy helpers mirror
- * into `toast.*`, new code calls it directly). The legacy stack below stays
- * until every notification reader migrates; until then one
- * legacy call renders twice (card plus Sonner toast) during the transition.
+ * The Sonner toaster beside it serves callers that use `toast.*` directly
+ * (transient confirmations without a legacy card). The helpers in
+ * state/notifications.ts render only through the stack below, so each
+ * helper call produces exactly one toast with its alert/status role.
  */
 export function NotificationCenter() {
 	const items = useNotifications((state) => state.items);

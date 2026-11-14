@@ -2,12 +2,9 @@ import { useId } from "react";
 import type { FlowGraph } from "../../api/flows.ts";
 import { FLOW_NODE_ID_EXTERNAL } from "../../api/flows.ts";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select.tsx";
+	NativeSelect,
+	NativeSelectOption,
+} from "@/components/ui/native-select.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import type { MovementFilter } from "../../domain/flowDiagram.ts";
@@ -55,28 +52,25 @@ export function FlowFilters({
 					>
 						Account
 					</Label>
-					<Select
+					<NativeSelect
+						id={`${id}-account`}
+						aria-label="Account"
 						value={filters.accountId ?? "all"}
-						onValueChange={(value) =>
-							onChange({ accountId: value === "all" ? null : value })
+						onChange={(event) =>
+							onChange({
+								accountId:
+									event.target.value === "all" ? null : event.target.value,
+							})
 						}
+						className="w-full"
 					>
-						<SelectTrigger
-							id={`${id}-account`}
-							aria-label="Account"
-							className={cn("w-full")}
-						>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All accounts</SelectItem>
-							{accounts.map((account) => (
-								<SelectItem key={account.id} value={account.id}>
-									{account.name}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
+						<NativeSelectOption value="all">All accounts</NativeSelectOption>
+						{accounts.map((account) => (
+							<NativeSelectOption key={account.id} value={account.id}>
+								{account.name}
+							</NativeSelectOption>
+						))}
+					</NativeSelect>
 				</div>
 				<div className="flex flex-col gap-1">
 					<span id={`${id}-movement`} className="text-xs text-muted">

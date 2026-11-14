@@ -181,6 +181,12 @@ test("compact financial independence cards open an inspector without more calcul
 		.getByRole("button", { name: "Pin Financial independence to Outlook" })
 		.click();
 	await page.getByRole("link", { name: "Outlook", exact: true }).click();
+	// Route chunks load asynchronously: the previous page stays mounted
+	// until Outlook arrives, so wait for its heading before touching the
+	// pinned card instead of acting on the stale evaluations card.
+	await expect(
+		page.getByRole("heading", { name: "Your financial outlook" }),
+	).toBeVisible();
 	await expect(card.getByRole("slider")).toHaveCount(0);
 	await expect(
 		card.getByRole("button", {
@@ -195,7 +201,8 @@ test("compact financial independence cards open an inspector without more calcul
 	await expect(spendingBar).toBeVisible();
 	await expect(dialog.getByRole("slider")).toHaveCount(0);
 	await expect(dialog.getByRole("combobox")).toHaveCount(0);
-	await dialog.getByRole("button", { name: "Close dialog" }).click();
+	// base-nova preset: close button is Close, not Close dialog
+	await dialog.getByRole("button", { name: "Close" }).click();
 	await expect(dialog).not.toBeVisible();
 	const pins = await request.get(`${FIXTURE_API}/v1/pinned-evaluations`);
 	expect((await pins.json()).instanceIds).toContain(id);
@@ -214,7 +221,8 @@ test("a complete test that cannot fit the horizon does not appear as financial f
 	await expect(card.getByText("More horizon needed")).toBeVisible();
 	await expect(
 		card.getByRole("progressbar", { name: "Available projection horizon" }),
-	).toHaveAttribute("value", "67");
+		// base-nova preset: ui/progress renders div[aria-valuenow], not native progress[value] (unit asserts aria-valuenow).
+	).toHaveAttribute("aria-valuenow", "67");
 	await expect(card.getByRole("slider")).toHaveCount(0);
 	await expect(card.getByRole("button", { name: /failed/ })).toHaveCount(0);
 	await card
@@ -302,7 +310,10 @@ test("financial independence configuration updates minimum, duration, and fundin
 	await expect(brokerage).toHaveAttribute("aria-pressed", "false");
 	await dialog.getByRole("button", { name: "Save configuration" }).click();
 	// Saving refreshes the result without discarding this inspector's state.
-	await expect(card.getByText("More horizon needed")).toBeVisible({
+	// The open inspector makes the background card inert to role queries,
+	// so read the verdict as page text: it stays visible in the DOM and
+	// appears exactly once while Configure is active.
+	await expect(page.getByText("More horizon needed", { exact: true })).toBeVisible({
 		timeout: 20000,
 	});
 	await expect(dialog).toBeVisible();
@@ -416,7 +427,7 @@ for (const theme of ["light", "dark"]) {
 			expect(modalBox!.width).toBeCloseTo(width, 0);
 			expect(modalBox!.height).toBeCloseTo(844, 0);
 			const expanded = await new AxeBuilder({ page })
-				.include("dialog")
+				.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 				.analyze();
 			expect(expanded.violations).toEqual([]);
 			await expect(
@@ -446,7 +457,7 @@ for (const theme of ["light", "dark"]) {
 				),
 			).toBe(true);
 			const configure = await new AxeBuilder({ page })
-				.include("dialog")
+				.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 				.analyze();
 			expect(configure.violations).toEqual([]);
 			await dialog.getByRole("tab", { name: "Overview" }).click();
@@ -470,7 +481,7 @@ for (const theme of ["light", "dark"]) {
 				),
 			).toBe(true);
 			const overview = await new AxeBuilder({ page })
-				.include("dialog")
+				.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 				.analyze();
 			expect(overview.violations).toEqual([]);
 			await dialog.getByText("Compare start dates", { exact: true }).click();

@@ -22,12 +22,9 @@ import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select.tsx";
+	NativeSelect,
+	NativeSelectOption,
+} from "@/components/ui/native-select.tsx";
 import { cn } from "@/lib/utils.ts";
 import { detailFooterClassName } from "./transactionDetailStyles.ts";
 import {
@@ -454,30 +451,22 @@ export function TransactionInsightsPanel({
 							<FieldLabel htmlFor="suggestedPostedCharge">
 								Posted as
 							</FieldLabel>
-							<Select
+							<NativeSelect
+								id="suggestedPostedCharge"
+								aria-label="Posted as"
 								value={voidCandidateId}
-								onValueChange={(next) => {
-									if (next !== null) setVoidCandidateId(next);
-								}}
+								onChange={(event) => setVoidCandidateId(event.target.value)}
 							>
-								<SelectTrigger
-									id="suggestedPostedCharge"
-									aria-label="Posted as"
-								>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{shown.candidates.map((candidate) => (
-										<SelectItem
-											key={candidate.transactionId}
-											value={candidate.transactionId}
-										>
-											{candidate.name} — {money(candidate.amount)} on{" "}
-											{dateLabel(candidate.date, true)}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+								{shown.candidates.map((candidate) => (
+									<NativeSelectOption
+										key={candidate.transactionId}
+										value={candidate.transactionId}
+									>
+										{candidate.name} — {money(candidate.amount)} on{" "}
+										{dateLabel(candidate.date, true)}
+									</NativeSelectOption>
+								))}
+							</NativeSelect>
 						</Field>
 					)}
 					{movesVoidClaim && shown.voidRow.claimScheduleId && (
@@ -539,20 +528,17 @@ export function TransactionInsightsPanel({
 						</Field>
 						<Field>
 							<FieldLabel htmlFor="plan-unit">Unit</FieldLabel>
-							<Select
+							<NativeSelect
+								id="plan-unit"
+								aria-label="Unit"
 								value={durationUnit}
-								onValueChange={(value) =>
-									setDurationUnit(value as "weeks" | "months")
+								onChange={(event) =>
+									setDurationUnit(event.target.value as "weeks" | "months")
 								}
 							>
-								<SelectTrigger id="plan-unit" aria-label="Unit">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="weeks">Weeks</SelectItem>
-									<SelectItem value="months">Months</SelectItem>
-								</SelectContent>
-							</Select>
+								<NativeSelectOption value="weeks">Weeks</NativeSelectOption>
+								<NativeSelectOption value="months">Months</NativeSelectOption>
+							</NativeSelect>
 						</Field>
 					</div>
 					<p className="m-0 text-xs leading-relaxed text-muted">

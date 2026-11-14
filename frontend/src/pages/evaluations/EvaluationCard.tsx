@@ -3,7 +3,7 @@ import { useId } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
+import { Progress } from "@/components/ui/progress.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
 import { dateLabel, money } from "@/domain/format.ts";
@@ -157,11 +157,8 @@ export function EvaluationCard({
 											Math.round((result.current / evaluation.target) * 100),
 										),
 									)}
-								>
-									<ProgressLabel className="sr-only">
-										{evaluation.name}
-									</ProgressLabel>
-								</Progress>
+									aria-label={evaluation.name}
+								/>
 							</div>
 						)
 					))}

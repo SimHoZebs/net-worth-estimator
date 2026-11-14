@@ -224,7 +224,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		page.getByRole("table", { name: new RegExp(labels.recordedCharges) }),
 	).toContainText("Prior cycle purchase");
 	const accessibility = await new AxeBuilder({ page })
-		.include("dialog")
+		.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 		.analyze();
 	expect(accessibility.violations).toEqual([]);
 	// The inline cycle views stay separate from the drawer lists: the
@@ -589,17 +589,17 @@ for (const theme of ["light", "dark"] as const) {
 			page.getByRole("tab", { name: "Configure", exact: true }),
 		).toBeInViewport();
 		const cycleAccessibility = await new AxeBuilder({ page })
-			.include("dialog")
+			.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 			.analyze();
 		expect(cycleAccessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: /This cycle/ }).click();
 		const currentAccessibility = await new AxeBuilder({ page })
-			.include("dialog")
+			.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 			.analyze();
 		expect(currentAccessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: "Configure", exact: true }).click();
 		const configureAccessibility = await new AxeBuilder({ page })
-			.include("dialog")
+			.include('[role="dialog"]') // base-nova preset: Sheet/Dialog render div[role=dialog], not native <dialog>
 			.analyze();
 		expect(configureAccessibility.violations).toEqual([]);
 	});

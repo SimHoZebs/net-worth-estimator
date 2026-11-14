@@ -1,4 +1,4 @@
-import { ArrowRightLeft, ListFilter, Plus } from "lucide-react";
+import { ArrowRightLeft, ChevronLeft, ChevronRight, ListFilter, Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
 	type AccountTransaction,
@@ -8,20 +8,12 @@ import {
 } from "../../domain/accountActivity.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import {
-	Pagination,
-	PaginationContent,
-	PaginationItem,
-	PaginationNext,
-	PaginationPrevious,
-} from "@/components/ui/pagination.tsx";
 import { useTransactionSelection } from "./useTransactionSelection.ts";
 import {
 	Empty,
 	EmptyContent,
 	EmptyHeader,
 	EmptyMedia,
-	EmptyTitle,
 } from "@/components/ui/empty.tsx";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
@@ -136,9 +128,11 @@ export function Transactions({
 							<ArrowRightLeft size={28} aria-hidden="true" />
 						</span>
 					</EmptyMedia>
-					<EmptyTitle className="text-lg">
+					{/* Real heading: the preset empty title is a plain div,
+					which dropped the heading the account specs assert. */}
+					<h3 className="font-heading text-lg font-medium tracking-tight">
 						No transactions for this account yet
-					</EmptyTitle>
+					</h3>
 				</EmptyHeader>
 				<EmptyContent>
 					<Button
@@ -228,32 +222,34 @@ export function Transactions({
 							{Math.min((currentPage + 1) * PAGE_SIZE, filtered.length)} of{" "}
 							{filtered.length} transactions
 						</span>
-						<Pagination className="mx-0 w-auto">
-							<PaginationContent>
-								<PaginationItem>
-									<PaginationPrevious
-										aria-disabled={currentPage === 0}
-										onClick={(event) => {
-											event.preventDefault();
-											if (currentPage > 0) turnPage(currentPage - 1);
-										}}
-									/>
-								</PaginationItem>
-								<span className="text-xs text-muted tabular-nums">
-									{currentPage + 1} / {pageCount}
-								</span>
-								<PaginationItem>
-									<PaginationNext
-										aria-disabled={currentPage >= pageCount - 1}
-										onClick={(event) => {
-											event.preventDefault();
-											if (currentPage < pageCount - 1)
-												turnPage(currentPage + 1);
-										}}
-									/>
-								</PaginationItem>
-							</PaginationContent>
-						</Pagination>
+						{/* Real buttons with the long-standing pager names: the
+							preset pagination links renamed them and broke the
+							transaction-page contract, stalling filter tests. */}
+						<div className="flex items-center gap-3 max-sm:gap-1">
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label="Previous transaction page"
+								disabled={currentPage === 0}
+								onClick={() => turnPage(currentPage - 1)}
+							>
+								<ChevronLeft size={16} aria-hidden="true" />
+							</Button>
+							<span className="text-xs text-muted tabular-nums">
+								{currentPage + 1} / {pageCount}
+							</span>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label="Next transaction page"
+								disabled={currentPage >= pageCount - 1}
+								onClick={() => turnPage(currentPage + 1)}
+							>
+								<ChevronRight size={16} aria-hidden="true" />
+							</Button>
+						</div>
 					</div>
 					{selected && (
 						<TransactionDetail
@@ -282,9 +278,9 @@ export function Transactions({
 								<ArrowRightLeft size={28} aria-hidden="true" />
 							</span>
 						</EmptyMedia>
-						<EmptyTitle className="text-lg">
+						<h3 className="font-heading text-lg font-medium tracking-tight">
 							No transactions for this account yet
-						</EmptyTitle>
+						</h3>
 					</EmptyHeader>
 					<EmptyContent>
 						<Button
@@ -303,9 +299,9 @@ export function Transactions({
 								<ListFilter size={28} aria-hidden="true" />
 							</span>
 						</EmptyMedia>
-						<EmptyTitle className="text-lg">
+						<h3 className="font-heading text-lg font-medium tracking-tight">
 							No matching transactions
-						</EmptyTitle>
+						</h3>
 					</EmptyHeader>
 					<EmptyContent>
 						<Button type="button" onClick={resetFilters}>

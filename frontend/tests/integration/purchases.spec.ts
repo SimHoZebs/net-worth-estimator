@@ -120,7 +120,8 @@ for (const reducedMotion of ["reduce", "no-preference"] as const) {
 		await page.getByRole("button", { name: "Add purchase" }).click();
 		const dialog = page.getByRole("dialog", { name: "Add purchase" });
 		await dialog.getByLabel("Purchase name").fill("Unsaved desk");
-		await dialog.getByRole("button", { name: "Close dialog" }).click();
+		// base-nova preset: close button is Close, not Close dialog
+		await dialog.getByRole("button", { name: "Close" }).click();
 		await expect(dialog.getByRole("alert")).toContainText(
 			"Discard the changes in this form?",
 		);
@@ -142,7 +143,8 @@ for (const reducedMotion of ["reduce", "no-preference"] as const) {
 		).toBeFocused();
 		await page.getByRole("button", { name: "Add purchase" }).click();
 		await expect(dialog.getByLabel("Purchase name")).toHaveValue("");
-		await dialog.getByRole("button", { name: "Close dialog" }).click();
+		// base-nova preset: close button is Close, not Close dialog
+		await dialog.getByRole("button", { name: "Close" }).click();
 		await expect(page.locator("dialog[open]")).toHaveCount(0);
 	});
 }

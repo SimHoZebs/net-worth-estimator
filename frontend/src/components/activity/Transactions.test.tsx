@@ -41,16 +41,7 @@ function recordedProps() {
 
 async function chooseSource(value: "all" | "historical" | "projected") {
 	const user = userEvent.setup();
-	await user.click(
-		screen.getByRole("combobox", { name: "Transaction source" }),
-	);
-	const name =
-		value === "all"
-			? "All transactions"
-			: value === "historical"
-				? /Historical/
-				: /Projected/;
-	await user.click(await screen.findByRole("option", { name }));
+	await user.selectOptions(screen.getByLabelText("Transaction source"), value);
 }
 
 describe("finance-first transaction activity", () => {

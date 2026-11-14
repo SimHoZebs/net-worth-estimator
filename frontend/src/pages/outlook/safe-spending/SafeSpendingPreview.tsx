@@ -604,7 +604,7 @@ export function SafeSpendingPreview({
 	// projection are absent.
 	if (savedRowsPending || settingsState.pending || pending)
 		return (
-			<Card aria-label="Safe card spending" className="relative">
+			<Card role="region" aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
 					<CardTitle className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
 						<CalendarDays
@@ -629,7 +629,7 @@ export function SafeSpendingPreview({
 		);
 
 	return (
-		<Card aria-label="Safe card spending" className="relative">
+		<Card role="region" aria-label="Safe card spending" className="relative">
 			<div className="flex items-center justify-between gap-4">
 				<CardTitle className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
 					<CalendarDays

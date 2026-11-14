@@ -8,7 +8,7 @@ import {
 	retainSearchParams,
 } from "@tanstack/react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { toast } from "sonner";
+import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { setupQueryScope, teardownQueryScope } from "../mocks/testScope.tsx";
 import { acceptTestResource } from "../mocks/resource.ts";
@@ -23,9 +23,10 @@ import {
 } from "./overlaySearch.ts";
 import { WorkspaceCallbacks } from "./useGmailCallback.ts";
 
-vi.mock("sonner", () => ({
-	toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
-	Toaster: () => null,
+vi.mock("../state/notifications.ts", () => ({
+	notifyError: vi.fn(),
+	notifySuccess: vi.fn(),
+	dismissKey: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -71,9 +72,9 @@ it("consumes a successful callback on Accounts and invalidates inactive caches w
 		"/accounts?editor=account&id=new&returnEvidence=position&gmail=connected",
 	);
 	await waitFor(() =>
-		expect(toast.success).toHaveBeenCalledWith(
+		expect(notifySuccess).toHaveBeenCalledWith(
+			"gmail-callback",
 			"Gmail connected.",
-			expect.objectContaining({ id: "gmail-callback" }),
 		),
 	);
 	await waitFor(() =>
@@ -90,7 +91,7 @@ it("consumes a successful callback on Accounts and invalidates inactive caches w
 	await act(async () => {
 		await router.navigate({ to: "/transactions" });
 	});
-	expect(toast.success).toHaveBeenCalledTimes(1);
+	expect(notifySuccess).toHaveBeenCalledTimes(1);
 });
 
 it("reports a failed callback once and preserves invalid dialog input for its error state", async () => {
@@ -98,28 +99,28 @@ it("reports a failed callback once and preserves invalid dialog input for its er
 		"/accounts?editor=account&id=a&id=b&gmail=error",
 	);
 	await waitFor(() =>
-		expect(toast.error).toHaveBeenCalledWith(
+		expect(notifyError).toHaveBeenCalledWith(
+			"gmail-callback",
 			"Gmail connection failed. Try connecting again.",
-			expect.objectContaining({ id: "gmail-callback" }),
 		),
 	);
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
 	expect(router.state.location.search.id).toEqual(["a", "b"]);
-	expect(toast.error).toHaveBeenCalledTimes(1);
+	expect(notifyError).toHaveBeenCalledTimes(1);
 });
 
 it("retains the callback through navigation during scope verification, then consumes it once", async () => {
 	suspendUserScope();
 	const router = await renderCallback("/accounts?gmail=connected");
-	expect(toast.success).not.toHaveBeenCalled();
+	expect(notifySuccess).not.toHaveBeenCalled();
 	expect(router.state.location.search.gmail).toBe("connected");
 	await act(async () => {
 		await router.navigate({ to: "/transactions" });
 	});
 	expect(router.state.location.search.gmail).toBe("connected");
-	expect(toast.success).not.toHaveBeenCalled();
+	expect(notifySuccess).not.toHaveBeenCalled();
 	await act(async () => {
 		acceptTestResource();
 		serverQueryClient().setQueryData(gmailCredentialKey(), {
@@ -128,16 +129,16 @@ it("retains the callback through navigation during scope verification, then cons
 		serverQueryClient().setQueryData(integrationsKey(), []);
 	});
 	await waitFor(() =>
-		expect(toast.success).toHaveBeenCalledWith(
+		expect(notifySuccess).toHaveBeenCalledWith(
+			"gmail-callback",
 			"Gmail connected.",
-			expect.objectContaining({ id: "gmail-callback" }),
 		),
 	);
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
 	expect(router.state.location.pathname).toBe("/transactions");
-	expect(toast.success).toHaveBeenCalledTimes(1);
+	expect(notifySuccess).toHaveBeenCalledTimes(1);
 	expect(
 		serverQueryClient().getQueryState(gmailCredentialKey())?.isInvalidated,
 	).toBe(true);
@@ -154,7 +155,7 @@ it("retains the callback through navigation during scope verification, then cons
 	await waitFor(() =>
 		expect(router.state.location.search.gmail).toBeUndefined(),
 	);
-	expect(toast.success).not.toHaveBeenCalled();
+	expect(notifySuccess).not.toHaveBeenCalled();
 	expect(
 		serverQueryClient().getQueryState(gmailCredentialKey())?.isInvalidated,
 	).toBe(false);

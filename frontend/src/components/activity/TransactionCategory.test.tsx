@@ -41,7 +41,7 @@ it("keeps the picker closed until the row is pressed", async () => {
 	);
 	expect(screen.queryByRole("listbox")).toBeNull();
 	await user.click(trigger());
-	expect(screen.getByRole("listbox")).toBeTruthy();
+	expect(await screen.findByRole("listbox")).toBeTruthy();
 });
 
 it("renders one row and saves a category chosen from the icon list", async () => {
@@ -57,13 +57,15 @@ it("renders one row and saves a category chosen from the icon list", async () =>
 	expect(trigger().textContent).toContain("Food & drink");
 	expect(screen.getByText("From your bank")).toBeTruthy();
 	await user.click(trigger());
-	expect(screen.getByRole("listbox")).toBeTruthy();
+	expect(await screen.findByRole("listbox")).toBeTruthy();
 	expect(
 		screen
 			.getByRole("option", { name: "Food & drink" })
 			.getAttribute("aria-selected"),
 	).toBe("true");
-	await user.click(screen.getByRole("option", { name: "Medical" }));
+	await user.click(
+		await screen.findByRole("option", { name: "Medical" }),
+	);
 	await waitFor(() => expect(categoryCalls(server)).toHaveLength(1));
 	expect(categoryCalls(server)[0]?.body).toEqual({ category: "MEDICAL" });
 });
@@ -97,7 +99,7 @@ it("shows an unknown server key in the row instead of a blank value", async () =
 	);
 	expect(trigger().textContent).toContain("FUTURE_CATEGORY");
 	await user.click(trigger());
-	expect(screen.getByRole("option", { name: "Medical" })).toBeTruthy();
+	expect(await screen.findByRole("option", { name: "Medical" })).toBeTruthy();
 });
 
 it("stays enabled until app read-only is set", () => {

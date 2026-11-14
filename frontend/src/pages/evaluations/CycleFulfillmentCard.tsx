@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
+import { Progress } from "@/components/ui/progress.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
 
@@ -119,9 +119,8 @@ export function CycleFulfillmentCard({
 								100,
 								Math.max(0, Math.round(item.progress.fraction * 100)),
 							)}
-						>
-							<ProgressLabel className="sr-only">{item.name}</ProgressLabel>
-						</Progress>
+							aria-label={item.name}
+						/>
 					</div>
 				)}
 			</div>

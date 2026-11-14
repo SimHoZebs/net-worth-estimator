@@ -7,13 +7,9 @@ import { Field } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select.tsx";
-import { cn } from "@/lib/utils.ts";
+	NativeSelect,
+	NativeSelectOption,
+} from "@/components/ui/native-select.tsx";
 
 const sources = ["all", "historical", "projected"] as const;
 const directions = ["all", "in", "out", "transfer"] as const;
@@ -67,87 +63,67 @@ export function TransactionFilters({
 					<Label htmlFor={`${id}-source`} className="text-xs text-muted">
 						Activity
 					</Label>
-					<Select
+					<NativeSelect
+						id={`${id}-source`}
+						aria-label="Transaction source"
 						value={filters.source}
-						onValueChange={(value) => {
-							const source = parseUnion(value, sources);
+						onChange={(event) => {
+							const source = parseUnion(event.target.value, sources);
 							if (source) onChange({ source });
 						}}
+						className="w-full"
 					>
-						<SelectTrigger
-							id={`${id}-source`}
-							aria-label="Transaction source"
-							className={cn(
-								"min-h-9 w-full px-2 py-2 text-xs text-success-text max-sm:min-h-11 max-sm:px-2 max-sm:text-base",
-							)}
-						>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All transactions</SelectItem>
-							<SelectItem value="historical">
-								Historical ({recordedCount})
-							</SelectItem>
-							<SelectItem value="projected">
-								Projected ({totalCount - recordedCount})
-							</SelectItem>
-						</SelectContent>
-					</Select>
+						<NativeSelectOption value="all">
+							All transactions
+						</NativeSelectOption>
+						<NativeSelectOption value="historical">
+							Historical ({recordedCount})
+						</NativeSelectOption>
+						<NativeSelectOption value="projected">
+							Projected ({totalCount - recordedCount})
+						</NativeSelectOption>
+					</NativeSelect>
 				</div>
 				<div className="flex flex-col gap-1">
 					<Label htmlFor={`${id}-direction`} className="text-xs text-muted">
 						Direction
 					</Label>
-					<Select
+					<NativeSelect
+						id={`${id}-direction`}
+						aria-label="Transaction direction"
 						value={filters.direction}
-						onValueChange={(value) => {
-							const direction = parseUnion(value, directions);
+						onChange={(event) => {
+							const direction = parseUnion(event.target.value, directions);
 							if (direction) onChange({ direction });
 						}}
+						className="w-full"
 					>
-						<SelectTrigger
-							id={`${id}-direction`}
-							aria-label="Transaction direction"
-							className={cn(
-								"min-h-9 w-full px-2 py-2 text-xs text-success-text max-sm:min-h-11 max-sm:px-2 max-sm:text-base",
-							)}
-						>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All types</SelectItem>
-							<SelectItem value="in">Money in</SelectItem>
-							<SelectItem value="out">Money out</SelectItem>
-							<SelectItem value="transfer">Transfers</SelectItem>
-						</SelectContent>
-					</Select>
+						<NativeSelectOption value="all">All types</NativeSelectOption>
+						<NativeSelectOption value="in">Money in</NativeSelectOption>
+						<NativeSelectOption value="out">Money out</NativeSelectOption>
+						<NativeSelectOption value="transfer">Transfers</NativeSelectOption>
+					</NativeSelect>
 				</div>
 				<div className="flex flex-col gap-1">
 					<Label htmlFor={`${id}-period`} className="text-xs text-muted">
 						Dates
 					</Label>
-					<Select
+					<NativeSelect
+						id={`${id}-period`}
+						aria-label="Transaction dates"
 						value={filters.period}
-						onValueChange={(value) => {
-							const period = parseUnion(value, periods);
+						onChange={(event) => {
+							const period = parseUnion(event.target.value, periods);
 							if (period) onChange({ period });
 						}}
+						className="w-full"
 					>
-						<SelectTrigger
-							id={`${id}-period`}
-							aria-label="Transaction dates"
-							className={cn(
-								"min-h-9 w-full px-2 py-2 text-xs text-success-text max-sm:min-h-11 max-sm:px-2 max-sm:text-base",
-							)}
-						>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All dates</SelectItem>
-							<SelectItem value="30-days">Next 30 days</SelectItem>
-							<SelectItem value="12-months">Next 12 months</SelectItem>
-						</SelectContent>
-					</Select>
+						<NativeSelectOption value="all">All dates</NativeSelectOption>
+						<NativeSelectOption value="30-days">Next 30 days</NativeSelectOption>
+						<NativeSelectOption value="12-months">
+							Next 12 months
+						</NativeSelectOption>
+					</NativeSelect>
 				</div>
 			</div>
 		</>

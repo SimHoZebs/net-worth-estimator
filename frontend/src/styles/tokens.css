@@ -9,6 +9,7 @@
 @layer base {
 	:root {
 		color-scheme: light;
+		background: var(--paper);
 		font-synthesis: none;
 		--font-ui: "Geist Variable", sans-serif;
 		--font-display: "Merriweather Variable", serif;

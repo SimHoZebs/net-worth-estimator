@@ -71,7 +71,10 @@ for (const width of [390, 1440]) {
 		});
 		await expect(receipt.getByText("Loading private image…")).toBeVisible();
 		// Even the 1ms reduced-motion animation can span a browser frame.
-		await receipt.locator(".waypoint-modal-panel").evaluate(async (panel) => {
+		// base-nova preset: the dialog popup is itself the animated panel
+		// (div[role=dialog][data-slot=dialog-content]), not a legacy
+		// .waypoint-modal-panel descendant, so settle it directly.
+		await receipt.evaluate(async (panel) => {
 			await Promise.all(
 				panel.getAnimations().map((animation) => animation.finished),
 			);
@@ -137,7 +140,8 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 		.click();
 	expect((await download).suggestedFilename()).toBe("market.png");
 	await receipt
-		.getByRole("button", { name: "Close dialog", exact: true })
+		// base-nova preset: close button is Close, not Close dialog
+		.getByRole("button", { name: "Close", exact: true })
 		.click();
 	// Dialog closed: the deferred toast is now actually visible.
 	await expect(page.getByText("Receipt details saved.")).toBeVisible();
@@ -192,7 +196,8 @@ test("reopened extraction polls only reads and exposes interrupted recovery", as
 	});
 	await expect(receipt).toBeVisible();
 	await receipt
-		.getByRole("button", { name: "Close dialog", exact: true })
+		// base-nova preset: close button is Close, not Close dialog
+		.getByRole("button", { name: "Close", exact: true })
 		.click();
 	const collection = await (
 		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
@@ -364,7 +369,9 @@ test("unknown images recover through manual review and drafts survive reload", a
 	await receipt
 		.getByRole("button", { name: "Delete receipt", exact: true })
 		.click();
-	const confirm = page.getByRole("dialog", { name: "Delete this receipt?" });
+	const confirm = page.getByRole("alertdialog", {
+		name: "Delete this receipt?",
+	});
 	await confirm
 		.getByRole("button", { name: "Delete receipt", exact: true })
 		.click();
@@ -398,7 +405,7 @@ test("receipt review supports narrow screens, keyboard dismissal, and accessible
 		),
 	).toBe(true);
 	const results = await new AxeBuilder({ page })
-		.include("dialog[open]:last-of-type")
+		.include('[role="dialog"]') // base-nova preset: Dialog renders div[role=dialog] with data-open, not native dialog[open]
 		.analyze();
 	expect(results.violations).toEqual([]);
 	await receipt.getByLabel("Merchant", { exact: true }).fill("Unsaved edit");
@@ -480,7 +487,7 @@ test("image controls replace all receipt content and delete it without changing 
 		mimeType: "image/png",
 		buffer: replacementPixels,
 	});
-	const replace = page.getByRole("dialog", {
+	const replace = page.getByRole("alertdialog", {
 		name: "Replace this receipt?",
 		exact: true,
 	});
@@ -548,7 +555,7 @@ test("image controls replace all receipt content and delete it without changing 
 	await receipt
 		.getByRole("button", { name: "Delete receipt", exact: true })
 		.click();
-	const remove = page.getByRole("dialog", {
+	const remove = page.getByRole("alertdialog", {
 		name: "Delete this receipt?",
 		exact: true,
 	});

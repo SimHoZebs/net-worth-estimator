@@ -10,7 +10,6 @@ import {
 import { Field } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
 import { parseDisplayNumber } from "../../components/editors/formValues.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -236,18 +235,20 @@ export function PlannedPurchaseEditor({
 							The forecast defers this item until its full cost fits, after all
 							established payments. It never buys anything for you.
 						</p>
-						<Label
+						<label
 							className="col-span-full flex cursor-pointer items-center gap-2 text-sm text-muted"
 							htmlFor={includeId}
 						>
-							<Checkbox
+							<input
 								id={includeId}
+								type="checkbox"
 								checked={enabled}
 								disabled={readOnly || saving}
-								onCheckedChange={(checked) => setEnabled(checked === true)}
+								onChange={(event) => setEnabled(event.target.checked)}
+								className="m-0 size-5 flex-none cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
 							/>{" "}
 							Include in purchase queue
-						</Label>
+						</label>
 					</fieldset>
 					{error && (
 						<p
