@@ -58,6 +58,11 @@ export interface SafeSpendingChargeCycle {
 	emptyMessage: string;
 	transactions: AccountTransaction[];
 	showTotal?: boolean;
+	/** Spent total plus per-card breakdown shown above the modal table. */
+	summary?: {
+		total: number | null;
+		byCard: { id: string; name: string; amount: number | null }[];
+	};
 	/** Actual dates whose cumulative card spending crossed each threshold. */
 	thresholds?: {
 		safetyNetDate: string | null;

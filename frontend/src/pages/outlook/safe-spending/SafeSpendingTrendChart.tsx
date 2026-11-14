@@ -19,28 +19,27 @@ function paceLabel(
 	trend: SafeSpendingTrend,
 	historical: boolean,
 ): {
-	text: string;
+	text: string | null;
 	tone: "normal" | "warning" | "danger";
 } {
-	const rate = `${money(trend.averageDaily)} a day`;
 	const limitName = historical ? "historical budget" : "limit";
 	if (trend.limitHit) {
 		return {
 			text: trend.limitHit.projected
-				? `${historical ? "Budget" : "Limit"} ~ ${monthDay(trend.limitHit.date)} · ${rate}`
-				: `Over ${limitName} · ${rate}`,
+				? `${historical ? "Budget" : "Limit"} ~ ${monthDay(trend.limitHit.date)}`
+				: `Over ${limitName}`,
 			tone: "danger",
 		};
 	}
 	if (trend.safetyNetHit) {
 		return {
 			text: trend.safetyNetHit.projected
-				? `Reserve ~ ${monthDay(trend.safetyNetHit.date)} · ${rate}`
-				: `Using reserve · ${rate}`,
+				? `Reserve ~ ${monthDay(trend.safetyNetHit.date)}`
+				: "Using reserve",
 			tone: "warning",
 		};
 	}
-	return { text: rate, tone: "normal" };
+	return { text: null, tone: "normal" };
 }
 
 function legendSwatch(dashed: boolean, tone: string) {
@@ -266,18 +265,20 @@ export function SafeSpendingTrendChart({
 		<div className="grid gap-2">
 			<div className="flex items-center justify-between gap-2">
 				<h3 className="m-0 text-sm text-ink">{labels.spendingPace}</h3>
-				<span
-					className={mergeStyles(
-						"text-xs whitespace-nowrap",
-						pace.tone === "danger"
-							? "text-danger-text"
-							: pace.tone === "warning"
-								? "text-warning-text"
-								: "text-muted",
-					)}
-				>
-					{pace.text}
-				</span>
+				{pace.text !== null && (
+					<span
+						className={mergeStyles(
+							"text-xs whitespace-nowrap",
+							pace.tone === "danger"
+								? "text-danger-text"
+								: pace.tone === "warning"
+									? "text-warning-text"
+									: "text-muted",
+						)}
+					>
+						{pace.text}
+					</span>
+				)}
 			</div>
 			<Chart
 				definition={definition}
@@ -304,14 +305,13 @@ export function SafeSpendingTrendChart({
 				{showThresholds && trend.safetyNet > 0 && (
 					<li className="flex items-center gap-2">
 						{legendSwatch(true, "border-warning-text")}
-						{labels.reserveStarts} {money(trend.safetyNet)}
+						{labels.reserveStarts}
 					</li>
 				)}
 				{showThresholds && trend.limit > 0 && (
 					<li className="flex items-center gap-2">
 						{legendSwatch(true, "border-danger-solid")}
-						{historical ? labels.historicalBudget : labels.spendingLimit}{" "}
-						{money(trend.limit)}
+						{historical ? labels.historicalBudget : labels.spendingLimit}
 					</li>
 				)}
 			</ul>

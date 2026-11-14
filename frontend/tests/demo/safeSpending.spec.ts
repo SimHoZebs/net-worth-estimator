@@ -12,7 +12,7 @@ test("seeded account demo", async ({ page }) => {
 		page.getByRole("heading", { name: "Safe card spending" }),
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
-		await expect(page.getByText("Card spending allowance")).toBeVisible();
+		await expect(page.getByText("Left at end of month")).toBeVisible();
 		await expect(page.getByText("Card spending pace")).toBeVisible();
 		await expect(
 			page.getByRole("separator", { name: "Card spending limit" }),

@@ -511,6 +511,10 @@ export function SafeSpendingPreview({
 				title: labels.cycleSpending,
 				emptyMessage: "No spending this cycle yet.",
 				transactions: spending,
+				summary: {
+					total: currentView.view.heroes.committedTotal,
+					byCard: currentView.view.heroes.committedByCard,
+				},
 				thresholds: {
 					safetyNetDate:
 						currentView.trend.safetyNetHit &&
@@ -523,8 +527,15 @@ export function SafeSpendingPreview({
 							: null,
 				},
 			},
+			"last-cycle": {
+				...chargeCycles["last-cycle"],
+				summary: {
+					total: lastView.view.heroes.committedTotal,
+					byCard: lastView.view.heroes.committedByCard,
+				},
+			},
 		};
-	}, [chargeCycles, directTransactions, transactionOrder, currentView]);
+	}, [chargeCycles, directTransactions, transactionOrder, currentView, lastView]);
 	// Saved rows hydrate after the card header. The header renders
 	// immediately; only the computed body waits for rows, settings,
 	// and the forecast.

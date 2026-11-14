@@ -88,6 +88,25 @@ describe("SafeSpendingCyclePanel", () => {
 		).toBeNull();
 	});
 
+	it("shows the spent summary above the table when present", () => {
+		show({
+			...current,
+			summary: {
+				total: 800,
+				byCard: [
+					{ id: "card", name: "Household card", amount: 600 },
+					{ id: "other", name: "Other card", amount: null },
+				],
+			},
+		});
+		expect(screen.getByText("Spent")).toBeTruthy();
+		expect(screen.getByText("$800")).toBeTruthy();
+		expect(screen.getByText("Household card")).toBeTruthy();
+		expect(screen.getByText("$600")).toBeTruthy();
+		expect(screen.getByText("Other card")).toBeTruthy();
+		expect(screen.getByText("—")).toBeTruthy();
+	});
+
 	const spending: SafeSpendingChargeCycle = {
 		...current,
 		transactions: [

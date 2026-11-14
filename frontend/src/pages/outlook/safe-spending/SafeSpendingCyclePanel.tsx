@@ -2,7 +2,9 @@ import { TransactionDetail } from "../../../components/activity/TransactionDetai
 import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import { useMemo } from "react";
+import { money } from "../../../domain/format.ts";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
+import { householdValueStyles } from "./householdStyles.ts";
 import {
 	TransactionSectionView,
 	SafeSpendingSectionHeader,
@@ -58,6 +60,27 @@ export function SafeSpendingCyclePanel({
 	}, [cycle.thresholds]);
 	return (
 		<div className="grid content-start gap-4">
+			{cycle.summary && (
+				<div className="grid gap-1">
+					<div className="flex items-center justify-between gap-3">
+						<span className="text-sm text-muted">Spent</span>
+						<strong className={householdValueStyles({ size: "base" })}>
+							{cycle.summary.total === null ? "—" : money(cycle.summary.total)}
+						</strong>
+					</div>
+					{cycle.summary.byCard.map((card) => (
+						<div
+							key={card.id}
+							className="flex items-center justify-between gap-3 text-sm"
+						>
+							<span className="text-muted">{card.name}</span>
+							<span className="font-semibold text-ink">
+								{card.amount === null ? "—" : money(card.amount)}
+							</span>
+						</div>
+					))}
+				</div>
+			)}
 			<SafeSpendingSectionHeader
 				title={cycle.title}
 				total={

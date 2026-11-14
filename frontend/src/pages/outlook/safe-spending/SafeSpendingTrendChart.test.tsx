@@ -40,15 +40,36 @@ describe("SafeSpendingTrendChart", () => {
 		expect(
 			screen.getByRole("heading", { name: "Card spending pace" }),
 		).toBeTruthy();
-		expect(screen.getByText("Limit ~ Jan 28 · $50 a day")).toBeTruthy();
+		expect(screen.getByText("Limit ~ Jan 28")).toBeTruthy();
 		expect(screen.getByText("Spending so far")).toBeTruthy();
 		expect(screen.getByText("Projected at average rate")).toBeTruthy();
-		expect(screen.getByText("Protected reserve starts $300")).toBeTruthy();
-		expect(screen.getByText("Card spending limit $400")).toBeTruthy();
+		expect(screen.getByText("Protected reserve starts")).toBeTruthy();
+		expect(screen.getByText("Card spending limit")).toBeTruthy();
 		const chart = screen.getByRole("img", { name: "Card spending pace" });
 		expect(chart.querySelector("desc")?.textContent).toContain(
 			"limit is reached around Jan 28, 2026",
 		);
+	});
+
+	it("renders no badge when no threshold is hit", () => {
+		const trend = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-02-19",
+			todayIso: "2026-01-21",
+			limit: 4000,
+			safetyNet: 3000,
+		});
+		render(<SafeSpendingTrendChart trend={trend} />);
+		expect(
+			screen.getByRole("heading", { name: "Card spending pace" }),
+		).toBeTruthy();
+		expect(screen.queryByText("$50 a day")).toBeNull();
+		expect(
+			screen
+				.getByRole("img", { name: "Card spending pace" })
+				.querySelector("desc")?.textContent,
+		).toContain("The average rate is $50 a day.");
 	});
 
 	it("labels a limit crossing that already happened", () => {
@@ -61,7 +82,7 @@ describe("SafeSpendingTrendChart", () => {
 			safetyNet: 300,
 		});
 		render(<SafeSpendingTrendChart trend={trend} />);
-		expect(screen.getByText("Over limit · $167 a day")).toBeTruthy();
+		expect(screen.getByText("Over limit")).toBeTruthy();
 		expect(
 			screen
 				.getByRole("img", { name: "Card spending pace" })
@@ -79,10 +100,10 @@ describe("SafeSpendingTrendChart", () => {
 			safetyNet: 300,
 		});
 		render(<SafeSpendingTrendChart trend={trend} historical />);
-		expect(screen.getByText("Over historical budget · $16 a day")).toBeTruthy();
+		expect(screen.getByText("Over historical budget")).toBeTruthy();
 		expect(screen.getByText("Spending so far")).toBeTruthy();
-		expect(screen.getByText("Historical budget $400")).toBeTruthy();
-		expect(screen.getByText("Protected reserve starts $300")).toBeTruthy();
+		expect(screen.getByText("Historical budget")).toBeTruthy();
+		expect(screen.getByText("Protected reserve starts")).toBeTruthy();
 		const description = screen
 			.getByRole("img", { name: "Card spending pace" })
 			.querySelector("desc")?.textContent;

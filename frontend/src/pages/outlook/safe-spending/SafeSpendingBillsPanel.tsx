@@ -1,10 +1,5 @@
 import {
-	Clock3,
-	CreditCard,
-	Landmark,
 	ShieldCheck,
-	ShoppingBag,
-	Wallet,
 } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
 import { Skeleton } from "../../../components/Skeleton.tsx";
@@ -30,6 +25,7 @@ import type {
 	StatementFunding,
 } from "./safeSpendingDetailModel.ts";
 import { bundleDatesText } from "./safeSpendingDetailModel.ts";
+import { describeAllowance } from "./allowanceView.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 const SafeSpendingTrendChart = lazy(() =>
 	import("./SafeSpendingTrendChart.tsx").then((module) => ({
@@ -38,44 +34,88 @@ const SafeSpendingTrendChart = lazy(() =>
 );
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
 import {
-	householdPanelStyles,
 	householdValueStyles,
 	type HouseholdValueStyleProps,
 } from "./householdStyles.ts";
 
-function HouseholdMetricCard({
+/**
+ * One compact decision row: plain label on the left, base-size value on
+ * the right, with an optional meter and qualifier underneath.
+ */
+function StatRow({
 	label,
 	value,
-	icon,
-	foot,
 	tone = "normal",
+	testId,
+	meter,
+	qualifier,
 }: {
 	label: string;
 	value: string;
-	icon: React.ReactNode;
-	foot?: string;
 	tone?: HouseholdValueStyleProps["tone"];
+	testId: string;
+	meter?: React.ReactNode;
+	qualifier?: string;
 }) {
 	return (
-		<section
-			aria-label={label}
-			className={householdPanelStyles({
-				density: "compact",
-				className: "min-h-28",
-			})}
+		<div className="grid min-w-0 gap-1">
+			<div className="flex items-center justify-between gap-3">
+				<span className="text-sm text-muted">{label}</span>
+				<strong
+					data-testid={testId}
+					className={householdValueStyles({ size: "base", tone }) + " whitespace-nowrap"}
+				>
+					{value}
+				</strong>
+			</div>
+			{meter}
+			{qualifier && <p className="m-0 text-xs text-muted">{qualifier}</p>}
+		</div>
+	);
+}
+
+/**
+ * Where card spending stands against the hard cap: spent fills from zero
+ * and the protected reserve reads as a band at the top of the scale.
+ * SegmentedBar cannot draw positional zones, so this is a tiny custom
+ * bar on the same surface and warning tokens.
+ */
+function ReserveMeter({
+	spent,
+	limit,
+	reserve,
+	limitWord,
+}: {
+	spent: number;
+	limit: number;
+	reserve: number;
+	limitWord: string;
+}) {
+	const scale = Math.max(limit, spent);
+	const zoneStart = Math.max(0, limit - reserve);
+	return (
+		<div
+			role="img"
+			aria-label={`Spent ${money(spent)} of ${money(limit)} ${limitWord}`}
+			className="relative h-1.5 overflow-hidden rounded-full bg-surface-3"
 		>
-			<div className="flex items-center gap-2 text-xs text-muted">
-				{icon}
-				{label}
-			</div>
-			<div
-				data-testid="metric-value"
-				className={householdValueStyles({ size: "metric", tone })}
-			>
-				{value}
-			</div>
-			{foot && <div className="text-xs text-muted">{foot}</div>}
-		</section>
+			<span
+				aria-hidden="true"
+				data-pattern="dots"
+				className="absolute inset-y-0 bg-warning-bg"
+				style={{
+					left: `${(zoneStart / scale) * 100}%`,
+					width: `${((limit - zoneStart) / scale) * 100}%`,
+				}}
+			/>
+			<span
+				aria-hidden="true"
+				className="absolute inset-y-0 left-0 bg-primary"
+				style={{
+					width: `${Math.min(100, Math.max(0, (spent / scale) * 100))}%`,
+				}}
+			/>
+		</div>
 	);
 }
 
@@ -119,113 +159,115 @@ export function SafeSpendingBillsPanel({
 		section.transactions,
 		savedById,
 	);
-	const dayUnit = heroes.fullDaysLeft === 1 ? "day" : "days";
-	const cardLabel = closed ? labels.closedCardBalances : labels.cardSpending;
+	const limitWord = closed ? "budget" : "limit";
 	const amountText = (value: number | null) =>
 		value === null ? "—" : money(value);
-	const reserveUsed = Math.max(0, allocation.reserve - cashNow.cushion);
-	const dailyFoot = !allocation.available
-		? undefined
-		: closed
-			? allocation.allowance >= 0
-				? `${money(heroes.dailySafe)} a day across the cycle`
-				: `${money(-heroes.dailySafe)} a day over the cycle`
-			: allocation.allowance >= 0
-				? `${money(heroes.dailySafe)} a day · ${heroes.fullDaysLeft} full ${dayUnit} left`
-				: `${money(-heroes.dailySafe)} a day over · ${heroes.fullDaysLeft} full ${dayUnit} left`;
-	// The funding payday for this statement lands after it closes, so the
-	// foot names it as the settler — never as cash that is already here.
+	// The funding payday for this statement lands after it closes, so it
+	// captions the decision rows — never the cash that is already here.
 	const fundingDates = bundleDatesText(funding);
-	const fundingFoot =
+	const fundingCaption =
 		fundingDates === null
 			? "No projected paycheck"
 			: funding.endDate !== null && funding.endDate !== funding.date
 				? `The ${fundingDates} paychecks ${closed ? "paid" : "pay"} this statement`
 				: `The ${fundingDates} paycheck ${closed ? "paid" : "pays"} this statement`;
+	// Cash at month-end: checking minus spent and the remaining bills.
+	const cashQualifier =
+		(cashNow.bills === 0
+			? `No bills through ${monthDay(cashNow.monthEnd)}`
+			: `After ${money(cashNow.bills)} bills · through ${monthDay(cashNow.monthEnd)}`) +
+		(cashNow.short > 0 ? ` · ${money(cashNow.short)} unfulfilled` : "");
+	const allowanceView = describeAllowance({
+		allowance: allocation.allowance,
+		theoretical: heroes.theoretical,
+		reserve: allocation.reserve,
+		available: allocation.available,
+	});
+	// The hard cap the meter draws: safe headroom plus the protected
+	// reserve it may draw into.
+	const limit = allocation.allowance + allocation.reserve;
+	const spent = heroes.committedTotal ?? 0;
+	const showMeter = allocation.available && limit > 0;
+	const spendLabel = `Spend till ${monthDay(heroes.cycleEnd)} closing`;
+	const spendQualifier =
+		allowanceView.phase === "unavailable"
+			? undefined
+			: allowanceView.phase === "safe"
+				? undefined
+				: allowanceView.phase === "into-reserve"
+					? `${money(allowanceView.intoReserve)} of ${money(allocation.reserve)} reserve in use`
+					: closed
+						? `Over budget by ${money(allowanceView.overLimit)}`
+						: `Over limit by ${money(allowanceView.overLimit)}`;
+	const dailyValue =
+		allowanceView.phase === "unavailable"
+			? null
+			: allowanceView.phase === "safe"
+				? Math.max(0, heroes.dailySafe)
+				: Math.max(0, heroes.dailyTheoretical);
+	const dailyQualifier =
+		allowanceView.phase === "unavailable" ||
+		allowanceView.primary === null ||
+		allowanceView.primary === 0
+			? undefined
+			: closed
+				? `of ${money(allowanceView.primary)} across the cycle`
+				: `of ${money(allowanceView.primary)}`;
 	return (
 		<div className="grid content-start gap-4">
-			<div className="grid grid-cols-2 gap-3">
-				<HouseholdMetricCard
-					label={labels.cashAfterBills}
-					icon={<Landmark size={16} aria-hidden="true" />}
-					value={money(cashNow.cushion)}
-					foot={fundingFoot}
-				/>
-				<HouseholdMetricCard
-					label={labels.allowance}
-					icon={<CreditCard size={16} aria-hidden="true" />}
-					value={amountText(allocation.available ? allocation.allowance : null)}
-					tone={
-						allocation.available && allocation.allowance < 0
-							? "normal"
-							: "positive"
-					}
-					foot={dailyFoot}
-				/>
-			</div>
-			<section className={householdPanelStyles()}>
-				<div className="flex items-center justify-between">
-					<div className="min-w-0">
-						<div className="text-xs text-muted">{cardLabel}</div>
-						<div className={householdValueStyles({ size: "metric" })}>
-							{amountText(heroes.committedTotal)}
-						</div>
-					</div>
-					<div className="min-w-0 text-right">
-						<div className="text-xs text-muted">{labels.reserve}</div>
-						<div className="text-xl font-bold tracking-tight text-ink tabular-nums">
-							{money(allocation.reserve)}
-						</div>
-						{reserveUsed > 0 && (
-							<div className="text-xs text-warning-text">
-								{money(reserveUsed)} used
+			{trend && (
+				<div className="grid content-start gap-4">
+					<Suspense
+						fallback={
+							<div aria-busy="true">
+								<Skeleton className="h-40 w-full" />
 							</div>
-						)}
-					</div>
+						}
+					>
+						<SafeSpendingTrendChart trend={trend} historical={closed} />
+					</Suspense>
 				</div>
+			)}
+			<div className="grid content-start gap-4">
+				<div className="grid grid-cols-1 gap-3 divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+				<StatRow
+					label={labels.leftAtEndOfMonth}
+					value={money(cashNow.cushion)}
+					testId="left-value"
+					qualifier={cashQualifier}
+				/>
+				<StatRow
+					label={spendLabel}
+					value={amountText(allowanceView.primary)}
+					tone={allowanceView.tone}
+					testId="spend-value"
+					meter={
+						showMeter ? (
+							<ReserveMeter
+								spent={spent}
+								limit={limit}
+								reserve={allocation.reserve}
+								limitWord={limitWord}
+							/>
+						) : undefined
+					}
+					qualifier={spendQualifier}
+				/>
+				<StatRow
+					label={labels.perDay}
+					value={dailyValue === null ? "—" : money(dailyValue)}
+					testId="perday-value"
+					qualifier={dailyQualifier}
+				/>
+				</div>
+				<p className="m-0 text-xs text-muted">{fundingCaption}</p>
 				{!allocation.available && (
 					<p className="m-0 text-xs text-muted">
 						Closed card balance unavailable
 					</p>
 				)}
-				<div className="h-px w-full bg-line" />
-				{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
-				<ul
-					role="list"
-					aria-label={cardLabel}
-					className="m-0 flex list-none items-center justify-between gap-2 p-0"
-				>
-					{heroes.committedByCard.map((card, index) => {
-						const Icon =
-							index === 0 ? CreditCard : index === 1 ? ShoppingBag : Wallet;
-						return (
-							<li key={card.id} className="flex min-w-0 items-center gap-2">
-								<Icon size={20} aria-hidden="true" />
-								<div className="flex flex-col gap-1">
-									<span className="text-xs text-muted">{card.name}</span>
-									<strong className="text-sm text-ink">
-										{amountText(card.amount)}
-									</strong>
-								</div>
-							</li>
-						);
-					})}
-				</ul>
-				{trend && (
-					<div className="border-t border-line pt-3">
-						<Suspense
-							fallback={
-								<div aria-busy="true">
-									<Skeleton className="h-40 w-full" />
-								</div>
-							}
-						>
-							<SafeSpendingTrendChart trend={trend} historical={closed} />
-						</Suspense>
-					</div>
-				)}
-			</section>
-			<section className={householdPanelStyles()}>
+			</div>
+			<div className="grid content-start gap-4">
 				<div className="flex items-center justify-between">
 					<strong className="text-sm text-ink">{labels.cashAccounts}</strong>
 					<ShieldCheck
@@ -233,12 +275,6 @@ export function SafeSpendingBillsPanel({
 						className="text-success-text"
 						aria-hidden="true"
 					/>
-				</div>
-				<div className="flex items-center justify-between gap-3 text-sm text-ink">
-					<span className="flex items-center gap-2 text-muted">
-						{labels.cashBalance}
-					</span>
-					<strong>{exactMoney(cashNow.checking)}</strong>
 				</div>
 				{cashNow.provisional && (
 					<p className="m-0 text-xs text-muted">Latest balance, not at close</p>
@@ -266,13 +302,6 @@ export function SafeSpendingBillsPanel({
 					]}
 					ariaLabel={`${labels.cashBalance} ${exactMoney(cashNow.checking)}, ${labels.remainingBills} ${exactMoney(cashNow.bills)}, ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
 				/>
-				<div className="flex items-center justify-between gap-3 text-sm text-ink">
-					<span className="flex items-center gap-2">
-						<Clock3 size={16} aria-hidden="true" /> {labels.remainingBills} ·{" "}
-						through {monthDay(cashNow.monthEnd)}
-					</span>
-					<strong>−{exactMoney(cashNow.bills)}</strong>
-				</div>
 				{cashNow.spentSinceStart > 0 ? (
 					<div className="flex items-center justify-between gap-3 text-sm text-ink">
 						<span className="flex items-center gap-2 text-muted">
@@ -304,7 +333,7 @@ export function SafeSpendingBillsPanel({
 					shortfall
 					shortfallLabel="Unfulfilled"
 				/>
-			</section>
+			</div>
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}
