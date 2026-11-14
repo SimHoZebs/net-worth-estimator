@@ -1,11 +1,26 @@
 import { Inbox } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import type { Transaction } from "@/api/contracts.ts";
-import { Badge } from "../components/Badge.tsx";
-import { Button } from "../components/Button.tsx";
-import { EmptyState } from "../components/EmptyState.tsx";
-import { ErrorNotice } from "../components/ErrorNotice.tsx";
-import { Tabs } from "../components/Tabs.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
+import { cn } from "@/lib/utils.ts";
 import { dateLabel, isoDateFromEpochSeconds, money } from "../domain/format.ts";
 import { literalAmountOf } from "../domain/transactionRows.ts";
 import type { InboxShareItem, InboxStatus } from "./inboxApi.ts";
@@ -32,14 +47,20 @@ const tabs: Array<{ id: InboxStatus; label: string }> = [
 	{ id: "canceled", label: "Canceled" },
 ];
 
-const statusTone: Record<
+const statusVariant: Record<
 	InboxStatus,
-	"outline" | "success" | "neutral" | "warning"
+	{ variant: "outline" | "default" | "secondary"; className?: string }
 > = {
-	pending: "outline",
-	accepted: "success",
-	declined: "neutral",
-	canceled: "warning",
+	pending: { variant: "outline" },
+	accepted: {
+		variant: "default",
+		className: "bg-success-bg text-success-text",
+	},
+	declined: { variant: "secondary" },
+	canceled: {
+		variant: "default",
+		className: "bg-warning-bg text-warning-text",
+	},
 };
 
 const emptyCopy: Record<InboxStatus, { title: string; description: string }> = {
@@ -87,18 +108,27 @@ function InboxItemCard({
 	return (
 		<article
 			aria-label={`Shared transaction ${item.transactionId}`}
-			className="grid gap-2 rounded-surface border border-solid border-line bg-surface p-4"
+			className="grid gap-2 rounded-xl border border-solid border-border bg-card p-4"
 		>
 			<div className="flex flex-wrap items-center gap-2">
-				<Badge tone={statusTone[item.status]}>{item.status}</Badge>
-				{item.unread && <Badge tone="success">New</Badge>}
-				{item.dismissed && <Badge tone="neutral">Hidden</Badge>}
+				<Badge
+					variant={statusVariant[item.status].variant}
+					className={cn("capitalize", statusVariant[item.status].className)}
+				>
+					{item.status}
+				</Badge>
+				{item.unread && (
+					<Badge variant="default" className="bg-success-bg text-success-text">
+						New
+					</Badge>
+				)}
+				{item.dismissed && <Badge variant="secondary">Hidden</Badge>}
 			</div>
 			<div>
 				<h3 className="m-0 text-base">
 					{transaction?.name ?? "Shared transaction"}
 				</h3>
-				<p className="mt-1 mb-0 text-sm text-muted">
+				<p className="mt-1 mb-0 text-sm text-muted-foreground">
 					{item.senderDisplayName
 						? `Shared by ${item.senderDisplayName}`
 						: "Shared with you"}
@@ -112,14 +142,14 @@ function InboxItemCard({
 					{amount != null ? <strong>{money(amount)}</strong> : "Varies"}
 				</p>
 			) : (
-				<p className="m-0 text-sm text-muted">
+				<p className="m-0 text-sm text-muted-foreground">
 					{item.status === "canceled"
 						? "This share was taken back before you decided."
 						: "This share is no longer available to view."}
 				</p>
 			)}
 			{item.status === "accepted" && item.copyTransactionId && (
-				<p className="m-0 text-sm text-muted">
+				<p className="m-0 text-sm text-muted-foreground">
 					Saved to your own records as an independent copy.
 				</p>
 			)}
@@ -128,13 +158,18 @@ function InboxItemCard({
 					<>
 						<Button
 							size="sm"
-							variant="primary"
+							variant="default"
 							disabled={busy}
 							onClick={onAccept}
 						>
 							Accept and save a copy
 						</Button>
-						<Button size="sm" disabled={busy} onClick={onDecline}>
+						<Button
+							size="sm"
+							variant="secondary"
+							disabled={busy}
+							onClick={onDecline}
+						>
 							Decline
 						</Button>
 					</>
@@ -180,6 +215,7 @@ function InboxItemCard({
 export function InboxPage() {
 	const [filter, setFilter] = useState<InboxStatus>("pending");
 	const [showDismissed, setShowDismissed] = useState(false);
+	const showDismissedId = useId();
 	const inboxQuery = useInbox(filter, showDismissed);
 	const items = inboxQuery.data?.items ?? [];
 	const acceptMutation = useAcceptInboxShare();
@@ -261,42 +297,65 @@ export function InboxPage() {
 		<section aria-label="Inbox" className="grid gap-6">
 			<div>
 				<h2 className="m-0 text-xl">Inbox</h2>
-				<p className="mb-0 text-sm text-muted">
+				<p className="mb-0 text-sm text-muted-foreground">
 					One place for transactions shared with you. Accepting saves your own
 					copy; declining removes you from the sender&apos;s list.
 				</p>
 			</div>
 			{inboxQuery.isError ? (
-				<ErrorNotice
-					message="Inbox could not be loaded."
-					action="Retry"
-					onAction={() => void inboxQuery.refetch()}
-				/>
+				<Alert variant="destructive">
+					<AlertCircle size={16} aria-hidden="true" />
+					<AlertDescription>
+						Inbox could not be loaded.{" "}
+						<Button variant="link" onClick={() => void inboxQuery.refetch()}>
+							Retry
+						</Button>
+					</AlertDescription>
+				</Alert>
 			) : (
-				<>
-					<Tabs
-						items={tabs}
-						value={filter}
-						onChange={setFilter}
-						label="Inbox status"
+				<Tabs
+					value={filter}
+					onValueChange={(next) => setFilter(next as InboxStatus)}
+				>
+					<TabsList
+						variant="line"
+						aria-label="Inbox status"
+						className="mb-6 flex w-full gap-6 overflow-x-auto p-0"
 					>
+						{tabs.map((tab) => (
+							<TabsTrigger
+								key={tab.id}
+								value={tab.id}
+								className="flex-none px-0.5 pt-3 pb-4"
+							>
+								{tab.label}
+							</TabsTrigger>
+						))}
+					</TabsList>
+					<TabsContent value={filter}>
 						<div>
-							<label className="mb-4 flex items-center gap-2 text-sm text-muted">
-								<input
-									type="checkbox"
+							<div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+								<Checkbox
+									id={showDismissedId}
 									checked={showDismissed}
-									onChange={(event) => setShowDismissed(event.target.checked)}
+									onCheckedChange={(checked) =>
+										setShowDismissed(checked === true)
+									}
 								/>
-								Show hidden items
-							</label>
+								<Label htmlFor={showDismissedId}>Show hidden items</Label>
+							</div>
 							{inboxQuery.isPending ? (
-								<p className="text-sm text-muted">Loading inbox…</p>
+								<p className="text-sm text-muted-foreground">Loading inbox…</p>
 							) : items.length === 0 ? (
-								<EmptyState
-									icon={Inbox}
-									title={empty.title}
-									description={empty.description}
-								/>
+								<Empty>
+									<EmptyHeader>
+										<EmptyMedia variant="icon">
+											<Inbox aria-hidden="true" />
+										</EmptyMedia>
+										<EmptyTitle>{empty.title}</EmptyTitle>
+										<EmptyDescription>{empty.description}</EmptyDescription>
+									</EmptyHeader>
+								</Empty>
 							) : (
 								<div className="grid gap-3">
 									{items.map((item) => (
@@ -315,8 +374,8 @@ export function InboxPage() {
 								</div>
 							)}
 						</div>
-					</Tabs>
-				</>
+					</TabsContent>
+				</Tabs>
 			)}
 		</section>
 	);

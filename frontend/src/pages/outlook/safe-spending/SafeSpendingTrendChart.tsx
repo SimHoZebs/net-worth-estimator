@@ -12,7 +12,7 @@ import {
 	monthDay,
 } from "../../../domain/format.ts";
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
-import { mergeStyles } from "../../../components/mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 function paceLabel(
@@ -46,11 +46,11 @@ function legendSwatch(dashed: boolean, tone: string) {
 	return (
 		<span
 			aria-hidden="true"
-			className={mergeStyles(
+			className={cn(
 				"inline-block w-4 shrink-0",
 				dashed
 					? `border-t-2 [border-top-style:dashed] ${tone}`
-					: `h-0.5 rounded-control ${tone}`,
+					: `h-0.5 rounded-md ${tone}`,
 			)}
 		/>
 	);
@@ -142,7 +142,7 @@ export function SafeSpendingTrendChart({
 									y: "spent",
 									r: 4,
 									fill: "var(--primary)",
-									stroke: "var(--surface)",
+									stroke: "var(--card)",
 									strokeWidth: 2,
 								}),
 							]
@@ -154,7 +154,7 @@ export function SafeSpendingTrendChart({
 									y: "amount",
 									r: 5,
 									fill: "var(--danger-solid)",
-									stroke: "var(--surface)",
+									stroke: "var(--card)",
 									strokeWidth: 2.5,
 								}),
 							]
@@ -264,16 +264,16 @@ export function SafeSpendingTrendChart({
 	return (
 		<div className="grid gap-2">
 			<div className="flex items-center justify-between gap-2">
-				<h3 className="m-0 text-sm text-ink">{labels.spendingPace}</h3>
+				<h3 className="m-0 text-sm text-foreground">{labels.spendingPace}</h3>
 				{pace.text !== null && (
 					<span
-						className={mergeStyles(
+						className={cn(
 							"text-xs whitespace-nowrap",
 							pace.tone === "danger"
 								? "text-danger-text"
 								: pace.tone === "warning"
 									? "text-warning-text"
-									: "text-muted",
+									: "text-muted-foreground",
 						)}
 					>
 						{pace.text}
@@ -288,7 +288,7 @@ export function SafeSpendingTrendChart({
 			/>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
 			<ul
-				className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted"
+				className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted-foreground"
 				role="list"
 				aria-label={`${labels.spendingPace} legend`}
 			>

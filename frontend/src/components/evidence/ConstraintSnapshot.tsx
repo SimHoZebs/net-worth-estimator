@@ -50,7 +50,7 @@ export function ConstraintSnapshot({
 					/>
 				</ul>
 			) : (
-				<h3 className="mb-3 text-xs font-semibold text-ink">
+				<h3 className="mb-3 text-xs font-semibold text-foreground">
 					In {ledger.month}
 				</h3>
 			)}
@@ -66,7 +66,9 @@ export function ConstraintSnapshot({
 				))}
 			</TransactionTable>
 			{ledger.overflow > 0 && (
-				<p className="mt-2 text-xs text-muted">+{ledger.overflow} more</p>
+				<p className="mt-2 text-xs text-muted-foreground">
+					+{ledger.overflow} more
+				</p>
 			)}
 			{selected && selectedSavedTransaction && (
 				<TransactionDetail

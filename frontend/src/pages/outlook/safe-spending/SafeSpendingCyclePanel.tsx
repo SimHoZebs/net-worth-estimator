@@ -4,7 +4,7 @@ import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import { useMemo } from "react";
 import { money } from "../../../domain/format.ts";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
-import { householdValueStyles } from "./householdStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import {
 	TransactionSectionView,
 	SafeSpendingSectionHeader,
@@ -63,8 +63,12 @@ export function SafeSpendingCyclePanel({
 			{cycle.summary && (
 				<div className="grid gap-1">
 					<div className="flex items-center justify-between gap-3">
-						<span className="text-sm text-muted">Spent</span>
-						<strong className={householdValueStyles({ size: "base" })}>
+						<span className="text-sm text-muted-foreground">Spent</span>
+						<strong
+							className={cn(
+								"m-0 text-base font-bold tabular-nums text-foreground [overflow-wrap:anywhere]",
+							)}
+						>
 							{cycle.summary.total === null ? "—" : money(cycle.summary.total)}
 						</strong>
 					</div>
@@ -73,8 +77,8 @@ export function SafeSpendingCyclePanel({
 							key={card.id}
 							className="flex items-center justify-between gap-3 text-sm"
 						>
-							<span className="text-muted">{card.name}</span>
-							<span className="font-semibold text-ink">
+							<span className="text-muted-foreground">{card.name}</span>
+							<span className="font-semibold text-foreground">
 								{card.amount === null ? "—" : money(card.amount)}
 							</span>
 						</div>

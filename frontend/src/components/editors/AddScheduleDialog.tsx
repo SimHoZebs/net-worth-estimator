@@ -1,9 +1,8 @@
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useState } from "react";
 import { createSchedule } from "@/api/generated/endpoints.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
@@ -15,11 +14,16 @@ import {
 	validateScheduleTerms,
 	type ScheduleTerms,
 } from "./transactionBodies.ts";
-import { Checkbox, InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { EditorDialog } from "./EditorDialog.tsx";
+import {
+	EditorCheckbox,
+	EditorField,
+	EditorSelect,
+	MoneyField,
+} from "./editorFields.tsx";
 import type { Frequency } from "../../api/contracts.ts";
 import {
 	SCHEDULE_AMOUNT_RECIPES,
@@ -27,6 +31,14 @@ import {
 	type AmountFields,
 } from "../../domain/scheduleAmounts.ts";
 import { ScheduleAmountFields } from "./ScheduleAmountFields.tsx";
+
+const frequencyOptions = [
+	{ value: "daily", label: "Daily" },
+	{ value: "weekly", label: "Weekly" },
+	{ value: "monthly", label: "Monthly" },
+	{ value: "quarterly", label: "Every 3 months" },
+	{ value: "annual", label: "Yearly" },
+] as const;
 
 /** Create-only schedule form. Recurrence, growth, and the end date live here. */
 export function AddScheduleDialog({
@@ -77,6 +89,16 @@ export function AddScheduleDialog({
 	const [error, setError] = useState<string | null>(null);
 	const enabledId = useId();
 	const noEndDateId = useId();
+	const nameId = useId();
+	const frequencyId = useId();
+	const fromIdInput = useId();
+	const toIdInput = useId();
+	const firstId = useId();
+	const lastId = useId();
+	const annualCapId = useId();
+	const annualCapHintId = `${annualCapId}-hint`;
+	const priorityId = useId();
+	const priorityHintId = `${priorityId}-hint`;
 
 	const dirty =
 		name !== "" ||
@@ -91,10 +113,8 @@ export function AddScheduleDialog({
 		!noEndDate ||
 		endDate !== "" ||
 		!enabled;
-	useBeforeUnload(dirty && !saving);
 
-	const submit = async (event: FormEvent) => {
-		event.preventDefault();
+	const submit = async () => {
 		if (saving) return;
 		const amountError = validateRecipe(recipe, amountFields);
 		if (amountError) {
@@ -152,188 +172,208 @@ export function AddScheduleDialog({
 	};
 
 	return (
-		<Modal title="Add schedule" onClose={onClose}>
-			<form
-				className="flex h-full min-h-0 flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
-			>
-				<div className="min-h-0 flex-1 overflow-y-auto">
-					<fieldset
-						disabled={saving}
-						className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
+		<EditorDialog
+			title="Add schedule"
+			onClose={onClose}
+			dirty={dirty}
+			busy={saving}
+			error={error}
+			submitLabel="Add schedule"
+			submitDisabled={!dirty}
+			onSubmit={() => void submit()}
+		>
+			<div className="min-h-0 flex-1 overflow-y-auto">
+				<fieldset
+					disabled={saving}
+					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
+				>
+					<EditorField
+						label="Schedule name"
+						htmlFor={nameId}
+						className="col-span-full"
 					>
-						<InputField
-							label="Schedule name"
-							wide
+						<Input
+							id={nameId}
 							required
 							maxLength={100}
 							value={name}
 							onChange={(event) => setName(event.target.value)}
 							placeholder="e.g. Monthly investing"
+							disabled={saving}
 						/>
-						<div className="col-span-full">
-							<ScheduleAmountFields
-								recipeId={amountKind}
-								values={amountFields}
-								accounts={savedAccounts}
-								schedules={schedules.data?.schedules ?? []}
-								onRecipe={(id) => {
-									setAmountKind(id);
-									setError(null);
-								}}
-								onChange={(key, value) => {
-									setAmountDrafts((old) => ({
-										...old,
-										[amountKind]: { ...amountFields, [key]: value },
-									}));
-									setError(null);
-								}}
-							/>
-							{sourceSchedule && (
-								<div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-									<span className="text-muted">
-										Source starts {sourceSchedule.startDate} ·{" "}
-										{sourceSchedule.frequency}
-									</span>
-									<Button
-										type="button"
-										variant="secondary"
-										size="sm"
-										onClick={() => {
-											const next = parseUnion(sourceSchedule.frequency, [
-												"daily",
-												"weekly",
-												"monthly",
-												"quarterly",
-												"annual",
-											] as const);
-											if (next) setFrequency(next);
-											setStartDate(sourceSchedule.startDate);
-											setEndDate(sourceSchedule.endDate ?? "");
-											setNoEndDate(!sourceSchedule.endDate);
-										}}
-									>
-										Use source timing
-									</Button>
-								</div>
-							)}
-							{amountKind === "schedule-percent" && schedules.isPending && (
-								<p role="status">Loading schedules…</p>
-							)}
-							{amountKind === "schedule-percent" && schedules.isError && (
-								<p role="alert">
+					</EditorField>
+					<div className="col-span-full">
+						<ScheduleAmountFields
+							recipeId={amountKind}
+							values={amountFields}
+							accounts={savedAccounts}
+							schedules={schedules.data?.schedules ?? []}
+							onRecipe={(id) => {
+								setAmountKind(id);
+								setError(null);
+							}}
+							onChange={(key, value) => {
+								setAmountDrafts((old) => ({
+									...old,
+									[amountKind]: { ...amountFields, [key]: value },
+								}));
+								setError(null);
+							}}
+						/>
+						{sourceSchedule && (
+							<div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+								<span className="text-muted-foreground">
+									Source starts {sourceSchedule.startDate} ·{" "}
+									{sourceSchedule.frequency}
+								</span>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										const next = parseUnion(sourceSchedule.frequency, [
+											"daily",
+											"weekly",
+											"monthly",
+											"quarterly",
+											"annual",
+										] as const);
+										if (next) setFrequency(next);
+										setStartDate(sourceSchedule.startDate);
+										setEndDate(sourceSchedule.endDate ?? "");
+										setNoEndDate(!sourceSchedule.endDate);
+									}}
+								>
+									Use source timing
+								</Button>
+							</div>
+						)}
+						{amountKind === "schedule-percent" && schedules.isPending && (
+							<p role="status">Loading schedules…</p>
+						)}
+						{amountKind === "schedule-percent" && schedules.isError && (
+							<Alert variant="destructive">
+								<AlertDescription>
 									Schedules could not be loaded.{" "}
 									<Button
 										type="button"
-										variant="secondary"
+										variant="outline"
+										size="sm"
 										onClick={() => void schedules.refetch()}
 									>
 										Retry
 									</Button>
-								</p>
-							)}
-						</div>
-						<SelectField
-							label="Frequency"
+								</AlertDescription>
+							</Alert>
+						)}
+					</div>
+					<EditorField label="Frequency" htmlFor={frequencyId}>
+						<EditorSelect
+							id={frequencyId}
 							value={frequency}
-							onChange={(event) => {
-								const next = parseUnion(event.target.value, [
+							onValueChange={(next) => {
+								const parsed = parseUnion(next, [
 									"daily",
 									"weekly",
 									"monthly",
 									"quarterly",
 									"annual",
 								] as const);
-								if (next) setFrequency(next);
+								if (parsed) setFrequency(parsed);
 							}}
-						>
-							<option value="daily">Daily</option>
-							<option value="weekly">Weekly</option>
-							<option value="monthly">Monthly</option>
-							<option value="quarterly">Every 3 months</option>
-							<option value="annual">Yearly</option>
-						</SelectField>
-						<SelectField
-							label="From"
+							options={[...frequencyOptions]}
+							disabled={saving}
+						/>
+					</EditorField>
+					<EditorField label="From" htmlFor={fromIdInput}>
+						<EditorSelect
+							id={fromIdInput}
 							value={fromId}
-							onChange={(event) => setFromId(event.target.value)}
-						>
-							<option value="">External income</option>
-							{savedAccounts
+							onValueChange={setFromId}
+							emptyLabel="External income"
+							options={savedAccounts
 								.filter((account) => account.kind !== "debt")
-								.map((account) => (
-									<option key={account.id} value={account.id}>
-										{account.name}
-									</option>
-								))}
-						</SelectField>
-						<SelectField
-							label="To"
+								.map((account) => ({
+									value: account.id,
+									label: account.name,
+								}))}
+							disabled={saving}
+						/>
+					</EditorField>
+					<EditorField label="To" htmlFor={toIdInput}>
+						<EditorSelect
+							id={toIdInput}
 							value={toId}
-							onChange={(event) => setToId(event.target.value)}
-						>
-							<option value="">External expense</option>
-							{savedAccounts.map((account) => (
-								<option key={account.id} value={account.id}>
-									{account.name}
-								</option>
-							))}
-						</SelectField>
-						<InputField
-							label="First occurrence"
+							onValueChange={setToId}
+							emptyLabel="External expense"
+							options={savedAccounts.map((account) => ({
+								value: account.id,
+								label: account.name,
+							}))}
+							disabled={saving}
+						/>
+					</EditorField>
+					<EditorField label="First occurrence" htmlFor={firstId}>
+						<Input
+							id={firstId}
 							type="date"
 							required
 							value={startDate}
 							onChange={(event) => setStartDate(event.target.value)}
+							disabled={saving}
 						/>
-						<InputField
-							label="Last occurrence"
+					</EditorField>
+					<EditorField label="Last occurrence" htmlFor={lastId}>
+						<Input
+							id={lastId}
 							type="date"
-							disabled={noEndDate}
+							disabled={saving || noEndDate}
 							value={endDate}
 							onChange={(event) => setEndDate(event.target.value)}
 						/>
-						<label
-							htmlFor={noEndDateId}
-							className="flex min-h-11 items-center gap-3 text-sm text-muted"
-						>
-							<Checkbox
-								id={noEndDateId}
-								checked={noEndDate}
-								onChange={(event) => setNoEndDate(event.target.checked)}
+					</EditorField>
+					<EditorCheckbox
+						id={noEndDateId}
+						label="No end date"
+						checked={noEndDate}
+						onChange={setNoEndDate}
+						disabled={saving}
+					/>
+					<EditorCheckbox
+						id={enabledId}
+						label="Include in projections"
+						checked={enabled}
+						onChange={setEnabled}
+						disabled={saving}
+					/>
+					<details className="col-span-full text-sm">
+						<summary className="cursor-pointer py-2 font-semibold">
+							Limits and execution order
+						</summary>
+						<div className="mt-3 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+							<MoneyField
+								id={annualCapId}
+								label="Annual cap"
+								name="annualCap"
+								min="0"
+								max="10000000000"
+								step="0.01"
+								value={annualCap}
+								onChange={(event) => setAnnualCap(event.target.value)}
+								placeholder="No cap"
+								aria-describedby={annualCapHintId}
+								hint="Caps this schedule only. It does not enforce a shared contribution limit."
+								hintId={annualCapHintId}
+								disabled={saving}
 							/>
-							No end date
-						</label>
-						<label
-							htmlFor={enabledId}
-							className="flex min-h-11 items-center gap-3 text-sm text-muted"
-						>
-							<Checkbox
-								id={enabledId}
-								checked={enabled}
-								onChange={(event) => setEnabled(event.target.checked)}
-							/>
-							Include in projections
-						</label>
-						<details className="col-span-full text-sm">
-							<summary className="cursor-pointer py-2 font-semibold">
-								Limits and execution order
-							</summary>
-							<div className="mt-3 grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-								<InputField
-									label="Annual cap (USD)"
-									name="annualCap"
-									type="number"
-									min="0"
-									max="10000000000"
-									step="0.01"
-									value={annualCap}
-									onChange={(event) => setAnnualCap(event.target.value)}
-									placeholder="No cap"
-									hint="Caps this schedule only. It does not enforce a shared contribution limit."
-								/>
-								<InputField
-									label="Execution priority"
+							<EditorField
+								label="Execution priority"
+								htmlFor={priorityId}
+								hint="Lower numbers run first on shared dates. Automatic runs after the selected source, or appends after existing schedules."
+								hintId={priorityHintId}
+							>
+								<Input
+									id={priorityId}
 									name="priority"
 									type="number"
 									step="1"
@@ -344,24 +384,14 @@ export function AddScheduleDialog({
 											: `Automatic: ${automaticPriority}`
 									}
 									onChange={(event) => setPriority(event.target.value)}
-									hint="Lower numbers run first on shared dates. Automatic runs after the selected source, or appends after existing schedules."
+									aria-describedby={priorityHintId}
+									disabled={saving}
 								/>
-							</div>
-						</details>
-					</fieldset>
-				</div>
-				<div className={`${dialogActionsStyles} shrink-0 items-center`}>
-					<div className="min-w-0 flex-1 basis-48 max-sm:basis-full">
-						<FieldError message={error} />
-					</div>
-					<Button type="button" variant="secondary" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={saving || !dirty}>
-						{saving ? "Saving…" : "Add schedule"}
-					</Button>
-				</div>
-			</form>
-		</Modal>
+							</EditorField>
+						</div>
+					</details>
+				</fieldset>
+			</div>
+		</EditorDialog>
 	);
 }

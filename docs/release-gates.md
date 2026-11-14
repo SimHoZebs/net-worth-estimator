@@ -30,9 +30,12 @@ payment-pattern upgrade. The workflow owns that inventory. Unit checks
 need no pre-existing stack, Docker daemon, or external credentials;
 package tests may create disposable local listeners.
 
-Browser integration owns isolated servers and temporary databases.
-It never attaches to the dev stack. Frontend and extension execution
-recipes remain in the testing guide and [extension guide](../extension/README.md).
+Frontend browser integration covers observed regressions only; the former
+broad UI suite was retired. When no regression specs exist, the runner logs
+an empty baseline and starts no servers. Extension browser tests still own
+isolated servers and temporary databases. They never attach to the dev stack.
+Frontend and extension execution recipes remain in the testing guide and
+[extension guide](../extension/README.md).
 
 Real-provider identity checks run automatically through the
 [disposable E2E gate](e2e-gate.md) with generated credentials. It runs

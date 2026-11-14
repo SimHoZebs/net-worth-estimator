@@ -1,65 +1,98 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { suspendUserScope } from "../auth/resourceScope.ts";
-import {
-	dismissKey,
-	resetNotifications,
-	useNotifications,
-} from "./notifications.ts";
+import { toast } from "../components/ui/toast.tsx";
+import { dismissKey, notifyError, notifySuccess } from "./notifications.ts";
+
+let published: {
+	id?: string;
+	type?: unknown;
+	description?: unknown;
+	actionProps?: { children?: unknown; onClick?: unknown };
+	onClose?: unknown;
+}[] = [];
+let closed: (string | undefined)[] = [];
+
+beforeEach(() => {
+	vi.spyOn(toast, "add").mockImplementation((options) => {
+		published.push(options);
+		return options.id ?? "toast-test";
+	});
+	vi.spyOn(toast, "close").mockImplementation((id) => {
+		closed.push(id);
+	});
+	toast.close();
+	suspendUserScope();
+	published = [];
+	closed = [];
+});
 
 afterEach(() => {
-	resetNotifications();
+	toast.close();
 	suspendUserScope();
 });
 
-describe("notification stack", () => {
-	it("pushes and dismisses toasts", () => {
-		const id = useNotifications
-			.getState()
-			.notify({ key: "workspace", kind: "error", message: "Load failed." });
-		expect(id).toBe("toast-1");
-		expect(useNotifications.getState().items).toHaveLength(1);
-		useNotifications.getState().dismiss(id);
-		expect(useNotifications.getState().items).toHaveLength(0);
+describe("notification policy", () => {
+	it("publishes errors with a stable key and urgent priority", () => {
+		notifyError("workspace", "Load failed.");
+		expect(published).toContainEqual(
+			expect.objectContaining({
+				id: "workspace",
+				type: "error",
+				description: "Load failed.",
+				priority: "high",
+			}),
+		);
+	});
+
+	it("publishes confirmations with a calm priority", () => {
+		notifySuccess("workspace-notice", "Changes saved.");
+		expect(published).toContainEqual(
+			expect.objectContaining({
+				id: "workspace-notice",
+				type: "success",
+				description: "Changes saved.",
+				priority: "low",
+			}),
+		);
 	});
 
 	it("replaces the toast for a repeated key instead of stacking", () => {
-		const store = useNotifications.getState();
-		store.notify({ key: "workspace", kind: "error", message: "First." });
-		store.notify({ key: "workspace", kind: "error", message: "Second." });
-		const items = useNotifications.getState().items;
-		expect(items).toHaveLength(1);
-		expect(items[0]?.message).toBe("Second.");
+		notifyError("workspace", "First.");
+		notifyError("workspace", "Second.");
+		expect(
+			published.filter((options) => options.id === "workspace"),
+		).toHaveLength(2);
+		expect(closed).not.toContain("workspace");
 	});
 
-	it("keeps only the newest toasts past the cap", () => {
-		const store = useNotifications.getState();
-		for (let index = 0; index < 6; index += 1)
-			store.notify({
-				key: `source-${index}`,
-				kind: "error",
-				message: `Failure ${index}.`,
-			});
-		const items = useNotifications.getState().items;
-		expect(items).toHaveLength(4);
-		expect(items[0]?.message).toBe("Failure 5.");
-		expect(items[3]?.message).toBe("Failure 2.");
-	});
-
-	it("starts clean on a new resource scope", () => {
-		useNotifications
-			.getState()
-			.notify({ key: "workspace", kind: "error", message: "Load failed." });
-		suspendUserScope();
-		expect(useNotifications.getState().items).toHaveLength(0);
+	it("adapts actions and dismissal callbacks to the manager", () => {
+		const onAction = vi.fn();
+		const onDismiss = vi.fn();
+		notifyError(
+			"workspace",
+			"Load failed.",
+			{ label: "Retry", onAction },
+			onDismiss,
+		);
+		const options = published.find((entry) => entry.id === "workspace");
+		expect(options?.actionProps).toMatchObject({ children: "Retry" });
+		(options?.actionProps?.onClick as (() => void) | undefined)?.();
+		expect(onAction).toHaveBeenCalledTimes(1);
+		(options?.onClose as (() => void) | undefined)?.();
+		expect(onDismiss).toHaveBeenCalledTimes(1);
 	});
 
 	it("clears one key while keeping the rest", () => {
-		const store = useNotifications.getState();
-		store.notify({ key: "account", kind: "error", message: "First." });
-		store.notify({ key: "workspace", kind: "error", message: "Second." });
+		notifyError("account", "First.");
+		notifyError("workspace", "Second.");
 		dismissKey("account");
-		const items = useNotifications.getState().items;
-		expect(items).toHaveLength(1);
-		expect(items[0]?.key).toBe("workspace");
+		expect(closed).toContain("account");
+		expect(closed).not.toContain("workspace");
+	});
+
+	it("starts clean on a new resource scope", () => {
+		notifyError("workspace", "Load failed.");
+		suspendUserScope();
+		expect(closed).toContain(undefined);
 	});
 });

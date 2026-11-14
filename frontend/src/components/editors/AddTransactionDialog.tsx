@@ -1,8 +1,7 @@
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useState } from "react";
 import { recordTransaction } from "@/api/generated/endpoints.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { dateLabel, todayIso } from "../../domain/format.ts";
-import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
@@ -22,11 +21,14 @@ import {
 	validateTransactionValues,
 	type TransactionFormValues,
 } from "./transactionBodies.ts";
-import { Checkbox, InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
+import { EditorDialog } from "./EditorDialog.tsx";
+import {
+	EditorCheckbox,
+	EditorField,
+	EditorSelect,
+	MoneyField,
+} from "./editorFields.tsx";
+import { Input } from "@/components/ui/input.tsx";
 
 /**
  * Create-only transaction form. A transaction is one fact: it has a date and
@@ -101,6 +103,15 @@ export function AddTransactionDialog({
 		transactionTime !== "" &&
 		!Number.isFinite(combineDayTime(startDate, transactionTime));
 	const enabledId = useId();
+	const nameId = useId();
+	const amountId = useId();
+	const fromIdInput = useId();
+	const toIdInput = useId();
+	const dateId = useId();
+	const timeId = useId();
+	const claimScheduleIdInput = useId();
+	const claimOccurrenceId = useId();
+	const timeHintId = timeInvalid ? `${timeId}-hint` : undefined;
 
 	const dirty =
 		name !== "" ||
@@ -112,10 +123,8 @@ export function AddTransactionDialog({
 		claimScheduleId !== "" ||
 		claimOccurrenceDate !== "" ||
 		transactionTime !== "";
-	useBeforeUnload(dirty && !saving);
 
-	const submit = async (event: FormEvent) => {
-		event.preventDefault();
+	const submit = async () => {
 		if (saving) return;
 		if (timeInvalid) {
 			setError("Choose a valid time.");
@@ -161,128 +170,143 @@ export function AddTransactionDialog({
 	};
 
 	return (
-		<Modal title="Add transaction" onClose={onClose}>
-			<form
-				className="flex flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
+		<EditorDialog
+			title="Add transaction"
+			onClose={onClose}
+			dirty={dirty}
+			busy={saving}
+			error={error}
+			submitLabel="Add transaction"
+			submitDisabled={!dirty}
+			onSubmit={() => void submit()}
+		>
+			<fieldset
+				disabled={saving}
+				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
 			>
-				<fieldset
-					disabled={saving}
-					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
+				<EditorField
+					label="Transaction name"
+					htmlFor={nameId}
+					className="col-span-full"
 				>
-					<InputField
-						label="Transaction name"
-						wide
+					<Input
+						id={nameId}
 						required
 						maxLength={100}
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 						placeholder="e.g. Annual insurance"
+						disabled={saving}
 					/>
-					<InputField
-						label="Amount (USD)"
-						type="number"
-						required
-						min="0"
-						max="10000000000"
-						step="0.01"
-						value={amount}
-						onChange={(event) => setAmount(event.target.value)}
-					/>
-					<SelectField
-						label="From"
+				</EditorField>
+				<MoneyField
+					id={amountId}
+					label="Amount"
+					required
+					min="0"
+					max="10000000000"
+					step="0.01"
+					value={amount}
+					onChange={(event) => setAmount(event.target.value)}
+					disabled={saving}
+				/>
+				<EditorField label="From" htmlFor={fromIdInput}>
+					<EditorSelect
+						id={fromIdInput}
 						value={fromId}
-						onChange={(event) => setFromId(event.target.value)}
-					>
-						<option value="">External income</option>
-						{savedAccounts
+						onValueChange={setFromId}
+						emptyLabel="External income"
+						options={savedAccounts
 							.filter((account) => account.kind !== "debt")
-							.map((account) => (
-								<option key={account.id} value={account.id}>
-									{account.name}
-								</option>
-							))}
-					</SelectField>
-					<SelectField
-						label="To"
+							.map((account) => ({
+								value: account.id,
+								label: account.name,
+							}))}
+						disabled={saving}
+					/>
+				</EditorField>
+				<EditorField label="To" htmlFor={toIdInput}>
+					<EditorSelect
+						id={toIdInput}
 						value={toId}
-						onChange={(event) => setToId(event.target.value)}
-					>
-						<option value="">External expense</option>
-						{savedAccounts.map((account) => (
-							<option key={account.id} value={account.id}>
-								{account.name}
-							</option>
-						))}
-					</SelectField>
-					<InputField
-						label="Date"
+						onValueChange={setToId}
+						emptyLabel="External expense"
+						options={savedAccounts.map((account) => ({
+							value: account.id,
+							label: account.name,
+						}))}
+						disabled={saving}
+					/>
+				</EditorField>
+				<EditorField label="Date" htmlFor={dateId}>
+					<Input
+						id={dateId}
 						type="date"
 						required
 						value={startDate}
 						onChange={(event) => setStartDate(event.target.value)}
+						disabled={saving}
 					/>
-					<InputField
-						label="Time (UTC, optional)"
+				</EditorField>
+				<EditorField
+					label="Time (UTC, optional)"
+					htmlFor={timeId}
+					hint={timeInvalid ? "Choose a valid time." : undefined}
+					hintId={timeHintId}
+				>
+					<Input
+						id={timeId}
 						type="time"
 						step="1"
-						hint={timeInvalid ? "Choose a valid time." : undefined}
+						aria-describedby={timeHintId}
 						value={transactionTime}
 						onChange={(event) => setTransactionTime(event.target.value)}
+						disabled={saving}
 					/>
-					<SelectField
-						label="Records an occurrence of"
+				</EditorField>
+				<EditorField
+					label="Records an occurrence of"
+					htmlFor={claimScheduleIdInput}
+				>
+					<EditorSelect
+						id={claimScheduleIdInput}
 						value={claimScheduleId}
-						onChange={(event) => setClaimRuleId(event.target.value)}
-					>
-						<option value="">No link — standalone record</option>
-						{claimSchedules.map((rule) => (
-							<option key={rule.id} value={rule.id}>
-								{rule.name}
-							</option>
-						))}
-					</SelectField>
-					<SelectField
-						label="Replaces occurrence on"
+						onValueChange={setClaimRuleId}
+						emptyLabel="No link — standalone record"
+						options={claimSchedules.map((rule) => ({
+							value: rule.id,
+							label: rule.name,
+						}))}
+						disabled={saving}
+					/>
+				</EditorField>
+				<EditorField label="Replaces occurrence on" htmlFor={claimOccurrenceId}>
+					<EditorSelect
+						id={claimOccurrenceId}
 						value={claimOccurrenceDate}
-						onChange={(event) => setClaimOccurrenceDate(event.target.value)}
-						disabled={!claimScheduleId}
-					>
-						<option value="">
-							{!claimScheduleId
+						onValueChange={setClaimOccurrenceDate}
+						emptyLabel={
+							!claimScheduleId
 								? "Choose a schedule first"
 								: occurrenceOptions.length === 0
 									? "No claimable occurrences"
-									: "Choose the occurrence"}
-						</option>
-						{occurrenceOptions.map((date) => (
-							<option key={date} value={date}>
-								{dateLabel(date, true)}
-							</option>
-						))}
-					</SelectField>
-					<label
-						htmlFor={enabledId}
-						className="flex min-h-11 items-center gap-3 text-sm text-muted"
-					>
-						<Checkbox
-							id={enabledId}
-							checked={enabled}
-							onChange={(event) => setEnabled(event.target.checked)}
-						/>
-						Include in projections
-					</label>
-				</fieldset>
-				<FieldError message={error} />
-				<div className={dialogActionsStyles}>
-					<Button type="button" variant="secondary" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={saving || !dirty}>
-						{saving ? "Saving…" : "Add transaction"}
-					</Button>
-				</div>
-			</form>
-		</Modal>
+									: "Choose the occurrence"
+						}
+						options={occurrenceOptions.map((date) => ({
+							value: date,
+							label: dateLabel(date, true),
+						}))}
+						disabled={saving || !claimScheduleId}
+					/>
+				</EditorField>
+				<EditorCheckbox
+					id={enabledId}
+					label="Include in projections"
+					checked={enabled}
+					onChange={setEnabled}
+					disabled={saving}
+				/>
+			</fieldset>
+		</EditorDialog>
 	);
 }

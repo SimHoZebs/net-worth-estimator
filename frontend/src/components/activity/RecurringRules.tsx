@@ -24,13 +24,25 @@ import {
 } from "../../state/workspaceResources.ts";
 import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
-import { Badge } from "../Badge.tsx";
-import { EmptyState } from "../EmptyState.tsx";
-import { Button, IconButton, TextButton } from "../Button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import {
-	transactionIconStyles,
-	transactionBadgeStyles,
-} from "./activityStyles.ts";
+	Empty,
+	EmptyContent,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
+import { transactionIconStyles } from "./activityStyles.ts";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 
 type Direction = "in" | "out" | "transfer";
@@ -79,18 +91,21 @@ function SortableRow({
 			dragControls={dragControls}
 			onDragStart={onDragStart}
 			onDragEnd={onDrop}
-			className="flex items-center gap-3 border-b border-line bg-transparent p-3 max-sm:gap-2 max-sm:px-2 max-sm:py-3"
+			className="border-b border-border last:border-b-0"
 			aria-label={label}
+			as="div"
 		>
-			<span
-				className="flex touch-none cursor-grab text-muted"
-				aria-hidden="true"
-				onPointerDown={(event) => dragControls.start(event)}
-			>
-				<GripVertical size={16} />
-			</span>
-			{children}
-			{controls}
+			<Item variant="default" size="sm" className="gap-3 px-2">
+				<span
+					className="flex touch-none cursor-grab text-muted-foreground"
+					aria-hidden="true"
+					onPointerDown={(event) => dragControls.start(event)}
+				>
+					<GripVertical size={16} />
+				</span>
+				{children}
+				{controls}
+			</Item>
 		</Reorder.Item>
 	);
 }
@@ -233,12 +248,26 @@ export function RecurringRules({
 
 	if (!rows.length)
 		return (
-			<EmptyState
-				icon={Repeat}
-				title="No recurring transactions for this account yet"
-				action="Add a schedule"
-				onAction={() => onEdit({ kind: "schedule", item: null })}
-			/>
+			<Empty className="px-6 py-12">
+				<EmptyHeader>
+					<EmptyMedia>
+						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+							<Repeat size={28} aria-hidden="true" />
+						</span>
+					</EmptyMedia>
+					<EmptyTitle className="text-lg">
+						No recurring transactions for this account yet
+					</EmptyTitle>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button
+						type="button"
+						onClick={() => onEdit({ kind: "schedule", item: null })}
+					>
+						Add a schedule
+					</Button>
+				</EmptyContent>
+			</Empty>
 		);
 
 	const rowContent = (
@@ -256,39 +285,44 @@ export function RecurringRules({
 		return (
 			<>
 				<span
-					className="min-w-[2ch] text-right text-xs whitespace-nowrap text-muted tabular-nums"
+					className="min-w-[2ch] text-right text-xs whitespace-nowrap text-muted-foreground tabular-nums"
 					aria-hidden={compact ? undefined : true}
 				>
 					{order}
 				</span>
-				<span
-					className={transactionIconStyles({
-						tone:
-							direction === "transfer"
-								? "transfer"
-								: direction === "in"
-									? "inflow"
-									: "outflow",
-					})}
-				>
-					<DirectionIcon size={16} aria-hidden="true" />
-				</span>
-				<span className="flex min-w-0 flex-col gap-1">
-					<strong className="m-0 text-xs font-semibold [overflow-wrap:anywhere]">
+				<ItemMedia>
+					<span
+						className={transactionIconStyles({
+							tone:
+								direction === "transfer"
+									? "transfer"
+									: direction === "in"
+										? "inflow"
+										: "outflow",
+						})}
+					>
+						<DirectionIcon size={16} aria-hidden="true" />
+					</span>
+				</ItemMedia>
+				<ItemContent>
+					<ItemTitle className="text-xs [overflow-wrap:anywhere]">
 						{transaction.name}
-					</strong>
-					<span className="m-0 text-xs text-muted">
+					</ItemTitle>
+					<ItemDescription>
 						{directionLabel(direction)} · {cadenceOf(transaction.id)} ·{" "}
 						{transaction.amountKnown ? money(transaction.amount) : "Varies"}
-					</span>
+					</ItemDescription>
 					{!transaction.enabled && (
 						<span className="m-0 flex flex-wrap gap-1">
-							<Badge tone="warning" className={transactionBadgeStyles()}>
+							<Badge
+								variant="secondary"
+								className="bg-warning-bg text-warning-text"
+							>
 								Excluded from account
 							</Badge>
 						</span>
 					)}
-				</span>
+				</ItemContent>
 			</>
 		);
 	};
@@ -296,7 +330,7 @@ export function RecurringRules({
 	return (
 		<>
 			<div className="flex flex-wrap items-center justify-between gap-4">
-				<p className="p-0 text-xs leading-[1.8] text-muted">
+				<p className="p-0 text-xs leading-[1.8] text-muted-foreground">
 					Execution order for this account. Same-day transactions apply in this
 					order.
 				</p>
@@ -338,7 +372,7 @@ export function RecurringRules({
 					axis="y"
 					values={displayedIds}
 					onReorder={handleReorder}
-					className="m-0 flex list-none flex-col border-t border-line p-0"
+					className="m-0 flex list-none flex-col border-t border-border p-0"
 					aria-label={`Reorder recurring transactions for ${account.name}`}
 				>
 					{orderedRules.map((transaction, index) => (
@@ -349,21 +383,32 @@ export function RecurringRules({
 							onDragStart={beginGesture}
 							onDrop={handleDrop}
 							controls={
-								<span className="ml-auto flex items-center gap-1 max-sm:gap-0.5">
-									<IconButton
-										icon={ChevronUp}
-										label={`Move ${transaction.name} up`}
+								<ItemActions className="ml-auto">
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Move ${transaction.name} up`}
+										title={`Move ${transaction.name} up`}
 										disabled={index === 0}
 										onClick={() => moveBy(transaction.id, -1)}
-									/>
-									<IconButton
-										icon={ChevronDown}
-										label={`Move ${transaction.name} down`}
+									>
+										<ChevronUp aria-hidden="true" />
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Move ${transaction.name} down`}
+										title={`Move ${transaction.name} down`}
 										disabled={index === orderedRules.length - 1}
 										onClick={() => moveBy(transaction.id, 1)}
-									/>
-									<TextButton
+									>
+										<ChevronDown aria-hidden="true" />
+									</Button>
+									<Button
 										type="button"
+										variant="link"
 										aria-label={`Edit ${transaction.name}`}
 										onClick={() => {
 											setDraft(null);
@@ -372,8 +417,8 @@ export function RecurringRules({
 										}}
 									>
 										Edit
-									</TextButton>
-								</span>
+									</Button>
+								</ItemActions>
 							}
 						>
 							{rowContent(transaction, index + 1, true)}
@@ -381,26 +426,24 @@ export function RecurringRules({
 					))}
 				</Reorder.Group>
 			) : (
-				<ul
-					className="m-0 flex list-none flex-col border-t border-line p-0"
-					aria-label={`Recurring transactions for ${account.name}`}
-				>
+				<ItemGroup aria-label={`Recurring transactions for ${account.name}`}>
 					{rows.map((transaction, index) => (
-						<li
+						<Item
 							key={transaction.id}
-							className="flex items-center gap-3 border-b border-line bg-transparent p-3 max-sm:gap-2 max-sm:px-2 max-sm:py-3"
+							variant="default"
+							size="sm"
+							render={
+								<button
+									type="button"
+									aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${cadenceOf(transaction.id).toLowerCase()}, position ${index + 1} of ${rows.length}`}
+									onClick={() => setSelectedId(transaction.id)}
+								/>
+							}
 						>
-							<button
-								type="button"
-								className="flex min-w-0 flex-1 items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left"
-								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${cadenceOf(transaction.id).toLowerCase()}, position ${index + 1} of ${rows.length}`}
-								onClick={() => setSelectedId(transaction.id)}
-							>
-								{rowContent(transaction, index + 1, false)}
-							</button>
-						</li>
+							{rowContent(transaction, index + 1, false)}
+						</Item>
 					))}
-				</ul>
+				</ItemGroup>
 			)}
 			{selected && (
 				<TransactionDetail

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { createLoan, updateLoan } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
 import { literalAmountOf } from "../../domain/transactionRows.ts";
@@ -10,11 +10,13 @@ import {
 	useSchedules,
 } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { DialogFooter } from "@/components/ui/dialog.tsx";
+import { FieldError, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { DiscardConfirm, useDiscardGuard } from "./EditorDialog.tsx";
+import { EditorField, EditorSelect, MoneyField } from "./editorFields.tsx";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 
@@ -27,6 +29,11 @@ const frequencies = [
 ] as const;
 type Frequency = (typeof frequencies)[number];
 
+const frequencyOptions = frequencies.map((frequency) => ({
+	value: frequency,
+	label: frequency,
+}));
+
 type LoanEditorProps = {
 	item: Account | null;
 	onClose: () => void;
@@ -34,6 +41,8 @@ type LoanEditorProps = {
 	formId: string;
 	name: string;
 	enabled: boolean;
+	dirtyOutside?: boolean;
+	onDirtyChange?: (dirty: boolean) => void;
 	onSavingChange: (saving: boolean) => void;
 };
 
@@ -44,7 +53,11 @@ export function LoanEditor(props: LoanEditorProps) {
 	if (!accounts || (item && schedules.isPending))
 		return <p role="status">Loading loan terms…</p>;
 	if (item && schedules.isError)
-		return <ErrorNotice message="Loan terms could not be loaded." />;
+		return (
+			<Alert variant="destructive">
+				<AlertDescription>Loan terms could not be loaded.</AlertDescription>
+			</Alert>
+		);
 	return (
 		<LoanForm
 			{...props}
@@ -63,6 +76,8 @@ function LoanForm({
 	formId,
 	name,
 	enabled,
+	dirtyOutside = false,
+	onDirtyChange,
 	onSavingChange,
 }: LoanEditorProps & {
 	accounts: Account[];
@@ -121,8 +136,22 @@ function LoanForm({
 	const [values, setValues] = useState(initial);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const dirty = JSON.stringify(values) !== JSON.stringify(baseline);
-	useBeforeUnload(dirty && !saving);
+	const principalId = useId();
+	const interestId = useId();
+	const rateId = useId();
+	const paymentId = useId();
+	const fundingId = useId();
+	const interestFrequencyId = useId();
+	const paymentFrequencyId = useId();
+	const interestStartId = useId();
+	const paymentStartId = useId();
+	const ownDirty = JSON.stringify(values) !== JSON.stringify(baseline);
+	const dirty = ownDirty || dirtyOutside;
+	const guard = useDiscardGuard({ dirty, busy: saving });
+	useEffect(() => {
+		onDirtyChange?.(ownDirty);
+	}, [ownDirty, onDirtyChange]);
+	const locked = saving || item?.readOnly;
 	const change = <K extends keyof typeof values>(
 		key: K,
 		value: (typeof values)[K],
@@ -185,144 +214,161 @@ function LoanForm({
 			onSubmit={(event) => void submit(event)}
 		>
 			<fieldset
-				disabled={saving || item?.readOnly}
+				disabled={locked}
 				className="m-0 flex flex-col gap-5 border-0 p-0"
 			>
 				<legend className="sr-only">Loan terms</legend>
-				<fieldset className="m-0 grid grid-cols-2 gap-4 rounded-control border border-line p-4 max-sm:grid-cols-1">
-					<legend className="px-2 text-sm font-semibold">Amount owed</legend>
-					<InputField
-						label="Principal (USD)"
+				<FieldSet className="grid grid-cols-2 gap-4 rounded-xl border border-border p-4 max-sm:grid-cols-1">
+					<FieldLegend>Amount owed</FieldLegend>
+					<MoneyField
+						id={principalId}
+						label="Principal"
 						name="principal"
-						type="number"
-						inputMode="decimal"
 						required
 						min="0"
 						max="10000000000"
 						step="0.01"
 						value={values.principal}
 						onChange={(e) => change("principal", e.target.value)}
+						disabled={locked}
 					/>
-					<InputField
-						label="Accrued interest (USD)"
+					<MoneyField
+						id={interestId}
+						label="Accrued interest"
 						name="interest"
-						type="number"
-						inputMode="decimal"
 						required
 						min="0"
 						max="10000000000"
 						step="0.01"
 						value={values.interest}
 						onChange={(e) => change("interest", e.target.value)}
+						disabled={locked}
 					/>
-					<p className="col-span-full m-0 flex justify-between text-sm text-muted">
+					<p className="col-span-full m-0 flex justify-between text-sm text-muted-foreground">
 						Total owed{" "}
-						<strong className="type-value text-ink">
+						<strong className="type-value text-foreground">
 							{exactMoney(Number(values.principal) + Number(values.interest))}
 						</strong>
 					</p>
-				</fieldset>
+				</FieldSet>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 border-0 p-0 max-sm:grid-cols-1">
 					<legend className="mb-3 text-sm font-semibold">Interest</legend>
-					<InputField
-						label="Annual interest rate (%)"
-						name="rate"
-						type="number"
-						required
-						min="0"
-						max="100"
-						step="0.0001"
-						value={values.rate}
-						onChange={(e) => change("rate", e.target.value)}
-					/>
-					<SelectField
+					<EditorField label="Annual interest rate (%)" htmlFor={rateId}>
+						<Input
+							id={rateId}
+							name="rate"
+							type="number"
+							required
+							min="0"
+							max="100"
+							step="0.0001"
+							value={values.rate}
+							onChange={(e) => change("rate", e.target.value)}
+							disabled={locked}
+						/>
+					</EditorField>
+					<EditorField
 						label="Interest charge frequency"
-						name="interestFrequency"
-						value={values.interestFrequency}
-						onChange={(e) =>
-							change("interestFrequency", e.target.value as Frequency)
-						}
+						htmlFor={interestFrequencyId}
 					>
-						{frequencies.map((f) => (
-							<option key={f} value={f}>
-								{f}
-							</option>
-						))}
-					</SelectField>
-					<InputField
-						label="First interest charge"
-						name="interestStart"
-						type="date"
-						required
-						value={values.interestStart}
-						onChange={(e) => change("interestStart", e.target.value)}
-					/>
+						<EditorSelect
+							id={interestFrequencyId}
+							value={values.interestFrequency}
+							onValueChange={(next) =>
+								change("interestFrequency", next as Frequency)
+							}
+							options={frequencyOptions}
+							disabled={locked}
+						/>
+					</EditorField>
+					<EditorField label="First interest charge" htmlFor={interestStartId}>
+						<Input
+							id={interestStartId}
+							name="interestStart"
+							type="date"
+							required
+							value={values.interestStart}
+							onChange={(e) => change("interestStart", e.target.value)}
+							disabled={locked}
+						/>
+					</EditorField>
 				</fieldset>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 border-0 p-0 max-sm:grid-cols-1">
 					<legend className="mb-3 text-sm font-semibold">Payments</legend>
-					<InputField
-						label="Payment amount (USD)"
+					<MoneyField
+						id={paymentId}
+						label="Payment amount"
 						name="payment"
-						type="number"
 						required
 						min="0"
 						max="10000000000"
 						step="0.01"
 						value={values.payment}
 						onChange={(e) => change("payment", e.target.value)}
+						disabled={locked}
 					/>
-					<SelectField
-						label="Pay from"
-						rich
-						name="funding"
-						value={values.funding}
-						onChange={(e) => change("funding", e.target.value)}
-					>
-						<option value="">Select funding account</option>
-						{accounts
-							.filter(
-								(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
-							)
-							.map((a) => (
-								<option key={a.id} value={a.id} aria-label={a.name}>
-									<AccountIcon account={a} size="sm" className="size-6" />
-									<span>{a.name}</span>
-								</option>
-							))}
-					</SelectField>
-					<SelectField
-						label="Payment frequency"
-						name="paymentFrequency"
-						value={values.paymentFrequency}
-						onChange={(e) =>
-							change("paymentFrequency", e.target.value as Frequency)
-						}
-					>
-						{frequencies.map((f) => (
-							<option key={f} value={f}>
-								{f}
-							</option>
-						))}
-					</SelectField>
-					<InputField
-						label="First payment"
-						name="paymentStart"
-						type="date"
-						required
-						value={values.paymentStart}
-						onChange={(e) => change("paymentStart", e.target.value)}
-					/>
+					<EditorField label="Pay from" htmlFor={fundingId}>
+						<EditorSelect
+							id={fundingId}
+							value={values.funding}
+							onValueChange={(next) => change("funding", next)}
+							emptyLabel="Select funding account"
+							options={accounts
+								.filter(
+									(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
+								)
+								.map((a) => ({
+									value: a.id,
+									label: a.name,
+									icon: (
+										<AccountIcon account={a} size="sm" className="size-6" />
+									),
+								}))}
+							disabled={locked}
+						/>
+					</EditorField>
+					<EditorField label="Payment frequency" htmlFor={paymentFrequencyId}>
+						<EditorSelect
+							id={paymentFrequencyId}
+							value={values.paymentFrequency}
+							onValueChange={(next) =>
+								change("paymentFrequency", next as Frequency)
+							}
+							options={frequencyOptions}
+							disabled={locked}
+						/>
+					</EditorField>
+					<EditorField label="First payment" htmlFor={paymentStartId}>
+						<Input
+							id={paymentStartId}
+							name="paymentStart"
+							type="date"
+							required
+							value={values.paymentStart}
+							onChange={(e) => change("paymentStart", e.target.value)}
+							disabled={locked}
+						/>
+					</EditorField>
 				</fieldset>
 			</fieldset>
-			<ErrorNotice message={error} />
-			<div className={dialogActionsStyles}>
-				<Button type="button" variant="secondary" onClick={onClose}>
+			{error ? <FieldError>{error}</FieldError> : null}
+			<DialogFooter>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => guard.requestClose(onClose)}
+				>
 					Cancel
 				</Button>
 				<Button type="submit" disabled={saving || item?.readOnly}>
 					{saving ? "Saving…" : item ? "Save account" : "Add account"}
 				</Button>
-			</div>
+			</DialogFooter>
+			<DiscardConfirm
+				open={guard.confirming}
+				onContinue={guard.dismissConfirm}
+				onDiscard={onClose}
+			/>
 		</form>
 	);
 }

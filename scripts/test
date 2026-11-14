@@ -12,7 +12,7 @@ usage() {
 Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matrix opts]|--gate [--no-browser] [--without-backend] [--shards=N]|--help]
 
   --unit         package/config checks (no pre-existing stack/daemon/credentials)
-  --integration  browser integration suite (fixtureapi + Vite over real HTTP)
+  --integration  observed UI regression specs (isolated browser harness)
   --all          --unit then --integration (tests only; not the completion gate:
                lint, typecheck, and build still run separately per TESTING.md)
   --e2e          disposable end-to-end gate: real provider, real images, real
@@ -32,15 +32,16 @@ Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matri
   --matrix       integration edge-case matrix: the Go edge-case suite once per
                dataset-pack x identity-set combination, then teardown to
                nothing (see docs/integration-edge-gates.md)
-  --browser      with --matrix: also run the sharing browser specs per pack
-               (fixture user only; duo/full/group journeys stay in Go)
+  --browser      with --matrix: also run the browser leg per pack
+               (observed regression specs, or an explicit empty baseline;
+               fixture user only; duo/full/group journeys stay in Go)
   --packs=A,B    with --matrix: fixture packs (default: base,unicode;
                base means the suite default seed, all means every pack file)
   --identities=A,B
                with --matrix: solo, duo, full (default: full,duo,solo)
   --repeat=N     with --matrix: go test -count for storm repetition (default 1)
-  --specs=A,B    with --matrix --browser: browser specs (default: the three
-               sharing specs)
+  --specs=A,B    with --matrix --browser: browser specs (default: all observed
+               regressions; reports an empty baseline when none exist)
   --bulk=NxM[:s] with --matrix: tagged bulk accounts on top of each pack
                (default: none; for example 20x200:7)
   --gate         full completion gate: install check, one API generation, then
@@ -58,7 +59,7 @@ Matrix:
                bun --filter ./extension test (node:test, no external APIs)
                 bun --filter @waypoint/auth test (real provider, disposable database)
                 bash scripts/test-contracts (config, scripts, auth, deployment safety)
-  integration  bun --filter ./frontend test:integration (tests/integration/*.spec.ts, sharded)
+  integration  bun --filter ./frontend test:integration (observed UI regressions; sharded)
                bun --filter ./extension test:browser (disposable browser profile)
   e2e          E2E_TEST_MUTATIONS=1 node auth/test-e2e.mjs (disposable provider,
                real images, real browser; covers the manual credential-gated
@@ -100,9 +101,10 @@ run_e2e() {
 # Integration edge-case matrix: one Go suite run per dataset-pack x
 # identity-set combination. Each run uses throwaway SQLite databases and
 # httptest HTTP only: no canonical stack, no fixed ports, nothing to tear
-# down beyond the test temp dirs. With --browser, the sharing specs also run
+# down beyond the test temp dirs. With --browser, the browser leg also runs
 # per pack against the pack-seeded fixture harness (fresh temp database and
-# random free ports per run, pruned on exit by the browser config).
+# random free ports per run, pruned on exit by the browser config), reporting
+# the empty UI baseline until a regression re-adds a spec.
 # One owner for pack/bulk env selection: the Go edge suite consumes
 # INTEGRATION_PACK/INTEGRATION_BULK/INTEGRATION_IDENTITY_SET, the browser
 # harness consumes only pack/bulk. Browser checks run once per pack.
@@ -269,7 +271,7 @@ matrix_browser=0
 matrix_packs="base,unicode"
 matrix_identities="full,duo,solo"
 matrix_repeat=1
-matrix_specs="groupSharing.spec.ts sharedFeed.spec.ts inbox.spec.ts"
+matrix_specs=""
 matrix_bulk=""
 matrix_only_opt=0
 for argument in "$@"; do

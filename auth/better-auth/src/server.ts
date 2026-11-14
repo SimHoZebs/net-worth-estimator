@@ -29,7 +29,12 @@ export function handler(auth: Auth, config: Settings) {
       else if (url.pathname.startsWith("/waypoint/account"))
         response = await accountRequest(auth, config, request);
       else if (
-        ["/assets/auth.css", "/assets/client.js", "/assets/manrope.woff2"].includes(url.pathname)
+        [
+          "/assets/auth.css",
+          "/assets/client.js",
+          "/assets/geist.woff2",
+          "/assets/merriweather.woff2",
+        ].includes(url.pathname)
       ) {
         response = new Response(
           Bun.file(new URL(`../public/${url.pathname.split("/").pop()}`, import.meta.url)),

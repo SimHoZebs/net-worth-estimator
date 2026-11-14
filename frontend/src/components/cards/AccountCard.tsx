@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { Badge } from "../Badge.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { money } from "../../domain/format.ts";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 
@@ -14,18 +14,22 @@ export function AccountCard({
 	return (
 		<button
 			type="button"
-			className="flex min-h-55 cursor-pointer flex-col gap-3 rounded-surface border border-line bg-surface p-4 text-left text-inherit transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-line-strong hover:shadow-md"
+			className="flex min-h-55 cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left text-inherit transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-input hover:shadow-md"
 			onClick={() => onOpen(card)}
 			aria-label={`View details for ${card.name}`}
 		>
 			<span className="flex items-center justify-between">
 				<AccountIcon account={card.account} />
-				<ArrowUpRight size={16} aria-hidden="true" className="text-muted" />
+				<ArrowUpRight
+					size={16}
+					aria-hidden="true"
+					className="text-muted-foreground"
+				/>
 			</span>
 			<span>
 				<span className="truncate text-sm font-semibold">{card.name}</span>
 				<br />
-				<span className="text-xs text-muted">
+				<span className="text-xs text-muted-foreground">
 					{card.institution}
 					{card.last4 ? ` ···· ${card.last4}` : ""}
 				</span>
@@ -35,11 +39,13 @@ export function AccountCard({
 					{money(card.balance)}
 				</span>
 				<br />
-				<span className="text-xs text-muted">{card.balanceLabel}</span>
+				<span className="text-xs text-muted-foreground">
+					{card.balanceLabel}
+				</span>
 			</span>
 			<span className="flex flex-wrap gap-2">
 				{card.roles.map((role) => (
-					<Badge key={role} tone="neutral">
+					<Badge key={role} variant="secondary">
 						{role}
 					</Badge>
 				))}

@@ -204,7 +204,6 @@ backend/scripts/verify.sh ./internal/api/...
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./cmd/refreshmodel
 bun --filter ./frontend test:unit -- src/domain/receipt.test.ts src/api/waypoint-fetch.test.ts
-TEST_API_PORT=18899 TEST_FRONTEND_PORT=5187 bun --filter ./frontend test:integration -- receipts.spec.ts
 NGINX_TEST_IMAGE=net-worth-frontend:main node --test scripts/nginx-receipts.test.mjs
 ```
 

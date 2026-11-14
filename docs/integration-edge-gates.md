@@ -3,7 +3,7 @@
 Companion to [the release gates](release-gates.md). That document owns the
 ship/no-ship checklist; this one owns the hostile half of the integration
 tier: the fixture packs, the edge-case suite, and the dataset × identity
-matrix runner. Nothing here replaces the unit gates, the browser suite, or
+matrix runner. Nothing here replaces the unit gates, focused browser regressions, or
 the manual tier below.
 
 ## Tiers
@@ -72,10 +72,11 @@ Loading per harness:
   suite seeds `INTEGRATION_PACK` automatically when set. Harness-specific
   seeds are read through the pack accessors (`BankFeeds`, `SplitProbes`,
   `LedgerExpected`, `SyncState`, `SharingScript`, `InviteScript`).
-- Browser suite: `INTEGRATION_PACK=<pack>` in the environment. The
+- Browser harness (observed regression specs only):
+  `INTEGRATION_PACK=<pack>` in the environment. The
   fixtureapi harness applies the pack's model and settings seeds on its own isolated ports and throwaway database; the
   Playwright config forwards the variable explicitly. Empty keeps the default
-  fixture.
+  fixture. A re-added regression spec would run against this harness.
 - Manual demo: `scripts/dev demo --pack safe-spending` starts the same
   fixture API and Vite on isolated ports, sets the browser clock to the pack's
   anchor date, and opens a headed browser. `safe-spending-shortfall` shows the
@@ -125,7 +126,6 @@ scripts/test --matrix
 scripts/test --matrix --packs=base,unicode,timezones --identities=full,duo --repeat=3
 scripts/test --matrix --packs=all --identities=full
 scripts/test --matrix --packs=unicode --browser
-scripts/test --matrix --packs=unicode --browser --specs=groupSharing.spec.ts
 scripts/test --matrix --packs=unicode --bulk=20x200:7
 ```
 
@@ -137,11 +137,9 @@ throwaway databases, never reused across runs.
 
 Isolation: the Go leg uses throwaway SQLite files and httptest HTTP only —
 no servers, no fixed ports, no canonical stack, no tailnet or issuer
-changes. The `--browser` leg runs the sharing specs per pack through the
-standard browser config: random free ports, a fresh temporary database
-pruned on exit, servers stopped by the runner. The browser harness has a
-single fixture user, so the browser leg always runs the solo-equivalent
-journeys; duo/full/group journeys run in the Go suite.
+changes. The `--browser` leg runs observed regression specs per pack (or
+reports an empty baseline if none exist). Use `--specs=` to select a spec;
+duo/full/group journeys run in the Go suite.
 
 ## Known findings (not failures)
 

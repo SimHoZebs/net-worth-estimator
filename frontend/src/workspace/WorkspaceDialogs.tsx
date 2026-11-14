@@ -1,7 +1,15 @@
 import { Suspense, lazy } from "react";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
-import { Modal } from "../components/Modal.tsx";
-import { Button } from "../components/Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
 
 export function WorkspaceInvalidLink({ onClose }: { onClose: () => void }) {
 	return (
@@ -14,7 +22,9 @@ export function WorkspaceInvalidLink({ onClose }: { onClose: () => void }) {
 				This link has invalid or conflicting dialog parameters. Check the
 				address or continue on this page.
 			</p>
-			<Button onClick={onClose}>Continue on this page</Button>
+			<Button variant="secondary" onClick={onClose}>
+				Continue on this page
+			</Button>
 		</section>
 	);
 }
@@ -65,17 +75,32 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
+	// The unavailable notice is a modal dialog. The mobile navigation
+	// sheet is modal too, so the library keeps the two ordered without a
+	// custom presence counter.
 	if (overlays.unavailable)
 		return (
-			<Modal
-				title="Linked item unavailable"
-				onClose={overlays.closeUnavailable}
+			<Dialog
+				open
+				onOpenChange={(next) => {
+					if (!next) overlays.closeUnavailable();
+				}}
 			>
-				<p>
-					This item does not exist or is not available in this workspace. Close
-					this message to continue on this page.
-				</p>
-			</Modal>
+				<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Linked item unavailable</DialogTitle>
+						<DialogDescription>
+							This item does not exist or is not available in this workspace.
+							Close this message to continue on this page.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<DialogClose render={<Button variant="secondary" />}>
+							Close message
+						</DialogClose>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		);
 	if (!overlays.editor) return null;
 	return (

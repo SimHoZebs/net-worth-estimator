@@ -43,7 +43,9 @@ export function BalanceHistory({
 		return (
 			<section aria-label="Balance history" className="grid min-w-0 gap-3">
 				<h3 className="m-0 text-sm font-semibold">Balance history</h3>
-				<p className="m-0 text-xs text-muted">No balance adjustments yet.</p>
+				<p className="m-0 text-xs text-muted-foreground">
+					No balance adjustments yet.
+				</p>
 			</section>
 		);
 	return (

@@ -86,7 +86,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 					y: "balance",
 					r: 5,
 					fill: "var(--primary)",
-					stroke: "var(--surface)",
+					stroke: "var(--card)",
 					strokeWidth: 3,
 				}),
 				dot([refusal[1]!], {
@@ -94,7 +94,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 					y: "balance",
 					r: 6,
 					fill: "var(--danger-solid)",
-					stroke: "var(--surface)",
+					stroke: "var(--card)",
 					strokeWidth: 3,
 				}),
 				text(
@@ -159,7 +159,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 		<div className="mt-4">
 			<div className="mb-2 flex items-center justify-between gap-2">
 				<h3 className="text-sm">Account balance over time</h3>
-				<span className="text-xs whitespace-nowrap text-muted">
+				<span className="text-xs whitespace-nowrap text-muted-foreground">
 					Through {money(summary.available)} available
 				</span>
 			</div>

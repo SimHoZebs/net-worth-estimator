@@ -36,7 +36,7 @@ export function EvalValueBands({ item }: { item: OtherEvaluation }) {
 			? `p10 ${bands.p10 ?? "—"} · p50 ${bands.p50 ?? "—"} · p90 ${bands.p90 ?? "—"}`
 			: null;
 	return (
-		<p className="m-0 text-xs text-muted">
+		<p className="m-0 text-xs text-muted-foreground">
 			{formatted !== null && (
 				<span>
 					{unitLabel}: <strong className="type-value">{formatted}</strong>

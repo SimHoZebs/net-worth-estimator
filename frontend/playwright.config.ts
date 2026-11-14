@@ -26,7 +26,9 @@ const baseURL = `http://127.0.0.1:${frontendPort}`;
 // A fresh database per run. Reusing a port-named file breaks the suite as soon
 // as the schema changes, and two agents would share one file. The directory is
 // removed when Playwright exits; the runner prunes leftovers from crashes.
-const temporaryRoot = existsSync("/tmp/opencode") ? "/tmp/opencode" : tmpdir();
+const temporaryRoot =
+	process.env.TMPDIR ??
+	(existsSync("/tmp/opencode") ? "/tmp/opencode" : tmpdir());
 const runDirectory = mkdtempSync(join(temporaryRoot, "waypoint-browser-"));
 const databasePath = join(runDirectory, "app.db");
 process.on("exit", () => {

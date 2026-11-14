@@ -1,14 +1,23 @@
-import { useRef, useState, type Ref } from "react";
+import { useId, useRef, useState, type Ref } from "react";
 import type { AnalysisDuration } from "@/api/generated/model/analysisDuration.ts";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { findingLabel, providerLabel } from "@/domain/analysisFindings.ts";
 import { useReviewAnalysisFinding } from "@/state/analyses.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { Badge } from "../Badge.tsx";
-import { Button } from "../Button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
-import { InputField, SelectField } from "../Field.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
 
 // useReviewAnalysisFinding awaits its finding refetch before action completion.
 // Schedule the action's focus handoff after React commits its new controls, without
@@ -38,12 +47,11 @@ export function BNPLConfirmation({
 	const provider = providerLabel(review?.provider ?? finding.provider);
 	function reportAnswerFailure(cause: unknown): void {
 		if (cause instanceof UserScopeError) return;
-		notifyError(
-			"analysis-answer",
+		const message =
 			cause instanceof ApiHttpError && cause.status === 409
 				? "This finding changed."
-				: "Your answer could not be saved.",
-		);
+				: "Your answer could not be saved.";
+		notifyError("analysis-answer", message);
 	}
 	const answer = (action: "confirm" | "reject") => {
 		feedback.mutate(
@@ -78,7 +86,11 @@ export function BNPLConfirmation({
 						Is this a buy now, pay later payment from {provider}?
 					</legend>
 					<div className="flex gap-2">
-						<Button size="sm" onClick={() => answer("confirm")}>
+						<Button
+							size="sm"
+							variant="secondary"
+							onClick={() => answer("confirm")}
+						>
 							Yes
 						</Button>
 						<Button
@@ -92,8 +104,20 @@ export function BNPLConfirmation({
 				</fieldset>
 			) : (
 				<div className="flex flex-wrap items-center gap-2">
-					<Badge tone="neutral">{findingLabel(finding)}</Badge>
-					{finding.stale && <Badge tone="warning">Awaiting analysis</Badge>}
+					<Badge
+						variant="secondary"
+						className="h-auto bg-accent text-muted-foreground"
+					>
+						{findingLabel(finding)}
+					</Badge>
+					{finding.stale && (
+						<Badge
+							variant="default"
+							className="h-auto bg-warning-bg text-warning-text"
+						>
+							Awaiting analysis
+						</Badge>
+					)}
 					<span className="text-sm">
 						{provider}
 						{duration
@@ -152,6 +176,63 @@ export function BNPLConfirmation({
 	);
 }
 
+function PlanDurationField({
+	inputRef,
+	count,
+	onCount,
+}: {
+	inputRef: Ref<HTMLInputElement>;
+	count: string;
+	onCount: (value: string) => void;
+}) {
+	const id = useId();
+	return (
+		<Field className="flex w-24 min-w-0 flex-col gap-2">
+			<Label htmlFor={id}>Duration</Label>
+			<Input
+				ref={inputRef}
+				id={id}
+				type="number"
+				inputMode="numeric"
+				min={1}
+				max={5200}
+				step={1}
+				required
+				value={count}
+				onChange={(event) => onCount(event.target.value)}
+			/>
+		</Field>
+	);
+}
+
+function PlanDurationUnit({
+	unit,
+	onUnit,
+}: {
+	unit: AnalysisDuration["unit"];
+	onUnit: (unit: AnalysisDuration["unit"]) => void;
+}) {
+	const id = useId();
+	return (
+		<Field className="flex min-w-0 flex-col gap-2">
+			<Label htmlFor={id}>Unit</Label>
+			<Select
+				name="unit"
+				value={unit}
+				onValueChange={(next) => onUnit(next as AnalysisDuration["unit"])}
+			>
+				<SelectTrigger id={id}>
+					<SelectValue>{unit === "weeks" ? "Weeks" : "Months"}</SelectValue>
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem value="weeks">Weeks</SelectItem>
+					<SelectItem value="months">Months</SelectItem>
+				</SelectContent>
+			</Select>
+		</Field>
+	);
+}
+
 function PlanDuration({
 	duration,
 	inputRef,
@@ -179,30 +260,13 @@ function PlanDuration({
 			<fieldset disabled={busy} className="m-0 space-y-3 border-0 p-0">
 				<legend className="text-sm font-semibold">How long is the plan?</legend>
 				<div className="flex flex-wrap items-end gap-2">
-					<InputField
-						ref={inputRef}
-						label="Duration"
-						type="number"
-						inputMode="numeric"
-						min={1}
-						max={5200}
-						step={1}
-						required
-						value={count}
-						onChange={(event) => setCount(event.target.value)}
-						containerClassName="w-24"
+					<PlanDurationField
+						inputRef={inputRef}
+						count={count}
+						onCount={setCount}
 					/>
-					<SelectField
-						label="Unit"
-						value={unit}
-						onChange={(event) =>
-							setUnit(event.target.value as AnalysisDuration["unit"])
-						}
-					>
-						<option value="weeks">Weeks</option>
-						<option value="months">Months</option>
-					</SelectField>
-					<Button type="submit" size="sm">
+					<PlanDurationUnit unit={unit} onUnit={setUnit} />
+					<Button type="submit" size="sm" variant="secondary">
 						Save
 					</Button>
 				</div>

@@ -1,13 +1,13 @@
 import type { Account } from "../domain/model.ts";
 import { AccountLabel } from "./AccountIcon.tsx";
-import { mergeStyles } from "./mergeStyles.ts";
+import { Toggle } from "@/components/ui/toggle.tsx";
+import { cn } from "@/lib/utils.ts";
 
-/** Shared press-toggle button recipe so account and pill toggles share states. */
-export const pressToggleStyles =
-	"group cursor-pointer rounded-control border border-line-strong bg-surface py-2 pr-3 pl-2 text-left text-xs transition-[border-color,background] duration-150 hover:bg-hover aria-pressed:border-primary aria-pressed:bg-success-bg motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-50";
-
-// Shared account press-toggle. Safe-spending uses the default sizing;
-// denser lists pass their own layout classes, which win on conflict.
+// Shared account press-toggle on the canonical toggle primitive. The
+// primitive owns pressed, hover, disabled, and focus visuals; the only
+// caller override is layout for the rich account identity content.
+// Safe-spending uses the default sizing; denser lists pass their own layout
+// classes, which win on conflict.
 export function AccountToggle({
 	account,
 	checked,
@@ -22,17 +22,17 @@ export function AccountToggle({
 	className?: string;
 }) {
 	return (
-		<button
-			type="button"
-			className={mergeStyles(pressToggleStyles, className)}
-			aria-pressed={checked}
+		<Toggle
+			pressed={checked}
+			onPressedChange={() => onToggle()}
 			disabled={disabled}
-			onClick={onToggle}
+			variant="outline"
+			className={cn(
+				"h-auto min-h-9 w-full min-w-0 justify-start gap-3 px-2 py-2 text-left text-xs",
+				className,
+			)}
 		>
-			<AccountLabel
-				account={account}
-				nameClassName="group-aria-[pressed=false]:text-muted"
-			/>
-		</button>
+			<AccountLabel account={account} />
+		</Toggle>
 	);
 }

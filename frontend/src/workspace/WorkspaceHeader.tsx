@@ -1,33 +1,21 @@
-import { Menu } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import type { Ref } from "react";
-import { IconButton } from "../components/Button.tsx";
+import { SidebarTrigger } from "@/components/ui/sidebar.tsx";
 import { useBreadcrumbSlotSetter } from "./breadcrumbSlot.tsx";
 import type { PageDefinition } from "./navigation.ts";
 
-export function WorkspaceTopbar({
-	page,
-	onOpenNavigation,
-}: {
-	page: PageDefinition;
-	onOpenNavigation: () => void;
-}) {
+export function WorkspaceTopbar({ page }: { page: PageDefinition }) {
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
 	});
 	const setSlot = useBreadcrumbSlotSetter();
-	const detail = pathname.startsWith("/accounts/")
-		|| pathname.startsWith("/groups/");
+	const detail =
+		pathname.startsWith("/accounts/") || pathname.startsWith("/groups/");
 	return (
 		<>
 			<title>{`${page.label} · Waypoint`}</title>
-			<header className="flex h-16 items-center gap-3 border-0 border-b border-solid border-line bg-surface px-5 print:hidden sm:px-6">
-				<IconButton
-					icon={Menu}
-					label="Open navigation"
-					className="md:hidden"
-					onClick={onOpenNavigation}
-				/>
+			<header className="flex h-16 items-center gap-3 border-0 border-b border-solid border-border bg-card px-5 print:hidden sm:px-6">
+				<SidebarTrigger />
 				{detail ? (
 					<div ref={setSlot} className="min-w-0 flex-1" />
 				) : (

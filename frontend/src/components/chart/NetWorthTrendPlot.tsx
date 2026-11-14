@@ -125,7 +125,7 @@ export function NetWorthTrendPlot({
 	);
 	if (!rows.length || !start || !last) {
 		return (
-			<p className="m-0 px-5 pb-5 text-sm text-muted">
+			<p className="m-0 px-5 pb-5 text-sm text-muted-foreground">
 				No net-worth data in this window.
 			</p>
 		);

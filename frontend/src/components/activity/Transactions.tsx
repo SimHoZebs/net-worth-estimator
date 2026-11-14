@@ -1,4 +1,10 @@
-import { ArrowRightLeft, ListFilter, Plus } from "lucide-react";
+import {
+	ArrowRightLeft,
+	ChevronLeft,
+	ChevronRight,
+	ListFilter,
+	Plus,
+} from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
 	type AccountTransaction,
@@ -8,14 +14,18 @@ import {
 } from "../../domain/accountActivity.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { TablePagination } from "../DataTable.tsx";
 import { useTransactionSelection } from "./useTransactionSelection.ts";
-import { EmptyState } from "../EmptyState.tsx";
+import {
+	Empty,
+	EmptyContent,
+	EmptyHeader,
+	EmptyMedia,
+} from "@/components/ui/empty.tsx";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
-import { Button } from "../Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { TransactionAnalysisProvider } from "../analysis/TransactionAnalysis.tsx";
 import { useTransferLinks } from "../../state/analyses.ts";
 import { transferLinkForEdge } from "../../pages/flows/TransferMatchNote.tsx";
@@ -117,12 +127,28 @@ export function Transactions({
 	const showsProjected = filters.source !== "historical";
 	if (!occurrences.length && !canRequestForecast)
 		return (
-			<EmptyState
-				icon={ArrowRightLeft}
-				title="No transactions for this account yet"
-				action="Add transaction"
-				onAction={() => onEdit({ kind: "transaction", item: null })}
-			/>
+			<Empty className="px-6 py-12">
+				<EmptyHeader>
+					<EmptyMedia>
+						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+							<ArrowRightLeft size={28} aria-hidden="true" />
+						</span>
+					</EmptyMedia>
+					{/* Real heading: the preset empty title is a plain div,
+					which dropped the heading the account specs assert. */}
+					<h3 className="font-heading text-lg font-medium tracking-tight">
+						No transactions for this account yet
+					</h3>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button
+						type="button"
+						onClick={() => onEdit({ kind: "transaction", item: null })}
+					>
+						Add transaction
+					</Button>
+				</EmptyContent>
+			</Empty>
 		);
 	return (
 		<>
@@ -139,7 +165,7 @@ export function Transactions({
 					!readOnly && occurrences.length > 0 ? (
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							onClick={() => onEdit({ kind: "transaction", item: null })}
 						>
@@ -157,9 +183,14 @@ export function Transactions({
 					{projected?.error ? (
 						<p role="alert">
 							{projected.error}{" "}
-							<button type="button" onClick={projected.retry}>
+							<Button
+								type="button"
+								variant="link"
+								size="sm"
+								onClick={projected.retry}
+							>
 								Retry forecast
-							</button>
+							</Button>
 						</p>
 					) : null}
 				</div>
@@ -196,13 +227,41 @@ export function Transactions({
 							))}
 						</TransactionTable>
 					</TransactionAnalysisProvider>
-					<TablePagination
-						page={currentPage}
-						pageCount={pageCount}
-						total={filtered.length}
-						pageSize={PAGE_SIZE}
-						onPage={turnPage}
-					/>
+					<div className="flex items-center justify-between gap-4 border-b border-border py-4 max-sm:gap-2">
+						<span className="text-xs text-muted-foreground" role="status">
+							Showing {currentPage * PAGE_SIZE + 1}–
+							{Math.min((currentPage + 1) * PAGE_SIZE, filtered.length)} of{" "}
+							{filtered.length} transactions
+						</span>
+						{/* Real buttons with the long-standing pager names: the
+							preset pagination links renamed them and broke the
+							transaction-page contract, stalling filter tests. */}
+						<div className="flex items-center gap-3 max-sm:gap-1">
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label="Previous transaction page"
+								disabled={currentPage === 0}
+								onClick={() => turnPage(currentPage - 1)}
+							>
+								<ChevronLeft size={16} aria-hidden="true" />
+							</Button>
+							<span className="text-xs text-muted-foreground tabular-nums">
+								{currentPage + 1} / {pageCount}
+							</span>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label="Next transaction page"
+								disabled={currentPage >= pageCount - 1}
+								onClick={() => turnPage(currentPage + 1)}
+							>
+								<ChevronRight size={16} aria-hidden="true" />
+							</Button>
+						</div>
+					</div>
 					{selected && (
 						<TransactionDetail
 							transaction={selected.transaction}
@@ -223,19 +282,44 @@ export function Transactions({
 					)}
 				</>
 			) : !occurrences.length ? (
-				<EmptyState
-					icon={ArrowRightLeft}
-					title="No transactions for this account yet"
-					action="Add transaction"
-					onAction={() => onEdit({ kind: "transaction", item: null })}
-				/>
+				<Empty className="px-6 py-12">
+					<EmptyHeader>
+						<EmptyMedia>
+							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+								<ArrowRightLeft size={28} aria-hidden="true" />
+							</span>
+						</EmptyMedia>
+						<h3 className="font-heading text-lg font-medium tracking-tight">
+							No transactions for this account yet
+						</h3>
+					</EmptyHeader>
+					<EmptyContent>
+						<Button
+							type="button"
+							onClick={() => onEdit({ kind: "transaction", item: null })}
+						>
+							Add transaction
+						</Button>
+					</EmptyContent>
+				</Empty>
 			) : (
-				<EmptyState
-					icon={ListFilter}
-					title="No matching transactions"
-					action="Clear transaction filters"
-					onAction={resetFilters}
-				/>
+				<Empty className="px-6 py-12">
+					<EmptyHeader>
+						<EmptyMedia>
+							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+								<ListFilter size={28} aria-hidden="true" />
+							</span>
+						</EmptyMedia>
+						<h3 className="font-heading text-lg font-medium tracking-tight">
+							No matching transactions
+						</h3>
+					</EmptyHeader>
+					<EmptyContent>
+						<Button type="button" onClick={resetFilters}>
+							Clear transaction filters
+						</Button>
+					</EmptyContent>
+				</Empty>
 			)}
 		</>
 	);

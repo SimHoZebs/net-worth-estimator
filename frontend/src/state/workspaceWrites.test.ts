@@ -9,7 +9,7 @@ import {
 } from "../auth/resourceScope.ts";
 import { ApiHttpError } from "../api/http.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
-import { resetNotifications, useNotifications } from "./notifications.ts";
+import { toast } from "../components/ui/toast.tsx";
 import { resetServerQueryCache, serverQueryClient } from "./serverQuery.ts";
 import { useUserReadOnly } from "./useUserScope.ts";
 import {
@@ -37,19 +37,24 @@ function owner() {
 	);
 }
 
-function toasts() {
-	return useNotifications.getState().items;
+function published() {
+	return addToast.mock.calls.map(([options]) => options);
 }
+
+const addToast = vi.spyOn(toast, "add");
+const closeToast = vi.spyOn(toast, "close");
 
 beforeEach(() => {
 	owner();
-	resetNotifications();
+	addToast.mockClear();
+	closeToast.mockClear();
+	toast.close();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
 });
 
 afterEach(() => {
-	resetNotifications();
+	toast.close();
 	resetServerQueryCache();
 	suspendUserScope();
 	vi.unstubAllGlobals();
@@ -66,11 +71,11 @@ it("runs the call, refreshes, and confirms with the shared success notice", asyn
 	);
 	expect(call).toHaveBeenCalledTimes(1);
 	expect(refresh).toHaveBeenCalledTimes(1);
-	expect(toasts()).toContainEqual(
+	expect(published()).toContainEqual(
 		expect.objectContaining({
-			kind: "success",
-			key: "workspace-notice",
-			message: "Changes saved.",
+			type: "success",
+			id: "workspace-notice",
+			description: "Changes saved.",
 		}),
 	);
 });
@@ -88,11 +93,14 @@ it("reloads authoritative state on a rejection, then reports it", async () => {
 		false,
 	);
 	expect(refresh).toHaveBeenCalledTimes(1);
-	expect(toasts()).toContainEqual(
-		expect.objectContaining({ kind: "error", message: "Choose an account." }),
+	expect(published()).toContainEqual(
+		expect.objectContaining({
+			type: "error",
+			description: "Choose an account.",
+		}),
 	);
-	expect(toasts()).not.toContainEqual(
-		expect.objectContaining({ kind: "success" }),
+	expect(published()).not.toContainEqual(
+		expect.objectContaining({ type: "success" }),
 	);
 });
 
@@ -109,8 +117,8 @@ it("reloads authoritative state on a transport failure, then reports it", async 
 		}),
 	).toBe(false);
 	expect(refresh).toHaveBeenCalledTimes(1);
-	expect(toasts()).toContainEqual(
-		expect.objectContaining({ kind: "error", message: "boom" }),
+	expect(published()).toContainEqual(
+		expect.objectContaining({ type: "error", description: "boom" }),
 	);
 });
 
@@ -176,7 +184,7 @@ it("stays silent without refresh when the resource switches during the call", as
 	});
 	expect(result).toBe(false);
 	expect(refresh).not.toHaveBeenCalled();
-	expect(toasts()).toEqual([]);
+	expect(published()).toEqual([]);
 });
 
 it("reports a saved-but-unconfirmed state when the reload fails", async () => {
@@ -190,15 +198,15 @@ it("reports a saved-but-unconfirmed state when the reload fails", async () => {
 		failureMessage: "Nope.",
 	});
 	expect(result).toBe(false);
-	expect(toasts()).toContainEqual(
+	expect(published()).toContainEqual(
 		expect.objectContaining({
-			kind: "error",
-			message:
+			type: "error",
+			description:
 				"The change was saved, but the latest server data could not be reloaded. Retry the server request.",
 		}),
 	);
-	expect(toasts()).not.toContainEqual(
-		expect.objectContaining({ kind: "success" }),
+	expect(published()).not.toContainEqual(
+		expect.objectContaining({ type: "success" }),
 	);
 });
 
@@ -213,7 +221,7 @@ it("stays silent without success when the resource switches during refresh", asy
 		failureMessage: "Nope.",
 	});
 	expect(result).toBe(false);
-	expect(toasts()).toEqual([]);
+	expect(published()).toEqual([]);
 });
 
 it("runs one save at a time and exposes the active save to observers", async () => {

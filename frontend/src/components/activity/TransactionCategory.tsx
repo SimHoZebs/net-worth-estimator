@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
 	ArrowDownLeft,
 	ArrowUpRight,
@@ -9,6 +9,7 @@ import {
 	HeartPulse,
 	House,
 	Landmark,
+	LoaderCircle,
 	Plane,
 	ReceiptText,
 	Settings,
@@ -30,7 +31,15 @@ import {
 import { refreshTransactions } from "../../state/workspaceResources.ts";
 import { useSavedTransactions } from "../../state/savedState.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { OptionPicker } from "../OptionPicker.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
 
 const categoryIcons: Record<TransactionCategoryKey, LucideIcon> = {
 	INCOME: BriefcaseBusiness,
@@ -85,6 +94,11 @@ export function TransactionCategory({
 		? transactionCategorySourceLabel(normalizedSource)
 		: null;
 	const canReset = normalizedSource === "user";
+	const id = useId();
+	const labelId = `${id}-label`;
+	const triggerId = `${id}-trigger`;
+	const valueId = `${id}-value`;
+	const sourceId = `${id}-source`;
 
 	const save = async (next: string | null) => {
 		if (saving) return;
@@ -99,26 +113,75 @@ export function TransactionCategory({
 	};
 
 	return (
-		<OptionPicker
-			label="Category"
-			labelClassName={labelClassName}
-			value={selected}
-			valueLabel={selectedLabel}
-			ValueIcon={SelectedIcon}
-			options={transactionCategoryOptions.map((option) => ({
-				value: option.value,
-				label: option.label,
-				icon: categoryIcons[option.value as TransactionCategoryKey] ?? Tag,
-			}))}
-			onSelect={(next) => {
-				setDraft(next);
-				void save(next);
-			}}
-			disabled={readOnly}
-			saving={saving}
-			resetLabel={canReset ? "Use automatic" : undefined}
-			onReset={canReset ? () => void save(null) : undefined}
-			sourceLabel={sourceLabel}
-		/>
+		<Field className={labelClassName}>
+			<FieldLabel id={labelId} htmlFor={triggerId}>
+				Category
+			</FieldLabel>
+			<Select
+				value={selected}
+				disabled={readOnly || saving}
+				onValueChange={(next) => {
+					setDraft(next);
+					void save(next);
+				}}
+			>
+				<SelectTrigger
+					id={triggerId}
+					aria-labelledby={[labelId, valueId, sourceLabel ? sourceId : ""]
+						.filter(Boolean)
+						.join(" ")}
+					aria-busy={saving}
+					className="w-full"
+				>
+					<SelectedIcon
+						size={16}
+						aria-hidden="true"
+						className="flex-none text-muted-foreground"
+					/>
+					<span id={valueId} className="min-w-0 flex-1 truncate">
+						<SelectValue>{selectedLabel}</SelectValue>
+					</span>
+					{sourceLabel && (
+						<span id={sourceId} className="sr-only">
+							{sourceLabel}
+						</span>
+					)}
+					{saving && (
+						<LoaderCircle
+							size={16}
+							aria-hidden="true"
+							className="flex-none animate-spin text-muted-foreground"
+						/>
+					)}
+				</SelectTrigger>
+				<SelectContent>
+					{transactionCategoryOptions.map((option) => {
+						const Icon =
+							categoryIcons[option.value as TransactionCategoryKey] ?? Tag;
+						return (
+							<SelectItem key={option.value} value={option.value}>
+								<Icon
+									size={16}
+									aria-hidden="true"
+									className="flex-none text-muted-foreground"
+								/>
+								<span className="min-w-0 flex-1 truncate">{option.label}</span>
+							</SelectItem>
+						);
+					})}
+				</SelectContent>
+			</Select>
+			{canReset && (
+				<Button
+					type="button"
+					variant="link"
+					size="sm"
+					disabled={readOnly || saving}
+					onClick={() => void save(null)}
+				>
+					Use automatic
+				</Button>
+			)}
+		</Field>
 	);
 }

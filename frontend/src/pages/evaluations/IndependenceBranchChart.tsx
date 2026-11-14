@@ -3,11 +3,14 @@ import { Chart } from "@tanstack/charts/react";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { useMemo } from "react";
 import {
-	DataTable,
+	Table,
+	TableBody,
+	TableCaption,
 	TableCell,
+	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/DataTable.tsx";
+} from "@/components/ui/table.tsx";
 import type { IndependenceCandidate } from "@/domain/financialIndependence.ts";
 import { dateLabel, isoDate, money, utcDate } from "@/domain/format.ts";
 
@@ -43,7 +46,7 @@ export function IndependenceBranchChart({
 		const failureTime = failure ? utcDate(failure).getTime() : null;
 		return defineChart({
 			marks: [
-				ruleY([0], { stroke: "var(--line-strong)" }),
+				ruleY([0], { stroke: "var(--input)" }),
 				lineY(points, {
 					x: "time",
 					y: "balance",
@@ -55,7 +58,7 @@ export function IndependenceBranchChart({
 					y: "balance",
 					r: 3.5,
 					fill: "var(--primary)",
-					stroke: "var(--surface)",
+					stroke: "var(--card)",
 					strokeWidth: 2,
 				}),
 				...(failureTime === null
@@ -96,9 +99,10 @@ export function IndependenceBranchChart({
 		`${dateLabel(first.date, true)} to ${dateLabel(last.date, true)}. ` +
 		`${money(first.balance)} to ${money(last.balance)}.` +
 		(failure ? ` First spending shortfall: ${dateLabel(failure, true)}.` : "");
+	const caption = "Projected financial independence asset balances";
 	return (
 		<figure className="m-0 mt-3">
-			<figcaption className="text-xs text-muted">
+			<figcaption className="text-xs text-muted-foreground">
 				Assets after the independence start · nominal dollars
 			</figcaption>
 			<Chart
@@ -108,20 +112,34 @@ export function IndependenceBranchChart({
 				height={170}
 				className="mt-2"
 			/>
-			<details className="mt-2 text-xs text-muted">
+			<details className="mt-2 text-xs text-muted-foreground">
 				<summary className="cursor-pointer py-2">Projected balances</summary>
-				<DataTable
-					caption="Projected financial independence asset balances"
-					showHeaders
-					columns={[{ label: "Date" }, { label: "Selected assets" }]}
-				>
-					{rows.map((row) => (
-						<TableRow key={row.date}>
-							<TableHeader scope="row">{dateLabel(row.date, true)}</TableHeader>
-							<TableCell>{money(row.balance)}</TableCell>
+				<Table containerProps={{ role: "region", "aria-label": caption }}>
+					<TableCaption className="sr-only">{caption}</TableCaption>
+					<TableHeader>
+						<TableRow>
+							{["Date", "Selected assets"].map((column, index) => (
+								<TableHead
+									key={column}
+									scope="col"
+									className={index ? "text-right" : undefined}
+								>
+									{column}
+								</TableHead>
+							))}
 						</TableRow>
-					))}
-				</DataTable>
+					</TableHeader>
+					<TableBody>
+						{rows.map((row) => (
+							<TableRow key={row.date}>
+								<TableHead scope="row">{dateLabel(row.date, true)}</TableHead>
+								<TableCell className="text-right">
+									{money(row.balance)}
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
 			</details>
 		</figure>
 	);

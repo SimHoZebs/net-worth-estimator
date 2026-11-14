@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { IconButton } from "../../components/Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { money } from "../../domain/format.ts";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
@@ -28,20 +29,23 @@ export function PurchaseRow({
 	const disabledMove = locked || item.purchase.readOnly;
 	return (
 		<li
-			className="group/purchase grid grid-cols-[--spacing(8)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-line py-5 @max-xl/wish-list:grid-cols-[--spacing(6)_minmax(0,1fr)_auto] @max-xl/wish-list:gap-3"
+			className="group/purchase grid grid-cols-[--spacing(8)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-border py-5 @max-xl/wish-list:grid-cols-[--spacing(6)_minmax(0,1fr)_auto] @max-xl/wish-list:gap-3"
 			data-excluded={!item.purchase.enabled}
 		>
-			<span className="text-sm text-muted tabular-nums" aria-hidden="true">
+			<span
+				className="text-sm text-muted-foreground tabular-nums"
+				aria-hidden="true"
+			>
 				{String(item.priority).padStart(2, "0")}
 			</span>
 			<div className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere]">
 				<button
 					type="button"
 					onClick={() => onInspect(item.purchase)}
-					className="rounded-control border-0 bg-transparent px-0 py-0.5 text-left text-inherit"
+					className="rounded-md border-0 bg-transparent px-0 py-0.5 text-left text-inherit"
 					aria-label={`Inspect ${item.purchase.name}, priority ${item.priority}`}
 				>
-					<strong className="text-sm group-data-[excluded=true]/purchase:text-muted group-data-[excluded=true]/purchase:line-through">
+					<strong className="text-sm group-data-[excluded=true]/purchase:text-muted-foreground group-data-[excluded=true]/purchase:line-through">
 						{item.purchase.name}
 					</strong>
 				</button>
@@ -51,29 +55,41 @@ export function PurchaseRow({
 				<strong className="text-sm tabular-nums">
 					{money(item.purchase.amount)}
 				</strong>
-				<span className="truncate text-xs text-muted">
+				<span className="truncate text-xs text-muted-foreground">
 					{item.accountName}
 					{!item.purchase.enabled && " · Excluded"}
 				</span>
 			</div>
 			{onMove ? (
 				<div className="flex flex-wrap gap-1 @max-xl/wish-list:col-[2/-1]">
-					<IconButton
-						icon={ArrowUp}
-						iconSize={16}
-						className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
-						label={`Move ${item.purchase.name} up`}
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						title={`Move ${item.purchase.name} up`}
+						aria-label={`Move ${item.purchase.name} up`}
 						disabled={disabledMove || !canMoveUp}
 						onClick={() => onMove(item.purchase, -1)}
-					/>
-					<IconButton
-						icon={ArrowDown}
-						iconSize={16}
-						className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
-						label={`Move ${item.purchase.name} down`}
+						className={cn(
+							"min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12",
+						)}
+					>
+						<ArrowUp size={16} aria-hidden="true" />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						title={`Move ${item.purchase.name} down`}
+						aria-label={`Move ${item.purchase.name} down`}
 						disabled={disabledMove || !canMoveDown}
 						onClick={() => onMove(item.purchase, 1)}
-					/>
+						className={cn(
+							"min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12",
+						)}
+					>
+						<ArrowDown size={16} aria-hidden="true" />
+					</Button>
 				</div>
 			) : (
 				<span aria-hidden="true" />

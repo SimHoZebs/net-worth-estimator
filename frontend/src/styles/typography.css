@@ -1,11 +1,11 @@
 /* Single font-family owner. Choose a font by the text's role, never by its
-   page or component: UI and data use Manrope (the default), display
-   headings use h1 or .type-display, headline amounts and evaluation
+   page or component: UI and data use Geist (the default), display
+   headings use Merriweather through h1 or .type-display, headline amounts and evaluation
    outcomes use .type-value (kept even for text outcomes such as
    "Already reached"), and code or editable JSON uses .type-code.
-   Component styles own size, weight, and layout, never family selection.
-    :focus-visible here is the single global focus owner; do not add
-    per-component focus rings. */
+    Component styles own size, weight, and layout, never family selection.
+    shadcn primitives own their focus rings; native links retain an outline
+    fallback here. */
 @layer base {
 	:root,
 	h2,
@@ -48,11 +48,11 @@
 		@apply min-w-xs text-sm leading-relaxed;
 	}
 	::selection {
-		background: var(--active);
-		color: var(--ink);
+		background: var(--accent);
+		color: var(--foreground);
 	}
-	:focus-visible {
-		@apply rounded-control outline-3 outline-solid outline-primary outline-offset-1;
+	a:focus-visible {
+		@apply rounded-md outline-3 outline-solid outline-ring outline-offset-1;
 	}
 	/* TanStack charts stay tabbable so keyboard users can reach the chart
 	   surface and move through data points. Chromium and WebKit paint a UA
@@ -75,7 +75,7 @@
 		@apply text-sm font-bold;
 	}
 	p {
-		color: var(--muted);
+		color: var(--muted-foreground);
 	}
 	strong,
 	b {

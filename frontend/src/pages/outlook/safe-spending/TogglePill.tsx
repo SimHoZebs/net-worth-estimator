@@ -1,5 +1,4 @@
-import { pressToggleStyles } from "../../../components/AccountToggle.tsx";
-import { mergeStyles } from "../../../components/mergeStyles.ts";
+import { Toggle } from "@/components/ui/toggle.tsx";
 import { exactMoney } from "../../../domain/format.ts";
 
 /**
@@ -10,13 +9,11 @@ export function formatRuleDetail({ amount }: { amount: number }): string {
 	return exactMoney(amount);
 }
 
-// Identity layout stays separate from the toggle button, mirroring
-// AccountLabel next to AccountToggle.
 function TogglePillLabel({ name, detail }: { name: string; detail: string }) {
 	return (
-		<span className="flex min-w-0 flex-col gap-1">
-			<strong className="group-aria-[pressed=false]:text-muted">{name}</strong>
-			<small className="text-xs text-muted">{detail}</small>
+		<span className="flex min-w-0 flex-col items-start gap-1">
+			<strong>{name}</strong>
+			<small className="text-xs text-muted-foreground">{detail}</small>
 		</span>
 	);
 }
@@ -33,13 +30,14 @@ export function TogglePill({
 	onToggle: () => void;
 }) {
 	return (
-		<button
-			type="button"
-			aria-pressed={checked}
-			onClick={onToggle}
-			className={mergeStyles(pressToggleStyles, "pl-3")}
+		<Toggle
+			pressed={checked}
+			onPressedChange={() => onToggle()}
+			variant="outline"
+			size="lg"
+			className="h-auto justify-start px-3 py-2 text-left text-xs"
 		>
 			<TogglePillLabel name={name} detail={detail} />
-		</button>
+		</Toggle>
 	);
 }

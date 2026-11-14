@@ -1,6 +1,9 @@
 import { ArrowUpRight, AlertCircle } from "lucide-react";
-import { TextButton } from "./Button.tsx";
-import { Notice } from "./Notice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Alert as ShadcnAlert,
+	AlertDescription as ShadcnAlertDescription,
+} from "@/components/ui/alert.tsx";
 
 export function ErrorNotice({
 	message,
@@ -12,17 +15,25 @@ export function ErrorNotice({
 	onAction?: () => void;
 }) {
 	const notice = message ? (
-		<Notice tone="danger" className="mb-5 p-5 text-sm" role="alert">
+		<ShadcnAlert
+			variant="destructive"
+			className="mb-5 flex items-start gap-3 p-5 text-sm"
+			role="alert"
+		>
 			<AlertCircle size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
-			<div className="min-w-0 break-words">
-				<p className="my-1 whitespace-pre-line text-danger-text">{message}</p>
+			<ShadcnAlertDescription className="min-w-0 text-danger-text">
+				<p className="my-1 whitespace-pre-line">{message}</p>
 				{action && (
-					<TextButton tone="danger" className="mt-2" onClick={onAction}>
+					<Button
+						variant="link"
+						className="mt-2 h-auto p-0 text-xs text-danger-text"
+						onClick={onAction}
+					>
 						{action} <ArrowUpRight size={15} />
-					</TextButton>
+					</Button>
 				)}
-			</div>
-		</Notice>
+			</ShadcnAlertDescription>
+		</ShadcnAlert>
 	) : null;
 	return notice;
 }

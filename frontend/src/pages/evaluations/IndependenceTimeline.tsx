@@ -82,14 +82,14 @@ export function IndependenceTimeline({
 									x2: "x2",
 									y1: "y1",
 									y2: "y2",
-									fill: "var(--line)",
+									fill: "var(--border)",
 									fillOpacity: 0.5,
 									inset: 0,
 								},
 							),
 						]
 					: []),
-				ruleY([0], { stroke: "var(--line-strong)" }),
+				ruleY([0], { stroke: "var(--input)" }),
 				areaY(points, {
 					x: "time",
 					y1: 0,
@@ -129,7 +129,7 @@ export function IndependenceTimeline({
 								x: "time",
 								y: "coverage",
 								r: 5,
-								fill: "var(--surface)",
+								fill: "var(--card)",
 								stroke: "var(--primary)",
 								strokeWidth: 2.5,
 							}),
@@ -142,13 +142,13 @@ export function IndependenceTimeline({
 								y: "coverage",
 								r: 6,
 								fill: "var(--primary)",
-								stroke: "var(--surface)",
+								stroke: "var(--card)",
 								strokeWidth: 2.5,
 							}),
 						]
 					: []),
 				ruleX([utcDate(candidate.date).getTime()], {
-					stroke: "var(--ink)",
+					stroke: "var(--foreground)",
 					strokeDasharray: "2 4",
 					strokeOpacity: 0.5,
 				}),
@@ -158,8 +158,8 @@ export function IndependenceTimeline({
 								x: "time",
 								y: "coverage",
 								r: 4,
-								fill: "var(--ink)",
-								stroke: "var(--surface)",
+								fill: "var(--foreground)",
+								stroke: "var(--card)",
 								strokeWidth: 2,
 							}),
 						]
@@ -228,17 +228,14 @@ export function IndependenceTimeline({
 				}
 				height={240}
 			/>
-			<div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
+			<div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
 				<span className="flex items-center gap-1">
-					<span
-						className="h-2 w-3 rounded-control bg-primary"
-						aria-hidden="true"
-					/>
+					<span className="h-2 w-3 rounded-md bg-primary" aria-hidden="true" />
 					Income
 				</span>
 				<span className="flex items-center gap-1">
 					<span
-						className="h-2 w-3 rounded-control border border-primary bg-chart-band"
+						className="h-2 w-3 rounded-md border border-primary bg-chart-band"
 						aria-hidden="true"
 					/>
 					Withdrawals
@@ -246,7 +243,7 @@ export function IndependenceTimeline({
 				{tail && (
 					<span className="ml-auto">
 						<span
-							className="mr-1 inline-block h-2 w-3 rounded-control bg-line"
+							className="mr-1 inline-block h-2 w-3 rounded-md bg-border"
 							aria-hidden="true"
 						/>
 						More horizon needed

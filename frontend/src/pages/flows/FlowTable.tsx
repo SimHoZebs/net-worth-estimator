@@ -1,6 +1,14 @@
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
-import { DataTable, TableCell, TableRow } from "../../components/DataTable.tsx";
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table.tsx";
 import {
 	describeFlowEdge,
 	sankeyLaneId,
@@ -22,52 +30,74 @@ export function FlowTable({
 	const totals = graph.totals;
 	return (
 		<div className="flex flex-col gap-4">
-			<DataTable
-				caption={`Money flows from ${graph.startDate} through ${graph.endDate}.`}
-				showHeaders
-				columns={[
-					{ label: "Flow" },
-					{ label: "Amount" },
-					{ label: "Transactions" },
-				]}
+			<Table
+				className="border-collapse text-left"
+				containerClassName="max-w-full"
+				containerProps={{
+					role: "region",
+					"aria-label": `Money flows from ${graph.startDate} through ${graph.endDate}.`,
+				}}
 			>
-				{visible.map((item, index) => (
-					<TableRow key={sankeyLaneId(item, index)}>
-						<TableCell>
-							{describeFlowEdge(item.edge, nameOf, money)}
-							{item.aggregated
-								? ` (groups ${item.members.length} small flows)`
-								: ""}
-						</TableCell>
-						<TableCell>{money(Math.abs(item.edge.amount))}</TableCell>
-						<TableCell>{item.edge.sources.length}</TableCell>
+				<TableCaption className="sr-only">
+					Money flows from {graph.startDate} through {graph.endDate}.
+				</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Flow</TableHead>
+						<TableHead>Amount</TableHead>
+						<TableHead>Transactions</TableHead>
 					</TableRow>
-				))}
-			</DataTable>
-			<DataTable
-				caption="Window totals by recorded and planned money."
-				showHeaders
-				columns={[
-					{ label: "Total" },
-					{ label: "Money in" },
-					{ label: "Money out" },
-					{ label: "Transfers" },
-				]}
+				</TableHeader>
+				<TableBody>
+					{visible.map((item, index) => (
+						<TableRow key={sankeyLaneId(item, index)}>
+							<TableCell>
+								{describeFlowEdge(item.edge, nameOf, money)}
+								{item.aggregated
+									? ` (groups ${item.members.length} small flows)`
+									: ""}
+							</TableCell>
+							<TableCell>{money(Math.abs(item.edge.amount))}</TableCell>
+							<TableCell>{item.edge.sources.length}</TableCell>
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
+			<Table
+				className="border-collapse text-left"
+				containerClassName="max-w-full"
+				containerProps={{
+					role: "region",
+					"aria-label": "Window totals by recorded and planned money.",
+				}}
 			>
-				<TableRow>
-					<TableCell>Recorded</TableCell>
-					<TableCell>{money(totals.actual.inflow)}</TableCell>
-					<TableCell>{money(totals.actual.outflow)}</TableCell>
-					<TableCell>{money(totals.actual.transfer)}</TableCell>
-				</TableRow>
-				<TableRow>
-					<TableCell>Planned</TableCell>
-					<TableCell>{money(totals.projected.inflow)}</TableCell>
-					<TableCell>{money(totals.projected.outflow)}</TableCell>
-					<TableCell>{money(totals.projected.transfer)}</TableCell>
-				</TableRow>
-			</DataTable>
-			<ul className="flex flex-col gap-1 text-xs text-muted">
+				<TableCaption className="sr-only">
+					Window totals by recorded and planned money.
+				</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Total</TableHead>
+						<TableHead>Money in</TableHead>
+						<TableHead>Money out</TableHead>
+						<TableHead>Transfers</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					<TableRow>
+						<TableCell>Recorded</TableCell>
+						<TableCell>{money(totals.actual.inflow)}</TableCell>
+						<TableCell>{money(totals.actual.outflow)}</TableCell>
+						<TableCell>{money(totals.actual.transfer)}</TableCell>
+					</TableRow>
+					<TableRow>
+						<TableCell>Planned</TableCell>
+						<TableCell>{money(totals.projected.inflow)}</TableCell>
+						<TableCell>{money(totals.projected.outflow)}</TableCell>
+						<TableCell>{money(totals.projected.transfer)}</TableCell>
+					</TableRow>
+				</TableBody>
+			</Table>
+			<ul className="flex flex-col gap-1 text-xs text-muted-foreground">
 				{totals.unmatched !== 0 && (
 					<li>
 						{money(Math.abs(totals.unmatched))} moved without a recorded path (

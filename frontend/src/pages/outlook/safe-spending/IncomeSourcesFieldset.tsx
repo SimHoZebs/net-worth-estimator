@@ -10,7 +10,7 @@ export function IncomeSourcesFieldset({
 }) {
 	return (
 		<fieldset className="grid gap-3">
-			<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted">
+			<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted-foreground">
 				Income sources
 			</legend>
 			{income.candidates.length ? (
@@ -37,7 +37,7 @@ export function IncomeSourcesFieldset({
 					})}
 				</div>
 			) : (
-				<p className="text-sm leading-relaxed text-muted">
+				<p className="text-sm leading-relaxed text-muted-foreground">
 					No recurring inflows for the selected income accounts.
 				</p>
 			)}

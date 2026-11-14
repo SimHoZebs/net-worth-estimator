@@ -290,9 +290,9 @@ export async function secondUserSignup(ctx, hooks) {
   // The first-account entry point lives on the landing route the signup
   // flow ends on (mirrors the proven order: loop, then click in place).
   await page.getByRole("button", { name: "Add your first account" }).click();
-  await page.getByLabel("Account name", { exact: true }).fill("Second checking");
-  await page.getByLabel("Balance (USD)", { exact: true }).fill("1250");
   const dialog = page.getByRole("dialog", { name: "Add account", exact: true });
+  await dialog.getByLabel("Account name", { exact: true }).fill("Second checking");
+  await dialog.getByLabel("Balance", { exact: true }).fill("1250");
   await dialog.getByRole("button", { name: "Add account", exact: true }).click();
   await expect(dialog).not.toBeVisible();
 

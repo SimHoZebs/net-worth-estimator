@@ -1,32 +1,15 @@
-/* Semantic roles reference Tailwind's stock palette and spacing scale.
-   Both theme values live in light-dark() tokens. Runtime charts share these variables. */
+/* Semantic roles the shadcn preset (taupe neutrals, amber charts) does not
+   define: financial status (success, warning, danger, guest) and chart
+   series. All neutral surfaces, text, borders, inputs, radii, and shadows
+   are preset-owned; see styles/index.css. */
 @layer base {
 	:root {
-		color-scheme: light dark;
-		color: var(--ink);
-		background: var(--paper);
+		color-scheme: light;
+		background: var(--background);
 		font-synthesis: none;
-		--font-ui: "Manrope Variable", sans-serif;
-		--font-display: var(--font-ui);
+		--font-ui: "Geist Variable", sans-serif;
+		--font-display: "Merriweather Variable", serif;
 		--font-code: ui-monospace, monospace;
-		--primary: light-dark(var(--color-emerald-700), var(--color-emerald-300));
-		--primary-hover: light-dark(
-			var(--color-emerald-800),
-			var(--color-emerald-200)
-		);
-		--on-primary: light-dark(var(--color-white), var(--color-emerald-950));
-		--ink: light-dark(var(--color-stone-800), var(--color-stone-100));
-		--muted: light-dark(var(--color-stone-600), var(--color-stone-400));
-		--subtle: var(--color-stone-500);
-		--line: light-dark(var(--color-stone-200), var(--color-stone-700));
-		--line-strong: light-dark(var(--color-stone-300), var(--color-stone-600));
-		--paper: light-dark(var(--color-stone-50), var(--color-stone-950));
-		--surface: light-dark(var(--color-white), var(--color-stone-900));
-		--surface-2: light-dark(var(--color-stone-50), var(--color-stone-800));
-		--surface-3: light-dark(var(--color-stone-100), var(--color-stone-800));
-		--input-bg: light-dark(var(--color-white), var(--color-stone-800));
-		--hover: light-dark(var(--color-stone-100), var(--color-stone-800));
-		--active: light-dark(var(--color-emerald-50), var(--color-emerald-950));
 		--success-bg: light-dark(var(--color-emerald-50), var(--color-emerald-950));
 		--success-text: light-dark(
 			var(--color-emerald-800),
@@ -46,34 +29,30 @@
 		--danger-text: light-dark(var(--color-red-800), var(--color-red-300));
 		--danger-border: light-dark(var(--color-red-200), var(--color-red-800));
 		--danger-solid: var(--color-red-700);
-		--on-danger: var(--color-white);
 		--guest: light-dark(var(--color-orange-700), var(--color-orange-400));
-		--on-guest: light-dark(var(--color-white), var(--color-orange-950));
+		--guest-foreground: light-dark(white, black);
 		--chart-band: light-dark(
-			var(--color-emerald-200),
-			var(--color-emerald-900)
+			color-mix(in oklch, var(--chart-1) 55%, white),
+			color-mix(in oklch, var(--chart-1) 45%, black)
 		);
-		--chart-median: var(--color-stone-500);
+		--chart-median: var(--muted-foreground);
+		/* Amber-led series: the lead tone takes the amber slot the emerald
+		   used to hold, the second tone steps deeper/lighter along the amber
+		   ramp, and sky plus violet keep carrying the third and fourth
+		   series so pattern-paired segments stay distinguishable. */
 		--chart-series-1: light-dark(
-			var(--color-emerald-600),
-			var(--color-emerald-400)
-		);
-		--chart-series-2: light-dark(
 			var(--color-amber-600),
 			var(--color-amber-400)
+		);
+		--chart-series-2: light-dark(
+			var(--color-amber-800),
+			var(--color-amber-200)
 		);
 		--chart-series-3: light-dark(var(--color-sky-600), var(--color-sky-400));
 		--chart-series-4: light-dark(
 			var(--color-violet-500),
 			var(--color-violet-400)
 		);
-		--backdrop-film: color-mix(
-			in oklab,
-			var(--color-stone-950) 40%,
-			transparent
-		);
-		--backdrop-blur: var(--blur-xs);
-		--sidebar: 0;
 		/* Layer scale. Native dialogs, popovers, and pickers paint in the
 		   top layer and ignore this scale. Open order decides there. */
 		--z-local: 10;
@@ -82,47 +61,16 @@
 		--z-skip: 45;
 		--z-menu: 50;
 		--z-toast: 60;
-		&:has(> head > meta[name="color-scheme"][content="dark"]) {
-			color-scheme: dark;
-		}
-		&:has(> head > meta[name="color-scheme"][content="light"]) {
-			color-scheme: light;
-		}
 	}
-	@media (width >= theme(--breakpoint-md)) {
-		:root {
-			--sidebar: --spacing(48);
-		}
-	}
-	@media (width >= theme(--breakpoint-xl)) {
-		:root {
-			--sidebar: --spacing(56);
-		}
+	:root.dark {
+		color-scheme: dark;
 	}
 }
 
-/* Expose semantic utilities without a second palette owner. */
+/* Expose the non-preset semantic utilities without a second palette owner. */
 @theme inline {
 	--font-sans: var(--font-ui);
 	--font-mono: var(--font-code);
-	--radius-control: var(--radius-md);
-	--radius-surface: var(--radius-xl);
-	--shadow-overlay: var(--shadow-2xl);
-	--color-primary: var(--primary);
-	--color-primary-hover: var(--primary-hover);
-	--color-on-primary: var(--on-primary);
-	--color-ink: var(--ink);
-	--color-muted: var(--muted);
-	--color-subtle: var(--subtle);
-	--color-line: var(--line);
-	--color-line-strong: var(--line-strong);
-	--color-paper: var(--paper);
-	--color-surface: var(--surface);
-	--color-surface-2: var(--surface-2);
-	--color-surface-3: var(--surface-3);
-	--color-input-bg: var(--input-bg);
-	--color-hover: var(--hover);
-	--color-active: var(--active);
 	--color-success-bg: var(--success-bg);
 	--color-success-text: var(--success-text);
 	--color-success-border: var(--success-border);
@@ -133,14 +81,12 @@
 	--color-danger-text: var(--danger-text);
 	--color-danger-border: var(--danger-border);
 	--color-danger-solid: var(--danger-solid);
-	--color-on-danger: var(--on-danger);
 	--color-guest: var(--guest);
-	--color-on-guest: var(--on-guest);
+	--color-guest-foreground: var(--guest-foreground);
 	--color-chart-band: var(--chart-band);
 	--color-chart-median: var(--chart-median);
 	--color-chart-series-1: var(--chart-series-1);
 	--color-chart-series-2: var(--chart-series-2);
 	--color-chart-series-3: var(--chart-series-3);
 	--color-chart-series-4: var(--chart-series-4);
-	--color-backdrop-film: var(--backdrop-film);
 }

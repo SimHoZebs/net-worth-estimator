@@ -12,25 +12,31 @@ export function IndependenceRange({
 	compact?: boolean;
 }) {
 	if (!range || range.probability === null)
-		return <p className="m-0 text-xs text-muted">Scenarios · Not calculated</p>;
+		return (
+			<p className="m-0 text-xs text-muted-foreground">
+				Scenarios · Not calculated
+			</p>
+		);
 	const probability = range.probability;
 	if (compact)
 		return (
-			<p className="m-0 text-xs text-muted">
+			<p className="m-0 text-xs text-muted-foreground">
 				Scenarios ·{" "}
-				<strong className="type-value text-ink">{percent(probability)}</strong>{" "}
+				<strong className="type-value text-foreground">
+					{percent(probability)}
+				</strong>{" "}
 				reached independence
 				{required === null ? "" : ` · ${percent(required)} required`}
 			</p>
 		);
 	return (
-		<div className="grid gap-2 border-t border-line pt-3">
+		<div className="grid gap-2 border-t border-border pt-3">
 			<div className="flex flex-wrap justify-between gap-2 text-xs">
 				<span>
 					<strong className="type-value">{percent(probability)}</strong> reached
 					independence
 				</span>
-				<span className="text-muted">
+				<span className="text-muted-foreground">
 					{required === null
 						? "Confidence target unavailable"
 						: `${percent(required)} required`}{" "}
@@ -43,7 +49,7 @@ export function IndependenceRange({
 				className="relative h-5"
 			>
 				<div
-					className="absolute inset-x-1 top-1/2 h-1.5 -translate-y-1/2 overflow-visible rounded-full bg-surface-3"
+					className="absolute inset-x-1 top-1/2 h-1.5 -translate-y-1/2 overflow-visible rounded-full bg-accent"
 					style={cssVariables({
 						"--probability": `${probability * 100}%`,
 						"--required": required === null ? "0%" : `${required * 100}%`,
@@ -51,15 +57,15 @@ export function IndependenceRange({
 				>
 					<div className="h-full w-(--probability) rounded-full bg-primary" />
 					{required !== null && (
-						<span className="absolute -inset-y-2 left-(--required) w-0.5 bg-ink" />
+						<span className="absolute -inset-y-2 left-(--required) w-0.5 bg-foreground" />
 					)}
-					<span className="absolute top-1/2 left-(--probability) size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-surface" />
+					<span className="absolute top-1/2 left-(--probability) size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-card" />
 				</div>
 			</div>
 			{range.date && (
-				<p className="m-0 text-xs text-muted">
+				<p className="m-0 text-xs text-muted-foreground">
 					Required confidence first reached ·{" "}
-					<strong className="type-value text-ink">
+					<strong className="type-value text-foreground">
 						{dateLabel(range.date)}
 					</strong>
 					{range.dateProbability === null

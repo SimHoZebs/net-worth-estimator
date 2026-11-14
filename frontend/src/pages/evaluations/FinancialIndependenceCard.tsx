@@ -1,12 +1,19 @@
 import { Check, Flag, Pin, TriangleAlert } from "lucide-react";
 import { lazy, Suspense, useId } from "react";
-import { Badge } from "@/components/Badge.tsx";
-import { IconButton } from "@/components/Button.tsx";
-import { Card, cardHeadingStyles } from "@/components/Card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Card,
+	CardHeader,
+	CardTitle,
+	CardAction,
+	CardContent,
+} from "@/components/ui/card.tsx";
 import { useSelectedEntry } from "@/components/entrySelection.ts";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { Progress } from "@/components/Progress.tsx";
+import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
 	independenceFunding,
 	independenceHorizon,
@@ -35,9 +42,11 @@ function CoveragePreview({ candidate }: { candidate: IndependenceCandidate }) {
 	} = funding;
 	return (
 		<div className="grid gap-2">
-			<div className="flex justify-between gap-2 text-xs text-muted">
+			<div className="flex justify-between gap-2 text-xs text-muted-foreground">
 				<span>Coverage · {dateLabel(candidate.date)}</span>
-				<strong className="type-value text-ink">{percent(coverage)}</strong>
+				<strong className="type-value text-foreground">
+					{percent(coverage)}
+				</strong>
 			</div>
 			<SegmentedBar
 				caption="Spending coverage"
@@ -86,9 +95,12 @@ export function FinancialIndependenceCard({
 	return (
 		<>
 			<Card
-				tone={item.enabled ? "default" : "subtle"}
+				role="region"
 				aria-labelledby={headingId}
-				className="relative"
+				className={cn(
+					"relative h-full w-full min-w-0 max-w-2xl print:break-inside-avoid",
+					!item.enabled && "bg-muted",
+				)}
 			>
 				{item.enabled && analysis && (
 					<button
@@ -96,81 +108,105 @@ export function FinancialIndependenceCard({
 						aria-haspopup="dialog"
 						aria-label={`Inspect independence for ${item.name}`}
 						onClick={() => setInspector(true)}
-						className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0"
+						className="absolute inset-0 cursor-pointer rounded-xl border-0 bg-transparent p-0"
 					/>
 				)}
-				<div className="relative flex items-start justify-between gap-3">
-					<h2
-						id={headingId}
-						className={cardHeadingStyles}
-					>
-						<StateIcon
-							size={16}
-							aria-hidden="true"
-							className="shrink-0 text-primary"
-						/>
-						{item.name}
-					</h2>
+				<CardHeader className="relative">
+					<CardTitle>
+						<h2
+							id={headingId}
+							className="flex items-center gap-2 [overflow-wrap:anywhere]"
+						>
+							<StateIcon
+								size={16}
+								aria-hidden="true"
+								className="shrink-0 text-primary"
+							/>
+							{item.name}
+						</h2>
+					</CardTitle>
 					{pin?.onPinChange && (
-						<IconButton
-							icon={Pin}
-							size="sm"
-							iconSize={16}
-							label={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
-							onClick={pin.onPinChange}
-							disabled={pin.disabled}
-							aria-pressed={pin.pinned}
-							className="relative z-(--z-local) aria-pressed:bg-success-bg aria-pressed:text-success-text"
-						/>
+						<CardAction>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								title={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
+								aria-label={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
+								onClick={pin.onPinChange}
+								disabled={pin.disabled}
+								aria-pressed={pin.pinned}
+								className="relative z-(--z-local) aria-pressed:bg-success-bg aria-pressed:text-success-text"
+							>
+								<Pin size={16} aria-hidden="true" />
+							</Button>
+						</CardAction>
 					)}
-				</div>
-				<IndependenceVerdict item={item} />
-				{item.enabled && (
-					<>
-						{horizon?.tooShort ? (
-							<div className="grid gap-2">
-								<div className="flex justify-between gap-2 text-xs text-muted">
-									<span>{horizon.availableYears}y horizon</span>
-									<span>{horizon.requiredYears}y required</span>
-								</div>
-								<Progress
-									label="Available projection horizon"
-									value={
-										(horizon.availableYears! / horizon.requiredYears!) * 100
-									}
-									tone="warning"
-								/>
-							</div>
-						) : (
-							candidate && <CoveragePreview candidate={candidate} />
-						)}
-						{analysis ? (
-							<>
-								{!!analysis.diagnostics.length && (
-									<button
-										type="button"
-										aria-haspopup="dialog"
-										onClick={() => setInspector(true)}
-										className="relative z-(--z-local) flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
+				</CardHeader>
+				<CardContent className="grid gap-4">
+					<IndependenceVerdict item={item} />
+					{item.enabled && (
+						<>
+							{horizon?.tooShort ? (
+								<div className="grid gap-2">
+									<div className="flex justify-between gap-2 text-xs text-muted-foreground">
+										<span>{horizon.availableYears}y horizon</span>
+										<span>{horizon.requiredYears}y required</span>
+									</div>
+									<Progress
+										value={Math.min(
+											100,
+											Math.max(
+												0,
+												Math.round(
+													(horizon.availableYears! / horizon.requiredYears!) *
+														100,
+												),
+											),
+										)}
+										className="[&_[data-slot=progress-indicator]]:bg-warning-text [&_[data-slot=progress-track]]:bg-warning-bg"
 									>
-										<TriangleAlert size={14} aria-hidden="true" />
-										{analysis.diagnostics.length} source or configuration{" "}
-										{analysis.diagnostics.length === 1 ? "issue" : "issues"}
-									</button>
-								)}
-							</>
-						) : (
-							<>
-								{item.goal && (
-									<p className="m-0 text-xs text-muted">{item.goal}</p>
-								)}
-								<Badge tone={reached ? "success" : "neutral"}>
-									{reached ? "Satisfied" : "Evidence unavailable"}
-								</Badge>
-							</>
-						)}
-					</>
-				)}
+										<ProgressLabel className="sr-only">
+											Available projection horizon
+										</ProgressLabel>
+									</Progress>
+								</div>
+							) : (
+								candidate && <CoveragePreview candidate={candidate} />
+							)}
+							{analysis ? (
+								<>
+									{!!analysis.diagnostics.length && (
+										<button
+											type="button"
+											aria-haspopup="dialog"
+											onClick={() => setInspector(true)}
+											className="relative z-(--z-local) flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
+										>
+											<TriangleAlert size={14} aria-hidden="true" />
+											{analysis.diagnostics.length} source or configuration{" "}
+											{analysis.diagnostics.length === 1 ? "issue" : "issues"}
+										</button>
+									)}
+								</>
+							) : (
+								<>
+									{item.goal && (
+										<p className="m-0 text-xs text-muted-foreground">
+											{item.goal}
+										</p>
+									)}
+									<Badge
+										variant={reached ? "default" : "secondary"}
+										className={cn(reached && "bg-success-bg text-success-text")}
+									>
+										{reached ? "Satisfied" : "Evidence unavailable"}
+									</Badge>
+								</>
+							)}
+						</>
+					)}
+				</CardContent>
 			</Card>
 			{item.enabled && analysis && inspector !== null && (
 				<Suspense fallback={null}>

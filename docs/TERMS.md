@@ -110,4 +110,4 @@ Both produce a result from their own inputs.
 
 ## Keeping the names
 
-The interface is the surface these names appear on, so the check is visual. `frontend/tests/integration/workspace.spec.ts` exercises every route and checks the displayed names.
+The interface is the surface these names appear on. The browser route-name sweep retired with the UI specs under the regression-first baseline, so no automated check currently exercises every route name. Re-add one only for an observed regression.

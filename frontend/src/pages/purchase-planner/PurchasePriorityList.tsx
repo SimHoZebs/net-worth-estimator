@@ -15,7 +15,7 @@ export function PurchasePriorityList({
 }) {
 	return (
 		<section aria-label="Purchase priority">
-			<p className="mb-2 text-xs text-muted">
+			<p className="mb-2 text-xs text-muted-foreground">
 				Higher priorities are considered first. Move an item to recalculate
 				purchase dates.
 			</p>

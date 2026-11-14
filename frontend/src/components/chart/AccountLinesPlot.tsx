@@ -163,7 +163,7 @@ export function AccountLinesPlot({
 	}, [rows, series, styles, low, high, showZero]);
 	if (!series.length || !rows.length) {
 		return (
-			<p className="m-0 text-sm text-muted">
+			<p className="m-0 text-sm text-muted-foreground">
 				No per-account data in this window.
 			</p>
 		);
@@ -184,7 +184,7 @@ export function AccountLinesPlot({
 			/>
 			<ul
 				aria-label="Accounts"
-				className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"
+				className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
 			>
 				{styles.map(({ entry, color, dash }) => (
 					<li key={entry.id} className="flex items-center gap-2">

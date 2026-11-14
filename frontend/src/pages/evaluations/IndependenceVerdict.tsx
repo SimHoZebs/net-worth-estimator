@@ -22,7 +22,7 @@ export function IndependenceVerdict({ item }: { item: OtherEvaluation }) {
 								? "Not reached"
 								: "Not calculated"}
 			</div>
-			<p className="m-0 mt-1 text-xs text-muted">
+			<p className="m-0 mt-1 text-xs text-muted-foreground">
 				{!item.enabled ? "Excluded from evaluation" : "Projection"}
 			</p>
 		</div>

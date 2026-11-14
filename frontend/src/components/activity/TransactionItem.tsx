@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { mergeStyles } from "../mergeStyles.ts";
-import { TableCell, TableHeader, TableRow } from "../DataTable.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table.tsx";
 import {
 	transactionIconStyles,
 	transactionCellStyles,
@@ -51,7 +52,7 @@ export function TransactionItemRow({
 }) {
 	return (
 		<TableRow
-			className={mergeStyles(
+			className={cn(
 				transactionRowStyles({ dimmed, divider }),
 				shortfall && transactionShortfallRowStyles(),
 			)}
@@ -59,22 +60,20 @@ export function TransactionItemRow({
 			<TableCell className={transactionCellStyles({ column: "date" })}>
 				{date}
 			</TableCell>
-			<TableHeader
+			<TableHead
 				scope="row"
 				className={transactionCellStyles({ column: "name" })}
 			>
-				<button
+				<Button
 					type="button"
-					className="flex w-full items-center gap-3 rounded-control border-0 bg-transparent text-left max-sm:gap-2"
+					variant="ghost"
+					className="h-auto w-full items-center justify-start gap-3 px-2 py-1 text-left has-disabled:opacity-60 max-sm:gap-2"
 					aria-label={actionLabel}
 					onClick={onSelect}
 					disabled={selectDisabled}
 				>
 					<span
-						className={mergeStyles(
-							transactionIconStyles({ tone }),
-							"max-sm:hidden",
-						)}
+						className={cn(transactionIconStyles({ tone }), "max-sm:hidden")}
 					>
 						{icon}
 					</span>
@@ -86,12 +85,12 @@ export function TransactionItemRow({
 							{title}
 						</strong>
 						{slots?.subtitle && (
-							<span className="block max-w-[32ch] truncate text-xs text-muted max-sm:max-w-[calc(100vw_-_13rem)]">
+							<span className="block max-w-[32ch] truncate text-xs text-muted-foreground max-sm:max-w-[calc(100vw_-_13rem)]">
 								{slots.subtitle}
 							</span>
 						)}
 						{slots?.mobile && (
-							<span className="hidden text-xs text-muted max-sm:block">
+							<span className="hidden text-xs text-muted-foreground max-sm:block">
 								{slots.mobile}
 							</span>
 						)}
@@ -99,8 +98,8 @@ export function TransactionItemRow({
 							<span className="flex flex-wrap gap-1">{slots.badges}</span>
 						)}
 					</span>
-				</button>
-			</TableHeader>
+				</Button>
+			</TableHead>
 			<TableCell className={transactionCellStyles({ column: "amount" })}>
 				<span className="flex flex-col items-end gap-0.5">{amount}</span>
 			</TableCell>

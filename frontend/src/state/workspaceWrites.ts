@@ -92,8 +92,8 @@ export async function performSave(options: {
 	 */
 	onRejected?: (message: string) => void;
 	/**
-	 * Skips the toast for write failures. An open native dialog owns those
-	 * errors inline because the dialog blocks toasts.
+	 * Keeps write failures inline in the open editor instead of relying on
+	 * a transient notification for an error that needs correction or retry.
 	 */
 	suppressToast?: boolean;
 }): Promise<boolean> {

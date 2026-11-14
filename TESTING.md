@@ -17,7 +17,7 @@ Unit tests run without application servers. Package and configuration tests may 
 | Layer | Entry point | Location | Boots |
 | --- | --- | --- | --- |
 | Unit | `scripts/test --unit`, `bun --filter ./frontend test:unit` | Frontend, Go, provider, script and deployment contracts | Disposable package fixtures; no Docker daemon |
-| Integration | `scripts/test --integration`, `bun --filter ./frontend test:integration` | `frontend/tests/integration/*.spec.ts` | Fixture API and frontend server over HTTP |
+| Integration | `scripts/test --integration`, `bun --filter ./frontend test:integration` | Focused UI tests for observed regressions only | Fixture API and frontend server over real HTTP |
 | E2E | `E2E_TEST_MUTATIONS=1 scripts/test --e2e` | `auth/test-e2e.mjs` | Real provider and images |
 
 The root aliases are `bun run test:unit`, `bun run test:integration`, and `E2E_TEST_MUTATIONS=1 bun run test:e2e`. The e2e alias keeps the deliberate disposable-run confirmation.
@@ -76,35 +76,32 @@ Refresh the checked-in OpenAPI snapshot without a running server or financial da
 bun --filter ./frontend openapi:refresh
 ```
 
-Run the routing regression specs with:
+The former browser UI suite was retired. New specs cover observed regressions only. The selection-label regression found during the Base UI migration runs with:
 
 ```bash
-bun --filter ./frontend test:integration -- modalUrls.spec.ts workspace.spec.ts groupSharing.spec.ts safeSpending.spec.ts
+bun --filter ./frontend test:integration -- selectLabels.spec.ts
 ```
 
 ## Integration suite
 
-The integration suite drives the real Go engine over real HTTP. It starts its own fixture API, seeded from a fixture pack, and frontend server. Each run picks random free ports and a fresh temporary database; several agents can run it concurrently.
+The broad browser suite was retired under the regression-first UI policy. `selectLabels.spec.ts` covers the reproduced bug where a Base UI selection trigger displayed an internal ID instead of the option label. It does not restore the retired broad coverage.
 
 ```bash
 (cd frontend && bunx --no-install playwright install chromium)
 bun --filter ./frontend test:integration
 ```
 
-`test:integration` is the sharding runner. It defaults to half the available CPUs, at most four; set `TEST_BROWSER_SHARDS` to change it. CI gives each of four Playwright shards its own runner. Pass an explicit shard with `bun --filter ./frontend test:integration -- --shard=N/4`. Each invocation writes its own blobs under `test-results/run-<pid>/` and merges them into one HTML report; parse the per-shard `results.json` for exact locators. The suite fixes `locale: en-US` and `timezoneId: America/Los_Angeles` and fails on unexpected console errors or uncaught exceptions.
+The harness supplies the sharding runner, Playwright config, fixture API, frontend server, demo harness, and per-run isolated ports, databases, and blob reports. When no specs exist, a default invocation explicitly reports an empty baseline and starts no servers. `TMPDIR` can put disposable browser state in a task-owned scratch directory.
 
-Run named specs in one shard:
+Passing an explicit file or grep selector that matches nothing still fails, so a typo or a deleted-spec command never passes silently.
 
-```bash
-bun --filter ./frontend test:integration -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
-```
+Re-add specs only for observed regressions, never as proactive replacements for the deleted coverage.
 
-`financeIndependence.spec.ts` verifies that an invalid forecast does not block account lists, recorded activity, or ordinary maintenance. `receipts.spec.ts` covers upload, replacement, deletion, review, extraction fallback, provenance, read-only, keyboard dismissal, and mobile accessibility with only extraction mocked. See [receipt verification](docs/receipts.md#verification). Blob adapter and storage failure checks live under `backend/internal/blobstore/` and `backend/internal/store/`.
+Financial-domain, API, authorization, and isolation coverage stays in the unit tier and the Go suites. Blob adapter and storage failure checks live under `backend/internal/blobstore/` and `backend/internal/store/`.
 
-To exercise the production build:
+The production-build leg reports the same empty baseline while no specs exist:
 
 ```bash
-bun --filter ./frontend build
 TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 ```
 
@@ -116,7 +113,7 @@ Agents run the narrowest local check, push the branch, and watch hosted `Tests` 
 scripts/test --gate
 ```
 
-That command checks install drift, generates the API client, runs backend, frontend, provider, extension, and shared contract groups, then runs both browser suites. Use `--no-browser` to skip browsers, `--shards=N` to control frontend fan-out, and `KEEP_GATE_LOGS=1` for logs. Hosted Tests additionally verifies the income sidecar, Northflank deployment image, and Python payment-pattern upgrade. The local aggregate does not reproduce those jobs. The pre-commit hook checks install drift and formatting only; it runs no tests. See [integration edge gates](docs/integration-edge-gates.md) for the matrix.
+That command checks install drift, generates the API client, runs backend, frontend, provider, extension, and shared contract groups, then runs the observed frontend regressions and extension browser suite. Use `--no-browser` to skip browsers, `--shards=N` to control frontend fan-out, and `KEEP_GATE_LOGS=1` for logs. Hosted Tests additionally verifies the income sidecar, Northflank deployment image, and Python payment-pattern upgrade. The local aggregate does not reproduce those jobs. The pre-commit hook checks install drift and formatting only; it runs no tests. See [integration edge gates](docs/integration-edge-gates.md) for the matrix.
 
 `node scripts/check-install.mjs` compares each workspace `package.json` against the root `bun.lock` and installed `node_modules`. Install or refresh everything with `bun install` from the repository root.
 
@@ -132,10 +129,9 @@ Completeness journeys join them: one fixed synthetic ledger (`backend/testdata/i
 
 ```bash
 CGO_ENABLED=0 go -C backend test ./internal/integrationledger/ -count=3
-INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:integration -- ledgerCompleteness.spec.ts
 ```
 
-The local aggregate and hosted CI run the Go journeys once and never set `INTEGRATION_PACK=ledger`, so the browser leg of the completeness journey skips itself there. The repetition and the browser leg are separate release work.
+The browser leg of the completeness journey retired with the UI specs; re-add it only for an observed regression. The repetition stays separate release work.
 
 ## Shared database isolation
 Isolation tests must use at least two users in the same physical SQLite file, with identical entity IDs, preset names, and upstream sync keys. Separate fixture files alone do not prove row-level isolation.

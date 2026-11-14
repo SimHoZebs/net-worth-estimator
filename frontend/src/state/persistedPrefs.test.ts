@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiNetworkError } from "../api/http.ts";
-import { useNotifications } from "./notifications.ts";
+import { toast } from "../components/ui/toast.tsx";
 import type { SafeSpendingSettings } from "../api/contracts.ts";
 import {
 	acceptUserScope,
@@ -82,6 +82,15 @@ const server = {
 	puts: [] as unknown[],
 };
 
+let published: {
+	id?: string;
+	type?: unknown;
+	description?: unknown;
+	actionProps?: { children?: unknown; onClick?: unknown };
+	onClose?: unknown;
+}[] = [];
+let closed: (string | undefined)[] = [];
+
 function backendKey() {
 	return `${getUserScope().apiBaseUrl}:${getUserScope().resource?.id}`;
 }
@@ -109,6 +118,13 @@ function stubSettingsFetch() {
 }
 
 beforeEach(async () => {
+	vi.spyOn(toast, "add").mockImplementation((options) => {
+		published.push(options);
+		return options.id ?? "toast-test";
+	});
+	vi.spyOn(toast, "close").mockImplementation((id) => {
+		closed.push(id);
+	});
 	vi.unstubAllGlobals();
 	suspendUserScope();
 	stubStorage(memoryStorage());
@@ -131,6 +147,8 @@ beforeEach(async () => {
 		// Ignore.
 	}
 	await verifyOwner();
+	published = [];
+	closed = [];
 });
 
 afterEach(() => {
@@ -145,14 +163,19 @@ describe("unified persisted prefs", () => {
 		server.putErrors.push(new Error("Offline"));
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
 		await vi.waitFor(() =>
-			expect(useNotifications.getState().items[0]?.message).toContain(
-				"not saved",
+			expect(published).toContainEqual(
+				expect.objectContaining({
+					id: "safe-spending-settings",
+					type: "error",
+					description: expect.stringContaining("not saved"),
+				}),
 			),
 		);
-		useNotifications.getState().items[0]?.action?.onAction();
-		await vi.waitFor(() =>
-			expect(useNotifications.getState().items).toHaveLength(0),
+		const options = published.find(
+			(entry) => entry.id === "safe-spending-settings",
 		);
+		(options?.actionProps?.onClick as (() => void) | undefined)?.();
+		await vi.waitFor(() => expect(closed).toContain("safe-spending-settings"));
 		expect((server.puts.at(-1) as { reserve?: number }).reserve).toBe(123);
 	});
 	it("does not mount financial preferences when the backend read fails", async () => {

@@ -19,7 +19,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const frontendDirectory = join(dirname(fileURLToPath(import.meta.url)), "..");
-const temporaryRoot = existsSync("/tmp/opencode") ? "/tmp/opencode" : tmpdir();
+const temporaryRoot =
+	process.env.TMPDIR ??
+	(existsSync("/tmp/opencode") ? "/tmp/opencode" : tmpdir());
 const resultsRoot = join(frontendDirectory, "test-results");
 // Unique per invocation: concurrent runs in one worktree must never share
 // trace and screenshot blobs, not even for single-shard runs.
@@ -92,6 +94,12 @@ function pruneStaleRuns() {
 	// the current per-run directories; rmSync removes files as well.
 	pruneDirectory(temporaryRoot, "waypoint-browser-");
 	pruneDirectory(resultsRoot, "run-");
+}
+
+function listIntegrationSpecs() {
+	return readdirSync(join(frontendDirectory, "tests", "integration")).filter(
+		(file) => file.endsWith(".spec.ts"),
+	);
 }
 
 function forward(stream, prefix) {
@@ -246,6 +254,33 @@ function generateClient() {
 
 async function main() {
 	const { shards, passthrough } = parseArguments(process.argv.slice(2));
+	// Regression-first UI baseline: the browser integration specs were
+	// retired deliberately and return only for an observed regression. With
+	// no specs on disk the default run is an empty baseline: log it and
+	// return before provisioning servers. An explicit file or grep selector
+	// that matches nothing is still a failure, so typos and deleted-spec
+	// commands never pass silently.
+	if (listIntegrationSpecs().length === 0) {
+		const explicit = passthrough.some(
+			(argument) =>
+				!argument.startsWith("-") ||
+				argument === "--grep" ||
+				argument === "--grep-invert" ||
+				argument.startsWith("--grep=") ||
+				argument.startsWith("--grep-invert=") ||
+				argument.startsWith("-g"),
+		);
+		if (explicit) {
+			console.error(
+				"[integration] no specs on disk and the explicit selector matched nothing; refusing to pass. Drop the selector or re-add the regression spec.",
+			);
+			process.exit(1);
+		}
+		console.log(
+			"[integration] empty baseline: no tests/integration/*.spec.ts on disk (UI specs stay retired until an observed regression re-adds one); no servers started, exit 0.",
+		);
+		process.exit(0);
+	}
 	pruneStaleRuns();
 	// No pre-hooks: the runner refreshes the client before shards boot so
 	// standalone runs never use a stale tree. Gate entries already generated

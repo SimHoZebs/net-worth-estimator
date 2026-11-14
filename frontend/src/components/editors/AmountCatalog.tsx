@@ -18,13 +18,23 @@ import {
 	deletePreset,
 	movePreset,
 } from "../../state/workspaceWrites.ts";
-import { Button, TextButton } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { Checkbox, InputField } from "../Field.tsx";
-import { ConfirmDialog } from "../ConfirmDialog.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import { textValue } from "./formValues.ts";
 import { AmountBuilder } from "./AmountBuilder.tsx";
 import { useAmountTemplates } from "./amountTemplates.ts";
+import { EditorCheckbox } from "./editorFields.tsx";
 
 type CopyEntry = {
 	name: string;
@@ -67,7 +77,7 @@ function CompactList({
 			{items.map((item) => (
 				<li
 					key={item.key}
-					className="border-0 border-b border-solid border-line py-2 text-sm"
+					className="border-0 border-b border-solid border-border py-2 text-sm"
 				>
 					<strong>{item.title}</strong> — {item.text}
 				</li>
@@ -82,6 +92,46 @@ function slugify(value: string): string {
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
+}
+
+function CatalogField({
+	id,
+	label,
+	name,
+	wide,
+	required,
+	maxLength,
+	placeholder,
+	hint,
+	hintId,
+	defaultValue,
+}: {
+	id: string;
+	label: string;
+	name: string;
+	wide?: boolean;
+	required?: boolean;
+	maxLength?: number;
+	placeholder?: string;
+	hint?: string;
+	hintId?: string;
+	defaultValue?: string;
+}) {
+	return (
+		<Field className={wide ? "col-span-full" : undefined}>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+			<Input
+				id={id}
+				name={name}
+				required={required}
+				maxLength={maxLength}
+				placeholder={placeholder}
+				defaultValue={defaultValue}
+				aria-describedby={hint ? hintId : undefined}
+			/>
+			{hint ? <FieldDescription id={hintId}>{hint}</FieldDescription> : null}
+		</Field>
+	);
 }
 
 export function AmountCatalog() {
@@ -117,6 +167,8 @@ export function AmountCatalog() {
 	const [creating, setCreating] = useState(false);
 	const [editing, setEditing] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [createEnabled, setCreateEnabled] = useState(true);
+	const [editEnabled, setEditEnabled] = useState(true);
 	const [stagedAmount, setStagedAmount] =
 		useState<TransactionAmountResolution | null>(null);
 
@@ -133,6 +185,7 @@ export function AmountCatalog() {
 		setCreating(false);
 		setEditing(false);
 		setStagedAmount(null);
+		setCreateEnabled(true);
 	}
 
 	async function submitCreate(event: FormEvent<HTMLFormElement>) {
@@ -147,7 +200,7 @@ export function AmountCatalog() {
 			summary: textValue(data, "summary") || null,
 			whenUse: textValue(data, "whenUse") || null,
 			amount: stagedAmount,
-			enabled: textValue(data, "enabled") === "on",
+			enabled: createEnabled,
 		});
 		if (ok) {
 			setSelectedId(name);
@@ -165,7 +218,7 @@ export function AmountCatalog() {
 			summary: textValue(data, "summary") || null,
 			whenUse: textValue(data, "whenUse") || null,
 			amount: stagedAmount ?? selectedPreset.amount,
-			enabled: textValue(data, "enabled") === "on",
+			enabled: editEnabled,
 		});
 		if (ok) closeForms();
 	}
@@ -173,24 +226,27 @@ export function AmountCatalog() {
 	return (
 		<section aria-label="How amounts are calculated">
 			<h3>How amounts are calculated</h3>
-			<p className="text-muted">
+			<p className="text-muted-foreground">
 				Pick a starting point, fill in the blanks, copy the result.
 			</p>
 			<ul className="mt-3 mb-5 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,var(--container-3xs)),1fr))] gap-3 p-0">
 				{templates.map((template) => (
 					<li key={template.id} className="m-0">
-						<button
+						<Button
 							type="button"
-							className="block w-full cursor-pointer rounded-surface border border-solid border-line bg-transparent p-3 text-left text-inherit aria-pressed:border-success-border aria-pressed:bg-success-bg"
+							variant={template.id === selected?.id ? "secondary" : "outline"}
 							aria-pressed={template.id === selected?.id}
 							onClick={() => {
 								setSelectedId(template.id);
 								closeForms();
 							}}
+							className="h-auto w-full flex-col items-start gap-1 p-3 text-left whitespace-normal"
 						>
-							<strong className="mb-1 block">{template.label}</strong>
-							<span className="m-0 text-xs text-muted">{template.summary}</span>
-						</button>
+							<span className="font-semibold">{template.label}</span>
+							<span className="text-xs font-normal text-muted-foreground">
+								{template.summary}
+							</span>
+						</Button>
 					</li>
 				))}
 			</ul>
@@ -198,7 +254,7 @@ export function AmountCatalog() {
 				<div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
 					<Button
 						type="button"
-						variant="secondary"
+						variant="outline"
 						onClick={() => {
 							closeForms();
 							setCreating(true);
@@ -208,17 +264,20 @@ export function AmountCatalog() {
 					</Button>
 					{selectedPreset && (
 						<>
-							<TextButton
+							<Button
 								type="button"
+								variant="link"
 								onClick={() => {
 									closeForms();
+									setEditEnabled(selectedPreset.enabled);
 									setEditing(true);
 								}}
 							>
 								Rename
-							</TextButton>
-							<TextButton
+							</Button>
+							<Button
 								type="button"
+								variant="link"
 								disabled={!canMoveUp}
 								onClick={() => {
 									const previous = serverPresets[index - 1];
@@ -226,9 +285,10 @@ export function AmountCatalog() {
 								}}
 							>
 								Move up
-							</TextButton>
-							<TextButton
+							</Button>
+							<Button
 								type="button"
+								variant="link"
 								disabled={!canMoveDown}
 								onClick={() => {
 									const after = serverPresets[index + 2];
@@ -236,44 +296,53 @@ export function AmountCatalog() {
 								}}
 							>
 								Move down
-							</TextButton>
-							<TextButton type="button" onClick={() => setDeleting(true)}>
+							</Button>
+							<Button
+								type="button"
+								variant="link"
+								onClick={() => setDeleting(true)}
+							>
 								Delete
-							</TextButton>
+							</Button>
 						</>
 					)}
 				</div>
 			)}
 			{creating && (
 				<form
-					className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4"
+					className="mt-3 mb-5 rounded-xl border border-border bg-transparent p-4"
 					onSubmit={submitCreate}
 				>
 					<h4>New recipe</h4>
-					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
-						<InputField
+					<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+						<CatalogField
+							id={`${id}-create-name`}
 							label="Name"
 							name="name"
 							required
 							maxLength={100}
 							placeholder="e.g. yearly-bonus"
 							hint="Lowercase letters, numbers, and dashes."
+							hintId={`${id}-create-name-hint`}
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-create-label`}
 							label="Label"
 							name="label"
 							required
 							maxLength={100}
 							placeholder="e.g. Yearly bonus"
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-create-summary`}
 							label="Summary"
 							name="summary"
 							wide
 							maxLength={280}
 							placeholder="e.g. Same bonus every December."
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-create-when-use`}
 							label="When to use"
 							name="whenUse"
 							wide
@@ -281,17 +350,12 @@ export function AmountCatalog() {
 							placeholder="e.g. Annual bonuses."
 						/>
 					</div>
-					<label
-						htmlFor={`${id}-create-enabled`}
-						className="flex min-h-11 items-center gap-3 text-sm text-muted"
-					>
-						<Checkbox
-							id={`${id}-create-enabled`}
-							name="enabled"
-							defaultChecked
-						/>
-						Enabled
-					</label>
+					<EditorCheckbox
+						id={`${id}-create-enabled`}
+						label="Enabled"
+						checked={createEnabled}
+						onChange={setCreateEnabled}
+					/>
 					<AmountBuilder
 						accounts={accounts}
 						transactions={transactions}
@@ -299,12 +363,14 @@ export function AmountCatalog() {
 						initialTemplateId="fixed"
 						onChange={setStagedAmount}
 					/>
-					{stagedAmount && <p className="text-muted">Amount ready to save.</p>}
-					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={closeForms}>
+					{stagedAmount && (
+						<p className="text-muted-foreground">Amount ready to save.</p>
+					)}
+					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-border pt-5">
+						<Button type="button" variant="outline" onClick={closeForms}>
 							Cancel
 						</Button>
-						<Button type="submit" variant="primary" disabled={!stagedAmount}>
+						<Button type="submit" disabled={!stagedAmount}>
 							Save recipe
 						</Button>
 					</div>
@@ -312,26 +378,29 @@ export function AmountCatalog() {
 			)}
 			{editing && selectedPreset && (
 				<form
-					className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4"
+					className="mt-3 mb-5 rounded-xl border border-border bg-transparent p-4"
 					onSubmit={submitEdit}
 				>
 					<h4>Rename recipe</h4>
-					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
-						<InputField
+					<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+						<CatalogField
+							id={`${id}-edit-label`}
 							label="Label"
 							name="label"
 							required
 							maxLength={100}
 							defaultValue={selectedPreset.label}
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-edit-summary`}
 							label="Summary"
 							name="summary"
 							wide
 							maxLength={280}
 							defaultValue={selectedPreset.summary ?? ""}
 						/>
-						<InputField
+						<CatalogField
+							id={`${id}-edit-when-use`}
 							label="When to use"
 							name="whenUse"
 							wide
@@ -339,17 +408,12 @@ export function AmountCatalog() {
 							defaultValue={selectedPreset.whenUse ?? ""}
 						/>
 					</div>
-					<label
-						htmlFor={`${id}-edit-enabled`}
-						className="flex min-h-11 items-center gap-3 text-sm text-muted"
-					>
-						<Checkbox
-							id={`${id}-edit-enabled`}
-							name="enabled"
-							defaultChecked={selectedPreset.enabled}
-						/>
-						Enabled
-					</label>
+					<EditorCheckbox
+						id={`${id}-edit-enabled`}
+						label="Enabled"
+						checked={editEnabled}
+						onChange={setEditEnabled}
+					/>
 					<details>
 						<summary>Replace amount</summary>
 						<AmountBuilder
@@ -364,36 +428,49 @@ export function AmountCatalog() {
 							onChange={setStagedAmount}
 						/>
 					</details>
-					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={closeForms}>
+					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-border pt-5">
+						<Button type="button" variant="outline" onClick={closeForms}>
 							Cancel
 						</Button>
-						<Button type="submit" variant="primary">
-							Save changes
-						</Button>
+						<Button type="submit">Save changes</Button>
 					</div>
 				</form>
 			)}
 			{deleting && selectedPreset && (
-				<ConfirmDialog
-					title={`Delete ${selectedPreset.label}?`}
-					cancelLabel="Keep recipe"
-					confirmLabel="Delete recipe"
-					onCancel={() => setDeleting(false)}
-					onConfirm={() => {
-						void deletePreset(selectedPreset.id).then((ok) => {
-							if (ok) {
-								setDeleting(false);
-								setSelectedId(templates[0]?.id ?? "fixed");
-							}
-						});
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open) setDeleting(false);
 					}}
 				>
-					<p>
-						The recipe stops appearing as a starting point. Transactions already
-						using its amounts are unaffected.
-					</p>
-				</ConfirmDialog>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								{`Delete ${selectedPreset.label}?`}
+							</AlertDialogTitle>
+						</AlertDialogHeader>
+						<AlertDialogDescription>
+							The recipe stops appearing as a starting point. Transactions
+							already using its amounts are unaffected.
+						</AlertDialogDescription>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Keep recipe</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								onClick={() => {
+									void deletePreset(selectedPreset.id).then((ok) => {
+										if (ok) {
+											setDeleting(false);
+											setSelectedId(templates[0]?.id ?? "fixed");
+										}
+									});
+								}}
+							>
+								Delete recipe
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 			{selected && !creating && !editing && (
 				<AmountBuilder

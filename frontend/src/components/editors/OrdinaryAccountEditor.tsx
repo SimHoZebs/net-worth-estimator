@@ -1,16 +1,17 @@
-import { useState, type FormEvent } from "react";
+import { LockKeyhole } from "lucide-react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { createAccount, updateAccount } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
-import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshAccounts } from "../../state/workspaceResources.ts";
 import { parseDisplayNumber } from "./formValues.ts";
-import { InputField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { Notice } from "../Notice.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Badge } from "../Badge.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldError, FieldTitle } from "@/components/ui/field.tsx";
+import { DialogFooter } from "@/components/ui/dialog.tsx";
+import { DiscardConfirm, useDiscardGuard } from "./EditorDialog.tsx";
+import { MoneyField } from "./editorFields.tsx";
 
 /** Row-first account editor. Saves straight to the server; no draft involved. */
 export function OrdinaryAccountEditor({
@@ -21,6 +22,8 @@ export function OrdinaryAccountEditor({
 	name,
 	kind,
 	enabled,
+	dirtyOutside = false,
+	onDirtyChange,
 	onSavingChange,
 }: {
 	item: Account | null;
@@ -30,6 +33,8 @@ export function OrdinaryAccountEditor({
 	name: string;
 	kind: Account["kind"];
 	enabled: boolean;
+	dirtyOutside?: boolean;
+	onDirtyChange?: (dirty: boolean) => void;
 	onSavingChange: (saving: boolean) => void;
 }) {
 	const [balance, setBalance] = useState(String(item?.balance ?? 0));
@@ -41,8 +46,11 @@ export function OrdinaryAccountEditor({
 	);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const balanceId = useId();
+	const minBalanceId = useId();
+	const maxBalanceId = useId();
 
-	const dirty =
+	const ownDirty =
 		name !== (item?.name ?? "") ||
 		kind !== (item?.kind ?? "cash") ||
 		enabled !== (item?.enabled ?? true) ||
@@ -52,9 +60,14 @@ export function OrdinaryAccountEditor({
 			(item?.maxBalance === null || item?.maxBalance === undefined
 				? ""
 				: String(item.maxBalance));
-	useBeforeUnload(dirty && !saving);
+	const dirty = ownDirty || dirtyOutside;
+	const guard = useDiscardGuard({ dirty, busy: saving });
+	useEffect(() => {
+		onDirtyChange?.(ownDirty);
+	}, [ownDirty, onDirtyChange]);
 
 	const readOnly = item?.readOnly ?? false;
+	const locked = readOnly || saving;
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -121,9 +134,12 @@ export function OrdinaryAccountEditor({
 	return (
 		<>
 			{readOnly && (
-				<Notice>
-					This account is synced from your bank and cannot be edited here.
-				</Notice>
+				<Alert>
+					<LockKeyhole aria-hidden="true" />
+					<AlertDescription>
+						This account is synced from your bank and cannot be edited here.
+					</AlertDescription>
+				</Alert>
 			)}
 			<form
 				id={formId}
@@ -131,61 +147,66 @@ export function OrdinaryAccountEditor({
 				onSubmit={(event) => void submit(event)}
 			>
 				<fieldset
-					disabled={readOnly || saving}
-					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
+					disabled={locked}
+					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
 				>
-					<InputField
-						label="Balance (USD)"
-						type="number"
+					<MoneyField
+						id={balanceId}
+						label="Balance"
 						required
-						step="0.01"
 						min="-10000000000"
 						max="10000000000"
+						step="0.01"
 						value={balance}
 						onChange={(event) => setBalance(event.target.value)}
+						disabled={locked}
 					/>
-					<InputField
-						label="Protected balance (USD)"
-						type="number"
+					<MoneyField
+						id={minBalanceId}
+						label="Protected balance"
 						required
 						min="0"
 						max="10000000000"
 						step="0.01"
 						value={minBalance}
 						onChange={(event) => setMinBalance(event.target.value)}
+						disabled={locked}
 					/>
-					<InputField
-						label="Maximum balance (USD)"
-						type="number"
+					<MoneyField
+						id={maxBalanceId}
+						label="Maximum balance"
 						min="0"
 						max="10000000000"
 						step="0.01"
 						value={maxBalance}
 						onChange={(event) => setMaxBalance(event.target.value)}
 						placeholder="No ceiling"
+						disabled={locked}
 					/>
-					<div className="col-span-full flex flex-col gap-2">
-						<span
-							id="account-source-label"
-							className="text-sm font-semibold text-muted"
-						>
-							Source
-						</span>
-						<div aria-labelledby="account-source-label">
-							<Badge tone="outline">{item?.source ?? "Manual entry"}</Badge>
-						</div>
-					</div>
+					<Field className="col-span-full">
+						<FieldTitle>Source</FieldTitle>
+						<Badge variant="outline">{item?.source ?? "Manual entry"}</Badge>
+					</Field>
 				</fieldset>
-				<FieldError message={error} />
-				<div className={dialogActionsStyles}>
-					<Button type="button" variant="secondary" onClick={onClose}>
+				{error ? <FieldError>{error}</FieldError> : null}
+				<DialogFooter>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={() => guard.requestClose(onClose)}
+					>
 						Cancel
 					</Button>
-					<Button type="submit" disabled={readOnly || saving || !dirty}>
+					<Button type="submit" disabled={saving || readOnly || !dirty}>
 						{saving ? "Saving…" : item ? "Save account" : "Add account"}
 					</Button>
-				</div>
+				</DialogFooter>
 			</form>
+			<DiscardConfirm
+				open={guard.confirming}
+				onContinue={guard.dismissConfirm}
+				onDiscard={onClose}
+			/>
 		</>
 	);
 }

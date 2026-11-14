@@ -203,7 +203,7 @@ export function FlowSankey({
 									y1: "y0",
 									y2: "y1",
 									key: "key",
-									fill: "var(--ink)",
+									fill: "var(--foreground)",
 									inset: 0,
 								}),
 								rect(layoutNodes, {
@@ -216,7 +216,7 @@ export function FlowSankey({
 									y1: (node) => node.y - LABEL_BACKGROUND_HEIGHT / 2,
 									y2: (node) => node.y + LABEL_BACKGROUND_HEIGHT / 2,
 									key: (node) => `${node.key}-label`,
-									fill: "var(--paper)",
+									fill: "var(--background)",
 									fillOpacity: 0.9,
 									inset: 0,
 								}),
@@ -226,7 +226,7 @@ export function FlowSankey({
 									text: (node) => truncateLabel(node.data.label),
 									key: "key",
 									anchor: (node) => (node.depth === 0 ? "end" : "start"),
-									fill: "var(--ink)",
+									fill: "var(--foreground)",
 									fontSize: 12,
 									fontWeight: 600,
 								}),
@@ -283,12 +283,12 @@ export function FlowSankey({
 				</div>
 			</div>
 			{/* oxlint-enable jsx-a11y/no-noninteractive-tabindex */}
-			<p className="text-xs text-muted sm:hidden">
+			<p className="text-xs text-muted-foreground sm:hidden">
 				Scroll sideways to see the whole diagram.
 			</p>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists. */}
 			<ul
-				className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-xs text-muted"
+				className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-xs text-muted-foreground"
 				role="list"
 				aria-label="Flow key"
 			>

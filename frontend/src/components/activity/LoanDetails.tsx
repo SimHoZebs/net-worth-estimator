@@ -5,7 +5,14 @@ import {
 	exactMoney,
 	isoDateFromEpochSeconds,
 } from "../../domain/format.ts";
-import { Button } from "../Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemGroup,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
+import { Card, CardContent, CardDescription } from "@/components/ui/card.tsx";
 
 export function LoanDetails({
 	account,
@@ -18,31 +25,34 @@ export function LoanDetails({
 }) {
 	return (
 		<section className="flex flex-col gap-5">
-			<p className="text-sm text-muted">
-				Payments cover accrued interest first, then principal. Interest charges
-				use principal only.
-			</p>
-			<dl className="m-0 grid grid-cols-2 gap-4">
+			<Card size="sm">
+				<CardContent>
+					<CardDescription>
+						Payments cover accrued interest first, then principal. Interest
+						charges use principal only.
+					</CardDescription>
+				</CardContent>
+			</Card>
+			<ItemGroup>
 				{account.components?.map((c) => (
-					<div
-						key={c.accountId}
-						className="rounded-control border border-line p-4"
-					>
-						<dt className="text-sm capitalize text-muted">
-							{c.role === "interest" ? "Accrued interest" : c.role}
-						</dt>
-						<dd className="type-value m-0 mt-2 text-xl">
-							{exactMoney(Math.abs(c.balance))}
-						</dd>
-						{c.observedAt !== null && c.observedBalance !== null && (
-							<dd className="m-0 mt-2 text-xs text-muted">
-								Recorded {exactMoney(Math.abs(c.observedBalance))} on{" "}
-								{dateLabel(isoDateFromEpochSeconds(c.observedAt), true)}
-							</dd>
-						)}
-					</div>
+					<Item key={c.accountId} variant="outline" size="sm">
+						<ItemContent>
+							<ItemTitle className="capitalize">
+								{c.role === "interest" ? "Accrued interest" : c.role}
+							</ItemTitle>
+							<p className="m-0 mt-1 text-xl font-medium tabular-nums">
+								{exactMoney(Math.abs(c.balance))}
+							</p>
+							{c.observedAt !== null && c.observedBalance !== null && (
+								<p className="m-0 mt-1 text-xs text-muted-foreground">
+									Recorded {exactMoney(Math.abs(c.observedBalance))} on{" "}
+									{dateLabel(isoDateFromEpochSeconds(c.observedAt), true)}
+								</p>
+							)}
+						</ItemContent>
+					</Item>
 				))}
-			</dl>
+			</ItemGroup>
 			<Button
 				type="button"
 				disabled={readOnly || account.readOnly}

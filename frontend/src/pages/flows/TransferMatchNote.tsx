@@ -3,15 +3,19 @@ import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
 import { UserScopeError } from "../../api/scopedRequest.ts";
-import { Button } from "../../components/Button.tsx";
-import { FieldError } from "../../components/ErrorNotice.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import {
 	useAnalysisFindings,
 	useConfirmTransferPair,
 	useRemoveTransferLinkByLeg,
 	useTransferLinks,
 } from "../../state/analyses.ts";
-import { dismissKey, notifyError } from "../../state/notifications.ts";
+import {
+	dismissKey,
+	notifyError,
+	notifySuccess,
+} from "../../state/notifications.ts";
+import { cn } from "@/lib/utils.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
 /** Read-only transfer-pair annotation (VIS-03 consumer) with confirm actions.
@@ -118,10 +122,8 @@ export function TransferMatchNote({
 	function reportLinkFailure(cause: unknown, fallback: string): void {
 		if (cause instanceof UserScopeError) return;
 		if (cause instanceof ApiHttpError && cause.status === 422) return;
-		notifyError(
-			"transfer-link",
-			cause instanceof Error ? cause.message : fallback,
-		);
+		const message = cause instanceof Error ? cause.message : fallback;
+		notifyError("transfer-link", message);
 	}
 	const matcherDetail = actionable?.finding.evidence?.[0]?.reason ?? null;
 	const confirmPair = () => {
@@ -134,19 +136,22 @@ export function TransferMatchNote({
 			{
 				onError: (cause) =>
 					reportLinkFailure(cause, "The transfer pair could not be saved."),
-				onSuccess: () => dismissKey("transfer-link"),
+				onSuccess: () => {
+					dismissKey("transfer-link");
+					notifySuccess("transfer-notice", "The transfer pair was saved.");
+				},
 			},
 		);
 	};
 	return (
-		<div className="mt-3 border-t border-line pt-3">
-			<p className="text-xs text-muted">
+		<div className="mt-3 border-t border-border pt-3">
+			<p className="text-xs text-muted-foreground">
 				Counted once as a transfer
 				{transferCount > 1 ? ` across ${transferCount} transactions` : ""}, not
 				as income plus spending.
 			</p>
 			{query.isError ? (
-				<p className="mt-1 text-xs text-muted">
+				<p className="mt-1 text-xs text-muted-foreground">
 					Transfer-pair information could not be loaded.
 				</p>
 			) : matched.length > 0 ? (
@@ -159,7 +164,7 @@ export function TransferMatchNote({
 					is not settled yet.
 				</p>
 			) : (
-				<p className="mt-1 text-xs text-muted">
+				<p className="mt-1 text-xs text-muted-foreground">
 					No matching opposite transfer is confirmed yet.
 				</p>
 			)}
@@ -183,7 +188,13 @@ export function TransferMatchNote({
 											cause,
 											"The transfer link could not be removed.",
 										),
-									onSuccess: () => dismissKey("transfer-link"),
+									onSuccess: () => {
+										dismissKey("transfer-link");
+										notifySuccess(
+											"transfer-notice",
+											"The transfer link was removed.",
+										);
+									},
 								},
 							)
 						}
@@ -196,6 +207,7 @@ export function TransferMatchNote({
 				<div className="mt-2">
 					<Button
 						type="button"
+						variant="secondary"
 						size="sm"
 						disabled={busy || !peer}
 						aria-label={`Link as transfer with ${peer}`}
@@ -226,6 +238,7 @@ export function TransferMatchNote({
 					</div>
 					<Button
 						type="button"
+						variant="secondary"
 						size="sm"
 						disabled={busy || !peer}
 						aria-label={`Link as transfer with ${peer}`}
@@ -237,13 +250,19 @@ export function TransferMatchNote({
 			)}
 			{matcherDetail && (
 				<details className="mt-1">
-					<summary className="cursor-pointer text-xs text-muted">
+					<summary className="cursor-pointer text-xs text-muted-foreground">
 						Matcher detail
 					</summary>
-					<p className="m-0 mt-1 text-xs text-muted">{matcherDetail}</p>
+					<p className="m-0 mt-1 text-xs text-muted-foreground">
+						{matcherDetail}
+					</p>
 				</details>
 			)}
-			<FieldError message={inlineError} />
+			{inlineError && (
+				<p role="alert" className={cn("mt-2 text-sm text-danger-text")}>
+					{inlineError}
+				</p>
+			)}
 		</div>
 	);
 }

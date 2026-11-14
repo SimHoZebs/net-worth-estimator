@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/client";
 import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { registerPasskey, signInPasskey } from "./passkeys";
-import { buttonStyles } from "../../../frontend/src/components/buttonStyles";
+import { ghostButton } from "./controls";
 
 const client = createAuthClient({ plugins: [oauthProviderClient()] });
 const feedback = document.querySelector("#feedback")!;
@@ -47,7 +47,7 @@ async function listPasskeys() {
     label.textContent = key.name || "Passkey";
     const button = document.createElement("button");
     button.type = "button";
-    button.className = buttonStyles({ variant: "ghost", size: "sm" });
+    button.className = ghostButton;
     button.textContent = "Remove";
     button.setAttribute("aria-label", `Remove ${key.name || "passkey"}`);
     button.addEventListener("click", async () => {

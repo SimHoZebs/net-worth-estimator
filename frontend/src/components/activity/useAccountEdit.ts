@@ -70,7 +70,7 @@ export function useAccountEdit(
 		(row) => row.observedAt === Math.floor(instant / 1000),
 	);
 	const previousBalance = existing?.previousBalance ?? previous.data;
-	useBeforeUnload(activeField !== null && !saving);
+	useBeforeUnload(edit.dirty || saving);
 	const update = (patch: Partial<typeof source>, field: AccountEditField) => {
 		// The kind selector stays available on synced accounts: kind is a
 		// user-configured label, and changing it is the supported way to
@@ -84,17 +84,11 @@ export function useAccountEdit(
 		setConfirmCancel(false);
 	};
 	const reset = () => {
-		const field = activeField;
 		edit.reset();
 		setActiveField(null);
 		setObservedAt(null);
 		setError(null);
 		setConfirmCancel(false);
-		if (field)
-			(
-				document.getElementById(`${formId}-${field}`) ??
-				document.getElementById(`${formId}-name`)
-			)?.focus();
 	};
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -251,6 +245,7 @@ export function useAccountEdit(
 		reset,
 		error,
 		saving,
+		dirty: edit.dirty,
 		confirmCancel,
 		setConfirmCancel,
 		observedAt,

@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { ApiError } from "../api/http.ts";
 import { AccountToggle } from "../components/AccountToggle.tsx";
-import { Button } from "../components/Button.tsx";
-import { ErrorNotice } from "../components/ErrorNotice.tsx";
-import { InputField } from "../components/Field.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { useSavedAccounts } from "../state/savedState.ts";
 import {
@@ -27,6 +30,29 @@ function serverMessage(cause: unknown, fallback: string): string {
 	return cause instanceof Error && cause.message ? cause.message : fallback;
 }
 
+function InlineError({
+	message,
+	action,
+	onAction,
+}: {
+	message: string | null;
+	action: string;
+	onAction: () => void;
+}) {
+	if (!message) return null;
+	return (
+		<Alert variant="destructive">
+			<AlertCircle size={16} aria-hidden="true" />
+			<AlertDescription>
+				{message}{" "}
+				<Button variant="link" onClick={onAction}>
+					{action}
+				</Button>
+			</AlertDescription>
+		</Alert>
+	);
+}
+
 /**
  * One member's own automatic-sharing consent for one group (GRP-04).
  * Sharing stays off until this member opts in; nobody else can change it.
@@ -40,6 +66,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	const accounts = useSavedAccounts();
 	const grantsQuery = useSharingGrants();
 	const setPolicy = useSetSharingPolicy();
+	const shareFromId = useId();
+	const shareUntilId = useId();
 
 	const [accountIds, setAccountIds] = useState<string[] | null>(null);
 	const [startDate, setStartDate] = useState<string | null>(null);
@@ -239,7 +267,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 	if (policyQuery.isPending) {
 		return (
-			<p className="m-0 text-sm text-muted" role="status">
+			<p className="m-0 text-sm text-muted-foreground" role="status">
 				Loading sharing…
 			</p>
 		);
@@ -247,7 +275,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 	if (policyQuery.isError) {
 		return (
-			<ErrorNotice
+			<InlineError
 				message="Sharing could not be loaded."
 				action="Retry"
 				onAction={() => void policyQuery.refetch()}
@@ -269,7 +297,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 		<section aria-label="My sharing" className="grid gap-4">
 			<div>
 				<h2 className="m-0 text-base">My sharing</h2>
-				<p className="mb-0 text-sm text-muted">
+				<p className="mb-0 text-sm text-muted-foreground">
 					{policy?.enabled
 						? "Automatic sharing is on for this group."
 						: "Automatic sharing is off. Only you can turn it on."}
@@ -279,11 +307,11 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			<fieldset className="grid gap-2 border-0 p-0">
 				<legend className="px-0 text-sm font-medium">Accounts to share</legend>
 				{accounts === null ? (
-					<p className="m-0 text-sm text-muted" role="status">
+					<p className="m-0 text-sm text-muted-foreground" role="status">
 						Loading accounts…
 					</p>
 				) : accounts.length === 0 ? (
-					<p className="m-0 text-sm text-muted">
+					<p className="m-0 text-sm text-muted-foreground">
 						No accounts yet. Add an account before sharing.
 					</p>
 				) : (
@@ -302,7 +330,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			</fieldset>
 
 			{staleSelections.length > 0 && (
-				<p className="m-0 text-sm text-muted" role="note">
+				<p className="m-0 text-sm text-muted-foreground" role="note">
 					{staleSelections.length} previously selected{" "}
 					{staleSelections.length === 1
 						? "account no longer"
@@ -313,28 +341,36 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			)}
 
 			<div className="grid max-w-md gap-2">
-				<InputField
-					label="Share from"
-					type="date"
-					value={draftStart}
-					maxLength={10}
-					onChange={(event) => {
-						setStartDate(event.target.value);
-					}}
-				/>
-				<InputField
-					label="Share until (leave empty for no end)"
-					type="date"
-					value={draftEnd}
-					maxLength={10}
-					onChange={(event) => {
-						setEndDate(event.target.value);
-					}}
-				/>
+				<Field>
+					<Label htmlFor={shareFromId}>Share from</Label>
+					<Input
+						id={shareFromId}
+						type="date"
+						value={draftStart}
+						maxLength={10}
+						onChange={(event) => {
+							setStartDate(event.target.value);
+						}}
+					/>
+				</Field>
+				<Field>
+					<Label htmlFor={shareUntilId}>
+						Share until (leave empty for no end)
+					</Label>
+					<Input
+						id={shareUntilId}
+						type="date"
+						value={draftEnd}
+						maxLength={10}
+						onChange={(event) => {
+							setEndDate(event.target.value);
+						}}
+					/>
+				</Field>
 			</div>
 
 			{draftAccounts.length > 0 && (
-				<div className="grid gap-2 rounded-control border border-solid border-line px-3 py-2 text-sm">
+				<div className="grid gap-2 rounded-md border border-solid border-border px-3 py-2 text-sm">
 					<p className="m-0">
 						<strong>Before you turn this on.</strong> Sharing covers matching
 						transactions already inside these dates, and later bank imports can
@@ -342,7 +378,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						review step for those.
 					</p>
 					{previewQuery.isPending ? (
-						<p className="m-0 text-muted" role="status">
+						<p className="m-0 text-muted-foreground" role="status">
 							Counting matching transactions…
 						</p>
 					) : previewQuery.isError ? (
@@ -355,7 +391,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						</p>
 					) : (
 						preview && (
-							<p className="m-0 text-muted">
+							<p className="m-0 text-muted-foreground">
 								{preview.eligibleTransactions}{" "}
 								{preview.eligibleTransactions === 1
 									? "transaction"
@@ -378,12 +414,17 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 			<div className="flex flex-wrap gap-2">
 				{policy?.enabled ? (
-					<Button size="sm" disabled={saving || stopping} onClick={onDisable}>
+					<Button
+						variant="secondary"
+						size="sm"
+						disabled={saving || stopping}
+						onClick={onDisable}
+					>
 						{saving ? "Turning off…" : "Turn off automatic sharing"}
 					</Button>
 				) : (
 					<Button
-						variant="primary"
+						variant="default"
 						size="sm"
 						disabled={
 							saving || stopping || draftAccounts.length === 0 || !draftStart
@@ -410,7 +451,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			</div>
 
 			{dirty && !policy?.enabled && (
-				<p className="m-0 text-sm text-muted">
+				<p className="m-0 text-sm text-muted-foreground">
 					Unsaved changes. They take effect when you turn sharing on.
 				</p>
 			)}
@@ -424,13 +465,13 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					>
 						{saving ? "Saving…" : "Save changes"}
 					</Button>
-					<span className="text-sm text-muted">
+					<span className="text-sm text-muted-foreground">
 						Narrowing dates or accounts revokes access that no longer matches.
 					</span>
 				</div>
 			)}
 
-			<p className="m-0 text-sm text-muted">
+			<p className="m-0 text-sm text-muted-foreground">
 				Single transactions can be shared with, or hidden from, a group from
 				their detail view, with or without automatic sharing. Copies a member
 				already accepted stay with them.

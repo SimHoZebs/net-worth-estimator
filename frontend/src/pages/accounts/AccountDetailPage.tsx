@@ -4,12 +4,19 @@ import { useRouter } from "@tanstack/react-router";
 import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
 import { useAccountEdit } from "../../components/activity/useAccountEdit.ts";
 import { AccountBalanceValue } from "../../components/activity/AccountBalanceValue.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import {
-	DetailEditActions,
-	DiscardConfirm,
-} from "../../components/activity/DetailEditActions.tsx";
-import { transactionControlStyles } from "../../components/activity/transactionDetailStyles.ts";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
 	isHistoricalTransaction,
@@ -31,7 +38,12 @@ import {
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
 import { Transactions } from "../../components/activity/Transactions.tsx";
 import { BalanceHistory } from "./BalanceHistory.tsx";
-import { Tabs } from "../../components/Tabs.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 import {
 	useSavedAccounts,
 	useSavedStartDate,
@@ -40,7 +52,7 @@ import {
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { useBreadcrumbSlot } from "../../workspace/breadcrumbSlot.tsx";
-import { Button } from "../../components/Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { ArrowLeft } from "lucide-react";
 
 /**
@@ -107,7 +119,7 @@ export function AccountDetailView({
 						Accounts
 					</Button>
 				</li>
-				<li aria-hidden="true" className="flex-none text-muted">
+				<li aria-hidden="true" className="flex-none text-muted-foreground">
 					/
 				</li>
 				<li
@@ -196,7 +208,7 @@ export function AccountDetailView({
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div className="flex min-w-0 items-center gap-3">
 					<AccountIcon account={account} size="lg" />
-					<input
+					<Input
 						id={`${edit.formId}-name`}
 						aria-label="Account name"
 						name="name"
@@ -208,17 +220,9 @@ export function AccountDetailView({
 						}
 						readOnly={locked || edit.saving}
 						form={edit.formId}
-						className={transactionControlStyles({ shape: "name" })}
+						className="min-w-0 flex-1 text-lg font-semibold"
 					/>
 				</div>
-				{edit.activeField !== null ? (
-					<DetailEditActions
-						formId={edit.formId}
-						onDiscard={edit.reset}
-						disabled={edit.saveBlocked}
-						discardDisabled={edit.saving}
-					/>
-				) : undefined}
 				<form
 					id={edit.formId}
 					className="min-w-0"
@@ -228,111 +232,158 @@ export function AccountDetailView({
 				</form>
 			</div>
 			<Tabs
-				items={[
-					{
-						id: "transactions",
-						label: "Transactions",
-						count: occurrences.length,
-					},
-					{ id: "recurring", label: "Recurring", count: recurring.length },
-					{ id: "details", label: "Account details" },
-				]}
 				value={view}
-				onChange={setView}
-				label="Account view"
-				className="mb-0"
-				panelClassName="flex min-w-0 flex-col gap-4"
+				onValueChange={(next) => {
+					if (next) setView(next as "transactions" | "details" | "recurring");
+				}}
+				className="gap-0"
 			>
-				{view === "transactions" ? (
-					<>
-						<Transactions
-							occurrences={occurrences}
-							rows={savedState}
-							accounts={accounts}
-							startDate={startDate}
-							readOnly={readOnly}
-							onEdit={requestEdit}
-							onSourceChange={(source) => {
-								if (source !== "historical") setForecastRequested(true);
-							}}
-							canRequestForecast={canRequestForecast}
-							projected={{
-								loading: forecastRequested && forecast.loading,
-								error: forecastRequested ? (forecast.baseError ?? null) : null,
-								requested: forecastRequested,
-								retry: forecast.retryProjection,
-							}}
-						/>
-						{!isGroupedDisplay(account) && (
-							<BalanceHistory
-								adjustments={adjustments.data ?? []}
-								isPending={adjustments.isPending}
-								isError={adjustments.isError}
-								onRetry={() => void adjustments.refetch()}
+				<TabsList
+					variant="line"
+					aria-label="Account view"
+					className="mb-0 flex w-full gap-6 overflow-x-auto p-0 max-sm:gap-5"
+				>
+					<TabsTrigger value="transactions" className="flex-none">
+						Transactions
+						<Badge variant="secondary">{occurrences.length}</Badge>
+					</TabsTrigger>
+					<TabsTrigger value="recurring" className="flex-none">
+						Recurring
+						<Badge variant="secondary">{recurring.length}</Badge>
+					</TabsTrigger>
+					<TabsTrigger value="details" className="flex-none">
+						Account details
+					</TabsTrigger>
+				</TabsList>
+				<TabsContent value={view} className="flex min-w-0 flex-col gap-4">
+					{view === "transactions" ? (
+						<>
+							<Transactions
+								occurrences={occurrences}
+								rows={savedState}
+								accounts={accounts}
+								startDate={startDate}
+								readOnly={readOnly}
+								onEdit={requestEdit}
+								onSourceChange={(source) => {
+									if (source !== "historical") setForecastRequested(true);
+								}}
+								canRequestForecast={canRequestForecast}
+								projected={{
+									loading: forecastRequested && forecast.loading,
+									error: forecastRequested
+										? (forecast.baseError ?? null)
+										: null,
+									requested: forecastRequested,
+									retry: forecast.retryProjection,
+								}}
 							/>
-						)}
-					</>
-				) : view === "recurring" ? (
-					rulesQuery.isPending ? (
-						<p role="status">Loading recurring transactions…</p>
-					) : rulesQuery.isError ? (
-						<p role="alert">
-							Recurring transactions could not be loaded.{" "}
-							<Button
-								type="button"
-								variant="secondary"
-								size="sm"
-								onClick={() => void rulesQuery.refetch()}
-							>
-								Retry
-							</Button>
-						</p>
-					) : (
-						<RecurringRules
+							{!isGroupedDisplay(account) && (
+								<BalanceHistory
+									adjustments={adjustments.data ?? []}
+									isPending={adjustments.isPending}
+									isError={adjustments.isError}
+									onRetry={() => void adjustments.refetch()}
+								/>
+							)}
+						</>
+					) : view === "recurring" ? (
+						rulesQuery.isPending ? (
+							<p role="status">Loading recurring transactions…</p>
+						) : rulesQuery.isError ? (
+							<p role="alert">
+								Recurring transactions could not be loaded.{" "}
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => void rulesQuery.refetch()}
+								>
+									Retry
+								</Button>
+							</p>
+						) : (
+							<RecurringRules
+								account={account}
+								accounts={accounts}
+								rules={accountRules}
+								startDate={startDate}
+								readOnly={readOnly}
+								onEdit={requestEdit}
+							/>
+						)
+					) : isGroupedDisplay(account) ? (
+						<LoanDetails
 							account={account}
-							accounts={accounts}
-							rules={accountRules}
-							startDate={startDate}
 							readOnly={readOnly}
 							onEdit={requestEdit}
 						/>
-					)
-				) : isGroupedDisplay(account) ? (
-					<LoanDetails
-						account={account}
-						readOnly={readOnly}
-						onEdit={requestEdit}
-					/>
-				) : (
-					<AccountDetails
-						key={account.id}
-						account={account}
-						edit={edit}
-						readOnly={locked}
-					/>
-				)}
+					) : (
+						<AccountDetails
+							key={account.id}
+							account={account}
+							edit={edit}
+							readOnly={locked}
+						/>
+					)}
+				</TabsContent>
 			</Tabs>
-			<ErrorNotice message={edit.error} />
+			{edit.error && (
+				<Alert variant="destructive">
+					<AlertDescription>{edit.error}</AlertDescription>
+				</Alert>
+			)}
 			{edit.saving && (
-				<p role="status" className="text-xs text-muted">
+				<p role="status" className="text-xs text-muted-foreground">
 					Saving…
 				</p>
 			)}
+			<div className="sticky bottom-0 z-(--z-local) mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card py-3">
+				<Button type="button" variant="secondary" onClick={requestClose}>
+					Cancel
+				</Button>
+				<Button
+					type="submit"
+					form={edit.formId}
+					disabled={edit.saveBlocked || !edit.dirty}
+				>
+					{edit.saving ? "Saving…" : "Save changes"}
+				</Button>
+			</div>
 			{edit.confirmCancel && (
-				<div className="sticky bottom-0 z-(--z-local) mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface py-3">
-					<DiscardConfirm
-						onContinue={() => {
+				<AlertDialog
+					open
+					onOpenChange={(open) => {
+						if (!open) {
 							setPendingEdit(null);
 							edit.setConfirmCancel(false);
-						}}
-						onDiscard={() => {
-							edit.reset();
-							setPendingEdit(null);
-							if (pendingEdit) onEdit(pendingEdit);
-							else onClose();
-						}}
-					/>
-				</div>
+						}
+					}}
+				>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+							<AlertDialogDescription>
+								Closing now loses the edits in this form. Continue editing to
+								keep them, or discard them.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Continue editing</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								onClick={() => {
+									edit.reset();
+									setPendingEdit(null);
+									if (pendingEdit) onEdit(pendingEdit);
+									else onClose();
+								}}
+							>
+								Discard changes
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			)}
 		</section>
 	);
@@ -369,7 +420,10 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
 					This account does not exist or is not available in this workspace.
 				</p>
 				<div>
-					<Button onClick={() => void router.navigate({ to: "/accounts" })}>
+					<Button
+						variant="secondary"
+						onClick={() => void router.navigate({ to: "/accounts" })}
+					>
 						<ArrowLeft size={16} aria-hidden="true" />
 						Back to accounts
 					</Button>

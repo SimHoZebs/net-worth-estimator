@@ -1,6 +1,6 @@
 import { money } from "../domain/format.ts";
 import { cssVariables } from "./cssVariables.ts";
-import { mergeStyles } from "./mergeStyles.ts";
+import { cn } from "@/lib/utils.ts";
 import {
 	TONE_BACKGROUNDS,
 	type TexturePattern,
@@ -50,11 +50,11 @@ export function SegmentedBar({
 	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
 	// oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists.
 	return (
-		<div className={mergeStyles("grid gap-2", className)}>
+		<div className={cn("grid gap-2", className)}>
 			{showDetails && (
 				<p
-					className={mergeStyles(
-						"m-0 text-sm leading-relaxed text-muted",
+					className={cn(
+						"m-0 text-sm leading-relaxed text-muted-foreground",
 						captionClassName,
 					)}
 				>
@@ -62,7 +62,7 @@ export function SegmentedBar({
 				</p>
 			)}
 			<div
-				className="m-0 flex h-3.5 overflow-hidden rounded-control bg-surface-3"
+				className="m-0 flex h-3.5 overflow-hidden rounded-md bg-accent"
 				role="img"
 				aria-label={ariaLabel}
 			>
@@ -70,8 +70,8 @@ export function SegmentedBar({
 					segment.amount > 0 ? (
 						<span
 							key={segment.label}
-							className={mergeStyles(
-								"block h-full min-w-1 w-(--segment-width) not-first:border-l-2 not-first:border-surface",
+							className={cn(
+								"block h-full min-w-1 w-(--segment-width) not-first:border-l-2 not-first:border-card",
 								toneClasses[segment.tone],
 							)}
 							data-tone={segment.tone}
@@ -85,15 +85,15 @@ export function SegmentedBar({
 			</div>
 			{showDetails && (
 				<ul
-					className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted"
+					className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted-foreground"
 					role="list"
 					aria-label={`${caption} details`}
 				>
 					{segments.map((segment) => (
 						<li key={segment.label} className="flex items-center gap-2">
 							<span
-								className={mergeStyles(
-									"inline-block h-2.5 w-3.5 flex-none rounded-control",
+								className={cn(
+									"inline-block h-2.5 w-3.5 flex-none rounded-md",
 									toneClasses[segment.tone],
 								)}
 								data-tone={segment.tone}

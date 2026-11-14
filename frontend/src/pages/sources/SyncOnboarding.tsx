@@ -1,8 +1,7 @@
 import { ArrowRight, ExternalLink, KeyRound } from "lucide-react";
 import { useRef, type ReactNode } from "react";
-import { TextButton } from "../../components/Button.tsx";
-import { buttonStyles } from "../../components/buttonStyles.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
+import { Button, buttonVariants } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
 import { simplefinLinks } from "./simplefinLinks.ts";
@@ -20,7 +19,7 @@ function SetupStep({
 		<li className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 sm:gap-4">
 			<span
 				aria-hidden="true"
-				className="inline-grid size-8 place-items-center rounded-full border border-line-strong bg-surface text-sm font-semibold text-primary"
+				className="inline-grid size-8 place-items-center rounded-full border border-input bg-card text-sm font-semibold text-primary"
 			>
 				{number}
 			</span>
@@ -36,15 +35,16 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 	const readOnly = useUserReadOnly();
 	const inputRef = useRef<HTMLInputElement>(null);
 	return (
-		<div className="rounded-surface border border-line bg-surface p-5 sm:p-6">
+		<div className="rounded-xl border border-border bg-card p-5 sm:p-6">
 			<div className="mb-4 flex justify-end">
-				<TextButton
+				<Button
+					variant="link"
 					className="min-h-6 text-sm"
 					disabled={readOnly}
 					onClick={() => inputRef.current?.focus()}
 				>
 					I already have a token <ArrowRight size={14} aria-hidden="true" />
-				</TextButton>
+				</Button>
 			</div>
 			<ol
 				// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
@@ -53,12 +53,12 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 				aria-label="SimpleFIN setup steps"
 			>
 				<SetupStep number={1} title="Link your banks in SimpleFIN">
-					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
 						Create a SimpleFIN Bridge account or sign in. In My account, choose{" "}
 						<strong>New connection</strong> and follow the prompts for each
 						bank.
 					</p>
-					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
 						SimpleFIN requires a separate paid subscription. Check its pricing
 						and bank support before you subscribe.
 					</p>
@@ -67,10 +67,7 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 							href={simplefinLinks.home}
 							target="_blank"
 							rel="noopener noreferrer"
-							className={mergeStyles(
-								buttonStyles({ variant: "secondary" }),
-								"hover:bg-hover",
-							)}
+							className={cn(buttonVariants({ variant: "secondary" }))}
 						>
 							Open SimpleFIN <ExternalLink size={14} aria-hidden="true" />
 							<span className="sr-only"> (opens in a new tab)</span>
@@ -87,7 +84,7 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 					</div>
 				</SetupStep>
 				<SetupStep number={2} title="Create a setup token for Waypoint">
-					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
 						In SimpleFIN, choose <strong>New app connection</strong>. Name it{" "}
 						<strong>Waypoint</strong>, then choose{" "}
 						<strong>Create Setup Token</strong>. Copy the entire token and
@@ -97,10 +94,7 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 						href={simplefinLinks.createToken}
 						target="_blank"
 						rel="noopener noreferrer"
-						className={mergeStyles(
-							buttonStyles({ variant: "secondary" }),
-							"hover:bg-hover",
-						)}
+						className={cn(buttonVariants({ variant: "secondary" }))}
 					>
 						<KeyRound size={16} aria-hidden="true" /> Create a setup token{" "}
 						<ExternalLink size={14} aria-hidden="true" />
@@ -108,7 +102,7 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 					</a>
 				</SetupStep>
 				<SetupStep number={3} title="Connect to Waypoint">
-					<p className="mt-0 mb-4 text-sm leading-relaxed text-muted">
+					<p className="mt-0 mb-4 text-sm leading-relaxed text-muted-foreground">
 						Paste the token you copied from SimpleFIN.
 					</p>
 					<SyncConnectForm onConnected={onConnected} inputRef={inputRef} />

@@ -1,6 +1,13 @@
-import type { ComponentProps } from "react";
-import { DataTable } from "../DataTable.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
+import type { ComponentProps, ReactNode } from "react";
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table.tsx";
+import { cn } from "@/lib/utils.ts";
 import { transactionCellStyles } from "./activityStyles.ts";
 
 /**
@@ -8,6 +15,8 @@ import { transactionCellStyles } from "./activityStyles.ts";
  * opt-in and hidden by default; the sr-only caption keeps the table named
  * for assistive technology.
  *
+ * Scroll ownership and keyboard panning live in the canonical Table
+ * container; this composes only the activity columns, caption, and headers.
  * The layout is fixed with the date and amount columns sized to their
  * content and the transaction column taking the remainder, so long titles
  * truncate inside their column instead of forcing the table wider than its
@@ -20,43 +29,52 @@ export function TransactionTable({
 	children,
 	className,
 	...props
-}: Omit<ComponentProps<typeof DataTable>, "columns" | "colgroup">) {
+}: {
+	caption: string;
+	showHeaders?: boolean;
+	scrollId?: string;
+	children: ReactNode;
+	className?: string;
+} & Omit<ComponentProps<"table">, "children">) {
 	return (
-		<DataTable
+		<Table
 			{...props}
-			className={mergeStyles("border-t border-line table-fixed", className)}
-			caption={caption}
-			showHeaders={showHeaders}
-			scrollId={scrollId}
-			// Fixed column widths keep the table at its container width:
-			// the date and amount columns hold their content while the
-			// transaction column takes the remainder, so long titles
-			// truncate instead of forcing horizontal scrolling. Hiding the
-			// date column (not just its cells) keeps the remaining columns
-			// aligned with their cells on small screens.
-			colgroup={
-				<colgroup>
-					<col className="w-24 max-sm:hidden" />
-					<col />
-					<col className="w-36 max-sm:w-28" />
-				</colgroup>
-			}
-			columns={[
-				{
-					label: "Date",
-					className: `${transactionCellStyles({ column: "date" })} pl-3`,
-				},
-				{
-					label: "Transaction",
-					className: transactionCellStyles({ column: "name" }),
-				},
-				{
-					label: "Amount",
-					className: transactionCellStyles({ column: "amount" }),
-				},
-			]}
+			containerProps={{ id: scrollId, role: "region", "aria-label": caption }}
+			className={cn("border-t border-border table-fixed", className)}
 		>
-			{children}
-		</DataTable>
+			<TableCaption className={showHeaders ? undefined : "sr-only"}>
+				{caption}
+			</TableCaption>
+			<colgroup>
+				<col className="w-24 max-sm:hidden" />
+				<col />
+				<col className="w-36 max-sm:w-28" />
+			</colgroup>
+			{showHeaders && (
+				<TableHeader>
+					<TableRow>
+						<TableHead
+							scope="col"
+							className={cn(transactionCellStyles({ column: "date" }), "pl-3")}
+						>
+							Date
+						</TableHead>
+						<TableHead
+							scope="col"
+							className={transactionCellStyles({ column: "name" })}
+						>
+							Transaction
+						</TableHead>
+						<TableHead
+							scope="col"
+							className={transactionCellStyles({ column: "amount" })}
+						>
+							Amount
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+			)}
+			<TableBody>{children}</TableBody>
+		</Table>
 	);
 }

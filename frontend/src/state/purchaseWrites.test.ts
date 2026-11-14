@@ -10,7 +10,7 @@ import type { PlannedPurchase } from "../domain/model.ts";
 import { acceptOwnerResource } from "../mocks/resource.ts";
 import { ok } from "../mocks/fetch.ts";
 import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
-import { resetNotifications, useNotifications } from "./notifications.ts";
+import { toast } from "../components/ui/toast.tsx";
 import { resetServerQueryCache } from "./serverQuery.ts";
 import {
 	movePurchaseOperations,
@@ -51,6 +51,14 @@ function wish(
 	};
 }
 
+let published: {
+	id?: string;
+	type?: unknown;
+	description?: unknown;
+	actionProps?: { children?: unknown; onClick?: unknown };
+	onClose?: unknown;
+}[] = [];
+
 function seedPurchases(): FinancialModel {
 	const model = modelFixture();
 	model.plannedPurchases = [
@@ -63,13 +71,18 @@ function seedPurchases(): FinancialModel {
 beforeEach(() => {
 	owner();
 	resetServerQueryCache();
-	resetNotifications();
+	toast.close();
+	published = [];
+	vi.spyOn(toast, "add").mockImplementation((options) => {
+		published.push(options);
+		return options.id ?? "toast-test";
+	});
 	vi.unstubAllGlobals();
 });
 
 afterEach(() => {
 	resetServerQueryCache();
-	resetNotifications();
+	toast.close();
 	suspendUserScope();
 	vi.unstubAllGlobals();
 });
@@ -225,9 +238,7 @@ it("fails a pending save on resource switch without a stale refresh", async () =
 			(call) => call.method === "GET" && call.url === "/v1/planned-purchases",
 		),
 	).toEqual([]);
-	expect(
-		useNotifications.getState().items.some((item) => item.kind === "success"),
-	).toBe(false);
+	expect(published.every((options) => options.type !== "success")).toBe(true);
 });
 
 it("never publishes an old failure into the new resource", async () => {
@@ -239,12 +250,12 @@ it("never publishes an old failure into the new resource", async () => {
 	const pending = saveNewPurchase(wish("desk"), 2);
 	acceptOwnerResource("users/b");
 	await expect(pending).resolves.toBe(false);
-	const messages = useNotifications
-		.getState()
-		.items.map((item) => item.message);
-	expect(messages.some((message) => message.includes("boom"))).toBe(false);
+	const descriptions = published.map((options) =>
+		typeof options.description === "string" ? options.description : "",
+	);
+	expect(descriptions.some((message) => message.includes("boom"))).toBe(false);
 	expect(
-		messages.some((message) =>
+		descriptions.some((message) =>
 			message.includes("The purchase could not be added."),
 		),
 	).toBe(false);
@@ -301,8 +312,6 @@ it("fails on resource switch during the refresh, not just the request", async ()
 		}),
 	);
 	await expect(pending).resolves.toBe(false);
-	expect(
-		useNotifications.getState().items.some((item) => item.kind === "success"),
-	).toBe(false);
-	expect(useNotifications.getState().items).toEqual([]);
+	expect(published.every((options) => options.type !== "success")).toBe(true);
+	expect(published).toEqual([]);
 });

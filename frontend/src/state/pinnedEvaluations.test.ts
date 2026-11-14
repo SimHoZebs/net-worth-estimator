@@ -4,7 +4,7 @@ import {
 	canonicalApiBaseUrl,
 	suspendUserScope,
 } from "@/auth/resourceScope.ts";
-import { resetNotifications, useNotifications } from "@/state/notifications.ts";
+import { toast } from "@/components/ui/toast.tsx";
 import {
 	pinnedEvaluationsKey,
 	refreshPins,
@@ -14,6 +14,14 @@ import {
 import { serverQueryClient } from "@/state/serverQuery.ts";
 
 const scopeId = `users/${"a".repeat(64)}`;
+
+let published: {
+	id?: string;
+	type?: unknown;
+	description?: unknown;
+	actionProps?: { children?: unknown; onClick?: unknown };
+	onClose?: unknown;
+}[] = [];
 
 function stubPins(initial: string[] = [], failWrite = false) {
 	const seen: { url: string; init?: RequestInit }[] = [];
@@ -53,7 +61,12 @@ const pins = () =>
 	serverQueryClient().getQueryData<string[]>(pinnedEvaluationsKey());
 
 beforeEach(() => {
-	resetNotifications();
+	toast.close();
+	published = [];
+	vi.spyOn(toast, "add").mockImplementation((options) => {
+		published.push(options);
+		return options.id ?? "toast-test";
+	});
 	resetPinnedEvaluationsClient();
 	vi.unstubAllGlobals();
 	acceptUserScope(
@@ -90,9 +103,10 @@ describe("query-owned pins", () => {
 		stubPins(["a", "b"], true);
 		expect(await togglePin("c")).toBe(false);
 		expect(pins()).toEqual(["a", "b"]);
-		expect(useNotifications.getState().items[0]?.action?.label).toBe(
-			"Reload pins",
-		);
+		expect(
+			published.find((options) => options.id === "evaluation-pins")?.actionProps
+				?.children,
+		).toBe("Reload pins");
 		vi.unstubAllGlobals();
 		stubPins(["b"]);
 		expect(await togglePin("a")).toBe(true);

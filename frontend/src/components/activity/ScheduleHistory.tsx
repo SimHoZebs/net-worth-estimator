@@ -5,7 +5,7 @@ import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { Badge } from "../Badge.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
 
@@ -55,18 +55,18 @@ export function ScheduleHistory({
 	};
 	return (
 		<section
-			className="mt-4 border-t border-line pt-4"
+			className="mt-4 border-t border-border pt-4"
 			aria-label="Recorded transactions"
 		>
 			<div className="flex items-center gap-2">
 				<History size={17} aria-hidden="true" />
 				<h3 className="text-sm font-semibold">Recorded transactions</h3>
 				{transactions.length > 0 && (
-					<Badge tone="neutral">{transactions.length}</Badge>
+					<Badge variant="secondary">{transactions.length}</Badge>
 				)}
 			</div>
 			{transactions.length === 0 ? (
-				<p className="mt-2 text-sm leading-relaxed text-muted">
+				<p className="mt-2 text-sm leading-relaxed text-muted-foreground">
 					No transactions record an occurrence of this schedule yet.
 				</p>
 			) : (

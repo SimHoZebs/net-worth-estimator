@@ -22,10 +22,19 @@ for (const path of ["/sign-in", "/sign-up", "/account", "/device"]) {
 }
 await Bun.write(new URL("auth.css", output), compiler.build([...candidates]));
 await Bun.write(
-  new URL("manrope.woff2", output),
+  new URL("geist.woff2", output),
   Bun.file(
     new URL(
-      "../../frontend/node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2",
+      "../../frontend/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2",
+      import.meta.url,
+    ),
+  ),
+);
+await Bun.write(
+  new URL("merriweather.woff2", output),
+  Bun.file(
+    new URL(
+      "../../frontend/node_modules/@fontsource-variable/merriweather/files/merriweather-latin-wght-normal.woff2",
       import.meta.url,
     ),
   ),

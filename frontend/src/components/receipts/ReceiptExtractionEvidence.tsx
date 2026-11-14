@@ -8,23 +8,23 @@ export function ReceiptExtractionEvidence({
 }) {
 	const { details, confidence } = extraction;
 	return (
-		<details className="rounded-surface border border-line p-4">
+		<details className="rounded-xl border border-border p-4">
 			<summary className="cursor-pointer text-sm font-semibold">
 				Original extracted values
 			</summary>
 			<div className="mt-3 flex flex-col gap-3 text-sm">
 				{confidence !== null && (
-					<p className="text-xs text-muted">
+					<p className="text-xs text-muted-foreground">
 						Source confidence: {Math.round(confidence * 100)}%. This is not
 						independent bank verification.
 					</p>
 				)}
 				<dl className="grid grid-cols-2 gap-2">
-					<dt className="text-muted">Merchant</dt>
+					<dt className="text-muted-foreground">Merchant</dt>
 					<dd className="break-words">{details.merchant || "Unknown"}</dd>
-					<dt className="text-muted">Date</dt>
+					<dt className="text-muted-foreground">Date</dt>
 					<dd>{details.date || "Unknown"}</dd>
-					<dt className="text-muted">Total</dt>
+					<dt className="text-muted-foreground">Total</dt>
 					<dd>
 						{details.totalCents === null
 							? "Unknown"

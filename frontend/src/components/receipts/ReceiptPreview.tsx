@@ -1,8 +1,8 @@
 import { Download } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useReceiptImage } from "@/state/receipts.ts";
-import { ErrorNotice } from "../ErrorNotice.tsx";
-import { Button } from "../Button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
 
 export function ReceiptPreview({
 	id,
@@ -33,7 +33,7 @@ export function ReceiptPreview({
 	const url = preview?.blob === image.data ? preview?.url : undefined;
 	return (
 		<figure className="flex flex-col gap-3">
-			<div className="flex min-h-48 items-center justify-center overflow-hidden rounded-surface border border-line bg-surface-2 p-3">
+			<div className="flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted p-3">
 				{url ? (
 					<img
 						src={url}
@@ -41,13 +41,20 @@ export function ReceiptPreview({
 						className="max-h-[60dvh] w-full object-contain"
 					/>
 				) : image.error ? (
-					<ErrorNotice
-						message={image.error.message}
-						action="Retry image"
-						onAction={() => void image.refetch()}
-					/>
+					<Alert variant="destructive">
+						<AlertDescription className="min-w-0 break-words">
+							<p className="my-1 whitespace-pre-line">{image.error.message}</p>
+							<Button
+								variant="link"
+								className="mt-2 px-0 py-0.5 text-xs font-semibold"
+								onClick={() => void image.refetch()}
+							>
+								Retry image
+							</Button>
+						</AlertDescription>
+					</Alert>
 				) : (
-					<p className="p-4 text-sm text-muted" role="status">
+					<p className="p-4 text-sm text-muted-foreground" role="status">
 						{image.isError ? "Image unavailable" : "Loading private image…"}
 					</p>
 				)}
@@ -57,7 +64,6 @@ export function ReceiptPreview({
 					<Button
 						variant="secondary"
 						size="sm"
-						className="w-fit"
 						onClick={() => {
 							const link = document.createElement("a");
 							link.href = url;

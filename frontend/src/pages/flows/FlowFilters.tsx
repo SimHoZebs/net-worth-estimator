@@ -1,8 +1,16 @@
 import { useId } from "react";
 import type { FlowGraph } from "../../api/flows.ts";
 import { FLOW_NODE_ID_EXTERNAL } from "../../api/flows.ts";
-import { Select } from "../../components/Field.tsx";
-import { SegmentedControl } from "../../components/SegmentedControl.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import type { MovementFilter } from "../../domain/flowDiagram.ts";
 import { FlowDateRangePicker } from "./FlowDateRangePicker.tsx";
 
@@ -29,6 +37,10 @@ export function FlowFilters({
 		.filter((node) => node.id !== FLOW_NODE_ID_EXTERNAL)
 		.slice()
 		.sort((a, b) => a.name.localeCompare(b.name));
+	const accountItems: Record<string, string> = {
+		all: "All accounts",
+	};
+	for (const account of accounts) accountItems[account.id] = account.name;
 	return (
 		<div className="flex flex-col gap-3">
 			<FlowDateRangePicker
@@ -37,42 +49,54 @@ export function FlowFilters({
 				onApply={(range) => onChange({ ...range })}
 			/>
 			<div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-				<label htmlFor={`${id}-account`} className="flex flex-col gap-1">
-					<span className="text-xs text-muted">Account</span>
+				<Field>
+					<Label htmlFor={`${id}-account`}>Account</Label>
 					<Select
-						id={`${id}-account`}
-						aria-label="Account"
 						value={filters.accountId ?? "all"}
-						onChange={(event) =>
+						items={accountItems}
+						onValueChange={(value) =>
 							onChange({
-								accountId:
-									event.target.value === "all" ? null : event.target.value,
+								accountId: value === "all" ? null : value,
 							})
 						}
 					>
-						<option value="all">All accounts</option>
-						{accounts.map((account) => (
-							<option key={account.id} value={account.id}>
-								{account.name}
-							</option>
-						))}
+						<SelectTrigger id={`${id}-account`} aria-label="Account">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">All accounts</SelectItem>
+							{accounts.map((account) => (
+								<SelectItem key={account.id} value={account.id}>
+									{account.name}
+								</SelectItem>
+							))}
+						</SelectContent>
 					</Select>
-				</label>
-				<div className="flex flex-col gap-1">
-					<span id={`${id}-movement`} className="text-xs text-muted">
-						Money
-					</span>
-					<SegmentedControl<MovementFilter>
-						ariaLabel="Recorded or planned money"
-						value={filters.movement}
-						onChange={(movement) => onChange({ movement })}
-						items={[
-							{ value: "all", label: "All" },
-							{ value: "actual", label: "Recorded" },
-							{ value: "projected", label: "Planned" },
-						]}
-					/>
-				</div>
+				</Field>
+				<Field>
+					<Label id={`${id}-movement`}>Money</Label>
+					<ToggleGroup
+						aria-labelledby={`${id}-movement`}
+						value={[filters.movement]}
+						onValueChange={(next) => {
+							const nextValue = next.find(
+								(candidate) => candidate !== filters.movement,
+							);
+							if (nextValue !== undefined)
+								onChange({ movement: nextValue as MovementFilter });
+						}}
+					>
+						<ToggleGroupItem type="button" value="all">
+							All
+						</ToggleGroupItem>
+						<ToggleGroupItem type="button" value="actual">
+							Recorded
+						</ToggleGroupItem>
+						<ToggleGroupItem type="button" value="projected">
+							Planned
+						</ToggleGroupItem>
+					</ToggleGroup>
+				</Field>
 			</div>
 		</div>
 	);

@@ -1,6 +1,8 @@
-export { cn } from "cn";
+import { cn } from "cn";
 
-// Companion to mergeStyles in ../components/mergeStyles.ts, which remains the
-// application merger: it knows the semantic radius (control, surface) and
-// shadow (overlay) scale that the default `cn` build does not. Unify them in
-// Phase 2 once primitive swaps land.
+/** Single class merger for the application. Generated primitives import
+ * this module (never the bare `cn` package directly) so the whole tree
+ * shares one engine. No theme extensions: neutral surfaces, text, borders,
+ * radii, and shadows are preset-owned tokens.
+ */
+export { cn };

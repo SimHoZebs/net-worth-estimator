@@ -1,9 +1,21 @@
 import { Plus, ShoppingBag } from "lucide-react";
 import { useState } from "react";
-import { Button } from "../../components/Button.tsx";
-import { EmptyState } from "../../components/EmptyState.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
-import { Tabs } from "../../components/Tabs.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+	Tabs,
+	TabsList,
+	TabsTrigger,
+	TabsContent,
+} from "@/components/ui/tabs.tsx";
 import { money } from "../../domain/format.ts";
 import type {
 	PurchasePlannerActions,
@@ -55,7 +67,8 @@ export function PurchasePlanner({
 			<div className="mb-5 flex justify-end">
 				{actions.onAdd && (
 					<Button
-						variant="primary"
+						type="button"
+						variant="default"
 						size="sm"
 						disabled={locked}
 						onClick={actions.onAdd}
@@ -70,55 +83,87 @@ export function PurchasePlanner({
 					aria-label="Loading planned purchases"
 					aria-busy="true"
 				>
-					<Skeleton className="h-16" label="Loading purchase totals" />
-					<Skeleton className="h-10 w-48" label="Loading purchase views" />
-					<Skeleton className="h-24" label="Loading purchases" />
+					<Skeleton
+						className="h-16"
+						role="status"
+						aria-label="Loading purchase totals"
+					/>
+					<Skeleton
+						className="h-10 w-48"
+						role="status"
+						aria-label="Loading purchase views"
+					/>
+					<Skeleton
+						className="h-24"
+						role="status"
+						aria-label="Loading purchases"
+					/>
 				</div>
 			) : items.length === 0 ? (
-				<EmptyState
-					icon={ShoppingBag}
-					title="What would you like to make room for?"
-					description="Add a purchase to discover its earliest financially safe date."
-				/>
+				<Empty className="flex-initial gap-0 px-6 py-12">
+					<EmptyHeader>
+						<EmptyMedia>
+							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+								<ShoppingBag size={28} />
+							</span>
+						</EmptyMedia>
+						<EmptyTitle>
+							<h3 className="text-lg">What would you like to make room for?</h3>
+						</EmptyTitle>
+						<EmptyDescription className="mt-2 mb-5 max-w-sm text-muted-foreground">
+							Add a purchase to discover its earliest financially safe date.
+						</EmptyDescription>
+					</EmptyHeader>
+					<EmptyContent />
+				</Empty>
 			) : (
 				<>
-					<div className="mb-4 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-y border-line-strong py-4 text-sm">
-						<strong className="text-2xl tabular-nums text-ink">
+					<div className="mb-4 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-y border-input py-4 text-sm">
+						<strong className="text-2xl tabular-nums text-foreground">
 							{money(total)}
 						</strong>
-						<span className="text-muted">{included.length} included</span>
+						<span className="text-muted-foreground">
+							{included.length} included
+						</span>
 						<span className="text-success-text">
 							{pending ? "Calculating dates…" : `${dated.length} dated`}
 						</span>
 						{!pending && (
-							<span className="text-muted">
+							<span className="text-muted-foreground">
 								{included.length - dated.length} not yet dated
 							</span>
 						)}
 					</div>
-					<Tabs<View>
-						items={[
-							{ id: "priority", label: "Priority" },
-							{ id: "schedule", label: "Schedule" },
-						]}
-						value={view}
-						onChange={setView}
-						label="Planned purchase views"
-						className="mb-4"
-					>
+					<Tabs value={view} onValueChange={(value) => setView(value as View)}>
+						<TabsList
+							variant="line"
+							aria-label="Planned purchase views"
+							className="mb-4 flex w-full gap-6 overflow-x-auto p-0 max-sm:gap-5"
+						>
+							<TabsTrigger value="priority" className="flex-none">
+								Priority
+							</TabsTrigger>
+							<TabsTrigger value="schedule" className="flex-none">
+								Schedule
+							</TabsTrigger>
+						</TabsList>
 						{view === "priority" ? (
-							<PurchasePriorityList
-								items={items}
-								onInspect={inspect}
-								onMove={actions.onMove}
-								locked={locked}
-							/>
+							<TabsContent value="priority">
+								<PurchasePriorityList
+									items={items}
+									onInspect={inspect}
+									onMove={actions.onMove}
+									locked={locked}
+								/>
+							</TabsContent>
 						) : (
-							<PurchaseScheduleView
-								items={items}
-								onInspect={inspect}
-								forecastEnd={forecastEnd}
-							/>
+							<TabsContent value="schedule">
+								<PurchaseScheduleView
+									items={items}
+									onInspect={inspect}
+									forecastEnd={forecastEnd}
+								/>
+							</TabsContent>
 						)}
 					</Tabs>
 				</>

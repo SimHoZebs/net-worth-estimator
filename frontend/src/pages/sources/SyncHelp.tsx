@@ -23,15 +23,15 @@ const questions = [
 
 export function SyncHelp() {
 	return (
-		<div className="rounded-surface border border-line bg-surface p-5 sm:p-6">
+		<div className="rounded-xl border border-border bg-card p-5 sm:p-6">
 			<h3 className="mt-0 mb-3 text-base">SimpleFIN help</h3>
-			<div className="divide-y divide-line">
+			<div className="divide-y divide-border">
 				{questions.map(({ question, answer }) => (
 					<details key={question} className="py-3">
 						<summary className="cursor-pointer text-sm font-semibold leading-relaxed">
 							{question}
 						</summary>
-						<p className="mt-3 mb-0 text-sm leading-relaxed text-muted">
+						<p className="mt-3 mb-0 text-sm leading-relaxed text-muted-foreground">
 							{answer}
 						</p>
 					</details>

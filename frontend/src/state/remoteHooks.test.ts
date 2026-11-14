@@ -6,7 +6,13 @@ import {
 	renderHook as renderHookRTL,
 	waitFor,
 } from "@testing-library/react";
-import { createElement, Fragment, useMemo, type ReactNode, StrictMode } from "react";
+import {
+	createElement,
+	Fragment,
+	useMemo,
+	type ReactNode,
+	StrictMode,
+} from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	acceptUserScope,
@@ -30,7 +36,7 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "./serverQuery.ts";
-import { resetNotifications, useNotifications } from "./notifications.ts";
+import { toast } from "../components/ui/toast.tsx";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import {
 	projectionResultToLocal,
@@ -78,10 +84,7 @@ function useRemoteWorkspace() {
 	const saving = useWorkspaceSaving();
 	const savedAccounts = useSavedAccounts();
 	const model = useMemo(
-		() =>
-			status.data?.hasModel
-				? { accounts: savedAccounts ?? [] }
-				: null,
+		() => (status.data?.hasModel ? { accounts: savedAccounts ?? [] } : null),
 		[status.data?.hasModel, savedAccounts],
 	);
 	const error =
@@ -427,7 +430,23 @@ function stochasticFixture(): StochasticProjectionResult {
 	};
 }
 
+let published: {
+	id?: string;
+	type?: unknown;
+	description?: unknown;
+	actionProps?: { children?: unknown; onClick?: unknown };
+	onClose?: unknown;
+}[] = [];
+let closed: (string | undefined)[] = [];
+
 beforeEach(() => {
+	vi.spyOn(toast, "add").mockImplementation((options) => {
+		published.push(options);
+		return options.id ?? "toast-test";
+	});
+	vi.spyOn(toast, "close").mockImplementation((id) => {
+		closed.push(id);
+	});
 	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
@@ -439,6 +458,8 @@ beforeEach(() => {
 		},
 		suspendUserScope(),
 	);
+	published = [];
+	closed = [];
 });
 
 afterEach(() => {
@@ -446,7 +467,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 	resetServerQueryCache();
 	resetUiStore();
-	resetNotifications();
+	toast.close();
 });
 
 describe("remote workspace state", () => {
@@ -484,9 +505,7 @@ describe("remote workspace state", () => {
 		const rendered = renderHookWith(() => useRemoteWorkspace(), {
 			strictMode: true,
 		});
-		await waitFor(() =>
-			expect(server.statusFetches()).not.toHaveLength(0),
-		);
+		await waitFor(() => expect(server.statusFetches()).not.toHaveLength(0));
 		await waitFor(() =>
 			expect(
 				server.calls.filter((call) => call.url.endsWith("/v1/amount-presets")),
@@ -571,7 +590,9 @@ describe("remote workspace state", () => {
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceQueries());
 		await waitFor(() =>
-			expect(serverQueryClient().getQueryData(userResourceKey("status"))).toBeDefined(),
+			expect(
+				serverQueryClient().getQueryData(userResourceKey("status")),
+			).toBeDefined(),
 		);
 		expect(server.statusFetches()).toHaveLength(1);
 		(server.model as FinancialModel).accounts[0]!.name = "Replacement cash";
@@ -614,7 +635,9 @@ describe("remote workspace state", () => {
 			);
 			await pending;
 		});
-		expect(serverQueryClient().getQueryData(userResourceKey("status"))).toMatchObject({
+		expect(
+			serverQueryClient().getQueryData(userResourceKey("status")),
+		).toMatchObject({
 			hasModel: true,
 		});
 		await act(async () => reloadWorkspace());
@@ -726,14 +749,16 @@ describe("remote workspace state", () => {
 				.length,
 		).toBeGreaterThanOrEqual(2);
 		expect(view.result().serverModel?.accounts).toHaveLength(2);
-		const items = useNotifications.getState().items;
+		const items = published;
 		expect(
 			items.some(
-				(item) =>
-					item.kind === "error" && item.message.includes("Name is required."),
+				(options) =>
+					options.type === "error" &&
+					typeof options.description === "string" &&
+					options.description.includes("Name is required."),
 			),
 		).toBe(true);
-		expect(items.some((item) => item.kind === "success")).toBe(false);
+		expect(items.every((options) => options.type !== "success")).toBe(true);
 		view.unmount();
 	});
 
@@ -768,9 +793,7 @@ describe("remote workspace state", () => {
 		release(undefined);
 		expect(await saving).toBe(false);
 		expect(getAccountBalances()).toBeUndefined();
-		expect(
-			useNotifications.getState().items.some((item) => item.kind === "success"),
-		).toBe(false);
+		expect(published.every((options) => options.type !== "success")).toBe(true);
 	});
 
 	it("creates rows when importing into an empty server", async () => {
@@ -844,20 +867,22 @@ describe("remote workspace state", () => {
 			),
 		).toHaveLength(0);
 		expect(
-			useNotifications
-				.getState()
-				.items.some((item) => item.message.includes("before importing")),
+			published.some(
+				(options) =>
+					typeof options.description === "string" &&
+					options.description.includes("before importing"),
+			),
 		).toBe(true);
 		await act(async () =>
 			finish(
-			server.ok({
-				readOnly: false,
-				hasModel: true,
-				syncConfigured: true,
-				syncQuotaUsed: 0,
-				syncQuotaLimit: 24,
-			}),
-		),
+				server.ok({
+					readOnly: false,
+					hasModel: true,
+					syncConfigured: true,
+					syncQuotaUsed: 0,
+					syncQuotaLimit: 24,
+				}),
+			),
 		);
 		await rendered.settle();
 		rendered.unmount();
@@ -1715,7 +1740,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(client.projectStochastic).toHaveBeenCalledTimes(2);
 		expect(second.result().progress).toBe(0);
 		expect(second.result().range).toBeNull();
-		expect(useNotifications.getState().items).toHaveLength(0);
+		expect(published).toHaveLength(0);
 		second.unmount();
 	});
 
@@ -1735,7 +1760,7 @@ describe("remote projection mapping and SSE", () => {
 		await act(async () => rendered.result().abort());
 		expect(stream().signal.aborted).toBe(true);
 		expect(rendered.result().rangeError).toBeNull();
-		expect(useNotifications.getState().items).toHaveLength(0);
+		expect(published).toHaveLength(0);
 		expect(client.projectStochastic).toHaveBeenCalledTimes(1);
 		rendered.unmount();
 	});
@@ -1756,7 +1781,7 @@ describe("remote projection mapping and SSE", () => {
 		});
 		await waitFor(() => expect(rendered.result().progress).toBe(1));
 		expect(rendered.result().rangeError).toBeNull();
-		expect(useNotifications.getState().items).toHaveLength(0);
+		expect(published).toHaveLength(0);
 		rendered.unmount();
 	});
 
@@ -1806,9 +1831,14 @@ describe("remote projection mapping and SSE", () => {
 			await act(async () => {
 				if (retryFrom === "button") second.result().retryRange();
 				else {
-					const action = useNotifications.getState().items[0]?.action;
-					if (!action) throw new Error("Expected a shared retry notice");
-					action.onAction();
+					const options = published.find(
+						(entry) => entry.id === "projection-range",
+					);
+					const retry = options?.actionProps?.onClick as
+						| (() => void)
+						| undefined;
+					if (!retry) throw new Error("Expected a shared retry notice");
+					retry();
 				}
 			});
 			await waitFor(() =>
@@ -1827,7 +1857,7 @@ describe("remote projection mapping and SSE", () => {
 				expect(first.result().progress).toBe(1);
 				expect(second.result().progress).toBe(1);
 			});
-			expect(useNotifications.getState().items).toHaveLength(0);
+			expect(closed).toContain("projection-range");
 			first.unmount();
 			second.unmount();
 		},
@@ -1861,7 +1891,8 @@ describe("remote projection mapping and SSE", () => {
 			stream().close();
 		});
 		expect(serverQueryClient().getQueryCache().getAll()).toHaveLength(0);
-		expect(useNotifications.getState().items).toHaveLength(0);
+		expect(published).toHaveLength(0);
+		expect(closed).toContain(undefined);
 		acceptUserScope(
 			{
 				apiBaseUrl: canonicalApiBaseUrl(""),
@@ -1914,14 +1945,15 @@ describe("remote projection mapping and SSE", () => {
 		);
 		await rendered.settle();
 		expect(rendered.result().rangeError).not.toBeNull();
-		const items = useNotifications.getState().items;
-		expect(items).toHaveLength(1);
-		expect(items[0]).toMatchObject({
-			key: "projection-range",
-			kind: "error",
-			message: "range failed",
+		expect(published).toHaveLength(1);
+		expect(published[0]).toMatchObject({
+			id: "projection-range",
+			type: "error",
+			description: "range failed",
 		});
-		expect(items[0]?.action?.label).toBe("Retry scenario calculation");
+		expect(published[0]?.actionProps).toMatchObject({
+			children: "Retry scenario calculation",
+		});
 		rendered.unmount();
 		vi.unstubAllGlobals();
 	});
@@ -1947,18 +1979,19 @@ describe("remote projection mapping and SSE", () => {
 		await rendered.settle();
 		expect(rendered.result().base).toBeNull();
 		await waitFor(() => expect(rendered.result().baseError).not.toBeNull());
-		const items = useNotifications.getState().items;
-		expect(items).toHaveLength(1);
-		expect(items[0]).toMatchObject({
-			key: "projection",
-			kind: "error",
-			message: expect.any(String),
+		expect(published).toHaveLength(1);
+		expect(published[0]).toMatchObject({
+			id: "projection",
+			type: "error",
+			description: expect.any(String),
 		});
-		expect(items[0]?.action?.label).toBe("Retry calculation");
+		expect(published[0]?.actionProps).toMatchObject({
+			children: "Retry calculation",
+		});
 		const calls = seen.filter((call) =>
 			call.url.endsWith("/v1/projections/deterministic"),
 		).length;
-		items[0]?.action?.onAction();
+		(published[0]?.actionProps?.onClick as (() => void) | undefined)?.();
 		await waitFor(() =>
 			expect(
 				seen.filter((call) =>
@@ -2012,7 +2045,10 @@ describe("saved-state resource scope", () => {
 			"B cash",
 		);
 		expect(
-			serverQueryClient().getQueryData([...userResourceKey("balances", first.scope), "latest"]),
+			serverQueryClient().getQueryData([
+				...userResourceKey("balances", first.scope),
+				"latest",
+			]),
 		).toBeUndefined();
 		second.rendered.unmount();
 		const sample = await mount(GUEST_USER_ID, "Cash");
@@ -2021,5 +2057,4 @@ describe("saved-state resource scope", () => {
 		);
 		sample.rendered.unmount();
 	});
-
 });

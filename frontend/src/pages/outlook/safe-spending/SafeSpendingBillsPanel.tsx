@@ -1,8 +1,6 @@
-import {
-	ShieldCheck,
-} from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
-import { Skeleton } from "../../../components/Skeleton.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
@@ -32,11 +30,8 @@ const SafeSpendingTrendChart = lazy(() =>
 		default: module.SafeSpendingTrendChart,
 	})),
 );
+import { cn } from "@/lib/utils.ts";
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
-import {
-	householdValueStyles,
-	type HouseholdValueStyleProps,
-} from "./householdStyles.ts";
 
 /**
  * One compact decision row: plain label on the left, base-size value on
@@ -52,7 +47,7 @@ function StatRow({
 }: {
 	label: string;
 	value: string;
-	tone?: HouseholdValueStyleProps["tone"];
+	tone?: "normal" | "positive" | "negative";
 	testId: string;
 	meter?: React.ReactNode;
 	qualifier?: string;
@@ -60,16 +55,25 @@ function StatRow({
 	return (
 		<div className="grid min-w-0 gap-1">
 			<div className="flex items-center justify-between gap-3">
-				<span className="text-sm text-muted">{label}</span>
+				<span className="text-sm text-muted-foreground">{label}</span>
 				<strong
 					data-testid={testId}
-					className={householdValueStyles({ size: "base", tone }) + " whitespace-nowrap"}
+					className={cn(
+						"m-0 text-base font-bold whitespace-nowrap tabular-nums [overflow-wrap:anywhere]",
+						tone === "positive"
+							? "text-success-text"
+							: tone === "negative"
+								? "text-danger-text"
+								: "text-foreground",
+					)}
 				>
 					{value}
 				</strong>
 			</div>
 			{meter}
-			{qualifier && <p className="m-0 text-xs text-muted">{qualifier}</p>}
+			{qualifier && (
+				<p className="m-0 text-xs text-muted-foreground">{qualifier}</p>
+			)}
 		</div>
 	);
 }
@@ -97,7 +101,7 @@ function ReserveMeter({
 		<div
 			role="img"
 			aria-label={`Spent ${money(spent)} of ${money(limit)} ${limitWord}`}
-			className="relative h-1.5 overflow-hidden rounded-full bg-surface-3"
+			className="relative h-1.5 overflow-hidden rounded-full bg-accent"
 		>
 			<span
 				aria-hidden="true"
@@ -229,47 +233,49 @@ export function SafeSpendingBillsPanel({
 				</div>
 			)}
 			<div className="grid content-start gap-4">
-				<div className="grid grid-cols-1 gap-3 divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-				<StatRow
-					label={labels.leftAtEndOfMonth}
-					value={money(cashNow.cushion)}
-					testId="left-value"
-					qualifier={cashQualifier}
-				/>
-				<StatRow
-					label={spendLabel}
-					value={amountText(allowanceView.primary)}
-					tone={allowanceView.tone}
-					testId="spend-value"
-					meter={
-						showMeter ? (
-							<ReserveMeter
-								spent={spent}
-								limit={limit}
-								reserve={allocation.reserve}
-								limitWord={limitWord}
-							/>
-						) : undefined
-					}
-					qualifier={spendQualifier}
-				/>
-				<StatRow
-					label={labels.perDay}
-					value={dailyValue === null ? "—" : money(dailyValue)}
-					testId="perday-value"
-					qualifier={dailyQualifier}
-				/>
+				<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+					<StatRow
+						label={labels.leftAtEndOfMonth}
+						value={money(cashNow.cushion)}
+						testId="left-value"
+						qualifier={cashQualifier}
+					/>
+					<StatRow
+						label={spendLabel}
+						value={amountText(allowanceView.primary)}
+						tone={allowanceView.tone}
+						testId="spend-value"
+						meter={
+							showMeter ? (
+								<ReserveMeter
+									spent={spent}
+									limit={limit}
+									reserve={allocation.reserve}
+									limitWord={limitWord}
+								/>
+							) : undefined
+						}
+						qualifier={spendQualifier}
+					/>
+					<StatRow
+						label={labels.perDay}
+						value={dailyValue === null ? "—" : money(dailyValue)}
+						testId="perday-value"
+						qualifier={dailyQualifier}
+					/>
 				</div>
-				<p className="m-0 text-xs text-muted">{fundingCaption}</p>
+				<p className="m-0 text-xs text-muted-foreground">{fundingCaption}</p>
 				{!allocation.available && (
-					<p className="m-0 text-xs text-muted">
+					<p className="m-0 text-xs text-muted-foreground">
 						Closed card balance unavailable
 					</p>
 				)}
 			</div>
 			<div className="grid content-start gap-4">
 				<div className="flex items-center justify-between">
-					<strong className="text-sm text-ink">{labels.cashAccounts}</strong>
+					<strong className="text-sm text-foreground">
+						{labels.cashAccounts}
+					</strong>
 					<ShieldCheck
 						size={19}
 						className="text-success-text"
@@ -277,7 +283,9 @@ export function SafeSpendingBillsPanel({
 					/>
 				</div>
 				{cashNow.provisional && (
-					<p className="m-0 text-xs text-muted">Latest balance, not at close</p>
+					<p className="m-0 text-xs text-muted-foreground">
+						Latest balance, not at close
+					</p>
 				)}
 				<SegmentedBar
 					showDetails={false}
@@ -303,14 +311,14 @@ export function SafeSpendingBillsPanel({
 					ariaLabel={`${labels.cashBalance} ${exactMoney(cashNow.checking)}, ${labels.remainingBills} ${exactMoney(cashNow.bills)}, ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
 				/>
 				{cashNow.spentSinceStart > 0 ? (
-					<div className="flex items-center justify-between gap-3 text-sm text-ink">
-						<span className="flex items-center gap-2 text-muted">
+					<div className="flex items-center justify-between gap-3 text-sm text-foreground">
+						<span className="flex items-center gap-2 text-muted-foreground">
 							{labels.cashPayments} · {monthDay(cashNow.since)}
 						</span>
 						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
 					</div>
 				) : null}
-				<div className="h-px w-full bg-line" />
+				<div className="h-px w-full bg-border" />
 				<div className="flex flex-wrap items-center justify-end gap-3">
 					<TransactionSortButton
 						order={transactionOrder}

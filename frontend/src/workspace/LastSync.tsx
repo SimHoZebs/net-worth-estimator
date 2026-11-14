@@ -1,5 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button.tsx";
 import type { ServerStatus } from "../api/index.ts";
 import { notifyError } from "../state/notifications.ts";
 
@@ -46,8 +47,9 @@ export function LastSync({
 		const label = <>Last synced {syncTimeFormat.format(time)}</>;
 		if (status.syncConfigured && isSyncStale(status.lastSyncAt, effectiveNow)) {
 			return (
-				<button
-					type="button"
+				<Button
+					variant="ghost"
+					size="sm"
 					onClick={() =>
 						notifyError("sync-stale", staleSyncMessage(), {
 							label: "Open bank sync",
@@ -56,7 +58,7 @@ export function LastSync({
 							},
 						})
 					}
-					className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-xs leading-relaxed whitespace-nowrap text-muted hover:text-ink hover:underline hover:underline-offset-4 pointer-coarse:min-h-12"
+					className="h-auto gap-1 px-1 text-xs whitespace-nowrap text-muted-foreground hover:underline hover:underline-offset-4"
 				>
 					<TriangleAlert
 						size={16}
@@ -66,7 +68,7 @@ export function LastSync({
 					/>
 					<time dateTime={status.lastSyncAt}>{label}</time>
 					<span className="sr-only">Sync stale</span>
-				</button>
+				</Button>
 			);
 		}
 		return <time dateTime={status.lastSyncAt}>{label}</time>;

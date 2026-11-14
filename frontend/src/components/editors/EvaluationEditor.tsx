@@ -1,11 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState } from "react";
 import {
 	createEvaluation,
 	updateEvaluation,
 } from "@/api/generated/endpoints.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	getEvaluationSummary,
@@ -14,11 +13,9 @@ import {
 } from "../../state/workspaceResources.ts";
 import { isRecord } from "../../domain/guards.ts";
 import { parseDisplayNumber } from "./formValues.ts";
-import { InputField, SelectField } from "../Field.tsx";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { FieldError } from "../ErrorNotice.tsx";
-import { Modal } from "../Modal.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { EditorDialog } from "./EditorDialog.tsx";
+import { EditorField, EditorSelect, MoneyField } from "./editorFields.tsx";
 import { balanceRowToDisplay } from "../../api/adapter.ts";
 import { toDisplayAccounts } from "../../domain/accountDisplay.ts";
 
@@ -60,6 +57,10 @@ export function EvaluationEditor({
 	const [accountId, setAccountId] = useState(item?.accountId ?? "");
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const nameId = useId();
+	const kindId = useId();
+	const targetId = useId();
+	const accountIdInput = useId();
 	const balances = useAccountBalances();
 	const accounts = toDisplayAccounts(
 		(balances.data?.accounts ?? []).map(balanceRowToDisplay),
@@ -70,10 +71,8 @@ export function EvaluationEditor({
 		kind !== (item?.kind ?? "net-worth") ||
 		target !== String(item?.target ?? 1000000) ||
 		accountId !== (item?.accountId ?? "");
-	useBeforeUnload(dirty && !saving);
 
-	const submit = async (event: FormEvent) => {
-		event.preventDefault();
+	const submit = async () => {
 		if (saving) return;
 		const trimmedName = name.trim();
 		if (!trimmedName) {
@@ -133,77 +132,84 @@ export function EvaluationEditor({
 	};
 
 	return (
-		<Modal title={`${item ? "Edit" : "Add"} evaluation`} onClose={onClose}>
-			<form
-				className="flex flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
+		<EditorDialog
+			title={`${item ? "Edit" : "Add"} evaluation`}
+			onClose={onClose}
+			dirty={dirty}
+			busy={saving}
+			error={error}
+			submitLabel={item ? "Save evaluation" : "Add evaluation"}
+			submitDisabled={!dirty}
+			onSubmit={() => void submit()}
+		>
+			<fieldset
+				disabled={saving}
+				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1"
 			>
-				<fieldset
-					disabled={saving}
-					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
+				<EditorField
+					label="Evaluation name"
+					htmlFor={nameId}
+					className="col-span-full"
 				>
-					<InputField
-						label="Evaluation name"
-						wide
+					<Input
+						id={nameId}
 						required
 						maxLength={100}
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 						placeholder="e.g. A comfortable cash cushion"
+						disabled={saving}
 					/>
-					<SelectField
-						label="Measure"
+				</EditorField>
+				<EditorField label="Measure" htmlFor={kindId}>
+					<EditorSelect
+						id={kindId}
 						value={kind}
-						onChange={(event) => {
-							const next = parseUnion(event.target.value, [
+						onValueChange={(next) => {
+							const parsed = parseUnion(next, [
 								"net-worth",
 								"reserve",
 							] as const);
-							if (next) setKind(next);
+							if (parsed) setKind(parsed);
 						}}
-					>
-						<option value="net-worth">Household net worth</option>
-						<option value="reserve">An account balance</option>
-					</SelectField>
-					<InputField
-						label="Target (USD)"
-						type="number"
-						required
-						min="1"
-						max="10000000000"
-						step="1"
-						value={target}
-						onChange={(event) => setTarget(event.target.value)}
+						options={[
+							{ value: "net-worth", label: "Household net worth" },
+							{ value: "reserve", label: "An account balance" },
+						]}
+						disabled={saving}
 					/>
-					{kind === "reserve" && (
-						<SelectField
-							label="Account"
-							wide
-							required
+				</EditorField>
+				<MoneyField
+					id={targetId}
+					label="Target"
+					required
+					min="1"
+					max="10000000000"
+					step="1"
+					value={target}
+					onChange={(event) => setTarget(event.target.value)}
+					disabled={saving}
+				/>
+				{kind === "reserve" && (
+					<EditorField
+						label="Account"
+						htmlFor={accountIdInput}
+						className="col-span-full"
+					>
+						<EditorSelect
+							id={accountIdInput}
 							value={accountId}
-							onChange={(event) => setAccountId(event.target.value)}
-						>
-							<option value="" disabled>
-								Select an account
-							</option>
-							{accounts.map((account) => (
-								<option key={account.id} value={account.id}>
-									{account.name}
-								</option>
-							))}
-						</SelectField>
-					)}
-				</fieldset>
-				<FieldError message={error} />
-				<div className={dialogActionsStyles}>
-					<Button type="button" variant="secondary" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={saving || !dirty}>
-						{saving ? "Saving…" : item ? "Save evaluation" : "Add evaluation"}
-					</Button>
-				</div>
-			</form>
-		</Modal>
+							onValueChange={setAccountId}
+							placeholder="Select an account"
+							options={accounts.map((account) => ({
+								value: account.id,
+								label: account.name,
+							}))}
+							disabled={saving}
+						/>
+					</EditorField>
+				)}
+			</fieldset>
+		</EditorDialog>
 	);
 }

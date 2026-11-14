@@ -1,11 +1,11 @@
 export function ProjectionUpdating() {
 	return (
 		<div
-			className="mb-4 flex items-center gap-3 text-sm text-muted"
+			className="mb-4 flex items-center gap-3 text-sm text-muted-foreground"
 			role="status"
 		>
 			<span
-				className="size-3 animate-spin rounded-full border-2 border-solid border-line-strong border-t-primary"
+				className="size-3 animate-spin rounded-full border-2 border-solid border-input border-t-primary"
 				aria-hidden="true"
 			/>
 			Updating projection…

@@ -1,33 +1,5 @@
-/* Global reset. First in the styles/index.css manifest; layer order is declared there. */
+/* Project platform preferences extend official Tailwind Preflight in the reset layer. */
 @layer reset {
-	*,
-	*::before,
-	*::after {
-		box-sizing: border-box;
-	}
-	body,
-	h1,
-	h2,
-	h3,
-	p,
-	ul,
-	dl,
-	dd,
-	figure {
-		margin: 0;
-	}
-	button,
-	input,
-	select,
-	textarea {
-		font: inherit;
-	}
-	button,
-	a,
-	input,
-	select {
-		-webkit-tap-highlight-color: transparent;
-	}
 	button {
 		cursor: pointer;
 	}
@@ -35,25 +7,14 @@
 	a {
 		touch-action: manipulation;
 	}
-	button {
-		color: inherit;
-	}
-	a {
-		color: inherit;
-		text-decoration: none;
-	}
 	svg {
 		flex-shrink: 0;
-		vertical-align: middle;
 	}
 	button:disabled {
 		cursor: not-allowed;
 		opacity: 0.5;
 	}
 	fieldset {
-		border: 0;
-		padding: 0;
-		margin: 0;
 		min-width: 0;
 	}
 }

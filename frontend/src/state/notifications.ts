@@ -1,88 +1,62 @@
-import { create } from "zustand";
 import { subscribeUserScope } from "../auth/resourceScope.ts";
+import { toast as toastManager } from "../components/ui/toast.tsx";
 
 export interface ToastAction {
 	label: string;
 	onAction: () => void;
 }
 
-export interface Toast {
-	id: string;
-	key: string;
-	kind: "error" | "success";
-	message: string;
-	action?: ToastAction;
-	onDismiss?: () => void;
-}
-
-interface NotificationsState {
-	items: Toast[];
-	notify: (input: Omit<Toast, "id">) => string;
-	dismiss: (id: string) => void;
-	clear: () => void;
-}
-
-/** The stack shows a handful of recent toasts; older ones roll off. */
-const MAX_TOASTS = 4;
-
-let sequence = 0;
-
-export const useNotifications = create<NotificationsState>()((set) => ({
-	items: [],
-	notify: (input) => {
-		const id = `toast-${(sequence += 1)}`;
-		set((state) => ({
-			items: [
-				{ ...input, id },
-				...state.items.filter((item) => item.key !== input.key),
-			].slice(0, MAX_TOASTS),
-		}));
-		return id;
-	},
-	dismiss: (id) =>
-		set((state) => ({
-			items: state.items.filter((item) => item.id !== id),
-		})),
-	clear: () => set({ items: [] }),
-}));
-
-/** Toasts describe a verified user's operations; a new resource starts clean. */
-subscribeUserScope(() => useNotifications.getState().clear());
-
-/** Test hook: restores an empty stack and deterministic ids between cases. */
-export function resetNotifications(): void {
-	sequence = 0;
-	useNotifications.setState({ items: [] });
-}
-
 /**
- * Explicit triggers. Call these where a failure or confirmation happens —
- * catch blocks, failed submit branches, store failure paths — instead of
- * watching state. Keys upsert, so repeats replace rather than stack.
+ * Thin domain policy over the shadcn Base UI Toast manager, which owns the
+ * single notification system: stacking, manual/swipe dismissal, and
+ * announcement urgency. Stable keys upsert in place through the manager id,
+ * so repeats replace rather than stack. Identity-scope changes close every
+ * toast. NotificationCenter disables automatic dismissal so retry actions
+ * remain available until dismissal, recovery, or identity-scope change.
  */
 export function notifyError(
 	key: string,
 	message: string,
 	action?: ToastAction,
 	onDismiss?: () => void,
-): string {
-	return useNotifications
-		.getState()
-		.notify({ key, kind: "error", message, action, onDismiss });
+): void {
+	toastManager.add({
+		id: key,
+		type: "error",
+		description: message,
+		priority: "high",
+		...(action
+			? {
+					actionProps: {
+						onClick: action.onAction,
+						children: action.label,
+					},
+				}
+			: {}),
+		...(onDismiss ? { onClose: onDismiss } : {}),
+	});
 }
 
 export function notifySuccess(
 	key: string,
 	message: string,
 	onDismiss?: () => void,
-): string {
-	return useNotifications
-		.getState()
-		.notify({ key, kind: "success", message, onDismiss });
+): void {
+	toastManager.add({
+		id: key,
+		type: "success",
+		description: message,
+		priority: "low",
+		...(onDismiss ? { onClose: onDismiss } : {}),
+	});
 }
 
 /** Clear every toast for a key, e.g. when its source resolves. */
 export function dismissKey(key: string): void {
-	for (const item of useNotifications.getState().items)
-		if (item.key === key) useNotifications.getState().dismiss(item.id);
+	toastManager.close(key);
 }
+
+/** Toasts describe a verified user's operations; a new resource starts clean. */
+subscribeUserScope(() => {
+	toastManager.close();
+});

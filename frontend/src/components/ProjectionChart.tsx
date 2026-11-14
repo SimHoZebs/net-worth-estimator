@@ -10,12 +10,18 @@ import { useCheckpoints } from "../state/workspaceResources.ts";
 import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
 import { useSavedAccounts } from "../state/savedState.ts";
 import { visibleAccounts } from "../domain/model.ts";
-import { IconButton, TextButton } from "./Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Alert as ShadcnAlert,
+	AlertDescription as ShadcnAlertDescription,
+} from "@/components/ui/alert.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
-import { Notice } from "./Notice.tsx";
 import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
-import { Skeleton } from "./Skeleton.tsx";
-import { SegmentedControl } from "./SegmentedControl.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+	ToggleGroup as ShadcnToggleGroup,
+	ToggleGroupItem as ShadcnToggleGroupItem,
+} from "@/components/ui/toggle-group.tsx";
 
 // Plot modules pull the chart engine (d3 scales and primitives). The
 // summary and its skeleton own the first frame; the engine arrives while
@@ -42,6 +48,33 @@ function preloadPlots() {
 }
 
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
+
+function TrailingWindowControl({
+	value,
+	onChange,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<ShadcnToggleGroup
+			aria-label="Trailing window"
+			value={[value]}
+			onValueChange={(next) => {
+				const nextValue = next.find((candidate) => candidate !== value);
+				if (nextValue !== undefined) onChange(nextValue);
+			}}
+			variant="outline"
+			size="sm"
+		>
+			{[TRAILING_NET_WORTH_DAYS, 90].map((days) => (
+				<ShadcnToggleGroupItem key={days} type="button" value={String(days)}>
+					{`${days} days`}
+				</ShadcnToggleGroupItem>
+			))}
+		</ShadcnToggleGroup>
+	);
+}
 
 export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
@@ -83,14 +116,18 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 		// Only data slots skeletonize, and only while data is absent.
 		if (!pending && savedAccounts !== null)
 			return status === "error" ? (
-				<Notice tone="danger" className="mb-4">
-					<span>Could not calculate forecast. {baseError}</span>
-					<TextButton onClick={retryProjection}>Retry forecast</TextButton>
-				</Notice>
+				<ShadcnAlert variant="destructive" className="mb-4">
+					<ShadcnAlertDescription>
+						<span>Could not calculate forecast. {baseError}</span>{" "}
+						<Button variant="link" onClick={retryProjection}>
+							Retry forecast
+						</Button>
+					</ShadcnAlertDescription>
+				</ShadcnAlert>
 			) : null;
 		return (
 			<section
-				className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
+				className="overflow-hidden rounded-xl border border-border bg-card print:break-inside-avoid"
 				aria-label={
 					view === "total"
 						? `Net worth over the trailing ${days} days`
@@ -98,25 +135,21 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 				}
 			>
 				<div className="flex items-center justify-between gap-4 px-5 pt-4">
-					<SegmentedControl
-						ariaLabel="Trailing window"
+					<TrailingWindowControl
 						value={String(days)}
-						onChange={(v) => {
-							setDays(Number(v));
+						onChange={(value) => {
+							setDays(Number(value));
 						}}
-						items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
-							value: String(d),
-							label: `${d} days`,
-						}))}
 					/>
-					<IconButton
-						icon={CircleHelp}
-						size="sm"
-						iconSize={14}
-						className="size-6"
-						label="Inspect current net worth evidence"
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Inspect current net worth evidence"
 						onClick={onEvidence}
-					/>
+					>
+						<CircleHelp size={14} aria-hidden="true" />
+					</Button>
 				</div>
 				<div aria-busy="true">
 					<Skeleton className="h-56 w-full" />
@@ -127,10 +160,14 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	return (
 		<>
 			{status === "error" && (
-				<Notice tone="danger" className="mb-4">
-					<span>Could not calculate forecast. {baseError}</span>
-					<TextButton onClick={retryProjection}>Retry forecast</TextButton>
-				</Notice>
+				<ShadcnAlert variant="destructive" className="mb-4">
+					<ShadcnAlertDescription>
+						<span>Could not calculate forecast. {baseError}</span>{" "}
+						<Button variant="link" onClick={retryProjection}>
+							Retry forecast
+						</Button>
+					</ShadcnAlertDescription>
+				</ShadcnAlert>
 			)}
 			{pending && (
 				<p className="sr-only" role="status">
@@ -139,7 +176,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 			)}
 			{loading && projection && <ProjectionUpdating />}
 			<section
-				className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
+				className="overflow-hidden rounded-xl border border-border bg-card print:break-inside-avoid"
 				aria-label={
 					view === "total"
 						? `Net worth over the trailing ${days} days`
@@ -152,34 +189,47 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 						checkpoints={checkpoints}
 						actions={
 							<>
-								<SegmentedControl
-									ariaLabel="Trailing window"
+								<TrailingWindowControl
 									value={String(days)}
-									onChange={(v) => {
-										setDays(Number(v));
+									onChange={(value) => {
+										setDays(Number(value));
 									}}
-									items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
-										value: String(d),
-										label: `${d} days`,
-									}))}
 								/>
-								<SegmentedControl
-									ariaLabel="Chart view"
-									value={view}
-									onChange={setView}
-									items={[
+								<ShadcnToggleGroup
+									aria-label="Chart view"
+									value={[view]}
+									onValueChange={(next) => {
+										const nextValue = next.find(
+											(candidate) => candidate !== view,
+										);
+										if (nextValue !== undefined)
+											setView(nextValue as typeof view);
+									}}
+									variant="outline"
+									size="sm"
+								>
+									{[
 										{ value: "total", label: "Total" },
 										{ value: "accounts", label: "Accounts" },
-									]}
-								/>
-								<IconButton
-									icon={CircleHelp}
-									size="sm"
-									iconSize={14}
-									className="size-6"
-									label="Inspect current net worth evidence"
+									].map((item) => (
+										<ShadcnToggleGroupItem
+											key={item.value}
+											type="button"
+											value={item.value}
+										>
+											{item.label}
+										</ShadcnToggleGroupItem>
+									))}
+								</ShadcnToggleGroup>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-sm"
+									aria-label="Inspect current net worth evidence"
 									onClick={onEvidence}
-								/>
+								>
+									<CircleHelp size={14} aria-hidden="true" />
+								</Button>
 							</>
 						}
 					/>

@@ -1,7 +1,25 @@
 import { useMemo, useState } from "react";
-import { Button } from "../Button.tsx";
-import { ErrorNotice, FieldError } from "../ErrorNotice.tsx";
-import { transactionControlStyles } from "./transactionDetailStyles.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldDescription,
+	FieldError,
+} from "@/components/ui/field.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemActions,
+	ItemGroup,
+} from "@/components/ui/item.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
 import { notifySuccess } from "../../state/notifications.ts";
 import { mintShareRequestId } from "../../pages/sharingApi.ts";
 import {
@@ -51,6 +69,13 @@ export function TransactionSharing({
 		const names = new Map(groups.map((group) => [group.id, group.name]));
 		return (id: string) => names.get(id) ?? "A group";
 	}, [groups]);
+	const shareTargetLabel = (value: string | null): string =>
+		!value ? "Choose a group…" : groupName(value);
+	const hideTargetLabel = (value: string | null): string => {
+		if (!value) return "Choose who…";
+		if (value === "all") return "Everyone, including future groups";
+		return groupName(value);
+	};
 
 	const usedAudience = useMemo(() => {
 		const used = new Set<string>();
@@ -158,7 +183,7 @@ export function TransactionSharing({
 
 	if (grantsQuery.isPending || groupsQuery.isPending) {
 		return (
-			<p className="m-0 text-sm text-muted" role="status">
+			<p className="m-0 text-sm text-muted-foreground" role="status">
 				Loading sharing…
 			</p>
 		);
@@ -166,14 +191,20 @@ export function TransactionSharing({
 
 	if (grantsQuery.isError || groupsQuery.isError) {
 		return (
-			<ErrorNotice
-				message="Sharing could not be loaded."
-				action="Retry"
-				onAction={() => {
-					void grantsQuery.refetch();
-					void groupsQuery.refetch();
-				}}
-			/>
+			<Alert variant="destructive">
+				<AlertTitle>Sharing could not be loaded.</AlertTitle>
+				<AlertDescription className="flex flex-wrap items-center gap-2 pt-2">
+					<Button
+						variant="link"
+						onClick={() => {
+							void grantsQuery.refetch();
+							void groupsQuery.refetch();
+						}}
+					>
+						Retry
+					</Button>
+				</AlertDescription>
+			</Alert>
 		);
 	}
 
@@ -183,21 +214,22 @@ export function TransactionSharing({
 				<h3 className="m-0 text-sm font-medium">Sharing</h3>
 			</div>
 
-			<FieldError message={error} />
+			{error && <FieldError>{error}</FieldError>}
 
 			{intents.length > 0 && (
-				<ul className="grid list-none gap-2 p-0">
+				<ItemGroup>
 					{intents.map((intent) => (
-						<li
+						<Item
 							key={`${intent.audienceType}:${intent.audienceId}`}
-							className="flex items-center justify-between gap-3 rounded-control border border-solid border-line px-3 py-2 text-sm"
+							variant="outline"
+							size="sm"
 						>
-							<span>
+							<ItemContent>
 								{intent.intent === "shared" ? (
 									<>
 										Shared with <strong>{groupName(intent.audienceId)}</strong>
 										{wildcardHidden && (
-											<span className="text-muted">
+											<span className="text-muted-foreground">
 												{" "}
 												— hidden while the everyone exclusion lasts
 											</span>
@@ -213,63 +245,66 @@ export function TransactionSharing({
 										Hidden from <strong>{groupName(intent.audienceId)}</strong>
 									</>
 								)}
-							</span>
+							</ItemContent>
 							{!readOnly && (
-								<Button
-									variant="ghost"
-									size="sm"
-									disabled={busy}
-									onClick={() =>
-										intent.intent === "shared"
-											? onRevoke(intent.audienceType, intent.audienceId)
-											: onRemoveExclusion(
-													intent.audienceType,
-													intent.audienceId,
-												)
-									}
-								>
-									{intent.intent === "shared" ? "Stop sharing" : "Remove"}
-								</Button>
+								<ItemActions>
+									<Button
+										variant="ghost"
+										size="sm"
+										disabled={busy}
+										onClick={() =>
+											intent.intent === "shared"
+												? onRevoke(intent.audienceType, intent.audienceId)
+												: onRemoveExclusion(
+														intent.audienceType,
+														intent.audienceId,
+													)
+										}
+									>
+										{intent.intent === "shared" ? "Stop sharing" : "Remove"}
+									</Button>
+								</ItemActions>
 							)}
-						</li>
+						</Item>
 					))}
-				</ul>
+				</ItemGroup>
 			)}
 
 			{!readOnly && (
 				<div className="grid gap-3">
-					<div className="grid gap-2">
-						<label
-							className="grid gap-1 text-sm"
-							htmlFor={`share-group-${transactionId}`}
-						>
-							<span className="font-medium">Share with a group</span>
-							<span className="text-muted">
-								The group sees this transaction in its usual shape. Works with
-								or without automatic sharing.
-							</span>
-						</label>
+					<Field>
+						<FieldLabel htmlFor={`share-group-${transactionId}`}>
+							Share with a group
+						</FieldLabel>
+						<FieldDescription>
+							The group sees this transaction in its usual shape. Works with or
+							without automatic sharing.
+						</FieldDescription>
 						<div className="flex flex-wrap gap-2">
-							<select
-								id={`share-group-${transactionId}`}
+							<Select
 								value={shareTarget}
 								disabled={busy || wildcardHidden || shareOptions.length === 0}
-								onChange={(event) => {
+								onValueChange={(value) => {
 									setError(null);
-									setShareTarget(event.target.value);
+									if (value !== null) setShareTarget(value);
 								}}
-								className={transactionControlStyles({
-									element: "select",
-									shape: "account",
-								})}
 							>
-								<option value="">Choose a group…</option>
-								{shareOptions.map((group) => (
-									<option key={group.id} value={group.id}>
-										{group.name}
-									</option>
-								))}
-							</select>
+								<SelectTrigger
+									id={`share-group-${transactionId}`}
+									aria-label="Share with a group"
+								>
+									<SelectValue placeholder="Choose a group…">
+										{(value: string | null) => shareTargetLabel(value)}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{shareOptions.map((group) => (
+										<SelectItem key={group.id} value={group.id}>
+											{group.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 							<Button
 								size="sm"
 								disabled={busy || wildcardHidden || !shareTarget}
@@ -279,48 +314,51 @@ export function TransactionSharing({
 							</Button>
 						</div>
 						{wildcardHidden && (
-							<p className="m-0 text-sm text-muted">
+							<p className="m-0 text-sm text-muted-foreground">
 								Sharing is paused while this transaction is hidden from
 								everyone. Remove that exclusion to share again.
 							</p>
 						)}
-					</div>
+					</Field>
 
-					<div className="grid gap-2">
-						<label
-							className="grid gap-1 text-sm"
-							htmlFor={`hide-group-${transactionId}`}
-						>
-							<span className="font-medium">Hide from a group or everyone</span>
-							<span className="text-muted">
-								Hiding wins over sharing. Hiding from everyone also covers
-								groups you join later and stays until removed.
-							</span>
-						</label>
+					<Field>
+						<FieldLabel htmlFor={`hide-group-${transactionId}`}>
+							Hide from a group or everyone
+						</FieldLabel>
+						<FieldDescription>
+							Hiding wins over sharing. Hiding from everyone also covers groups
+							you join later and stays until removed.
+						</FieldDescription>
 						<div className="flex flex-wrap gap-2">
-							<select
-								id={`hide-group-${transactionId}`}
+							<Select
 								value={hideTarget}
 								disabled={busy || (wildcardHidden && hideOptions.length === 0)}
-								onChange={(event) => {
+								onValueChange={(value) => {
 									setError(null);
-									setHideTarget(event.target.value);
+									if (value !== null) setHideTarget(value);
 								}}
-								className={transactionControlStyles({
-									element: "select",
-									shape: "account",
-								})}
 							>
-								<option value="">Choose who…</option>
-								{hideOptions.map((group) => (
-									<option key={group.id} value={group.id}>
-										{group.name}
-									</option>
-								))}
-								{!wildcardHidden && (
-									<option value="all">Everyone, including future groups</option>
-								)}
-							</select>
+								<SelectTrigger
+									id={`hide-group-${transactionId}`}
+									aria-label="Hide from a group or everyone"
+								>
+									<SelectValue placeholder="Choose who…">
+										{(value: string | null) => hideTargetLabel(value)}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{hideOptions.map((group) => (
+										<SelectItem key={group.id} value={group.id}>
+											{group.name}
+										</SelectItem>
+									))}
+									{!wildcardHidden && (
+										<SelectItem value="all">
+											Everyone, including future groups
+										</SelectItem>
+									)}
+								</SelectContent>
+							</Select>
 							<Button
 								size="sm"
 								variant="secondary"
@@ -330,7 +368,7 @@ export function TransactionSharing({
 								{busy ? "Hiding…" : "Hide"}
 							</Button>
 						</div>
-					</div>
+					</Field>
 				</div>
 			)}
 		</section>

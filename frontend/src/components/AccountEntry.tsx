@@ -37,7 +37,7 @@ export function AccountEntry({
 			)}
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<strong className="truncate text-xs font-semibold">{name}</strong>
-				<small className="text-xs text-muted">{caption}</small>
+				<small className="text-xs text-muted-foreground">{caption}</small>
 			</span>
 			{value !== undefined && (
 				<strong className="whitespace-nowrap text-sm font-semibold tracking-tight tabular-nums">

@@ -1,16 +1,13 @@
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { useState } from "react";
-import { Badge } from "../../components/Badge.tsx";
-import { EmptyState } from "../../components/EmptyState.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Empty, EmptyHeader, EmptyMedia } from "@/components/ui/empty.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import { scheduleTransaction } from "../../domain/accountActivity.ts";
-import {
-	transactionAmountStyles,
-	transactionBadgeStyles,
-} from "../../components/activity/activityStyles.ts";
 import { dateLabel, money } from "../../domain/format.ts";
+import { cn } from "@/lib/utils.ts";
 import {
 	isPendingTransaction,
 	type Account,
@@ -38,7 +35,18 @@ export function TransactionsPanel({
 }) {
 	const cadenceOf = (id: string) => ruleCadence?.get(id) ?? "Recurring";
 	if (!transactions.length)
-		return <EmptyState icon={ArrowRight} title="No matching transactions" />;
+		return (
+			<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+				<EmptyHeader>
+					<EmptyMedia>
+						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+							<ArrowRight size={28} />
+						</span>
+					</EmptyMedia>
+					<h3 className="text-lg">No matching transactions</h3>
+				</EmptyHeader>
+			</Empty>
+		);
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const selected = selectedId
@@ -114,16 +122,18 @@ export function TransactionsPanel({
 									<>
 										{transaction.void ? (
 											<Badge
-												tone="neutral"
-												className={transactionBadgeStyles()}
+												variant="secondary"
+												className={cn("h-auto px-1 py-0.5 text-xs")}
 											>
 												Did not post
 											</Badge>
 										) : (
 											excluded && (
 												<Badge
-													tone="warning"
-													className={transactionBadgeStyles()}
+													variant="default"
+													className={cn(
+														"bg-warning-bg text-warning-text h-auto px-1 py-0.5 text-xs",
+													)}
 												>
 													Excluded
 												</Badge>
@@ -140,15 +150,18 @@ export function TransactionsPanel({
 									/>
 									{pending ? (
 										<Badge
-											tone="neutral"
-											className={transactionBadgeStyles()}
+											variant="secondary"
+											className={cn("h-auto px-1 py-0.5 text-xs")}
 										>
 											Pending
 										</Badge>
 									) : null}
 									{transaction.claimScheduleId &&
 										transaction.claimOccurrenceDate && (
-											<Badge tone="neutral">
+											<Badge
+												variant="secondary"
+												className={cn("h-auto px-1 py-0.5 text-xs")}
+											>
 												Records{" "}
 												{dateLabel(transaction.claimOccurrenceDate, true)}
 											</Badge>
@@ -190,7 +203,7 @@ function TransactionAmount({
 }) {
 	if (transaction.amountKnown)
 		return (
-			<strong className={transactionAmountStyles()}>
+			<strong className={cn("text-sm font-semibold max-sm:text-xs")}>
 				{money(transaction.amount)}
 			</strong>
 		);
@@ -201,16 +214,21 @@ function TransactionAmount({
 				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
 		return (
 			<>
-				<strong className={transactionAmountStyles()} title={label}>
+				<strong
+					className={cn("text-sm font-semibold max-sm:text-xs")}
+					title={label}
+				>
 					{money(resolved.amount)}
 				</strong>
-				<Badge tone="neutral">Varies</Badge>
+				<Badge variant="secondary" className={cn("h-auto px-1 py-0.5 text-xs")}>
+					Varies
+				</Badge>
 			</>
 		);
 	}
 	return (
 		<strong
-			className={transactionAmountStyles()}
+			className={cn("text-sm font-semibold max-sm:text-xs")}
 			title="Calculated during projection · varies each occurrence"
 		>
 			Varies

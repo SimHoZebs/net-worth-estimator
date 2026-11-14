@@ -2,6 +2,24 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, vi } from "vitest";
 import { resetServerQueryCache } from "../src/state/serverQuery.ts";
 
+// jsdom has no matchMedia. Sonner's Toaster reads it in a passive-mount
+// effect, so every tree that mounts the Toaster crashes without a stub.
+// Install unconditionally (the per-test reinstall in afterEach keeps it
+// alive across files; files with their own stub keep overriding per test).
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+	Object.defineProperty(window, "matchMedia", {
+		writable: true,
+		value: (query: string) => ({
+			matches: /prefers-reduced-motion:\s*reduce/.test(query),
+			media: query,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			addListener: () => {},
+			removeListener: () => {},
+			dispatchEvent: () => false,
+		}),
+	});
+}
 // jsdom has no dialog API. Stub only the open-state toggle: top layer, focus
 // containment, Escape, and focus return are browser behavior covered by the
 // browser suite.
@@ -19,7 +37,7 @@ if (
 
 // Tests share one worker and one environment, so every file must leave no DOM,
 // storage, timers, route, or module state behind for the next file. The suite
-// runs with isolate: false (about 6s for 121 files / 958 tests, against about
+// runs with isolate: false (about 6s for the retained safety tier, against about
 // 32s isolated), and these hooks are the contract that makes that safe.
 // Window singletons such as __WAYPOINT_CONFIG__ stay per-file discipline:
 // set them in the file's own beforeEach and clear them in its afterEach, so

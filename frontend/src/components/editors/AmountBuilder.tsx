@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
 	patchTemplateAmount,
 	templateFieldsFromAmount,
@@ -12,9 +13,14 @@ import {
 	FALLBACK_TEMPLATES,
 	plainLanguageForAmount,
 } from "../../domain/amountCatalog.ts";
-import { Button } from "../Button.tsx";
-import { dialogActionsStyles } from "../dialogStyles.ts";
-import { InputField, SelectField, TextAreaField } from "../Field.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import {
+	EditorField,
+	EditorSelect,
+	type EditorSelectOption,
+} from "./editorFields.tsx";
 
 function numberOr(fallback: number, value: string): number {
 	const parsed = Number(value);
@@ -41,17 +47,8 @@ function parseBrackets(value: string): JsonValue[] {
 
 type Option = { id: string; name: string };
 
-function optionsFor(list: Option[], placeholder: string) {
-	return (
-		<>
-			<option value="">{placeholder}</option>
-			{list.map((item) => (
-				<option key={item.id} value={item.id}>
-					{item.name}
-				</option>
-			))}
-		</>
-	);
+function optionList(list: Option[]): EditorSelectOption[] {
+	return list.map((item) => ({ value: item.id, label: item.name }));
 }
 
 export function buildTemplateAmount(
@@ -184,6 +181,25 @@ export function buildTemplateAmount(
 	}
 }
 
+function TemplateControl({
+	label,
+	inputKey,
+	prefix,
+	children,
+}: {
+	label: string;
+	inputKey: string;
+	prefix: string;
+	children: (id: string) => ReactNode;
+}) {
+	const id = `${prefix}-${inputKey}`;
+	return (
+		<EditorField label={label} htmlFor={id}>
+			{children(id)}
+		</EditorField>
+	);
+}
+
 function TemplateFields({
 	templateId,
 	accounts,
@@ -197,181 +213,324 @@ function TemplateFields({
 	fields: Record<string, string>;
 	onField: (key: string, value: string) => void;
 }) {
+	const prefix = useId();
 	const set = (key: string) => ({
 		value: fields[key] ?? "",
-		onChange: (
-			event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-		) => onField(key, event.target.value),
+		onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+			onField(key, event.target.value),
 	});
-	const accountOptions = (placeholder: string) =>
-		optionsFor(accounts, placeholder);
+	const select = (key: string) => ({
+		value: fields[key] ?? "",
+		onValueChange: (value: string) => onField(key, value),
+	});
+	const accountItems = optionList(accounts);
 	switch (templateId) {
 		case "fixed":
 			return (
-				<InputField
+				<TemplateControl
 					label="Dollars each time"
-					name="amount"
-					type="number"
-					step="0.01"
-					placeholder="e.g. 500"
-					{...set("amount")}
-				/>
+					inputKey="amount"
+					prefix={prefix}
+				>
+					{(id) => (
+						<Input
+							id={id}
+							name="amount"
+							type="number"
+							step="0.01"
+							placeholder="e.g. 500"
+							{...set("amount")}
+						/>
+					)}
+				</TemplateControl>
 			);
 		case "growth":
 			return (
 				<>
-					<InputField
+					<TemplateControl
 						label="Starting dollars"
-						name="base"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 500"
-						{...set("base")}
-					/>
-					<InputField
+						inputKey="base"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="base"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 500"
+								{...set("base")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Yearly growth (0.03 = 3%)"
-						name="annualGrowthRate"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.03"
-						{...set("annualGrowthRate")}
-					/>
+						inputKey="annualGrowthRate"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="annualGrowthRate"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.03"
+								{...set("annualGrowthRate")}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "account-percent":
 			return (
 				<>
-					<SelectField label="Account" name="accountId" {...set("accountId")}>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
+					<TemplateControl label="Account" inputKey="accountId" prefix={prefix}>
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick an account"
+								options={accountItems}
+								{...select("accountId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Percent (0.04 = 4%)"
-						name="pct"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.04"
-						{...set("pct")}
-					/>
+						inputKey="pct"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="pct"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.04"
+								{...set("pct")}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "investment-growth":
 			return (
 				<>
-					<SelectField label="Balance to grow" name="refId" {...set("refId")}>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
+					<TemplateControl
+						label="Balance to grow"
+						inputKey="refId"
+						prefix={prefix}
+					>
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick an account"
+								options={accountItems}
+								{...select("refId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Yearly rate (0.07 = 7%)"
-						name="annualRate"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.07"
-						{...set("annualRate")}
-					/>
-					<InputField
+						inputKey="annualRate"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="annualRate"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.07"
+								{...set("annualRate")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Wobble (0 = exact, 0.12 = bumpy)"
-						name="volatility"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 0.12"
-						{...set("volatility")}
-					/>
+						inputKey="volatility"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="volatility"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 0.12"
+								{...set("volatility")}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "debt-minimum":
 			return (
-				<SelectField
+				<TemplateControl
 					label="Card account"
-					name="accountId"
-					{...set("accountId")}
+					inputKey="accountId"
+					prefix={prefix}
 				>
-					{accountOptions("Pick an account")}
-				</SelectField>
+					{(id) => (
+						<EditorSelect
+							id={id}
+							emptyLabel="Pick an account"
+							options={accountItems}
+							{...select("accountId")}
+						/>
+					)}
+				</TemplateControl>
 			);
 		case "late-fee":
 			return (
 				<>
-					<SelectField
+					<TemplateControl
 						label="Payment to check"
-						name="paymentId"
-						{...set("paymentId")}
+						inputKey="paymentId"
+						prefix={prefix}
 					>
-						{optionsFor(transactions, "Pick a transaction")}
-					</SelectField>
-					<SelectField
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick a transaction"
+								options={optionList(transactions)}
+								{...select("paymentId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Card account"
-						name="accountId"
-						{...set("accountId")}
+						inputKey="accountId"
+						prefix={prefix}
 					>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
-						label="Fee dollars"
-						name="fee"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 30"
-						{...set("fee")}
-					/>
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick an account"
+								options={accountItems}
+								{...select("accountId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl label="Fee dollars" inputKey="fee" prefix={prefix}>
+						{(id) => (
+							<Input
+								id={id}
+								name="fee"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 30"
+								{...set("fee")}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "low-balance-fee":
 			return (
 				<>
-					<SelectField label="Account" name="accountId" {...set("accountId")}>
-						{accountOptions("Pick an account")}
-					</SelectField>
-					<InputField
+					<TemplateControl label="Account" inputKey="accountId" prefix={prefix}>
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick an account"
+								options={accountItems}
+								{...select("accountId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Balance limit"
-						name="threshold"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 1500"
-						{...set("threshold")}
-					/>
-					<InputField
-						label="Fee dollars"
-						name="fee"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 12"
-						{...set("fee")}
-					/>
+						inputKey="threshold"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="threshold"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 1500"
+								{...set("threshold")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl label="Fee dollars" inputKey="fee" prefix={prefix}>
+						{(id) => (
+							<Input
+								id={id}
+								name="fee"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 12"
+								{...set("fee")}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		case "federal-tax":
 			return (
 				<>
-					<SelectField
+					<TemplateControl
 						label="Gross pay transaction"
-						name="grossId"
-						{...set("grossId")}
+						inputKey="grossId"
+						prefix={prefix}
 					>
-						{optionsFor(transactions, "Pick gross pay")}
-					</SelectField>
-					<SelectField
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick gross pay"
+								options={optionList(transactions)}
+								{...select("grossId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Pre-tax slice transaction"
-						name="pretaxId"
-						{...set("pretaxId")}
+						inputKey="pretaxId"
+						prefix={prefix}
 					>
-						{optionsFor(transactions, "Pick pre-tax slice")}
-					</SelectField>
-					<InputField
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick pre-tax slice"
+								options={optionList(transactions)}
+								{...select("pretaxId")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Deduction per paycheck"
-						name="deduction"
-						type="number"
-						step="0.01"
-						placeholder="e.g. 1341.67"
-						{...set("deduction")}
-					/>
-					<TextAreaField
+						inputKey="deduction"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="deduction"
+								type="number"
+								step="0.01"
+								placeholder="e.g. 1341.67"
+								{...set("deduction")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
 						label="Brackets (JSON: upTo per paycheck, rate 0–1)"
-						className="type-code"
-						name="brackets"
-						rows={4}
-						defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
-						onChange={(event) => onField("brackets", event.target.value)}
-					/>
+						inputKey="brackets"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Textarea
+								id={id}
+								className="type-code"
+								name="brackets"
+								rows={4}
+								defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
+								onChange={(event) => onField("brackets", event.target.value)}
+							/>
+						)}
+					</TemplateControl>
 				</>
 			);
 		default:
@@ -420,35 +579,38 @@ export function AmountBuilder({
 	}, [fixedAmount, source, template.id, fields, accounts]);
 	const plain = plainLanguageForAmount(amount);
 	const wire = JSON.stringify(amount, null, 2);
+	const templatePickerId = useId();
 	return (
-		<div className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4">
+		<div className="mt-3 mb-5 rounded-xl border border-border bg-transparent p-4">
 			{!hidePicker && (
 				<>
-					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
-						<SelectField
+					<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+						<EditorField
 							label="What kind of amount?"
-							name="amountTemplate"
-							value={template.id}
-							onChange={(event) => {
-								setTemplateId(event.target.value);
-								setFields({});
-							}}
+							htmlFor={templatePickerId}
 						>
-							{list.map((item) => (
-								<option key={item.id} value={item.id}>
-									{item.label}
-								</option>
-							))}
-						</SelectField>
+							<EditorSelect
+								id={templatePickerId}
+								value={template.id}
+								onValueChange={(next) => {
+									setTemplateId(next);
+									setFields({});
+								}}
+								options={list.map((item) => ({
+									value: item.id,
+									label: item.label,
+								}))}
+							/>
+						</EditorField>
 					</div>
-					<p className="text-muted">
+					<p className="text-muted-foreground">
 						<strong>{template.label}.</strong> {template.summary}{" "}
 						{template.whenToUse && <span>Use when: {template.whenToUse}</span>}
 					</p>
 				</>
 			)}
 			{!fixedAmount && (
-				<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
+				<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
 					<TemplateFields
 						templateId={template.id}
 						accounts={accounts}
@@ -460,20 +622,16 @@ export function AmountBuilder({
 					/>
 				</div>
 			)}
-			<p className="text-muted">{plain}</p>
+			<p className="text-muted-foreground">{plain}</p>
 			<details>
 				<summary>Show saved data (JSON)</summary>
-				<pre className="max-h-70 overflow-auto rounded-surface border border-solid border-line bg-surface-2 p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
+				<pre className="max-h-70 overflow-auto rounded-xl border border-border bg-muted p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
 					{wire}
 				</pre>
 			</details>
 			{onChange && (
-				<div className={dialogActionsStyles}>
-					<Button
-						type="button"
-						variant="primary"
-						onClick={() => onChange(amount)}
-					>
+				<div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+					<Button type="button" onClick={() => onChange(amount)}>
 						Use this amount
 					</Button>
 				</div>

@@ -1,8 +1,9 @@
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useId, useState, type Ref } from "react";
-import { Button, TextButton } from "../../components/Button.tsx";
-import { InputField } from "../../components/Field.tsx";
-import { FieldError } from "../../components/ErrorNotice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { connectSyncKey } from "../../state/syncSettings.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
@@ -49,30 +50,33 @@ export function SyncConnectForm({
 				void handleConnect();
 			}}
 		>
-			<InputField
-				id={inputId}
-				ref={inputRef}
-				name="setupToken"
-				label="Setup token"
-				type={visible ? "text" : "password"}
-				required
-				autoComplete="off"
-				autoCapitalize="off"
-				autoCorrect="off"
-				spellCheck={false}
-				enterKeyHint="go"
-				value={token}
-				disabled={readOnly || busy}
-				aria-invalid={error ? true : undefined}
-				aria-describedby={error ? errorId : undefined}
-				onChange={(event) => {
-					setToken(event.currentTarget.value);
-					setError(null);
-				}}
-				placeholder="Paste your setup token"
-			/>
+			<Field>
+				<Label htmlFor={inputId}>Setup token</Label>
+				<Input
+					id={inputId}
+					ref={inputRef}
+					name="setupToken"
+					type={visible ? "text" : "password"}
+					required
+					autoComplete="off"
+					autoCapitalize="off"
+					autoCorrect="off"
+					spellCheck={false}
+					enterKeyHint="go"
+					value={token}
+					disabled={readOnly || busy}
+					aria-invalid={error ? true : undefined}
+					aria-describedby={error ? errorId : undefined}
+					onChange={(event) => {
+						setToken(event.currentTarget.value);
+						setError(null);
+					}}
+					placeholder="Paste your setup token"
+				/>
+			</Field>
 			<div className="mt-2 flex justify-end">
-				<TextButton
+				<Button
+					variant="link"
 					className="min-h-6"
 					aria-controls={inputId}
 					aria-pressed={visible}
@@ -85,16 +89,20 @@ export function SyncConnectForm({
 						<Eye size={14} aria-hidden="true" />
 					)}
 					{visible ? "Hide token" : "Show token"}
-				</TextButton>
+				</Button>
 			</div>
-			<FieldError id={errorId} message={error} />
+			{error ? (
+				<p id={errorId} role="alert">
+					{error}
+				</p>
+			) : null}
 			<div className="mt-3 flex flex-wrap items-center gap-3">
-				<Button type="submit" variant="primary" disabled={readOnly || busy}>
+				<Button type="submit" variant="default" disabled={readOnly || busy}>
 					{busy ? "Connecting…" : "Connect SimpleFIN"}
 					{!busy && <ArrowRight size={16} aria-hidden="true" />}
 				</Button>
 			</div>
-			<p className="mt-3 mb-0 min-h-[2lh] text-xs leading-relaxed text-muted">
+			<p className="mt-3 mb-0 min-h-[2lh] text-xs leading-relaxed text-muted-foreground">
 				{busy
 					? "Keep this page open while Waypoint connects to SimpleFIN."
 					: null}

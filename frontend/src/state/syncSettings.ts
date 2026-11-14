@@ -244,7 +244,7 @@ export async function supersedeSyncedAccount(
 			await refreshSyncSettings(true);
 		},
 		failureMessage: "The accounts could not be linked.",
-		// The native dialog blocks toasts. It owns failures inline.
+		// Keep failures in the link editor so the user can correct and retry.
 		suppressToast: true,
 		onRejected,
 	});

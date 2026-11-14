@@ -274,8 +274,8 @@ Consistency turns visual details into learned vocabulary.
 Inconsistency forces users back into reading and interpretation.
 
 Typography follows the same rule: one typeface per text role, never per page
-or component. Manrope serves UI, data, display, and value roles; system
-monospace serves code. The roles live in `frontend/src/styles/typography.css`.
+or component. Geist serves UI, data, and value roles; Merriweather serves
+display headings; system monospace serves code. The roles live in `frontend/src/styles/typography.css`.
 
 ## 17. Never make color carry meaning alone
 

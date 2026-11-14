@@ -33,11 +33,11 @@ jobs:
           - image: backend
             context: .
             file: backend/Dockerfile
-            target: ''
+            target: ""
           - image: frontend
             context: .
             file: frontend/Dockerfile
-            target: ''
+            target: ""
           - image: backend-northflank
             context: .
             file: backend/Dockerfile
@@ -45,7 +45,7 @@ jobs:
           - image: auth
             context: .
             file: auth/better-auth/Dockerfile
-            target: ''
+            target: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,7 +89,7 @@ jobs:
               # sources. Dockerfile is the single source; if a COPY source
               # changes, update this list. deploy/images.test.mjs parses the
               # Dockerfile and verifies this list covers every COPY source.
-              paths=(auth/better-auth .dockerignore package.json bun.lock frontend/package.json extension/package.json frontend/src/styles frontend/src/components/brandStyles.ts frontend/src/components/buttonStyles.ts frontend/src/components/fieldStyles.ts)
+              paths=(auth/better-auth .dockerignore package.json bun.lock frontend/package.json extension/package.json frontend/src/styles frontend/src/components/ui/control-styles.ts)
               ;;
             *)
               echo "unknown image component: $COMPONENT" >&2

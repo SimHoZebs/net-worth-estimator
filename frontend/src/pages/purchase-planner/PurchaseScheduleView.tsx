@@ -43,7 +43,7 @@ export function PurchaseScheduleView({
 	const pending = waiting.some((item) => item.outcome.kind === "pending");
 	return (
 		<section aria-label="Purchase schedule" className="space-y-4">
-			<p className="text-xs text-muted">
+			<p className="text-xs text-muted-foreground">
 				Dates shift automatically as your forecast changes.
 			</p>
 			{groups.map((group) => {
@@ -59,14 +59,14 @@ export function PurchaseScheduleView({
 							<span className="grid size-6 place-items-center rounded-full bg-success-bg text-success-text">
 								<CalendarDays size={14} />
 							</span>
-							<span className="h-full min-h-5 w-px bg-line" />
+							<span className="h-full min-h-5 w-px bg-border" />
 						</div>
 						<div className="min-w-0 pb-4">
-							<h3 className="text-sm font-semibold text-ink">
+							<h3 className="text-sm font-semibold text-foreground">
 								<time dateTime={group.date}>{dateLabel(group.date, true)}</time>
 							</h3>
 							<ol
-								className="m-0 mt-1 list-none rounded-surface border border-line bg-surface px-2"
+								className="m-0 mt-1 list-none rounded-xl border border-border bg-card px-2"
 								// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
 								role="list"
 							>
@@ -85,22 +85,22 @@ export function PurchaseScheduleView({
 			{waiting.length > 0 && (
 				<div className="grid grid-cols-[--spacing(6)_minmax(0,1fr)] gap-3">
 					<div
-						className="grid size-6 place-items-center rounded-full bg-surface-3 text-muted"
+						className="grid size-6 place-items-center rounded-full bg-accent text-muted-foreground"
 						aria-hidden="true"
 					>
 						<Clock3 size={14} />
 					</div>
 					<div className="min-w-0">
-						<h3 className="text-sm font-semibold text-ink">
+						<h3 className="text-sm font-semibold text-foreground">
 							{pending ? "Calculating dates…" : "Not yet dated"}
 						</h3>
-						<p className="mt-1 text-xs text-muted">
+						<p className="mt-1 text-xs text-muted-foreground">
 							{pending
 								? "Finding the earliest financially safe dates for your purchases."
 								: `No calculated date before ${dateLabel(forecastEnd, true)}. This does not mean the purchase is impossible.`}
 						</p>
 						<ol
-							className="m-0 mt-2 list-none rounded-surface border border-line bg-surface px-2"
+							className="m-0 mt-2 list-none rounded-xl border border-border bg-card px-2"
 							// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
 							role="list"
 						>
@@ -117,11 +117,11 @@ export function PurchaseScheduleView({
 			)}
 			{excluded.length > 0 && (
 				<div className="ml-8">
-					<h3 className="text-sm font-semibold text-muted">
+					<h3 className="text-sm font-semibold text-muted-foreground">
 						Excluded from account
 					</h3>
 					<ol
-						className="m-0 mt-2 list-none rounded-surface border border-line bg-surface px-2"
+						className="m-0 mt-2 list-none rounded-xl border border-border bg-card px-2"
 						// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
 						role="list"
 					>
@@ -136,7 +136,9 @@ export function PurchaseScheduleView({
 				</div>
 			)}
 			{groups.length === 0 && waiting.length === 0 && excluded.length === 0 && (
-				<p className="text-sm text-muted">No purchases to schedule.</p>
+				<p className="text-sm text-muted-foreground">
+					No purchases to schedule.
+				</p>
 			)}
 		</section>
 	);

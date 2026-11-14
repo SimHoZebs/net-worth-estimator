@@ -1,12 +1,11 @@
 import { Check, ExternalLink, Landmark, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge } from "../../components/Badge.tsx";
-import { Button, TextButton } from "../../components/Button.tsx";
-import { buttonStyles } from "../../components/buttonStyles.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import { Notice } from "../../components/Notice.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
+import { AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button, buttonVariants } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
 	disconnectSyncKey,
 	triggerSyncNow,
@@ -117,11 +116,15 @@ export function SyncProviderPanel() {
 	if (credential.isError) {
 		return (
 			<div className="grid gap-6">
-				<ErrorNotice
-					message="The sync connection could not be loaded."
-					action="Retry"
-					onAction={() => void credential.refetch()}
-				/>
+				<Alert variant="destructive">
+					<AlertCircle size={16} aria-hidden="true" />
+					<AlertDescription>
+						The sync connection could not be loaded.{" "}
+						<Button variant="link" onClick={() => void credential.refetch()}>
+							Retry
+						</Button>
+					</AlertDescription>
+				</Alert>
 			</div>
 		);
 	}
@@ -132,7 +135,9 @@ export function SyncProviderPanel() {
 		setSyncing(false);
 		// Failures reach the toast from the sync mutation. The panel never
 		// mirrors them inline so one event keeps one place to find.
-		if (ok) notifySuccess("sync-notice", "Sync complete.");
+		if (ok) {
+			notifySuccess("sync-notice", "Sync complete.");
+		}
 	}
 
 	async function handleDisconnect() {
@@ -166,12 +171,12 @@ export function SyncProviderPanel() {
 					>
 						Connect bank accounts
 					</h2>
-					<Badge tone="neutral">Not connected</Badge>
+					<Badge variant="secondary">Not connected</Badge>
 				</header>
 			)}
 
 			{readOnly && (
-				<p className="m-0 rounded-control border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
+				<p className="m-0 rounded-md border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
 					This workspace is read-only. You can view the setup guide and
 					connection details. Write access is required to connect, disconnect,
 					or sync.
@@ -180,11 +185,11 @@ export function SyncProviderPanel() {
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{configured ? (
-						<div className="overflow-hidden rounded-surface border border-line bg-surface">
+						<div className="overflow-hidden rounded-xl border border-border bg-card">
 							<div className="p-5 sm:p-6">
 								<div className="flex flex-wrap items-start gap-4">
 									<div className="flex min-w-0 items-start gap-3">
-										<span className="inline-grid size-11 shrink-0 place-items-center rounded-control bg-success-bg text-success-text">
+										<span className="inline-grid size-11 shrink-0 place-items-center rounded-md bg-success-bg text-success-text">
 											<Landmark size={22} aria-hidden="true" />
 										</span>
 										<div className="grid min-w-0 gap-1">
@@ -194,12 +199,15 @@ export function SyncProviderPanel() {
 												className="m-0 flex items-center gap-2 text-lg"
 											>
 												SimpleFIN
-												<Badge tone="success">
+												<Badge
+													variant="default"
+													className="bg-success-bg text-success-text"
+												>
 													<Check size={14} aria-hidden="true" />
 													Connected
 												</Badge>
 											</h3>
-											<p className="m-0 text-sm leading-relaxed text-muted">
+											<p className="m-0 text-sm leading-relaxed text-muted-foreground">
 												{since && <>Connected since {since} · </>}
 												{lastSynced ? (
 													<>
@@ -223,7 +231,7 @@ export function SyncProviderPanel() {
 									</div>
 									<div className="flex flex-wrap gap-3 sm:ml-auto">
 										<Button
-											variant="primary"
+											variant="default"
 											disabled={readOnly || busy || syncing || syncUnavailable}
 											onClick={() => void handleSyncNow()}
 										>
@@ -234,10 +242,7 @@ export function SyncProviderPanel() {
 											href={simplefinLinks.home}
 											target="_blank"
 											rel="noopener noreferrer"
-											className={mergeStyles(
-												buttonStyles({ variant: "secondary" }),
-												"hover:bg-hover",
-											)}
+											className={cn(buttonVariants({ variant: "secondary" }))}
 										>
 											Open SimpleFIN Bridge{" "}
 											<ExternalLink size={14} aria-hidden="true" />
@@ -246,24 +251,33 @@ export function SyncProviderPanel() {
 									</div>
 								</div>
 								{status.isError && (
-									<ErrorNotice
-										message="The sync status could not be loaded."
-										action="Reload status"
-										onAction={() => void status.refetch()}
-									/>
+									<Alert variant="destructive">
+										<AlertCircle size={16} aria-hidden="true" />
+										<AlertDescription>
+											The sync status could not be loaded.{" "}
+											<Button
+												variant="link"
+												onClick={() => void status.refetch()}
+											>
+												Reload status
+											</Button>
+										</AlertDescription>
+									</Alert>
 								)}
 								{status.data?.syncError && (
-									<Notice tone="warning" className="mb-4">
-										<p className="m-0 text-sm leading-relaxed">
-											{status.data.syncError.message}
-										</p>
-										{status.data.syncError.scope === "connection" && (
-											<p className="mt-2 mb-0 text-sm leading-relaxed">
-												Other bank logins can keep syncing. Reconnect the
-												affected login in SimpleFIN to resume it.
+									<Alert className="mb-4 border-warning-border bg-warning-bg text-warning-text">
+										<AlertDescription className="text-warning-text">
+											<p className="m-0 text-sm leading-relaxed">
+												{status.data.syncError.message}
 											</p>
-										)}
-									</Notice>
+											{status.data.syncError.scope === "connection" && (
+												<p className="mt-2 mb-0 text-sm leading-relaxed">
+													Other bank logins can keep syncing. Reconnect the
+													affected login in SimpleFIN to resume it.
+												</p>
+											)}
+										</AlertDescription>
+									</Alert>
 								)}
 								{syncUnavailable && (
 									<p className="mb-4 text-sm leading-relaxed text-warning-text">
@@ -278,10 +292,10 @@ export function SyncProviderPanel() {
 									notifySuccess("sync-connection", linkedMessage);
 								}}
 							/>
-							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
+							<div className="border-t border-border bg-muted px-5 py-4 sm:px-6">
 								{reconnecting ? (
 									<div>
-										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
 											Paste a new setup token to replace the saved connection.
 											Your accounts and imported history stay in Waypoint.
 										</p>
@@ -290,50 +304,53 @@ export function SyncProviderPanel() {
 											inputRef={reconnectInputRef}
 										/>
 										<div className="mt-3">
-											<TextButton
+											<Button
+												variant="link"
 												className="min-h-6"
 												onClick={() => setReconnecting(false)}
 											>
 												Cancel reconnect
-											</TextButton>
+											</Button>
 										</div>
 									</div>
 								) : confirmingDisconnect ? (
 									<div>
-										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
 											Disconnect SimpleFIN? Future imports will stop. Your
 											existing accounts and imported history will stay in
 											Waypoint.
 										</p>
 										<div className="flex flex-wrap items-center gap-4">
 											<Button
+												variant="secondary"
 												disabled={busy}
 												onClick={() => setConfirmingDisconnect(false)}
 											>
 												Keep connected
 											</Button>
-											<TextButton
-												tone="danger"
-												className="min-h-6"
+											<Button
+												variant="link"
+												className="min-h-6 text-danger-text"
 												disabled={readOnly || busy}
 												onClick={() => void handleDisconnect()}
 											>
 												{busy ? "Disconnecting…" : "Confirm disconnect"}
-											</TextButton>
+											</Button>
 										</div>
 									</div>
 								) : (
 									<div className="flex flex-wrap items-center gap-4">
-										<TextButton
-											tone="danger"
-											className="min-h-6"
+										<Button
+											variant="link"
+											className="min-h-6 text-danger-text"
 											disabled={readOnly || busy || syncing}
 											onClick={() => setConfirmingDisconnect(true)}
 										>
 											Disconnect
-										</TextButton>
-										<TextButton
+										</Button>
+										<Button
 											ref={reconnectButtonRef}
+											variant="link"
 											className="min-h-6"
 											disabled={readOnly || busy || syncing}
 											onClick={() => {
@@ -342,7 +359,7 @@ export function SyncProviderPanel() {
 											}}
 										>
 											Reconnect
-										</TextButton>
+										</Button>
 									</div>
 								)}
 							</div>

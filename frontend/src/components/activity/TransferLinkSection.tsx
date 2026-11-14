@@ -3,8 +3,15 @@ import { Link2 } from "lucide-react";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
 import { UserScopeError } from "../../api/scopedRequest.ts";
-import { Button } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldLabel, FieldError } from "@/components/ui/field.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
 import { dismissKey, notifyError } from "../../state/notifications.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import {
@@ -134,10 +141,8 @@ export function TransferLinkSection({
 	function reportLinkFailure(cause: unknown, fallback: string): void {
 		if (cause instanceof UserScopeError) return;
 		if (cause instanceof ApiHttpError && cause.status === 422) return;
-		notifyError(
-			"transfer-link",
-			cause instanceof Error ? cause.message : fallback,
-		);
+		const message = cause instanceof Error ? cause.message : fallback;
+		notifyError("transfer-link", message);
 	}
 
 	if (!link && !actionable) return null;
@@ -166,18 +171,18 @@ export function TransferLinkSection({
 		return (
 			<section
 				aria-label="Transfer link"
-				className="mt-4 border-t border-line pt-4"
+				className="mt-4 border-t border-border pt-4"
 			>
 				<p className="flex items-center gap-2 text-xs">
 					<Link2 size={15} aria-hidden="true" />
 					<strong>{title}</strong>
 					{resolution?.peerName && (
-						<span className="min-w-0 truncate text-muted">
+						<span className="min-w-0 truncate text-muted-foreground">
 							{resolution.peerName}
 						</span>
 					)}
 				</p>
-				<p className="mt-1 text-xs text-muted">
+				<p className="mt-1 text-xs text-muted-foreground">
 					Counted once as a transfer, not as income plus spending.
 				</p>
 				{!readOnly && (
@@ -206,7 +211,7 @@ export function TransferLinkSection({
 						</Button>
 					</div>
 				)}
-				<FieldError message={inlineError} />
+				{inlineError && <FieldError>{inlineError}</FieldError>}
 			</section>
 		);
 	}
@@ -242,13 +247,13 @@ export function TransferLinkSection({
 	return (
 		<section
 			aria-label="Transfer link"
-			className="mt-4 border-t border-line pt-4"
+			className="mt-4 border-t border-border pt-4"
 		>
 			<p className="flex items-center gap-2 text-xs">
 				<Link2 size={15} aria-hidden="true" />
 				<strong>Possible transfer</strong>
 			</p>
-			<p className="mt-1 text-xs text-muted">
+			<p className="mt-1 text-xs text-muted-foreground">
 				Counted once as a transfer, not as income plus spending.
 			</p>
 			{!readOnly && peers.length === 1 && (
@@ -265,42 +270,53 @@ export function TransferLinkSection({
 				</div>
 			)}
 			{!readOnly && peers.length > 1 && (
-				<fieldset disabled={busy} className="mt-2 space-y-2 border-0 p-0">
-					<legend className="text-xs font-semibold">
+				<Field className="mt-2">
+					<FieldLabel htmlFor={`transfer-peer-${actionable.finding.id}`}>
 						Which transaction is the opposite side?
-					</legend>
-					<div className="space-y-1">
-						{peerOptions.map((option) => (
-							<label
-								key={option.peerId}
-								className="flex items-center gap-2 text-xs"
+					</FieldLabel>
+					<div className="flex flex-wrap gap-2">
+						<Select
+							value={peer ?? ""}
+							disabled={busy}
+							onValueChange={(value) => setSelectedPeer(value)}
+						>
+							<SelectTrigger
+								id={`transfer-peer-${actionable.finding.id}`}
+								aria-label="Opposite side of the transfer"
 							>
-								<input
-									type="radio"
-									name={`transfer-peer-${actionable.finding.id}`}
-									value={option.peerId}
-									checked={peer === option.peerId}
-									onChange={() => setSelectedPeer(option.peerId)}
-								/>
-								<span>
-									{option.label}
-									{option.accountName ? ` · ${option.accountName}` : ""}
-								</span>
-							</label>
-						))}
+								<SelectValue placeholder="Choose the opposite side">
+									{(value: string | null) => {
+										if (!value) return "Choose the opposite side";
+										const option = peerOptions.find(
+											(entry) => entry.peerId === value,
+										);
+										if (!option) return "Unknown transaction";
+										return `${option.label}${option.accountName ? ` · ${option.accountName}` : ""}`;
+									}}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								{peerOptions.map((option) => (
+									<SelectItem key={option.peerId} value={option.peerId}>
+										{option.label}
+										{option.accountName ? ` · ${option.accountName}` : ""}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Button
+							type="button"
+							size="sm"
+							disabled={busy || !peer}
+							aria-label={`Link as transfer with ${peer}`}
+							onClick={confirmPair}
+						>
+							{confirm.isPending ? "Linking…" : "Link as transfer"}
+						</Button>
 					</div>
-					<Button
-						type="button"
-						size="sm"
-						disabled={busy || !peer}
-						aria-label={`Link as transfer with ${peer}`}
-						onClick={confirmPair}
-					>
-						{confirm.isPending ? "Linking…" : "Link as transfer"}
-					</Button>
-				</fieldset>
+				</Field>
 			)}
-			<FieldError message={inlineError} />
+			{inlineError && <FieldError>{inlineError}</FieldError>}
 		</section>
 	);
 }

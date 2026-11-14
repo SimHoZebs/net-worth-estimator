@@ -6,6 +6,7 @@ import {
 	useSavedTransactions,
 } from "../state/savedState.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
+import { Button } from "@/components/ui/button.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { SafeSpendingEvidence } from "./evidence/SafeSpendingEvidence.tsx";
 
@@ -49,9 +50,9 @@ export function EvidenceDialog({
 					<p role="alert">
 						{projectionError ?? "Forecast unavailable."}{" "}
 						{retryProjection ? (
-							<button type="button" onClick={retryProjection}>
+							<Button variant="link" onClick={retryProjection}>
 								Retry forecast
-							</button>
+							</Button>
 						) : null}
 					</p>
 				);

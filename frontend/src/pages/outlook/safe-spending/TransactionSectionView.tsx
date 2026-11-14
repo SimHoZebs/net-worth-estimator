@@ -18,9 +18,11 @@ export function SafeSpendingSectionHeader({
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
 			<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-				<h3 className="m-0 text-xs font-semibold text-ink">{title}</h3>
+				<h3 className="m-0 text-xs font-semibold text-foreground">{title}</h3>
 				{subtitle && (
-					<p className="mt-1 text-xs leading-relaxed text-muted">{subtitle}</p>
+					<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+						{subtitle}
+					</p>
 				)}
 			</div>
 			{total !== undefined && (
@@ -55,7 +57,7 @@ function ThresholdDivider({
 						aria-hidden="true"
 						className={
 							tone === "danger"
-								? "h-0.5 flex-1 rounded-control bg-danger-text"
+								? "h-0.5 flex-1 rounded-md bg-danger-text"
 								: "flex-1 border-t-2 [border-top-style:dashed] border-warning-text"
 						}
 					/>
@@ -103,7 +105,7 @@ export function TransactionSectionView({
 }) {
 	if (!transactions.length) {
 		return (
-			<div className="border-t border-line pt-3">
+			<div className="border-t border-border pt-3">
 				<p>{emptyMessage}</p>
 			</div>
 		);

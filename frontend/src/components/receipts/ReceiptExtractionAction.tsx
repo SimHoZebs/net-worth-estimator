@@ -1,5 +1,5 @@
 import { Check, ScanLine } from "lucide-react";
-import { Button } from "../Button.tsx";
+import { Button } from "@/components/ui/button.tsx";
 
 export function ReceiptExtractionAction({
 	available,
@@ -17,10 +17,9 @@ export function ReceiptExtractionAction({
 	return (
 		<div className="flex flex-col gap-2">
 			<Button
-				variant={pending ? "primary" : "secondary"}
+				variant={pending ? "default" : "secondary"}
 				disabled={!available || disabled || pending}
 				aria-busy={pending}
-				className="enabled:active:bg-active enabled:active:inset-shadow-sm"
 				onClick={onExtract}
 			>
 				{pending ? (
@@ -36,7 +35,7 @@ export function ReceiptExtractionAction({
 				{pending ? "Extracting details…" : "Extract details"}
 			</Button>
 			<p
-				className={`text-xs ${complete && !pending ? "text-success-text" : "text-muted"}`}
+				className={`text-xs ${complete && !pending ? "text-success-text" : "text-muted-foreground"}`}
 				role="status"
 			>
 				{pending

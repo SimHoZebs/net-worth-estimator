@@ -12,13 +12,13 @@ import {
 	refreshPaymentTerms,
 	usePaymentTerms,
 } from "../../state/workspaceResources.ts";
-import { Button } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldLabel, FieldError } from "@/components/ui/field.tsx";
 import {
-	detailPropertyLabelClassName,
-	transactionControlStyles,
-} from "./transactionDetailStyles.ts";
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/components/ui/input-group.tsx";
 
 type TermsDraft = {
 	minimumFixed: string;
@@ -192,17 +192,17 @@ export function PaymentTermsSection({
 	return (
 		<section
 			aria-label="Payment terms"
-			className="grid gap-4 border-t border-line pt-4"
+			className="grid gap-4 border-t border-border pt-4"
 		>
 			<div>
 				<h3 className="m-0 text-sm font-semibold">Payment terms</h3>
-				<p className="m-0 mt-1 text-xs leading-relaxed text-muted">
+				<p className="m-0 mt-1 text-xs leading-relaxed text-muted-foreground">
 					Minimums and due dates for this account. Saving writes the terms;
 					clearing the minimum removes them.
 				</p>
 			</div>
 			{termsQuery.isPending ? (
-				<p role="status" className="m-0 text-sm text-muted">
+				<p role="status" className="m-0 text-sm text-muted-foreground">
 					Loading payment terms…
 				</p>
 			) : termsQuery.isError ? (
@@ -210,7 +210,7 @@ export function PaymentTermsSection({
 					role="alert"
 					className="m-0 flex flex-wrap items-center gap-2 text-sm"
 				>
-					<span className="text-danger-text">
+					<span className="text-destructive">
 						Payment terms could not be loaded.
 					</span>
 					<Button
@@ -228,18 +228,11 @@ export function PaymentTermsSection({
 					className="grid gap-4"
 					onSubmit={(event) => void submit(event)}
 				>
-					<div className="flex items-center gap-4 border-t-0">
-						<label
-							htmlFor={`${formId}-minimum`}
-							className={detailPropertyLabelClassName}
-						>
-							Minimum
-						</label>
-						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<span className="text-sm" aria-hidden="true">
-								$
-							</span>
-							<input
+					<Field orientation="horizontal">
+						<FieldLabel htmlFor={`${formId}-minimum`}>Minimum</FieldLabel>
+						<InputGroup className="max-w-48 flex-1">
+							<InputGroupAddon aria-hidden="true">$</InputGroupAddon>
+							<InputGroupInput
 								id={`${formId}-minimum`}
 								aria-label="Minimum payment in USD"
 								name="minimumFixed"
@@ -252,22 +245,15 @@ export function PaymentTermsSection({
 								onChange={(event) =>
 									update({ minimumFixed: event.target.value })
 								}
-								className={mergeStyles(
-									transactionControlStyles({ shape: "inline" }),
-									"w-16 min-w-0 flex-1 text-sm",
-								)}
 							/>
-						</div>
-					</div>
-					<div className="flex items-center gap-4 border-t border-line">
-						<label
-							htmlFor={`${formId}-percent`}
-							className={detailPropertyLabelClassName}
-						>
+						</InputGroup>
+					</Field>
+					<Field orientation="horizontal">
+						<FieldLabel htmlFor={`${formId}-percent`}>
 							Minimum percent
-						</label>
-						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<input
+						</FieldLabel>
+						<InputGroup className="max-w-48 flex-1">
+							<InputGroupInput
 								id={`${formId}-percent`}
 								aria-label="Minimum percent of the balance"
 								name="minimumPercent"
@@ -281,25 +267,14 @@ export function PaymentTermsSection({
 								onChange={(event) =>
 									update({ minimumPercent: event.target.value })
 								}
-								className={mergeStyles(
-									transactionControlStyles({ shape: "inline" }),
-									"w-16 min-w-0 flex-1 text-sm",
-								)}
 							/>
-							<span className="text-sm" aria-hidden="true">
-								%
-							</span>
-						</div>
-					</div>
-					<div className="flex items-center gap-4 border-t border-line">
-						<label
-							htmlFor={`${formId}-due`}
-							className={detailPropertyLabelClassName}
-						>
-							Due day
-						</label>
-						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<input
+							<InputGroupAddon aria-hidden="true">%</InputGroupAddon>
+						</InputGroup>
+					</Field>
+					<Field orientation="horizontal">
+						<FieldLabel htmlFor={`${formId}-due`}>Due day</FieldLabel>
+						<InputGroup className="max-w-48 flex-1">
+							<InputGroupInput
 								id={`${formId}-due`}
 								aria-label="Due day of the month"
 								name="dueDay"
@@ -310,22 +285,15 @@ export function PaymentTermsSection({
 								value={draft.dueDay}
 								readOnly={locked}
 								onChange={(event) => update({ dueDay: event.target.value })}
-								className={mergeStyles(
-									transactionControlStyles({ shape: "inline" }),
-									"w-16 min-w-0 flex-1 text-sm",
-								)}
 							/>
-						</div>
-					</div>
-					<div className="flex items-center gap-4 border-t border-line">
-						<label
-							htmlFor={`${formId}-statement`}
-							className={detailPropertyLabelClassName}
-						>
+						</InputGroup>
+					</Field>
+					<Field orientation="horizontal">
+						<FieldLabel htmlFor={`${formId}-statement`}>
 							Statement day
-						</label>
-						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-							<input
+						</FieldLabel>
+						<InputGroup className="max-w-48 flex-1">
+							<InputGroupInput
 								id={`${formId}-statement`}
 								aria-label="Statement day of the month, optional"
 								name="statementDay"
@@ -339,19 +307,14 @@ export function PaymentTermsSection({
 								onChange={(event) =>
 									update({ statementDay: event.target.value })
 								}
-								className={mergeStyles(
-									transactionControlStyles({ shape: "inline" }),
-									"w-16 min-w-0 flex-1 text-sm",
-								)}
 							/>
-						</div>
-					</div>
-					<FieldError message={error} />
+						</InputGroup>
+					</Field>
+					{error && <FieldError>{error}</FieldError>}
 					{!readOnly && (
 						<div className="flex flex-wrap items-center gap-2">
 							<Button
 								type="submit"
-								variant="primary"
 								size="sm"
 								disabled={saving || (!edit.dirty && !removeIntent)}
 							>

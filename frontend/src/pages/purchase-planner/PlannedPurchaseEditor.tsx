@@ -2,19 +2,36 @@ import { useId, useState, type FormEvent } from "react";
 import type { Account, PlannedPurchase } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { plannedPurchaseSchema } from "../../domain/modelSchemas.ts";
-import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
+import {
+	DiscardConfirm,
+	useDiscardGuard,
+} from "../../components/editors/EditorDialog.tsx";
 import {
 	saveNewPurchase,
 	savePurchaseEdit,
 } from "../../state/purchaseWrites.ts";
-import { Checkbox, InputField, SelectField } from "../../components/Field.tsx";
-import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
+import { Field, FieldContent } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { parseDisplayNumber } from "../../components/editors/formValues.ts";
-import { Button } from "../../components/Button.tsx";
-import { dialogActionsStyles } from "../../components/dialogStyles.ts";
-import { FieldError } from "../../components/ErrorNotice.tsx";
-import { Modal } from "../../components/Modal.tsx";
-import { Notice } from "../../components/Notice.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog.tsx";
 
 /**
  * Row-first planned-purchase editor. Saves one planned purchase straight to
@@ -40,6 +57,10 @@ export function PlannedPurchaseEditor({
 	onClose: () => void;
 }) {
 	const includeId = useId();
+	const nameId = useId();
+	const costId = useId();
+	const accountId = useId();
+	const earliestId = useId();
 	const fundable = visibleAccounts(accounts).filter(
 		(account) => account.enabled && account.kind !== "debt",
 	);
@@ -50,7 +71,6 @@ export function PlannedPurchaseEditor({
 	const [enabled, setEnabled] = useState(item?.enabled ?? true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [confirmCancel, setConfirmCancel] = useState(false);
 
 	const readOnly = item?.readOnly ?? false;
 	const dirty =
@@ -59,15 +79,8 @@ export function PlannedPurchaseEditor({
 		fromId !== (item?.fromId ?? "") ||
 		earliest !== (item?.startDate ?? startDate) ||
 		enabled !== (item?.enabled ?? true);
-	useBeforeUnload(dirty && !saving);
-	const requestClose = () => {
-		if (!dirty) return true;
-		setConfirmCancel(true);
-		return false;
-	};
-	const close = () => {
-		if (requestClose()) onClose();
-	};
+	const guard = useDiscardGuard({ dirty, busy: saving });
+	const close = () => guard.requestClose(onClose);
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -119,111 +132,137 @@ export function PlannedPurchaseEditor({
 	};
 
 	return (
-		<Modal
-			title={item ? "Edit purchase" : "Add purchase"}
-			onClose={onClose}
-			onCloseRequest={requestClose}
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) close();
+			}}
 		>
-			{readOnly && <Notice>These planned purchases are read-only.</Notice>}
-			<form
-				className="flex flex-col gap-4"
-				onSubmit={(event) => void submit(event)}
-			>
-				<fieldset
-					disabled={readOnly || saving}
-					className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
+			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
+				<DialogHeader>
+					<DialogTitle>{item ? "Edit purchase" : "Add purchase"}</DialogTitle>
+					<DialogDescription className="sr-only">
+						Planned purchase details
+					</DialogDescription>
+				</DialogHeader>
+				{readOnly && (
+					<Alert variant="default" role="note">
+						<AlertDescription>
+							These planned purchases are read-only.
+						</AlertDescription>
+					</Alert>
+				)}
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => void submit(event)}
 				>
-					<InputField
-						label="Purchase name"
-						required
-						maxLength={100}
-						value={name}
-						onChange={(event) => setName(event.target.value)}
-						wide
-					/>
-					<InputField
-						label="Cost (USD)"
-						type="number"
-						inputMode="decimal"
-						min="0.01"
-						max="10000000000"
-						step="0.01"
-						required
-						value={amount}
-						onChange={(event) => setAmount(event.target.value)}
-					/>
-					<SelectField
-						label="Funding account"
-						required
-						value={fromId}
-						onChange={(event) => setFromId(event.target.value)}
+					<fieldset
+						disabled={readOnly || saving}
+						className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
 					>
-						<option value="" disabled>
-							Choose an account
-						</option>
-						<AccountOptions accounts={fundable} />
-					</SelectField>
-					<InputField
-						label="Earliest purchase date"
-						type="date"
-						required
-						value={earliest}
-						onChange={(event) => setEarliest(event.target.value)}
-						wide
-					/>
-					<p className="col-span-full text-xs text-muted">
-						The forecast defers this item until its full cost fits, after all
-						established payments. It never buys anything for you.
-					</p>
-					<label
-						className="col-span-full flex cursor-pointer items-center gap-2 text-sm text-muted"
-						htmlFor={includeId}
-					>
-						<Checkbox
-							id={includeId}
-							checked={enabled}
-							onChange={(event) => setEnabled(event.target.checked)}
-						/>{" "}
-						Include in purchase queue
-					</label>
-				</fieldset>
-				<FieldError message={error} />
-				{confirmCancel ? (
-					<div
-						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"
-						role="alert"
-					>
-						<p className="mb-3 text-sm text-danger-text">
-							Discard the changes in this form?
-						</p>
-						<div className="flex flex-wrap gap-2">
-							<Button
-								type="button"
-								variant="secondary"
-								onClick={() => setConfirmCancel(false)}
+						<Field className="col-span-full">
+							<Label htmlFor={nameId}>Purchase name</Label>
+							<Input
+								id={nameId}
+								required
+								maxLength={100}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+							/>
+						</Field>
+						<Field>
+							<Label htmlFor={costId}>Cost (USD)</Label>
+							<Input
+								id={costId}
+								type="number"
+								inputMode="decimal"
+								min="0.01"
+								max="10000000000"
+								step="0.01"
+								required
+								value={amount}
+								onChange={(event) => setAmount(event.target.value)}
+							/>
+						</Field>
+						<Field>
+							<Label htmlFor={accountId}>Funding account</Label>
+							<Select
+								value={fromId}
+								items={Object.fromEntries(
+									fundable.map((account) => [account.id, account.name]),
+								)}
+								onValueChange={(value) => setFromId(value ?? "")}
 							>
-								Continue
-							</Button>
-							<Button type="button" variant="danger" onClick={onClose}>
-								Discard changes
-							</Button>
-						</div>
-					</div>
-				) : (
-					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={close}>
+								<SelectTrigger id={accountId}>
+									<SelectValue placeholder="Choose an account" />
+								</SelectTrigger>
+								<SelectContent>
+									{fundable.map((account) => (
+										<SelectItem key={account.id} value={account.id}>
+											{account.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</Field>
+						<Field className="col-span-full">
+							<Label htmlFor={earliestId}>Earliest purchase date</Label>
+							<Input
+								id={earliestId}
+								type="date"
+								required
+								value={earliest}
+								onChange={(event) => setEarliest(event.target.value)}
+							/>
+						</Field>
+						<p className="col-span-full text-xs text-muted-foreground">
+							The forecast defers this item until its full cost fits, after all
+							established payments. It never buys anything for you.
+						</p>
+						<Field orientation="horizontal" className="col-span-full">
+							<Checkbox
+								id={includeId}
+								checked={enabled}
+								disabled={readOnly || saving}
+								onCheckedChange={(checked) => setEnabled(checked === true)}
+							/>
+							<FieldContent>
+								<Label htmlFor={includeId}>Include in purchase queue</Label>
+							</FieldContent>
+						</Field>
+					</fieldset>
+					{error && (
+						<p
+							role="alert"
+							className="m-0 text-sm leading-relaxed text-danger-text"
+						>
+							{error}
+						</p>
+					)}
+					<DialogFooter>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={saving}
+							onClick={close}
+						>
 							Cancel
 						</Button>
 						<Button
 							type="submit"
-							variant="primary"
+							variant="default"
 							disabled={readOnly || saving || !dirty}
 						>
 							{saving ? "Saving…" : item ? "Save purchase" : "Add purchase"}
 						</Button>
-					</div>
-				)}
-			</form>
-		</Modal>
+					</DialogFooter>
+				</form>
+				<DiscardConfirm
+					open={guard.confirming}
+					onContinue={guard.dismissConfirm}
+					onDiscard={onClose}
+				/>
+			</DialogContent>
+		</Dialog>
 	);
 }

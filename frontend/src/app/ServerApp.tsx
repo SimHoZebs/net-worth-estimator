@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useMatches } from "@tanstack/react-router";
-import { Button } from "../components/Button.tsx";
-import { FieldError } from "../components/ErrorNotice.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { FieldError } from "@/components/ui/field.tsx";
 import { useSession, type Session } from "../auth/sessionContext.ts";
 import { useUserScope } from "../state/useUserScope.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
@@ -83,16 +83,8 @@ export function ServerApp({ invalidLink = false }: { invalidLink?: boolean }) {
 		<>
 			{guest && <GuestFrame />}
 			<WorkspaceLayout
-				navigation={(close) => (
-					<WorkspaceSidebar
-						page={page}
-						onClose={close}
-						pending={status.isPending}
-					/>
-				)}
-				header={(open) => (
-					<WorkspaceTopbar page={currentPage} onOpenNavigation={open} />
-				)}
+				navigation={<WorkspaceSidebar page={page} pending={status.isPending} />}
+				header={<WorkspaceTopbar page={currentPage} />}
 			>
 				{!recovery && !blocked && (
 					<WorkspaceHeading page={currentPage} headingRef={headingRef} />
@@ -158,14 +150,20 @@ function SessionErrorBody({
 						: "Retry the access check. If the problem continues, the workspace owner must restore guest access."
 					: "Retry the access check below."}
 			</p>
-			<FieldError message={error} />
+			<FieldError>{error}</FieldError>
 			<div className="flex flex-wrap gap-3">
 				{session?.authenticated && (
-					<Button disabled={logoutPending} onClick={onLogout}>
+					<Button
+						variant="secondary"
+						disabled={logoutPending}
+						onClick={onLogout}
+					>
 						{logoutPending ? "Signing out…" : "Sign out"}
 					</Button>
 				)}
-				<Button onClick={onRetry}>Retry access check</Button>
+				<Button variant="secondary" onClick={onRetry}>
+					Retry access check
+				</Button>
 			</div>
 		</div>
 	);

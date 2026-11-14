@@ -4,8 +4,8 @@ import {
 	transactionOrderLabel,
 	type TransactionOrder,
 } from "../../domain/transactionSort.ts";
-import { mergeStyles } from "../mergeStyles.ts";
-import { TextButton } from "../Button.tsx";
+import { cn } from "@/lib/utils.ts";
+import { Button } from "@/components/ui/button.tsx";
 
 export function TransactionSortButton({
 	order,
@@ -18,9 +18,10 @@ export function TransactionSortButton({
 }) {
 	const label = transactionOrderLabel(order);
 	return (
-		<TextButton
+		<Button
 			type="button"
-			className={mergeStyles(
+			variant="link"
+			className={cn(
 				"whitespace-nowrap text-xs max-sm:ml-auto max-sm:min-h-8",
 				className,
 			)}
@@ -29,6 +30,6 @@ export function TransactionSortButton({
 		>
 			<ArrowDownUp size={14} aria-hidden="true" />
 			{label}
-		</TextButton>
+		</Button>
 	);
 }

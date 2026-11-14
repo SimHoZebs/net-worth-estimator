@@ -16,12 +16,18 @@ import {
 	useDismissAnalysisFinding,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
-import { Badge } from "../Badge.tsx";
-import { Button, TextButton } from "../Button.tsx";
-import { FieldError } from "../ErrorNotice.tsx";
-import { InputField, SelectField } from "../Field.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
-import { detailFooterClassName } from "./transactionDetailStyles.ts";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+import { Field, FieldLabel, FieldError } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select.tsx";
 import {
 	ExistingScheduleDialog,
 	NewScheduleDialog,
@@ -128,15 +134,16 @@ export function TransactionInsightsTrigger({
 }) {
 	if (!count) return null;
 	return (
-		<TextButton
+		<Button
 			type="button"
+			variant="link"
 			onClick={onClick}
 			aria-label={`Review ${count} suggestion${count === 1 ? "" : "s"}`}
 		>
 			<Sparkles size={14} aria-hidden="true" />
 			<span>Review suggestions</span>
-			<Badge tone="neutral">{count}</Badge>
-		</TextButton>
+			<Badge variant="secondary">{count}</Badge>
+		</Button>
 	);
 }
 
@@ -261,7 +268,7 @@ export function TransactionInsightsPanel({
 				<h3 className="m-0 mb-6 text-lg font-semibold tracking-tight">
 					All caught up
 				</h3>
-				<Button type="button" variant="primary" onClick={onDone}>
+				<Button type="button" variant="default" onClick={onDone}>
 					Done
 				</Button>
 			</div>
@@ -321,6 +328,17 @@ export function TransactionInsightsPanel({
 				shown.candidates[0] ??
 				null)
 			: null;
+	const voidCandidateLabel = (value: string | null): string => {
+		if (!value) return "Choose the posted charge";
+		const candidate =
+			shown.kind === "void"
+				? (shown.candidates.find(
+						(candidate) => candidate.transactionId === value,
+					) ?? null)
+				: null;
+		if (!candidate) return "Unknown charge";
+		return `${candidate.name} — ${money(candidate.amount)} on ${dateLabel(candidate.date, true)}`;
+	};
 	const movesVoidClaim = Boolean(
 		shown.kind === "void" &&
 		shown.voidRow.claimScheduleId &&
@@ -420,20 +438,20 @@ export function TransactionInsightsPanel({
 				{Array.from({ length: dotCount }, (_, index) => (
 					<span
 						key={index}
-						className={`h-0.5 flex-1 rounded-full ${index < litCount ? "bg-success-text" : "bg-line"}`}
+						className={`h-0.5 flex-1 rounded-full ${index < litCount ? "bg-success-text" : "bg-border"}`}
 					/>
 				))}
 			</div>
-			<div className="mb-5 grid size-11 place-items-center rounded-surface bg-success-bg text-success-text">
+			<div className="mb-5 grid size-11 place-items-center rounded-xl bg-success-bg text-success-text">
 				<Icon size={21} aria-hidden="true" />
 			</div>
-			<p className="mb-2 text-xs font-extrabold tracking-widest text-muted uppercase">
+			<p className="mb-2 text-xs font-extrabold tracking-widest text-muted-foreground uppercase">
 				{kicker}
 			</p>
 			<h3 className="m-0 mb-3 text-xl leading-snug font-bold tracking-tight">
 				{question}
 			</h3>
-			<p className="mt-0 mb-6 flex items-start gap-2 rounded-surface bg-surface-2 p-3 text-xs leading-relaxed text-muted">
+			<p className="mt-0 mb-6 flex items-start gap-2 rounded-xl bg-muted p-3 text-xs leading-relaxed text-muted-foreground">
 				<Info size={15} aria-hidden="true" className="mt-px flex-none" />
 				<span>{suggestionEvidence(shown)}</span>
 			</p>
@@ -441,25 +459,38 @@ export function TransactionInsightsPanel({
 			{shown.kind === "void" ? (
 				<div className="grid gap-3">
 					{shown.candidates.length > 1 && (
-						<SelectField
-							label="Posted as"
-							name="suggestedPostedCharge"
-							value={voidCandidateId}
-							onChange={(event) => setVoidCandidateId(event.target.value)}
-						>
-							{shown.candidates.map((candidate) => (
-								<option
-									key={candidate.transactionId}
-									value={candidate.transactionId}
+						<Field>
+							<FieldLabel htmlFor="suggestedPostedCharge">Posted as</FieldLabel>
+							<Select
+								value={voidCandidateId}
+								onValueChange={(value) => {
+									if (value !== null) setVoidCandidateId(value);
+								}}
+							>
+								<SelectTrigger
+									id="suggestedPostedCharge"
+									aria-label="Posted as"
 								>
-									{candidate.name} — {money(candidate.amount)} on{" "}
-									{dateLabel(candidate.date, true)}
-								</option>
-							))}
-						</SelectField>
+									<SelectValue placeholder="Choose the posted charge">
+										{(value: string | null) => voidCandidateLabel(value)}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{shown.candidates.map((candidate) => (
+										<SelectItem
+											key={candidate.transactionId}
+											value={candidate.transactionId}
+										>
+											{candidate.name} — {money(candidate.amount)} on{" "}
+											{dateLabel(candidate.date, true)}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</Field>
 					)}
 					{movesVoidClaim && shown.voidRow.claimScheduleId && (
-						<p className="m-0 text-xs leading-relaxed text-muted">
+						<p className="m-0 text-xs leading-relaxed text-muted-foreground">
 							The posted charge records the occurrence of{" "}
 							{names.get(shown.voidRow.claimScheduleId) ?? "its rule"} on{" "}
 							{dateLabel(shown.voidRow.claimOccurrenceDate ?? "", true)}.
@@ -468,12 +499,12 @@ export function TransactionInsightsPanel({
 					{!movesVoidClaim &&
 						shown.voidRow.claimScheduleId &&
 						selectedVoid?.claimScheduleId && (
-							<p className="m-0 text-xs leading-relaxed text-muted">
+							<p className="m-0 text-xs leading-relaxed text-muted-foreground">
 								The posted charge already records an occurrence. Its claim
 								stays; this hold's claim is cleared with the hold.
 							</p>
 						)}
-					<p className="m-0 text-xs leading-relaxed text-muted">
+					<p className="m-0 text-xs leading-relaxed text-muted-foreground">
 						The posted charge keeps its amount and date. This clears the
 						vanished hold record.
 					</p>
@@ -490,7 +521,7 @@ export function TransactionInsightsPanel({
 					</Button>
 					<Button
 						type="button"
-						variant="primary"
+						variant="default"
 						disabled={busy || readOnly}
 						onClick={() => answer("confirm")}
 					>
@@ -500,38 +531,56 @@ export function TransactionInsightsPanel({
 			) : isBnpl && !recurringSnapshot ? (
 				<form onSubmit={(event) => saveDuration(event)} className="grid gap-4">
 					<div className="grid grid-cols-2 gap-3">
-						<InputField
-							label="Plan length"
-							ref={durationRef}
-							type="number"
-							inputMode="numeric"
-							min={1}
-							max={5200}
-							step={1}
-							required
-							value={durationCount}
-							onChange={(event) => setDurationCount(event.target.value)}
-							containerClassName="min-w-0"
-						/>
-						<SelectField
-							label="Unit"
-							value={durationUnit}
-							onChange={(event) =>
-								setDurationUnit(event.target.value as "weeks" | "months")
-							}
-						>
-							<option value="weeks">Weeks</option>
-							<option value="months">Months</option>
-						</SelectField>
+						<Field className="min-w-0">
+							<FieldLabel htmlFor="plan-length">Plan length</FieldLabel>
+							<Input
+								id="plan-length"
+								ref={durationRef}
+								type="number"
+								inputMode="numeric"
+								min={1}
+								max={5200}
+								step={1}
+								required
+								value={durationCount}
+								onChange={(event) => setDurationCount(event.target.value)}
+							/>
+						</Field>
+						<Field>
+							<FieldLabel htmlFor="plan-unit">Unit</FieldLabel>
+							<Select
+								value={durationUnit}
+								onValueChange={(value) => {
+									if (value === "weeks" || value === "months")
+										setDurationUnit(value);
+								}}
+							>
+								<SelectTrigger id="plan-unit" aria-label="Unit">
+									<SelectValue>
+										{(value: string | null) =>
+											value === "weeks"
+												? "Weeks"
+												: value === "months"
+													? "Months"
+													: "Unit"
+										}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="weeks">Weeks</SelectItem>
+									<SelectItem value="months">Months</SelectItem>
+								</SelectContent>
+							</Select>
+						</Field>
 					</div>
-					<p className="m-0 text-xs leading-relaxed text-muted">
+					<p className="m-0 text-xs leading-relaxed text-muted-foreground">
 						Enter the full plan length. The bank charge alone does not establish
 						the total, count, or due dates.
 					</p>
 				</form>
 			) : (
 				<div className="grid gap-2">
-					<p className="m-0 text-xs leading-relaxed text-muted">
+					<p className="m-0 text-xs leading-relaxed text-muted-foreground">
 						Create a forecast schedule or link payments to an existing schedule.
 						Saving records your acceptance of the pattern. Recorded payments
 						stay unchanged.
@@ -539,7 +588,7 @@ export function TransactionInsightsPanel({
 					<div className="flex flex-wrap gap-2">
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							aria-label={`Create forecast schedule for ${patternTitleText}`}
 							onClick={() => {
@@ -574,22 +623,21 @@ export function TransactionInsightsPanel({
 				</div>
 			)}
 
-			<FieldError
-				message={
-					error ??
-					voidError ??
-					(review.isError || dismiss.isError
-						? "Your answer could not be saved."
-						: null)
-				}
-			/>
+			{(error ??
+				voidError ??
+				(review.isError || dismiss.isError
+					? "Your answer could not be saved."
+					: null)) && (
+				<FieldError>
+					{error ??
+						voidError ??
+						(review.isError || dismiss.isError
+							? "Your answer could not be saved."
+							: null)}
+				</FieldError>
+			)}
 
-			<div
-				className={mergeStyles(
-					detailFooterClassName,
-					"mt-8 max-sm:sticky max-sm:mx-0 max-sm:px-5",
-				)}
-			>
+			<div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3">
 				{shown.kind === "void" ? (
 					<>
 						<Button
@@ -603,7 +651,7 @@ export function TransactionInsightsPanel({
 						</Button>
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							disabled={busy || readOnly || !selectedVoid}
 							onClick={() => void mergeVoid()}
@@ -622,18 +670,18 @@ export function TransactionInsightsPanel({
 						>
 							Not now
 						</Button>
-						<span className="text-xs font-semibold text-muted">
+						<span className="text-xs font-semibold text-muted-foreground">
 							{open.length} to review
 						</span>
 					</>
 				) : isBnpl ? (
 					<>
-						<span className="text-xs font-semibold text-muted">
+						<span className="text-xs font-semibold text-muted-foreground">
 							{open.length} to review
 						</span>
 						<Button
 							type="button"
-							variant="primary"
+							variant="default"
 							size="sm"
 							disabled={busy || readOnly || !durationCount}
 							onClick={() => saveDuration()}
@@ -662,7 +710,7 @@ export function TransactionInsightsPanel({
 						>
 							Continue
 						</Button>
-						<span className="text-xs font-semibold text-muted">
+						<span className="text-xs font-semibold text-muted-foreground">
 							{open.length} to review
 						</span>
 					</>

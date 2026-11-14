@@ -1,11 +1,19 @@
 @import "../../../frontend/src/styles/index.css";
 
 @font-face {
-  font-family: "Manrope Variable";
+  font-family: "Geist Variable";
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url("/assets/manrope.woff2") format("woff2");
+  src: url("/assets/geist.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Merriweather Variable";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("/assets/merriweather.woff2") format("woff2");
 }
 
 @layer components {
@@ -16,7 +24,7 @@
     display: none;
   }
   #feedback:not(:empty) {
-    @apply rounded-control border border-solid border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger-text;
+    @apply rounded-md border border-solid border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger-text;
   }
   #feedback[data-tone="success"]:not(:empty) {
     @apply border-success-border bg-success-bg text-success-text;
@@ -26,6 +34,6 @@
     list-style: none;
   }
   #passkeys li {
-    @apply flex items-center justify-between gap-3 rounded-control border border-solid border-line px-3 py-2;
+    @apply flex items-center justify-between gap-3 rounded-md border border-solid border-border px-3 py-2;
   }
 }

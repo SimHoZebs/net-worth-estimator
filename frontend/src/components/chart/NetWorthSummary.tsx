@@ -1,6 +1,10 @@
 import type { BackendCheckpoint } from "../../api/contracts.ts";
 import type { ReactNode } from "react";
-import { dateLabel, isoDateFromEpochSeconds, money } from "../../domain/format.ts";
+import {
+	dateLabel,
+	isoDateFromEpochSeconds,
+	money,
+} from "../../domain/format.ts";
 import { netWorthChangeSinceFirstSync } from "../../domain/netWorthChange.ts";
 import type { Projection } from "../../domain/result.ts";
 
@@ -34,13 +38,13 @@ export function NetWorthSummary({
 			the big value character by character. */}
 			<div className="flex flex-wrap items-start justify-between gap-3 max-sm:flex-col">
 				<div className="min-w-0 flex-1">
-					<h2 className="text-sm text-muted">Net worth</h2>
+					<h2 className="text-sm text-muted-foreground">Net worth</h2>
 					<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-						<strong className="type-value text-3xl font-medium tracking-tight text-ink [overflow-wrap:anywhere]">
+						<strong className="type-value text-3xl font-medium tracking-tight text-foreground [overflow-wrap:anywhere]">
 							{money(projection.currentNetWorth)}
 						</strong>
 						{asOf && (
-							<span className="text-xs text-muted">
+							<span className="text-xs text-muted-foreground">
 								As of {dateLabel(asOf, true)}
 							</span>
 						)}
@@ -48,7 +52,7 @@ export function NetWorthSummary({
 					{change && (
 						<p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs">
 							<span
-								className={`font-semibold tabular-nums ${change.amount > 0 ? "text-success-text" : change.amount < 0 ? "text-danger-text" : "text-muted"}`}
+								className={`font-semibold tabular-nums ${change.amount > 0 ? "text-success-text" : change.amount < 0 ? "text-danger-text" : "text-muted-foreground"}`}
 							>
 								{change.amount > 0 ? "+" : ""}
 								{money(change.amount)}

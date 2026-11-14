@@ -18,7 +18,7 @@ export function PurchaseStatus({
 	const { outcome } = item;
 	let icon = <Clock3 size={14} aria-hidden="true" />;
 	let label = "Calculating date";
-	let tone = "text-muted";
+	let tone = "text-muted-foreground";
 
 	switch (outcome.kind) {
 		case "scheduled":

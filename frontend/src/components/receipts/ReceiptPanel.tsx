@@ -8,9 +8,9 @@ import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
-import { Badge } from "../Badge.tsx";
-import { Button } from "../Button.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { ReceiptReviewDialog } from "./ReceiptReviewDialog.tsx";
 
 export function ReceiptPanel({
@@ -55,12 +55,11 @@ export function ReceiptPanel({
 				// UserScopeError and the new resource starts with a clean stack.
 				if (cause instanceof UserScopeError) return;
 				if (scope !== getUserScope()) return;
-				notifyError(
-					"receipt-attach",
+				const message =
 					cause instanceof Error
 						? cause.message
-						: "The receipt could not be attached.",
-				);
+						: "The receipt could not be attached.";
+				notifyError("receipt-attach", message);
 			});
 	};
 	const receipts = collection.data?.receipts ?? [];
@@ -71,7 +70,12 @@ export function ReceiptPanel({
 					<ReceiptText size={17} aria-hidden="true" />
 					<h3 className="text-sm font-semibold">Receipts</h3>
 					{receipts.length > 0 && (
-						<Badge tone="neutral">{receipts.length}</Badge>
+						<Badge
+							variant="secondary"
+							className="h-auto bg-accent text-muted-foreground"
+						>
+							{receipts.length}
+						</Badge>
 					)}
 				</div>
 				{!locked && eligible && (
@@ -120,26 +124,37 @@ export function ReceiptPanel({
 			</div>
 			<>
 				{collection.isPending && (
-					<p role="status" className="text-sm text-muted">
+					<p role="status" className="text-sm text-muted-foreground">
 						Loading receipts…
 					</p>
 				)}
-				<ErrorNotice
-					message={collection.error?.message}
-					action={collection.error ? "Retry receipts" : undefined}
-					onAction={() => void collection.refetch()}
-				/>
+				{collection.error?.message && (
+					<Alert variant="destructive">
+						<AlertDescription className="min-w-0 break-words">
+							<p className="my-1 whitespace-pre-line">
+								{collection.error.message}
+							</p>
+							<Button
+								variant="link"
+								className="mt-2 px-0 py-0.5 text-xs font-semibold"
+								onClick={() => void collection.refetch()}
+							>
+								Retry receipts
+							</Button>
+						</AlertDescription>
+					</Alert>
+				)}
 				{receipts.map((receipt) => (
 					<button
 						key={receipt.id}
 						type="button"
-						className="flex w-full items-start gap-3 rounded-surface border border-line bg-surface-2 p-4 text-left hover:border-line-strong"
+						className="flex w-full items-start gap-3 rounded-xl border border-border bg-muted p-4 text-left hover:border-input"
 						onClick={() => setSelection({ scope: scope.key, id: receipt.id })}
 					>
 						<Paperclip
 							size={16}
 							aria-hidden="true"
-							className="mt-1 flex-none text-muted"
+							className="mt-1 flex-none text-muted-foreground"
 						/>
 						<span className="flex min-w-0 flex-1 flex-col gap-1">
 							<span className="text-sm font-semibold break-words">
@@ -148,7 +163,7 @@ export function ReceiptPanel({
 									receipt.extraction?.details.merchant ||
 									receipt.filename}
 							</span>
-							<span className="text-xs text-muted">
+							<span className="text-xs text-muted-foreground">
 								{receiptReviewLabel(receipt)}
 								{receipt.stale ? " · Transaction changed" : ""}
 							</span>
@@ -156,18 +171,18 @@ export function ReceiptPanel({
 					</button>
 				))}
 				{!locked && eligible && (
-					<p id="receipt-size-hint" className="text-xs text-muted">
+					<p id="receipt-size-hint" className="text-xs text-muted-foreground">
 						JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB after
 						normalization.
 					</p>
 				)}
 				{actions.attach.isPending && (
-					<p role="status" className="text-sm text-muted">
+					<p role="status" className="text-sm text-muted-foreground">
 						Saving private receipt…
 					</p>
 				)}
 				{!eligible && receipts.length === 0 && (
-					<p className="text-sm text-muted">
+					<p className="text-sm text-muted-foreground">
 						Receipts attach to saved owner transactions, not pending or void
 						bank rows.
 					</p>

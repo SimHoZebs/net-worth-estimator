@@ -1,12 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
-import { Waves } from "lucide-react";
+import { AlertCircle, ArrowUpRight, Waves } from "lucide-react";
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
-import { EmptyState } from "../../components/EmptyState.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import { Notice } from "../../components/Notice.tsx";
-import { SegmentedControl } from "../../components/SegmentedControl.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+} from "@/components/ui/empty.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import {
 	aggregateFlowEdges,
 	buildSankeyInput,
@@ -64,13 +69,19 @@ function TotalsSummary({ graph }: { graph: FlowGraph }) {
 				.
 			</p>
 			{!graph.reconciliation.reconciled && (
-				<Notice tone="warning">
-					Edge totals do not fully reconcile with their source records; the
-					table below carries the exact figures.
-				</Notice>
+				<Alert
+					variant="default"
+					role="note"
+					className="border-warning-border bg-warning-bg text-warning-text"
+				>
+					<AlertDescription className="text-xs text-warning-text">
+						Edge totals do not fully reconcile with their source records; the
+						table below carries the exact figures.
+					</AlertDescription>
+				</Alert>
 			)}
 			{unobserved.length > 0 && (
-				<p className="text-xs text-muted">
+				<p className="text-xs text-muted-foreground">
 					Partial coverage: {unobserved.length}{" "}
 					{unobserved.length === 1 ? "account has" : "accounts have"} no
 					starting balance observation.
@@ -168,8 +179,8 @@ export function FlowsPage() {
 			next.endDate !== "" &&
 			next.startDate > next.endDate
 		) {
-			if (change.startDate !== undefined) next.endDate = next.startDate;
-			else next.startDate = next.endDate;
+			if (change.startDate !== undefined) next.endDate = change.startDate;
+			else if (change.endDate !== undefined) next.startDate = change.endDate;
 		}
 		setWindow(next);
 		setSelection({ owner: graph, key: null });
@@ -196,59 +207,104 @@ export function FlowsPage() {
 				}}
 			/>
 			{query.isPending && window.startDate !== "" && window.endDate !== "" && (
-				<Skeleton className="h-64" label="Loading money flows" />
-			)}
-			{(window.startDate === "" || window.endDate === "") && (
-				<EmptyState
-					icon={Waves}
-					title="Choose both dates"
-					description="Money flows need a start and an end date before the calculation runs."
+				<Skeleton
+					className="h-64"
+					role="status"
+					aria-label="Loading money flows"
 				/>
 			)}
-			<ErrorNotice
-				message={
-					query.isError
-						? (query.error?.message ??
-							"Money flows could not be loaded. Retry the request.")
-						: null
-				}
-				action="Retry"
-				onAction={() => void query.refetch()}
-			/>
+			{(window.startDate === "" || window.endDate === "") && (
+				<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+					<EmptyHeader>
+						<EmptyMedia>
+							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+								<Waves size={28} />
+							</span>
+						</EmptyMedia>
+						<h3 className="text-lg">Choose both dates</h3>
+						<EmptyDescription className="mt-2 mb-5 max-w-sm">
+							Money flows need a start and an end date before the calculation
+							runs.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			)}
+			{query.isError && (
+				<Alert variant="destructive" className="mb-5 p-5 text-sm">
+					<AlertCircle
+						size={20}
+						className="mt-0.5 shrink-0"
+						aria-hidden="true"
+					/>
+					<div className="min-w-0 break-words">
+						<AlertDescription className="my-1 whitespace-pre-line">
+							{query.error?.message ??
+								"Money flows could not be loaded. Retry the request."}
+						</AlertDescription>
+						<Button
+							variant="link"
+							className="mt-2"
+							onClick={() => void query.refetch()}
+						>
+							Retry <ArrowUpRight size={15} />
+						</Button>
+					</div>
+				</Alert>
+			)}
 			{graph && (
 				<>
 					<TotalsSummary graph={graph} />
 					<div className="flex flex-wrap items-center justify-between gap-3">
-						<p className="text-xs text-muted" role="status">
+						<p className="text-xs text-muted-foreground" role="status">
 							{focusName
 								? `Showing flows touching ${focusName} (${visible.length} of ${graph.edges.length}). Totals still describe the whole window.`
 								: `Showing all ${visible.length} flows from ${graph.startDate} through ${graph.endDate}.`}
 						</p>
-						<SegmentedControl<FlowView>
-							ariaLabel="Diagram or table view"
-							value={view}
-							onChange={setView}
-							items={[
-								{ value: "diagram", label: "Diagram" },
-								{ value: "table", label: "Table" },
-							]}
-						/>
+						<ToggleGroup
+							aria-label="Diagram or table view"
+							value={[view]}
+							onValueChange={(next) => {
+								const nextValue = next.find((candidate) => candidate !== view);
+								if (nextValue !== undefined) setView(nextValue as FlowView);
+							}}
+						>
+							<ToggleGroupItem type="button" value="diagram">
+								Diagram
+							</ToggleGroupItem>
+							<ToggleGroupItem type="button" value="table">
+								Table
+							</ToggleGroupItem>
+						</ToggleGroup>
 					</div>
 					{visible.length === 0 || !input ? (
-						<EmptyState
-							icon={Waves}
-							title="No money movement in this view"
-							description="Widen the dates or clear the account and money filters."
-						/>
+						<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+							<EmptyHeader>
+								<EmptyMedia>
+									<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
+										<Waves size={28} />
+									</span>
+								</EmptyMedia>
+								<h3 className="text-lg">No money movement in this view</h3>
+								<EmptyDescription className="mt-2 mb-5 max-w-sm">
+									Widen the dates or clear the account and money filters.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					) : view === "table" ? (
 						<FlowTable graph={graph} visible={visible} />
 					) : cyclic || !measurable ? (
 						<>
-							<Notice tone="warning">
-								{cyclic
-									? "These flows loop back on each other, so they cannot be drawn as a one-way diagram. The table below lists every flow with exact amounts."
-									: "Every flow in this view is exactly zero, so widths cannot show them. The table below lists every flow with exact amounts."}
-							</Notice>
+							<Alert
+								variant="default"
+								role="note"
+								className="border-warning-border bg-warning-bg text-warning-text"
+							>
+								<AlertDescription className="text-xs text-warning-text">
+									{cyclic
+										? "These flows loop back on each other, so they cannot be drawn as a one-way diagram. The table below lists every flow with exact amounts."
+										: "Every flow in this view is exactly zero, so widths cannot show them. The table below lists every flow with exact amounts."}
+								</AlertDescription>
+							</Alert>
 							<FlowTable graph={graph} visible={visible} />
 						</>
 					) : (
