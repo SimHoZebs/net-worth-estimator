@@ -8,7 +8,7 @@ import {
 	supportsPopover,
 	useAnchoredPopover,
 } from "../../components/popoverAnchor.ts";
-import { segmentedPillStyles } from "../../components/SegmentedControl.tsx";
+import { SegmentedControl, segmentedPillStyles } from "../../components/SegmentedControl.tsx";
 import {
 	FLOW_RANGE_PRESETS,
 	flowPresetRange,
@@ -130,8 +130,10 @@ function MonthCalendar({
 
 /**
  * AWS-style money-flow date range picker. The trigger names the matched
- * preset or the custom window; the dialog pairs the shared preset list with
- * two independently navigated month grids and an Apply/Cancel footer.
+ * preset or the custom window; the dialog pairs the shared preset list
+ * with month grids and an Apply/Cancel footer. Wide screens show two
+ * independently navigated grids; small screens show one grid at a time
+ * behind Start/End tabs.
  */
 export function FlowDateRangePicker({
 	startDate,
@@ -153,6 +155,7 @@ export function FlowDateRangePicker({
 	const [awaitingSecond, setAwaitingSecond] = useState(false);
 	const [leftMonth, setLeftMonth] = useState(() => monthOf(startDate));
 	const [rightMonth, setRightMonth] = useState(() => monthOf(endDate));
+	const [compactMonth, setCompactMonth] = useState<"start" | "end">("start");
 	const compact = useMediaQuery(viewportQueries.belowSm);
 
 	const today = todayIso();
@@ -199,6 +202,7 @@ export function FlowDateRangePicker({
 		setDraftStart(startDate);
 		setDraftEnd(endDate);
 		setAwaitingSecond(false);
+		setCompactMonth("start");
 		const left = monthOf(startDate);
 		const end = monthOf(endDate);
 		setLeftMonth(left);
@@ -264,24 +268,61 @@ export function FlowDateRangePicker({
 					))}
 				</div>
 				<div className="flex min-w-0 flex-1 gap-4 max-sm:flex-col">
-					<MonthCalendar
-						year={leftMonth.year}
-						monthIndex={leftMonth.month}
-						draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
-						draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
-						onPrev={() => setLeftMonth((value) => shiftMonth(value, -1))}
-						onNext={() => setLeftMonth((value) => shiftMonth(value, 1))}
-						onDay={clickDay}
-					/>
-					<MonthCalendar
-						year={rightMonth.year}
-						monthIndex={rightMonth.month}
-						draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
-						draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
-						onPrev={() => setRightMonth((value) => shiftMonth(value, -1))}
-						onNext={() => setRightMonth((value) => shiftMonth(value, 1))}
-						onDay={clickDay}
-					/>
+					{compact ? (
+						<div className="flex min-w-0 flex-1 flex-col gap-2">
+							<SegmentedControl
+								items={[
+									{ value: "start", label: "Start" },
+									{ value: "end", label: "End" },
+								]}
+								value={compactMonth}
+								onChange={setCompactMonth}
+								ariaLabel="Start or end month"
+							/>
+							{compactMonth === "start" ? (
+								<MonthCalendar
+									year={leftMonth.year}
+									monthIndex={leftMonth.month}
+									draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
+									draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
+									onPrev={() => setLeftMonth((value) => shiftMonth(value, -1))}
+									onNext={() => setLeftMonth((value) => shiftMonth(value, 1))}
+									onDay={clickDay}
+								/>
+							) : (
+								<MonthCalendar
+									year={rightMonth.year}
+									monthIndex={rightMonth.month}
+									draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
+									draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
+									onPrev={() => setRightMonth((value) => shiftMonth(value, -1))}
+									onNext={() => setRightMonth((value) => shiftMonth(value, 1))}
+									onDay={clickDay}
+								/>
+							)}
+						</div>
+					) : (
+						<>
+							<MonthCalendar
+								year={leftMonth.year}
+								monthIndex={leftMonth.month}
+								draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
+								draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
+								onPrev={() => setLeftMonth((value) => shiftMonth(value, -1))}
+								onNext={() => setLeftMonth((value) => shiftMonth(value, 1))}
+								onDay={clickDay}
+							/>
+							<MonthCalendar
+								year={rightMonth.year}
+								monthIndex={rightMonth.month}
+								draftStart={draftStart <= draftEnd ? draftStart : draftEnd}
+								draftEnd={draftStart <= draftEnd ? draftEnd : draftStart}
+								onPrev={() => setRightMonth((value) => shiftMonth(value, -1))}
+								onNext={() => setRightMonth((value) => shiftMonth(value, 1))}
+								onDay={clickDay}
+							/>
+						</>
+					)}
 				</div>
 			</div>
 			<div className="mt-4 flex justify-end gap-2">

@@ -137,7 +137,7 @@ describe("FlowDateRangePicker", () => {
 		).toBeTruthy();
 	});
 
-	it("opens the modal sheet with presets, calendars, and Apply on small screens", () => {
+	it("opens the modal sheet with presets, Start/End tabs, and one month grid on small screens", () => {
 		vi.stubGlobal("matchMedia", (query: string) => ({
 			matches: true,
 			media: query,
@@ -156,9 +156,18 @@ describe("FlowDateRangePicker", () => {
 			screen.getByRole("group", { name: "Date range presets" }),
 		).toBeTruthy();
 		expect(
+			screen.getByRole("group", { name: "Start or end month" }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("button", { name: "Start" }).getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(
+			screen.getByRole("button", { name: "End" }).getAttribute("aria-pressed"),
+		).toBe("false");
+		expect(
 			screen.getByRole("region", { name: "March 2026" }),
 		).toBeTruthy();
-		expect(screen.getByRole("region", { name: "April 2026" })).toBeTruthy();
+		expect(screen.queryByRole("region", { name: "April 2026" })).toBeNull();
 		fireEvent.click(
 			screen.getByRole("button", { name: dateLabel("2026-03-15", true) }),
 		);
@@ -170,6 +179,83 @@ describe("FlowDateRangePicker", () => {
 			startDate: "2026-03-15",
 			endDate: "2026-03-20",
 		});
+	});
+
+	it("switches the compact sheet between the start and end month grids", () => {
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			matches: true,
+			media: query,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			addListener: () => {},
+			removeListener: () => {},
+			dispatchEvent: () => false,
+		}));
+		openDialog("2026-03-10", "2026-04-20", vi.fn());
+		fireEvent.click(screen.getByRole("button", { name: "End" }));
+		expect(
+			screen.getByRole("button", { name: "End" }).getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(
+			screen.getByRole("button", { name: "Start" }).getAttribute("aria-pressed"),
+		).toBe("false");
+		expect(
+			screen.getByRole("region", { name: "April 2026" }),
+		).toBeTruthy();
+		expect(screen.queryByRole("region", { name: "March 2026" })).toBeNull();
+	});
+
+	it("stages day taps across compact tabs and applies the ordered range", () => {
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			matches: true,
+			media: query,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			addListener: () => {},
+			removeListener: () => {},
+			dispatchEvent: () => false,
+		}));
+		const onApply = vi.fn();
+		openDialog("2026-03-10", "2026-04-20", onApply);
+		fireEvent.click(screen.getByRole("button", { name: "End" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: dateLabel("2026-04-20", true) }),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Start" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: dateLabel("2026-03-15", true) }),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+		expect(onApply).toHaveBeenCalledWith({
+			startDate: "2026-03-15",
+			endDate: "2026-04-20",
+		});
+	});
+
+	it("resets the compact sheet to the Start tab when reopened", () => {
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			matches: true,
+			media: query,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			addListener: () => {},
+			removeListener: () => {},
+			dispatchEvent: () => false,
+		}));
+		const trigger = openDialog("2026-03-10", "2026-04-20", vi.fn());
+		fireEvent.click(screen.getByRole("button", { name: "End" }));
+		expect(
+			screen.getByRole("region", { name: "April 2026" }),
+		).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+		fireEvent.click(trigger);
+		expect(
+			screen.getByRole("button", { name: "Start" }).getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(
+			screen.getByRole("region", { name: "March 2026" }),
+		).toBeTruthy();
+		expect(screen.queryByRole("region", { name: "April 2026" })).toBeNull();
 	});
 
 	afterEach(() => {
