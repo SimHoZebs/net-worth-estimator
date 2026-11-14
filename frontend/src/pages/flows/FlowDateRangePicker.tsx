@@ -114,7 +114,7 @@ function MonthCalendar({
 							aria-label={dateLabel(date, true)}
 							aria-pressed={date >= draftStart && date <= draftEnd}
 							onClick={() => onDay(date)}
-							className="min-h-9 rounded-control border border-transparent bg-transparent px-1 py-1 text-center text-sm text-ink hover:bg-hover aria-pressed:bg-surface-3 aria-pressed:font-bold"
+							className="min-h-9 rounded-control border border-transparent bg-transparent px-1 py-1 text-center text-sm text-ink hover:bg-hover aria-pressed:bg-surface-3 aria-pressed:font-bold pointer-coarse:min-h-12"
 						>
 							{Number(date.slice(8, 10))}
 						</button>
@@ -240,7 +240,7 @@ export function FlowDateRangePicker({
 	};
 
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
+		<div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
 			<span id={captionId} className="text-xs text-muted">
 				Date range
 			</span>
