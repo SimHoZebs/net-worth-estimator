@@ -12,7 +12,6 @@ import { useMemo } from "react";
 import { mergeStyles } from "./mergeStyles.ts";
 import { IconButton } from "./Button.tsx";
 import {
-	Table as ShadcnTable,
 	TableBody as ShadcnTableBody,
 	TableCaption as ShadcnTableCaption,
 	TableCell as ShadcnTableCell,
@@ -41,10 +40,19 @@ const tablePaginationBaseClassName =
 	"flex items-center justify-between gap-4 border-b border-line py-4 max-sm:gap-2";
 
 export function Table({ className, ...props }: ComponentProps<"table">) {
+	// Plain table element (not the shadcn Table wrapper): the wrapper adds
+	// its own overflow-x-auto container, which would nest inside TableScroll
+	// and create a scrollable region without keyboard access. TableScroll
+	// stays the single keyboard-accessible scroll region.
 	return (
-		<ShadcnTable
+		<table
+			data-slot="table"
 			{...props}
-			className={mergeStyles(tableBaseClassName, className)}
+			className={mergeStyles(
+				"w-full caption-bottom text-sm",
+				tableBaseClassName,
+				className,
+			)}
 		/>
 	);
 }

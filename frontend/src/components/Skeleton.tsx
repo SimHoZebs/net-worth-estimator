@@ -1,10 +1,10 @@
 import { mergeStyles } from "./mergeStyles.ts";
-import { Skeleton as ShadcnSkeleton } from "./ui/skeleton.tsx";
 
 /**
- * Loading placeholder on the shadcn skeleton primitive. The legacy recipe
- * stays the visual owner (dark-mode-safe application tokens, status
- * announcement); the primitive contributes the data slot.
+ * Loading placeholder with the legacy recipe as the visual owner
+ * (dark-mode-safe application tokens, status announcement). It renders a
+ * span (not the shadcn div primitive) so it stays valid phrasing content
+ * inside p elements such as the evaluation card outcome line.
  */
 export function Skeleton({
 	className,
@@ -14,7 +14,8 @@ export function Skeleton({
 	label?: string;
 }) {
 	return (
-		<ShadcnSkeleton
+		<span
+			data-slot="skeleton"
 			className={mergeStyles(
 				"block h-4 w-full max-w-full animate-[skeleton-pulse_1.2s_ease-in-out_infinite] rounded-control bg-line-strong opacity-55",
 				className,
