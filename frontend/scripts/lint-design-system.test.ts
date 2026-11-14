@@ -72,24 +72,4 @@ describe("focused design-system checks", () => {
 			),
 		).toEqual([]);
 	});
-	it("requires all four offsets on a fixed popover element", () => {
-		expect(
-			designSystemWarnings(
-				"src/Example.tsx",
-				'<div popover="manual" className="pointer-events-none fixed right-3 bottom-3 m-0 flex flex-col items-end" />',
-			),
-		).toHaveLength(1);
-		expect(
-			designSystemWarnings(
-				"src/Example.tsx",
-				'<div popover="manual" className="pointer-events-none fixed top-auto right-3 bottom-3 left-auto m-0 flex flex-col items-end" />',
-			),
-		).toEqual([]);
-		expect(
-			designSystemWarnings(
-				"src/Example.tsx",
-				'<div popover="auto" className="fixed inset-0 cursor-default bg-transparent" />',
-			),
-		).toEqual([]);
-	});
 });

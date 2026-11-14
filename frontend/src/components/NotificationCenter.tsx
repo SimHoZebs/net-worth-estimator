@@ -1,9 +1,7 @@
 import { AlertCircle, Check, X } from "lucide-react";
-import { useLayoutEffect, useRef } from "react";
 import { useNotifications, type Toast } from "../state/notifications.ts";
 import { IconButton, TextButton } from "./Button.tsx";
 import { mergeStyles } from "./mergeStyles.ts";
-import { supportsPopover } from "./popoverAnchor.ts";
 
 const toastToneStyles: Record<Toast["kind"], string> = {
 	error: "border-danger-border bg-danger-bg text-danger-text",
@@ -54,42 +52,16 @@ function ToastCard({ toast }: { toast: Toast }) {
 /**
  * Floating bottom-right stack. Mounted once in the workspace layout.
  *
- * The stack is a manual popover, so it paints in the top layer above
- * modal dialogs and drawers. A fixed element with a large z-index can
- * never outrank a dialog. The manual popover keeps focus free, so the
- * toast stays non-modal and never blocks the page.
+ * A plain fixed element, so what the classes say is what renders: no
+ * top-layer promotion, no browser geometry to override the corner. An open
+ * native dialog covers it; errors that gate a dialog stay inline inside it.
  */
 export function NotificationCenter() {
 	const items = useNotifications((state) => state.items);
-	const stackRef = useRef<HTMLDivElement>(null);
-
-	useLayoutEffect(() => {
-		const stack = stackRef.current;
-		if (!stack || !supportsPopover()) return;
-		if (!items.length) {
-			if (
-				typeof stack.hidePopover === "function" &&
-				stack.matches(":popover-open")
-			) {
-				stack.hidePopover();
-			}
-			return;
-		}
-		if (
-			typeof stack.showPopover === "function" &&
-			!stack.matches(":popover-open")
-		) {
-			stack.showPopover();
-		}
-	}, [items.length]);
 
 	if (!items.length) return null;
 	return (
-		<div
-			ref={stackRef}
-			{...(supportsPopover() ? { popover: "manual" as const } : {})}
-			className="pointer-events-none fixed top-auto right-3 bottom-3 left-auto z-(--z-toast) m-0 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 border-0 bg-transparent p-0 sm:right-6 sm:bottom-5 xl:right-8 print:hidden"
-		>
+		<div className="pointer-events-none fixed right-3 bottom-3 z-(--z-toast) flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 sm:right-6 sm:bottom-5 xl:right-8 print:hidden">
 			{items.map((toast) => (
 				<ToastCard key={toast.id} toast={toast} />
 			))}

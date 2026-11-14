@@ -37,19 +37,10 @@ it("announces success as a status without an alert", () => {
 	expect(screen.queryByRole("alert")).toBeNull();
 });
 
-it("shows the stack as a manual popover in the top layer", () => {
-	const showPopover = vi.fn();
-	const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
-	const previous = proto.showPopover;
-	proto.showPopover = showPopover;
-	try {
-		notifySuccess("save", "Changes saved.");
-		const { container } = render(<NotificationCenter />);
-		const stack = container.firstElementChild;
-		expect(stack?.getAttribute("popover")).toBe("manual");
-		expect(showPopover).toHaveBeenCalledTimes(1);
-	} finally {
-		if (previous === undefined) delete proto.showPopover;
-		else proto.showPopover = previous;
-	}
+it("renders as a plain element with no top-layer promotion", () => {
+	notifySuccess("save", "Changes saved.");
+	const { container } = render(<NotificationCenter />);
+	const stack = container.firstElementChild;
+	expect(stack?.hasAttribute("popover")).toBe(false);
+	expect(stack?.className).toContain("fixed");
 });

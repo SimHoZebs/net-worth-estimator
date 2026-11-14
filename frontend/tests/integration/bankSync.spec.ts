@@ -379,8 +379,8 @@ test("connected accounts and sync feedback stay accessible in dark mode on mobil
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
 	await expect(page.getByRole("status")).toContainText("Sync complete");
 	await expect(bankSync.getByText("Sync complete")).toHaveCount(0);
-	// The toast stack is a manual popover: browser UA geometry centers such
-	// elements unless top/left are explicitly auto, so guard the corner.
+	// The toast stack is a plain fixed element, so the corner it renders
+	// is the corner the classes state. Guard it against regressions.
 	const toastBox = await page.getByRole("status").boundingBox();
 	const viewport = page.viewportSize();
 	expect(toastBox).not.toBeNull();

@@ -125,7 +125,8 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	await receipt
 		.getByRole("button", { name: "Confirm receipt", exact: true })
 		.click();
-	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	// The toast renders behind the open native dialog: attached but covered.
+	await expect(page.getByText("Receipt details saved.")).toBeAttached();
 	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await expect(
 		receipt.getByText("Simulated data", { exact: true }).first(),
@@ -138,6 +139,8 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	await receipt
 		.getByRole("button", { name: "Close dialog", exact: true })
 		.click();
+	// Dialog closed: the deferred toast is now actually visible.
+	await expect(page.getByText("Receipt details saved.")).toBeVisible();
 	await page.reload();
 	const reopened = await openExpense(page);
 	await reopened.getByRole("button", { name: /Reviewed market/ }).click();
@@ -160,7 +163,8 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	await receipt
 		.getByRole("button", { name: "Save draft", exact: true })
 		.click();
-	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	// The toast renders behind the open native dialog: attached but covered.
+	await expect(page.getByText("Receipt details saved.")).toBeAttached();
 	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await expect(receipt.getByText("Reviewed", { exact: true })).toHaveCount(0);
 	await page.reload();
@@ -340,7 +344,8 @@ test("unknown images recover through manual review and drafts survive reload", a
 	await receipt
 		.getByRole("button", { name: "Save draft", exact: true })
 		.click();
-	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	// The toast renders behind the open native dialog: attached but covered.
+	await expect(page.getByText("Receipt details saved.")).toBeAttached();
 	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await page.reload();
 	const again = await openExpense(page);
@@ -353,7 +358,8 @@ test("unknown images recover through manual review and drafts survive reload", a
 	await receipt
 		.getByRole("button", { name: "Confirm receipt", exact: true })
 		.click();
-	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	// The toast renders behind the open native dialog: attached but covered.
+	await expect(page.getByText("Receipt details saved.")).toBeAttached();
 	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	await receipt
 		.getByRole("button", { name: "Delete receipt", exact: true })
@@ -456,7 +462,8 @@ test("image controls replace all receipt content and delete it without changing 
 	await receipt
 		.getByRole("button", { name: "Confirm receipt", exact: true })
 		.click();
-	await expect(page.getByText("Receipt details saved.")).toBeVisible();
+	// The toast renders behind the open native dialog: attached but covered.
+	await expect(page.getByText("Receipt details saved.")).toBeAttached();
 	await expect(receipt.getByText("Receipt details saved.")).toHaveCount(0);
 	const original = await (
 		await page.request.get(`/v1/transactions/${transactionId}/receipts`)
