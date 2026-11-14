@@ -285,7 +285,7 @@ export function FlowDateRangePicker({
 						<div
 							role="group"
 							aria-label="Date range presets"
-							className="flex w-36 flex-none flex-col gap-1 max-sm:w-full"
+							className="flex w-36 flex-none flex-col gap-1 max-sm:w-auto max-sm:flex-row max-sm:flex-wrap"
 						>
 							{FLOW_RANGE_PRESETS.map((preset) => (
 								<button
