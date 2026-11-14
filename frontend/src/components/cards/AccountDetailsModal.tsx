@@ -1,11 +1,16 @@
 import { Repeat2, Search } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { Fragment, useId, useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { Input } from "@/components/ui/input.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/components/ui/input-group.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
@@ -26,7 +31,12 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
-import { Item, ItemContent, ItemGroup } from "@/components/ui/item.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemGroup,
+	ItemSeparator,
+} from "@/components/ui/item.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 import { transactionSelectionKey, useSelectedId } from "../entrySelection.ts";
 
@@ -181,16 +191,16 @@ export function AccountDetailsModal({
 					</div>
 				)}
 				<ItemGroup className="my-5 gap-0">
-					{card.metrics.map((metric) => (
-						<Item
-							key={metric.label}
-							className="justify-between gap-5 rounded-none border-x-0 border-t-0 border-b border-border px-0 py-3"
-						>
-							<span className="text-muted-foreground">{metric.label}</span>
-							<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
-								{metric.value}
-							</ItemContent>
-						</Item>
+					{card.metrics.map((metric, index) => (
+						<Fragment key={metric.label}>
+							{index > 0 && <ItemSeparator />}
+							<Item className="justify-between gap-5">
+								<span className="text-muted-foreground">{metric.label}</span>
+								<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
+									{metric.value}
+								</ItemContent>
+							</Item>
+						</Fragment>
 					))}
 				</ItemGroup>
 				<div className="mt-2 flex items-center justify-between gap-4">
@@ -200,23 +210,26 @@ export function AccountDetailsModal({
 					</span>
 				</div>
 				<div className="mb-3 flex flex-wrap items-center gap-3">
-					<label
-						htmlFor={searchId}
-						className="inline-flex flex-1 items-center gap-2 text-muted-foreground"
-					>
-						<Search size={16} aria-hidden="true" />
-						<span className="sr-only">Search account transactions</span>
-						<Input
-							id={searchId}
-							value={query}
-							onChange={(event) => {
-								setQuery(event.target.value);
-								setPage(0);
-							}}
-							placeholder="Search transactions…"
-							className="w-32 sm:w-48"
-						/>
-					</label>
+					<Field orientation="horizontal" className="min-w-0 flex-1">
+						<FieldLabel htmlFor={searchId} className="sr-only">
+							Search account transactions
+						</FieldLabel>
+						<InputGroup className="w-32 sm:w-48">
+							<InputGroupAddon>
+								<Search size={16} aria-hidden="true" />
+							</InputGroupAddon>
+							<InputGroupInput
+								id={searchId}
+								type="search"
+								value={query}
+								onChange={(event) => {
+									setQuery(event.target.value);
+									setPage(0);
+								}}
+								placeholder="Search transactions…"
+							/>
+						</InputGroup>
+					</Field>
 					<ToggleGroup
 						aria-label="Filter by transaction status"
 						value={[filter]}

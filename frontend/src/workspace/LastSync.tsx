@@ -48,7 +48,7 @@ export function LastSync({
 		if (status.syncConfigured && isSyncStale(status.lastSyncAt, effectiveNow)) {
 			return (
 				<Button
-					variant="ghost"
+					variant="link"
 					size="sm"
 					onClick={() =>
 						notifyError("sync-stale", staleSyncMessage(), {
@@ -58,7 +58,7 @@ export function LastSync({
 							},
 						})
 					}
-					className="h-auto gap-1 px-1 text-xs whitespace-nowrap text-muted-foreground hover:underline hover:underline-offset-4"
+					className="whitespace-nowrap"
 				>
 					<TriangleAlert
 						size={16}

@@ -11,6 +11,14 @@ import { useUserScope } from "@/state/useUserScope.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
 import { ReceiptReviewDialog } from "./ReceiptReviewDialog.tsx";
 
 export function ReceiptPanel({
@@ -70,12 +78,7 @@ export function ReceiptPanel({
 					<ReceiptText size={17} aria-hidden="true" />
 					<h3 className="text-sm font-semibold">Receipts</h3>
 					{receipts.length > 0 && (
-						<Badge
-							variant="secondary"
-							className="h-auto bg-accent text-muted-foreground"
-						>
-							{receipts.length}
-						</Badge>
+						<Badge variant="secondary">{receipts.length}</Badge>
 					)}
 				</div>
 				{!locked && eligible && (
@@ -144,32 +147,45 @@ export function ReceiptPanel({
 						</AlertDescription>
 					</Alert>
 				)}
-				{receipts.map((receipt) => (
-					<button
-						key={receipt.id}
-						type="button"
-						className="flex w-full items-start gap-3 rounded-xl border border-border bg-muted p-4 text-left hover:border-input"
-						onClick={() => setSelection({ scope: scope.key, id: receipt.id })}
-					>
-						<Paperclip
-							size={16}
-							aria-hidden="true"
-							className="mt-1 flex-none text-muted-foreground"
-						/>
-						<span className="flex min-w-0 flex-1 flex-col gap-1">
-							<span className="text-sm font-semibold break-words">
-								{receipt.draft?.merchant ||
-									receipt.confirmed?.merchant ||
-									receipt.extraction?.details.merchant ||
-									receipt.filename}
-							</span>
-							<span className="text-xs text-muted-foreground">
-								{receiptReviewLabel(receipt)}
-								{receipt.stale ? " · Transaction changed" : ""}
-							</span>
-						</span>
-					</button>
-				))}
+				{receipts.length > 0 && (
+					<ItemGroup>
+						{receipts.map((receipt) => {
+							const title =
+								receipt.draft?.merchant ||
+								receipt.confirmed?.merchant ||
+								receipt.extraction?.details.merchant ||
+								receipt.filename;
+							return (
+								<Item
+									key={receipt.id}
+									variant="outline"
+									render={
+										<button
+											type="button"
+											aria-label={`Review receipt ${title}`}
+											onClick={() =>
+												setSelection({ scope: scope.key, id: receipt.id })
+											}
+										/>
+									}
+								>
+									<ItemMedia>
+										<Paperclip size={16} aria-hidden="true" />
+									</ItemMedia>
+									<ItemContent>
+										<ItemTitle className="line-clamp-none break-words">
+											{title}
+										</ItemTitle>
+										<ItemDescription>
+											{receiptReviewLabel(receipt)}
+											{receipt.stale ? " · Transaction changed" : ""}
+										</ItemDescription>
+									</ItemContent>
+								</Item>
+							);
+						})}
+					</ItemGroup>
+				)}
 				{!locked && eligible && (
 					<p id="receipt-size-hint" className="text-xs text-muted-foreground">
 						JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB after

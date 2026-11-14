@@ -6,7 +6,12 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet.tsx";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { dateLabel } from "../../../domain/format.ts";
 import {
@@ -45,7 +50,7 @@ export function SafeSpendingDetailShell({
 				aria-label={title}
 				className="overflow-y-auto max-sm:data-[side=right]:w-full max-sm:data-[side=right]:max-w-full sm:max-w-3xl"
 			>
-				<SheetHeader className="border-b-0 p-4 pb-2">
+				<SheetHeader>
 					{range && (
 						<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
 							{`${dateLabel(range.start, true)} – ${dateLabel(range.end, true)}`}
@@ -66,7 +71,7 @@ export function SafeSpendingDetailShell({
 							variant="line"
 							aria-label="SafeSpending detail view"
 							activateOnFocus
-							className="mb-4 flex w-full gap-6 overflow-x-auto p-0 max-sm:gap-5"
+							className="relative mb-4 flex w-full justify-start gap-6 overflow-x-auto p-0 max-sm:gap-5"
 						>
 							{SAFE_SPENDING_DETAIL_TABS.map((item) => (
 								<TabsTrigger
@@ -82,13 +87,13 @@ export function SafeSpendingDetailShell({
 								</TabsTrigger>
 							))}
 						</TabsList>
-						<div
+						<TabsContent
+							value={tab}
 							id={`${id}-panel`}
-							role="tabpanel"
 							aria-labelledby={`${id}-${tab}`}
 						>
 							{children}
-						</div>
+						</TabsContent>
 					</Tabs>
 				</div>
 			</SheetContent>

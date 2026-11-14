@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
+import { FieldLabel } from "@/components/ui/field.tsx";
 import {
 	Pagination,
 	PaginationContent,
@@ -148,7 +148,7 @@ function AccountsView({
 		<>
 			<section>
 				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
-					<Label
+					<FieldLabel
 						htmlFor={searchId}
 						className="inline-flex items-center gap-2 text-muted-foreground"
 					>
@@ -161,7 +161,7 @@ function AccountsView({
 							placeholder="Find an account…"
 							className="w-32 sm:w-48"
 						/>
-					</Label>
+					</FieldLabel>
 					<Button
 						type="button"
 						variant="default"
@@ -389,7 +389,7 @@ function TransactionsView({
 			</TabsList>
 			<TabsContent value={schedule}>
 				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 max-sm:pb-4">
-					<Label
+					<FieldLabel
 						htmlFor={`${listId}-search`}
 						className="inline-flex items-center gap-2 text-muted-foreground"
 					>
@@ -402,7 +402,7 @@ function TransactionsView({
 							placeholder="Find a transaction…"
 							className="w-32 sm:w-48"
 						/>
-					</Label>
+					</FieldLabel>
 					<div className="flex shrink-0 flex-wrap items-center gap-3">
 						<TransactionSortButton order={order} onChange={changeOrder} />
 						{schedule === "recurring" ? (

@@ -10,9 +10,15 @@ import {
 	saveNewPurchase,
 	savePurchaseEdit,
 } from "../../state/purchaseWrites.ts";
-import { Field, FieldContent } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { parseDisplayNumber } from "../../components/editors/formValues.ts";
 import {
@@ -156,12 +162,12 @@ export function PlannedPurchaseEditor({
 					className="flex flex-col gap-4"
 					onSubmit={(event) => void submit(event)}
 				>
-					<fieldset
+					<FieldSet
 						disabled={readOnly || saving}
 						className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
 					>
 						<Field className="col-span-full">
-							<Label htmlFor={nameId}>Purchase name</Label>
+							<FieldLabel htmlFor={nameId}>Purchase name</FieldLabel>
 							<Input
 								id={nameId}
 								required
@@ -171,7 +177,7 @@ export function PlannedPurchaseEditor({
 							/>
 						</Field>
 						<Field>
-							<Label htmlFor={costId}>Cost (USD)</Label>
+							<FieldLabel htmlFor={costId}>Cost (USD)</FieldLabel>
 							<Input
 								id={costId}
 								type="number"
@@ -185,7 +191,7 @@ export function PlannedPurchaseEditor({
 							/>
 						</Field>
 						<Field>
-							<Label htmlFor={accountId}>Funding account</Label>
+							<FieldLabel htmlFor={accountId}>Funding account</FieldLabel>
 							<Select
 								value={fromId}
 								items={Object.fromEntries(
@@ -206,7 +212,9 @@ export function PlannedPurchaseEditor({
 							</Select>
 						</Field>
 						<Field className="col-span-full">
-							<Label htmlFor={earliestId}>Earliest purchase date</Label>
+							<FieldLabel htmlFor={earliestId}>
+								Earliest purchase date
+							</FieldLabel>
 							<Input
 								id={earliestId}
 								type="date"
@@ -214,11 +222,11 @@ export function PlannedPurchaseEditor({
 								value={earliest}
 								onChange={(event) => setEarliest(event.target.value)}
 							/>
+							<FieldDescription>
+								The forecast defers this item until its full cost fits, after
+								all established payments. It never buys anything for you.
+							</FieldDescription>
 						</Field>
-						<p className="col-span-full text-xs text-muted-foreground">
-							The forecast defers this item until its full cost fits, after all
-							established payments. It never buys anything for you.
-						</p>
 						<Field orientation="horizontal" className="col-span-full">
 							<Checkbox
 								id={includeId}
@@ -227,18 +235,13 @@ export function PlannedPurchaseEditor({
 								onCheckedChange={(checked) => setEnabled(checked === true)}
 							/>
 							<FieldContent>
-								<Label htmlFor={includeId}>Include in purchase queue</Label>
+								<FieldLabel htmlFor={includeId}>
+									Include in purchase queue
+								</FieldLabel>
 							</FieldContent>
 						</Field>
-					</fieldset>
-					{error && (
-						<p
-							role="alert"
-							className="m-0 text-sm leading-relaxed text-danger-text"
-						>
-							{error}
-						</p>
-					)}
+					</FieldSet>
+					{error && <FieldError>{error}</FieldError>}
 					<DialogFooter>
 						<Button
 							type="button"

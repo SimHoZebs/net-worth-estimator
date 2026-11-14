@@ -3,6 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button, buttonVariants } from "@/components/ui/button.tsx";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
 import { cn } from "@/lib/utils.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -176,27 +186,33 @@ export function SyncProviderPanel() {
 			)}
 
 			{readOnly && (
-				<p className="m-0 rounded-md border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
-					This workspace is read-only. You can view the setup guide and
-					connection details. Write access is required to connect, disconnect,
-					or sync.
-				</p>
+				<Alert
+					variant="default"
+					role="note"
+					className="border-warning-border bg-warning-bg text-warning-text"
+				>
+					<AlertDescription className="text-sm text-warning-text">
+						This workspace is read-only. You can view the setup guide and
+						connection details. Write access is required to connect, disconnect,
+						or sync.
+					</AlertDescription>
+				</Alert>
 			)}
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{configured ? (
-						<div className="overflow-hidden rounded-xl border border-border bg-card">
-							<div className="p-5 sm:p-6">
-								<div className="flex flex-wrap items-start gap-4">
-									<div className="flex min-w-0 items-start gap-3">
-										<span className="inline-grid size-11 shrink-0 place-items-center rounded-md bg-success-bg text-success-text">
-											<Landmark size={22} aria-hidden="true" />
-										</span>
-										<div className="grid min-w-0 gap-1">
+						<Card>
+							<CardHeader>
+								<div className="flex min-w-0 items-start gap-3">
+									<span className="inline-grid size-11 shrink-0 place-items-center rounded-md bg-success-bg text-success-text">
+										<Landmark size={22} aria-hidden="true" />
+									</span>
+									<div className="grid min-w-0 gap-1">
+										<CardTitle>
 											<h3
 												ref={focusConnectedHeading}
 												tabIndex={-1}
-												className="m-0 flex items-center gap-2 text-lg"
+												className="flex items-center gap-2"
 											>
 												SimpleFIN
 												<Badge
@@ -207,92 +223,106 @@ export function SyncProviderPanel() {
 													Connected
 												</Badge>
 											</h3>
-											<p className="m-0 text-sm leading-relaxed text-muted-foreground">
-												{since && <>Connected since {since} · </>}
-												{lastSynced ? (
-													<>
-														Last synced{" "}
-														<time dateTime={status.data?.lastSyncAt}>
-															{lastSynced}
-														</time>
-													</>
-												) : (
-													"No successful sync yet"
-												)}
-												{quotaRemaining !== null && quotaLimit !== null && (
-													<>
-														{" "}
-														· {quotaRemaining} out of {quotaLimit} syncs
-														available
-													</>
-												)}
-											</p>
-										</div>
-									</div>
-									<div className="flex flex-wrap gap-3 sm:ml-auto">
-										<Button
-											variant="default"
-											disabled={readOnly || busy || syncing || syncUnavailable}
-											onClick={() => void handleSyncNow()}
-										>
-											<RefreshCw size={16} aria-hidden="true" />
-											{syncing ? "Syncing…" : "Sync now"}
-										</Button>
-										<a
-											href={simplefinLinks.home}
-											target="_blank"
-											rel="noopener noreferrer"
-											className={cn(buttonVariants({ variant: "secondary" }))}
-										>
-											Open SimpleFIN Bridge{" "}
-											<ExternalLink size={14} aria-hidden="true" />
-											<span className="sr-only"> (opens in a new tab)</span>
-										</a>
+										</CardTitle>
+										<CardDescription>
+											{since && <>Connected since {since} · </>}
+											{lastSynced ? (
+												<>
+													Last synced{" "}
+													<time dateTime={status.data?.lastSyncAt}>
+														{lastSynced}
+													</time>
+												</>
+											) : (
+												"No successful sync yet"
+											)}
+											{quotaRemaining !== null && quotaLimit !== null && (
+												<>
+													{" "}
+													· {quotaRemaining} out of {quotaLimit} syncs available
+												</>
+											)}
+										</CardDescription>
 									</div>
 								</div>
-								{status.isError && (
-									<Alert variant="destructive">
-										<AlertCircle size={16} aria-hidden="true" />
-										<AlertDescription>
-											The sync status could not be loaded.{" "}
-											<Button
-												variant="link"
-												onClick={() => void status.refetch()}
-											>
-												Reload status
-											</Button>
-										</AlertDescription>
-									</Alert>
-								)}
-								{status.data?.syncError && (
-									<Alert className="mb-4 border-warning-border bg-warning-bg text-warning-text">
-										<AlertDescription className="text-warning-text">
-											<p className="m-0 text-sm leading-relaxed">
-												{status.data.syncError.message}
-											</p>
-											{status.data.syncError.scope === "connection" && (
-												<p className="mt-2 mb-0 text-sm leading-relaxed">
-													Other bank logins can keep syncing. Reconnect the
-													affected login in SimpleFIN to resume it.
+								<CardAction className="flex flex-wrap gap-3 max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-2 max-sm:justify-self-start">
+									<Button
+										variant="default"
+										disabled={readOnly || busy || syncing || syncUnavailable}
+										onClick={() => void handleSyncNow()}
+									>
+										<RefreshCw size={16} aria-hidden="true" />
+										{syncing ? "Syncing…" : "Sync now"}
+									</Button>
+									<a
+										href={simplefinLinks.home}
+										target="_blank"
+										rel="noopener noreferrer"
+										className={cn(buttonVariants({ variant: "secondary" }))}
+									>
+										Open SimpleFIN Bridge{" "}
+										<ExternalLink size={14} aria-hidden="true" />
+										<span className="sr-only"> (opens in a new tab)</span>
+									</a>
+								</CardAction>
+							</CardHeader>
+							{(status.isError ||
+								status.data?.syncError ||
+								syncUnavailable) && (
+								<CardContent>
+									{status.isError && (
+										<Alert variant="destructive">
+											<AlertCircle size={16} aria-hidden="true" />
+											<AlertDescription>
+												The sync status could not be loaded.{" "}
+												<Button
+													variant="link"
+													onClick={() => void status.refetch()}
+												>
+													Reload status
+												</Button>
+											</AlertDescription>
+										</Alert>
+									)}
+									{status.data?.syncError && (
+										<Alert className="border-warning-border bg-warning-bg text-warning-text">
+											<AlertDescription className="text-warning-text">
+												<p className="m-0 text-sm leading-relaxed">
+													{status.data.syncError.message}
 												</p>
-											)}
-										</AlertDescription>
-									</Alert>
-								)}
-								{syncUnavailable && (
-									<p className="mb-4 text-sm leading-relaxed text-warning-text">
-										Your connection is saved, but the server has not enabled
-										sync for this user. Ask your server administrator to check
-										the sync configuration.
-									</p>
-								)}
-							</div>
-							<SyncConnectedAccounts
-								onLinked={(linkedMessage) => {
-									notifySuccess("sync-connection", linkedMessage);
-								}}
-							/>
-							<div className="border-t border-border bg-muted px-5 py-4 sm:px-6">
+												{status.data.syncError.scope === "connection" && (
+													<p className="mt-2 mb-0 text-sm leading-relaxed">
+														Other bank logins can keep syncing. Reconnect the
+														affected login in SimpleFIN to resume it.
+													</p>
+												)}
+											</AlertDescription>
+										</Alert>
+									)}
+									{syncUnavailable && (
+										<Alert
+											variant="default"
+											role="note"
+											className="border-warning-border bg-warning-bg text-warning-text"
+										>
+											<AlertDescription className="text-sm text-warning-text">
+												Your connection is saved, but the server has not enabled
+												sync for this user. Ask your server administrator to
+												check the sync configuration.
+											</AlertDescription>
+										</Alert>
+									)}
+								</CardContent>
+							)}
+							<Separator />
+							<CardContent>
+								<SyncConnectedAccounts
+									onLinked={(linkedMessage) => {
+										notifySuccess("sync-connection", linkedMessage);
+									}}
+								/>
+							</CardContent>
+							<CardFooter>
 								{reconnecting ? (
 									<div>
 										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
@@ -362,8 +392,8 @@ export function SyncProviderPanel() {
 										</Button>
 									</div>
 								)}
-							</div>
-						</div>
+							</CardFooter>
+						</Card>
 					) : (
 						<SyncOnboarding
 							onConnected={() => {

@@ -7,6 +7,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import type {
 	FinancialIndependenceAnalysis,
 	IndependenceCandidate,
@@ -92,13 +93,14 @@ export function IndependenceEvidence({
 						{candidate.assets.map((asset) => (
 							<TableRow key={asset.accountId}>
 								<TableHead scope="row">
-									<button
+									<Button
 										type="button"
-										className="cursor-pointer border-0 bg-transparent p-0 text-left text-success-text underline underline-offset-4"
+										variant="link"
+										className="h-auto justify-start p-0 text-left text-success-text underline"
 										onClick={() => openAccount(asset.accountId)}
 									>
 										{analysis.accountNames[asset.accountId] ?? asset.accountId}
-									</button>
+									</Button>
 								</TableHead>
 								<TableCell className="text-right">
 									{money(asset.balance)}
@@ -191,14 +193,15 @@ export function IndependenceEvidence({
 							{!!failure.accountIds.length && (
 								<div className="flex flex-wrap gap-2">
 									{failure.accountIds.map((id) => (
-										<button
+										<Button
 											key={id}
 											type="button"
-											className="cursor-pointer border-0 bg-transparent p-0 text-left text-xs text-success-text underline underline-offset-4"
+											variant="link"
+											className="h-auto justify-start p-0 text-left text-xs text-success-text underline"
 											onClick={() => openAccount(id)}
 										>
 											{analysis.accountNames[id] ?? id}
-										</button>
+										</Button>
 									))}
 								</div>
 							)}

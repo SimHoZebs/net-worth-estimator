@@ -8,6 +8,13 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Field } from "@/components/ui/field.tsx";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+} from "@/components/ui/item.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { redirectToSignIn } from "./navigation.ts";
@@ -234,30 +241,31 @@ export function AccountPage() {
 						No other signed-in devices.
 					</p>
 				) : (
-					<ul className="grid list-none gap-2 p-0">
+					<ItemGroup role="list" aria-label="Signed-in sessions">
 						{sessions.map((item) => (
-							<li
-								key={item.id}
-								className="flex items-center justify-between gap-3 rounded-md border border-solid border-border px-3 py-2 text-sm"
-							>
-								<span className="text-muted-foreground">
-									{item.current ? "This device" : "Another device"} · expires{" "}
-									<time dateTime={item.expiresAt}>
-										{new Date(item.expiresAt).toLocaleString()}
-									</time>
-								</span>
+							<Item key={item.id} role="listitem" variant="outline" size="sm">
+								<ItemContent>
+									<ItemDescription>
+										{item.current ? "This device" : "Another device"} · expires{" "}
+										<time dateTime={item.expiresAt}>
+											{new Date(item.expiresAt).toLocaleString()}
+										</time>
+									</ItemDescription>
+								</ItemContent>
 								{item.current ? null : (
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => void onRevoke(item.id)}
-									>
-										Revoke
-									</Button>
+									<ItemActions>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => void onRevoke(item.id)}
+										>
+											Revoke
+										</Button>
+									</ItemActions>
 								)}
-							</li>
+							</Item>
 						))}
-					</ul>
+					</ItemGroup>
 				)}
 			</div>
 

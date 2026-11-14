@@ -1,6 +1,6 @@
 import { useId, useMemo } from "react";
 import { AccountToggle } from "../../../components/AccountToggle.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import { Field, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import type { Account } from "../../../domain/model.ts";
@@ -77,10 +77,8 @@ export function SafeSpendingConfigurePanel({
 					}
 				/>
 			</Field>
-			<fieldset className="grid gap-3">
-				<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted-foreground">
-					Income accounts
-				</legend>
+			<FieldSet>
+				<FieldLegend variant="label">Income accounts</FieldLegend>
 				<div className="flex flex-wrap gap-2">
 					{config.incomeAccounts.map((account) => {
 						const full = accountsById.get(account.id);
@@ -96,15 +94,13 @@ export function SafeSpendingConfigurePanel({
 						);
 					})}
 				</div>
-			</fieldset>
+			</FieldSet>
 			<IncomeSourcesFieldset
 				income={income}
 				onChange={(incomeScheduleIds) => onUpdateConfig({ incomeScheduleIds })}
 			/>
-			<fieldset className="grid gap-3">
-				<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted-foreground">
-					{labels.cashAccounts}
-				</legend>
+			<FieldSet>
+				<FieldLegend variant="label">{labels.cashAccounts}</FieldLegend>
 				<div className="flex flex-wrap gap-2">
 					{config.spendingAccounts.map((account) => {
 						const full = accountsById.get(account.id);
@@ -120,11 +116,9 @@ export function SafeSpendingConfigurePanel({
 						);
 					})}
 				</div>
-			</fieldset>
-			<fieldset className="grid gap-3">
-				<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted-foreground">
-					Tracked cards
-				</legend>
+			</FieldSet>
+			<FieldSet>
+				<FieldLegend variant="label">Tracked cards</FieldLegend>
 				<div className="flex flex-wrap gap-2">
 					{config.cards.map((card) => {
 						const full = accountsById.get(card.id);
@@ -140,11 +134,9 @@ export function SafeSpendingConfigurePanel({
 						);
 					})}
 				</div>
-			</fieldset>
-			<fieldset className="grid gap-3">
-				<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted-foreground">
-					Included bills
-				</legend>
+			</FieldSet>
+			<FieldSet>
+				<FieldLegend variant="label">Included bills</FieldLegend>
 				{billCandidates.length ? (
 					<div className="flex flex-wrap gap-2">
 						{billCandidates.map((bill) => (
@@ -162,7 +154,7 @@ export function SafeSpendingConfigurePanel({
 						No recurring bills found for the selected cash accounts.
 					</p>
 				)}
-			</fieldset>
+			</FieldSet>
 		</div>
 	);
 }

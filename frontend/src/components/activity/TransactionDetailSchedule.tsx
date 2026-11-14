@@ -7,7 +7,14 @@ import type { Frequency } from "@/api/contracts.ts";
 import { timeOfDay } from "../editors/transactionBodies.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent } from "@/components/ui/card.tsx";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Field, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -396,24 +403,22 @@ export function ScheduleCapsule({
 			: ` · ${annualIncrease > 0 ? "+" : ""}${annualIncrease}% yearly`;
 	return (
 		<Card size="sm" className="mt-5">
-			<CardContent className="flex flex-col gap-3">
-				<div className="flex items-center gap-3 text-muted-foreground">
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2">
 					<Repeat size={16} aria-hidden="true" />
-					<div className="flex min-w-0 flex-col gap-0.5">
-						<strong className="text-sm font-semibold text-foreground">
-							Recurring schedule
-						</strong>
-						<span className="text-xs text-muted-foreground">
-							{scheduleCadence ?? "Recurring schedule"}
-							{growth}
-						</span>
-					</div>
-					{savedTransaction.enabled === false && (
-						<Badge variant="secondary" className="ml-auto">
-							Excluded
-						</Badge>
-					)}
-				</div>
+					Recurring schedule
+				</CardTitle>
+				<CardDescription>
+					{scheduleCadence ?? "Recurring schedule"}
+					{growth}
+				</CardDescription>
+				{savedTransaction.enabled === false && (
+					<CardAction>
+						<Badge variant="secondary">Excluded</Badge>
+					</CardAction>
+				)}
+			</CardHeader>
+			<CardContent>
 				<div className="flex flex-wrap items-center gap-2">
 					<Field className="min-w-32 flex-1">
 						<FieldLabel htmlFor={scheduleControlId}>

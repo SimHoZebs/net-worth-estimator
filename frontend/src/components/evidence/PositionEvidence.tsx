@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import { Fragment } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
 import { visibleAccounts, type Account } from "../../domain/model.ts";
 import type { CurrentPosition } from "../../api/position.ts";
@@ -10,7 +11,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { Item, ItemContent, ItemGroup } from "@/components/ui/item.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemGroup,
+	ItemSeparator,
+} from "@/components/ui/item.tsx";
 import { cn } from "@/lib/utils.ts";
 
 export function PositionEvidence({
@@ -45,29 +51,29 @@ export function PositionEvidence({
 				<ItemGroup className="my-5 gap-0">
 					{visibleAccounts(accounts)
 						.filter((account) => account.enabled)
-						.map((account) => {
+						.map((account, index) => {
 							const positionAccount = position.accounts.find(
 								(item) => item.accountId === account.id,
 							);
 							const balance = positionAccount?.balance;
 							return (
-								<Item
-									key={account.id}
-									className="justify-between gap-5 rounded-none border-x-0 border-t-0 border-b border-border px-0 py-3"
-								>
-									<span className="text-muted-foreground">
-										<span className="inline-flex items-center gap-2">
-											<AccountDot color={account.color} />
-											{account.name}
+								<Fragment key={account.id}>
+									{index > 0 && <ItemSeparator />}
+									<Item className="justify-between gap-5">
+										<span className="text-muted-foreground">
+											<span className="inline-flex items-center gap-2">
+												<AccountDot color={account.color} />
+												{account.name}
+											</span>
+											<small className="mt-1 block text-xs">
+												{dateLabel(account.observedOn, true)}
+											</small>
 										</span>
-										<small className="mt-1 block text-xs">
-											{dateLabel(account.observedOn, true)}
-										</small>
-									</span>
-									<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
-										{balance === undefined ? "Unavailable" : money(balance)}
-									</ItemContent>
-								</Item>
+										<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
+											{balance === undefined ? "Unavailable" : money(balance)}
+										</ItemContent>
+									</Item>
+								</Fragment>
 							);
 						})}
 				</ItemGroup>

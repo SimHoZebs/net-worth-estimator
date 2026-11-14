@@ -8,9 +8,13 @@ import { UserScopeError } from "@/api/scopedRequest.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import {
 	Select,
 	SelectContent,
@@ -78,13 +82,10 @@ export function BNPLConfirmation({
 	return (
 		<div className="space-y-3">
 			{(!confirmed || changeAnswer) && !readOnly && !finding.stale ? (
-				<fieldset
-					disabled={feedback.isPending || finding.stale}
-					className="m-0 space-y-3 border-0 p-0"
-				>
-					<legend className="text-sm font-semibold">
+				<FieldSet disabled={feedback.isPending || finding.stale}>
+					<FieldLegend variant="label">
 						Is this a buy now, pay later payment from {provider}?
-					</legend>
+					</FieldLegend>
 					<div className="flex gap-2">
 						<Button
 							size="sm"
@@ -101,19 +102,14 @@ export function BNPLConfirmation({
 							No
 						</Button>
 					</div>
-				</fieldset>
+				</FieldSet>
 			) : (
 				<div className="flex flex-wrap items-center gap-2">
-					<Badge
-						variant="secondary"
-						className="h-auto bg-accent text-muted-foreground"
-					>
-						{findingLabel(finding)}
-					</Badge>
+					<Badge variant="secondary">{findingLabel(finding)}</Badge>
 					{finding.stale && (
 						<Badge
 							variant="default"
-							className="h-auto bg-warning-bg text-warning-text"
+							className="bg-warning-bg text-warning-text"
 						>
 							Awaiting analysis
 						</Badge>
@@ -187,8 +183,8 @@ function PlanDurationField({
 }) {
 	const id = useId();
 	return (
-		<Field className="flex w-24 min-w-0 flex-col gap-2">
-			<Label htmlFor={id}>Duration</Label>
+		<Field className="w-24 min-w-0">
+			<FieldLabel htmlFor={id}>Duration</FieldLabel>
 			<Input
 				ref={inputRef}
 				id={id}
@@ -214,8 +210,8 @@ function PlanDurationUnit({
 }) {
 	const id = useId();
 	return (
-		<Field className="flex min-w-0 flex-col gap-2">
-			<Label htmlFor={id}>Unit</Label>
+		<Field>
+			<FieldLabel htmlFor={id}>Unit</FieldLabel>
 			<Select
 				name="unit"
 				value={unit}
@@ -257,8 +253,8 @@ function PlanDuration({
 					onSave({ count: value, unit });
 			}}
 		>
-			<fieldset disabled={busy} className="m-0 space-y-3 border-0 p-0">
-				<legend className="text-sm font-semibold">How long is the plan?</legend>
+			<FieldSet disabled={busy}>
+				<FieldLegend variant="label">How long is the plan?</FieldLegend>
 				<div className="flex flex-wrap items-end gap-2">
 					<PlanDurationField
 						inputRef={inputRef}
@@ -270,7 +266,7 @@ function PlanDuration({
 						Save
 					</Button>
 				</div>
-			</fieldset>
+			</FieldSet>
 		</form>
 	);
 }

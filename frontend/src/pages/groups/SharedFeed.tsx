@@ -20,9 +20,8 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import {
 	Select,
 	SelectContent,
@@ -32,10 +31,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
-import {
-	transactionAmountStyles,
-	transactionBadgeStyles,
-} from "../../components/activity/activityStyles.ts";
+import { transactionAmountStyles } from "../../components/activity/activityStyles.ts";
 import {
 	dateLabel,
 	exactMoney,
@@ -172,7 +168,7 @@ export function SharedFeed({
 				onSubmit={(event) => event.preventDefault()}
 			>
 				<Field>
-					<Label htmlFor={fromDateId}>From date</Label>
+					<FieldLabel htmlFor={fromDateId}>From date</FieldLabel>
 					<Input
 						id={fromDateId}
 						type="date"
@@ -181,7 +177,7 @@ export function SharedFeed({
 					/>
 				</Field>
 				<Field>
-					<Label htmlFor={toDateId}>To date</Label>
+					<FieldLabel htmlFor={toDateId}>To date</FieldLabel>
 					<Input
 						id={toDateId}
 						type="date"
@@ -190,7 +186,7 @@ export function SharedFeed({
 					/>
 				</Field>
 				<Field>
-					<Label htmlFor={memberId}>Member</Label>
+					<FieldLabel htmlFor={memberId}>Member</FieldLabel>
 					<Select
 						value={member || "all"}
 						items={{
@@ -220,7 +216,7 @@ export function SharedFeed({
 					</Select>
 				</Field>
 				<Field>
-					<Label htmlFor={movementId}>Movement</Label>
+					<FieldLabel htmlFor={movementId}>Movement</FieldLabel>
 					<Select
 						value={direction || "all"}
 						items={{ all: "All movements", ...DIRECTION_LABELS }}
@@ -310,12 +306,7 @@ export function SharedFeed({
 									),
 									mobile: <time dateTime={day}>{dateLabel(day, true)}</time>,
 									badges: isSaved ? (
-										<Badge
-											variant="secondary"
-											className={transactionBadgeStyles()}
-										>
-											Saved
-										</Badge>
+										<Badge variant="secondary">Saved</Badge>
 									) : null,
 								}}
 								amount={
@@ -341,12 +332,7 @@ export function SharedFeed({
 											</strong>
 										)}
 										{item.transaction.pending ? (
-											<Badge
-												variant="secondary"
-												className={transactionBadgeStyles()}
-											>
-												Pending
-											</Badge>
+											<Badge variant="secondary">Pending</Badge>
 										) : null}
 									</>
 								}

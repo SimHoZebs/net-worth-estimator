@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { AccountPage } from "../auth/AccountPage.tsx";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { SyncSettings } from "./sources/SyncSettings.tsx";
 import { AnalysisFindings } from "./sources/AnalysisFindings.tsx";
@@ -22,24 +27,30 @@ export function SourcesPage() {
 			<TabsList
 				variant="line"
 				aria-label="Configuration sections"
-				className="mb-6 flex w-full gap-6 overflow-x-auto p-0"
+				className="relative mb-6 flex w-full justify-start gap-6 overflow-x-auto"
 			>
 				{configTabs.map((configTab) => (
 					<TabsTrigger
 						key={configTab.id}
 						value={configTab.id}
-						className="flex-none px-0.5 pt-3 pb-4"
+						className="flex-none"
 					>
 						{configTab.label}
 					</TabsTrigger>
 				))}
 			</TabsList>
-			<section>
-				{tab === "sync" && <SyncSettings />}
-				{tab === "amounts" && <AmountCatalog />}
-				{tab === "account" && <AccountPage />}
-				{tab === "analysis" && <AnalysisFindings />}
-			</section>
+			<TabsContent value="sync">
+				<SyncSettings />
+			</TabsContent>
+			<TabsContent value="amounts">
+				<AmountCatalog />
+			</TabsContent>
+			<TabsContent value="account">
+				<AccountPage />
+			</TabsContent>
+			<TabsContent value="analysis">
+				<AnalysisFindings />
+			</TabsContent>
 		</Tabs>
 	);
 }

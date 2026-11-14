@@ -1,9 +1,8 @@
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useId, useState, type Ref } from "react";
 import { Button } from "@/components/ui/button.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { connectSyncKey } from "../../state/syncSettings.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
@@ -51,7 +50,7 @@ export function SyncConnectForm({
 			}}
 		>
 			<Field>
-				<Label htmlFor={inputId}>Setup token</Label>
+				<FieldLabel htmlFor={inputId}>Setup token</FieldLabel>
 				<Input
 					id={inputId}
 					ref={inputRef}
@@ -91,11 +90,7 @@ export function SyncConnectForm({
 					{visible ? "Hide token" : "Show token"}
 				</Button>
 			</div>
-			{error ? (
-				<p id={errorId} role="alert">
-					{error}
-				</p>
-			) : null}
+			{error ? <FieldError id={errorId}>{error}</FieldError> : null}
 			<div className="mt-3 flex flex-wrap items-center gap-3">
 				<Button type="submit" variant="default" disabled={readOnly || busy}>
 					{busy ? "Connecting…" : "Connect SimpleFIN"}

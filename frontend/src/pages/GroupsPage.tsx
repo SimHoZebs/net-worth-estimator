@@ -19,9 +19,16 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { GroupSharingSection } from "./GroupSharingSection.tsx";
 import {
 	useCreateGroup,
@@ -271,19 +278,16 @@ export function GroupsPage({
 							</div>
 						)}
 
-						<ul aria-label="Members" className="grid list-none gap-2 p-0">
+						<ItemGroup role="list" aria-label="Members" className="gap-2">
 							{members.map((member) => (
-								<li
-									key={member.accountId}
-									className="flex items-center justify-between gap-3 rounded-md border border-solid border-border px-3 py-2 text-sm"
-								>
-									<span>
-										{member.displayName || member.accountId}{" "}
-										<span className="text-muted-foreground">
-											· {member.role}
-										</span>
-									</span>
-									<span className="flex gap-2">
+								<Item role="listitem" key={member.accountId} variant="outline">
+									<ItemContent>
+										<ItemTitle>
+											{member.displayName || member.accountId}
+										</ItemTitle>
+										<ItemDescription>{member.role}</ItemDescription>
+									</ItemContent>
+									<ItemActions>
 										{detail &&
 											detail.role === "owner" &&
 											member.role !== "owner" && (
@@ -311,10 +315,10 @@ export function GroupsPage({
 													Remove
 												</Button>
 											)}
-									</span>
-								</li>
+									</ItemActions>
+								</Item>
 							))}
-						</ul>
+						</ItemGroup>
 
 						{selected && (
 							<SharedFeed
@@ -336,25 +340,26 @@ export function GroupsPage({
 							/>
 						)}
 						{invites.length > 0 && (
-							<ul className="grid list-none gap-2 p-0">
+							<ItemGroup role="list" className="gap-2">
 								{invites.map((invite) => (
-									<li
-										key={invite.id}
-										className="flex items-center justify-between gap-3 text-sm"
-									>
-										<span className="text-muted-foreground">
-											Uses {invite.usedCount}/{invite.maxUses}
-										</span>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => void onRevoke(selected, invite.id)}
-										>
-											Revoke
-										</Button>
-									</li>
+									<Item role="listitem" key={invite.id}>
+										<ItemContent>
+											<ItemDescription>
+												Uses {invite.usedCount}/{invite.maxUses}
+											</ItemDescription>
+										</ItemContent>
+										<ItemActions>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => void onRevoke(selected, invite.id)}
+											>
+												Revoke
+											</Button>
+										</ItemActions>
+									</Item>
 								))}
-							</ul>
+							</ItemGroup>
 						)}
 
 						{detail && <GroupSharingSection groupId={detail.id} />}
@@ -427,20 +432,17 @@ export function GroupsPage({
 						</EmptyContent>
 					</Empty>
 				) : (
-					<ul className="grid list-none gap-2 p-0">
+					<ItemGroup role="list" className="gap-2">
 						{groups.map((group) => (
-							<li
-								key={group.id}
-								className="flex items-center justify-between gap-3 rounded-md border border-solid border-border px-3 py-2 text-sm"
-							>
-								<span>
-									<strong>{group.name}</strong>{" "}
-									<span className="text-muted-foreground">
-										· {group.role} · {group.memberCount} member
+							<Item role="listitem" key={group.id} variant="outline">
+								<ItemContent>
+									<ItemTitle>{group.name}</ItemTitle>
+									<ItemDescription>
+										{group.role} · {group.memberCount} member
 										{group.memberCount === 1 ? "" : "s"}
-									</span>
-								</span>
-								<span className="flex gap-2">
+									</ItemDescription>
+								</ItemContent>
+								<ItemActions>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -464,17 +466,17 @@ export function GroupsPage({
 											Delete
 										</Button>
 									)}
-								</span>
-							</li>
+								</ItemActions>
+							</Item>
 						))}
-					</ul>
+					</ItemGroup>
 				)}
 			</div>
 
 			<form onSubmit={onJoin} className="grid max-w-md gap-2">
 				<h2 className="m-0 text-base">Join with a code</h2>
 				<Field>
-					<Label htmlFor={inviteCodeId}>Invite code</Label>
+					<FieldLabel htmlFor={inviteCodeId}>Invite code</FieldLabel>
 					<Input
 						id={inviteCodeId}
 						value={code}
@@ -505,7 +507,7 @@ export function GroupsPage({
 						</DialogHeader>
 						<form onSubmit={onCreate} className="grid gap-4">
 							<Field>
-								<Label htmlFor={groupNameId}>Group name</Label>
+								<FieldLabel htmlFor={groupNameId}>Group name</FieldLabel>
 								<Input
 									id={groupNameId}
 									value={name}

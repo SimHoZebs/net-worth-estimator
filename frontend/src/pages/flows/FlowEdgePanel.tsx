@@ -1,5 +1,6 @@
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
+import { Button } from "@/components/ui/button.tsx";
 import {
 	Table,
 	TableBody,
@@ -53,16 +54,18 @@ export function FlowEdgePanel({
 				.
 			</p>
 			{item.aggregated && (
-				<button
+				<Button
 					type="button"
+					variant="link"
+					size="xs"
 					onClick={onToggleExpanded}
 					aria-expanded={expanded}
-					className="mt-2 text-xs font-bold text-success-text underline"
+					className="mt-2 text-success-text"
 				>
 					{expanded
 						? "Hide the grouped flows"
 						: `Show the ${item.members.length} grouped flows`}
-				</button>
+				</Button>
 			)}
 			{expanded &&
 				item.members.map((member) => (

@@ -34,7 +34,12 @@ import { serverQueryClient } from "../../state/serverQuery.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Card, CardContent } from "@/components/ui/card.tsx";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -1061,8 +1066,8 @@ export function TransactionDetail({
 												}
 												className={
 													transaction.direction === "in"
-														? "text-lg font-medium text-success-text tabular-nums"
-														: "text-lg font-medium tabular-nums"
+														? "text-success-text tabular-nums"
+														: "tabular-nums"
 												}
 											/>
 										</InputGroup>
@@ -1164,97 +1169,95 @@ export function TransactionDetail({
 							)}
 						</div>
 						{kind === "transfer" && (
-							<section aria-label="Transfer details" className="mt-5">
-								<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>
-								<Card size="sm">
-									<CardContent className="flex flex-col gap-3">
-										<Field>
-											<FieldLabel htmlFor={`${edit.formId}-from`}>
-												From account
-											</FieldLabel>
-											<div className="flex items-center gap-3">
-												{fromAccount ? (
-													<AccountIcon account={fromAccount} />
-												) : (
-													<AccountIconFallback />
-												)}
-												<Select
-													value={edit.draft.fromId}
-													disabled={!canEdit}
-													onValueChange={(value) => {
-														if (value !== null)
-															edit.updateDraft({ fromId: value }, "from");
-													}}
+							<Card size="sm" className="mt-5">
+								<CardHeader>
+									<CardTitle>Transfer details</CardTitle>
+								</CardHeader>
+								<CardContent className="flex flex-col gap-3">
+									<Field>
+										<FieldLabel htmlFor={`${edit.formId}-from`}>
+											From account
+										</FieldLabel>
+										<div className="flex items-center gap-3">
+											{fromAccount ? (
+												<AccountIcon account={fromAccount} />
+											) : (
+												<AccountIconFallback />
+											)}
+											<Select
+												value={edit.draft.fromId}
+												disabled={!canEdit}
+												onValueChange={(value) => {
+													if (value !== null)
+														edit.updateDraft({ fromId: value }, "from");
+												}}
+											>
+												<SelectTrigger
+													id={`${edit.formId}-from`}
+													aria-label="From"
+													className="min-w-0 flex-1"
 												>
-													<SelectTrigger
-														id={`${edit.formId}-from`}
-														aria-label="From"
-														className="min-w-0 flex-1"
-													>
-														<SelectValue placeholder="External income">
-															{(value: string | null) =>
-																fromAccountLabel(value)
-															}
-														</SelectValue>
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="">External income</SelectItem>
-														{fromAccountOptions(fullAccounts).map((account) => (
-															<SelectItem key={account.id} value={account.id}>
-																{account.name}
-															</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-											</div>
-										</Field>
-										<div
-											className="flex items-center gap-3 text-muted-foreground"
-											aria-hidden="true"
-										>
-											<ArrowDown size={16} />
+													<SelectValue placeholder="External income">
+														{(value: string | null) => fromAccountLabel(value)}
+													</SelectValue>
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="">External income</SelectItem>
+													{fromAccountOptions(fullAccounts).map((account) => (
+														<SelectItem key={account.id} value={account.id}>
+															{account.name}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
 										</div>
-										<Field>
-											<FieldLabel htmlFor={`${edit.formId}-to`}>
-												To account
-											</FieldLabel>
-											<div className="flex items-center gap-3">
-												{toAccount ? (
-													<AccountIcon account={toAccount} />
-												) : (
-													<AccountIconFallback />
-												)}
-												<Select
-													value={edit.draft.toId}
-													disabled={!canEdit}
-													onValueChange={(value) => {
-														if (value !== null)
-															edit.updateDraft({ toId: value }, "to");
-													}}
+									</Field>
+									<div
+										className="flex items-center gap-3 text-muted-foreground"
+										aria-hidden="true"
+									>
+										<ArrowDown size={16} />
+									</div>
+									<Field>
+										<FieldLabel htmlFor={`${edit.formId}-to`}>
+											To account
+										</FieldLabel>
+										<div className="flex items-center gap-3">
+											{toAccount ? (
+												<AccountIcon account={toAccount} />
+											) : (
+												<AccountIconFallback />
+											)}
+											<Select
+												value={edit.draft.toId}
+												disabled={!canEdit}
+												onValueChange={(value) => {
+													if (value !== null)
+														edit.updateDraft({ toId: value }, "to");
+												}}
+											>
+												<SelectTrigger
+													id={`${edit.formId}-to`}
+													aria-label="To"
+													className="min-w-0 flex-1"
 												>
-													<SelectTrigger
-														id={`${edit.formId}-to`}
-														aria-label="To"
-														className="min-w-0 flex-1"
-													>
-														<SelectValue placeholder="External spending">
-															{(value: string | null) => toAccountLabel(value)}
-														</SelectValue>
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="">External spending</SelectItem>
-														{visibleAccounts(fullAccounts).map((account) => (
-															<SelectItem key={account.id} value={account.id}>
-																{account.name}
-															</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-											</div>
-										</Field>
-									</CardContent>
-								</Card>
-							</section>
+													<SelectValue placeholder="External spending">
+														{(value: string | null) => toAccountLabel(value)}
+													</SelectValue>
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="">External spending</SelectItem>
+													{visibleAccounts(fullAccounts).map((account) => (
+														<SelectItem key={account.id} value={account.id}>
+															{account.name}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+										</div>
+									</Field>
+								</CardContent>
+							</Card>
 						)}
 						{once && (
 							<TransferLinkSection

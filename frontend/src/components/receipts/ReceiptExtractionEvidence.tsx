@@ -8,7 +8,7 @@ export function ReceiptExtractionEvidence({
 }) {
 	const { details, confidence } = extraction;
 	return (
-		<details className="rounded-xl border border-border p-4">
+		<details>
 			<summary className="cursor-pointer text-sm font-semibold">
 				Original extracted values
 			</summary>

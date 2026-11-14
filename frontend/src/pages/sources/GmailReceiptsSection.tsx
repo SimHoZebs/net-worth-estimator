@@ -4,9 +4,25 @@ import type { EmailReceipt } from "../../api/generated/model/index.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemFooter,
+	ItemGroup,
+	ItemHeader,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { notifySuccess } from "../../state/notifications.ts";
 import {
@@ -47,22 +63,19 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 	const pending = items.filter((item) => item.status === "needs-review");
 
 	return (
-		<section
-			aria-label="Extracted receipts"
-			className="mt-6 overflow-hidden rounded-xl border border-border bg-card"
-		>
-			<div className="p-5 sm:p-6">
-				<div className="flex flex-wrap items-center justify-between gap-3">
-					<h3 className="m-0 text-lg">
-						Extracted receipts{" "}
-						{!receipts.isPending && (
-							<span className="text-sm font-normal text-muted-foreground">
-								{items.length === 0
-									? "none yet"
-									: `${items.length} found${pending.length > 0 ? `, ${pending.length} need review` : ""}`}
-							</span>
-						)}
-					</h3>
+		<Card role="region" aria-label="Extracted receipts" className="mt-6">
+			<CardHeader>
+				<CardTitle>
+					<h3>Extracted receipts</h3>
+				</CardTitle>
+				{!receipts.isPending && (
+					<CardDescription>
+						{items.length === 0
+							? "none yet"
+							: `${items.length} found${pending.length > 0 ? `, ${pending.length} need review` : ""}`}
+					</CardDescription>
+				)}
+				<CardAction className="max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-2 max-sm:justify-self-start">
 					<Button
 						variant="secondary"
 						disabled={readOnly || busy || receipts.isPending}
@@ -70,30 +83,30 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 					>
 						{busy ? "Scanning…" : "Scan now"}
 					</Button>
-				</div>
+				</CardAction>
+			</CardHeader>
+			<CardContent>
 				{receipts.isPending ? (
-					<div aria-busy="true" className="mt-4">
+					<div aria-busy="true">
 						<Skeleton className="h-16 w-full" />
 					</div>
 				) : receipts.isError ? (
-					<div className="mt-4">
-						<Alert variant="destructive">
-							<AlertCircle size={16} aria-hidden="true" />
-							<AlertDescription>
-								The extracted receipts could not be loaded.{" "}
-								<Button variant="link" onClick={() => void receipts.refetch()}>
-									Retry
-								</Button>
-							</AlertDescription>
-						</Alert>
-					</div>
+					<Alert variant="destructive">
+						<AlertCircle size={16} aria-hidden="true" />
+						<AlertDescription>
+							The extracted receipts could not be loaded.{" "}
+							<Button variant="link" onClick={() => void receipts.refetch()}>
+								Retry
+							</Button>
+						</AlertDescription>
+					</Alert>
 				) : items.length === 0 ? (
-					<p className="mt-4 mb-0 text-sm leading-relaxed text-muted-foreground">
+					<p className="m-0 text-sm leading-relaxed text-muted-foreground">
 						Run a scan to find purchase and refund receipts in Gmail. Shipping
 						updates and ordinary mail are left out.
 					</p>
 				) : (
-					<ul className="mt-4 grid list-none gap-3 p-0">
+					<ItemGroup role="list">
 						{items.map((item) => (
 							<ReceiptRow
 								key={item.id}
@@ -106,10 +119,10 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 								onDone={() => setEditingId(null)}
 							/>
 						))}
-					</ul>
+					</ItemGroup>
 				)}
-			</div>
-		</section>
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -159,28 +172,38 @@ function ReceiptRow({
 	}
 
 	return (
-		<li className="rounded-md border border-border bg-muted p-4">
-			<div className="flex flex-wrap items-center gap-2">
-				<span className="font-medium">{shown.merchant}</span>
-				<Badge variant="secondary">
-					{item.verdict === "refund" ? "Refund" : "Receipt"}
-				</Badge>
-				{needsReview ? (
-					<Badge variant="default" className="bg-warning-bg text-warning-text">
-						Needs review
+		<Item role="listitem" variant="muted">
+			<ItemHeader>
+				<ItemTitle>{shown.merchant}</ItemTitle>
+				<span className="flex flex-wrap gap-2">
+					<Badge variant="secondary">
+						{item.verdict === "refund" ? "Refund" : "Receipt"}
 					</Badge>
-				) : (
-					<Badge variant="default" className="bg-success-bg text-success-text">
-						Reviewed
-					</Badge>
-				)}
-			</div>
-			<p className="mt-2 mb-0 text-sm leading-relaxed text-muted-foreground">
-				{shown.date} · {shown.amount}
-				{shown.reference ? ` · Order ${shown.reference}` : ""}
-			</p>
+					{needsReview ? (
+						<Badge
+							variant="default"
+							className="bg-warning-bg text-warning-text"
+						>
+							Needs review
+						</Badge>
+					) : (
+						<Badge
+							variant="default"
+							className="bg-success-bg text-success-text"
+						>
+							Reviewed
+						</Badge>
+					)}
+				</span>
+			</ItemHeader>
+			<ItemContent>
+				<ItemDescription className="line-clamp-none">
+					{shown.date} · {shown.amount}
+					{shown.reference ? ` · Order ${shown.reference}` : ""}
+				</ItemDescription>
+			</ItemContent>
 			{needsReview && !readOnly && (
-				<div className="mt-3 flex flex-wrap gap-4">
+				<ItemFooter className="justify-start">
 					<Button
 						variant="link"
 						className="min-h-6"
@@ -197,16 +220,18 @@ function ReceiptRow({
 					>
 						{editing ? "Close correction" : "Correct"}
 					</Button>
-				</div>
+				</ItemFooter>
 			)}
 			{editing && needsReview && (
-				<CorrectionForm
-					item={item}
-					disabled={readOnly || busy}
-					onDone={onDone}
-				/>
+				<div className="basis-full">
+					<CorrectionForm
+						item={item}
+						disabled={readOnly || busy}
+						onDone={onDone}
+					/>
+				</div>
 			)}
-		</li>
+		</Item>
 	);
 }
 
@@ -268,7 +293,7 @@ function CorrectionForm({
 			className="mt-3 grid gap-3"
 		>
 			<Field>
-				<Label htmlFor={merchantId}>Merchant</Label>
+				<FieldLabel htmlFor={merchantId}>Merchant</FieldLabel>
 				<Input
 					id={merchantId}
 					name="merchant"
@@ -278,7 +303,7 @@ function CorrectionForm({
 				/>
 			</Field>
 			<Field>
-				<Label htmlFor={dateId}>Receipt date (YYYY-MM-DD)</Label>
+				<FieldLabel htmlFor={dateId}>Receipt date (YYYY-MM-DD)</FieldLabel>
 				<Input
 					id={dateId}
 					name="receiptDate"
@@ -288,7 +313,7 @@ function CorrectionForm({
 				/>
 			</Field>
 			<Field>
-				<Label htmlFor={amountId}>Amount</Label>
+				<FieldLabel htmlFor={amountId}>Amount</FieldLabel>
 				<Input
 					id={amountId}
 					name="amount"
@@ -298,7 +323,7 @@ function CorrectionForm({
 				/>
 			</Field>
 			<Field>
-				<Label htmlFor={currencyId}>Currency</Label>
+				<FieldLabel htmlFor={currencyId}>Currency</FieldLabel>
 				<Input
 					id={currencyId}
 					name="currency"
@@ -308,7 +333,7 @@ function CorrectionForm({
 				/>
 			</Field>
 			<Field>
-				<Label htmlFor={referenceId}>Order reference</Label>
+				<FieldLabel htmlFor={referenceId}>Order reference</FieldLabel>
 				<Input
 					id={referenceId}
 					name="reference"
@@ -317,7 +342,7 @@ function CorrectionForm({
 					onChange={(event) => setReference(event.target.value)}
 				/>
 			</Field>
-			{error ? <p role="alert">{error}</p> : null}
+			{error ? <FieldError>{error}</FieldError> : null}
 			<div>
 				<Button variant="secondary" type="submit" disabled={disabled || busy}>
 					{busy ? "Saving…" : "Save correction"}

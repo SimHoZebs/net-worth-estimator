@@ -177,16 +177,18 @@ export function FinancialIndependenceCard({
 							{analysis ? (
 								<>
 									{!!analysis.diagnostics.length && (
-										<button
+										<Button
 											type="button"
+											variant="link"
+											size="sm"
 											aria-haspopup="dialog"
 											onClick={() => setInspector(true)}
-											className="relative z-(--z-local) flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
+											className="relative z-(--z-local) h-auto justify-start gap-1 p-0 text-left text-xs text-warning-text no-underline pointer-coarse:min-h-12"
 										>
 											<TriangleAlert size={14} aria-hidden="true" />
 											{analysis.diagnostics.length} source or configuration{" "}
 											{analysis.diagnostics.length === 1 ? "issue" : "issues"}
-										</button>
+										</Button>
 									)}
 								</>
 							) : (

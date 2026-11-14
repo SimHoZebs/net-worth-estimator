@@ -1,7 +1,12 @@
 import { LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Empty, EmptyHeader, EmptyMedia } from "@/components/ui/empty.tsx";
+import {
+	Empty,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
 import {
 	Table,
 	TableBody,
@@ -29,14 +34,12 @@ export function AccountsPanel({
 }) {
 	if (!accounts.length)
 		return (
-			<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+			<Empty>
 				<EmptyHeader>
-					<EmptyMedia>
-						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-							<Wallet size={28} />
-						</span>
+					<EmptyMedia variant="icon">
+						<Wallet aria-hidden="true" />
 					</EmptyMedia>
-					<h3 className="text-lg">No matching accounts</h3>
+					<EmptyTitle>No matching accounts</EmptyTitle>
 				</EmptyHeader>
 			</Empty>
 		);
@@ -72,9 +75,11 @@ export function AccountsPanel({
 						}}
 					>
 						<TableHead scope="row" className="py-5 max-sm:px-4 max-sm:py-5">
-							<button
+							<Button
 								type="button"
-								className="group flex items-center gap-3 rounded-md border-0 bg-transparent text-left text-inherit"
+								variant="ghost"
+								size="sm"
+								className="group h-auto justify-start gap-3 px-1 py-0.5 text-left font-normal"
 								aria-label={`Open ${account.name} transactions`}
 								onClick={() => onAccount(account.id)}
 							>
@@ -86,7 +91,7 @@ export function AccountsPanel({
 								{account.readOnly && (
 									<LockKeyhole size={14} aria-label="Read-only record" />
 								)}
-							</button>
+							</Button>
 						</TableHead>
 						<TableCell className="tabular-nums max-sm:p-4">
 							<div>{money(account.balance)}</div>

@@ -1,7 +1,12 @@
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Empty, EmptyHeader, EmptyMedia } from "@/components/ui/empty.tsx";
+import {
+	Empty,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
@@ -36,14 +41,12 @@ export function TransactionsPanel({
 	const cadenceOf = (id: string) => ruleCadence?.get(id) ?? "Recurring";
 	if (!transactions.length)
 		return (
-			<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+			<Empty>
 				<EmptyHeader>
-					<EmptyMedia>
-						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-							<ArrowRight size={28} />
-						</span>
+					<EmptyMedia variant="icon">
+						<ArrowRight aria-hidden="true" />
 					</EmptyMedia>
-					<h3 className="text-lg">No matching transactions</h3>
+					<EmptyTitle>No matching transactions</EmptyTitle>
 				</EmptyHeader>
 			</Empty>
 		);
@@ -121,19 +124,12 @@ export function TransactionsPanel({
 								badges: (transaction.void || excluded) && (
 									<>
 										{transaction.void ? (
-											<Badge
-												variant="secondary"
-												className={cn("h-auto px-1 py-0.5 text-xs")}
-											>
-												Did not post
-											</Badge>
+											<Badge variant="secondary">Did not post</Badge>
 										) : (
 											excluded && (
 												<Badge
 													variant="default"
-													className={cn(
-														"bg-warning-bg text-warning-text h-auto px-1 py-0.5 text-xs",
-													)}
+													className="bg-warning-bg text-warning-text"
 												>
 													Excluded
 												</Badge>
@@ -148,20 +144,10 @@ export function TransactionsPanel({
 										transaction={transaction}
 										resolved={resolvedAmounts?.get(transaction.id)}
 									/>
-									{pending ? (
-										<Badge
-											variant="secondary"
-											className={cn("h-auto px-1 py-0.5 text-xs")}
-										>
-											Pending
-										</Badge>
-									) : null}
+									{pending ? <Badge variant="secondary">Pending</Badge> : null}
 									{transaction.claimScheduleId &&
 										transaction.claimOccurrenceDate && (
-											<Badge
-												variant="secondary"
-												className={cn("h-auto px-1 py-0.5 text-xs")}
-											>
+											<Badge variant="secondary">
 												Records{" "}
 												{dateLabel(transaction.claimOccurrenceDate, true)}
 											</Badge>
@@ -220,9 +206,7 @@ function TransactionAmount({
 				>
 					{money(resolved.amount)}
 				</strong>
-				<Badge variant="secondary" className={cn("h-auto px-1 py-0.5 text-xs")}>
-					Varies
-				</Badge>
+				<Badge variant="secondary">Varies</Badge>
 			</>
 		);
 	}

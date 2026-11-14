@@ -1,7 +1,12 @@
 import { useId } from "react";
 import type { FlowGraph } from "../../api/flows.ts";
 import { FLOW_NODE_ID_EXTERNAL } from "../../api/flows.ts";
-import { Label } from "@/components/ui/label.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import {
 	Select,
 	SelectContent,
@@ -9,7 +14,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select.tsx";
-import { Field } from "@/components/ui/field.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import type { MovementFilter } from "../../domain/flowDiagram.ts";
 import { FlowDateRangePicker } from "./FlowDateRangePicker.tsx";
@@ -50,7 +54,7 @@ export function FlowFilters({
 			/>
 			<div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
 				<Field>
-					<Label htmlFor={`${id}-account`}>Account</Label>
+					<FieldLabel htmlFor={`${id}-account`}>Account</FieldLabel>
 					<Select
 						value={filters.accountId ?? "all"}
 						items={accountItems}
@@ -73,10 +77,9 @@ export function FlowFilters({
 						</SelectContent>
 					</Select>
 				</Field>
-				<Field>
-					<Label id={`${id}-movement`}>Money</Label>
+				<FieldSet>
+					<FieldLegend variant="label">Money</FieldLegend>
 					<ToggleGroup
-						aria-labelledby={`${id}-movement`}
 						value={[filters.movement]}
 						onValueChange={(next) => {
 							const nextValue = next.find(
@@ -96,7 +99,7 @@ export function FlowFilters({
 							Planned
 						</ToggleGroupItem>
 					</ToggleGroup>
-				</Field>
+				</FieldSet>
 			</div>
 		</div>
 	);

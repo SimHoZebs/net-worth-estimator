@@ -95,7 +95,7 @@ function SortableRow({
 			aria-label={label}
 			as="div"
 		>
-			<Item variant="default" size="sm" className="gap-3 px-2">
+			<Item variant="default" size="sm" className="gap-3">
 				<span
 					className="flex touch-none cursor-grab text-muted-foreground"
 					aria-hidden="true"
@@ -248,14 +248,12 @@ export function RecurringRules({
 
 	if (!rows.length)
 		return (
-			<Empty className="px-6 py-12">
+			<Empty>
 				<EmptyHeader>
-					<EmptyMedia>
-						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-							<Repeat size={28} aria-hidden="true" />
-						</span>
+					<EmptyMedia variant="icon">
+						<Repeat aria-hidden="true" />
 					</EmptyMedia>
-					<EmptyTitle className="text-lg">
+					<EmptyTitle>
 						No recurring transactions for this account yet
 					</EmptyTitle>
 				</EmptyHeader>

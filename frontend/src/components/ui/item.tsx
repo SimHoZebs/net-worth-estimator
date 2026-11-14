@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 function ItemGroup({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
+			// group, not list: Item children are generic divs without listitem
+			// roles, so a list role would fail owned-element requirements.
 			role="group"
 			data-slot="item-group"
 			className={cn(

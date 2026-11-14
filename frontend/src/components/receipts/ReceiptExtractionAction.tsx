@@ -1,4 +1,4 @@
-import { Check, ScanLine } from "lucide-react";
+import { Check, LoaderCircle, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 
 export function ReceiptExtractionAction({
@@ -23,9 +23,10 @@ export function ReceiptExtractionAction({
 				onClick={onExtract}
 			>
 				{pending ? (
-					<progress
+					<LoaderCircle
+						size={16}
 						aria-hidden="true"
-						className="size-4 shrink-0 appearance-none rounded-full border-2 border-current border-t-transparent bg-transparent motion-safe:animate-spin [&::-webkit-progress-bar]:hidden [&::-webkit-progress-value]:hidden [&::-moz-progress-bar]:hidden"
+						className="shrink-0 animate-spin"
 					/>
 				) : complete ? (
 					<Check size={16} aria-hidden="true" />

@@ -47,8 +47,6 @@ export const transactionAmountStyles = cva(
 	},
 );
 
-export const transactionBadgeStyles = cva("px-1 py-0.5 text-xs");
-
 export const transactionShortfallRowStyles = cva(
 	"bg-warning-bg border-l-4 border-warning-text hover:bg-warning-bg",
 );

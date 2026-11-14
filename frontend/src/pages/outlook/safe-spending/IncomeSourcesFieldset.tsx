@@ -1,4 +1,5 @@
 import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
+import { FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { formatRuleDetail, TogglePill } from "./TogglePill.tsx";
 
 export function IncomeSourcesFieldset({
@@ -9,10 +10,8 @@ export function IncomeSourcesFieldset({
 	onChange: (ruleIds: string[]) => void;
 }) {
 	return (
-		<fieldset className="grid gap-3">
-			<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted-foreground">
-				Income sources
-			</legend>
+		<FieldSet>
+			<FieldLegend variant="label">Income sources</FieldLegend>
 			{income.candidates.length ? (
 				<div className="flex flex-wrap gap-2">
 					{income.candidates.map((rule) => {
@@ -41,6 +40,6 @@ export function IncomeSourcesFieldset({
 					No recurring inflows for the selected income accounts.
 				</p>
 			)}
-		</fieldset>
+		</FieldSet>
 	);
 }

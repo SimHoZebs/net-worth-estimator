@@ -218,7 +218,7 @@ function LoanForm({
 				className="m-0 flex flex-col gap-5 border-0 p-0"
 			>
 				<legend className="sr-only">Loan terms</legend>
-				<FieldSet className="grid grid-cols-2 gap-4 rounded-xl border border-border p-4 max-sm:grid-cols-1">
+				<FieldSet className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
 					<FieldLegend>Amount owed</FieldLegend>
 					<MoneyField
 						id={principalId}
@@ -252,7 +252,7 @@ function LoanForm({
 					</p>
 				</FieldSet>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 border-0 p-0 max-sm:grid-cols-1">
-					<legend className="mb-3 text-sm font-semibold">Interest</legend>
+					<FieldLegend variant="label">Interest</FieldLegend>
 					<EditorField label="Annual interest rate (%)" htmlFor={rateId}>
 						<Input
 							id={rateId}
@@ -294,7 +294,7 @@ function LoanForm({
 					</EditorField>
 				</fieldset>
 				<fieldset className="m-0 grid grid-cols-2 gap-4 border-0 p-0 max-sm:grid-cols-1">
-					<legend className="mb-3 text-sm font-semibold">Payments</legend>
+					<FieldLegend variant="label">Payments</FieldLegend>
 					<MoneyField
 						id={paymentId}
 						label="Payment amount"

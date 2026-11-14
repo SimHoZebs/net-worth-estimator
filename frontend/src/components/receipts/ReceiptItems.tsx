@@ -1,9 +1,13 @@
 import { Plus, X } from "lucide-react";
 import { emptyReceiptItem, type ReceiptItemDraft } from "@/domain/receipt.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { ReactNode } from "react";
 
@@ -19,10 +23,8 @@ function ItemField({
 	children: (id: string) => ReactNode;
 }) {
 	return (
-		<Field
-			className={cn("flex min-w-0 flex-col gap-2", wide && "sm:col-span-2")}
-		>
-			<Label htmlFor={id}>{label}</Label>
+		<Field className={cn("min-w-0", wide && "sm:col-span-2")}>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
 			{children(id)}
 		</Field>
 	);
@@ -63,14 +65,12 @@ export function ReceiptItems({
 				</p>
 			)}
 			{items.map((item, index) => (
-				<fieldset
+				<FieldSet
 					key={index}
-					className="relative grid gap-3 rounded-xl border border-border p-4 sm:grid-cols-2"
 					disabled={disabled}
+					className="grid gap-3 sm:grid-cols-2"
 				>
-					<legend className="px-1 text-xs font-semibold text-muted-foreground">
-						Item {index + 1}
-					</legend>
+					<FieldLegend>Item {index + 1}</FieldLegend>
 					<ItemField id={`item-${index}-description`} label="Description" wide>
 						{(id) => (
 							<Input
@@ -151,7 +151,7 @@ export function ReceiptItems({
 							</Button>
 						</div>
 					)}
-				</fieldset>
+				</FieldSet>
 			))}
 		</section>
 	);

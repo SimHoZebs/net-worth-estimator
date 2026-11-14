@@ -8,7 +8,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 
 /**
@@ -102,11 +107,7 @@ export function TransactionDateModal({
 						</FieldDescription>
 					</Field>
 				</div>
-				{error && (
-					<p role="alert" className="m-0 text-sm text-danger-text">
-						{error}
-					</p>
-				)}
+				{error && <FieldError>{error}</FieldError>}
 				<DialogFooter>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

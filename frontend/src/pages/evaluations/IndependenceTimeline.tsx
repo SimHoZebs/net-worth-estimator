@@ -118,7 +118,7 @@ export function IndependenceTimeline({
 					x: "time",
 					y: "value",
 					text: "label",
-					fill: "var(--muted)",
+					fill: "var(--muted-foreground)",
 					fontSize: 12,
 					anchor: "start",
 					dy: -8,

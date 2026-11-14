@@ -4,9 +4,13 @@ import { ApiError } from "../api/http.ts";
 import { AccountToggle } from "../components/AccountToggle.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { useSavedAccounts } from "../state/savedState.ts";
 import {
@@ -304,8 +308,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				</p>
 			</div>
 
-			<fieldset className="grid gap-2 border-0 p-0">
-				<legend className="px-0 text-sm font-medium">Accounts to share</legend>
+			<FieldSet className="grid gap-2">
+				<FieldLegend variant="label">Accounts to share</FieldLegend>
 				{accounts === null ? (
 					<p className="m-0 text-sm text-muted-foreground" role="status">
 						Loading accounts…
@@ -327,22 +331,24 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						))}
 					</div>
 				)}
-			</fieldset>
+			</FieldSet>
 
 			{staleSelections.length > 0 && (
-				<p className="m-0 text-sm text-muted-foreground" role="note">
-					{staleSelections.length} previously selected{" "}
-					{staleSelections.length === 1
-						? "account no longer"
-						: "accounts no longer"}{" "}
-					exist, so {staleSelections.length === 1 ? "it was" : "they were"}{" "}
-					removed from the selection. Saving keeps it that way.
-				</p>
+				<Alert role="note">
+					<AlertDescription>
+						{staleSelections.length} previously selected{" "}
+						{staleSelections.length === 1
+							? "account no longer"
+							: "accounts no longer"}{" "}
+						exist, so {staleSelections.length === 1 ? "it was" : "they were"}{" "}
+						removed from the selection. Saving keeps it that way.
+					</AlertDescription>
+				</Alert>
 			)}
 
 			<div className="grid max-w-md gap-2">
 				<Field>
-					<Label htmlFor={shareFromId}>Share from</Label>
+					<FieldLabel htmlFor={shareFromId}>Share from</FieldLabel>
 					<Input
 						id={shareFromId}
 						type="date"
@@ -354,9 +360,9 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					/>
 				</Field>
 				<Field>
-					<Label htmlFor={shareUntilId}>
+					<FieldLabel htmlFor={shareUntilId}>
 						Share until (leave empty for no end)
-					</Label>
+					</FieldLabel>
 					<Input
 						id={shareUntilId}
 						type="date"
@@ -370,46 +376,48 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			</div>
 
 			{draftAccounts.length > 0 && (
-				<div className="grid gap-2 rounded-md border border-solid border-border px-3 py-2 text-sm">
-					<p className="m-0">
-						<strong>Before you turn this on.</strong> Sharing covers matching
-						transactions already inside these dates, and later bank imports can
-						add older matching transactions on their own. There is no second
-						review step for those.
-					</p>
-					{previewQuery.isPending ? (
-						<p className="m-0 text-muted-foreground" role="status">
-							Counting matching transactions…
+				<Alert role="note">
+					<AlertDescription>
+						<p className="m-0 text-foreground">
+							<strong>Before you turn this on.</strong> Sharing covers matching
+							transactions already inside these dates, and later bank imports
+							can add older matching transactions on their own. There is no
+							second review step for those.
 						</p>
-					) : previewQuery.isError ? (
-						<p className="m-0" role="alert">
-							Preview unavailable:{" "}
-							{serverMessage(
-								previewQuery.error,
-								"the selection could not be counted.",
-							)}
-						</p>
-					) : (
-						preview && (
-							<p className="m-0 text-muted-foreground">
-								{preview.eligibleTransactions}{" "}
-								{preview.eligibleTransactions === 1
-									? "transaction"
-									: "transactions"}{" "}
-								across {preview.accountIds.length}{" "}
-								{preview.accountIds.length === 1 ? "account" : "accounts"} from{" "}
-								{preview.startDate}
-								{preview.endDate
-									? ` to ${preview.endDate}`
-									: " with no end"}{" "}
-								match this selection for {preview.memberCount}{" "}
-								{preview.memberCount === 1 ? "member" : "members"}. Transactions
-								hidden individually still count here but stay hidden. Only
-								counts are shown here, never amounts or payees.
+						{previewQuery.isPending ? (
+							<p className="m-0 text-muted-foreground" role="status">
+								Counting matching transactions…
 							</p>
-						)
-					)}
-				</div>
+						) : previewQuery.isError ? (
+							<p className="m-0" role="alert">
+								Preview unavailable:{" "}
+								{serverMessage(
+									previewQuery.error,
+									"the selection could not be counted.",
+								)}
+							</p>
+						) : (
+							preview && (
+								<p className="m-0">
+									{preview.eligibleTransactions}{" "}
+									{preview.eligibleTransactions === 1
+										? "transaction"
+										: "transactions"}{" "}
+									across {preview.accountIds.length}{" "}
+									{preview.accountIds.length === 1 ? "account" : "accounts"}{" "}
+									from {preview.startDate}
+									{preview.endDate
+										? ` to ${preview.endDate}`
+										: " with no end"}{" "}
+									match this selection for {preview.memberCount}{" "}
+									{preview.memberCount === 1 ? "member" : "members"}.
+									Transactions hidden individually still count here but stay
+									hidden. Only counts are shown here, never amounts or payees.
+								</p>
+							)
+						)}
+					</AlertDescription>
+				</Alert>
 			)}
 
 			<div className="flex flex-wrap gap-2">

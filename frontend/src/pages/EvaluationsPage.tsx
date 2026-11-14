@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Empty,
-	EmptyContent,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
@@ -105,18 +104,13 @@ export function EvaluationsPage() {
 				</Button>
 			</div>
 			{!pending && !visible.length && !others.length && (
-				<Empty className="flex-initial gap-0 px-6 py-12">
+				<Empty>
 					<EmptyHeader>
-						<EmptyMedia>
-							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-								<Flag size={28} />
-							</span>
+						<EmptyMedia variant="icon">
+							<Flag aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>
-							<h3 className="text-lg">What are you working toward?</h3>
-						</EmptyTitle>
+						<EmptyTitle>What are you working toward?</EmptyTitle>
 					</EmptyHeader>
-					<EmptyContent />
 				</Empty>
 			)}
 			{pending && (

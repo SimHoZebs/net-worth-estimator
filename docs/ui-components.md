@@ -31,6 +31,19 @@ Controlled primitive state is appropriate when needed for those rules or route
 navigation. A dirty editor requests a nested discard confirmation; it does not
 silently remove its unsaved-change protection to match a library default.
 
+## Card composition
+
+`Card` owns vertical rhythm and footer chrome, but horizontal padding lives in
+`CardHeader` and `CardContent`. Render flow content only through those slots
+(plus `CardFooter`), and compose `CardTitle` inside `CardHeader`. Content
+placed directly in `Card` renders edge-to-edge with no horizontal padding.
+
+Native headings nested in `CardTitle` for outline semantics keep their level,
+ID, and layout classes, and inherit the canonical title composition
+(Merriweather, size, weight, line height) from a `CardTitle`-owned
+direct-child rule — the global h2–h6 base styles apply everywhere else and
+stay untouched. Do not add per-consumer font resets on those headings.
+
 Notifications use one manager and one viewport. Keyed replacement, persistence
 until manual dismissal or recovery, identity scope clearing, and domain actions
 are application policy. The viewport sets the Base UI provider timeout to zero

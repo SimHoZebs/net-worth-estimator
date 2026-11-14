@@ -54,9 +54,11 @@ function EmptyMedia({
 	);
 }
 
-function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
+function EmptyTitle({ className, ...props }: React.ComponentProps<"h3">) {
+	// Empty-state titles retain native heading semantics and preset typography.
 	return (
-		<div
+		// oxlint-disable-next-line jsx-a11y/heading-has-content -- content arrives via props from every caller; the empty-title regression spec asserts a visible accessible name.
+		<h3
 			data-slot="empty-title"
 			className={cn(
 				"font-heading text-sm font-medium tracking-tight",

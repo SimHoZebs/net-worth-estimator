@@ -7,6 +7,7 @@ import {
 } from "../../domain/format.ts";
 import { netWorthChangeSinceFirstSync } from "../../domain/netWorthChange.ts";
 import type { Projection } from "../../domain/result.ts";
+import { CardAction, CardHeader } from "@/components/ui/card.tsx";
 
 const changePercent = new Intl.NumberFormat("en-US", {
 	style: "percent",
@@ -31,44 +32,38 @@ export function NetWorthSummary({
 			null,
 		);
 	return (
-		<div className="px-5 pt-5">
-			{/* Stacked below sm: side-by-side the summary can collapse to
-			leftover width beside the controls (a few px of font metrics
-			decide wrap vs. crush), and overflow-wrap:anywhere then breaks
-			the big value character by character. */}
-			<div className="flex flex-wrap items-start justify-between gap-3 max-sm:flex-col">
-				<div className="min-w-0 flex-1">
-					<h2 className="text-sm text-muted-foreground">Net worth</h2>
-					<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-						<strong className="type-value text-3xl font-medium tracking-tight text-foreground [overflow-wrap:anywhere]">
-							{money(projection.currentNetWorth)}
-						</strong>
-						{asOf && (
-							<span className="text-xs text-muted-foreground">
-								As of {dateLabel(asOf, true)}
-							</span>
-						)}
-					</div>
-					{change && (
-						<p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs">
-							<span
-								className={`font-semibold tabular-nums ${change.amount > 0 ? "text-success-text" : change.amount < 0 ? "text-danger-text" : "text-muted-foreground"}`}
-							>
-								{change.amount > 0 ? "+" : ""}
-								{money(change.amount)}
-								{change.fraction !== null &&
-									` (${changePercent.format(change.fraction)})`}
-							</span>
-							<span>since first sync · {dateLabel(change.date, true)}</span>
-						</p>
+		<CardHeader>
+			<div className="min-w-0">
+				<h2 className="text-sm text-muted-foreground">Net worth</h2>
+				<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+					<strong className="type-value text-3xl font-medium tracking-tight text-foreground [overflow-wrap:anywhere]">
+						{money(projection.currentNetWorth)}
+					</strong>
+					{asOf && (
+						<span className="text-xs text-muted-foreground">
+							As of {dateLabel(asOf, true)}
+						</span>
 					)}
 				</div>
-				{actions && (
-					<div className="flex flex-wrap items-center justify-end gap-2 max-sm:justify-start">
-						{actions}
-					</div>
+				{change && (
+					<p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs">
+						<span
+							className={`font-semibold tabular-nums ${change.amount > 0 ? "text-success-text" : change.amount < 0 ? "text-danger-text" : "text-muted-foreground"}`}
+						>
+							{change.amount > 0 ? "+" : ""}
+							{money(change.amount)}
+							{change.fraction !== null &&
+								` (${changePercent.format(change.fraction)})`}
+						</span>
+						<span>since first sync · {dateLabel(change.date, true)}</span>
+					</p>
 				)}
 			</div>
-		</div>
+			{actions && (
+				<CardAction className="flex flex-wrap items-center gap-2 max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-2 max-sm:justify-self-start">
+					{actions}
+				</CardAction>
+			)}
+		</CardHeader>
 	);
 }

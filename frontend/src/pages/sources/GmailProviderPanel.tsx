@@ -5,9 +5,17 @@ import { ApiError } from "../../api/http.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
+import { Item, ItemContent, ItemDescription } from "@/components/ui/item.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { notifySuccess } from "../../state/notifications.ts";
 import {
@@ -43,26 +51,30 @@ export function GmailProviderPanel() {
 		) {
 			return (
 				<div className="grid gap-6">
-					<div className="overflow-hidden rounded-xl border border-border bg-card">
-						<div className="p-5 sm:p-6">
+					<Card>
+						<CardHeader>
 							<div className="flex items-start gap-3">
 								<span className="inline-grid size-11 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
 									<Mail size={22} aria-hidden="true" />
 								</span>
 								<div className="min-w-0">
-									<h3 className="m-0 flex items-center gap-2 text-lg">
-										Gmail
-										<Badge variant="secondary">Unavailable</Badge>
-									</h3>
+									<CardTitle>
+										<h3 className="flex items-center gap-2">
+											Gmail
+											<Badge variant="secondary">Unavailable</Badge>
+										</h3>
+									</CardTitle>
 								</div>
 							</div>
-							<p className="mt-4 mb-0 text-sm leading-relaxed text-muted-foreground">
+						</CardHeader>
+						<CardContent>
+							<p className="m-0 text-sm leading-relaxed text-muted-foreground">
 								The server administrator has not configured Gmail connection.
 								Receipt discovery over Gmail is unavailable until the server
 								provides its OAuth credentials.
 							</p>
-						</div>
-					</div>
+						</CardContent>
+					</Card>
 				</div>
 			);
 		}
@@ -133,60 +145,72 @@ export function GmailProviderPanel() {
 			)}
 
 			{readOnly && (
-				<p className="m-0 rounded-md border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
-					This workspace is read-only. You can view the connection details.
-					Write access is required to connect, disconnect, or change the scan
-					window.
-				</p>
+				<Alert
+					variant="default"
+					role="note"
+					className="border-warning-border bg-warning-bg text-warning-text"
+				>
+					<AlertDescription className="text-sm text-warning-text">
+						This workspace is read-only. You can view the connection details.
+						Write access is required to connect, disconnect, or change the scan
+						window.
+					</AlertDescription>
+				</Alert>
 			)}
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{connected ? (
-						<div className="overflow-hidden rounded-xl border border-border bg-card">
-							<div className="p-5 sm:p-6">
+						<Card>
+							<CardHeader>
 								<div className="flex items-start gap-3">
 									<span className="inline-grid size-11 shrink-0 place-items-center rounded-md bg-success-bg text-success-text">
 										<Mail size={22} aria-hidden="true" />
 									</span>
 									<div className="min-w-0">
-										<h3 className="m-0 flex items-center gap-2 text-lg">
-											Gmail
-											<Badge
-												variant="default"
-												className="bg-success-bg text-success-text"
-											>
-												<Check size={14} aria-hidden="true" />
-												Connected
-											</Badge>
-										</h3>
+										<CardTitle>
+											<h3 className="flex items-center gap-2">
+												Gmail
+												<Badge
+													variant="default"
+													className="bg-success-bg text-success-text"
+												>
+													<Check size={14} aria-hidden="true" />
+													Connected
+												</Badge>
+											</h3>
+										</CardTitle>
 									</div>
 								</div>
-								<div className="my-5 rounded-md border border-border bg-muted p-4">
-									<p className="m-0 text-sm leading-relaxed text-muted-foreground">
-										{credential.data.emailAddress && (
-											<>Connected as {credential.data.emailAddress}. </>
-										)}
-										Read-only access: Waypoint can read messages to find
-										receipts. It never sends, deletes, or relabels mail.
-									</p>
-									<p className="mt-2 mb-0 text-sm leading-relaxed text-muted-foreground">
-										{credential.data.lastScanAt ? (
-											<>
-												Last scan{" "}
-												<time dateTime={credential.data.lastScanAt}>
-													{credential.data.lastScanAt}
-												</time>
-												. Later scans resume from where the last one stopped.
-											</>
-										) : (
-											<>
-												The first scan looks back {credential.data.lookbackDays}{" "}
-												days. Later scans resume from where the last one
-												stopped.
-											</>
-										)}
-									</p>
-								</div>
+							</CardHeader>
+							<CardContent className="grid gap-5">
+								<Item variant="muted">
+									<ItemContent>
+										<ItemDescription className="line-clamp-none">
+											{credential.data.emailAddress && (
+												<>Connected as {credential.data.emailAddress}. </>
+											)}
+											Read-only access: Waypoint can read messages to find
+											receipts. It never sends, deletes, or relabels mail.
+										</ItemDescription>
+										<ItemDescription className="line-clamp-none">
+											{credential.data.lastScanAt ? (
+												<>
+													Last scan{" "}
+													<time dateTime={credential.data.lastScanAt}>
+														{credential.data.lastScanAt}
+													</time>
+													. Later scans resume from where the last one stopped.
+												</>
+											) : (
+												<>
+													The first scan looks back{" "}
+													{credential.data.lookbackDays} days. Later scans
+													resume from where the last one stopped.
+												</>
+											)}
+										</ItemDescription>
+									</ItemContent>
+								</Item>
 								<GmailLookbackEditor
 									lookbackDays={credential.data.lookbackDays}
 									draft={lookback}
@@ -195,8 +219,8 @@ export function GmailProviderPanel() {
 									onSave={(days) => void handleLookbackSave(days)}
 								/>
 								<GmailReceiptsSection readOnly={readOnly} />
-							</div>
-							<div className="border-t border-border bg-muted px-5 py-4 sm:px-6">
+							</CardContent>
+							<CardFooter>
 								{confirmingDisconnect ? (
 									<div>
 										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
@@ -232,37 +256,39 @@ export function GmailProviderPanel() {
 										Disconnect
 									</Button>
 								)}
-							</div>
-						</div>
+							</CardFooter>
+						</Card>
 					) : (
-						<div className="overflow-hidden rounded-xl border border-border bg-card">
-							<div className="p-5 sm:p-6">
+						<Card>
+							<CardHeader>
 								<div className="flex items-start gap-3">
 									<span className="inline-grid size-11 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
 										<Mail size={22} aria-hidden="true" />
 									</span>
 									<div className="min-w-0">
-										<h3 className="m-0 text-lg">Gmail</h3>
-										<p className="mt-2 mb-0 text-sm leading-relaxed text-muted-foreground">
+										<CardTitle>
+											<h3>Gmail</h3>
+										</CardTitle>
+										<CardDescription>
 											Connect Gmail so Waypoint can find purchase receipts in
 											your mail. Google asks for read-only access to messages;
 											Waypoint cannot send, delete, or relabel mail, and the
 											grant can be revoked here at any time.
-										</p>
+										</CardDescription>
 									</div>
 								</div>
-								<div className="mt-5 flex flex-wrap gap-3">
-									<Button
-										variant="default"
-										disabled={readOnly || busy}
-										onClick={() => void handleConnect()}
-									>
-										{busy ? "Starting…" : "Connect Gmail"}
-										<ExternalLink size={14} aria-hidden="true" />
-									</Button>
-								</div>
-							</div>
-						</div>
+							</CardHeader>
+							<CardContent>
+								<Button
+									variant="default"
+									disabled={readOnly || busy}
+									onClick={() => void handleConnect()}
+								>
+									{busy ? "Starting…" : "Connect Gmail"}
+									<ExternalLink size={14} aria-hidden="true" />
+								</Button>
+							</CardContent>
+						</Card>
 					)}
 				</div>
 			</div>
@@ -297,7 +323,7 @@ function GmailLookbackEditor({
 			}}
 		>
 			<Field>
-				<Label htmlFor={lookbackId}>Initial scan window (days)</Label>
+				<FieldLabel htmlFor={lookbackId}>Initial scan window (days)</FieldLabel>
 				<Input
 					id={lookbackId}
 					name="lookbackDays"

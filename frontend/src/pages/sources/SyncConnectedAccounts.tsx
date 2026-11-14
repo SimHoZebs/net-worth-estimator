@@ -8,6 +8,20 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+} from "@/components/ui/item.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -53,8 +67,8 @@ export function SyncConnectedAccounts({
 		[linkedAccountIDs, savedAccounts],
 	);
 	return (
-		<div className="border-t border-border p-5 sm:p-6">
-			<h3 className="mt-0 mb-4 text-base">Synced accounts</h3>
+		<>
+			<h3 className="mb-4">Synced accounts</h3>
 			{balancesQuery.isError ? (
 				<Alert variant="destructive">
 					<AlertCircle size={16} aria-hidden="true" />
@@ -85,12 +99,7 @@ export function SyncConnectedAccounts({
 					</AlertDescription>
 				</Alert>
 			) : links.data.length > 0 ? (
-				<ul
-					// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
-					role="list"
-					aria-label="Synced accounts"
-					className="m-0 grid list-none gap-3 p-0"
-				>
+				<ItemGroup role="list" aria-label="Synced accounts" className="gap-3">
 					{links.data.map((link) => {
 						const account = byId.get(link.modelAccountId);
 						// A synced loan can never absorb a manual account: the server rejects loan components on both sides.
@@ -100,25 +109,26 @@ export function SyncConnectedAccounts({
 							!readOnly &&
 							manualAccounts.length > 0;
 						return (
-							<li
+							<Item
+								role="listitem"
 								key={link.bridgeAccountId}
-								className="rounded-md border border-border px-4 py-3 text-sm"
+								variant="outline"
 							>
-								<div className="flex flex-wrap items-center justify-between gap-3">
-									<div className="min-w-0">
-										{account ? (
-											<AccountLabel account={account} />
-										) : (
-											link.bridgeName || link.modelAccountId
-										)}
-										{link.institution ? (
-											<small className="mt-1 block text-xs text-muted-foreground">
-												{link.institution}
-												{link.bridgeName ? ` · ${link.bridgeName}` : ""}
-											</small>
-										) : null}
-									</div>
-									{canLink ? (
+								<ItemContent>
+									{account ? (
+										<AccountLabel account={account} />
+									) : (
+										link.bridgeName || link.modelAccountId
+									)}
+									{link.institution ? (
+										<ItemDescription>
+											{link.institution}
+											{link.bridgeName ? ` · ${link.bridgeName}` : ""}
+										</ItemDescription>
+									) : null}
+								</ItemContent>
+								{canLink ? (
+									<ItemActions>
 										<DropdownMenu>
 											<DropdownMenuTrigger
 												render={
@@ -152,27 +162,25 @@ export function SyncConnectedAccounts({
 												</DropdownMenuItem>
 											</DropdownMenuContent>
 										</DropdownMenu>
-									) : null}
-								</div>
-							</li>
+									</ItemActions>
+								) : null}
+							</Item>
 						);
 					})}
-				</ul>
+				</ItemGroup>
 			) : (
-				<div className="rounded-md border border-dashed border-input bg-muted p-5">
-					<Landmark
-						size={24}
-						aria-hidden="true"
-						className="text-muted-foreground"
-					/>
-					<p className="mt-3 mb-2 text-sm font-semibold">
-						No synced accounts yet.
-					</p>
-					<p className="m-0 text-sm leading-relaxed text-muted-foreground">
-						No bank accounts have been imported. Confirm your banks are
-						connected in SimpleFIN, then choose Sync now.
-					</p>
-				</div>
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<Landmark aria-hidden="true" />
+						</EmptyMedia>
+						<EmptyTitle>No synced accounts yet.</EmptyTitle>
+						<EmptyDescription>
+							No bank accounts have been imported. Confirm your banks are
+							connected in SimpleFIN, then choose Sync now.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
 			)}
 			{linking && (
 				<SyncLinkAccountDialog
@@ -188,6 +196,6 @@ export function SyncConnectedAccounts({
 					}}
 				/>
 			)}
-		</div>
+		</>
 	);
 }

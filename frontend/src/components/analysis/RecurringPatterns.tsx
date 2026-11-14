@@ -27,7 +27,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { Item, ItemContent } from "@/components/ui/item.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemGroup,
+	ItemSeparator,
+} from "@/components/ui/item.tsx";
+import { Fragment } from "react";
 import { useId } from "react";
 
 const errorClassName =
@@ -81,27 +87,7 @@ export function NewScheduleDialog({
 					</Alert>
 				) : (
 					<div className="space-y-4">
-						<div className="m-0 flex flex-col gap-0">
-							<ForecastDetail label="Suggested schedule">
-								{plan.schedule?.name ?? title}
-							</ForecastDetail>
-							<ForecastDetail label="Amount">
-								{plan.schedule
-									? `${plan.schedule.amount} ${plan.currency}`
-									: `${plan.typicalAmount} ${plan.currency}`}
-							</ForecastDetail>
-							{plan.schedule && (
-								<>
-									<ForecastDetail label="Repeats">
-										{frequencyLabel(plan.schedule.frequency)}
-									</ForecastDetail>
-									<ForecastDetail label="Starts">
-										{plan.schedule.startDate}
-									</ForecastDetail>
-									<ForecastDetail label="Account">{accountName}</ForecastDetail>
-								</>
-							)}
-						</div>
+						<ForecastRows plan={plan} title={title} accountName={accountName} />
 						{plan.schedule && plan.upcoming && plan.upcoming.length > 0 && (
 							<div>
 								<h3 className="text-sm font-semibold">Upcoming</h3>
@@ -173,20 +159,48 @@ function evidenceSummary(plan: PatternToNewSchedulePreview): string {
 	return `${occurrences.length} recorded ${occurrences.length === 1 ? "payment" : "payments"} · ${plan.typicalAmount} ${plan.currency} typical · ${range}`;
 }
 
-function ForecastDetail({
-	label,
-	children,
+function ForecastRows({
+	plan,
+	title,
+	accountName,
 }: {
-	label: string;
-	children: React.ReactNode;
+	plan: PatternToNewSchedulePreview;
+	title: string;
+	accountName: string;
 }) {
+	const rows: { label: string; value: React.ReactNode }[] = [
+		{ label: "Suggested schedule", value: plan.schedule?.name ?? title },
+		{
+			label: "Amount",
+			value: plan.schedule
+				? `${plan.schedule.amount} ${plan.currency}`
+				: `${plan.typicalAmount} ${plan.currency}`,
+		},
+		...(plan.schedule
+			? [
+					{
+						label: "Repeats",
+						value: frequencyLabel(plan.schedule.frequency),
+					},
+					{ label: "Starts", value: plan.schedule.startDate },
+					{ label: "Account", value: accountName },
+				]
+			: []),
+	];
 	return (
-		<Item className="justify-between gap-5 rounded-none border-x-0 border-t-0 border-b border-border px-0 py-3">
-			<span className="text-muted-foreground">{label}</span>
-			<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
-				{children}
-			</ItemContent>
-		</Item>
+		<ItemGroup className="gap-0">
+			{rows.map((row, index) => (
+				<Fragment key={row.label}>
+					{index > 0 && <ItemSeparator />}
+					<Item className="justify-between gap-5">
+						<span className="text-muted-foreground">{row.label}</span>
+						<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
+							{row.value}
+						</ItemContent>
+					</Item>
+				</Fragment>
+			))}
+		</ItemGroup>
 	);
 }
 

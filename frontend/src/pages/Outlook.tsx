@@ -36,17 +36,13 @@ function OutlookContent() {
 	if (accounts && accounts.length === 0) {
 		const readOnly = writeBlocked;
 		return (
-			<Empty className="flex-initial gap-0 px-6 py-12">
+			<Empty>
 				<EmptyHeader>
-					<EmptyMedia>
-						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-							<Wallet size={28} />
-						</span>
+					<EmptyMedia variant="icon">
+						<Wallet aria-hidden="true" />
 					</EmptyMedia>
-					<EmptyTitle>
-						<h3 className="text-lg">Your workspace is ready</h3>
-					</EmptyTitle>
-					<EmptyDescription className="mt-2 mb-5 max-w-sm text-muted-foreground">
+					<EmptyTitle>Your workspace is ready</EmptyTitle>
+					<EmptyDescription>
 						Start with an account and its current balance. Add income, expenses,
 						and goals at your own pace.
 					</EmptyDescription>

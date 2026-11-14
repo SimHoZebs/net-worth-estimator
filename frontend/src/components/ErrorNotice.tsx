@@ -15,18 +15,14 @@ export function ErrorNotice({
 	onAction?: () => void;
 }) {
 	const notice = message ? (
-		<ShadcnAlert
-			variant="destructive"
-			className="mb-5 flex items-start gap-3 p-5 text-sm"
-			role="alert"
-		>
+		<ShadcnAlert variant="destructive" className="mb-5" role="alert">
 			<AlertCircle size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
 			<ShadcnAlertDescription className="min-w-0 text-danger-text">
 				<p className="my-1 whitespace-pre-line">{message}</p>
 				{action && (
 					<Button
 						variant="link"
-						className="mt-2 h-auto p-0 text-xs text-danger-text"
+						className="mt-2 text-danger-text"
 						onClick={onAction}
 					>
 						{action} <ArrowUpRight size={15} />

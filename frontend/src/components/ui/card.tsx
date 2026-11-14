@@ -38,6 +38,12 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
 			data-slot="card-title"
 			className={cn(
 				"font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+				// Native headings nested for outline semantics inherit the
+				// canonical composition instead of the global h2-h6 base
+				// styles. `font` covers family/size/weight/line-height;
+				// letter-spacing inherits separately. Layout, IDs, and
+				// heading levels are untouched.
+				"[&>:is(h1,h2,h3,h4,h5,h6)]:[font:inherit] [&>:is(h1,h2,h3,h4,h5,h6)]:[letter-spacing:inherit]",
 				className,
 			)}
 			{...props}

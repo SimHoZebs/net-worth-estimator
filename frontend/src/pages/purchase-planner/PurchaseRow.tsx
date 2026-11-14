@@ -39,23 +39,25 @@ export function PurchaseRow({
 				{String(item.priority).padStart(2, "0")}
 			</span>
 			<div className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere]">
-				<button
+				<Button
 					type="button"
+					variant="ghost"
+					size="sm"
 					onClick={() => onInspect(item.purchase)}
-					className="rounded-md border-0 bg-transparent px-0 py-0.5 text-left text-inherit"
+					className="h-auto justify-start px-0 py-0.5 text-left whitespace-normal"
 					aria-label={`Inspect ${item.purchase.name}, priority ${item.priority}`}
 				>
 					<strong className="text-sm group-data-[excluded=true]/purchase:text-muted-foreground group-data-[excluded=true]/purchase:line-through">
 						{item.purchase.name}
 					</strong>
-				</button>
+				</Button>
 				<PurchaseStatus item={item} />
 			</div>
 			<div className="flex min-w-0 max-w-[52%] flex-col items-end gap-1 text-right max-sm:max-w-[48%]">
 				<strong className="text-sm tabular-nums">
 					{money(item.purchase.amount)}
 				</strong>
-				<span className="truncate text-xs text-muted-foreground">
+				<span className="max-w-full truncate text-xs text-muted-foreground">
 					{item.accountName}
 					{!item.purchase.enabled && " · Excluded"}
 				</span>

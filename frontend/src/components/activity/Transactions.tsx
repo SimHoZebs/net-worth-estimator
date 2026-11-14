@@ -20,6 +20,7 @@ import {
 	EmptyContent,
 	EmptyHeader,
 	EmptyMedia,
+	EmptyTitle,
 } from "@/components/ui/empty.tsx";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
@@ -127,18 +128,12 @@ export function Transactions({
 	const showsProjected = filters.source !== "historical";
 	if (!occurrences.length && !canRequestForecast)
 		return (
-			<Empty className="px-6 py-12">
+			<Empty>
 				<EmptyHeader>
-					<EmptyMedia>
-						<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-							<ArrowRightLeft size={28} aria-hidden="true" />
-						</span>
+					<EmptyMedia variant="icon">
+						<ArrowRightLeft aria-hidden="true" />
 					</EmptyMedia>
-					{/* Real heading: the preset empty title is a plain div,
-					which dropped the heading the account specs assert. */}
-					<h3 className="font-heading text-lg font-medium tracking-tight">
-						No transactions for this account yet
-					</h3>
+					<EmptyTitle>No transactions for this account yet</EmptyTitle>
 				</EmptyHeader>
 				<EmptyContent>
 					<Button
@@ -176,7 +171,7 @@ export function Transactions({
 				}
 			/>
 			{showsProjected && (
-				<div className="h-24 overflow-auto">
+				<div>
 					{projected?.loading ? (
 						<p role="status">Loading projected activity…</p>
 					) : null}
@@ -282,16 +277,12 @@ export function Transactions({
 					)}
 				</>
 			) : !occurrences.length ? (
-				<Empty className="px-6 py-12">
+				<Empty>
 					<EmptyHeader>
-						<EmptyMedia>
-							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-								<ArrowRightLeft size={28} aria-hidden="true" />
-							</span>
+						<EmptyMedia variant="icon">
+							<ArrowRightLeft aria-hidden="true" />
 						</EmptyMedia>
-						<h3 className="font-heading text-lg font-medium tracking-tight">
-							No transactions for this account yet
-						</h3>
+						<EmptyTitle>No transactions for this account yet</EmptyTitle>
 					</EmptyHeader>
 					<EmptyContent>
 						<Button
@@ -303,16 +294,12 @@ export function Transactions({
 					</EmptyContent>
 				</Empty>
 			) : (
-				<Empty className="px-6 py-12">
+				<Empty>
 					<EmptyHeader>
-						<EmptyMedia>
-							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-								<ListFilter size={28} aria-hidden="true" />
-							</span>
+						<EmptyMedia variant="icon">
+							<ListFilter aria-hidden="true" />
 						</EmptyMedia>
-						<h3 className="font-heading text-lg font-medium tracking-tight">
-							No matching transactions
-						</h3>
+						<EmptyTitle>No matching transactions</EmptyTitle>
 					</EmptyHeader>
 					<EmptyContent>
 						<Button type="button" onClick={resetFilters}>

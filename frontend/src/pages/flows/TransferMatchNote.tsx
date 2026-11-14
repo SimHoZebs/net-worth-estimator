@@ -1,9 +1,17 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { AnalysisFinding } from "../../api/generated/model/analysisFinding.ts";
 import type { TransferLink } from "../../api/generated/model/transferLink.ts";
 import { ApiHttpError } from "../../api/http.ts";
 import { UserScopeError } from "../../api/scopedRequest.ts";
 import { Button } from "@/components/ui/button.tsx";
+import {
+	Field,
+	FieldError,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import {
 	useAnalysisFindings,
 	useConfirmTransferPair,
@@ -15,7 +23,6 @@ import {
 	notifyError,
 	notifySuccess,
 } from "../../state/notifications.ts";
-import { cn } from "@/lib/utils.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
 /** Read-only transfer-pair annotation (VIS-03 consumer) with confirm actions.
@@ -83,6 +90,7 @@ export function TransferMatchNote({
 	const confirm = useConfirmTransferPair();
 	const unlink = useRemoveTransferLinkByLeg();
 	const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
+	const legendId = useId();
 	const findings = transferFindingsForEdge(
 		query.data?.findings ?? [],
 		transactionIds,
@@ -218,24 +226,32 @@ export function TransferMatchNote({
 				</div>
 			)}
 			{!readOnly && !link && actionable && actionable.peers.length > 1 && (
-				<fieldset disabled={busy} className="mt-2 space-y-2 border-0 p-0">
-					<legend className="text-xs font-semibold">
+				<FieldSet disabled={busy} className="mt-2 gap-2">
+					<FieldLegend variant="label" id={legendId}>
 						Which transaction is the opposite side?
-					</legend>
-					<div className="space-y-1">
+					</FieldLegend>
+					<RadioGroup
+						name={`transfer-peer-${actionable.finding.id}`}
+						value={peer}
+						onValueChange={(value) => setSelectedPeer(value)}
+						disabled={busy}
+						aria-labelledby={legendId}
+					>
 						{actionable.peers.map((peerId) => (
-							<label key={peerId} className="flex items-center gap-2 text-xs">
-								<input
-									type="radio"
-									name={`transfer-peer-${actionable.finding.id}`}
+							<Field orientation="horizontal" key={peerId}>
+								<RadioGroupItem
 									value={peerId}
-									checked={peer === peerId}
-									onChange={() => setSelectedPeer(peerId)}
+									id={`transfer-peer-${actionable.finding.id}-${peerId}`}
 								/>
-								<span>{peerId}</span>
-							</label>
+								<FieldLabel
+									htmlFor={`transfer-peer-${actionable.finding.id}-${peerId}`}
+									className="text-xs font-normal"
+								>
+									{peerId}
+								</FieldLabel>
+							</Field>
 						))}
-					</div>
+					</RadioGroup>
 					<Button
 						type="button"
 						variant="secondary"
@@ -246,7 +262,7 @@ export function TransferMatchNote({
 					>
 						{confirm.isPending ? "Linking…" : "Link as transfer"}
 					</Button>
-				</fieldset>
+				</FieldSet>
 			)}
 			{matcherDetail && (
 				<details className="mt-1">
@@ -258,11 +274,7 @@ export function TransferMatchNote({
 					</p>
 				</details>
 			)}
-			{inlineError && (
-				<p role="alert" className={cn("mt-2 text-sm text-danger-text")}>
-					{inlineError}
-				</p>
-			)}
+			{inlineError && <FieldError className="mt-2">{inlineError}</FieldError>}
 		</div>
 	);
 }

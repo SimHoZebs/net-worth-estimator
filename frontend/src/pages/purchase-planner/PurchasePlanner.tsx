@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Empty,
-	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -100,21 +99,16 @@ export function PurchasePlanner({
 					/>
 				</div>
 			) : items.length === 0 ? (
-				<Empty className="flex-initial gap-0 px-6 py-12">
+				<Empty>
 					<EmptyHeader>
-						<EmptyMedia>
-							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-								<ShoppingBag size={28} />
-							</span>
+						<EmptyMedia variant="icon">
+							<ShoppingBag aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>
-							<h3 className="text-lg">What would you like to make room for?</h3>
-						</EmptyTitle>
-						<EmptyDescription className="mt-2 mb-5 max-w-sm text-muted-foreground">
+						<EmptyTitle>What would you like to make room for?</EmptyTitle>
+						<EmptyDescription>
 							Add a purchase to discover its earliest financially safe date.
 						</EmptyDescription>
 					</EmptyHeader>
-					<EmptyContent />
 				</Empty>
 			) : (
 				<>

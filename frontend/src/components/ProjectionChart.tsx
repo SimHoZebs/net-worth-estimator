@@ -12,6 +12,12 @@ import { useSavedAccounts } from "../state/savedState.ts";
 import { visibleAccounts } from "../domain/model.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
+	Card,
+	CardAction,
+	CardContent,
+	CardHeader,
+} from "@/components/ui/card.tsx";
+import {
 	Alert as ShadcnAlert,
 	AlertDescription as ShadcnAlertDescription,
 } from "@/components/ui/alert.tsx";
@@ -126,35 +132,40 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 				</ShadcnAlert>
 			) : null;
 		return (
-			<section
-				className="overflow-hidden rounded-xl border border-border bg-card print:break-inside-avoid"
+			<Card
+				role="region"
 				aria-label={
 					view === "total"
 						? `Net worth over the trailing ${days} days`
 						: `Net worth by account over the trailing ${days} days`
 				}
+				className="print:break-inside-avoid"
 			>
-				<div className="flex items-center justify-between gap-4 px-5 pt-4">
+				<CardHeader>
 					<TrailingWindowControl
 						value={String(days)}
 						onChange={(value) => {
 							setDays(Number(value));
 						}}
 					/>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						aria-label="Inspect current net worth evidence"
-						onClick={onEvidence}
-					>
-						<CircleHelp size={14} aria-hidden="true" />
-					</Button>
-				</div>
-				<div aria-busy="true">
-					<Skeleton className="h-56 w-full" />
-				</div>
-			</section>
+					<CardAction>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Inspect current net worth evidence"
+							onClick={onEvidence}
+						>
+							<CircleHelp size={14} aria-hidden="true" />
+						</Button>
+					</CardAction>
+				</CardHeader>
+				<CardContent>
+					<div aria-busy="true">
+						<Skeleton className="h-56 w-full" />
+					</div>
+				</CardContent>
+			</Card>
 		);
 	}
 	return (
@@ -175,13 +186,14 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 				</p>
 			)}
 			{loading && projection && <ProjectionUpdating />}
-			<section
-				className="overflow-hidden rounded-xl border border-border bg-card print:break-inside-avoid"
+			<Card
+				role="region"
 				aria-label={
 					view === "total"
 						? `Net worth over the trailing ${days} days`
 						: `Net worth by account over the trailing ${days} days`
 				}
+				className="print:break-inside-avoid"
 			>
 				{projection && (
 					<NetWorthSummary
@@ -235,7 +247,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 					/>
 				)}
 				{view === "total" ? (
-					<div className="px-2 pb-2">
+					<CardContent className="px-2">
 						<Suspense
 							fallback={
 								<div aria-busy="true">
@@ -245,9 +257,9 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 						>
 							<NetWorthTrendPlot points={daily} days={days} height={300} />
 						</Suspense>
-					</div>
+					</CardContent>
 				) : (
-					<div className="px-5 pt-2 pb-5">
+					<CardContent>
 						{savedAccounts === null ? (
 							<div aria-busy="true">
 								<Skeleton className="h-56 w-full" />
@@ -267,9 +279,9 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 								/>
 							</Suspense>
 						)}
-					</div>
+					</CardContent>
 				)}
-			</section>
+			</Card>
 		</>
 	);
 }

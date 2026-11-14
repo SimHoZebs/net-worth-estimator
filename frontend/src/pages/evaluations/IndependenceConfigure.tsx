@@ -1,9 +1,13 @@
 import { useId, useMemo, useState } from "react";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { finite, isRecord, parseUnion } from "@/domain/guards.ts";
 import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
@@ -278,7 +282,7 @@ function IndependenceForm({
 		<div className="grid gap-3">
 			<div className="grid gap-3 sm:grid-cols-2">
 				<Field>
-					<Label htmlFor={minimumId}>Minimum net worth ($)</Label>
+					<FieldLabel htmlFor={minimumId}>Minimum net worth ($)</FieldLabel>
 					<Input
 						id={minimumId}
 						type="number"
@@ -293,7 +297,9 @@ function IndependenceForm({
 					/>
 				</Field>
 				<Field>
-					<Label htmlFor={yearsId}>Spending test duration (years)</Label>
+					<FieldLabel htmlFor={yearsId}>
+						Spending test duration (years)
+					</FieldLabel>
 					<Input
 						id={yearsId}
 						type="number"
@@ -309,10 +315,8 @@ function IndependenceForm({
 					/>
 				</Field>
 			</div>
-			<fieldset className="grid gap-2">
-				<legend className="m-0 p-0 text-xs font-semibold text-muted-foreground">
-					Funding accounts
-				</legend>
+			<FieldSet className="grid gap-2">
+				<FieldLegend variant="label">Funding accounts</FieldLegend>
 				{accounts.length ? (
 					<div className="flex flex-wrap gap-2">
 						{accounts.map((account) => (
@@ -330,11 +334,9 @@ function IndependenceForm({
 						No accounts available.
 					</p>
 				)}
-			</fieldset>
-			<fieldset className="grid gap-2" disabled={saving || readOnly}>
-				<legend className="m-0 p-0 text-xs font-semibold text-muted-foreground">
-					Funding income
-				</legend>
+			</FieldSet>
+			<FieldSet className="grid gap-2" disabled={saving || readOnly}>
+				<FieldLegend variant="label">Funding income</FieldLegend>
 				{incomeCandidates.length ? (
 					<div className="flex flex-wrap gap-2">
 						{incomeCandidates.map((item) => (
@@ -356,7 +358,7 @@ function IndependenceForm({
 						No income sources available.
 					</p>
 				)}
-			</fieldset>
+			</FieldSet>
 			<div className="mt-6 flex flex-wrap items-center gap-3 border-t pt-5">
 				<Button type="button" disabled={saving || readOnly} onClick={onSave}>
 					{saving ? "Saving…" : "Save configuration"}

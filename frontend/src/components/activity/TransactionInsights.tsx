@@ -16,8 +16,16 @@ import {
 	useDismissAnalysisFinding,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import {
+	Empty,
+	EmptyContent,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty.tsx";
 
 import { Field, FieldLabel, FieldError } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -258,20 +266,19 @@ export function TransactionInsightsPanel({
 
 	if (!shown) {
 		return (
-			<div
-				className="flex flex-col items-center py-12 text-center"
-				aria-live="polite"
-			>
-				<span className="mb-5 grid size-12 place-items-center rounded-full bg-success-bg text-success-text">
-					<Check size={24} aria-hidden="true" />
-				</span>
-				<h3 className="m-0 mb-6 text-lg font-semibold tracking-tight">
-					All caught up
-				</h3>
-				<Button type="button" variant="default" onClick={onDone}>
-					Done
-				</Button>
-			</div>
+			<Empty aria-live="polite">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<Check aria-hidden="true" />
+					</EmptyMedia>
+					<EmptyTitle>All caught up</EmptyTitle>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button type="button" variant="default" onClick={onDone}>
+						Done
+					</Button>
+				</EmptyContent>
+			</Empty>
 		);
 	}
 
@@ -451,10 +458,10 @@ export function TransactionInsightsPanel({
 			<h3 className="m-0 mb-3 text-xl leading-snug font-bold tracking-tight">
 				{question}
 			</h3>
-			<p className="mt-0 mb-6 flex items-start gap-2 rounded-xl bg-muted p-3 text-xs leading-relaxed text-muted-foreground">
-				<Info size={15} aria-hidden="true" className="mt-px flex-none" />
-				<span>{suggestionEvidence(shown)}</span>
-			</p>
+			<Alert>
+				<Info size={15} aria-hidden="true" />
+				<AlertDescription>{suggestionEvidence(shown)}</AlertDescription>
+			</Alert>
 
 			{shown.kind === "void" ? (
 				<div className="grid gap-3">
@@ -637,7 +644,7 @@ export function TransactionInsightsPanel({
 				</FieldError>
 			)}
 
-			<div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3">
+			<div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
 				{shown.kind === "void" ? (
 					<>
 						<Button

@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import { BalanceAdjustmentRow } from "../../components/activity/BalanceAdjustmentRow.tsx";
 
@@ -32,12 +34,14 @@ export function BalanceHistory({
 	if (isPending) return <p role="status">Loading balance adjustments…</p>;
 	if (isError)
 		return (
-			<p role="alert">
-				Balance adjustments could not be loaded.{" "}
-				<button type="button" onClick={onRetry}>
-					Retry adjustments
-				</button>
-			</p>
+			<Alert variant="destructive">
+				<AlertDescription>
+					Balance adjustments could not be loaded.{" "}
+					<Button variant="link" onClick={onRetry}>
+						Retry adjustments
+					</Button>
+				</AlertDescription>
+			</Alert>
 		);
 	if (!sorted.length)
 		return (

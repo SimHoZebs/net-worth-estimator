@@ -4,6 +4,7 @@ import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
@@ -35,14 +36,9 @@ export function PurchaseInspector({
 		>
 			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
 				<DialogHeader>
-					<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
+					<DialogTitle className="pr-10">{purchase.name}</DialogTitle>
+					<DialogDescription>
 						Priority {item.priority} · Planned purchase
-					</p>
-					<DialogTitle className="text-sm leading-snug font-semibold tracking-normal">
-						{purchase.name}
-					</DialogTitle>
-					<DialogDescription className="sr-only">
-						Planned purchase details
 					</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-4">
@@ -87,7 +83,7 @@ export function PurchaseInspector({
 							</span>
 						</div>
 					)}
-					<div className="flex flex-wrap justify-end gap-2">
+					<DialogFooter>
 						{canEdit && onRemove && (
 							<Button
 								type="button"
@@ -108,7 +104,7 @@ export function PurchaseInspector({
 								Edit purchase
 							</Button>
 						)}
-					</div>
+					</DialogFooter>
 				</div>
 			</DialogContent>
 		</Dialog>

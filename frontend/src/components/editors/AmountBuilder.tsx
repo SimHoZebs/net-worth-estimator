@@ -21,6 +21,7 @@ import {
 	EditorSelect,
 	type EditorSelectOption,
 } from "./editorFields.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
 
 function numberOr(fallback: number, value: string): number {
 	const parsed = Number(value);
@@ -581,61 +582,65 @@ export function AmountBuilder({
 	const wire = JSON.stringify(amount, null, 2);
 	const templatePickerId = useId();
 	return (
-		<div className="mt-3 mb-5 rounded-xl border border-border bg-transparent p-4">
-			{!hidePicker && (
-				<>
+		<Card size="sm" className="mt-3 mb-5">
+			<CardContent className="flex flex-col gap-4">
+				{!hidePicker && (
+					<>
+						<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+							<EditorField
+								label="What kind of amount?"
+								htmlFor={templatePickerId}
+							>
+								<EditorSelect
+									id={templatePickerId}
+									value={template.id}
+									onValueChange={(next) => {
+										setTemplateId(next);
+										setFields({});
+									}}
+									options={list.map((item) => ({
+										value: item.id,
+										label: item.label,
+									}))}
+								/>
+							</EditorField>
+						</div>
+						<p className="text-muted-foreground">
+							<strong>{template.label}.</strong> {template.summary}{" "}
+							{template.whenToUse && (
+								<span>Use when: {template.whenToUse}</span>
+							)}
+						</p>
+					</>
+				)}
+				{!fixedAmount && (
 					<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
-						<EditorField
-							label="What kind of amount?"
-							htmlFor={templatePickerId}
-						>
-							<EditorSelect
-								id={templatePickerId}
-								value={template.id}
-								onValueChange={(next) => {
-									setTemplateId(next);
-									setFields({});
-								}}
-								options={list.map((item) => ({
-									value: item.id,
-									label: item.label,
-								}))}
-							/>
-						</EditorField>
+						<TemplateFields
+							templateId={template.id}
+							accounts={accounts}
+							transactions={transactions}
+							fields={currentFields}
+							onField={(key, value) =>
+								setFields((previous) => ({ ...previous, [key]: value }))
+							}
+						/>
 					</div>
-					<p className="text-muted-foreground">
-						<strong>{template.label}.</strong> {template.summary}{" "}
-						{template.whenToUse && <span>Use when: {template.whenToUse}</span>}
-					</p>
-				</>
-			)}
-			{!fixedAmount && (
-				<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
-					<TemplateFields
-						templateId={template.id}
-						accounts={accounts}
-						transactions={transactions}
-						fields={currentFields}
-						onField={(key, value) =>
-							setFields((previous) => ({ ...previous, [key]: value }))
-						}
-					/>
-				</div>
-			)}
-			<p className="text-muted-foreground">{plain}</p>
-			<details>
-				<summary>Show saved data (JSON)</summary>
-				<pre className="max-h-70 overflow-auto rounded-xl border border-border bg-muted p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
-					{wire}
-				</pre>
-			</details>
-			{onChange && (
-				<div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-					<Button type="button" onClick={() => onChange(amount)}>
-						Use this amount
-					</Button>
-				</div>
-			)}
-		</div>
+				)}
+				<p className="text-muted-foreground">{plain}</p>
+				<details>
+					<summary>Show saved data (JSON)</summary>
+					<pre className="max-h-70 overflow-auto rounded-xl border border-border bg-muted p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
+						{wire}
+					</pre>
+				</details>
+				{onChange && (
+					<div className="flex flex-wrap items-center justify-end gap-3">
+						<Button type="button" onClick={() => onChange(amount)}>
+							Use this amount
+						</Button>
+					</div>
+				)}
+			</CardContent>
+		</Card>
 	);
 }

@@ -9,6 +9,7 @@ import {
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
+	EmptyTitle,
 } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
@@ -214,15 +215,13 @@ export function FlowsPage() {
 				/>
 			)}
 			{(window.startDate === "" || window.endDate === "") && (
-				<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+				<Empty>
 					<EmptyHeader>
-						<EmptyMedia>
-							<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-								<Waves size={28} />
-							</span>
+						<EmptyMedia variant="icon">
+							<Waves aria-hidden="true" />
 						</EmptyMedia>
-						<h3 className="text-lg">Choose both dates</h3>
-						<EmptyDescription className="mt-2 mb-5 max-w-sm">
+						<EmptyTitle>Choose both dates</EmptyTitle>
+						<EmptyDescription>
 							Money flows need a start and an end date before the calculation
 							runs.
 						</EmptyDescription>
@@ -277,15 +276,13 @@ export function FlowsPage() {
 						</ToggleGroup>
 					</div>
 					{visible.length === 0 || !input ? (
-						<Empty className="flex w-full min-w-0 flex-initial flex-col items-center gap-0 px-6 py-12 text-center">
+						<Empty>
 							<EmptyHeader>
-								<EmptyMedia>
-									<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
-										<Waves size={28} />
-									</span>
+								<EmptyMedia variant="icon">
+									<Waves aria-hidden="true" />
 								</EmptyMedia>
-								<h3 className="text-lg">No money movement in this view</h3>
-								<EmptyDescription className="mt-2 mb-5 max-w-sm">
+								<EmptyTitle>No money movement in this view</EmptyTitle>
+								<EmptyDescription>
 									Widen the dates or clear the account and money filters.
 								</EmptyDescription>
 							</EmptyHeader>

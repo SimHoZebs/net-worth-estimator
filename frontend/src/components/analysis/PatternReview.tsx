@@ -31,7 +31,18 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { cn } from "@/lib/utils.ts";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs.tsx";
 
 const errorClassName =
 	"m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text";
@@ -81,12 +92,7 @@ function ClassificationAnswers({
 			<div className="flex flex-wrap items-center gap-2">
 				<Badge
 					variant={confirmed ? "default" : "secondary"}
-					className={cn(
-						"h-auto",
-						confirmed
-							? "bg-success-bg text-success-text"
-							: "bg-accent text-muted-foreground",
-					)}
+					className={confirmed ? "bg-success-bg text-success-text" : undefined}
 				>
 					{paymentStatus(finding)}
 				</Badge>
@@ -150,12 +156,7 @@ function RepetitionActions({
 			<div className="flex flex-wrap items-center gap-2">
 				<Badge
 					variant={confirmed ? "default" : "secondary"}
-					className={cn(
-						"h-auto",
-						confirmed
-							? "bg-success-bg text-success-text"
-							: "bg-accent text-muted-foreground",
-					)}
+					className={confirmed ? "bg-success-bg text-success-text" : undefined}
 				>
 					{recurringPatternStatus(pattern)}
 				</Badge>
@@ -429,8 +430,6 @@ export function PatternReview({
 	if (!groups.length) return null;
 	const counts = new Map<PatternReviewTab, number>();
 	for (const row of groups) counts.set(row.tab, (counts.get(row.tab) ?? 0) + 1);
-	const matching = groups.filter((row) => row.tab === tab);
-	const active = TABS.find((entry) => entry.id === tab)!;
 	const openRow = openKey
 		? (groups.find((row) => row.key === openKey) ?? null)
 		: null;
@@ -442,101 +441,109 @@ export function PatternReview({
 					Confirm or correct suggested payment purposes.
 				</p>
 			</header>
-			<div
-				role="tablist"
-				aria-label="Pattern review status"
-				className="flex flex-wrap gap-2"
+			<Tabs
+				value={tab}
+				onValueChange={(next) => {
+					setTab(next as PatternReviewTab);
+					setRows(5);
+					setOpenKey(null);
+				}}
 			>
-				{TABS.map((entry) => (
-					<Button
-						key={entry.id}
-						type="button"
-						role="tab"
-						aria-selected={tab === entry.id}
-						variant={tab === entry.id ? "default" : "secondary"}
-						size="sm"
-						onClick={() => {
-							setTab(entry.id);
-							setRows(5);
-							setOpenKey(null);
-						}}
-					>
-						{entry.label} ({counts.get(entry.id) ?? 0})
-					</Button>
-				))}
-			</div>
-			{matching.length === 0 ? (
-				<p className="m-0 text-sm text-muted-foreground">{active.empty}</p>
-			) : (
-				<ul className="m-0 list-none space-y-2 p-0">
-					{matching.slice(0, rows).map((row) => {
-						const title = reviewTitle(row, names);
-						const amount = reviewAmount(row);
-						return (
-							<li key={row.key}>
-								<button
-									type="button"
-									aria-label={`Review ${title}`}
-									onClick={() => setOpenKey(row.key)}
-									className="flex w-full items-center gap-3 rounded-md border border-solid border-border p-4 text-left"
-								>
-									<span className="min-w-0 flex-1 space-y-1">
-										<span className="block text-sm font-semibold">{title}</span>
-										<span className="block text-xs text-muted-foreground">
-											{reviewCadenceLabel(row)} · {reviewRecordedCount(row)}{" "}
-											recorded
-										</span>
-										{amount && (
-											<span
-												className={
-													amount.inflow
-														? "block text-xs font-semibold text-success-text"
-														: "block text-xs font-semibold"
-												}
-											>
-												{amount.text} · {amount.direction}
-											</span>
-										)}
-										<span className="flex flex-wrap gap-1 pt-1">
-											{reviewChips(row).map((chip) => (
-												<Badge
-													key={chip.key}
-													variant={
-														chip.tone === "success" ? "default" : "secondary"
+				<TabsList aria-label="Pattern review status">
+					{TABS.map((entry) => (
+						<TabsTrigger key={entry.id} value={entry.id}>
+							{entry.label} ({counts.get(entry.id) ?? 0})
+						</TabsTrigger>
+					))}
+				</TabsList>
+				{TABS.map((entry) => {
+					const entryRows = groups.filter((row) => row.tab === entry.id);
+					return (
+						<TabsContent key={entry.id} value={entry.id}>
+							{entryRows.length === 0 ? (
+								<p className="m-0 text-sm text-muted-foreground">
+									{entry.empty}
+								</p>
+							) : (
+								<ul className="m-0 list-none space-y-2 p-0">
+									{entryRows.slice(0, rows).map((row) => {
+										const title = reviewTitle(row, names);
+										const amount = reviewAmount(row);
+										return (
+											<li key={row.key}>
+												<Item
+													variant="outline"
+													render={
+														<button
+															type="button"
+															aria-label={`Review ${title}`}
+															onClick={() => setOpenKey(row.key)}
+														/>
 													}
-													className={cn(
-														"h-auto",
-														chip.tone === "success"
-															? "bg-success-bg text-success-text"
-															: "bg-accent text-muted-foreground",
-													)}
+													className="text-left"
 												>
-													{chip.label}
-												</Badge>
-											))}
-										</span>
-									</span>
-									<ChevronRight
-										size={16}
-										aria-hidden="true"
-										className="flex-none text-muted-foreground"
-									/>
-								</button>
-							</li>
-						);
-					})}
-				</ul>
-			)}
-			{matching.length > rows && (
-				<Button
-					type="button"
-					variant="secondary"
-					size="sm"
-					onClick={() => setRows((value) => value + 10)}
-				>
-					Show more patterns
-				</Button>
-			)}
+													<ItemContent>
+														<ItemTitle>{title}</ItemTitle>
+														<ItemDescription>
+															{reviewCadenceLabel(row)} ·{" "}
+															{reviewRecordedCount(row)} recorded
+														</ItemDescription>
+														{amount && (
+															<span
+																className={
+																	amount.inflow
+																		? "text-xs font-semibold text-success-text"
+																		: "text-xs font-semibold"
+																}
+															>
+																{amount.text} · {amount.direction}
+															</span>
+														)}
+														<span className="flex flex-wrap gap-1 pt-1">
+															{reviewChips(row).map((chip) => (
+																<Badge
+																	key={chip.key}
+																	variant={
+																		chip.tone === "success"
+																			? "default"
+																			: "secondary"
+																	}
+																	className={
+																		chip.tone === "success"
+																			? "bg-success-bg text-success-text"
+																			: undefined
+																	}
+																>
+																	{chip.label}
+																</Badge>
+															))}
+														</span>
+													</ItemContent>
+													<ChevronRight
+														size={16}
+														aria-hidden="true"
+														className="flex-none text-muted-foreground"
+													/>
+												</Item>
+											</li>
+										);
+									})}
+								</ul>
+							)}
+							{entryRows.length > rows && (
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onClick={() => setRows((value) => value + 10)}
+								>
+									Show more patterns
+								</Button>
+							)}
+						</TabsContent>
+					);
+				})}
+			</Tabs>
 			{openRow && (
 				<PatternReviewDialog
 					row={openRow}

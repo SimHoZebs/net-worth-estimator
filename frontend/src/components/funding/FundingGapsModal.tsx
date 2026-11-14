@@ -1,6 +1,16 @@
 import { AlertCircle, CalendarDays, TriangleAlert } from "lucide-react";
+import { Fragment } from "react";
 import { SegmentedBar } from "../SegmentedBar.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from "@/components/ui/item.tsx";
 import {
 	Dialog,
 	DialogContent,
@@ -108,24 +118,30 @@ export function FundingGapsModal({
 				</p>
 				<BalancePathChart gap={gap} />
 				<div className="my-4 grid grid-cols-3 gap-3">
-					<div className="rounded-md bg-muted px-3 py-3">
-						<span className="text-xs text-muted-foreground">Opening</span>
-						<strong className="mt-1 block text-sm tabular-nums">
-							{money(gap.openingBalance)}
-						</strong>
-					</div>
-					<div className="rounded-md bg-muted px-3 py-3">
-						<span className="text-xs text-muted-foreground">Money in</span>
-						<strong className="mt-1 block text-sm tabular-nums">
-							+{money(summary.moneyIn)}
-						</strong>
-					</div>
-					<div className="rounded-md bg-muted px-3 py-3">
-						<span className="text-xs text-muted-foreground">Money out</span>
-						<strong className="mt-1 block text-sm tabular-nums">
-							−{money(summary.moneyOut)}
-						</strong>
-					</div>
+					<Item variant="muted">
+						<ItemContent>
+							<ItemDescription>Opening</ItemDescription>
+							<ItemTitle className="tabular-nums">
+								{money(gap.openingBalance)}
+							</ItemTitle>
+						</ItemContent>
+					</Item>
+					<Item variant="muted">
+						<ItemContent>
+							<ItemDescription>Money in</ItemDescription>
+							<ItemTitle className="tabular-nums">
+								+{money(summary.moneyIn)}
+							</ItemTitle>
+						</ItemContent>
+					</Item>
+					<Item variant="muted">
+						<ItemContent>
+							<ItemDescription>Money out</ItemDescription>
+							<ItemTitle className="tabular-nums">
+								−{money(summary.moneyOut)}
+							</ItemTitle>
+						</ItemContent>
+					</Item>
 				</div>
 				<h3 className="mt-4 mb-1 text-sm">Before the payment</h3>
 				<p className="text-sm leading-relaxed text-muted-foreground">
@@ -133,36 +149,34 @@ export function FundingGapsModal({
 					{dateLabel(gap.windowStartDate, true)} · {summary.rows.length}{" "}
 					transactions in execution order · Later deposits excluded
 				</p>
-				{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */}
-				<ul className="mt-3 mb-0 grid list-none p-0" role="list">
-					{summary.rows.map((row) => (
-						<li
-							key={row.id}
-							className="flex items-center gap-3 border-t border-border py-3 text-xs"
-						>
-							<FundingTransactionIcon kind={row.kind} />
-							<div className="min-w-0 flex-1">
-								<div>{row.name}</div>
-								<small className="text-xs text-muted-foreground">
-									{dateLabel(row.date, true)}
-									{row.counterpartAccountName
-										? ` · ${row.counterpartAccountName}`
-										: ""}
-								</small>
-							</div>
-							<div className="min-w-0 flex-1 text-right tabular-nums">
-								<div>
-									{row.amount >= 0 ? "+" : "−"}
-									{money(Math.abs(row.amount))}
-								</div>
-								<small className="text-xs text-muted-foreground">
-									→ {money(row.balanceAfter)}
-								</small>
-							</div>
-						</li>
+				<ItemGroup className="mt-3 mb-0 gap-0">
+					{summary.rows.map((row, index) => (
+						<Fragment key={row.id}>
+							{index > 0 && <ItemSeparator />}
+							<Item className="gap-3 text-xs">
+								<ItemMedia>
+									<FundingTransactionIcon kind={row.kind} />
+								</ItemMedia>
+								<ItemContent>
+									<span>{row.name}</span>
+									<ItemDescription>
+										{dateLabel(row.date, true)}
+										{row.counterpartAccountName
+											? ` · ${row.counterpartAccountName}`
+											: ""}
+									</ItemDescription>
+								</ItemContent>
+								<ItemContent className="items-end text-right tabular-nums">
+									<span>
+										{row.amount >= 0 ? "+" : "−"}
+										{money(Math.abs(row.amount))}
+									</span>
+									<ItemDescription>→ {money(row.balanceAfter)}</ItemDescription>
+								</ItemContent>
+							</Item>
+						</Fragment>
 					))}
-				</ul>
-				{/* oxlint-enable jsx-a11y/no-redundant-roles */}
+				</ItemGroup>
 				<div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-danger-border bg-danger-bg p-3">
 					<span className="flex items-center gap-3">
 						<TriangleAlert size={18} aria-hidden="true" />

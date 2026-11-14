@@ -17,7 +17,15 @@ import {
 	todayIso,
 } from "@/domain/format.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Card, CardTitle } from "@/components/ui/card.tsx";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
 import {
 	checkingAccountId,
 	mandatoryTransactions,
@@ -612,118 +620,129 @@ export function SafeSpendingPreview({
 	// projection are absent.
 	if (savedRowsPending || settingsState.pending || pending)
 		return (
-			<Card role="region" aria-label="Safe card spending" className="relative">
-				<div className="flex items-center justify-between gap-4">
-					<CardTitle className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
-						<CalendarDays
-							size={16}
-							className="shrink-0 text-muted-foreground"
-							aria-hidden="true"
-						/>
-						Safe card spending
+			<Card role="region" aria-label="Safe card spending">
+				<CardHeader>
+					<CardTitle>
+						<h2 className="flex min-h-8 items-center gap-2 [overflow-wrap:anywhere]">
+							<CalendarDays
+								size={16}
+								className="shrink-0 text-muted-foreground"
+								aria-hidden="true"
+							/>
+							Safe card spending
+						</h2>
 					</CardTitle>
-				</div>
-				<p className="m-0 text-xs">
-					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
-					{fullDaysLeft === 1 ? "day" : "days"} left
-					{staleData
-						? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
-						: ""}
-				</p>
-				<div aria-busy="true">
-					<Skeleton className="h-32 w-full" />
-				</div>
-			</Card>
-		);
-
-	return (
-		<Card role="region" aria-label="Safe card spending" className="relative">
-			<div className="flex items-center justify-between gap-4">
-				<CardTitle className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
-					<CalendarDays
-						size={16}
-						className="shrink-0 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					Safe card spending
-				</CardTitle>
-				{trackedIds.length > 0 && (
-					<Button variant="link" onClick={() => onDetail("configure")}>
-						Configure
-					</Button>
-				)}
-			</div>
-			{trackedIds.length > 0 ? (
-				<>
-					<p className="m-0 text-xs">
+					<CardDescription>
 						{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 						{fullDaysLeft === 1 ? "day" : "days"} left
 						{staleData
 							? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
 							: ""}
-					</p>
-					<ToggleGroup
-						aria-label="Safe card spending cycle view"
-						value={[cycleViewTab]}
-						onValueChange={(next) => {
-							const nextValue = next.find(
-								(candidate) => candidate !== cycleViewTab,
-							);
-							if (nextValue !== undefined)
-								setCycleViewTab(nextValue as SafeSpendingCycleTab);
-						}}
-						className="mb-4"
-					>
-						{SAFE_SPENDING_DETAIL_TABS.filter(
-							(
-								item,
-							): item is Extract<
-								(typeof SAFE_SPENDING_DETAIL_TABS)[number],
-								{ view: "charges" }
-							> => isSafeSpendingCycleTab(item.id),
-						).map((item) => (
-							<ToggleGroupItem key={item.id} value={item.id}>
-								{item.label}
-							</ToggleGroupItem>
-						))}
-					</ToggleGroup>
-					<SafeSpendingBillsPanel
-						heroes={inlineView.view.heroes}
-						cashNow={inlineView.view.cashNow}
-						allocation={inlineView.view.allocation}
-						funding={inlineView.view.funding}
-						trend={inlineView.trend}
-						section={inlineView.section}
-						closed={cycleViewTab === "last-cycle"}
-						accounts={accounts ?? []}
-						transactions={savedState}
-						readOnly={readOnly}
-						transactionOrder={transactionOrder}
-						onTransactionOrderChange={setTransactionOrder}
-					/>
-					<div className="flex flex-wrap items-center gap-4 border-t border-border pt-4">
-						<Button variant="link" onClick={() => onDetail("cycle")}>
-							This cycle transactions
-						</Button>
-						<Button
-							variant="link"
-							className="ml-auto"
-							onClick={() => onDetail("last-cycle")}
-						>
-							Last cycle transactions
-						</Button>
+					</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<div aria-busy="true">
+						<Skeleton className="h-32 w-full" />
 					</div>
-				</>
-			) : (
-				<div className="grid gap-3">
-					<p className="m-0 text-sm leading-relaxed text-muted-foreground">
-						Its statement cycle, spending, and balance settle here.
-					</p>
-					<Button variant="link" onClick={() => onDetail("configure")}>
-						Choose a card
-					</Button>
-				</div>
-			)}
+				</CardContent>
+			</Card>
+		);
+
+	return (
+		<>
+			<Card role="region" aria-label="Safe card spending">
+				<CardHeader>
+					<CardTitle>
+						<h2 className="flex min-h-8 items-center gap-2 [overflow-wrap:anywhere]">
+							<CalendarDays
+								size={16}
+								className="shrink-0 text-muted-foreground"
+								aria-hidden="true"
+							/>
+							Safe card spending
+						</h2>
+					</CardTitle>
+					<CardDescription>
+						{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
+						{fullDaysLeft === 1 ? "day" : "days"} left
+						{staleData
+							? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
+							: ""}
+					</CardDescription>
+					{trackedIds.length > 0 && (
+						<CardAction>
+							<Button variant="link" onClick={() => onDetail("configure")}>
+								Configure
+							</Button>
+						</CardAction>
+					)}
+				</CardHeader>
+				{trackedIds.length > 0 ? (
+					<>
+						<CardContent className="grid content-start gap-4">
+							<ToggleGroup
+								aria-label="Safe card spending cycle view"
+								value={[cycleViewTab]}
+								onValueChange={(next) => {
+									const nextValue = next.find(
+										(candidate) => candidate !== cycleViewTab,
+									);
+									if (nextValue !== undefined)
+										setCycleViewTab(nextValue as SafeSpendingCycleTab);
+								}}
+							>
+								{SAFE_SPENDING_DETAIL_TABS.filter(
+									(
+										item,
+									): item is Extract<
+										(typeof SAFE_SPENDING_DETAIL_TABS)[number],
+										{ view: "charges" }
+									> => isSafeSpendingCycleTab(item.id),
+								).map((item) => (
+									<ToggleGroupItem key={item.id} value={item.id}>
+										{item.label}
+									</ToggleGroupItem>
+								))}
+							</ToggleGroup>
+							<SafeSpendingBillsPanel
+								heroes={inlineView.view.heroes}
+								cashNow={inlineView.view.cashNow}
+								allocation={inlineView.view.allocation}
+								funding={inlineView.view.funding}
+								trend={inlineView.trend}
+								section={inlineView.section}
+								closed={cycleViewTab === "last-cycle"}
+								accounts={accounts ?? []}
+								transactions={savedState}
+								readOnly={readOnly}
+								transactionOrder={transactionOrder}
+								onTransactionOrderChange={setTransactionOrder}
+							/>
+						</CardContent>
+						<CardFooter className="flex-wrap gap-4">
+							<Button variant="link" onClick={() => onDetail("cycle")}>
+								This cycle transactions
+							</Button>
+							<Button
+								variant="link"
+								className="ml-auto"
+								onClick={() => onDetail("last-cycle")}
+							>
+								Last cycle transactions
+							</Button>
+						</CardFooter>
+					</>
+				) : (
+					<CardContent className="grid content-start gap-3">
+						<p className="m-0 text-sm leading-relaxed text-muted-foreground">
+							Its statement cycle, spending, and balance settle here.
+						</p>
+						<Button variant="link" onClick={() => onDetail("configure")}>
+							Choose a card
+						</Button>
+					</CardContent>
+				)}
+			</Card>
 			{detail && (
 				<SafeSpendingDetailShell
 					tab={detail}
@@ -784,6 +803,6 @@ export function SafeSpendingPreview({
 					)}
 				</SafeSpendingDetailShell>
 			)}
-		</Card>
+		</>
 	);
 }

@@ -20,9 +20,13 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
-import { Field } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import {
 	Select,
 	SelectContent,
@@ -56,7 +60,7 @@ function ReceiptField({
 }) {
 	return (
 		<Field className={cn("flex min-w-0 flex-col gap-2", className)}>
-			<Label htmlFor={id}>{label}</Label>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
 			{children(id)}
 		</Field>
 	);
@@ -241,7 +245,7 @@ function ReceiptEditor({
 						variant="default"
 						role="status"
 						className={cn(
-							"border-warning-border bg-warning-bg p-4 text-warning-text",
+							"border-warning-border bg-warning-bg text-warning-text",
 						)}
 					>
 						<AlertDescription className="text-warning-text">
@@ -260,7 +264,7 @@ function ReceiptEditor({
 						variant="default"
 						role="status"
 						className={cn(
-							"border-warning-border bg-warning-bg p-4 text-warning-text",
+							"border-warning-border bg-warning-bg text-warning-text",
 						)}
 					>
 						<AlertDescription className="text-warning-text">
@@ -340,7 +344,7 @@ function ReceiptEditor({
 							<Alert
 								variant="default"
 								className={cn(
-									"border-warning-border bg-warning-bg p-4 text-warning-text",
+									"border-warning-border bg-warning-bg text-warning-text",
 								)}
 							>
 								<AlertDescription className="text-warning-text">
@@ -359,13 +363,11 @@ function ReceiptEditor({
 							onSubmit={(event) => void save(event)}
 							className="flex flex-col gap-5"
 						>
-							<fieldset
+							<FieldSet
 								disabled={readOnly || busy}
 								className="grid min-w-0 gap-3 sm:grid-cols-2"
 							>
-								<legend className="mb-3 text-sm font-semibold">
-									Receipt details
-								</legend>
+								<FieldLegend>Receipt details</FieldLegend>
 								<ReceiptField
 									id={`${fieldPrefix}-merchant`}
 									label="Merchant"
@@ -488,7 +490,7 @@ function ReceiptEditor({
 										/>
 									)}
 								</ReceiptField>
-							</fieldset>
+							</FieldSet>
 							<ReceiptItems
 								items={draft.items}
 								disabled={readOnly || busy}

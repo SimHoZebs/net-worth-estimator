@@ -121,7 +121,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 					x: "index",
 					y: "balance",
 					text: "label",
-					fill: "var(--muted)",
+					fill: "var(--muted-foreground)",
 					fontSize: 12,
 					anchor: "end",
 					dx: -6,

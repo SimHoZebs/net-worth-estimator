@@ -19,7 +19,15 @@ import {
 	movePreset,
 } from "../../state/workspaceWrites.ts";
 import { Button } from "@/components/ui/button.tsx";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
 	AlertDialog,
@@ -229,27 +237,32 @@ export function AmountCatalog() {
 			<p className="text-muted-foreground">
 				Pick a starting point, fill in the blanks, copy the result.
 			</p>
-			<ul className="mt-3 mb-5 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,var(--container-3xs)),1fr))] gap-3 p-0">
+			<ToggleGroup
+				aria-label="Amount starting point"
+				variant="outline"
+				value={selected ? [selected.id] : []}
+				onValueChange={(next) => {
+					const nextId = next[0];
+					if (!nextId) return;
+					setSelectedId(nextId);
+					closeForms();
+				}}
+				className="mt-3 mb-5 grid w-full grid-cols-[repeat(auto-fill,minmax(min(100%,var(--container-3xs)),1fr))] gap-3"
+			>
 				{templates.map((template) => (
-					<li key={template.id} className="m-0">
-						<Button
-							type="button"
-							variant={template.id === selected?.id ? "secondary" : "outline"}
-							aria-pressed={template.id === selected?.id}
-							onClick={() => {
-								setSelectedId(template.id);
-								closeForms();
-							}}
-							className="h-auto w-full flex-col items-start gap-1 p-3 text-left whitespace-normal"
-						>
-							<span className="font-semibold">{template.label}</span>
-							<span className="text-xs font-normal text-muted-foreground">
-								{template.summary}
-							</span>
-						</Button>
-					</li>
+					<ToggleGroupItem
+						key={template.id}
+						value={template.id}
+						aria-label={template.label}
+						className="h-auto w-full flex-col items-start gap-1 p-3 text-left whitespace-normal"
+					>
+						<span className="font-semibold">{template.label}</span>
+						<span className="text-xs font-normal text-muted-foreground">
+							{template.summary}
+						</span>
+					</ToggleGroupItem>
 				))}
-			</ul>
+			</ToggleGroup>
 			{!readOnly && serverPresets !== null && (
 				<div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
 					<Button
@@ -309,132 +322,138 @@ export function AmountCatalog() {
 				</div>
 			)}
 			{creating && (
-				<form
-					className="mt-3 mb-5 rounded-xl border border-border bg-transparent p-4"
-					onSubmit={submitCreate}
-				>
-					<h4>New recipe</h4>
-					<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
-						<CatalogField
-							id={`${id}-create-name`}
-							label="Name"
-							name="name"
-							required
-							maxLength={100}
-							placeholder="e.g. yearly-bonus"
-							hint="Lowercase letters, numbers, and dashes."
-							hintId={`${id}-create-name-hint`}
-						/>
-						<CatalogField
-							id={`${id}-create-label`}
-							label="Label"
-							name="label"
-							required
-							maxLength={100}
-							placeholder="e.g. Yearly bonus"
-						/>
-						<CatalogField
-							id={`${id}-create-summary`}
-							label="Summary"
-							name="summary"
-							wide
-							maxLength={280}
-							placeholder="e.g. Same bonus every December."
-						/>
-						<CatalogField
-							id={`${id}-create-when-use`}
-							label="When to use"
-							name="whenUse"
-							wide
-							maxLength={280}
-							placeholder="e.g. Annual bonuses."
-						/>
-					</div>
-					<EditorCheckbox
-						id={`${id}-create-enabled`}
-						label="Enabled"
-						checked={createEnabled}
-						onChange={setCreateEnabled}
-					/>
-					<AmountBuilder
-						accounts={accounts}
-						transactions={transactions}
-						templates={templates}
-						initialTemplateId="fixed"
-						onChange={setStagedAmount}
-					/>
-					{stagedAmount && (
-						<p className="text-muted-foreground">Amount ready to save.</p>
-					)}
-					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-border pt-5">
-						<Button type="button" variant="outline" onClick={closeForms}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={!stagedAmount}>
-							Save recipe
-						</Button>
-					</div>
-				</form>
+				<Card className="mt-3 mb-5">
+					<form onSubmit={submitCreate}>
+						<CardHeader>
+							<CardTitle>New recipe</CardTitle>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4">
+							<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+								<CatalogField
+									id={`${id}-create-name`}
+									label="Name"
+									name="name"
+									required
+									maxLength={100}
+									placeholder="e.g. yearly-bonus"
+									hint="Lowercase letters, numbers, and dashes."
+									hintId={`${id}-create-name-hint`}
+								/>
+								<CatalogField
+									id={`${id}-create-label`}
+									label="Label"
+									name="label"
+									required
+									maxLength={100}
+									placeholder="e.g. Yearly bonus"
+								/>
+								<CatalogField
+									id={`${id}-create-summary`}
+									label="Summary"
+									name="summary"
+									wide
+									maxLength={280}
+									placeholder="e.g. Same bonus every December."
+								/>
+								<CatalogField
+									id={`${id}-create-when-use`}
+									label="When to use"
+									name="whenUse"
+									wide
+									maxLength={280}
+									placeholder="e.g. Annual bonuses."
+								/>
+							</div>
+							<EditorCheckbox
+								id={`${id}-create-enabled`}
+								label="Enabled"
+								checked={createEnabled}
+								onChange={setCreateEnabled}
+							/>
+							<AmountBuilder
+								accounts={accounts}
+								transactions={transactions}
+								templates={templates}
+								initialTemplateId="fixed"
+								onChange={setStagedAmount}
+							/>
+							{stagedAmount && (
+								<p className="text-muted-foreground">Amount ready to save.</p>
+							)}
+						</CardContent>
+						<CardFooter>
+							<Button type="button" variant="outline" onClick={closeForms}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={!stagedAmount}>
+								Save recipe
+							</Button>
+						</CardFooter>
+					</form>
+				</Card>
 			)}
 			{editing && selectedPreset && (
-				<form
-					className="mt-3 mb-5 rounded-xl border border-border bg-transparent p-4"
-					onSubmit={submitEdit}
-				>
-					<h4>Rename recipe</h4>
-					<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
-						<CatalogField
-							id={`${id}-edit-label`}
-							label="Label"
-							name="label"
-							required
-							maxLength={100}
-							defaultValue={selectedPreset.label}
-						/>
-						<CatalogField
-							id={`${id}-edit-summary`}
-							label="Summary"
-							name="summary"
-							wide
-							maxLength={280}
-							defaultValue={selectedPreset.summary ?? ""}
-						/>
-						<CatalogField
-							id={`${id}-edit-when-use`}
-							label="When to use"
-							name="whenUse"
-							wide
-							maxLength={280}
-							defaultValue={selectedPreset.whenUse ?? ""}
-						/>
-					</div>
-					<EditorCheckbox
-						id={`${id}-edit-enabled`}
-						label="Enabled"
-						checked={editEnabled}
-						onChange={setEditEnabled}
-					/>
-					<details>
-						<summary>Replace amount</summary>
-						<AmountBuilder
-							accounts={accounts}
-							transactions={transactions}
-							templates={templates}
-							initialTemplateId={
-								BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name)
-									? selectedPreset.name
-									: "fixed"
-							}
-							onChange={setStagedAmount}
-						/>
-					</details>
-					<div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-0 border-t border-solid border-border pt-5">
-						<Button type="button" variant="outline" onClick={closeForms}>
-							Cancel
-						</Button>
-						<Button type="submit">Save changes</Button>
-					</div>
-				</form>
+				<Card className="mt-3 mb-5">
+					<form onSubmit={submitEdit}>
+						<CardHeader>
+							<CardTitle>Rename recipe</CardTitle>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4">
+							<div className="grid grid-cols-2 gap-5 max-sm:grid-cols-1">
+								<CatalogField
+									id={`${id}-edit-label`}
+									label="Label"
+									name="label"
+									required
+									maxLength={100}
+									defaultValue={selectedPreset.label}
+								/>
+								<CatalogField
+									id={`${id}-edit-summary`}
+									label="Summary"
+									name="summary"
+									wide
+									maxLength={280}
+									defaultValue={selectedPreset.summary ?? ""}
+								/>
+								<CatalogField
+									id={`${id}-edit-when-use`}
+									label="When to use"
+									name="whenUse"
+									wide
+									maxLength={280}
+									defaultValue={selectedPreset.whenUse ?? ""}
+								/>
+							</div>
+							<EditorCheckbox
+								id={`${id}-edit-enabled`}
+								label="Enabled"
+								checked={editEnabled}
+								onChange={setEditEnabled}
+							/>
+							<details>
+								<summary>Replace amount</summary>
+								<AmountBuilder
+									accounts={accounts}
+									transactions={transactions}
+									templates={templates}
+									initialTemplateId={
+										BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name)
+											? selectedPreset.name
+											: "fixed"
+									}
+									onChange={setStagedAmount}
+								/>
+							</details>
+						</CardContent>
+						<CardFooter>
+							<Button type="button" variant="outline" onClick={closeForms}>
+								Cancel
+							</Button>
+							<Button type="submit">Save changes</Button>
+						</CardFooter>
+					</form>
+				</Card>
 			)}
 			{deleting && selectedPreset && (
 				<AlertDialog

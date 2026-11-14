@@ -33,7 +33,7 @@ export function ScheduleAmountFields({
 	)!;
 	const recipeIdInput = useId();
 	return (
-		<FieldSet className="grid grid-cols-2 gap-4 rounded-xl border border-border p-4 max-sm:grid-cols-1">
+		<FieldSet className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
 			<FieldLegend>Amount</FieldLegend>
 			<EditorField
 				label="How is the amount calculated?"

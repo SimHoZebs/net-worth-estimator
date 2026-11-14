@@ -13,13 +13,21 @@ import {
 } from "@/components/ui/empty.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { Label } from "@/components/ui/label.tsx";
+import { Field, FieldContent, FieldLabel } from "@/components/ui/field.tsx";
 import {
 	Tabs,
 	TabsContent,
 	TabsList,
 	TabsTrigger,
 } from "@/components/ui/tabs.tsx";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card.tsx";
 import { cn } from "@/lib/utils.ts";
 import { dateLabel, isoDateFromEpochSeconds, money } from "../domain/format.ts";
 import { literalAmountOf } from "../domain/transactionRows.ts";
@@ -106,54 +114,59 @@ function InboxItemCard({
 	const transaction = item.transaction;
 	const amount = transaction ? previewAmount(transaction) : null;
 	return (
-		<article
+		<Card
+			role="article"
 			aria-label={`Shared transaction ${item.transactionId}`}
-			className="grid gap-2 rounded-xl border border-solid border-border bg-card p-4"
 		>
-			<div className="flex flex-wrap items-center gap-2">
-				<Badge
-					variant={statusVariant[item.status].variant}
-					className={cn("capitalize", statusVariant[item.status].className)}
-				>
-					{item.status}
-				</Badge>
-				{item.unread && (
-					<Badge variant="default" className="bg-success-bg text-success-text">
-						New
+			<CardHeader>
+				<div className="flex flex-wrap items-center gap-2">
+					<Badge
+						variant={statusVariant[item.status].variant}
+						className={cn("capitalize", statusVariant[item.status].className)}
+					>
+						{item.status}
 					</Badge>
-				)}
-				{item.dismissed && <Badge variant="secondary">Hidden</Badge>}
-			</div>
-			<div>
-				<h3 className="m-0 text-base">
-					{transaction?.name ?? "Shared transaction"}
-				</h3>
-				<p className="mt-1 mb-0 text-sm text-muted-foreground">
+					{item.unread && (
+						<Badge
+							variant="default"
+							className="bg-success-bg text-success-text"
+						>
+							New
+						</Badge>
+					)}
+					{item.dismissed && <Badge variant="secondary">Hidden</Badge>}
+				</div>
+				<CardTitle>
+					<h3>{transaction?.name ?? "Shared transaction"}</h3>
+				</CardTitle>
+				<CardDescription>
 					{item.senderDisplayName
 						? `Shared by ${item.senderDisplayName}`
 						: "Shared with you"}
 					{transaction
 						? ` · ${dateLabel(isoDateFromEpochSeconds(transaction.postedTime), true)}`
 						: ""}
-				</p>
-			</div>
-			{transaction ? (
-				<p className="m-0 text-sm">
-					{amount != null ? <strong>{money(amount)}</strong> : "Varies"}
-				</p>
-			) : (
-				<p className="m-0 text-sm text-muted-foreground">
-					{item.status === "canceled"
-						? "This share was taken back before you decided."
-						: "This share is no longer available to view."}
-				</p>
-			)}
-			{item.status === "accepted" && item.copyTransactionId && (
-				<p className="m-0 text-sm text-muted-foreground">
-					Saved to your own records as an independent copy.
-				</p>
-			)}
-			<div className="flex flex-wrap gap-2">
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
+				{transaction ? (
+					<p className="m-0 text-sm">
+						{amount != null ? <strong>{money(amount)}</strong> : "Varies"}
+					</p>
+				) : (
+					<p className="m-0 text-sm text-muted-foreground">
+						{item.status === "canceled"
+							? "This share was taken back before you decided."
+							: "This share is no longer available to view."}
+					</p>
+				)}
+				{item.status === "accepted" && item.copyTransactionId && (
+					<p className="m-0 text-sm text-muted-foreground">
+						Saved to your own records as an independent copy.
+					</p>
+				)}
+			</CardContent>
+			<CardFooter className="flex-wrap gap-2">
 				{item.status === "pending" && transaction && (
 					<>
 						<Button
@@ -207,8 +220,8 @@ function InboxItemCard({
 						Mark unread
 					</Button>
 				)}
-			</div>
-		</article>
+			</CardFooter>
+		</Card>
 	);
 }
 
@@ -316,25 +329,22 @@ export function InboxPage() {
 				<Tabs
 					value={filter}
 					onValueChange={(next) => setFilter(next as InboxStatus)}
+					className="min-w-0"
 				>
 					<TabsList
 						variant="line"
 						aria-label="Inbox status"
-						className="mb-6 flex w-full gap-6 overflow-x-auto p-0"
+						className="relative mb-6 flex w-full justify-start gap-6 overflow-x-auto"
 					>
 						{tabs.map((tab) => (
-							<TabsTrigger
-								key={tab.id}
-								value={tab.id}
-								className="flex-none px-0.5 pt-3 pb-4"
-							>
+							<TabsTrigger key={tab.id} value={tab.id} className="flex-none">
 								{tab.label}
 							</TabsTrigger>
 						))}
 					</TabsList>
 					<TabsContent value={filter}>
 						<div>
-							<div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+							<Field orientation="horizontal" className="mb-4">
 								<Checkbox
 									id={showDismissedId}
 									checked={showDismissed}
@@ -342,8 +352,12 @@ export function InboxPage() {
 										setShowDismissed(checked === true)
 									}
 								/>
-								<Label htmlFor={showDismissedId}>Show hidden items</Label>
-							</div>
+								<FieldContent>
+									<FieldLabel htmlFor={showDismissedId}>
+										Show hidden items
+									</FieldLabel>
+								</FieldContent>
+							</Field>
 							{inboxQuery.isPending ? (
 								<p className="text-sm text-muted-foreground">Loading inbox…</p>
 							) : items.length === 0 ? (

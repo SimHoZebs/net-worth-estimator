@@ -1,4 +1,5 @@
 import { CalendarDays, Clock3 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card.tsx";
 import { dateLabel } from "../../domain/format.ts";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
@@ -65,19 +66,23 @@ export function PurchaseScheduleView({
 							<h3 className="text-sm font-semibold text-foreground">
 								<time dateTime={group.date}>{dateLabel(group.date, true)}</time>
 							</h3>
-							<ol
-								className="m-0 mt-1 list-none rounded-xl border border-border bg-card px-2"
-								// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
-								role="list"
-							>
-								{group.items.map((item) => (
-									<PurchaseRow
-										key={item.purchase.id}
-										item={item}
-										onInspect={onInspect}
-									/>
-								))}
-							</ol>
+							<Card className="mt-1">
+								<CardContent>
+									<ol
+										className="m-0 list-none p-0"
+										// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
+										role="list"
+									>
+										{group.items.map((item) => (
+											<PurchaseRow
+												key={item.purchase.id}
+												item={item}
+												onInspect={onInspect}
+											/>
+										))}
+									</ol>
+								</CardContent>
+							</Card>
 						</div>
 					</div>
 				);
@@ -99,19 +104,23 @@ export function PurchaseScheduleView({
 								? "Finding the earliest financially safe dates for your purchases."
 								: `No calculated date before ${dateLabel(forecastEnd, true)}. This does not mean the purchase is impossible.`}
 						</p>
-						<ol
-							className="m-0 mt-2 list-none rounded-xl border border-border bg-card px-2"
-							// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
-							role="list"
-						>
-							{waiting.map((item) => (
-								<PurchaseRow
-									key={item.purchase.id}
-									item={item}
-									onInspect={onInspect}
-								/>
-							))}
-						</ol>
+						<Card className="mt-2">
+							<CardContent>
+								<ol
+									className="m-0 list-none p-0"
+									// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
+									role="list"
+								>
+									{waiting.map((item) => (
+										<PurchaseRow
+											key={item.purchase.id}
+											item={item}
+											onInspect={onInspect}
+										/>
+									))}
+								</ol>
+							</CardContent>
+						</Card>
 					</div>
 				</div>
 			)}
@@ -120,19 +129,23 @@ export function PurchaseScheduleView({
 					<h3 className="text-sm font-semibold text-muted-foreground">
 						Excluded from account
 					</h3>
-					<ol
-						className="m-0 mt-2 list-none rounded-xl border border-border bg-card px-2"
-						// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
-						role="list"
-					>
-						{excluded.map((item) => (
-							<PurchaseRow
-								key={item.purchase.id}
-								item={item}
-								onInspect={onInspect}
-							/>
-						))}
-					</ol>
+					<Card className="mt-2">
+						<CardContent>
+							<ol
+								className="m-0 list-none p-0"
+								// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
+								role="list"
+							>
+								{excluded.map((item) => (
+									<PurchaseRow
+										key={item.purchase.id}
+										item={item}
+										onInspect={onInspect}
+									/>
+								))}
+							</ol>
+						</CardContent>
+					</Card>
 				</div>
 			)}
 			{groups.length === 0 && waiting.length === 0 && excluded.length === 0 && (

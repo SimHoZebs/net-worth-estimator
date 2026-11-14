@@ -1,6 +1,7 @@
 import { ArrowRight, ExternalLink, KeyRound } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { Button, buttonVariants } from "@/components/ui/button.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
 import { cn } from "@/lib/utils.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
@@ -35,79 +36,81 @@ export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
 	const readOnly = useUserReadOnly();
 	const inputRef = useRef<HTMLInputElement>(null);
 	return (
-		<div className="rounded-xl border border-border bg-card p-5 sm:p-6">
-			<div className="mb-4 flex justify-end">
-				<Button
-					variant="link"
-					className="min-h-6 text-sm"
-					disabled={readOnly}
-					onClick={() => inputRef.current?.focus()}
+		<Card>
+			<CardContent>
+				<div className="mb-4 flex justify-end">
+					<Button
+						variant="link"
+						className="min-h-6 text-sm"
+						disabled={readOnly}
+						onClick={() => inputRef.current?.focus()}
+					>
+						I already have a token <ArrowRight size={14} aria-hidden="true" />
+					</Button>
+				</div>
+				<ol
+					// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
+					role="list"
+					className="m-0 grid list-none gap-6 p-0"
+					aria-label="SimpleFIN setup steps"
 				>
-					I already have a token <ArrowRight size={14} aria-hidden="true" />
-				</Button>
-			</div>
-			<ol
-				// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
-				role="list"
-				className="m-0 grid list-none gap-6 p-0"
-				aria-label="SimpleFIN setup steps"
-			>
-				<SetupStep number={1} title="Link your banks in SimpleFIN">
-					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
-						Create a SimpleFIN Bridge account or sign in. In My account, choose{" "}
-						<strong>New connection</strong> and follow the prompts for each
-						bank.
-					</p>
-					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
-						SimpleFIN requires a separate paid subscription. Check its pricing
-						and bank support before you subscribe.
-					</p>
-					<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+					<SetupStep number={1} title="Link your banks in SimpleFIN">
+						<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
+							Create a SimpleFIN Bridge account or sign in. In My account,
+							choose <strong>New connection</strong> and follow the prompts for
+							each bank.
+						</p>
+						<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
+							SimpleFIN requires a separate paid subscription. Check its pricing
+							and bank support before you subscribe.
+						</p>
+						<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+							<a
+								href={simplefinLinks.home}
+								target="_blank"
+								rel="noopener noreferrer"
+								className={cn(buttonVariants({ variant: "secondary" }))}
+							>
+								Open SimpleFIN <ExternalLink size={14} aria-hidden="true" />
+								<span className="sr-only"> (opens in a new tab)</span>
+							</a>
+							<a
+								href={simplefinLinks.institutions}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="inline-flex min-h-6 items-center gap-2 text-sm font-semibold text-primary underline underline-offset-4"
+							>
+								Check bank support <ExternalLink size={14} aria-hidden="true" />
+								<span className="sr-only"> (opens in a new tab)</span>
+							</a>
+						</div>
+					</SetupStep>
+					<SetupStep number={2} title="Create a setup token for Waypoint">
+						<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
+							In SimpleFIN, choose <strong>New app connection</strong>. Name it{" "}
+							<strong>Waypoint</strong>, then choose{" "}
+							<strong>Create Setup Token</strong>. Copy the entire token and
+							return to this tab.
+						</p>
 						<a
-							href={simplefinLinks.home}
+							href={simplefinLinks.createToken}
 							target="_blank"
 							rel="noopener noreferrer"
 							className={cn(buttonVariants({ variant: "secondary" }))}
 						>
-							Open SimpleFIN <ExternalLink size={14} aria-hidden="true" />
+							<KeyRound size={16} aria-hidden="true" /> Create a setup token{" "}
+							<ExternalLink size={14} aria-hidden="true" />
 							<span className="sr-only"> (opens in a new tab)</span>
 						</a>
-						<a
-							href={simplefinLinks.institutions}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="inline-flex min-h-6 items-center gap-2 text-sm font-semibold text-primary underline underline-offset-4"
-						>
-							Check bank support <ExternalLink size={14} aria-hidden="true" />
-							<span className="sr-only"> (opens in a new tab)</span>
-						</a>
-					</div>
-				</SetupStep>
-				<SetupStep number={2} title="Create a setup token for Waypoint">
-					<p className="mt-0 mb-3 text-sm leading-relaxed text-muted-foreground">
-						In SimpleFIN, choose <strong>New app connection</strong>. Name it{" "}
-						<strong>Waypoint</strong>, then choose{" "}
-						<strong>Create Setup Token</strong>. Copy the entire token and
-						return to this tab.
-					</p>
-					<a
-						href={simplefinLinks.createToken}
-						target="_blank"
-						rel="noopener noreferrer"
-						className={cn(buttonVariants({ variant: "secondary" }))}
-					>
-						<KeyRound size={16} aria-hidden="true" /> Create a setup token{" "}
-						<ExternalLink size={14} aria-hidden="true" />
-						<span className="sr-only"> (opens in a new tab)</span>
-					</a>
-				</SetupStep>
-				<SetupStep number={3} title="Connect to Waypoint">
-					<p className="mt-0 mb-4 text-sm leading-relaxed text-muted-foreground">
-						Paste the token you copied from SimpleFIN.
-					</p>
-					<SyncConnectForm onConnected={onConnected} inputRef={inputRef} />
-				</SetupStep>
-			</ol>
-		</div>
+					</SetupStep>
+					<SetupStep number={3} title="Connect to Waypoint">
+						<p className="mt-0 mb-4 text-sm leading-relaxed text-muted-foreground">
+							Paste the token you copied from SimpleFIN.
+						</p>
+						<SyncConnectForm onConnected={onConnected} inputRef={inputRef} />
+					</SetupStep>
+				</ol>
+			</CardContent>
+		</Card>
 	);
 }
