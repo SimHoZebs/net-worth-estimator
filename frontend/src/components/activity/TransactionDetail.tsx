@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import {
 	Sheet,
+	SheetBody,
 	SheetContent,
 	SheetDescription,
 	SheetFooter,
@@ -940,9 +941,9 @@ export function TransactionDetail({
 				if (!open && edit.requestClose()) onClose();
 			}}
 		>
-			<SheetContent side="right" className="data-[side=right]:sm:max-w-xl">
+			<SheetContent side="right">
 				<SheetHeader>
-					<div className="flex min-w-0 items-start justify-between gap-2 pr-8">
+					<div className="flex min-w-0 items-start justify-between gap-2">
 						<SheetTitle className="min-w-0">{editHeading}</SheetTitle>
 						<div className="flex flex-none items-center gap-1">
 							{menuItems.length > 0 && (
@@ -1008,7 +1009,7 @@ export function TransactionDetail({
 							: "Transaction details"}
 					</SheetDescription>
 				</SheetHeader>
-				<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+				<SheetBody>
 					<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
 						<div className="flex flex-col gap-3 pt-1 pb-2">
 							<Field>
@@ -1336,7 +1337,7 @@ export function TransactionDetail({
 							/>
 						</div>
 					)}
-				</div>
+				</SheetBody>
 				<SheetFooter className="flex-row flex-wrap items-center justify-between gap-3 border-t border-border">
 					<div className="flex flex-wrap items-center gap-4">
 						{once && (
@@ -1433,14 +1434,14 @@ export function TransactionDetail({
 						if (!open) setInsightsOpen(false);
 					}}
 				>
-					<SheetContent side="right" className="data-[side=right]:sm:max-w-md">
+					<SheetContent side="right">
 						<SheetHeader>
 							<SheetTitle>Suggestions</SheetTitle>
 							<SheetDescription className="sr-only">
 								Small checks to improve future estimates
 							</SheetDescription>
 						</SheetHeader>
-						<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+						<SheetBody>
 							<p className="mt-0 mb-6 text-xs text-muted-foreground">
 								Small checks to improve future estimates
 							</p>
@@ -1451,7 +1452,7 @@ export function TransactionDetail({
 								onDone={() => setInsightsOpen(false)}
 								onMergeVoid={savedTransaction.void ? mergeVoidHold : undefined}
 							/>
-						</div>
+						</SheetBody>
 					</SheetContent>
 				</Sheet>
 			)}
@@ -1462,19 +1463,19 @@ export function TransactionDetail({
 						if (!open) setSharingOpen(false);
 					}}
 				>
-					<SheetContent side="right" className="data-[side=right]:sm:max-w-md">
+					<SheetContent side="right">
 						<SheetHeader>
 							<SheetTitle>Sharing</SheetTitle>
 							<SheetDescription className="sr-only">
 								Sharing settings for this transaction
 							</SheetDescription>
 						</SheetHeader>
-						<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+						<SheetBody>
 							<TransactionSharing
 								transactionId={savedTransaction.id}
 								readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 							/>
-						</div>
+						</SheetBody>
 					</SheetContent>
 				</Sheet>
 			)}

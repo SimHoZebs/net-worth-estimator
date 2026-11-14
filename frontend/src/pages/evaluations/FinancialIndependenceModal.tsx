@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import {
 	Sheet,
+	SheetBody,
 	SheetContent,
 	SheetDescription,
 	SheetHeader,
@@ -47,26 +48,24 @@ export function FinancialIndependenceModal({
 				if (!open) onClose();
 			}}
 		>
-			<SheetContent
-				side="right"
-				className="overflow-y-auto data-[side=right]:w-full sm:max-w-3xl"
-			>
-				<SheetHeader className="border-b-0 p-4 pb-2">
+			<SheetContent side="right">
+				<SheetHeader>
 					<SheetTitle>{item.name}</SheetTitle>
 					<SheetDescription className="sr-only">
 						Financial independence detail view
 					</SheetDescription>
 				</SheetHeader>
-				<div className="flex flex-col gap-4 px-4 pb-4">
+				<SheetBody className="flex flex-col gap-4">
 					<Tabs
 						value={tab}
 						onValueChange={(value) => setTab(value as InspectorTab)}
 					>
 						<TabsList
 							variant="line"
+							scrollable
 							aria-label="Financial independence detail view"
 							activateOnFocus
-							className="mb-6 flex w-full gap-6 overflow-x-auto p-0 max-sm:gap-5"
+							className="mb-6 gap-6 max-sm:gap-5"
 						>
 							<TabsTrigger value="overview" className="flex-none">
 								Overview
@@ -132,7 +131,7 @@ export function FinancialIndependenceModal({
 							</ul>
 						</details>
 					)}
-				</div>
+				</SheetBody>
 			</SheetContent>
 		</Sheet>
 	);

@@ -26,8 +26,9 @@ export function SourcesPage() {
 		<Tabs value={tab} onValueChange={(next) => setTab(next as ConfigTab)}>
 			<TabsList
 				variant="line"
+				scrollable
 				aria-label="Configuration sections"
-				className="relative mb-6 flex w-full justify-start gap-6 overflow-x-auto"
+				className="mb-6 gap-6"
 			>
 				{configTabs.map((configTab) => (
 					<TabsTrigger

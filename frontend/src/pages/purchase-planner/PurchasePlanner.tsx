@@ -131,8 +131,9 @@ export function PurchasePlanner({
 					<Tabs value={view} onValueChange={(value) => setView(value as View)}>
 						<TabsList
 							variant="line"
+							scrollable
 							aria-label="Planned purchase views"
-							className="mb-4 flex w-full gap-6 overflow-x-auto p-0 max-sm:gap-5"
+							className="mb-4 gap-6 max-sm:gap-5"
 						>
 							<TabsTrigger value="priority" className="flex-none">
 								Priority

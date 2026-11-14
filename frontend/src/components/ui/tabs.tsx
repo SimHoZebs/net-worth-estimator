@@ -38,13 +38,34 @@ const tabsListVariants = cva(
 function TabsList({
 	className,
 	variant = "default",
+	scrollable = false,
 	...props
-}: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
+}: TabsPrimitive.List.Props &
+	VariantProps<typeof tabsListVariants> & {
+		/**
+		 * Set for a horizontal tab strip whose tabs may overflow its width.
+		 * The strip keeps the standard tab sizing but reserves room below
+		 * the tabs so the selected underline and focus ring paint fully
+		 * without opening a vertical scroll container. This is pure layout:
+		 * no color, type, or interaction changes. Horizontal only.
+		 */
+		scrollable?: boolean;
+	}) {
 	return (
 		<TabsPrimitive.List
 			data-slot="tabs-list"
 			data-variant={variant}
-			className={cn(tabsListVariants({ variant }), className)}
+			className={cn(
+				tabsListVariants({ variant }),
+				// Positioned so Base UI's scroll-into-view math resolves
+				// offsets against this list instead of an ancestor; left
+				// origin so the first tab is reachable by scrolling back.
+				// Height and bottom padding reserve room for the selected
+				// underline below the tabs, so nothing overflows vertically.
+				scrollable &&
+					"group-data-horizontal/tabs:h-10 group-data-horizontal/tabs:pt-[3px] group-data-horizontal/tabs:px-[3px] group-data-horizontal/tabs:pb-[11px] relative flex w-full justify-start overflow-x-auto",
+				className,
+			)}
 			{...props}
 		/>
 	);

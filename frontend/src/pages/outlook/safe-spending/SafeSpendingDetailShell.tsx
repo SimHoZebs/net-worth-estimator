@@ -1,6 +1,7 @@
 import { useId } from "react";
 import {
 	Sheet,
+	SheetBody,
 	SheetContent,
 	SheetDescription,
 	SheetHeader,
@@ -45,11 +46,7 @@ export function SafeSpendingDetailShell({
 				if (!open) onClose();
 			}}
 		>
-			<SheetContent
-				side="right"
-				aria-label={title}
-				className="overflow-y-auto max-sm:data-[side=right]:w-full max-sm:data-[side=right]:max-w-full sm:max-w-3xl"
-			>
+			<SheetContent side="right" aria-label={title}>
 				<SheetHeader>
 					{range && (
 						<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
@@ -61,7 +58,7 @@ export function SafeSpendingDetailShell({
 						SafeSpending detail view
 					</SheetDescription>
 				</SheetHeader>
-				<div className="flex flex-col gap-4 px-4 pb-4">
+				<SheetBody className="flex flex-col gap-4">
 					<Tabs
 						value={tab}
 						onValueChange={(next) => onTabChange(next as SafeSpendingDetailTab)}
@@ -69,9 +66,10 @@ export function SafeSpendingDetailShell({
 					>
 						<TabsList
 							variant="line"
+							scrollable
 							aria-label="SafeSpending detail view"
 							activateOnFocus
-							className="relative mb-4 flex w-full justify-start gap-6 overflow-x-auto p-0 max-sm:gap-5"
+							className="mb-4 gap-6 max-sm:gap-5"
 						>
 							{SAFE_SPENDING_DETAIL_TABS.map((item) => (
 								<TabsTrigger
@@ -95,7 +93,7 @@ export function SafeSpendingDetailShell({
 							{children}
 						</TabsContent>
 					</Tabs>
-				</div>
+				</SheetBody>
 			</SheetContent>
 		</Sheet>
 	);

@@ -44,6 +44,23 @@ ID, and layout classes, and inherit the canonical title composition
 direct-child rule — the global h2–h6 base styles apply everywhere else and
 stay untouched. Do not add per-consumer font resets on those headings.
 
+## Sheet composition
+
+Right-side sheets share one shell geometry: full width on mobile, `xl`
+(576px) on desktop, owned by `SheetContent`. Compose `SheetHeader` (which
+reserves the close-button zone centrally — title actions stay local content),
+`SheetTitle`, an optional `SheetDescription`, scrollable `SheetBody`
+(`min-h-0 flex-1 overflow-y-auto` with scroll chaining contained), and an
+optional `SheetFooter` for sheets that have actions. Do not reapply width,
+padding, or scroll recipes per consumer, and do not add a footer when a
+read-only sheet has no actions. All right sheets share this geometry, including
+nested ones; the mobile navigation sheet keeps its own stock geometry.
+
+Horizontal tab strips use the central `TabsList scrollable` prop, which owns
+inline overflow, the scroll offset boundary, and the bottom paint space for
+the selected underline. Consumers set only domain margins and gaps; no
+per-consumer overflow or clip hacks.
+
 Notifications use one manager and one viewport. Keyed replacement, persistence
 until manual dismissal or recovery, identity scope clearing, and domain actions
 are application policy. The viewport sets the Base UI provider timeout to zero

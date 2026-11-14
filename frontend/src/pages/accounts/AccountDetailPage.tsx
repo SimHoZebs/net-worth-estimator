@@ -240,8 +240,9 @@ export function AccountDetailView({
 			>
 				<TabsList
 					variant="line"
+					scrollable
 					aria-label="Account view"
-					className="relative mb-0 flex w-full justify-start gap-6 overflow-x-auto p-0 max-sm:gap-5"
+					className="mb-0 gap-6 max-sm:gap-5"
 				>
 					<TabsTrigger value="transactions" className="flex-none">
 						Transactions

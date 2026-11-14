@@ -375,8 +375,9 @@ function TransactionsView({
 		>
 			<TabsList
 				variant="line"
+				scrollable
 				aria-label="Transactions sections"
-				className="mb-6 flex w-full gap-6 overflow-x-auto p-0 max-sm:gap-5"
+				className="mb-6 gap-6 max-sm:gap-5"
 			>
 				{tabs.map((item) => (
 					<TabsTrigger key={item.id} value={item.id} className="flex-none">

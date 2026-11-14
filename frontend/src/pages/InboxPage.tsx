@@ -333,8 +333,9 @@ export function InboxPage() {
 				>
 					<TabsList
 						variant="line"
+						scrollable
 						aria-label="Inbox status"
-						className="relative mb-6 flex w-full justify-start gap-6 overflow-x-auto"
+						className="mb-6 gap-6"
 					>
 						{tabs.map((tab) => (
 							<TabsTrigger key={tab.id} value={tab.id} className="flex-none">
