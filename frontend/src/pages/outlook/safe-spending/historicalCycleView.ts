@@ -62,7 +62,7 @@ export function historicalCycleView({
 		view,
 		trend,
 		section: {
-			title: "Recorded bill payments this cycle",
+			title: "Cash payments this cycle",
 			subtitle: `Recorded amounts · ${monthDay(closedCycle.start)} – ${monthDay(closedCycle.end)}`,
 			total: sum(transactions.map((row) => row.amount)),
 			transactions,

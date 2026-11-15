@@ -11,11 +11,15 @@ import {
 	type SpendingLimitDivider,
 } from "./TransactionSectionView.tsx";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
-import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
+import type {
+	SafeSpendingChargeCycle,
+	SafeSpendingMandatorySection,
+} from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingCyclePanel({
 	cycle,
+	cashPayments,
 	accounts,
 	transactions,
 	readOnly,
@@ -24,6 +28,7 @@ export function SafeSpendingCyclePanel({
 	showHeaders = false,
 }: {
 	cycle: SafeSpendingChargeCycle;
+	cashPayments?: SafeSpendingMandatorySection;
 	accounts: Account[];
 	/** Saved rules, for the detail view's rule lookups and edit controls. */
 	transactions: Transaction[];
@@ -37,7 +42,7 @@ export function SafeSpendingCyclePanel({
 		[transactions],
 	);
 	const { selected, inspect, close } = useTransactionSelection(
-		cycle.transactions,
+		[...cycle.transactions, ...(cashPayments?.transactions ?? [])],
 		savedById,
 	);
 	const dividers = useMemo<SpendingLimitDivider[]>(() => {
@@ -112,6 +117,24 @@ export function SafeSpendingCyclePanel({
 				showHeaders={showHeaders}
 				dividers={dividers}
 			/>
+			{cashPayments && (
+				<>
+					<SafeSpendingSectionHeader
+						title={cashPayments.title}
+						subtitle={cashPayments.subtitle}
+						total={cashPayments.total}
+					/>
+					<TransactionSectionView
+						transactions={cashPayments.transactions}
+						caption={cashPayments.title}
+						emptyMessage="No recorded cash payments in this period."
+						savedTransactions={savedById}
+						onInspect={inspect}
+						order={transactionOrder}
+						showHeaders={showHeaders}
+					/>
+				</>
+			)}
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}

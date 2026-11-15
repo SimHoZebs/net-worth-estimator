@@ -60,7 +60,7 @@ describe("safe spending cash evidence", () => {
 	it("renders the server amount and due-today rows with exact independent observation provenance", () => {
 		const html = render(summary());
 		expect(html).toContain("-$216.58");
-		expect(html).toContain("Short by $216.58 for these bills");
+		expect(html).not.toContain("Short by");
 		expect(html).toMatch(
 			/class="[^"]*text-danger-text[^"]*" data-testid="left-value"/,
 		);
@@ -68,7 +68,8 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Synthetic checking");
 		expect(html).toContain("2026-11-14T18:00:00.000Z");
 		expect(html).toContain("Bills due Nov 15 – Nov 30");
-		expect(html).toContain("Excludes future income and earlier bills");
+		expect(html).toContain("Nov 15–30 bills · income excluded");
+		expect(html).toContain("Future income and earlier bills are excluded.");
 		expect(html).not.toContain("Cash accounts");
 		expect(html).not.toContain('role="img"');
 	});
@@ -97,7 +98,9 @@ describe("safe spending cash evidence", () => {
 			}),
 		);
 		expect(html).toContain('data-testid="left-value">—');
-		expect(html).toMatch(/Cash from recorded evidence<\/dt><dd[^>]*>—/);
+		expect(html).toMatch(
+			/Synthetic checking · observed available<\/dt><dd[^>]*>\$1,244.43/,
+		);
 		expect(html).toContain("Posted $1,608.05 · Available $1,244.43");
 		expect(html).toContain(
 			"A pending payment may already be included in available cash, so the exact remainder is unavailable.",
@@ -192,7 +195,7 @@ describe("safe spending cash evidence", () => {
 			}),
 			true,
 		);
-		expect(html).toContain("Cash balance at close unavailable");
+		expect(html).toContain("No balance recorded at close");
 		expect(html).not.toContain("1,244.43");
 		expect(html).toContain(
 			"An observed posted balance is not an available balance.",
@@ -221,8 +224,34 @@ describe("safe spending cash evidence", () => {
 			}),
 			true,
 		);
-		expect(html).toContain('data-testid="close-cash-value">—');
+		expect(html).not.toContain('data-testid="close-cash-value"');
 		expect(html).toContain("Posted $500.00 · Available —");
 		expect(html).toContain("Available cash at close is not evidenced");
+	});
+	it("keeps known cash visible while collapsing verbose and duplicate uncertainty explanations", () => {
+		const html = render(
+			summary({
+				cashAfterBills: null,
+				status: "uncertain",
+				reasons: [
+					"pending-after-baseline-coverage-unknown",
+					"pending-obligation-coverage-unknown",
+				],
+			}),
+		);
+		const collapsed = html.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
+		expect(collapsed).toContain("$1,244.43");
+		expect(collapsed).toContain("Remainder uncertain");
+		expect(collapsed).not.toContain("Posted");
+		expect(collapsed).not.toContain("pending payment");
+		expect(collapsed).not.toContain("Synthetic due today");
+		expect(html).toContain(
+			'<details><summary class="text-sm">Details</summary>',
+		);
+		expect(html).toContain(
+			'<details><summary class="text-sm">Bills $1,461.01</summary>',
+		);
+		expect(html).not.toContain("<details open");
+		expect(html.match(/A pending payment may already/g)).toHaveLength(1);
 	});
 });

@@ -1,15 +1,6 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
-import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
-import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
-import { money, monthDay } from "../../../domain/format.ts";
-import type { Account, Transaction } from "../../../domain/model.ts";
-import type { TransactionOrder } from "../../../domain/transactionSort.ts";
-import {
-	TransactionSectionView,
-	SafeSpendingSectionHeader,
-} from "./TransactionSectionView.tsx";
+import { exactMoney, money, monthDay } from "../../../domain/format.ts";
 import type {
 	CycleAllocation,
 	SafeSpendingHeroes,
@@ -124,12 +115,6 @@ export function SafeSpendingBillsPanel({
 	trend,
 	section,
 	funding,
-	accounts,
-	transactions,
-	readOnly,
-	transactionOrder,
-	onTransactionOrderChange,
-	showHeaders = false,
 	closed = false,
 }: {
 	heroes: SafeSpendingHeroes;
@@ -139,24 +124,9 @@ export function SafeSpendingBillsPanel({
 	section: SafeSpendingMandatorySection;
 	/** The payday bundle that settles this statement. */
 	funding: StatementFunding;
-	accounts: Account[];
-	/** Saved rules, for the detail view's rule lookups and edit controls. */
-	transactions: Transaction[];
-	readOnly: boolean;
-	transactionOrder: TransactionOrder;
-	onTransactionOrderChange: (order: TransactionOrder) => void;
-	showHeaders?: boolean;
 	/** The statement already closed; the payday and pace are historical. */
 	closed?: boolean;
 }) {
-	const savedById = useMemo(
-		() => new Map(transactions.map((saved) => [saved.id, saved])),
-		[transactions],
-	);
-	const { selected, inspect, close } = useTransactionSelection(
-		section.transactions,
-		savedById,
-	);
 	const limitWord = closed ? "budget" : "limit";
 	const amountText = (value: number | null) =>
 		value === null ? "—" : money(value);
@@ -226,21 +196,20 @@ export function SafeSpendingBillsPanel({
 					<>
 						<StatRow
 							label={labels.recordedCharges}
-							value={amountText(heroes.committedTotal)}
+							value={
+								heroes.committedTotal === null
+									? "—"
+									: exactMoney(heroes.committedTotal)
+							}
 							testId="recorded-charges-value"
 						/>
-						<StatRow
-							label="Closed card balance"
-							value={amountText(heroes.closedCycle.total)}
-							testId="closed-card-value"
-						/>
-						<p className="m-0 text-sm text-muted-foreground">
-							Historical budget unavailable
-						</p>
-						<p className="m-0 text-xs text-muted-foreground">
-							The historical income, bills, and reserve needed to establish this
-							cycle’s budget are not available.
-						</p>
+						{heroes.closedCycle.total !== null && (
+							<StatRow
+								label="Closed card balance"
+								value={amountText(heroes.closedCycle.total)}
+								testId="closed-card-value"
+							/>
+						)}
 					</>
 				) : (
 					<>
@@ -284,48 +253,10 @@ export function SafeSpendingBillsPanel({
 				)}
 			</div>
 			{closed && (
-				<div className="grid content-start gap-4">
-					<div className="h-px w-full bg-border" />
-					<div className="flex flex-wrap items-center justify-end gap-3">
-						<TransactionSortButton
-							order={transactionOrder}
-							onChange={onTransactionOrderChange}
-						/>
-					</div>
-					<SafeSpendingSectionHeader
-						title={section.title}
-						subtitle={section.subtitle}
-						total={section.total}
-					/>
-					<TransactionSectionView
-						transactions={section.transactions}
-						caption={section.title}
-						emptyMessage="No recorded bill payments in this period."
-						savedTransactions={savedById}
-						onInspect={inspect}
-						order={transactionOrder}
-						showHeaders={showHeaders}
-						shortfall
-						shortfallLabel="Unfulfilled"
-					/>
-				</div>
-			)}
-			{selected && (
-				<TransactionDetail
-					transaction={selected.transaction}
-					savedTransaction={selected.savedTransaction}
-					accounts={accounts}
-					transactions={transactions}
-					readOnly={readOnly}
-					claimScheduleName={
-						selected.savedTransaction.claimScheduleId
-							? (transactions.find(
-									(item) =>
-										item.id === selected.savedTransaction.claimScheduleId,
-								)?.name ?? null)
-							: null
-					}
-					onClose={close}
+				<StatRow
+					label="Cash payments"
+					value={exactMoney(section.total)}
+					testId="cash-payments-value"
 				/>
 			)}
 		</div>

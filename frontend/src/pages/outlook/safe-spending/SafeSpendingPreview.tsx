@@ -632,11 +632,6 @@ export function SafeSpendingPreview({
 								trend={inlineView.trend}
 								section={lastView.section}
 								closed={cycleViewTab === "last-cycle"}
-								accounts={accounts ?? []}
-								transactions={savedState}
-								readOnly={readOnly}
-								transactionOrder={transactionOrder}
-								onTransactionOrderChange={setTransactionOrder}
 							/>
 						</CardContent>
 						<CardFooter className="flex-wrap gap-4">
@@ -670,7 +665,10 @@ export function SafeSpendingPreview({
 					cycleCounts={Object.fromEntries(
 						Object.entries(tabChargeCycles).map(([id, entry]) => [
 							id,
-							entry.transactions.length,
+							entry.transactions.length +
+								(id === "last-cycle"
+									? lastView.section.transactions.length
+									: 0),
 						]),
 					)}
 					range={
@@ -682,6 +680,9 @@ export function SafeSpendingPreview({
 						<SafeSpendingCyclePanel
 							key={detail}
 							cycle={tabChargeCycles[detail]}
+							cashPayments={
+								detail === "last-cycle" ? lastView.section : undefined
+							}
 							accounts={accounts ?? []}
 							transactions={savedState}
 							readOnly={readOnly}

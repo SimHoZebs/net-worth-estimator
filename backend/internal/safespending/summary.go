@@ -163,11 +163,12 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 					continue
 				}
 				instant := domain.TransactionInstant(&tx)
+				// Pending rows at or before the observation do not invalidate
+				// bank-reported available cash or need another deduction. The
+				// observation proves the balance, not which holds it covers;
+				// claimed bills retain their separate coverage uncertainty.
 				if tx.Pending && instant <= cut && instant > cp.ObservedAt {
 					reason(&b.Reasons, "pending-after-baseline-coverage-unknown")
-				}
-				if tx.Pending && instant <= cut && instant <= cp.ObservedAt {
-					reason(&b.Reasons, "pending-baseline-coverage-unknown")
 				}
 				// A newly posted debit may settle a hold already in available cash.
 				// Aggregate gaps cannot identify which transaction held that cash.

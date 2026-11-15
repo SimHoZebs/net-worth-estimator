@@ -31,8 +31,23 @@ func TestDisabledPendingRemainsEvidenceAndClaimsWithoutMutatingSnapshot(t *testi
 					wantRows = 1
 					wantTotal = 600
 				}
-				if s.Status != "uncertain" || s.CashAfterBills != nil || s.CheckingAvailable != nil || len(s.OutstandingObligations) != wantRows {
+				uncertain := claimed || at > "2026-11-14T20:00:00Z"
+				if len(s.OutstandingObligations) != wantRows || (s.Status == "uncertain") != uncertain {
 					t.Fatalf("summary %+v", s)
+				}
+				if at > "2026-11-14T20:00:00Z" {
+					if s.CheckingAvailable != nil {
+						t.Fatal("post-observation pending coverage presented as exact cash")
+					}
+				} else {
+					assertMoney(t, s.CheckingAvailable, 1244.43)
+				}
+				if uncertain {
+					if s.CashAfterBills != nil {
+						t.Fatal("uncertain coverage presented as exact cash after bills")
+					}
+				} else {
+					assertMoney(t, s.CashAfterBills, 544.43)
 				}
 				assertMoney(t, s.OutstandingBillsTotal, wantTotal)
 				if m.Transactions[0].Enabled {
@@ -248,7 +263,7 @@ func TestExplicitFactualCutExcludesPreauthoredFutureTodayObservationsAndMovement
 	}
 }
 
-func TestPendingOutsideBillWindowOnlyAffectsBaselineCoverage(t *testing.T) {
+func TestPendingOutsideBillWindowRespectsObservationCut(t *testing.T) {
 	for _, claimedOutside := range []bool{false, true} {
 		m := baseModel()
 		tx := payment("earlier-hold", 363.62, "2026-11-14T12:00:00Z")
@@ -262,13 +277,43 @@ func TestPendingOutsideBillWindowOnlyAffectsBaselineCoverage(t *testing.T) {
 		}
 		m.Transactions = []types.Transaction{tx}
 		s := Build(m, nil, "2026-11-15", testEnd)
-		if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil || len(s.OutstandingObligations) != 0 || len(s.Baselines) != 1 {
+		if len(s.OutstandingObligations) != 0 || len(s.Baselines) != 1 {
 			t.Fatalf("outside hold became bill %+v", s)
 		}
 		assertMoney(t, s.OutstandingBillsTotal, 0)
 		assertMoney(t, s.Baselines[0].AvailableBalance, 1244.43)
-		if len(s.Baselines[0].Reasons) == 0 {
-			t.Fatal("outside hold coverage uncertainty silently dropped")
+		if claimedOutside {
+			if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil || !slices.Contains(s.Baselines[0].Reasons, "pending-after-baseline-coverage-unknown") {
+				t.Fatalf("post-observation coverage uncertainty silently dropped %+v", s)
+			}
+		} else {
+			if s.Status != "available" || len(s.Baselines[0].Reasons) != 0 {
+				t.Fatalf("old pending row invalidated bank observation %+v", s)
+			}
+			assertMoney(t, s.CheckingAvailable, 1244.43)
+			assertMoney(t, s.CashAfterBills, 1244.43)
 		}
+	}
+}
+
+func TestObservedBankAvailableSurvivesEarlierDisabledPendingWithFutureBills(t *testing.T) {
+	for _, at := range []string{"2026-11-14T12:00:00Z", "2026-11-14T20:00:00Z"} {
+		t.Run(at, func(t *testing.T) {
+			m := baseModel()
+			m.Checkpoints[0].Source = "banksync"
+			hold := payment("earlier-bank-hold", 363.62, at)
+			hold.Pending = true
+			hold.Enabled = false
+			hold.PostedTime = 0
+			m.Transactions = []types.Transaction{hold}
+			m.Schedules = []types.Schedule{bill("due-one", "2026-11-15", 711.12), bill("due-two", "2026-11-15", 98.92), bill("future", "2026-11-16", 650.97)}
+			s := Build(m, nil, "2026-11-15", testEnd)
+			if s.Status != "available" || len(s.Reasons) != 0 || len(s.ConfirmedMovements) != 0 || len(s.OutstandingObligations) != 3 {
+				t.Fatalf("observed cash invalidated or old hold deducted twice %+v", s)
+			}
+			assertMoney(t, s.CheckingAvailable, 1244.43)
+			assertMoney(t, s.OutstandingBillsTotal, 1461.01)
+			assertMoney(t, s.CashAfterBills, -216.58)
+		})
 	}
 }

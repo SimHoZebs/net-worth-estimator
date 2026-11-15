@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AccountTransaction } from "@/domain/accountActivity.ts";
@@ -6,7 +6,15 @@ import { transactionFixture } from "@/mocks/projection.ts";
 import { selectObligationResults } from "@/domain/safeSpendingHistory.ts";
 import { historicalCycleView } from "./historicalCycleView.ts";
 import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
+import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
 import { cycleCaption } from "./safeSpendingDetailModel.ts";
+
+// Card/drawer placement belongs to these panels; row query hooks are covered by
+// the browser test with real transaction inspection.
+vi.mock("../../../components/activity/TransactionRow.tsx", () => ({
+	TransactionRow: ({ transaction }: { transaction: AccountTransaction }) =>
+		createElement("tr", null, createElement("td", null, transaction.name)),
+}));
 
 export const recordedCharge: AccountTransaction = {
 	id: "purchase",
@@ -117,18 +125,14 @@ describe("historical cycle evidence", () => {
 				...view,
 				cashEvidence: "Cash balance at close unavailable",
 				section: { ...section, transactions: [] },
-				accounts: [],
-				transactions: [],
-				readOnly: true,
-				transactionOrder: "newest",
-				onTransactionOrderChange: () => {},
 				closed: true,
 			}),
 		);
 		expect(html).toContain("Cash balance at close unavailable");
-		expect(html).toContain("Historical budget unavailable");
+		expect(html).not.toContain("Historical budget unavailable");
+		expect(html).not.toContain("closed-card-value");
 		expect(html).toContain("Recorded card charges");
-		expect(html).toContain("No recorded bill payments in this period.");
+		expect(html).not.toContain("No recorded cash payments in this period.");
 		expect(html).not.toContain("No bills due in this period.");
 		expect(html).toContain("125");
 		expect(html).not.toContain("left-value");
@@ -137,5 +141,55 @@ describe("historical cycle evidence", () => {
 		expect(html).not.toContain("Latest balance");
 		expect(html).not.toContain("lucide-shield-check");
 		expect(html).not.toContain("Cash balance 0");
+	});
+	it("keeps a populated cash payment list out of the card and available separately in the drawer", () => {
+		const { view, section } = historicalFixture();
+		const rows = Array.from({ length: 13 }, (_, index) => ({
+			...section.transactions[0]!,
+			id: `anonymous-payment-${index}`,
+			transactionId: `anonymous-payment-${index}`,
+			name: `Anonymous cash payment ${index}`,
+			amount: 12.34,
+		}));
+		const html = renderToStaticMarkup(
+			createElement(SafeSpendingBillsPanel, {
+				...view,
+				heroes: { ...view.heroes, committedTotal: 125.67 },
+				cashEvidence: "No balance recorded at close",
+				section: { ...section, transactions: rows, total: 160.42 },
+				closed: true,
+			}),
+		);
+		expect(html).toContain('data-testid="recorded-charges-value"');
+		expect(html).toContain("$125.67");
+		expect(html).toContain("Cash payments");
+		expect(html).toContain("$160.42");
+		expect(html).not.toContain("Anonymous cash payment");
+		expect(html).not.toContain("<details");
+		const drawer = renderToStaticMarkup(
+			createElement(SafeSpendingCyclePanel, {
+				cycle: {
+					start: "2026-09-20",
+					end: "2026-10-19",
+					title: "Recorded card charges",
+					emptyMessage: "No card charges",
+					transactions: [recordedCharge],
+					showTotal: true,
+				},
+				cashPayments: { ...section, transactions: rows, total: 160.42 },
+				accounts: [],
+				transactions: [],
+				readOnly: true,
+				transactionOrder: "newest",
+				onTransactionOrderChange: () => {},
+			}),
+		);
+		expect(drawer).toContain("Synthetic purchase");
+		expect(drawer).toContain("Anonymous cash payment 12");
+		expect(drawer).toContain("Cash payments this cycle");
+		expect(drawer).toContain("Sep 20 – Oct 19");
+		expect(drawer).toContain("$125.00");
+		expect(drawer).toContain("$160.42");
+		expect(drawer).not.toContain("$285.42");
 	});
 });

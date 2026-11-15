@@ -39,9 +39,16 @@ estimates; they are never evidence of historical payments or budgets.
 
 Pending payments need particular care because available balance can already
 include their holds. The cash calculation must not deduct a covered payment a
-second time. An aggregate available-versus-posted difference does not establish
-which individual payments are covered. Missing or ambiguous evidence must be
-reported rather than hidden behind a precise, apparently certain amount.
+second time. A pending row predating the bank observation does not invalidate
+the bank's reported available balance. An aggregate available-versus-posted
+difference does not establish which individual payments are covered. Missing or
+ambiguous evidence must be reported rather than hidden behind a precise,
+apparently certain amount.
+
+Keep the default panel concise. Supporting observations, payment-coverage
+explanations, and movements belong in a closed native disclosure. Show known
+balances even when a dependent estimate is unavailable; omit unsupported
+historical metrics rather than filling the page with blank rows.
 
 Bill dates are calendar dates under the existing UTC calendar convention.
 Observation timestamps are instants. Changing the overall projection start or
