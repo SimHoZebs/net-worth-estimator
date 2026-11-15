@@ -1,17 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture } from "../mocks/projection.ts";
 import {
-	cashCushion,
-	checkingShortfall,
 	cycleAllowance,
 	groupMandatorySpending,
 	monthEndIso,
 	nextMonthObligations,
 	nextMonthRange,
-	realizedCheckingOutflows,
-	remainingMonthlyObligations,
-	spendingBalance,
 } from "./safeSpending.ts";
 
 describe("month helpers", () => {
@@ -29,216 +23,6 @@ describe("month helpers", () => {
 			start: "2027-01-01",
 			end: "2027-01-31",
 		});
-	});
-});
-
-describe("cashCushion", () => {
-	it("subtracts spending since the checkpoint and remaining obligations", () => {
-		expect(
-			cashCushion({
-				checking: 5000,
-				spentSinceStart: 700,
-				remainingObligations: 3200,
-			}),
-		).toBe(1100);
-	});
-
-	it("ignores the blind window when the checkpoint is current", () => {
-		expect(
-			cashCushion({
-				checking: 5000,
-				spentSinceStart: 0,
-				remainingObligations: 0,
-			}),
-		).toBe(5000);
-	});
-});
-
-describe("realizedCheckingOutflows", () => {
-	const transactions = [
-		transactionFixture({
-			date: "2026-10-02",
-			transactionId: "start-day",
-			name: "Start day",
-			fromId: "checking",
-			toId: null,
-			requested: 100,
-			realized: 100,
-		}),
-		transactionFixture({
-			date: "2026-10-05",
-			transactionId: "rent",
-			name: "Rent",
-			fromId: "checking",
-			toId: null,
-			requested: 2874,
-			realized: 2874,
-		}),
-		transactionFixture({
-			date: "2026-10-05",
-			transactionId: "shortfall-bill",
-			name: "Shortfall",
-			fromId: "checking",
-			toId: null,
-			requested: 500,
-			realized: 200,
-		}),
-		transactionFixture({
-			date: "2026-10-20",
-			transactionId: "later",
-			name: "Later",
-			fromId: "checking",
-			toId: null,
-			requested: 300,
-			realized: 300,
-		}),
-	];
-
-	it("sums realized outflows after the start through today", () => {
-		expect(
-			realizedCheckingOutflows({
-				transactions,
-				checkingIds: ["checking"],
-				after: "2026-10-02",
-				through: "2026-10-08",
-			}),
-		).toBe(3074);
-	});
-
-	it("returns zero when today is the projection start", () => {
-		expect(
-			realizedCheckingOutflows({
-				transactions,
-				checkingIds: ["checking"],
-				after: "2026-10-02",
-				through: "2026-10-02",
-			}),
-		).toBe(0);
-	});
-});
-
-describe("checkingShortfall", () => {
-	const transactions = [
-		transactionFixture({
-			date: "2026-10-13",
-			transactionId: "car-loan",
-			name: "Car loan",
-			fromId: "checking",
-			toId: null,
-			requested: 403,
-			realized: 276,
-		}),
-		transactionFixture({
-			date: "2026-10-15",
-			transactionId: "living",
-			name: "Living",
-			fromId: "checking",
-			toId: null,
-			requested: 2400,
-			realized: 0,
-		}),
-		transactionFixture({
-			date: "2026-10-15",
-			transactionId: "paid",
-			name: "Paid",
-			fromId: "checking",
-			toId: null,
-			requested: 91,
-			realized: 91,
-		}),
-		transactionFixture({
-			date: "2026-11-15",
-			transactionId: "later",
-			name: "Later",
-			fromId: "checking",
-			toId: null,
-			requested: 2400,
-			realized: 0,
-		}),
-	];
-
-	it("sums canonical unfulfilled amounts with the first short date", () => {
-		expect(
-			checkingShortfall({
-				transactions,
-				checkingIds: ["checking"],
-				after: "2026-10-09",
-				through: "2026-10-31",
-			}),
-		).toEqual({ total: 2527, firstDate: "2026-10-13" });
-	});
-
-	it("ignores fully paid transactions and other windows", () => {
-		expect(
-			checkingShortfall({
-				transactions,
-				checkingIds: ["checking"],
-				after: "2026-10-31",
-				through: "2026-11-30",
-			}),
-		).toEqual({ total: 2400, firstDate: "2026-11-15" });
-	});
-
-	it("returns zero when nothing is short", () => {
-		expect(
-			checkingShortfall({
-				transactions: transactions.filter(
-					(item) => item.transactionId === "paid",
-				),
-				checkingIds: ["checking"],
-				after: "2026-10-09",
-				through: "2026-10-31",
-			}),
-		).toEqual({ total: 0, firstDate: null });
-	});
-
-	it("ignores destination limits and nonreportable residuals", () => {
-		expect(
-			checkingShortfall({
-				transactions: [
-					transactionFixture({
-						date: "2026-10-13",
-						fulfillment: {
-							unfulfilledAmount: 0,
-							destinationLimitedAmount: 2650,
-						},
-					}),
-					transactionFixture({
-						date: "2026-10-14",
-						requested: 101,
-						realized: 100,
-						fulfillment: {
-							unfulfilledAmount: 0,
-							destinationLimitedAmount: 0,
-						},
-					}),
-				],
-				checkingIds: ["checking"],
-				after: "2026-10-09",
-				through: "2026-10-31",
-			}),
-		).toEqual({ total: 0, firstDate: null });
-	});
-
-	it("keeps a reportable shortfall when public amounts round to the same value", () => {
-		expect(
-			checkingShortfall({
-				transactions: [
-					transactionFixture({
-						date: "2026-10-13",
-						requested: 100,
-						realized: 100,
-						fulfillment: {
-							unfulfilledAmount: 1,
-							destinationLimitedAmount: 0,
-						},
-					}),
-				],
-				checkingIds: ["checking"],
-				after: "2026-10-09",
-				through: "2026-10-31",
-			}),
-		).toEqual({ total: 1, firstDate: "2026-10-13" });
 	});
 });
 
@@ -305,16 +89,6 @@ describe("projection-derived safe spending", () => {
 			realized: 7579,
 		}),
 	];
-
-	it("sums remaining obligations through month end", () => {
-		expect(
-			remainingMonthlyObligations({
-				transactions,
-				checkingIds: ["checking"],
-				todayIso: "2026-10-08",
-			}),
-		).toEqual({ total: 4200, monthEnd: "2026-10-31" });
-	});
 
 	it("sums next month obligations", () => {
 		expect(
@@ -423,26 +197,5 @@ describe("groupMandatorySpending", () => {
 			"living",
 			"savings-transfer",
 		]);
-	});
-});
-
-describe("spendingBalance", () => {
-	it("sums the selected accounts and ignores unknown ids", () => {
-		expect(
-			spendingBalance(financialModelFixture.accounts, ["checking", "savings"]),
-		).toBe(60250);
-		expect(
-			spendingBalance(financialModelFixture.accounts, ["checking", "missing"]),
-		).toBe(18250);
-		expect(spendingBalance(financialModelFixture.accounts, [])).toBe(0);
-	});
-
-	it("prefers the bank-reported available balance when present", () => {
-		const accounts = financialModelFixture.accounts.map((account) =>
-			account.id === "checking"
-				? { ...account, availableBalance: 9000 }
-				: account,
-		);
-		expect(spendingBalance(accounts, ["checking"])).toBe(9000);
 	});
 });

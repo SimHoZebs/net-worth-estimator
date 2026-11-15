@@ -12,7 +12,9 @@ test("seeded account demo", async ({ page }) => {
 		page.getByRole("heading", { name: "Safe card spending" }),
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
-		await expect(page.getByText("Left at end of month")).toBeVisible();
+		await expect(
+			page.getByText("Cash after outstanding bills", { exact: true }),
+		).toBeVisible();
 		await expect(page.getByText("Card spending pace")).toBeVisible();
 		await expect(
 			page.getByRole("separator", { name: "Card spending limit" }),
@@ -23,7 +25,9 @@ test("seeded account demo", async ({ page }) => {
 	}
 	if (process.env.DEMO_PACK === "safe-spending-shortfall") {
 		await expect(page.getByText("Retirement contribution")).toBeVisible();
-		await expect(page.getByText("Unfulfilled")).toBeVisible();
+		await expect(
+			page.getByText("Outstanding bills", { exact: true }),
+		).toBeVisible();
 	}
 	// The drawer keeps the per-cycle transaction list.
 	await page.getByRole("button", { name: "This cycle transactions" }).click();

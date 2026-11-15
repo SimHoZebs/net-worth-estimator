@@ -51,7 +51,8 @@ export function userResourceKey(
 		| "terms"
 		| "catalog"
 		| "eval-summary"
-		| "checkpoints",
+		| "checkpoints"
+		| "safe-spending-summary",
 	scope = getUserScope(),
 ) {
 	return ["user-resources", scope.key, kind] as const;
@@ -453,6 +454,9 @@ export async function refreshAccounts(): Promise<void> {
 	const scope = getUserScope();
 	const cache = serverQueryClient();
 	await cache.invalidateQueries({
+		queryKey: userResourceKey("safe-spending-summary", scope),
+	});
+	await cache.invalidateQueries({
 		queryKey: userResourceKey("balances", scope),
 	});
 	await cache.invalidateQueries({
@@ -555,6 +559,9 @@ export async function refreshPaymentTerms(): Promise<void> {
 export async function refreshTransactions(): Promise<void> {
 	const scope = getUserScope();
 	const cache = serverQueryClient();
+	await cache.invalidateQueries({
+		queryKey: userResourceKey("safe-spending-summary", scope),
+	});
 	await cache.invalidateQueries({
 		queryKey: userResourceKey("transactions", scope),
 	});

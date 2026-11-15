@@ -1,0 +1,274 @@
+package safespending
+
+import (
+	"slices"
+	"testing"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
+)
+
+func TestDisabledPendingRemainsEvidenceAndClaimsWithoutMutatingSnapshot(t *testing.T) {
+	for _, claimed := range []bool{false, true} {
+		for _, at := range []string{"2026-10-31T12:00:00Z", "2026-11-14T12:00:00Z", "2026-11-15T12:00:00Z"} {
+			t.Run(at+map[bool]string{false: "unclaimed", true: "claimed"}[claimed], func(t *testing.T) {
+				m := baseModel()
+				m.Schedules = []types.Schedule{bill("bill", "2026-11-15", 700)}
+				tx := payment("stable-id", 600, at)
+				tx.Enabled = false
+				tx.Pending = true
+				if claimed {
+					tx.Claim = &types.TransactionClaim{ScheduleID: "bill", OccurrenceDate: "2026-11-15"}
+				}
+				m.Transactions = []types.Transaction{tx}
+				s := Build(m, nil, "2026-11-15", testEnd)
+				wantRows := 2
+				wantTotal := 1300.0
+				if at[:10] < "2026-11-15" {
+					wantRows = 1
+					wantTotal = 700
+				}
+				if claimed {
+					wantRows = 1
+					wantTotal = 600
+				}
+				if s.Status != "uncertain" || s.CashAfterBills != nil || s.CheckingAvailable != nil || len(s.OutstandingObligations) != wantRows {
+					t.Fatalf("summary %+v", s)
+				}
+				assertMoney(t, s.OutstandingBillsTotal, wantTotal)
+				if m.Transactions[0].Enabled {
+					t.Fatal("mutated simulation eligibility")
+				}
+				found := false
+				for _, row := range s.OutstandingObligations {
+					if row.ID == "transaction:stable-id" {
+						found = row.Status == "pending-coverage-unknown"
+					}
+				}
+				if found != (claimed || at[:10] >= "2026-11-15") {
+					t.Fatal("pending bill inclusion did not follow the requested range")
+				}
+				// The bank settles the same identity and its claim remains exact.
+				m.Transactions[0].Pending = false
+				m.Transactions[0].Enabled = true
+				settled := Build(m, nil, "2026-11-15", testEnd)
+				for _, row := range settled.OutstandingObligations {
+					if row.TransactionID != nil && *row.TransactionID == "stable-id" {
+						t.Fatal("settled payment deducted as an outstanding bill")
+					}
+				}
+				if claimed && len(settled.OutstandingObligations) != 0 {
+					t.Fatalf("claim generated duplicate bill %+v", settled)
+				}
+			})
+		}
+	}
+}
+
+func TestOldMultiDestinationFactDoesNotPoisonObservedCash(t *testing.T) {
+	m := baseModel()
+	tx := payment("old-routing", 100, "2026-11-14T19:00:00Z")
+	tx.Destinations = []string{"one", "two"}
+	m.Transactions = []types.Transaction{tx}
+	s := Build(m, nil, "2026-11-15", testEnd)
+	if s.Status != "available" || slices.Contains(s.Reasons, "posted-routing-unknown") {
+		t.Fatalf("old routing %+v", s)
+	}
+	assertMoney(t, s.CashAfterBills, 1244.43)
+	m.Transactions[0].TransactionTime = stamp("2026-11-14T21:00:00Z")
+	s = Build(m, nil, "2026-11-15", testEnd)
+	if s.CashAfterBills != nil || !slices.Contains(s.Reasons, "posted-routing-unknown") {
+		t.Fatalf("new routing %+v", s)
+	}
+}
+
+func TestCashCutUsesCanonicalTransactionInstantNotPostedMetadata(t *testing.T) {
+	m := baseModel()
+	m.Checkpoints[0].AvailableBalance = ptr(1608.05)
+	before := payment("before", 10, "2026-11-15T10:00:00Z")
+	before.TransactionTime = stamp("2026-11-14T19:59:59Z")
+	at := payment("at", 20, "2026-11-15T10:00:01Z")
+	at.TransactionTime = stamp("2026-11-14T20:00:00Z")
+	after := payment("after", 30, "2026-11-14T12:00:00Z")
+	after.TransactionTime = stamp("2026-11-14T20:00:01Z")
+	fallback := payment("fallback", 40, "2026-11-14T20:00:02Z")
+	fallback.TransactionTime = 0
+	m.Transactions = []types.Transaction{before, at, after, fallback}
+	s := Build(m, nil, "2026-11-15", testEnd)
+	assertMoney(t, s.CashAfterBills, 1538.05)
+	if len(s.ConfirmedMovements) != 2 || s.ConfirmedMovements[0].TransactionID != "after" || s.ConfirmedMovements[0].EffectiveAt != after.TransactionTime || s.ConfirmedMovements[1].TransactionID != "fallback" {
+		t.Fatalf("movements %+v", s.ConfirmedMovements)
+	}
+}
+
+func TestSameInstantExecutionOrderForKnownRecordedAmountDependencies(t *testing.T) {
+	m := baseModel()
+	m.Checkpoints[0].AvailableBalance = ptr(1608.05)
+	first := payment("first", 10, "2026-11-15T09:00:00Z")
+	first.ExecutionOrder = 1
+	second := payment("second", 0, "2026-11-15T09:00:00Z")
+	second.ExecutionOrder = 2
+	second.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "previous * 2"}, Inputs: map[string]types.AmountInputBinding{"previous": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "first"}}}}
+	m.Transactions = []types.Transaction{second, first}
+	s := Build(m, nil, "2026-11-15", testEnd)
+	assertMoney(t, s.CashAfterBills, 1578.05)
+	if len(s.ConfirmedMovements) != 2 || s.ConfirmedMovements[0].TransactionID != "first" || s.ConfirmedMovements[1].TransactionID != "second" {
+		t.Fatalf("execution order %+v", s)
+	}
+}
+
+func TestDynamicRecordedAmountsCannotBorrowLaterObservation(t *testing.T) {
+	m := baseModel()
+	m.Checkpoints[0].AvailableBalance = ptr(1608.05)
+	tx := payment("dynamic", 0, "2026-11-15T09:00:00Z")
+	tx.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "balance * .1"}, Inputs: map[string]types.AmountInputBinding{"balance": {Source: "provider", Provider: "account-balance", Arguments: map[string]any{"id": "checking"}}}}
+	m.Transactions = []types.Transaction{tx}
+	s := Build(m, nil, "2026-11-15", testEnd)
+	if s.CashAfterBills != nil || s.CheckingAvailable != nil || !slices.Contains(s.Reasons, "posted-amount-unavailable") {
+		t.Fatalf("dynamic amount guessed %+v", s)
+	}
+	// Once a later actual observation incorporates that transaction, it no
+	// longer requires replay to establish cash, but its amount remains unknown.
+	m.Checkpoints[0].ObservedAt = stamp("2026-11-15T10:00:00Z")
+	s = Build(m, nil, "2026-11-15", testEnd)
+	assertMoney(t, s.CashAfterBills, 1608.05)
+	if len(s.ConfirmedMovements) != 0 {
+		t.Fatal("reconstructed old dynamic actual")
+	}
+}
+
+func TestRequestedBillSurvivesSimulatedPartialRealizationAndExactClaimReplacesWholeOccurrence(t *testing.T) {
+	m := baseModel()
+	m.Checkpoints[0].Balance = 100
+	m.Checkpoints[0].AvailableBalance = ptr(100.0)
+	m.Schedules = []types.Schedule{bill("bill", "2026-11-15", 700)}
+	// A simulator can only realize 100, but its claim is not actual evidence.
+	projected := payment("simulated-partial", 100, "2026-11-15T09:00:00Z")
+	projected.Source = "projected"
+	projected.Claim = &types.TransactionClaim{ScheduleID: "bill", OccurrenceDate: "2026-11-15"}
+	m.Transactions = []types.Transaction{projected}
+	s := Build(m, nil, "2026-11-15", testEnd)
+	assertMoney(t, s.OutstandingBillsTotal, 700)
+	assertMoney(t, s.CashAfterBills, -600)
+	// Canonical claims replace an occurrence, not a guessed unpaid remainder.
+	actual := projected
+	actual.ID = "confirmed-partial"
+	actual.Source = "banksync"
+	actual.TransactionTime = stamp("2026-11-14T12:00:00Z")
+	actual.PostedTime = actual.TransactionTime
+	m.Transactions = append(m.Transactions, actual)
+	s = Build(m, nil, "2026-11-15", testEnd)
+	assertMoney(t, s.OutstandingBillsTotal, 0)
+	assertMoney(t, s.CashAfterBills, 100)
+	if len(s.OutstandingObligations) != 0 {
+		t.Fatalf("invented residual %+v", s)
+	}
+}
+
+func TestBillWindowOmitsEarlierSchedulesAndSameDayObservationMakesPaymentUnknown(t *testing.T) {
+	for _, due := range []string{"2026-11-01", "2026-11-14", "2026-11-15"} {
+		t.Run(due, func(t *testing.T) {
+			m := baseModel()
+			m.Schedules = []types.Schedule{bill("unclaimed", due, 100)}
+			// This actual may have paid the bill, or be unrelated. Matching
+			// its amount is not evidence; an exact claim is the only link.
+			m.Transactions = []types.Transaction{payment("unclaimed-bank-actual", 100, "2026-11-01T12:00:00Z")}
+			s := Build(m, nil, "2026-11-15", testEnd)
+			assertMoney(t, s.CheckingAvailable, 1244.43)
+			if due <= "2026-11-14" {
+				assertMoney(t, s.CashAfterBills, 1244.43)
+				assertMoney(t, s.OutstandingBillsTotal, 0)
+				if len(s.OutstandingObligations) != 0 {
+					t.Fatalf("out-of-window arrears %+v", s)
+				}
+			} else {
+				assertMoney(t, s.OutstandingBillsTotal, 100)
+				assertMoney(t, s.CashAfterBills, 1144.43)
+				if s.OutstandingObligations[0].Status != "outstanding" {
+					t.Fatalf("future bill %+v", s)
+				}
+				m.Checkpoints[0].ObservedAt = stamp("2026-11-15T08:00:00Z")
+				s = Build(m, nil, "2026-11-15", testEnd)
+				assertMoney(t, s.CheckingAvailable, 1244.43)
+				if s.Status != "uncertain" || s.CashAfterBills != nil || !slices.Contains(s.Reasons, "scheduled-payment-status-unknown") || s.OutstandingObligations[0].Status != "payment-status-unknown" {
+					t.Fatalf("same-day payment status guessed %+v", s)
+				}
+			}
+			m.Transactions[0].Claim = &types.TransactionClaim{ScheduleID: "unclaimed", OccurrenceDate: due}
+			s = Build(m, nil, "2026-11-15", testEnd)
+			assertMoney(t, s.CashAfterBills, 1244.43)
+			if len(s.OutstandingObligations) != 0 {
+				t.Fatalf("confirmed occurrence remained %+v", s)
+			}
+		})
+	}
+}
+
+func TestInclusiveArbitraryWindowAndCashCutStayIndependent(t *testing.T) {
+	m := baseModel()
+	m.Schedules = []types.Schedule{bill("before", "2026-11-14", 10), bill("start", "2026-11-15", 20), bill("end", "2026-11-18", 30), bill("after", "2026-11-19", 40)}
+	// An observation inside the bill window but after the cash start must
+	// never replace the per-account cash evidence selected at start.
+	m.Checkpoints = append(m.Checkpoints, types.Checkpoint{AccountID: "checking", Balance: 9999, AvailableBalance: ptr(9999.0), ObservedAt: stamp("2026-11-18T12:00:00Z")})
+	m.Transactions = []types.Transaction{payment("future-window-payment", 50, "2026-11-16T12:00:00Z")}
+	income := payment("future-window-income", 999, "2026-11-16T12:00:00Z")
+	income.SourceAccountID = nil
+	income.Destinations = []string{"checking"}
+	m.Transactions = append(m.Transactions, income)
+	s := Build(m, nil, "2026-11-15", "2026-11-18")
+	assertMoney(t, s.CheckingAvailable, 1244.43)
+	assertMoney(t, s.OutstandingBillsTotal, 100)
+	assertMoney(t, s.CashAfterBills, 1144.43)
+	if len(s.ConfirmedMovements) != 0 {
+		t.Fatalf("window payments leaked into start cash %+v", s)
+	}
+	if s.Start != "2026-11-15" || s.End != "2026-11-18" || len(s.OutstandingObligations) != 3 || s.OutstandingObligations[0].Date != s.Start || s.OutstandingObligations[2].Date != s.End {
+		t.Fatalf("window %+v", s)
+	}
+}
+
+func TestExplicitFactualCutExcludesPreauthoredFutureTodayObservationsAndMovements(t *testing.T) {
+	m := baseModel()
+	m.Checkpoints = append(m.Checkpoints,
+		types.Checkpoint{AccountID: "checking", Balance: 200, AvailableBalance: ptr(200.0), ObservedAt: stamp("2026-11-15T09:00:00Z")},
+		types.Checkpoint{AccountID: "checking", Balance: 9999, AvailableBalance: ptr(9999.0), ObservedAt: stamp("2026-11-15T13:00:00Z")},
+	)
+	confirmed := payment("confirmed-income", 20, "2026-11-15T10:00:00Z")
+	confirmed.SourceAccountID = nil
+	confirmed.Destinations = []string{"checking"}
+	future := payment("future-today-income", 500, "2026-11-15T13:00:00Z")
+	future.SourceAccountID = nil
+	future.Destinations = []string{"checking"}
+	m.Transactions = []types.Transaction{confirmed, future, payment("conditional-future-today-bill", 30, "2026-11-15T14:00:00Z")}
+	s := BuildAtCut(m, nil, "2026-11-15", "2026-11-15", stamp("2026-11-15T12:00:00Z"))
+	assertMoney(t, s.CheckingAvailable, 220)
+	assertMoney(t, s.OutstandingBillsTotal, 30)
+	assertMoney(t, s.CashAfterBills, 190)
+	if len(s.Baselines) != 1 || *s.Baselines[0].ObservedAt != stamp("2026-11-15T09:00:00Z") || len(s.ConfirmedMovements) != 1 || s.ConfirmedMovements[0].TransactionID != "confirmed-income" {
+		t.Fatalf("future authored fact leaked %+v", s)
+	}
+}
+
+func TestPendingOutsideBillWindowOnlyAffectsBaselineCoverage(t *testing.T) {
+	for _, claimedOutside := range []bool{false, true} {
+		m := baseModel()
+		tx := payment("earlier-hold", 363.62, "2026-11-14T12:00:00Z")
+		tx.Enabled = false
+		tx.Pending = true
+		if claimedOutside {
+			// Even a transaction dated inside the window is not a bill in it
+			// when its exact claim names an earlier occurrence.
+			tx.TransactionTime = stamp("2026-11-15T09:00:00Z")
+			tx.Claim = &types.TransactionClaim{ScheduleID: "earlier-bill", OccurrenceDate: "2026-11-14"}
+		}
+		m.Transactions = []types.Transaction{tx}
+		s := Build(m, nil, "2026-11-15", testEnd)
+		if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil || len(s.OutstandingObligations) != 0 || len(s.Baselines) != 1 {
+			t.Fatalf("outside hold became bill %+v", s)
+		}
+		assertMoney(t, s.OutstandingBillsTotal, 0)
+		assertMoney(t, s.Baselines[0].AvailableBalance, 1244.43)
+		if len(s.Baselines[0].Reasons) == 0 {
+			t.Fatal("outside hold coverage uncertainty silently dropped")
+		}
+	}
+}

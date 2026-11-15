@@ -1,14 +1,9 @@
-import { ShieldCheck } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
-import {
-	type BarSegment,
-	SegmentedBar,
-} from "../../../components/SegmentedBar.tsx";
-import { exactMoney, money, monthDay } from "../../../domain/format.ts";
+import { money, monthDay } from "../../../domain/format.ts";
 import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
@@ -16,7 +11,6 @@ import {
 	SafeSpendingSectionHeader,
 } from "./TransactionSectionView.tsx";
 import type {
-	CashNowDecomposition,
 	CycleAllocation,
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
@@ -125,7 +119,7 @@ function ReserveMeter({
 
 export function SafeSpendingBillsPanel({
 	heroes,
-	cashNow,
+	cashEvidence,
 	allocation,
 	trend,
 	section,
@@ -139,7 +133,7 @@ export function SafeSpendingBillsPanel({
 	closed = false,
 }: {
 	heroes: SafeSpendingHeroes;
-	cashNow: CashNowDecomposition;
+	cashEvidence: React.ReactNode;
 	allocation: CycleAllocation;
 	trend?: SafeSpendingTrend;
 	section: SafeSpendingMandatorySection;
@@ -175,12 +169,6 @@ export function SafeSpendingBillsPanel({
 			: funding.endDate !== null && funding.endDate !== funding.date
 				? `The ${fundingDates} paychecks ${closed ? "paid" : "pay"} this statement`
 				: `The ${fundingDates} paycheck ${closed ? "paid" : "pays"} this statement`;
-	// Cash at month-end: checking minus spent and the remaining bills.
-	const cashQualifier =
-		(cashNow.bills === 0
-			? `No bills through ${monthDay(cashNow.monthEnd)}`
-			: `After ${money(cashNow.bills)} bills · through ${monthDay(cashNow.monthEnd)}`) +
-		(cashNow.short > 0 ? ` · ${money(cashNow.short)} unfulfilled` : "");
 	const allowanceView = describeAllowance({
 		allowance: allocation.allowance,
 		theoretical: heroes.theoretical,
@@ -232,116 +220,96 @@ export function SafeSpendingBillsPanel({
 					</Suspense>
 				</div>
 			)}
+			{cashEvidence}
 			<div className="grid content-start gap-4">
-				<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-					<StatRow
-						label={labels.leftAtEndOfMonth}
-						value={money(cashNow.cushion)}
-						testId="left-value"
-						qualifier={cashQualifier}
-					/>
-					<StatRow
-						label={spendLabel}
-						value={amountText(allowanceView.primary)}
-						tone={allowanceView.tone}
-						testId="spend-value"
-						meter={
-							showMeter ? (
-								<ReserveMeter
-									spent={spent}
-									limit={limit}
-									reserve={allocation.reserve}
-									limitWord={limitWord}
-								/>
-							) : undefined
-						}
-						qualifier={spendQualifier}
-					/>
-					<StatRow
-						label={labels.perDay}
-						value={dailyValue === null ? "—" : money(dailyValue)}
-						testId="perday-value"
-						qualifier={dailyQualifier}
-					/>
-				</div>
-				<p className="m-0 text-xs text-muted-foreground">{fundingCaption}</p>
-				{!allocation.available && (
-					<p className="m-0 text-xs text-muted-foreground">
-						Closed card balance unavailable
-					</p>
+				{closed ? (
+					<>
+						<StatRow
+							label={labels.recordedCharges}
+							value={amountText(heroes.committedTotal)}
+							testId="recorded-charges-value"
+						/>
+						<StatRow
+							label="Closed card balance"
+							value={amountText(heroes.closedCycle.total)}
+							testId="closed-card-value"
+						/>
+						<p className="m-0 text-sm text-muted-foreground">
+							Historical budget unavailable
+						</p>
+						<p className="m-0 text-xs text-muted-foreground">
+							The historical income, bills, and reserve needed to establish this
+							cycle’s budget are not available.
+						</p>
+					</>
+				) : (
+					<>
+						<p className="m-0 text-xs text-muted-foreground">
+							Card allowance · separate from cash
+						</p>
+						<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+							<StatRow
+								label={spendLabel}
+								value={amountText(allowanceView.primary)}
+								tone={allowanceView.tone}
+								testId="spend-value"
+								meter={
+									showMeter ? (
+										<ReserveMeter
+											spent={spent}
+											limit={limit}
+											reserve={allocation.reserve}
+											limitWord={limitWord}
+										/>
+									) : undefined
+								}
+								qualifier={spendQualifier}
+							/>
+							<StatRow
+								label={labels.perDay}
+								value={dailyValue === null ? "—" : money(dailyValue)}
+								testId="perday-value"
+								qualifier={dailyQualifier}
+							/>
+						</div>
+						<p className="m-0 text-xs text-muted-foreground">
+							{fundingCaption}
+						</p>
+						{!allocation.available && (
+							<p className="m-0 text-xs text-muted-foreground">
+								Closed card balance unavailable
+							</p>
+						)}
+					</>
 				)}
 			</div>
-			<div className="grid content-start gap-4">
-				<div className="flex items-center justify-between">
-					<strong className="text-sm text-foreground">
-						{labels.cashAccounts}
-					</strong>
-					<ShieldCheck
-						size={19}
-						className="text-success-text"
-						aria-hidden="true"
-					/>
-				</div>
-				{cashNow.provisional && (
-					<p className="m-0 text-xs text-muted-foreground">
-						Latest balance, not at close
-					</p>
-				)}
-				<SegmentedBar
-					showDetails={false}
-					caption={`${labels.cashBalance} ${exactMoney(cashNow.checking)} · ${labels.remainingBills} ${exactMoney(cashNow.bills)} · ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
-					segments={[
-						{
-							label: labels.remainingBills,
-							amount: Math.min(cashNow.checking, Math.max(0, cashNow.bills)),
-							pattern: "stripes",
-							tone: "sage",
-						} as BarSegment,
-						...(cashNow.cushion > 0
-							? [
-									{
-										label: labels.cashAfterBills,
-										amount: cashNow.cushion,
-										pattern: "solid",
-										tone: "plum",
-									} as BarSegment,
-								]
-							: []),
-					]}
-					ariaLabel={`${labels.cashBalance} ${exactMoney(cashNow.checking)}, ${labels.remainingBills} ${exactMoney(cashNow.bills)}, ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
-				/>
-				{cashNow.spentSinceStart > 0 ? (
-					<div className="flex items-center justify-between gap-3 text-sm text-foreground">
-						<span className="flex items-center gap-2 text-muted-foreground">
-							{labels.cashPayments} · {monthDay(cashNow.since)}
-						</span>
-						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
+			{closed && (
+				<div className="grid content-start gap-4">
+					<div className="h-px w-full bg-border" />
+					<div className="flex flex-wrap items-center justify-end gap-3">
+						<TransactionSortButton
+							order={transactionOrder}
+							onChange={onTransactionOrderChange}
+						/>
 					</div>
-				) : null}
-				<div className="h-px w-full bg-border" />
-				<div className="flex flex-wrap items-center justify-end gap-3">
-					<TransactionSortButton
+					<SafeSpendingSectionHeader
+						title={section.title}
+						subtitle={section.subtitle}
+						total={section.total}
+					/>
+					<TransactionSectionView
+						transactions={section.transactions}
+						caption={section.title}
+						emptyMessage="No recorded bill payments in this period."
+						savedTransactions={savedById}
+						onInspect={inspect}
 						order={transactionOrder}
-						onChange={onTransactionOrderChange}
+						showHeaders={showHeaders}
+						shortfall
+						shortfallLabel="Unfulfilled"
 					/>
 				</div>
-				<SafeSpendingSectionHeader
-					title={section.title}
-					subtitle={section.subtitle}
-					total={section.total}
-				/>
-				<TransactionSectionView
-					transactions={section.transactions}
-					caption={section.title}
-					emptyMessage="No bills due in this period."
-					savedTransactions={savedById}
-					onInspect={inspect}
-					order={transactionOrder}
-					showHeaders={showHeaders}
-					shortfall
-					shortfallLabel="Unfulfilled"
-				/>
-			</div>
+			)}
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}

@@ -1323,9 +1323,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"peerTransactionId"
-				],
+				"required": ["peerTransactionId"],
 				"type": "object"
 			},
 			"Confirm-transfer-pairResponse": {
@@ -1347,10 +1345,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"link",
-					"revision"
-				],
+				"required": ["link", "revision"],
 				"type": "object"
 			},
 			"Create-pattern-to-new-scheduleResponse": {
@@ -2952,15 +2947,10 @@
 						"items": {
 							"$ref": "#/components/schemas/TransferLink"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"links"
-				],
+				"required": ["links"],
 				"type": "object"
 			},
 			"LoanTerms": {
@@ -4295,9 +4285,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"revision"
-				],
+				"required": ["revision"],
 				"type": "object"
 			},
 			"ReorderInputBody": {
@@ -4381,6 +4369,128 @@
 					}
 				},
 				"required": ["revision", "details", "confirm"],
+				"type": "object"
+			},
+			"SafeSpendingBaseline": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"accountName": {
+						"type": "string"
+					},
+					"availableBalance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"basis": {
+						"type": "string"
+					},
+					"observedAt": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					},
+					"postedBalance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"reasons": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"status": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"accountId",
+					"accountName",
+					"observedAt",
+					"postedBalance",
+					"availableBalance",
+					"basis",
+					"status",
+					"reasons"
+				],
+				"type": "object"
+			},
+			"SafeSpendingMovement": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"effectiveAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"name": {
+						"type": "string"
+					},
+					"postedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transactionId",
+					"accountId",
+					"name",
+					"postedAt",
+					"effectiveAt",
+					"amount"
+				],
+				"type": "object"
+			},
+			"SafeSpendingObligation": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"date": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"scheduleId": {
+						"type": ["string", "null"]
+					},
+					"status": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": [
+					"id",
+					"transactionId",
+					"scheduleId",
+					"accountId",
+					"name",
+					"date",
+					"amount",
+					"status"
+				],
 				"type": "object"
 			},
 			"SafeSpendingOutputBody": {
@@ -4468,6 +4578,89 @@
 					"incomeScheduleIds",
 					"transactionIds",
 					"statementDaySet"
+				],
+				"type": "object"
+			},
+			"SafeSpendingSummary": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SafeSpendingSummary.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"baselines": {
+						"items": {
+							"$ref": "#/components/schemas/SafeSpendingBaseline"
+						},
+						"type": ["array", "null"]
+					},
+					"cashAfterBills": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"checkingAvailable": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"confirmedMovements": {
+						"items": {
+							"$ref": "#/components/schemas/SafeSpendingMovement"
+						},
+						"type": ["array", "null"]
+					},
+					"end": {
+						"type": "string"
+					},
+					"outstandingBillsTotal": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"outstandingObligations": {
+						"items": {
+							"$ref": "#/components/schemas/SafeSpendingObligation"
+						},
+						"type": ["array", "null"]
+					},
+					"reasons": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"selectedAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"start": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"revision",
+					"start",
+					"end",
+					"status",
+					"reasons",
+					"selectedAccountIds",
+					"baselines",
+					"checkingAvailable",
+					"confirmedMovements",
+					"outstandingObligations",
+					"outstandingBillsTotal",
+					"cashAfterBills"
 				],
 				"type": "object"
 			},
@@ -6129,13 +6322,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"legA",
-					"legB",
-					"findingId",
-					"actor",
-					"createdAt"
-				],
+				"required": ["legA", "legB", "findingId", "actor", "createdAt"],
 				"type": "object"
 			},
 			"UpcomingNewScheduleOccurrence": {
@@ -9309,6 +9496,65 @@
 					}
 				},
 				"summary": "Save safe card spending settings"
+			}
+		},
+		"/v1/safe-spending-summary": {
+			"get": {
+				"operationId": "get-safe-spending-summary",
+				"parameters": [
+					{
+						"description": "UTC cash evidence cut and inclusive bill-window start YYYY-MM-DD",
+						"explode": false,
+						"in": "query",
+						"name": "start",
+						"required": true,
+						"schema": {
+							"description": "UTC cash evidence cut and inclusive bill-window start YYYY-MM-DD",
+							"type": "string"
+						}
+					},
+					{
+						"description": "Inclusive conditional bill-window end YYYY-MM-DD",
+						"explode": false,
+						"in": "query",
+						"name": "end",
+						"required": true,
+						"schema": {
+							"description": "Inclusive conditional bill-window end YYYY-MM-DD",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SafeSpendingSummary"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read observed cash and outstanding bills with evidence"
 			}
 		},
 		"/v1/schedules": {

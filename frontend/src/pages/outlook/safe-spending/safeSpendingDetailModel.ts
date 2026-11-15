@@ -1,6 +1,6 @@
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import type { ClosedCardBalances } from "../../../domain/closedCardBalances.ts";
-import { monthDay } from "../../../domain/format.ts";
+import { dateLabel, monthDay } from "../../../domain/format.ts";
 
 export const SAFE_SPENDING_DETAIL_TABS = [
 	{ id: "cycle", label: "This cycle", view: "charges" },
@@ -21,6 +21,22 @@ export function isSafeSpendingCycleTab(
 	return SAFE_SPENDING_DETAIL_TABS.some(
 		(item) => item.id === tab && item.view === "charges",
 	);
+}
+
+export function cycleCaption({
+	start,
+	end,
+	closed,
+	daysLeft,
+}: {
+	start: string;
+	end: string;
+	closed: boolean;
+	daysLeft: number;
+}): string {
+	return closed
+		? `${dateLabel(start, true)} – ${dateLabel(end, true)} · Closed`
+		: `${dateLabel(end, true)} · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
 }
 /**
  * The statement-settlement bundle plus the bills window it covers: the
@@ -76,24 +92,6 @@ export interface SafeSpendingMandatorySection {
 	total: number;
 	transactions: AccountTransaction[];
 }
-export interface CashNowDecomposition {
-	checking: number;
-	spentSinceStart: number;
-	/** Past direct cash outflows since the balance check, kept outside bill filters. */
-	directSpentSinceStart?: number;
-	bills: number;
-	cushion: number;
-	/** True when the closed balance is the latest balance, not a close checkpoint. */
-	provisional?: boolean;
-	/** Projection-start date anchoring spentSinceStart, for caption context. */
-	since: string;
-	/** Last day of the calendar-month bills window, for caption context. */
-	monthEnd: string;
-	/** Simulated unpaid bills in the due window (fulfillment gaps). */
-	short: number;
-	/** First date the simulation leaves a bill unpaid, if any. */
-	firstShort: string | null;
-}
 
 /** The allocation figures the This-cycle panel renders; the funding bundle lives on StatementFunding. */
 export interface CycleAllocation {
@@ -104,8 +102,6 @@ export interface CycleAllocation {
 }
 
 export interface SafeSpendingHeroes {
-	cushion: number;
-	checkingAmount: number;
 	safe: number;
 	theoretical: number;
 	dailySafe: number;
@@ -120,53 +116,31 @@ export interface SafeSpendingHeroes {
 
 export interface CycleView {
 	heroes: SafeSpendingHeroes;
-	cashNow: CashNowDecomposition;
 	allocation: CycleAllocation;
 	funding: StatementFunding;
 }
 
 /**
- * Assemble one statement tab from the shared cash and allowance formulas.
- * The open tab and the closed tab differ only in their inputs.
+ * Assemble card allowance figures. A null card amount explicitly disables the allowance.
  */
 export function buildCycleView({
 	cycleStart,
 	cycleEnd,
 	closedCycle,
-	checking,
-	spentSinceStart,
-	directSpentSinceStart,
-	bills,
-	cushion,
-	since,
-	monthEnd,
-	short,
-	firstShort,
 	funding,
 	cardSpent,
 	cardSpentByCard,
 	reserve,
 	fullDaysLeft,
-	provisional = false,
 }: {
 	cycleStart: string;
 	cycleEnd: string;
 	closedCycle: SafeSpendingClosedCycle;
-	checking: number;
-	spentSinceStart: number;
-	directSpentSinceStart: number;
-	bills: number;
-	cushion: number;
-	since: string;
-	monthEnd: string;
-	short: number;
-	firstShort: string | null;
 	funding: StatementFunding;
 	cardSpent: number | null;
 	cardSpentByCard: { id: string; name: string; amount: number | null }[];
 	reserve: number;
 	fullDaysLeft: number;
-	provisional?: boolean;
 }): CycleView {
 	const available = cardSpent !== null;
 	const closedCards = cardSpent ?? 0;
@@ -182,8 +156,6 @@ export function buildCycleView({
 	const dailyTheoretical = theoretical / days;
 	return {
 		heroes: {
-			cushion,
-			checkingAmount: checking,
 			safe: allowance,
 			theoretical,
 			dailySafe,
@@ -194,18 +166,6 @@ export function buildCycleView({
 			closedCycle,
 			committedTotal: cardSpent,
 			committedByCard: cardSpentByCard,
-		},
-		cashNow: {
-			checking,
-			spentSinceStart,
-			directSpentSinceStart,
-			bills,
-			cushion,
-			provisional,
-			since,
-			monthEnd,
-			short,
-			firstShort,
 		},
 		allocation: { reserve, allowance, available },
 		funding,

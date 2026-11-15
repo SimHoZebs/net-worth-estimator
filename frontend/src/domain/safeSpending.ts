@@ -52,54 +52,6 @@ export function checkingAccountId(accounts: Account[]): string | null {
 	return anyCash?.id ?? null;
 }
 
-/**
- * Available-balance total: the summed balance of the accounts the user
- * counts as spendable. An empty set holds nothing.
- */
-export function spendingBalance(
-	accounts: Account[],
-	accountIds: string[],
-): number {
-	const selected = new Set(accountIds);
-	// The bank's available figure is as of the same observation as the posted
-	// balance. Prefer it when present: it already accounts for live holds.
-	return accounts
-		.filter((account) => selected.has(account.id) && !account.archived)
-		.reduce(
-			(sum, account) => sum + (account.availableBalance ?? account.balance),
-			0,
-		);
-}
-/**
- * Remaining unpaid monthly obligations: requested outflows from the
- * spendable accounts dated after today through the end of the current
- * calendar month.
- */
-export function remainingMonthlyObligations({
-	transactions,
-	checkingIds,
-	todayIso,
-}: {
-	transactions: TransactionResult[];
-	checkingIds: string[];
-	todayIso: string;
-}): { total: number; monthEnd: string } {
-	const today = todayIso.slice(0, 10);
-	const monthEnd = monthEndIso(today);
-	const sources = new Set(checkingIds);
-	const total = transactions
-		.filter(
-			(transaction) =>
-				transaction.fromId !== null &&
-				sources.has(transaction.fromId) &&
-				transaction.date > today &&
-				transaction.date <= monthEnd &&
-				transaction.requested > 0,
-		)
-		.reduce((sum, transaction) => sum + transaction.requested, 0);
-	return { total, monthEnd };
-}
-
 /** Next calendar month's fixed obligations from the spendable accounts. */
 export function nextMonthObligations({
 	transactions,
@@ -123,24 +75,6 @@ export function nextMonthObligations({
 		)
 		.reduce((sum, transaction) => sum + transaction.requested, 0);
 	return { total, start, end };
-}
-
-/**
- * Available balance: the selected balance minus spending since it was
- * confirmed and remaining unpaid monthly obligations. Card purchases do
- * not reduce it here; they are budgeted against the next paycheck in the
- * cycle allowance.
- */
-export function cashCushion({
-	checking,
-	spentSinceStart,
-	remainingObligations,
-}: {
-	checking: number;
-	spentSinceStart: number;
-	remainingObligations: number;
-}): number {
-	return checking - spentSinceStart - remainingObligations;
 }
 
 /**
@@ -168,75 +102,6 @@ export interface MandatorySpendingGroup {
 	total: number;
 	count: number;
 	dates: string[];
-}
-
-/**
- * Realized outflows from the spendable accounts inside (after, through]:
- * money the projection shows as already left between confirmation and
- * today. The available balance subtracts these so logged actuals dated
- * after the projection start still move today's figures.
- */
-export function realizedCheckingOutflows({
-	transactions,
-	checkingIds,
-	after,
-	through,
-}: {
-	transactions: TransactionResult[];
-	checkingIds: string[];
-	after: string;
-	through: string;
-}): number {
-	const start = after.slice(0, 10);
-	const end = through.slice(0, 10);
-	if (end <= start) return 0;
-	const sources = new Set(checkingIds);
-	return transactions
-		.filter(
-			(transaction) =>
-				transaction.fromId !== null &&
-				sources.has(transaction.fromId) &&
-				transaction.date > start &&
-				transaction.date <= end &&
-				transaction.realized > 0,
-		)
-		.reduce((sum, transaction) => sum + transaction.realized, 0);
-}
-
-/**
- * Canonical unfulfilled amounts inside (after, through], scoped to the
- * spendable accounts and bills window. The backend owns reportability and
- * destination-limit classification, just as for transaction fulfillment.
- */
-export function checkingShortfall({
-	transactions,
-	checkingIds,
-	after,
-	through,
-}: {
-	transactions: TransactionResult[];
-	checkingIds: string[];
-	after: string;
-	through: string;
-}): { total: number; firstDate: string | null } {
-	const start = after.slice(0, 10);
-	const end = through.slice(0, 10);
-	if (end <= start) return { total: 0, firstDate: null };
-	const sources = new Set(checkingIds);
-	let total = 0;
-	let firstDate: string | null = null;
-	for (const transaction of transactions) {
-		if (transaction.fromId === null || !sources.has(transaction.fromId))
-			continue;
-		if (transaction.date <= start || transaction.date > end) continue;
-		const gap = transaction.fulfillment?.unfulfilledAmount ?? 0;
-		if (gap <= 0) continue;
-		total += gap;
-		if (firstDate === null || transaction.date < firstDate) {
-			firstDate = transaction.date;
-		}
-	}
-	return { total: Math.round(total * 100) / 100, firstDate };
 }
 
 /**

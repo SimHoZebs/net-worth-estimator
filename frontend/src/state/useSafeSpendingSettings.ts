@@ -15,6 +15,7 @@ import {
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
+import { userResourceKey } from "@/state/workspaceResources.ts";
 
 // Query caches server-owned safe-spending settings. Settings stay outside
 // the base projection identity, so edits do not rerun the base simulation.
@@ -171,6 +172,9 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 						),
 					);
 				dismissKey("safe-spending-settings");
+				void cache.invalidateQueries({
+					queryKey: userResourceKey("safe-spending-summary", scope),
+				});
 			},
 			onError: (error) => {
 				if (scope !== getUserScope()) return;

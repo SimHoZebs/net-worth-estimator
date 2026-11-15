@@ -382,6 +382,7 @@ func main() {
 	defer stopCategories()
 
 	mux := http.NewServeMux()
+	mux.Handle(cashObservationsPath, cashObservationsHandler(database, &mu))
 	// Sharing seed provisions a fresh second user, a group with the fixture
 	// user as a member, and group-granted transactions for shared-feed browser
 	// tests. Every call mints a new owner, so seeds never collide with state

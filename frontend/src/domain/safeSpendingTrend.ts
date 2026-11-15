@@ -17,8 +17,8 @@ export interface SafeSpendingThresholdHit {
 export interface SafeSpendingTrend {
 	actual: SafeSpendingTrendPoint[];
 	projected: SafeSpendingTrendPoint[];
-	limit: number;
-	safetyNet: number;
+	limit: number | null;
+	safetyNet: number | null;
 	averageDaily: number;
 	limitHit: SafeSpendingThresholdHit | null;
 	safetyNetHit: SafeSpendingThresholdHit | null;
@@ -28,9 +28,9 @@ const roundCents = (value: number) => Math.round(value * 100) / 100;
 
 function firstHit(
 	points: readonly SafeSpendingTrendPoint[],
-	threshold: number,
+	threshold: number | null,
 ): SafeSpendingThresholdHit | null {
-	if (!Number.isFinite(threshold)) return null;
+	if (threshold === null || !Number.isFinite(threshold)) return null;
 	for (const point of points) {
 		// A negative threshold is already exceeded at zero spending. The
 		// first real charge is the first row a divider can follow.
@@ -65,8 +65,8 @@ export function safeSpendingTrend({
 	cycleStart: string;
 	cycleEnd: string;
 	todayIso: string;
-	limit: number;
-	safetyNet: number;
+	limit: number | null;
+	safetyNet: number | null;
 }): SafeSpendingTrend {
 	const start = cycleStart.slice(0, 10);
 	const end = cycleEnd.slice(0, 10);
