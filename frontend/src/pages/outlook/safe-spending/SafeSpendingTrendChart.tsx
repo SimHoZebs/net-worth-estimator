@@ -407,6 +407,32 @@ export function SafeSpendingTrendChart({
 				height={190}
 			/>
 			{incomeValue}
+			{!historical && !earned && (
+				<p className="m-0 text-xs text-muted-foreground">
+					Monthly income unavailable. Check recurring income sources in
+					Configure.
+				</p>
+			)}
+			{earned?.amount === 0 && (
+				<p className="m-0 text-xs text-muted-foreground">
+					No received payments linked this month.
+				</p>
+			)}
+			{earned?.coordinate !== null &&
+				earned?.coordinate !== undefined &&
+				Math.abs(earned.coordinate - earned.amount) >= 0.005 && (
+					<p
+						className="m-0 text-xs text-muted-foreground"
+						data-testid="monthly-income-offset"
+					>
+						Income line at {exactMoney(earned.coordinate)}:{" "}
+						{exactMoney(earned.amount)} received this month{" "}
+						{actual[0] && actual[0].date < earned.start
+							? `+ ${exactMoney(earned.coordinate - earned.amount)} net spent before ${monthDay(earned.start)}`
+							: `− ${exactMoney(earned.amount - earned.coordinate)} net spent before this cycle`}
+						.
+					</p>
+				)}
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
 			<ul
 				className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted-foreground"

@@ -80,7 +80,9 @@ export function sanitizeSafeSpendingSettings(
 		),
 		accountIds: stringIds(record.accountIds),
 		spendingAccountIds: stringIds(record.spendingAccountIds),
-		incomeAccountIds: stringIds(record.incomeAccountIds),
+		incomeAccountIds: Array.isArray(record.incomeAccountIds)
+			? (stringIds(record.incomeAccountIds) ?? [])
+			: null,
 		incomeScheduleIds: [...new Set(stringIds(record.incomeScheduleIds) ?? [])],
 		transactionIds: stringIds(record.transactionIds),
 	};

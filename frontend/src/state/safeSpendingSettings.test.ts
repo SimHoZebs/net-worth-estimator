@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { resolveEffectiveIds } from "./useSafeSpendingSettings.ts";
+import {
+	resolveEffectiveIds,
+	sanitizeSafeSpendingSettings,
+} from "./useSafeSpendingSettings.ts";
+
+describe("explicit income-account selection", () => {
+	it("preserves explicit none separately from the initial automatic selection", () => {
+		expect(
+			sanitizeSafeSpendingSettings({ incomeAccountIds: [] }).incomeAccountIds,
+		).toEqual([]);
+		expect(
+			sanitizeSafeSpendingSettings({ incomeAccountIds: null }).incomeAccountIds,
+		).toBeNull();
+		expect(
+			sanitizeSafeSpendingSettings({ incomeAccountIds: ["cash"] })
+				.incomeAccountIds,
+		).toEqual(["cash"]);
+	});
+});
 
 describe("resolveEffectiveIds", () => {
 	it("returns every known id when nothing is stored", () => {

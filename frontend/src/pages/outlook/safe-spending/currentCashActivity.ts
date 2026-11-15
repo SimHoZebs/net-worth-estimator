@@ -4,23 +4,29 @@ import {
 } from "@/domain/accountActivity.ts";
 import type { Account, Transaction } from "@/domain/model.ts";
 import { transactionCategoryLabels } from "@/domain/categories.ts";
+import { incomeSourceCandidates } from "@/domain/safeSpendingIncome.ts";
 
-/** Routing excludes internal movements. The server's accepted category separates
- * received income from refunds; unclassified incoming evidence stays unknown. */
+/** Only explicit occurrence claims to selected recurring sources establish
+ * received income. Categories and projected occurrences are not receipt evidence. */
 export function receivedMonthlyIncome({
 	accounts,
 	transactions,
-	spendingIds,
+	rules,
+	incomeAccountIds,
+	incomeScheduleIds,
 	today,
 }: {
 	accounts: Account[];
 	transactions: Transaction[];
-	spendingIds: string[];
+	rules: Transaction[];
+	incomeAccountIds: string[];
+	incomeScheduleIds: string[];
 	today: string;
 }): number | null {
 	if (
-		!spendingIds.length ||
-		spendingIds.some(
+		!incomeScheduleIds.length ||
+		!incomeAccountIds.length ||
+		incomeAccountIds.some(
 			(id) =>
 				!accounts.some(
 					(account) =>
@@ -29,10 +35,21 @@ export function receivedMonthlyIncome({
 		)
 	)
 		return null;
+	const eligible = new Set(
+		incomeSourceCandidates({
+			accounts,
+			rules,
+			incomeAccountIds,
+			incomeScheduleIds,
+			today,
+		}).map((rule) => rule.id),
+	);
+	if (incomeScheduleIds.some((id) => !eligible.has(id))) return null;
+	const selected = new Set(incomeScheduleIds);
 	const saved = new Map(transactions.map((row) => [row.id, row]));
 	const seen = new Set<string>();
 	let cents = 0;
-	for (const id of spendingIds) {
+	for (const id of new Set(incomeAccountIds)) {
 		for (const row of accountTransactions({
 			accountId: id,
 			accounts,
@@ -51,16 +68,13 @@ export function receivedMonthlyIncome({
 			)
 				continue;
 			const original = saved.get(row.transactionId);
-			if (!original?.enabled) continue;
-			if (original.category !== "INCOME") {
-				if (
-					row.direction === "in" &&
-					(!original.category ||
-						!Object.hasOwn(transactionCategoryLabels, original.category))
-				)
-					return null;
+			if (
+				!original?.enabled ||
+				!original.claimScheduleId ||
+				!selected.has(original.claimScheduleId)
+			)
 				continue;
-			}
+			if (original.fromId !== null && original.toId !== null) continue;
 			if (!original.amountKnown || !Number.isFinite(row.amount)) return null;
 			seen.add(row.transactionId);
 			cents +=

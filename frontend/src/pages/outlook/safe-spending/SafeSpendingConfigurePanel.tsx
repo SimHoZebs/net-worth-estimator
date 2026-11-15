@@ -3,7 +3,7 @@ import { AccountToggle } from "../../../components/AccountToggle.tsx";
 import { Field, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import type { Account } from "../../../domain/model.ts";
+import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
 import { clampStatementDay } from "../../../state/useSafeSpendingSettings.ts";
 import type {
@@ -18,6 +18,12 @@ export function SafeSpendingConfigurePanel({
 	billCandidates,
 	trackedBillIds,
 	accounts,
+	incomeAccounts,
+	incomeAccountIds,
+	incomeCandidates,
+	incomeScheduleIds,
+	onToggleIncomeAccount,
+	onToggleIncomeSource,
 	onToggleBill,
 	onToggleAccount,
 	onToggleSpendingAccount,
@@ -27,6 +33,12 @@ export function SafeSpendingConfigurePanel({
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Account[];
+	incomeAccounts: Account[];
+	incomeAccountIds: string[];
+	incomeCandidates: Transaction[];
+	incomeScheduleIds: string[];
+	onToggleIncomeAccount: (id: string) => void;
+	onToggleIncomeSource: (id: string) => void;
 	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
@@ -106,6 +118,67 @@ export function SafeSpendingConfigurePanel({
 						);
 					})}
 				</div>
+			</FieldSet>
+			<FieldSet>
+				<FieldLegend variant="label">Income accounts</FieldLegend>
+				<div className="flex flex-wrap gap-2">
+					{incomeAccounts.map((account) => (
+						<AccountToggle
+							key={account.id}
+							account={account}
+							checked={incomeAccountIds.includes(account.id)}
+							onToggle={() => onToggleIncomeAccount(account.id)}
+						/>
+					))}
+					{incomeAccountIds
+						.filter(
+							(id) => !incomeAccounts.some((account) => account.id === id),
+						)
+						.map((id) => (
+							<TogglePill
+								key={id}
+								name={`Unavailable account (${id})`}
+								detail="Remove selection"
+								checked
+								onToggle={() => onToggleIncomeAccount(id)}
+							/>
+						))}
+				</div>
+			</FieldSet>
+			<FieldSet>
+				<FieldLegend variant="label">Recurring income sources</FieldLegend>
+				<div className="flex flex-wrap gap-2">
+					{incomeCandidates.map((source) => (
+						<TogglePill
+							key={source.id}
+							name={source.name}
+							detail={formatRuleDetail({ amount: source.amount })}
+							checked={incomeScheduleIds.includes(source.id)}
+							onToggle={() => onToggleIncomeSource(source.id)}
+						/>
+					))}
+					{incomeScheduleIds
+						.filter(
+							(id) => !incomeCandidates.some((source) => source.id === id),
+						)
+						.map((id) => (
+							<TogglePill
+								key={id}
+								name={`Unavailable source (${id})`}
+								detail="Remove selection"
+								checked
+								onToggle={() => onToggleIncomeSource(id)}
+							/>
+						))}
+				</div>
+				<p className="text-sm leading-relaxed text-muted-foreground">
+					Only received payments linked to selected sources count.
+				</p>
+				{!incomeScheduleIds.length && (
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						Select a recurring income source.
+					</p>
+				)}
 			</FieldSet>
 			<FieldSet>
 				<FieldLegend variant="label">Included bills</FieldLegend>

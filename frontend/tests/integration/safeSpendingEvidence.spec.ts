@@ -88,10 +88,17 @@ async function seedEvidence(
 		schedule("evidence-future-c", "Synthetic later bill C", 91.08, 27),
 		{
 			...schedule("evidence-salary", "Synthetic future salary", 7458.34, 30),
+			...(crossing ? { startDate: "2026-10-08" } : {}),
 			sourceAccountId: null,
 			destinations: [checkingId],
 		},
 	];
+	if (crossing)
+		schedules.push({
+			...schedule("evidence-other-income", "Synthetic other income", 999, 30),
+			sourceAccountId: null,
+			destinations: [checkingId],
+		});
 	const transactions: Record<string, unknown>[] = [
 		{
 			id: "01900000-0000-7000-8000-00000000e003",
@@ -130,11 +137,22 @@ async function seedEvidence(
 	];
 	if (crossing) {
 		transactions.push({
+			id: "01900000-0000-7000-8000-00000000e008",
+			name: "Synthetic unlinked income category",
+			sourceAccountId: null,
+			destinations: [checkingId],
+			amount: amount(32.11),
+			transactionTime: Date.parse("2026-11-08T13:00:00Z") / 1000,
+			postedTime: Date.parse("2026-11-08T13:00:00Z") / 1000,
+			enabled: true,
+		});
+		transactions.push({
 			id: "01900000-0000-7000-8000-00000000e007",
 			name: "Synthetic received income",
 			sourceAccountId: null,
 			destinations: [checkingId],
 			amount: amount(150),
+			claim: { scheduleId: "evidence-salary", occurrenceDate: "2026-11-08" },
 			transactionTime: Date.parse("2026-11-08T12:00:00Z") / 1000,
 			postedTime: Date.parse("2026-11-08T12:00:00Z") / 1000,
 			enabled: true,
@@ -188,6 +206,11 @@ async function seedEvidence(
 			{ data: { category: "INCOME" } },
 		);
 		expect(categorized.ok(), await categorized.text()).toBe(true);
+		const unlinkedCategory = await api.post(
+			`${FIXTURE_API}/v1/transactions/01900000-0000-7000-8000-00000000e008/categorize`,
+			{ data: { category: "INCOME" } },
+		);
+		expect(unlinkedCategory.ok(), await unlinkedCategory.text()).toBe(true);
 	}
 	const heldPayment = baseline.transactions.find(
 		(row: { name: string }) => row.name === "Synthetic held payment",
@@ -586,10 +609,10 @@ test("current cash budget and exact crossing survive inline history, sorting and
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		await expect(
 			drawer.getByText("Income accounts", { exact: true }),
-		).toHaveCount(0);
+		).toBeVisible();
 		await expect(
-			drawer.getByText("Income sources", { exact: true }),
-		).toHaveCount(0);
+			drawer.getByText("Recurring income sources", { exact: true }),
+		).toBeVisible();
 		await page.keyboard.press("Escape");
 		await page.route("**/v1/safe-spending-summary?**", async (route) => {
 			const response = await route.fetch();
@@ -612,6 +635,109 @@ test("current cash budget and exact crossing survive inline history, sorting and
 		await expect(drawer.locator("[data-spending-divider]")).toContainText(
 			"Income this month",
 		);
+	} finally {
+		await api.dispose();
+	}
+});
+
+test("Configure preserves explicit recurring sources and counts only their linked receipts after reload", async ({
+	page,
+}) => {
+	const api = await request.newContext();
+	try {
+		await seedEvidence(api, false, true);
+		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
+		await page.goto("/outlook");
+		const card = page.getByRole("region", {
+			name: "Safe spending",
+			exact: true,
+		});
+		const drawer = page.getByRole("dialog", {
+			name: "Safe spending",
+			exact: true,
+		});
+		await expect(card.getByTestId("monthly-income-value")).toHaveText(
+			"$150.00",
+		);
+		const cashBefore = await card.getByTestId("left-value").textContent();
+		await card.getByRole("button", { name: "Configure", exact: true }).click();
+		const payroll = drawer.getByRole("button", {
+			name: /Synthetic future salary/,
+		});
+		const other = drawer.getByRole("button", {
+			name: /Synthetic other income/,
+		});
+		await expect(payroll).toHaveAttribute("aria-pressed", "true");
+		await expect(other).toHaveAttribute("aria-pressed", "false");
+		const toggle = async (button: typeof payroll) => {
+			const saved = page.waitForResponse(
+				(response) =>
+					response.url().includes("/v1/safe-spending-settings") &&
+					response.request().method() === "PUT",
+			);
+			await button.click();
+			expect((await saved).ok()).toBe(true);
+		};
+		await toggle(payroll);
+		await page.keyboard.press("Escape");
+		await expect(card.getByTestId("monthly-income-value")).toHaveCount(0);
+		await expect(
+			card.getByText(
+				"Monthly income unavailable. Check recurring income sources in Configure.",
+			),
+		).toBeVisible();
+		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
+		await card.getByRole("button", { name: "Configure", exact: true }).click();
+		await toggle(other);
+		await page.keyboard.press("Escape");
+		await page.reload();
+		await expect(card.getByTestId("monthly-income-value")).toHaveText("$0.00");
+		await expect(
+			card.getByText("No received payments linked this month."),
+		).toBeVisible();
+		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
+		await card.getByRole("button", { name: "Configure", exact: true }).click();
+		await expect(payroll).toHaveAttribute("aria-pressed", "false");
+		await expect(other).toHaveAttribute("aria-pressed", "true");
+		await toggle(payroll);
+		await page.keyboard.press("Escape");
+		await page.reload();
+		await expect(card.getByTestId("monthly-income-value")).toHaveText(
+			"$150.00",
+		);
+		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
+		const settings = await api.get(`${FIXTURE_API}/v1/safe-spending-settings`);
+		expect(await settings.json()).toMatchObject({
+			settings: {
+				incomeAccountIds: ["evidence-checking"],
+				incomeScheduleIds: ["evidence-other-income", "evidence-salary"],
+			},
+		});
+		await card.getByRole("button", { name: "Configure", exact: true }).click();
+		const incomeAccount = drawer
+			.getByRole("group", { name: "Income accounts", exact: true })
+			.getByRole("button", { name: "Synthetic checking cash", exact: true });
+		await expect(incomeAccount).toHaveAttribute("aria-pressed", "true");
+		await toggle(incomeAccount);
+		await expect(incomeAccount).toHaveAttribute("aria-pressed", "false");
+		await page.keyboard.press("Escape");
+		await page.reload();
+		await expect(card.getByTestId("monthly-income-value")).toHaveCount(0);
+		await expect(
+			card.getByText(
+				"Monthly income unavailable. Check recurring income sources in Configure.",
+			),
+		).toBeVisible();
+		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
+		await card.getByRole("button", { name: "Configure", exact: true }).click();
+		await expect(incomeAccount).toHaveAttribute("aria-pressed", "false");
+		const cleared = await api.get(`${FIXTURE_API}/v1/safe-spending-settings`);
+		expect(await cleared.json()).toMatchObject({
+			settings: {
+				incomeAccountIds: [],
+				incomeScheduleIds: ["evidence-other-income", "evidence-salary"],
+			},
+		});
 	} finally {
 		await api.dispose();
 	}

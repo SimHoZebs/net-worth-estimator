@@ -13,6 +13,7 @@ import {
 import { transactionToDisplay } from "@/domain/transactionRows.ts";
 import { TransactionSectionView } from "./TransactionSectionView.tsx";
 import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
+import { incomeSourceCandidates } from "@/domain/safeSpendingIncome.ts";
 import {
 	paceLabel,
 	SafeSpendingTrendChart,
@@ -401,6 +402,28 @@ describe("monthly income comparison", () => {
 		expect(cashOnly.trend.limit).not.toBeNull();
 		expect(cashOnly.trend.monthlyIncome).toBeUndefined();
 	});
+	it("explains the income line's cycle offset without presenting it as received income", () => {
+		const result = cycleView({
+			...input,
+			cycle: { start: "2026-10-20", end: "2026-11-19" },
+			monthlyIncome: 32.11,
+			transactions: [
+				{ ...charge("october", 4552.47, "09:00:00"), date: "2026-10-25" },
+				charge("november", 4734.37, "10:00:00"),
+			],
+		});
+		expect(result.trend.monthlyIncome).toMatchObject({
+			amount: 32.11,
+			coordinate: 4584.58,
+		});
+		const markup = renderToStaticMarkup(
+			createElement(SafeSpendingTrendChart, { trend: result.trend }),
+		);
+		expect(markup).toContain('data-testid="monthly-income-offset"');
+		expect(markup).toContain(
+			"Income line at $4,584.58: $32.11 received this month + $4,552.47 net spent before Nov 1.",
+		);
+	});
 	it("warns about monthly overspending with savings left, or low cash with sufficient income", () => {
 		const savings = cycleView({
 			...input,
@@ -512,27 +535,82 @@ describe("canonical recorded cash selection", () => {
 			...overrides,
 		};
 	}
-	it("uses posted external income only, independent of checkpoint and future schedules", () => {
+	const incomeSelection = {
+		rules: [cash("payroll", { kind: "schedule", fromId: null, toId: "cash" })],
+		incomeAccountIds: ["cash"],
+		incomeScheduleIds: ["payroll"],
+	};
+	it("keeps the established independent income-account candidate scope, including future starts", () => {
+		const accounts = [
+			account,
+			{ ...account, id: "savings" },
+			{ ...account, id: "disabled", enabled: false },
+		];
+		const rule = cash("salary", {
+			kind: "schedule",
+			fromId: null,
+			toId: "savings",
+		});
+		const rules = [
+			rule,
+			{ ...rule, id: "future-start", startDate: "2026-12-01" },
+			{ ...rule, id: "ended", endDate: "2026-10-31" },
+			{ ...rule, id: "disabled", enabled: false },
+			{ ...rule, id: "wrong-destination", toId: "cash" },
+			{ ...rule, id: "internal", fromId: "savings" },
+			{ ...rule, id: "invalid-source", fromId: "disabled" },
+		];
+		expect(
+			incomeSourceCandidates({
+				accounts,
+				rules,
+				incomeAccountIds: ["savings"],
+				today: input.referenceDay,
+			}).map((item) => item.id),
+		).toEqual(["salary", "future-start"]);
+		expect(
+			receivedMonthlyIncome({
+				accounts,
+				rules,
+				incomeAccountIds: ["savings"],
+				incomeScheduleIds: ["salary"],
+				today: input.referenceDay,
+				transactions: [
+					cash("savings-receipt", {
+						fromId: null,
+						toId: "savings",
+						claimScheduleId: "salary",
+						amount: 200,
+					}),
+				],
+			}),
+		).toBe(200);
+	});
+	it("uses selected claimed posted receipts only, independent of categories and forecasts", () => {
 		const evidence = {
+			...incomeSelection,
 			accounts: [account],
-			spendingIds: ["cash", "cash"],
+			incomeAccountIds: ["cash", "cash"],
 			today: input.referenceDay,
 			transactions: [
 				cash("income", {
 					fromId: null,
 					toId: "cash",
 					amount: 500,
-					category: "INCOME",
+					claimScheduleId: "payroll",
+					category: "GENERAL_MERCHANDISE",
 					categorySource: "user",
 					startDate: "2026-11-14",
 				}),
 				cash("future", {
+					claimScheduleId: "payroll",
 					fromId: null,
 					toId: "cash",
 					amount: 9000,
 					startDate: "2026-11-16",
 				}),
 				cash("pending", {
+					claimScheduleId: "payroll",
 					fromId: null,
 					toId: "cash",
 					pending: true,
@@ -559,6 +637,7 @@ describe("canonical recorded cash selection", () => {
 					category: "INCOME",
 				}),
 				cash("old-month", {
+					claimScheduleId: "payroll",
 					fromId: null,
 					toId: "cash",
 					startDate: "2026-10-31",
@@ -567,18 +646,27 @@ describe("canonical recorded cash selection", () => {
 		};
 		expect(receivedMonthlyIncome(evidence)).toBe(500);
 		expect(receivedMonthlyIncome({ ...evidence, transactions: [] })).toBe(0);
-		expect(receivedMonthlyIncome({ ...evidence, spendingIds: [] })).toBeNull();
+		expect(
+			receivedMonthlyIncome({ ...evidence, incomeAccountIds: [] }),
+		).toBeNull();
+		expect(
+			receivedMonthlyIncome({ ...evidence, incomeScheduleIds: [] }),
+		).toBeNull();
+		expect(
+			receivedMonthlyIncome({ ...evidence, incomeScheduleIds: ["missing"] }),
+		).toBeNull();
 		expect(
 			receivedMonthlyIncome({
 				...evidence,
 				transactions: [cash("unclassified", { fromId: null, toId: "cash" })],
 			}),
-		).toBeNull();
+		).toBe(0);
 		expect(
 			receivedMonthlyIncome({
 				...evidence,
 				transactions: [
 					cash("unknown", {
+						claimScheduleId: "payroll",
 						fromId: null,
 						toId: "cash",
 						amountKnown: false,
@@ -588,9 +676,97 @@ describe("canonical recorded cash selection", () => {
 			}),
 		).toBeNull();
 	});
+	it("requires selection and canonical claim, deduplicates receipts, and uses the actual payment month", () => {
+		const receipt = cash("received", {
+			fromId: null,
+			toId: "cash",
+			amount: 300,
+			claimScheduleId: "payroll",
+			claimOccurrenceDate: "2026-10-31",
+			startDate: "2026-11-01",
+		});
+		const evidence = {
+			...incomeSelection,
+			accounts: [account],
+			today: input.referenceDay,
+			transactions: [receipt],
+		};
+		expect(receivedMonthlyIncome(evidence)).toBe(300);
+		expect(
+			receivedMonthlyIncome({ ...evidence, transactions: [receipt, receipt] }),
+		).toBe(300);
+		for (const override of [
+			{ claimScheduleId: null, category: "INCOME", amount: 32.11 },
+			{ claimScheduleId: "other", category: "INCOME" },
+			{ pending: true },
+			{ void: true },
+			{ enabled: false },
+			{ kind: "schedule" as const },
+			{ fromId: "other-account" },
+			{ startDate: "2026-10-31" },
+			{ startDate: "2026-11-16" },
+		])
+			expect(
+				receivedMonthlyIncome({
+					...evidence,
+					transactions: [{ ...receipt, ...override }],
+				}),
+			).toBe(0);
+		expect(
+			receivedMonthlyIncome({
+				...evidence,
+				transactions: [{ ...receipt, amountKnown: false }],
+			}),
+		).toBeNull();
+		expect(
+			receivedMonthlyIncome({ ...evidence, incomeAccountIds: ["missing"] }),
+		).toBeNull();
+		expect(
+			receivedMonthlyIncome({
+				...evidence,
+				rules: [{ ...incomeSelection.rules[0]!, enabled: false }],
+			}),
+		).toBe(300);
+		expect(
+			receivedMonthlyIncome({
+				...evidence,
+				incomeScheduleIds: ["other"],
+				rules: [
+					cash("other", { kind: "schedule", fromId: null, toId: "cash" }),
+				],
+			}),
+		).toBe(0);
+	});
+	it.each([{ endDate: "2026-11-10" }, { enabled: false }])(
+		"preserves received facts and known zero when a selected source stops recurrence: %j",
+		(ruleState) => {
+			const rules = [{ ...incomeSelection.rules[0]!, ...ruleState }];
+			const evidence = {
+				...incomeSelection,
+				accounts: [account],
+				rules,
+				today: "2026-11-15",
+				transactions: [
+					cash("received-before-end", {
+						fromId: null,
+						toId: "cash",
+						claimScheduleId: "payroll",
+						startDate: "2026-11-05",
+						amount: 100,
+					}),
+				],
+			};
+			expect(receivedMonthlyIncome(evidence)).toBe(100);
+			expect(receivedMonthlyIncome({ ...evidence, transactions: [] })).toBe(0);
+			expect(
+				incomeSourceCandidates(evidence).map((source) => source.id),
+			).toEqual(["payroll"]);
+		},
+	);
 	it("subtracts categorized refunds once without turning them into income or changing cash", () => {
 		const transactions = [
 			cash("income", {
+				claimScheduleId: "payroll",
 				fromId: null,
 				toId: "cash",
 				amount: 50,
@@ -627,9 +803,9 @@ describe("canonical recorded cash selection", () => {
 			...input,
 			transactions: rows,
 			monthlyIncome: receivedMonthlyIncome({
+				...incomeSelection,
 				accounts: [account],
 				transactions,
-				spendingIds: ["cash"],
 				today: input.referenceDay,
 			}),
 		});
@@ -672,10 +848,11 @@ describe("canonical recorded cash selection", () => {
 		[100, 80],
 		[10, -10],
 	])(
-		"nets categorized income reversals from a %s deposit without counting spending",
+		"nets explicitly claimed income reversals from a %s deposit without counting spending",
 		(deposit, expected) => {
 			const transactions = [
 				cash("deposit", {
+					claimScheduleId: "payroll",
 					fromId: null,
 					toId: "cash",
 					amount: deposit,
@@ -683,15 +860,16 @@ describe("canonical recorded cash selection", () => {
 					categorySource: "user",
 				}),
 				cash("clawback", {
+					claimScheduleId: "payroll",
 					amount: 20,
 					category: "INCOME",
 					categorySource: "bank",
 				}),
 			];
 			const income = receivedMonthlyIncome({
+				...incomeSelection,
 				accounts: [account],
 				transactions,
-				spendingIds: ["cash"],
 				today: input.referenceDay,
 			});
 			expect(income).toBe(expected);
@@ -726,6 +904,7 @@ describe("canonical recorded cash selection", () => {
 		(kind) => {
 			const transactions = [
 				cash("income", {
+					claimScheduleId: "payroll",
 					fromId: null,
 					toId: "cash",
 					amount: 100,
@@ -756,9 +935,9 @@ describe("canonical recorded cash selection", () => {
 				transactions: rows,
 				cashSummary: { ...summary, cashAfterBills: 183.42 },
 				monthlyIncome: receivedMonthlyIncome({
+					...incomeSelection,
 					accounts: [account],
 					transactions,
-					spendingIds: ["cash"],
 					today: input.referenceDay,
 				}),
 			});

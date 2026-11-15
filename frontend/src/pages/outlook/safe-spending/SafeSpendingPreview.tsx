@@ -70,6 +70,7 @@ import { useOutlookProjection } from "@/pages/outlook/useOutlookProjection.ts";
 import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
 import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
+import { incomeSourceCandidates } from "@/domain/safeSpendingIncome.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -200,6 +201,24 @@ export function SafeSpendingPreview({
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
 	}, [settings.spendingAccountIds, spendableAccounts, accounts]);
+	// Income scope is independent of cash/spending scope. A saved missing ID
+	// remains explicit and unavailable rather than silently choosing a replacement.
+	const incomeIds = useMemo(() => {
+		if (settings.incomeAccountIds !== null) return settings.incomeAccountIds;
+		const fallback = checkingAccountId(accounts ?? []);
+		return fallback ? [fallback] : [];
+	}, [settings.incomeAccountIds, accounts]);
+	const incomeCandidates = useMemo(
+		() =>
+			incomeSourceCandidates({
+				accounts: accounts ?? [],
+				rules,
+				incomeAccountIds: incomeIds,
+				incomeScheduleIds: settings.incomeScheduleIds,
+				today: displayToday,
+			}),
+		[accounts, rules, incomeIds, settings.incomeScheduleIds, displayToday],
+	);
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return rules
@@ -341,7 +360,9 @@ export function SafeSpendingPreview({
 				monthlyIncome: receivedMonthlyIncome({
 					accounts: accounts ?? [],
 					transactions: transactions ?? [],
-					spendingIds,
+					rules,
+					incomeAccountIds: incomeIds,
+					incomeScheduleIds: settings.incomeScheduleIds,
 					today: displayToday,
 				}),
 				cashSummary: currentCashSummary.data,
@@ -358,7 +379,9 @@ export function SafeSpendingPreview({
 			currentSpendingTransactions,
 			accounts,
 			transactions,
-			spendingIds,
+			rules,
+			incomeIds,
+			settings.incomeScheduleIds,
 			currentCashSummary.data,
 			currentCardByCard,
 			settings.reserve,
@@ -489,6 +512,18 @@ export function SafeSpendingPreview({
 			: [...explicit, accountId];
 		updateSettings({ spendingAccountIds: next.length ? next : null });
 	};
+	const toggleIncomeAccount = (id: string) =>
+		updateSettings({
+			incomeAccountIds: incomeIds.includes(id)
+				? incomeIds.filter((item) => item !== id)
+				: [...incomeIds, id],
+		});
+	const toggleIncomeSource = (id: string) =>
+		updateSettings({
+			incomeScheduleIds: settings.incomeScheduleIds.includes(id)
+				? settings.incomeScheduleIds.filter((item) => item !== id)
+				: [...settings.incomeScheduleIds, id],
+		});
 
 	// Saved-data frame (header, cycle dates) renders regardless; only the
 	// computed safe spending body skeletonizes while rows, settings, or the
@@ -675,6 +710,12 @@ export function SafeSpendingPreview({
 							billCandidates={billCandidates}
 							trackedBillIds={trackedBillIds}
 							accounts={accounts ?? []}
+							incomeAccounts={spendableAccounts}
+							incomeAccountIds={incomeIds}
+							incomeCandidates={incomeCandidates}
+							incomeScheduleIds={settings.incomeScheduleIds}
+							onToggleIncomeAccount={toggleIncomeAccount}
+							onToggleIncomeSource={toggleIncomeSource}
 							onToggleBill={toggleBill}
 							onToggleAccount={toggleAccount}
 							onToggleSpendingAccount={toggleSpendingAccount}
