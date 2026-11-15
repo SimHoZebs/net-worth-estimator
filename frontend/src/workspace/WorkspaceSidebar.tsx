@@ -37,6 +37,8 @@ function WorkspaceNavLink({
 	return (
 		<SidebarMenuButton
 			isActive={active}
+			size="lg"
+			className="min-h-12 h-auto text-base [&>svg]:size-5"
 			onClick={(event) => {
 				// Plain clicks close the mobile sheet; modifier and middle
 				// clicks keep the native new-tab behavior.
