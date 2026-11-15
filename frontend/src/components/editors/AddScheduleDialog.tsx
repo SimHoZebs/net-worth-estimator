@@ -362,14 +362,14 @@ export function AddScheduleDialog({
 								onChange={(event) => setAnnualCap(event.target.value)}
 								placeholder="No cap"
 								aria-describedby={annualCapHintId}
-								hint="Caps this schedule only. It does not enforce a shared contribution limit."
+								hint="Schedule-only cap, not a shared contribution limit."
 								hintId={annualCapHintId}
 								disabled={saving}
 							/>
 							<EditorField
 								label="Execution priority"
 								htmlFor={priorityId}
-								hint="Lower numbers run first on shared dates. Automatic runs after the selected source, or appends after existing schedules."
+								hint="Lower numbers run first on the same date. Automatic runs after the selected source, otherwise after existing schedules."
 								hintId={priorityHintId}
 							>
 								<Input

@@ -316,7 +316,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					</p>
 				) : accounts.length === 0 ? (
 					<p className="m-0 text-sm text-muted-foreground">
-						No accounts yet. Add an account before sharing.
+						Add an account to start sharing.
 					</p>
 				) : (
 					<div className="flex flex-wrap gap-2">
@@ -361,7 +361,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				</Field>
 				<Field>
 					<FieldLabel htmlFor={shareUntilId}>
-						Share until (leave empty for no end)
+						Share until (empty for no end)
 					</FieldLabel>
 					<Input
 						id={shareUntilId}
@@ -379,10 +379,9 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				<Alert role="note">
 					<AlertDescription>
 						<p className="m-0 text-foreground">
-							<strong>Before you turn this on.</strong> Sharing covers matching
-							transactions already inside these dates, and later bank imports
-							can add older matching transactions on their own. There is no
-							second review step for those.
+							<strong>Before sharing.</strong> Matching transactions within
+							these dates are shared automatically, including older transactions
+							from later bank imports. No second review step.
 						</p>
 						{previewQuery.isPending ? (
 							<p className="m-0 text-muted-foreground" role="status">
@@ -410,9 +409,9 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 										? ` to ${preview.endDate}`
 										: " with no end"}{" "}
 									match this selection for {preview.memberCount}{" "}
-									{preview.memberCount === 1 ? "member" : "members"}.
-									Transactions hidden individually still count here but stay
-									hidden. Only counts are shown here, never amounts or payees.
+									{preview.memberCount === 1 ? "member" : "members"}. Hidden
+									transactions count but stay hidden. Counts only; no amounts or
+									payees.
 								</p>
 							)
 						)}
@@ -460,7 +459,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 			{dirty && !policy?.enabled && (
 				<p className="m-0 text-sm text-muted-foreground">
-					Unsaved changes. They take effect when you turn sharing on.
+					Unsaved changes take effect when sharing turns on.
 				</p>
 			)}
 			{policy?.enabled && dirty && (
@@ -480,9 +479,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			)}
 
 			<p className="m-0 text-sm text-muted-foreground">
-				Single transactions can be shared with, or hidden from, a group from
-				their detail view, with or without automatic sharing. Copies a member
-				already accepted stay with them.
+				Share or hide individual transactions in their detail view, regardless
+				of automatic sharing. Members keep copies they already accepted.
 			</p>
 		</section>
 	);

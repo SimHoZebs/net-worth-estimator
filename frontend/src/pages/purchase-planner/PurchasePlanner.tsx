@@ -102,9 +102,9 @@ export function PurchasePlanner({
 						<EmptyMedia variant="icon">
 							<ShoppingBag aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>What would you like to make room for?</EmptyTitle>
+						<EmptyTitle>No planned purchases</EmptyTitle>
 						<EmptyDescription>
-							Add a purchase to discover its earliest financially safe date.
+							Add a purchase to find its earliest financially safe date.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>

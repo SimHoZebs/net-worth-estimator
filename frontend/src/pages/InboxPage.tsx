@@ -75,11 +75,11 @@ const emptyCopy: Record<InboxStatus, { title: string; description: string }> = {
 	pending: {
 		title: "Nothing waiting",
 		description:
-			"Transactions people share with you land here, along with split requests once sending arrives.",
+			"Shared transactions appear here; split requests are coming later.",
 	},
 	accepted: {
 		title: "Nothing accepted yet",
-		description: "Accepted shares keep their own copy in your records.",
+		description: "Accepted shares are saved as independent copies.",
 	},
 	declined: {
 		title: "Nothing declined",
@@ -88,7 +88,7 @@ const emptyCopy: Record<InboxStatus, { title: string; description: string }> = {
 	},
 	canceled: {
 		title: "Nothing taken back",
-		description: "Shares the sender takes back before you decide land here.",
+		description: "Shares withdrawn before your decision appear here.",
 	},
 };
 
@@ -156,13 +156,13 @@ function InboxItemCard({
 				) : (
 					<p className="m-0 text-sm text-muted-foreground">
 						{item.status === "canceled"
-							? "This share was taken back before you decided."
-							: "This share is no longer available to view."}
+							? "Share taken back before your decision."
+							: "Share no longer available."}
 					</p>
 				)}
 				{item.status === "accepted" && item.copyTransactionId && (
 					<p className="m-0 text-sm text-muted-foreground">
-						Saved to your own records as an independent copy.
+						Independent copy saved in your records.
 					</p>
 				)}
 			</CardContent>
@@ -311,8 +311,7 @@ export function InboxPage() {
 			<div>
 				<h2 className="m-0 text-xl">Inbox</h2>
 				<p className="mb-0 text-sm text-muted-foreground">
-					One place for transactions shared with you. Accepting saves your own
-					copy; declining removes you from the sender&apos;s list.
+					Accept to save your own copy; decline to leave the sender&apos;s list.
 				</p>
 			</div>
 			{inboxQuery.isError ? (

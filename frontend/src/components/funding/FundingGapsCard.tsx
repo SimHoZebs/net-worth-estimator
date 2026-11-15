@@ -113,7 +113,7 @@ export function FundingGapsCard({
 		? "Excluded from evaluation"
 		: (item.qualifier ??
 			(clear
-				? "All selected payments can be covered in the evaluated period."
+				? "Can cover all selected payments in the evaluated period."
 				: null));
 	return (
 		<>

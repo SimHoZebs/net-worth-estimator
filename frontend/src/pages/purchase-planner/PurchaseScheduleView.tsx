@@ -45,7 +45,7 @@ export function PurchaseScheduleView({
 	return (
 		<section aria-label="Purchase schedule" className="space-y-4">
 			<p className="text-xs text-muted-foreground">
-				Dates shift automatically as your forecast changes.
+				Dates adjust with your forecast.
 			</p>
 			{groups.map((group) => {
 				return (
@@ -101,8 +101,8 @@ export function PurchaseScheduleView({
 						</h3>
 						<p className="mt-1 text-xs text-muted-foreground">
 							{pending
-								? "Finding the earliest financially safe dates for your purchases."
-								: `No calculated date before ${dateLabel(forecastEnd, true)}. This does not mean the purchase is impossible.`}
+								? "Finding earliest financially safe purchase dates."
+								: `No date found before ${dateLabel(forecastEnd, true)}. The purchase may still be possible.`}
 						</p>
 						<Card className="mt-2">
 							<CardContent>

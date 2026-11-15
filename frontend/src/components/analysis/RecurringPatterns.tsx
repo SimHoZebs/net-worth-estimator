@@ -280,7 +280,7 @@ export function ExistingScheduleDialog({
 					</Field>
 					{!selected ? (
 						<p className="m-0 text-sm text-muted-foreground">
-							Choose the forecast schedule these recorded payments belong to.
+							Forecast schedule for these recorded payments.
 						</p>
 					) : preview.isPending ? (
 						<p className="text-sm text-muted-foreground">

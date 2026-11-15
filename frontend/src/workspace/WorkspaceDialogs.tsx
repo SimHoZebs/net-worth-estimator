@@ -19,8 +19,8 @@ export function WorkspaceInvalidLink({ onClose }: { onClose: () => void }) {
 		>
 			<h2 className="text-2xl">Invalid workspace link</h2>
 			<p>
-				This link has invalid or conflicting dialog parameters. Check the
-				address or continue on this page.
+				Invalid or conflicting dialog parameters. Check the address or continue
+				on this page.
 			</p>
 			<Button variant="secondary" onClick={onClose}>
 				Continue on this page
@@ -90,8 +90,7 @@ export function WorkspaceDialogs({
 					<DialogHeader>
 						<DialogTitle>Linked item unavailable</DialogTitle>
 						<DialogDescription>
-							This item does not exist or is not available in this workspace.
-							Close this message to continue on this page.
+							Item missing or unavailable in this workspace.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

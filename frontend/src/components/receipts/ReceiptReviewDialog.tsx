@@ -206,8 +206,7 @@ function ReceiptEditor({
 				)}
 				{readOnly && extracting && (
 					<p role="status" className="text-sm text-muted-foreground">
-						Extraction is in progress. This receipt will update when it
-						finishes.
+						Extracting receipt. Updates appear when complete.
 					</p>
 				)}
 				{receipt.status === "interrupted" && (

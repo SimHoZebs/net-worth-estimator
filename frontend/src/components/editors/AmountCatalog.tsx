@@ -235,7 +235,7 @@ export function AmountCatalog() {
 		<section aria-label="How amounts are calculated">
 			<h3>How amounts are calculated</h3>
 			<p className="text-muted-foreground">
-				Pick a starting point, fill in the blanks, copy the result.
+				Customize a starting point, then copy the result.
 			</p>
 			<ToggleGroup
 				aria-label="Amount starting point"

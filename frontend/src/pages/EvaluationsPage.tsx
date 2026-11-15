@@ -111,7 +111,7 @@ export function EvaluationsPage() {
 						<EmptyMedia variant="icon">
 							<Flag aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>What are you working toward?</EmptyTitle>
+						<EmptyTitle>No evaluations</EmptyTitle>
 					</EmptyHeader>
 				</Empty>
 			)}

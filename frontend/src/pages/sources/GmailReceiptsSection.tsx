@@ -102,8 +102,8 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 					</Alert>
 				) : items.length === 0 ? (
 					<p className="m-0 text-sm leading-relaxed text-muted-foreground">
-						Run a scan to find purchase and refund receipts in Gmail. Shipping
-						updates and ordinary mail are left out.
+						Scan Gmail for purchase and refund receipts, excluding shipping
+						updates and ordinary mail.
 					</p>
 				) : (
 					<ItemGroup role="list">

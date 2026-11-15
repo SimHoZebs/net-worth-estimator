@@ -176,8 +176,7 @@ export function SyncConnectedAccounts({
 						</EmptyMedia>
 						<EmptyTitle>No synced accounts yet.</EmptyTitle>
 						<EmptyDescription>
-							No bank accounts have been imported. Confirm your banks are
-							connected in SimpleFIN, then choose Sync now.
+							Check your bank connections in SimpleFIN, then choose Sync now.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>

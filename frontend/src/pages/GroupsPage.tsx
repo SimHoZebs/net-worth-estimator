@@ -419,7 +419,7 @@ export function GroupsPage({
 							</EmptyMedia>
 							<EmptyTitle>No groups yet</EmptyTitle>
 							<EmptyDescription>
-								Create a group to get started, or join one with an invite code.
+								Create a group or join with an invite code.
 							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>

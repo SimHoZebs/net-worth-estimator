@@ -76,7 +76,7 @@ export function PlannedPurchaseEditor({
 	const submit = async () => {
 		if (readOnly || saving) return;
 		if (!fromId) {
-			setError("Choose the funding account for this purchase.");
+			setError("Choose a funding account.");
 			return;
 		}
 		const parsed = plannedPurchaseSchema.safeParse({

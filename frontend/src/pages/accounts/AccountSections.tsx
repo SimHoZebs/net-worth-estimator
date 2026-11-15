@@ -206,8 +206,7 @@ function AccountsView({
 							</p>
 							<AlertDialogTitle>Remove {remove.name}?</AlertDialogTitle>
 							<AlertDialogDescription>
-								This deletes the account immediately. Balance history for this
-								account goes with it.
+								Deletes the account and its balance history immediately.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						{removeError && (

@@ -56,7 +56,7 @@ export function AnalysisFindings() {
 		query.isError || analyses.isError
 			? "Analysis results could not be loaded."
 			: state === "failed"
-				? "Analysis could not finish. The background worker will retry. Account sync is unaffected."
+				? "Analysis failed. Automatic retry pending. Account sync is unaffected."
 				: null;
 	return (
 		<>
@@ -66,8 +66,7 @@ export function AnalysisFindings() {
 				)}
 				{(state === "queued" || state === "running") && (
 					<p className="text-xs text-muted-foreground">
-						Analysis is pending. Previous findings can appear as awaiting
-						analysis.
+						Analysis pending. Previous findings may show as awaiting analysis.
 					</p>
 				)}
 				{findingsError ? (

@@ -133,7 +133,7 @@ export function PlannedPurchasePanel() {
 							</p>
 							<AlertDialogTitle>Remove {remove.name}?</AlertDialogTitle>
 							<AlertDialogDescription>
-								This removes the item and saves immediately.
+								Removes the purchase and saves immediately.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>

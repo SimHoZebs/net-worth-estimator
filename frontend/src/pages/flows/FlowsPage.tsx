@@ -222,8 +222,7 @@ export function FlowsPage() {
 						</EmptyMedia>
 						<EmptyTitle>Choose both dates</EmptyTitle>
 						<EmptyDescription>
-							Money flows need a start and an end date before the calculation
-							runs.
+							Start and end dates are required to calculate money flows.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
@@ -237,8 +236,7 @@ export function FlowsPage() {
 					/>
 					<div className="min-w-0 break-words">
 						<AlertDescription className="my-1 whitespace-pre-line">
-							{query.error?.message ??
-								"Money flows could not be loaded. Retry the request."}
+							{query.error?.message ?? "Money flows could not be loaded."}
 						</AlertDescription>
 						<Button
 							variant="link"
@@ -256,8 +254,8 @@ export function FlowsPage() {
 					<div className="flex flex-wrap items-center justify-between gap-3">
 						<p className="text-xs text-muted-foreground" role="status">
 							{focusName
-								? `Showing flows touching ${focusName} (${visible.length} of ${graph.edges.length}). Totals still describe the whole window.`
-								: `Showing all ${visible.length} flows from ${graph.startDate} through ${graph.endDate}.`}
+								? `Flows involving ${focusName}: ${visible.length} of ${graph.edges.length}. Totals cover the full date range.`
+								: `${visible.length} flows from ${graph.startDate} through ${graph.endDate}.`}
 						</p>
 						<ToggleGroup
 							aria-label="Diagram or table view"
@@ -298,8 +296,8 @@ export function FlowsPage() {
 							>
 								<AlertDescription className="text-xs text-warning-text">
 									{cyclic
-										? "These flows loop back on each other, so they cannot be drawn as a one-way diagram. The table below lists every flow with exact amounts."
-										: "Every flow in this view is exactly zero, so widths cannot show them. The table below lists every flow with exact amounts."}
+										? "Looping flows cannot form a one-way diagram. The table lists every flow and exact amount."
+										: "All flows are zero, so diagram widths cannot show them. The table lists every flow and exact amount."}
 								</AlertDescription>
 							</Alert>
 							<FlowTable graph={graph} visible={visible} />

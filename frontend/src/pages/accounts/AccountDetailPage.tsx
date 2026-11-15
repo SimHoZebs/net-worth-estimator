@@ -407,9 +407,7 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
 		return (
 			<section aria-label="Account details" className="grid gap-4 p-6">
 				<h2 className="text-2xl">Account not found</h2>
-				<p>
-					This account does not exist or is not available in this workspace.
-				</p>
+				<p>Account missing or unavailable in this workspace.</p>
 				<div>
 					<Button
 						variant="secondary"

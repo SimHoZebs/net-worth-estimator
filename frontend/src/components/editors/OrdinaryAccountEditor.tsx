@@ -137,7 +137,7 @@ export function OrdinaryAccountEditor({
 				<Alert>
 					<LockKeyhole aria-hidden="true" />
 					<AlertDescription>
-						This account is synced from your bank and cannot be edited here.
+						Bank-synced accounts cannot be edited here.
 					</AlertDescription>
 				</Alert>
 			)}
