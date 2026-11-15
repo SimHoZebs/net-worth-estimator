@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
 import { useAccountEdit } from "../../components/activity/useAccountEdit.ts";
 import { AccountBalanceValue } from "../../components/activity/AccountBalanceValue.tsx";
@@ -110,15 +110,12 @@ export function AccountDetailView({
 		<nav aria-label="Breadcrumb">
 			<ol className="m-0 flex min-w-0 list-none flex-nowrap items-center gap-2 p-0 text-xs">
 				<li className="flex-none">
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onClick={requestClose}
+					<Link
+						to="/accounts"
+						className="text-muted-foreground hover:text-foreground hover:underline hover:underline-offset-4"
 					>
-						<ArrowLeft size={16} aria-hidden="true" />
 						Accounts
-					</Button>
+					</Link>
 				</li>
 				<li aria-hidden="true" className="flex-none text-muted-foreground">
 					/
@@ -390,7 +387,7 @@ export function AccountDetailView({
 /**
  * Route-level account page. Resolves the account from saved rows and
  * renders the detail in the main window. The topbar renders the
- * breadcrumb back to the accounts list. Editors open as overlays
+ * breadcrumb link to the accounts list. Editors open as overlays
  * above this page.
  */
 export function AccountDetailPage({ accountId }: { accountId: string }) {

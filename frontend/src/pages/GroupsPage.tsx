@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertCircle } from "lucide-react";
@@ -43,7 +43,7 @@ import {
 	useRevokeInvite,
 	useUpdateMemberRole,
 } from "../state/groups.ts";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useBreadcrumbSlot } from "../workspace/breadcrumbSlot.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { SharedFeed } from "./groups/SharedFeed.tsx";
@@ -222,15 +222,12 @@ export function GroupsPage({
 			<nav aria-label="Breadcrumb">
 				<ol className="m-0 flex min-w-0 list-none flex-nowrap items-center gap-2 p-0 text-xs">
 					<li className="flex-none">
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={goToGroups}
+						<Link
+							to="/groups"
+							className="text-muted-foreground hover:text-foreground hover:underline hover:underline-offset-4"
 						>
-							<ArrowLeft size={16} aria-hidden="true" />
 							Groups
-						</Button>
+						</Link>
 					</li>
 					<li aria-hidden="true" className="flex-none text-muted-foreground">
 						/
