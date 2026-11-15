@@ -129,7 +129,7 @@ describe("safeSpendingTrend", () => {
 		expect(trend.actual.at(-1)?.spent).toBe(50);
 	});
 
-	it("counts pending charges but not future rows", () => {
+	it("counts pending charge commitments but not future rows", () => {
 		const trend = safeSpendingTrend({
 			transactions: [
 				charge("2026-01-21", 100, { pending: true, excluded: true }),

@@ -25,6 +25,35 @@ transaction boundary.
 The cutoff replaces that transaction's existing row divider, with its label
 centered in the line. It does not insert another table row or a second border.
 
+## Monthly income threshold
+
+The income threshold compares recorded spending with income received in the
+same UTC calendar month, from month-start through today. It excludes projected
+paychecks, pending income, and transfers between the user's accounts. Recorded
+bill payments count as spending once; scheduled future bills are not recorded
+spending. Income uses recorded incoming transactions classified as income by the
+existing category owner, without guessing wages or refunds from merchant names.
+Explicit expense-category refunds reduce spending once and do not become income.
+Unclassified incoming money cannot be silently asserted to be earned income.
+
+The income threshold is a separate warning, not a cash deduction or a replacement
+for the cash-backed limit. Savings can leave cash available while spending exceeds
+this month's income. Conversely, having earned income does not prove cash remains.
+
+Chart ceilings share the cycle's cumulative-spending coordinates. The cash ceiling
+is cycle spending plus cash after bills. The income ceiling is cycle spending plus
+monthly income minus monthly spending. This accounts for spending outside the
+visible cycle so a statement cycle crossing month-start never compares different
+calendar windows. Exact crossing
+identities come from the same recorded ledger as the monthly totals. An income
+limit crossed before the visible cycle is already exceeded at its start, not
+caused by its first displayed transaction. Missing income evidence does not
+disable known cash evidence, and missing cash evidence does not invent income.
+
+Use short labels with enough context to distinguish cash, reserve, monthly income,
+and actual versus projected values. Preserve dates, financial qualifiers, action
+meaning, and accessible names while removing filler and repeated explanations.
+
 The summary accepts an explicit inclusive `start` and `end` calendar date.
 It always returns evidenced available cash at `start` and conditional
 outstanding bills within that range. It has no current-versus-historical mode

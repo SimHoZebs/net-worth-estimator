@@ -82,7 +82,7 @@ export function SafeSpendingBillsPanel({
 		reserve: allocation.reserve,
 		available: allocation.available,
 	});
-	const spendLabel = `Spend till ${monthDay(heroes.cycleEnd)} closing`;
+	const spendLabel = `Spend by ${monthDay(heroes.cycleEnd)}`;
 	const spendQualifier =
 		allowanceView.phase === "unavailable"
 			? undefined
@@ -99,14 +99,6 @@ export function SafeSpendingBillsPanel({
 			: allowanceView.phase === "safe"
 				? Math.max(0, heroes.dailySafe)
 				: Math.max(0, heroes.dailyTheoretical);
-	const dailyQualifier =
-		allowanceView.phase === "unavailable" ||
-		allowanceView.primary === null ||
-		allowanceView.primary === 0
-			? undefined
-			: closed
-				? `of ${exactMoney(allowanceView.primary)} across the cycle`
-				: `of ${exactMoney(allowanceView.primary)}`;
 	return (
 		<div className="grid content-start gap-4">
 			{trend && (
@@ -157,7 +149,6 @@ export function SafeSpendingBillsPanel({
 								label={labels.perDay}
 								value={dailyValue === null ? "—" : exactMoney(dailyValue)}
 								testId="perday-value"
-								qualifier={dailyQualifier}
 							/>
 						</div>
 						{!allocation.available && (

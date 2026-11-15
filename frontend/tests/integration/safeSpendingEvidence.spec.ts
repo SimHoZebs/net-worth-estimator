@@ -129,6 +129,16 @@ async function seedEvidence(
 		},
 	];
 	if (crossing) {
+		transactions.push({
+			id: "01900000-0000-7000-8000-00000000e007",
+			name: "Synthetic received income",
+			sourceAccountId: null,
+			destinations: [checkingId],
+			amount: amount(150),
+			transactionTime: Date.parse("2026-11-08T12:00:00Z") / 1000,
+			postedTime: Date.parse("2026-11-08T12:00:00Z") / 1000,
+			enabled: true,
+		});
 		for (const [suffix, name, time] of [
 			["e005", "Synthetic crossing purchase", "12:00:00"],
 			["e006", "Synthetic later purchase", "15:00:00"],
@@ -172,6 +182,13 @@ async function seedEvidence(
 	});
 	expect(imported.ok(), await imported.text()).toBe(true);
 	expect(await imported.json()).toMatchObject({ saved: true });
+	if (crossing) {
+		const categorized = await api.post(
+			`${FIXTURE_API}/v1/transactions/01900000-0000-7000-8000-00000000e007/categorize`,
+			{ data: { category: "INCOME" } },
+		);
+		expect(categorized.ok(), await categorized.text()).toBe(true);
+	}
 	const heldPayment = baseline.transactions.find(
 		(row: { name: string }) => row.name === "Synthetic held payment",
 	);
@@ -281,7 +298,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		});
 		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(
-			card.getByText("Cash after outstanding bills", { exact: true }),
+			card.getByText("Cash after bills", { exact: true }),
 		).toBeVisible();
 		await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
 		await expect(card.locator("details")).toHaveCount(0);
@@ -293,7 +310,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			/The .+ paychecks? (pays|pay|paid) this statement/,
 		);
 		await expect(
-			card.getByRole("heading", { name: "Outstanding bills", exact: true }),
+			card.getByRole("heading", { name: "Bills", exact: true }),
 		).toBeVisible();
 		await expect(
 			card
@@ -471,11 +488,32 @@ test("current cash budget and exact crossing survive inline history, sorting and
 			await expect(card.getByTestId("perday-value")).toHaveText("$0.00");
 			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
-			).toHaveText(/\$283\.42 limit was crossed on Nov 9, 2026/);
+			).toHaveText(/\$283\.42 cash limit was crossed on Nov 9, 2026/);
+			await expect(card.getByTestId("monthly-income-value")).toHaveText(
+				"$150.00",
+			);
+			await expect(
+				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
+			).toHaveText(/Income crossed on Nov 9, 2026/);
+			const chart = card.getByLabel("Spending pace", { exact: true });
+			await expect(
+				chart.locator("text").filter({ hasText: /^Oct / }).first(),
+			).toBeVisible();
+			const axisDates = (await chart.locator("text").allTextContents())
+				.filter((text) => /^(Oct|Nov) \d{1,2}$/.test(text))
+				.map(
+					(text) =>
+						(text.startsWith("Oct") ? 1000 : 1100) + Number(text.split(" ")[1]),
+				);
+			expect(axisDates.length).toBeGreaterThan(2);
+			expect(axisDates[0]).toBeLessThan(1100);
+			expect(axisDates.at(-1)).toBeGreaterThan(1100);
+			expect(axisDates).toEqual([...axisDates].sort((a, b) => a - b));
 		};
 		await checkCurrent();
 		await card.getByRole("button", { name: "Last cycle", exact: true }).click();
 		await expect(card.getByTestId("recorded-charges-value")).toBeVisible();
+		await expect(card.getByText(/Income this month/)).toHaveCount(0);
 		await card
 			.getByRole("button", { name: "This cycle transactions", exact: true })
 			.click();
@@ -492,14 +530,16 @@ test("current cash budget and exact crossing survive inline history, sorting and
 					name: /View Synthetic crossing purchase on/,
 				}),
 			});
-			await expect(row).toContainText("Spending limit");
+			await expect(row).toContainText(
+				"Income this month · Reserve · Cash limit",
+			);
 			await expect(row).toHaveClass(/border-b-0/);
 			await expect(
 				row.locator('[data-spending-divider="danger"]'),
-			).toContainText("Spending limit");
+			).toContainText("Cash limit");
 			await expect(
 				row.locator("td").last().locator(":scope > span").first(),
-			).not.toContainText("Spending limit");
+			).not.toContainText("Cash limit");
 			const geometry = await row.evaluate((element) => {
 				const marker = element.querySelector(
 					'[data-spending-divider="danger"]',
@@ -522,7 +562,7 @@ test("current cash budget and exact crossing survive inline history, sorting and
 			expect(geometry.left).toBe("2px");
 			expect(geometry.right).toBe("2px");
 			await expect(
-				table.getByRole("row").filter({ hasText: "Spending limit" }),
+				table.getByRole("row").filter({ hasText: "Cash limit" }),
 			).toHaveCount(1);
 		};
 		await checkCrossing();
@@ -568,7 +608,10 @@ test("current cash budget and exact crossing survive inline history, sorting and
 		await expect(drawer.getByRole("table").locator("tbody > tr")).toHaveCount(
 			3,
 		);
-		await expect(drawer.locator("[data-spending-divider]")).toHaveCount(0);
+		await expect(drawer.locator("[data-spending-divider]")).toHaveCount(1);
+		await expect(drawer.locator("[data-spending-divider]")).toContainText(
+			"Income this month",
+		);
 	} finally {
 		await api.dispose();
 	}
@@ -612,7 +655,7 @@ test("an older unclaimed pending payment preserves observed cash without subtrac
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(
-			card.getByText("Cash after outstanding bills", { exact: true }),
+			card.getByText("Cash after bills", { exact: true }),
 		).toBeVisible();
 		await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
 		await expect(

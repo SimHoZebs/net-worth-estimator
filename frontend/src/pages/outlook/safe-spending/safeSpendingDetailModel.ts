@@ -57,6 +57,7 @@ export interface SafeSpendingChargeCycle {
 	};
 	/** Exact recorded spending rows that first crossed the current budget. */
 	thresholds?: {
+		incomeTransactionId?: string | null;
 		safetyNetTransactionId: string | null;
 		limitTransactionId: string | null;
 	};

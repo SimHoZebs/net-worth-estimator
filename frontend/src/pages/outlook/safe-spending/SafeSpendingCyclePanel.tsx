@@ -47,6 +47,13 @@ export function SafeSpendingCyclePanel({
 	);
 	const dividers = useMemo<SpendingLimitDivider[]>(() => {
 		const items: SpendingLimitDivider[] = [];
+		if (cycle.thresholds?.incomeTransactionId) {
+			items.push({
+				transactionId: cycle.thresholds.incomeTransactionId,
+				tone: "warning",
+				label: labels.earnedThisMonth,
+			});
+		}
 		if (cycle.thresholds?.safetyNetTransactionId) {
 			items.push({
 				transactionId: cycle.thresholds.safetyNetTransactionId,

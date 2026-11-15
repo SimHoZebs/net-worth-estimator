@@ -3,6 +3,72 @@ import {
 	type AccountTransaction,
 } from "@/domain/accountActivity.ts";
 import type { Account, Transaction } from "@/domain/model.ts";
+import { transactionCategoryLabels } from "@/domain/categories.ts";
+
+/** Routing excludes internal movements. The server's accepted category separates
+ * received income from refunds; unclassified incoming evidence stays unknown. */
+export function receivedMonthlyIncome({
+	accounts,
+	transactions,
+	spendingIds,
+	today,
+}: {
+	accounts: Account[];
+	transactions: Transaction[];
+	spendingIds: string[];
+	today: string;
+}): number | null {
+	if (
+		!spendingIds.length ||
+		spendingIds.some(
+			(id) =>
+				!accounts.some(
+					(account) =>
+						account.id === id && !account.archived && account.enabled,
+				),
+		)
+	)
+		return null;
+	const saved = new Map(transactions.map((row) => [row.id, row]));
+	const seen = new Set<string>();
+	let cents = 0;
+	for (const id of spendingIds) {
+		for (const row of accountTransactions({
+			accountId: id,
+			accounts,
+			transactions,
+			startDate: today,
+		})) {
+			if (
+				row.source !== "historical" ||
+				row.flow === "transfer" ||
+				row.pending ||
+				row.void ||
+				row.excluded ||
+				row.date < `${today.slice(0, 7)}-01` ||
+				row.date > today ||
+				seen.has(row.transactionId)
+			)
+				continue;
+			const original = saved.get(row.transactionId);
+			if (!original?.enabled) continue;
+			if (original.category !== "INCOME") {
+				if (
+					row.direction === "in" &&
+					(!original.category ||
+						!Object.hasOwn(transactionCategoryLabels, original.category))
+				)
+					return null;
+				continue;
+			}
+			if (!original.amountKnown || !Number.isFinite(row.amount)) return null;
+			seen.add(row.transactionId);
+			cents +=
+				Math.round(row.amount * 100) * (row.direction === "out" ? -1 : 1);
+		}
+	}
+	return cents / 100;
+}
 
 /** Preserve exact chronology through display projection, including posted-time
  * fallback already resolved by transactionToDisplay for untimed transactions. */
@@ -12,6 +78,40 @@ export function currentSpendingActivity(
 ): AccountTransaction[] {
 	const saved = new Map(transactions.map((row) => [row.id, row]));
 	return rows.map((row) => {
+		// A zero/unresolved debit has no negative delta for accountTransactions
+		// to infer direction from. Its external-expense routing still owns it.
+		if (row.flow === "expense" && row.amount === 0)
+			row = { ...row, direction: "out" };
+		const category = saved.get(row.transactionId)?.category;
+		const transfer = row.flow === "transfer";
+		const expenseCredit =
+			row.direction === "in" &&
+			category !== undefined &&
+			category !== null &&
+			Object.hasOwn(transactionCategoryLabels, category) &&
+			category !== "INCOME" &&
+			category !== "TRANSFER_IN" &&
+			category !== "TRANSFER_OUT";
+		row = {
+			...row,
+			spendingAmountUnknown:
+				!transfer &&
+				category !== "INCOME" &&
+				(row.direction === "out" || expenseCredit) &&
+				saved.get(row.transactionId)?.amountKnown === false,
+			spendingAmount:
+				transfer || category === "INCOME"
+					? 0
+					: row.direction === "out"
+						? row.amount
+						: category &&
+							  Object.hasOwn(transactionCategoryLabels, category) &&
+							  category !== "INCOME" &&
+							  category !== "TRANSFER_IN" &&
+							  category !== "TRANSFER_OUT"
+							? -row.amount
+							: 0,
+		};
 		if (row.sortDate !== undefined && Number.isFinite(Date.parse(row.sortDate)))
 			return row;
 		const instant = saved.get(row.transactionId)?.transactionTime;
@@ -32,8 +132,6 @@ export function currentCashActivity({
 	accounts,
 	transactions,
 	spendingIds,
-	billIds,
-	ruleIds,
 	cycleStart,
 	cycleEnd,
 	today,
@@ -41,15 +139,11 @@ export function currentCashActivity({
 	accounts: Account[];
 	transactions: Transaction[];
 	spendingIds: string[];
-	billIds: string[];
-	ruleIds: string[];
-	startDate: string;
 	cycleStart: string;
 	cycleEnd: string;
 	today: string;
 }): AccountTransaction[] {
 	const saved = new Map(transactions.map((row) => [row.id, row]));
-	const bills = new Set([...billIds, ...ruleIds]);
 	return spendingIds
 		.flatMap((accountId) =>
 			// Recorded facts through today are independent of the latest balance
@@ -67,11 +161,12 @@ export function currentCashActivity({
 				original?.enabled &&
 				!row.pending &&
 				!row.void &&
-				row.direction === "out" &&
+				(row.direction === "out" ||
+					row.flow === "income" ||
+					row.flow === "expense") &&
 				row.date >= cycleStart &&
 				row.date <= today &&
-				row.date <= cycleEnd &&
-				!bills.has(original.claimScheduleId ?? original.id)
+				row.date <= cycleEnd
 			);
 		});
 }

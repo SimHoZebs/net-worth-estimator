@@ -13,15 +13,13 @@ test("seeded account demo", async ({ page }) => {
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
 		await expect(
-			page.getByText("Cash after outstanding bills", { exact: true }),
+			page.getByText("Cash after bills", { exact: true }),
 		).toBeVisible();
 		await expect(page.getByText("Spending pace")).toBeVisible();
 		await expect(
-			page.getByRole("separator", { name: "Spending limit" }),
+			page.getByRole("separator", { name: "Cash limit" }),
 		).toHaveCount(0);
-		await expect(
-			page.getByText("Protected reserve starts", { exact: true }),
-		).toBeVisible();
+		await expect(page.getByText("Reserve", { exact: true })).toBeVisible();
 	}
 	if (process.env.DEMO_PACK === "safe-spending-shortfall") {
 		await expect(page.getByText("Retirement contribution")).toBeVisible();

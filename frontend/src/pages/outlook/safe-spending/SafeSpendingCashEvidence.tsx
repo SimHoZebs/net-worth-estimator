@@ -111,7 +111,7 @@ export function SafeSpendingCashEvidence({
 			{!historical && (
 				<div className="mt-1 grid gap-3 border-t border-border pt-4">
 					<div className="flex items-center justify-between gap-3">
-						<h3 className="m-0 text-sm font-semibold">Outstanding bills</h3>
+						<h3 className="m-0 text-sm font-semibold">Bills</h3>
 						<strong className="text-base tabular-nums">
 							{amountText(summary.outstandingBillsTotal)}
 						</strong>

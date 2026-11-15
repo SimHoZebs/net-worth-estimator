@@ -3,6 +3,8 @@ import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSumm
 import {
 	safeSpendingTrend,
 	spendingLedger,
+	ledgerHit,
+	spendingAmount,
 } from "@/domain/safeSpendingTrend.ts";
 import { buildCycleView, type CycleView } from "./safeSpendingDetailModel.ts";
 import { monthEndIso } from "@/domain/safeSpending.ts";
@@ -16,6 +18,8 @@ export interface CycleViewInput {
 	reserve: number;
 	closedCycle: CycleView["heroes"]["closedCycle"];
 	fullDaysLeft: number;
+	/** Posted external cash inflows; null means evidence is unavailable. */
+	monthlyIncome?: number | null;
 }
 
 export interface CycleViewResult {
@@ -38,16 +42,26 @@ export function cycleView({
 	reserve,
 	closedCycle,
 	fullDaysLeft,
+	monthlyIncome,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
-	const ledger = spendingLedger({
+	const monthStart = `${referenceDay.slice(0, 7)}-01`;
+	const recorded = spendingLedger({
 		transactions,
+		cycleStart: monthStart < cycle.start ? monthStart : cycle.start,
+		cycleEnd: cycle.end,
+		todayIso: referenceDay,
+	});
+	const ledger = spendingLedger({
+		transactions: recorded,
 		cycleStart: cycle.start,
 		cycleEnd: cycle.end,
 		todayIso: referenceDay,
 	});
 	const spent =
-		ledger.reduce((total, row) => total + Math.round(row.amount * 100), 0) /
-		100;
+		ledger.reduce(
+			(total, row) => total + Math.round(spendingAmount(row) * 100),
+			0,
+		) / 100;
 	const remaining =
 		cashSummary?.status === "available" &&
 		cashSummary.start === referenceDay &&
@@ -58,7 +72,58 @@ export function cycleView({
 			: null;
 	const protectedReserve = Math.max(0, reserve);
 	const capacity =
-		remaining === null ? null : Math.round((spent + remaining) * 100) / 100;
+		remaining === null || ledger.some((row) => row.spendingAmountUnknown)
+			? null
+			: Math.round((spent + remaining) * 100) / 100;
+	const trend = safeSpendingTrend({
+		transactions: ledger,
+		cycleStart: cycle.start,
+		cycleEnd: cycle.end,
+		todayIso: referenceDay,
+		limit: capacity,
+		safetyNet:
+			capacity === null
+				? null
+				: Math.round((capacity - protectedReserve) * 100) / 100,
+	});
+	if (
+		monthlyIncome !== null &&
+		monthlyIncome !== undefined &&
+		Number.isFinite(monthlyIncome)
+	) {
+		const monthlyLedger = recorded.filter((row) => row.date >= monthStart);
+		const monthlySpent = monthlyLedger.some((row) => row.spendingAmountUnknown)
+			? null
+			: monthlyLedger.reduce(
+					(total, row) => total + Math.round(spendingAmount(row) * 100),
+					0,
+				) / 100;
+		const hit =
+			monthlySpent === null ? null : ledgerHit(monthlyLedger, monthlyIncome);
+		const coordinate =
+			monthlySpent === null || ledger.some((row) => row.spendingAmountUnknown)
+				? null
+				: Math.round((monthlyIncome + spent - monthlySpent) * 100) / 100;
+		trend.monthlyIncome = {
+			amount: monthlyIncome,
+			spent: monthlySpent,
+			coordinate,
+			start: monthStart > cycle.start ? monthStart : cycle.start,
+			end:
+				monthEndIso(referenceDay) < cycle.end
+					? monthEndIso(referenceDay)
+					: cycle.end,
+			hit:
+				hit && coordinate !== null && hit.date >= cycle.start
+					? {
+							...hit,
+							amount:
+								Math.round((hit.amount + spent - (monthlySpent ?? 0)) * 100) /
+								100,
+						}
+					: null,
+		};
+	}
 	return {
 		ledger,
 		view: buildCycleView({
@@ -66,21 +131,11 @@ export function cycleView({
 			cycleEnd: cycle.end,
 			closedCycle,
 			remaining,
-			cardSpent: spent,
+			cardSpent: ledger.some((row) => row.spendingAmountUnknown) ? null : spent,
 			cardSpentByCard,
 			reserve: protectedReserve,
 			fullDaysLeft,
 		}),
-		trend: safeSpendingTrend({
-			transactions: ledger,
-			cycleStart: cycle.start,
-			cycleEnd: cycle.end,
-			todayIso: referenceDay,
-			limit: capacity,
-			safetyNet:
-				capacity === null
-					? null
-					: Math.round((capacity - protectedReserve) * 100) / 100,
-		}),
+		trend,
 	};
 }

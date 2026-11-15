@@ -17,6 +17,15 @@ export interface SafeSpendingThresholdHit {
 }
 
 export interface SafeSpendingTrend {
+	spendingAvailable?: boolean;
+	monthlyIncome?: {
+		amount: number;
+		spent: number | null;
+		coordinate: number | null;
+		start: string;
+		end: string;
+		hit: SafeSpendingThresholdHit | null;
+	};
 	actual: SafeSpendingTrendPoint[];
 	projected: SafeSpendingTrendPoint[];
 	limit: number | null;
@@ -27,6 +36,9 @@ export interface SafeSpendingTrend {
 }
 
 const roundCents = (value: number) => Math.round(value * 100) / 100;
+
+export const spendingAmount = (row: AccountTransaction): number =>
+	row.spendingAmount ?? row.amount;
 
 function firstHit(
 	points: readonly SafeSpendingTrendPoint[],
@@ -64,9 +76,14 @@ export function spendingLedger({
 			.filter(
 				(row) =>
 					row.source === "historical" &&
-					isCycleOutflow(row) &&
+					(row.direction === "out"
+						? isCycleOutflow(row)
+						: row.spendingAmount !== undefined &&
+							!row.pending &&
+							!row.excluded &&
+							!row.void) &&
 					row.flow !== "transfer" &&
-					row.amount !== 0 &&
+					(spendingAmount(row) !== 0 || row.spendingAmountUnknown === true) &&
 					row.date >= cycleStart &&
 					row.date <= cycleEnd &&
 					row.date <= todayIso,
@@ -93,7 +110,7 @@ export function spendingLedger({
 	});
 }
 
-function ledgerHit(
+export function ledgerHit(
 	ledger: readonly AccountTransaction[],
 	threshold: number | null,
 ): SafeSpendingThresholdHit | null {
@@ -102,7 +119,7 @@ function ledgerHit(
 	let spentCents = 0;
 	for (const row of ledger) {
 		const before = spentCents;
-		spentCents += Math.round(row.amount * 100);
+		spentCents += Math.round(spendingAmount(row) * 100);
 		const thresholdCents = Math.round(threshold * 100);
 		if (before <= thresholdCents && spentCents > thresholdCents) {
 			return {
@@ -159,12 +176,15 @@ export function safeSpendingTrend({
 		cycleEnd: end,
 		todayIso: today,
 	});
+	if (ledger.some((row) => row.spendingAmountUnknown)) {
+		return { ...empty, spendingAvailable: false, limit: null, safetyNet: null };
+	}
 	for (const transaction of ledger) {
 		const date = transaction.date.slice(0, 10);
 		if (date < start || date > today) continue;
 		daily.set(
 			date,
-			(daily.get(date) ?? 0) + Math.round(transaction.amount * 100),
+			(daily.get(date) ?? 0) + Math.round(spendingAmount(transaction) * 100),
 		);
 	}
 

@@ -76,9 +76,16 @@ export function TransactionSectionView({
 	const dividerById = new Map<string, SpendingLimitDivider>();
 	for (const divider of dividers) {
 		const existing = dividerById.get(divider.transactionId);
-		if (!existing || divider.tone === "danger") {
-			dividerById.set(divider.transactionId, divider);
-		}
+		dividerById.set(
+			divider.transactionId,
+			existing
+				? {
+						...divider,
+						tone: existing.tone === "danger" ? "danger" : divider.tone,
+						label: `${existing.label} · ${divider.label}`,
+					}
+				: divider,
+		);
 	}
 	const rows = transactions.map((transaction) => (
 		<TransactionRow

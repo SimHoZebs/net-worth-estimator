@@ -28,6 +28,10 @@ export interface AccountTransaction {
 	from: string;
 	to: string;
 	amount: number;
+	/** Signed recorded spending effect, when classified by the spending owner.
+	 * Incoming refunds retain their displayed amount and direction. */
+	spendingAmount?: number;
+	spendingAmountUnknown?: boolean;
 	requested: number;
 	shortfall: number;
 	constraint: string | null;

@@ -81,6 +81,7 @@ export function useCardCycleActivity({
 							cycleStart: closed.cycleStart,
 							todayIso: closed.cycleEnd,
 						}),
+						recorded: activity,
 					};
 				});
 		return {

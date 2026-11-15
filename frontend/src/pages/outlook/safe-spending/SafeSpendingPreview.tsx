@@ -31,9 +31,10 @@ import {
 	selectObligationResults,
 } from "@/domain/safeSpendingHistory.ts";
 import { visibleAccounts } from "@/domain/model.ts";
-import { spendingLedger } from "@/domain/safeSpendingTrend.ts";
+import { spendingLedger, spendingAmount } from "@/domain/safeSpendingTrend.ts";
 import {
 	currentCashActivity,
+	receivedMonthlyIncome,
 	currentSpendingActivity,
 } from "./currentCashActivity.ts";
 import type { Projection } from "@/domain/result.ts";
@@ -244,25 +245,25 @@ export function SafeSpendingPreview({
 	);
 	const directTransactions = useMemo(() => {
 		return sortTransactionsByDate({
-			items: currentCashActivity({
-				accounts: accounts ?? [],
-				transactions: transactions ?? [],
-				spendingIds,
-				billIds: trackedBillIds,
-				ruleIds: rules.map((row) => row.id),
-				startDate: startDate ?? displayToday,
-				cycleStart: cycle.cycleStart,
-				cycleEnd: cycle.cycleEnd,
-				today: displayToday,
-			}),
+			items: currentSpendingActivity(
+				currentCashActivity({
+					accounts: accounts ?? [],
+					transactions: transactions ?? [],
+					spendingIds,
+					cycleStart:
+						cycle.cycleStart < `${displayToday.slice(0, 7)}-01`
+							? cycle.cycleStart
+							: `${displayToday.slice(0, 7)}-01`,
+					cycleEnd: cycle.cycleEnd,
+					today: displayToday,
+				}),
+				transactions ?? [],
+			),
 			getDate: (transaction) => transaction.date,
 			getId: (transaction) => transaction.id,
 			order: transactionOrder,
 		});
 	}, [
-		trackedBillIds,
-		rules,
-		startDate,
 		displayToday,
 		spendingIds,
 		accounts,
@@ -282,7 +283,10 @@ export function SafeSpendingPreview({
 	);
 	const cashPayments = useMemo(() => {
 		const rows = directTransactions.filter(
-			(row) => row.flow === "transfer" && row.source === "historical",
+			(row) =>
+				row.flow === "transfer" &&
+				row.source === "historical" &&
+				row.date >= cycle.cycleStart,
 		);
 		return {
 			title: "Cash payments this cycle",
@@ -290,11 +294,11 @@ export function SafeSpendingPreview({
 			total: sum(rows.map((row) => row.amount)),
 			transactions: rows,
 		};
-	}, [directTransactions]);
+	}, [directTransactions, cycle.cycleStart]);
 
 	// Card and direct cash share one list; only the rows merge.
 	const currentCardTransactions = useMemo(
-		() => perAccount.flatMap((item) => item.inCycle),
+		() => perAccount.flatMap((item) => item.recorded),
 		[perAccount],
 	);
 	const lastCardTransactions = useMemo(
@@ -308,14 +312,17 @@ export function SafeSpendingPreview({
 				name: item.name,
 				amount: sum(
 					spendingLedger({
-						transactions: item.inCycle,
+						transactions: currentSpendingActivity(
+							item.recorded,
+							transactions ?? [],
+						),
 						cycleStart: cycle.cycleStart,
 						cycleEnd: cycle.cycleEnd,
 						todayIso: displayToday,
-					}).map((transaction) => transaction.amount),
+					}).map(spendingAmount),
 				),
 			})),
-		[perAccount, cycle.cycleStart, cycle.cycleEnd, displayToday],
+		[perAccount, cycle.cycleStart, cycle.cycleEnd, displayToday, transactions],
 	);
 	const currentSpendingTransactions = useMemo(
 		() =>
@@ -331,6 +338,12 @@ export function SafeSpendingPreview({
 				cycle: { start: cycle.cycleStart, end: cycle.cycleEnd },
 				referenceDay: displayToday,
 				transactions: currentSpendingTransactions,
+				monthlyIncome: receivedMonthlyIncome({
+					accounts: accounts ?? [],
+					transactions: transactions ?? [],
+					spendingIds,
+					today: displayToday,
+				}),
 				cashSummary: currentCashSummary.data,
 				cardSpentByCard: currentCardByCard,
 				reserve: settings.reserve,
@@ -343,6 +356,9 @@ export function SafeSpendingPreview({
 			cycle.daysLeft,
 			displayToday,
 			currentSpendingTransactions,
+			accounts,
+			transactions,
+			spendingIds,
 			currentCashSummary.data,
 			currentCardByCard,
 			settings.reserve,
@@ -392,6 +408,8 @@ export function SafeSpendingPreview({
 					byCard: currentView.view.heroes.committedByCard,
 				},
 				thresholds: {
+					incomeTransactionId:
+						currentView.trend.monthlyIncome?.hit?.transactionId ?? null,
 					safetyNetTransactionId:
 						currentView.trend.safetyNetHit &&
 						!currentView.trend.safetyNetHit.projected
