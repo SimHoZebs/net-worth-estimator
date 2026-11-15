@@ -35,7 +35,6 @@ import {
 	stochasticQueryKey,
 } from "./serverQuery.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
-import { useUiStore } from "./uiStore.ts";
 import { projectionEvaluationKey } from "./projectionKeys.ts";
 import {
 	normalizedEvaluations,
@@ -57,6 +56,13 @@ import { useUserScope } from "./useUserScope.ts";
 export { projectionStartDate } from "./projectionSource.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
 import { stochasticProjectionOptions } from "./stochasticProjectionQuery.ts";
+
+/**
+ * Shared projection defaults. Production callers pass explicit years/ranges;
+ * these cover tests and callers that only override one axis.
+ */
+export const DEFAULT_PROJECTION_YEARS = 20;
+export const DEFAULT_PROJECTION_RANGES = true;
 
 export interface ProjectionDateRange {
 	startDate?: string;
@@ -280,8 +286,7 @@ export function projectionResultToLocal(
 	const startCheckpoint =
 		model?.checkpoints.some(
 			(checkpoint) =>
-				isoDateFromEpochSeconds(checkpoint.observedAt) ===
-				projectionStartDate,
+				isoDateFromEpochSeconds(checkpoint.observedAt) === projectionStartDate,
 		) ?? false;
 	const transactions = projectionTransactions(result, model, {
 		startCheckpoint,
@@ -712,10 +717,8 @@ export function useRemoteProjection({
 		() => projectionEvaluationKey(evaluationsOverride),
 		[evaluationsOverride],
 	);
-	const storeYears = useUiStore((state) => state.years);
-	const storeRanges = useUiStore((state) => state.ranges);
-	const years = yearsOverride ?? storeYears;
-	const ranges = rangesOverride ?? storeRanges;
+	const years = yearsOverride ?? DEFAULT_PROJECTION_YEARS;
+	const ranges = rangesOverride ?? DEFAULT_PROJECTION_RANGES;
 	const overlayNeeded =
 		evaluationsOverride !== undefined &&
 		baseSource !== null &&

@@ -5,21 +5,11 @@ import {
 	receiptDraft,
 	type ReceiptDraft,
 } from "@/domain/receipt.ts";
-import { useBeforeUnload } from "@/state/useBeforeUnload.ts";
 import { useReceipt, useReceiptActions } from "@/state/receipts.ts";
 import { notifySuccess } from "../../state/notifications.ts";
+import { DiscardConfirm, useDiscardGuard } from "../editors/EditorDialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog.tsx";
 import {
 	Field,
 	FieldLabel,
@@ -143,7 +133,6 @@ function ReceiptEditor({
 		draft: ReceiptDraft;
 	} | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [askDiscard, setAskDiscard] = useState(false);
 	const source = receiptDraft(
 		receipt.draft ?? receipt.confirmed ?? receipt.extraction?.details,
 	);
@@ -157,7 +146,7 @@ function ReceiptEditor({
 		actions.replace.isPending;
 	const extracting = receipt.status === "extracting";
 	const fieldPrefix = useId();
-	useBeforeUnload(dirty);
+	const guard = useDiscardGuard({ dirty, busy });
 	const update = (patch: Partial<ReceiptDraft>) => {
 		setEdit({
 			revision: edit?.revision ?? receipt.revision,
@@ -180,7 +169,7 @@ function ReceiptEditor({
 			});
 			setEdit(null);
 			setError(null);
-			setAskDiscard(false);
+			guard.dismissConfirm();
 			notifySuccess("receipt-notice", "Receipt details saved.");
 		} catch (cause) {
 			setError(
@@ -195,51 +184,13 @@ function ReceiptEditor({
 		<Dialog
 			open
 			onOpenChange={(open) => {
-				if (open) return;
-				if (busy) return;
-				if (dirty) {
-					setAskDiscard(true);
-					return;
-				}
-				onClose();
+				if (!open) guard.requestClose(onClose);
 			}}
 		>
 			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
 				<DialogHeader>
 					<DialogTitle>Receipt details</DialogTitle>
 				</DialogHeader>
-				<AlertDialog
-					open={askDiscard}
-					onOpenChange={(open) => {
-						if (!open && !busy) setAskDiscard(false);
-					}}
-				>
-					<AlertDialogContent>
-						<AlertDialogHeader>
-							<AlertDialogTitle>
-								Discard unsaved receipt edits?
-							</AlertDialogTitle>
-							<AlertDialogDescription>
-								Your in-progress edits will be lost. The saved receipt stays
-								unchanged.
-							</AlertDialogDescription>
-						</AlertDialogHeader>
-						<AlertDialogFooter>
-							<AlertDialogCancel disabled={busy}>
-								Continue editing
-							</AlertDialogCancel>
-							<AlertDialogAction
-								variant="destructive"
-								disabled={busy}
-								onClick={() => {
-									if (!busy) onClose();
-								}}
-							>
-								Discard edits and close
-							</AlertDialogAction>
-						</AlertDialogFooter>
-					</AlertDialogContent>
-				</AlertDialog>
 				{receipt.problem && (
 					<Alert
 						variant="default"
@@ -313,7 +264,7 @@ function ReceiptEditor({
 									});
 									setEdit(null);
 									setError(null);
-									setAskDiscard(false);
+									guard.dismissConfirm();
 									actions.extract.reset();
 									actions.review.reset();
 								}}
@@ -537,6 +488,12 @@ function ReceiptEditor({
 						)}
 					</div>
 				</div>
+				<DiscardConfirm
+					open={guard.confirming}
+					onContinue={guard.dismissConfirm}
+					onDiscard={onClose}
+					busy={busy}
+				/>
 			</DialogContent>
 		</Dialog>
 	);

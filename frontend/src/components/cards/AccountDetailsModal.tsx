@@ -15,7 +15,7 @@ import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { TablePagination } from "../DataTable.tsx";
+import { TablePagination } from "../TablePagination.tsx";
 import {
 	Empty,
 	EmptyDescription,
@@ -38,7 +38,7 @@ import {
 	ItemSeparator,
 } from "@/components/ui/item.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
-import { transactionSelectionKey, useSelectedId } from "../entrySelection.ts";
+import { transactionSelectionKey } from "../entrySelection.ts";
 
 type StatusFilter = "all" | "pending" | "posted";
 
@@ -88,7 +88,7 @@ export function AccountDetailsModal({
 			}),
 		[card.id, accounts, transactions, startDate, projection],
 	);
-	const [selectedId, setSelectedId] = useSelectedId();
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const searchId = useId();
 	const savedById = useMemo(
 		() => new Map(transactions.map((saved) => [saved.id, saved])),
@@ -118,12 +118,6 @@ export function AccountDetailsModal({
 		currentPage * PAGE_SIZE,
 		(currentPage + 1) * PAGE_SIZE,
 	);
-	const turnPage = (next: number) => {
-		setPage(next);
-		document
-			.getElementById(`${listId}-table`)
-			?.scrollIntoView({ block: "nearest" });
-	};
 	const selected = selectedId
 		? (ledger.find(
 				(transaction) => transactionSelectionKey(transaction) === selectedId,
@@ -277,7 +271,7 @@ export function AccountDetailsModal({
 								pageCount={pageCount}
 								total={shown.length}
 								pageSize={PAGE_SIZE}
-								onPage={turnPage}
+								onPage={setPage}
 							/>
 						)}
 					</>

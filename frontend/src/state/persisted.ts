@@ -1,7 +1,6 @@
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
 
 export const THEME_STORAGE_KEY = "waypoint-theme";
-export const UI_PREFS_STORAGE_KEY = "waypoint.ui-prefs.v1";
 
 const memory = new Map<string, string>();
 

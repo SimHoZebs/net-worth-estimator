@@ -7,7 +7,7 @@ import { PanelLeft } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils.ts";
 
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useMediaQuery, viewportQueries } from "@/state/useMediaQuery.ts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -66,7 +66,7 @@ function SidebarProvider({
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 }) {
-	const isMobile = useIsMobile();
+	const isMobile = useMediaQuery(viewportQueries.belowMd);
 	const [openMobile, setOpenMobile] = React.useState(false);
 
 	// This is the internal state of the sidebar.

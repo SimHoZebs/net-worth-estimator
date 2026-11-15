@@ -10,6 +10,7 @@ import {
 	scheduleBody,
 	scheduleUpdate,
 	timeOfDay,
+	validateScheduleTerms,
 	validateTransactionValues,
 	validateScheduleValues,
 } from "./transactionBodies.ts";
@@ -274,6 +275,35 @@ describe("schedule patches", () => {
 				scheduleValues({ startDate: "2026-10-03", endDate: "2026-09-01" }),
 			),
 		).toBe("The last occurrence cannot come before the first one.");
+	});
+
+	it("rejects a matching account pair on create but keeps it editable in place", () => {
+		expect(
+			validateScheduleTerms(
+				scheduleValues({ fromId: "checking", toId: "checking" }),
+			),
+		).toBe("Choose different source and destination accounts.");
+		expect(
+			validateScheduleValues(
+				scheduleValues({ fromId: "checking", toId: "checking" }),
+			),
+		).toBeNull();
+		const values = detailScheduleValues({
+			draft: {
+				name: "Monthly investing",
+				amount: "1800",
+				fromId: "checking",
+				toId: "checking",
+				frequency: "monthly",
+				startDate: "2026-10-03",
+				endDate: "",
+				noEndDate: true,
+				annualIncrease: "2.5",
+				enabled: true,
+			},
+		});
+		if (values instanceof Error) throw values;
+		expect(values.toId).toBe("checking");
 	});
 });
 

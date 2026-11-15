@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
-
-const brandLink = "flex items-center gap-2 text-2xl font-bold tracking-tight";
-const brandMark = "grid size-8 place-items-center rounded-xl bg-primary";
-const brandIcon =
-	"w-7 fill-none stroke-primary-foreground [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]";
-const brandPath = "m5 23 6-15 6 12 5-9 5 12";
+import {
+	brandIcon,
+	brandLink,
+	brandMark,
+	brandPath,
+} from "@/components/ui/brand.ts";
 
 export function Brand() {
 	return (

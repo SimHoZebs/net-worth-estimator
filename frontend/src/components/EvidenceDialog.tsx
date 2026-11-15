@@ -1,5 +1,8 @@
 import type { EditorTarget } from "../domain/accountEdits.ts";
-import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import {
+	DEFAULT_PROJECTION_YEARS,
+	useRemoteProjection,
+} from "../state/useRemoteProjection.ts";
 import {
 	useSavedAccounts,
 	useSavedStartDate,
@@ -30,6 +33,7 @@ export function EvidenceDialog({
 	const startDate = useSavedStartDate();
 	const readOnly = useUserReadOnly();
 	const projectionQuery = useRemoteProjection({
+		years: DEFAULT_PROJECTION_YEARS,
 		ranges: false,
 		enabled: true,
 	});

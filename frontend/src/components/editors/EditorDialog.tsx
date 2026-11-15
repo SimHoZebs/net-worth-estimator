@@ -50,16 +50,19 @@ export function DiscardConfirm({
 	open,
 	onContinue,
 	onDiscard,
+	busy = false,
 }: {
 	open: boolean;
 	onContinue: () => void;
 	onDiscard: () => void;
+	/** In-flight operation: keep the editor mounted by disabling dismissal. */
+	busy?: boolean;
 }) {
 	return (
 		<AlertDialog
 			open={open}
 			onOpenChange={(next) => {
-				if (!next) onContinue();
+				if (!next && !busy) onContinue();
 			}}
 		>
 			<AlertDialogContent>
@@ -71,8 +74,16 @@ export function DiscardConfirm({
 					saving.
 				</AlertDialogDescription>
 				<AlertDialogFooter>
-					<AlertDialogCancel>Continue editing</AlertDialogCancel>
-					<AlertDialogAction variant="destructive" onClick={onDiscard}>
+					<AlertDialogCancel disabled={busy}>
+						Continue editing
+					</AlertDialogCancel>
+					<AlertDialogAction
+						variant="destructive"
+						disabled={busy}
+						onClick={() => {
+							if (!busy) onDiscard();
+						}}
+					>
 						Discard changes
 					</AlertDialogAction>
 				</AlertDialogFooter>
@@ -147,6 +158,7 @@ export function EditorDialog({
 					open={guard.confirming}
 					onContinue={guard.dismissConfirm}
 					onDiscard={onClose}
+					busy={busy}
 				/>
 			</DialogContent>
 		</Dialog>

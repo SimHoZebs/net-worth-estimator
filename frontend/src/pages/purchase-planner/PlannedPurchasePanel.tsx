@@ -16,8 +16,10 @@ import {
 	removeSavedPurchase,
 } from "../../state/purchaseWrites.ts";
 import { PURCHASE_EVALUATIONS } from "../../state/purchaseEvaluation.ts";
-import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
-import { useUiStore } from "../../state/uiStore.ts";
+import {
+	DEFAULT_PROJECTION_YEARS,
+	useRemoteProjection,
+} from "../../state/useRemoteProjection.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import {
 	useSavedAccounts,
@@ -38,6 +40,7 @@ export function PlannedPurchasePanel() {
 	const purchases = useSavedPurchases();
 	const startDate = useSavedStartDate();
 	const projection = useRemoteProjection({
+		years: DEFAULT_PROJECTION_YEARS,
 		ranges: false,
 		evaluations: PURCHASE_EVALUATIONS,
 	});
@@ -45,7 +48,6 @@ export function PlannedPurchasePanel() {
 	const current = base !== null && !projection.loading && !projection.baseError;
 	const schedule = current ? (base?.plannedPurchases ?? null) : null;
 	const blocked = useUserReadOnly();
-	const years = useUiStore((state) => state.years);
 	const locked = blocked;
 	const [editor, setEditor] = useState<{ item: PlannedPurchase | null } | null>(
 		null,
@@ -60,7 +62,9 @@ export function PlannedPurchasePanel() {
 		accounts: accounts ?? [],
 		schedule,
 	});
-	const end = startDate ? horizonDate({ start: startDate, years }) : "";
+	const end = startDate
+		? horizonDate({ start: startDate, years: DEFAULT_PROJECTION_YEARS })
+		: "";
 
 	const moveItem = (purchase: PlannedPurchase, direction: -1 | 1) => {
 		if (locked || purchase.readOnly || !purchases) return;

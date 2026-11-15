@@ -37,7 +37,6 @@ import {
 	serverQueryClient,
 } from "./serverQuery.ts";
 import { toast } from "../components/ui/toast.tsx";
-import { resetUiStore, useUiStore } from "./uiStore.ts";
 import {
 	projectionResultToLocal,
 	stochasticResultToLocal,
@@ -466,7 +465,6 @@ afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
 	resetServerQueryCache();
-	resetUiStore();
 	toast.close();
 });
 
@@ -559,7 +557,7 @@ describe("remote workspace state", () => {
 		expect(getAccountBalances()).toBeUndefined();
 	});
 
-	it("keeps session credentials out of workspace and UI state", async () => {
+	it("keeps session credentials out of workspace state", async () => {
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceQueries());
 		await waitFor(() =>
@@ -569,7 +567,6 @@ describe("remote workspace state", () => {
 				}),
 			).toBe(0),
 		);
-		await act(async () => useUiStore.getState().setYears(10));
 		expect(
 			server.calls.filter((call) => call.url.endsWith("/v1/status")),
 		).toHaveLength(1);
@@ -582,7 +579,6 @@ describe("remote workspace state", () => {
 				.filter(([url]) => String(url).endsWith("/v1/amount-presets"))
 				.at(-1)?.[1],
 		).not.toHaveProperty("authToken");
-		expect(useUiStore.getState()).not.toHaveProperty("authToken");
 		rendered.unmount();
 	});
 

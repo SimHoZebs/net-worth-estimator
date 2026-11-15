@@ -6,7 +6,7 @@ import {
 	ShieldCheck,
 	TriangleAlert,
 } from "lucide-react";
-import { lazy, Suspense, useId, useMemo } from "react";
+import { lazy, Suspense, useId, useMemo, useState } from "react";
 import { dateLabel, money } from "@/domain/format.ts";
 import {
 	deriveFundingGaps,
@@ -35,7 +35,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card.tsx";
 import { cn } from "@/lib/utils.ts";
-import { useSelectedId } from "@/components/entrySelection.ts";
 
 const FundingGapsModal = lazy(() =>
 	import("@/components/funding/FundingGapsModal.tsx").then((module) => ({
@@ -80,7 +79,7 @@ export function FundingGapsCard({
 			projection,
 		],
 	);
-	const [selectedId, setSelectedId] = useSelectedId();
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 	// The inspector follows its gap: a selected id with no current gap
 	// renders as no selection and closes, instead of falling back to a
 	// different gap.

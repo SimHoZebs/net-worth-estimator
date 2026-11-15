@@ -24,7 +24,10 @@ import {
 	type Transaction,
 } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
+import {
+	DEFAULT_PROJECTION_YEARS,
+	useRemoteProjection,
+} from "../../state/useRemoteProjection.ts";
 import { useSchedules } from "../../state/workspaceResources.ts";
 import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import { AccountIcon } from "../../components/AccountIcon.tsx";
@@ -77,8 +80,6 @@ export function AccountDetailView({
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
-	const [view, setView] = useTransactionView();
-	// Display accounts keep their atomic loan editor and component balances.
 	const locked = readOnly || account.readOnly || isGroupedDisplay(account);
 	const adjustments = useAccountAdjustments(
 		account.id,
@@ -136,6 +137,7 @@ export function AccountDetailView({
 	// after the viewer asks for projected activity.
 	const [forecastRequested, setForecastRequested] = useState(false);
 	const forecast = useRemoteProjection({
+		years: DEFAULT_PROJECTION_YEARS,
 		ranges: false,
 		enabled: forecastRequested,
 	});
@@ -231,13 +233,7 @@ export function AccountDetailView({
 					<AccountBalanceValue edit={edit} readOnly={locked} />
 				</form>
 			</div>
-			<Tabs
-				value={view}
-				onValueChange={(next) => {
-					if (next) setView(next as "transactions" | "details" | "recurring");
-				}}
-				className="gap-0"
-			>
+			<Tabs defaultValue="transactions" className="gap-0">
 				<TabsList
 					variant="line"
 					scrollable
@@ -256,64 +252,65 @@ export function AccountDetailView({
 						Account details
 					</TabsTrigger>
 				</TabsList>
-				<TabsContent value={view} className="flex min-w-0 flex-col gap-4">
-					{view === "transactions" ? (
-						<>
-							<Transactions
-								occurrences={occurrences}
-								rows={savedState}
-								accounts={accounts}
-								startDate={startDate}
-								readOnly={readOnly}
-								onEdit={requestEdit}
-								onSourceChange={(source) => {
-									if (source !== "historical") setForecastRequested(true);
-								}}
-								canRequestForecast={canRequestForecast}
-								projected={{
-									loading: forecastRequested && forecast.loading,
-									error: forecastRequested
-										? (forecast.baseError ?? null)
-										: null,
-									requested: forecastRequested,
-									retry: forecast.retryProjection,
-								}}
-							/>
-							{!isGroupedDisplay(account) && (
-								<BalanceHistory
-									adjustments={adjustments.data ?? []}
-									isPending={adjustments.isPending}
-									isError={adjustments.isError}
-									onRetry={() => void adjustments.refetch()}
-								/>
-							)}
-						</>
-					) : view === "recurring" ? (
-						rulesQuery.isPending ? (
-							<p role="status">Loading recurring transactions…</p>
-						) : rulesQuery.isError ? (
-							<p role="alert">
-								Recurring transactions could not be loaded.{" "}
-								<Button
-									type="button"
-									variant="secondary"
-									size="sm"
-									onClick={() => void rulesQuery.refetch()}
-								>
-									Retry
-								</Button>
-							</p>
-						) : (
-							<RecurringRules
-								account={account}
-								accounts={accounts}
-								rules={accountRules}
-								startDate={startDate}
-								readOnly={readOnly}
-								onEdit={requestEdit}
-							/>
-						)
-					) : isGroupedDisplay(account) ? (
+				<TabsContent
+					value="transactions"
+					className="flex min-w-0 flex-col gap-4"
+				>
+					<Transactions
+						occurrences={occurrences}
+						rows={savedState}
+						accounts={accounts}
+						startDate={startDate}
+						readOnly={readOnly}
+						onEdit={requestEdit}
+						onSourceChange={(source) => {
+							if (source !== "historical") setForecastRequested(true);
+						}}
+						canRequestForecast={canRequestForecast}
+						projected={{
+							loading: forecastRequested && forecast.loading,
+							error: forecastRequested ? (forecast.baseError ?? null) : null,
+							requested: forecastRequested,
+							retry: forecast.retryProjection,
+						}}
+					/>
+					{!isGroupedDisplay(account) && (
+						<BalanceHistory
+							adjustments={adjustments.data ?? []}
+							isPending={adjustments.isPending}
+							isError={adjustments.isError}
+							onRetry={() => void adjustments.refetch()}
+						/>
+					)}
+				</TabsContent>
+				<TabsContent value="recurring" className="flex min-w-0 flex-col gap-4">
+					{rulesQuery.isPending ? (
+						<p role="status">Loading recurring transactions…</p>
+					) : rulesQuery.isError ? (
+						<p role="alert">
+							Recurring transactions could not be loaded.{" "}
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								onClick={() => void rulesQuery.refetch()}
+							>
+								Retry
+							</Button>
+						</p>
+					) : (
+						<RecurringRules
+							account={account}
+							accounts={accounts}
+							rules={accountRules}
+							startDate={startDate}
+							readOnly={readOnly}
+							onEdit={requestEdit}
+						/>
+					)}
+				</TabsContent>
+				<TabsContent value="details" className="flex min-w-0 flex-col gap-4">
+					{isGroupedDisplay(account) ? (
 						<LoanDetails
 							account={account}
 							readOnly={readOnly}
@@ -388,10 +385,6 @@ export function AccountDetailView({
 			)}
 		</section>
 	);
-}
-
-function useTransactionView() {
-	return useState<"transactions" | "details" | "recurring">("transactions");
 }
 
 /**

@@ -27,6 +27,7 @@ import {
 import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
 import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
 import { useWorkspaceOverlays } from "@/workspace/useWorkspaceOverlays.ts";
+import { DEFAULT_PROJECTION_YEARS } from "@/state/useRemoteProjection.ts";
 
 export function EvaluationsPage() {
 	const overlays = useWorkspaceOverlays();
@@ -54,6 +55,7 @@ export function EvaluationsPage() {
 	const projectionQuery = useRemoteProjection({
 		// Reuse the regular range request for configured financial independence
 		// confidence. Inspecting dates and evidence never starts a calculation.
+		years: DEFAULT_PROJECTION_YEARS,
 		ranges: savedEvaluations.length > 0 || financialIndependenceEnabled,
 	});
 	const base =

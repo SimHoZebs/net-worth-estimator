@@ -11,6 +11,7 @@ RUN bun install --frozen-lockfile
 COPY auth/better-auth auth/better-auth
 COPY frontend/src/styles frontend/src/styles
 COPY frontend/src/components/ui/control-styles.ts frontend/src/components/ui/control-styles.ts
+COPY frontend/src/components/ui/brand.ts frontend/src/components/ui/brand.ts
 RUN bun --filter @waypoint/auth build
 
 FROM oven/bun:1.4.4-slim

@@ -1,5 +1,5 @@
 import { Check, Flag, Pin, TriangleAlert } from "lucide-react";
-import { lazy, Suspense, useId } from "react";
+import { lazy, Suspense, useId, useState } from "react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -9,7 +9,6 @@ import {
 	CardAction,
 	CardContent,
 } from "@/components/ui/card.tsx";
-import { useSelectedEntry } from "@/components/entrySelection.ts";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
 import { Progress, ProgressLabel } from "@/components/ui/progress.tsx";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
@@ -83,7 +82,7 @@ export function FinancialIndependenceCard({
 }) {
 	const headingId = useId();
 	const analysis = item.financialIndependence;
-	const [inspector, setInspector] = useSelectedEntry<true>(null);
+	const [inspector, setInspector] = useState<true | null>(null);
 	const candidate =
 		analysis?.candidates.find((row) => row.date === analysis.defaultDate) ??
 		analysis?.candidates[0];

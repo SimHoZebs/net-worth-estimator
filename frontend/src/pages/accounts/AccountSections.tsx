@@ -1,6 +1,7 @@
 import { Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
+import { TablePagination } from "../../components/TablePagination.tsx";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -16,13 +17,6 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { FieldLabel } from "@/components/ui/field.tsx";
-import {
-	Pagination,
-	PaginationContent,
-	PaginationItem,
-	PaginationNext,
-	PaginationPrevious,
-} from "@/components/ui/pagination.tsx";
 import {
 	Tabs,
 	TabsContent,
@@ -65,7 +59,6 @@ import { useRouter } from "@tanstack/react-router";
 import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
-import { cn } from "@/lib/utils.ts";
 
 export type AccountSectionView = "accounts" | "transactions";
 
@@ -361,10 +354,6 @@ function TransactionsView({
 		setOrder(next);
 		setPage(0);
 	};
-	const turnPage = (next: number) => {
-		setPage(next);
-		document.getElementById(listId)?.scrollIntoView({ block: "nearest" });
-	};
 	return (
 		<Tabs
 			value={schedule}
@@ -460,52 +449,15 @@ function TransactionsView({
 					)}
 				</div>
 				{pageCount > 1 && (
-					<div
-						className={cn(
-							"flex items-center justify-between gap-4 border-b border-border py-4 max-sm:gap-2",
-							"border-t",
-							"px-0.5",
-						)}
-					>
-						<span className="text-xs text-muted-foreground" role="status">
-							Showing {currentPage * TRANSACTIONS_PAGE_SIZE + 1}–
-							{Math.min(
-								(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
-								sortedTransactions.length,
-							)}{" "}
-							of {sortedTransactions.length} transactions
-						</span>
-						<Pagination className="mx-0 w-auto justify-end">
-							<PaginationContent>
-								<PaginationItem>
-									<PaginationPrevious
-										aria-label="Previous transaction page"
-										aria-disabled={currentPage === 0}
-										className={cn(
-											currentPage === 0 && "pointer-events-none opacity-50",
-										)}
-										onClick={() => turnPage(Math.max(currentPage - 1, 0))}
-									/>
-								</PaginationItem>
-								<span className="text-xs text-muted-foreground tabular-nums">
-									{currentPage + 1} / {pageCount}
-								</span>
-								<PaginationItem>
-									<PaginationNext
-										aria-label="Next transaction page"
-										aria-disabled={currentPage >= pageCount - 1}
-										className={cn(
-											currentPage >= pageCount - 1 &&
-												"pointer-events-none opacity-50",
-										)}
-										onClick={() =>
-											turnPage(Math.min(currentPage + 1, pageCount - 1))
-										}
-									/>
-								</PaginationItem>
-							</PaginationContent>
-						</Pagination>
-					</div>
+					<TablePagination
+						page={currentPage}
+						pageCount={pageCount}
+						total={sortedTransactions.length}
+						pageSize={TRANSACTIONS_PAGE_SIZE}
+						topBorder
+						className="px-0.5"
+						onPage={setPage}
+					/>
 				)}
 			</TabsContent>
 		</Tabs>

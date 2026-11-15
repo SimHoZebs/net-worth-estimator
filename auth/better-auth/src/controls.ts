@@ -9,6 +9,7 @@
 // actions, names, autocomplete, CSP, CSRF, and passkey behavior live
 // elsewhere and are unchanged by these classes.
 import { buttonVariants, inputClassName } from "../../../frontend/src/components/ui/control-styles";
+export { brand } from "../../../frontend/src/components/ui/brand";
 
 /** Preset default button at the large size, for form submit actions. */
 export const primaryButton = buttonVariants({ variant: "default", size: "lg" });
@@ -30,10 +31,3 @@ export const labelClass = "text-sm font-medium text-muted-foreground";
 
 /** Preset input control. */
 export const controlClass = inputClassName;
-
-export const brand = {
-  link: "flex items-center gap-2 text-2xl font-bold tracking-tight",
-  mark: "grid size-8 place-items-center rounded-xl bg-primary",
-  icon: "w-7 fill-none stroke-primary-foreground [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]",
-  path: "m5 23 6-15 6 12 5-9 5 12",
-};

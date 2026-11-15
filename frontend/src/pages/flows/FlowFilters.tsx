@@ -14,7 +14,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select.tsx";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import type { MovementFilter } from "../../domain/flowDiagram.ts";
 import { FlowDateRangePicker } from "./FlowDateRangePicker.tsx";
 
@@ -79,26 +79,25 @@ export function FlowFilters({
 				</Field>
 				<FieldSet>
 					<FieldLegend variant="label">Money</FieldLegend>
-					<ToggleGroup
-						value={[filters.movement]}
-						onValueChange={(next) => {
-							const nextValue = next.find(
-								(candidate) => candidate !== filters.movement,
-							);
-							if (nextValue !== undefined)
-								onChange({ movement: nextValue as MovementFilter });
-						}}
+					<RadioGroup
+						value={filters.movement}
+						onValueChange={(value) =>
+							onChange({ movement: value as MovementFilter })
+						}
 					>
-						<ToggleGroupItem type="button" value="all">
-							All
-						</ToggleGroupItem>
-						<ToggleGroupItem type="button" value="actual">
-							Recorded
-						</ToggleGroupItem>
-						<ToggleGroupItem type="button" value="projected">
-							Planned
-						</ToggleGroupItem>
-					</ToggleGroup>
+						{[
+							{ value: "all", label: "All" },
+							{ value: "actual", label: "Recorded" },
+							{ value: "projected", label: "Planned" },
+						].map(({ value, label }) => (
+							<Field key={value} orientation="horizontal">
+								<RadioGroupItem value={value} id={`${id}-movement-${value}`} />
+								<FieldLabel htmlFor={`${id}-movement-${value}`}>
+									{label}
+								</FieldLabel>
+							</Field>
+						))}
+					</RadioGroup>
 				</FieldSet>
 			</div>
 		</div>

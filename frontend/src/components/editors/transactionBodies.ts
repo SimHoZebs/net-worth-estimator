@@ -184,9 +184,15 @@ export function transactionUpdate({
 	if ((values.postedDate ?? null) !== baseline.postedDate)
 		patch.postedDate = values.postedDate ?? null;
 	if (values.enabled !== baseline.enabled) patch.enabled = values.enabled;
-	if (typeof values.pending === "boolean" && values.pending !== (baseline.pending === true))
+	if (
+		typeof values.pending === "boolean" &&
+		values.pending !== (baseline.pending === true)
+	)
 		patch.pending = values.pending;
-	if (typeof values.void === "boolean" && values.void !== (baseline.void === true))
+	if (
+		typeof values.void === "boolean" &&
+		values.void !== (baseline.void === true)
+	)
 		patch.void = values.void;
 	return patch;
 }
@@ -254,39 +260,49 @@ export function validateTransactionValues(
 	return null;
 }
 
-/** Shared client-side validation for schedule forms. */
-export function validateScheduleValues(
-	values: ScheduleFormValues,
-): string | null {
-	const termsError = validateScheduleTerms(values);
-	if (termsError) return termsError;
-	if (
-		!Number.isFinite(values.amount) ||
-		values.amount < 0 ||
-		values.amount > 1e10
-	)
-		return "Enter an amount of zero or more.";
-	if (!Number.isFinite(values.annualIncrease))
-		return "Enter a yearly increase between -50 and 50 percent.";
-	if (values.annualIncrease < -50 || values.annualIncrease > 50)
-		return "Enter a yearly increase between -50 and 50 percent.";
-	return null;
-}
-
-export function validateScheduleTerms(values: ScheduleTerms): string | null {
+function scheduleBaseError(values: {
+	name: string;
+	fromId: string | null;
+	toId: string | null;
+	startDate: string;
+	endDate: string | null;
+}): string | null {
 	if (!values.name.trim()) return "Give the schedule a name.";
 	if (!values.fromId && !values.toId)
 		return "Choose a source or destination account.";
-	if (values.fromId && values.fromId === values.toId)
-		return "Choose different source and destination accounts.";
 	if (!values.startDate) return "Choose a date.";
 	if (values.endDate && values.endDate < values.startDate)
 		return "The last occurrence cannot come before the first one.";
 	return null;
 }
 
-export function parseAmountInput(raw: string): number | null {
-	return parseDisplayNumber(raw);
+/** Shared client-side validation for schedule forms. */
+export function validateScheduleValues(
+	values: ScheduleFormValues,
+): string | null {
+	const baseError = scheduleBaseError(values);
+	if (baseError) return baseError;
+	if (
+		!Number.isFinite(values.amount) ||
+		values.amount < 0 ||
+		values.amount > 1e10
+	)
+		return "Enter an amount of zero or more.";
+	if (
+		!Number.isFinite(values.annualIncrease) ||
+		values.annualIncrease < -50 ||
+		values.annualIncrease > 50
+	)
+		return "Enter a yearly increase between -50 and 50 percent.";
+	return null;
+}
+
+export function validateScheduleTerms(values: ScheduleTerms): string | null {
+	const baseError = scheduleBaseError(values);
+	if (baseError) return baseError;
+	if (values.fromId && values.fromId === values.toId)
+		return "Choose different source and destination accounts.";
+	return null;
 }
 
 /** Form values from the in-place one-time transaction draft. */
@@ -297,23 +313,11 @@ export function detailTransactionValues({
 	draft: TransactionDraftValues;
 	item: Transaction;
 }): TransactionFormValues | Error {
-	const name = draft.name.trim();
-	const amount = parseDisplayNumber(draft.amount);
-	if (name === "") return new Error("Give the transaction a name.");
-	if (amount === null || amount < 0 || amount > 1e10)
-		return new Error("Enter an amount of zero or more.");
-	const fromId = draft.fromId || null;
-	const toId = draft.toId || null;
-	if (!fromId && !toId)
-		return new Error("Choose a source or destination account.");
-	if (!draft.startDate) return new Error("Choose a date.");
-	if (draft.claimScheduleId && !draft.claimOccurrenceDate)
-		return new Error("Choose which occurrence this replaces.");
-	return {
-		name,
-		amount,
-		fromId,
-		toId,
+	const values: TransactionFormValues = {
+		name: draft.name.trim(),
+		amount: parseDisplayNumber(draft.amount) ?? Number.NaN,
+		fromId: draft.fromId || null,
+		toId: draft.toId || null,
 		startDate: draft.startDate,
 		postedDate: draft.postedDate || item.postedDate,
 		transactionTime:
@@ -332,6 +336,9 @@ export function detailTransactionValues({
 		pending: typeof draft.pending === "boolean" ? draft.pending : item.pending,
 		void: typeof draft.void === "boolean" ? draft.void : item.void,
 	};
+	const invalid = validateTransactionValues(values);
+	if (invalid) return new Error(invalid);
+	return values;
 }
 
 /** Form values from the in-place schedule draft. */
@@ -340,33 +347,21 @@ export function detailScheduleValues({
 }: {
 	draft: ScheduleDraftValues;
 }): ScheduleFormValues | Error {
-	const name = draft.name.trim();
-	const amount = parseDisplayNumber(draft.amount);
-	if (name === "") return new Error("Give the schedule a name.");
-	if (amount === null || amount < 0 || amount > 1e10)
-		return new Error("Enter an amount of zero or more.");
-	const fromId = draft.fromId || null;
-	const toId = draft.toId || null;
-	if (!fromId && !toId)
-		return new Error("Choose a source or destination account.");
-	if (!draft.startDate) return new Error("Choose a date.");
-	const growth =
-		draft.annualIncrease.trim() !== ""
-			? (parseDisplayNumber(draft.annualIncrease) ?? Number.NaN)
-			: 0;
-	if (!Number.isFinite(growth) || growth < -50 || growth > 50)
-		return new Error("Enter a yearly increase between -50 and 50 percent.");
-	if (!draft.noEndDate && draft.endDate && draft.endDate < draft.startDate)
-		return new Error("The last occurrence cannot come before the first one.");
-	return {
-		name,
-		amount,
-		annualIncrease: growth,
-		fromId,
-		toId,
+	const values: ScheduleFormValues = {
+		name: draft.name.trim(),
+		amount: parseDisplayNumber(draft.amount) ?? Number.NaN,
+		annualIncrease:
+			draft.annualIncrease.trim() !== ""
+				? (parseDisplayNumber(draft.annualIncrease) ?? Number.NaN)
+				: 0,
+		fromId: draft.fromId || null,
+		toId: draft.toId || null,
 		frequency: draft.frequency,
 		startDate: draft.startDate,
 		endDate: !draft.noEndDate && draft.endDate ? draft.endDate : null,
 		enabled: draft.enabled,
 	};
+	const invalid = validateScheduleValues(values);
+	if (invalid) return new Error(invalid);
+	return values;
 }

@@ -24,7 +24,6 @@ import { PurchaseInspector } from "./PurchaseInspector.tsx";
 import { PurchasePriorityList } from "./PurchasePriorityList.tsx";
 import { PurchaseScheduleView } from "./PurchaseScheduleView.tsx";
 
-type View = "priority" | "schedule";
 export function PurchasePlanner({
 	items,
 	forecastEnd,
@@ -37,7 +36,6 @@ export function PurchasePlanner({
 	locked?: boolean;
 	loading?: boolean;
 } & PurchasePlannerActions) {
-	const [view, setView] = useState<View>("priority");
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const selected =
 		items.find((item) => item.purchase.id === selectedId) ?? null;
@@ -128,7 +126,7 @@ export function PurchasePlanner({
 							</span>
 						)}
 					</div>
-					<Tabs value={view} onValueChange={(value) => setView(value as View)}>
+					<Tabs defaultValue="priority">
 						<TabsList
 							variant="line"
 							scrollable
@@ -142,24 +140,21 @@ export function PurchasePlanner({
 								Schedule
 							</TabsTrigger>
 						</TabsList>
-						{view === "priority" ? (
-							<TabsContent value="priority">
-								<PurchasePriorityList
-									items={items}
-									onInspect={inspect}
-									onMove={actions.onMove}
-									locked={locked}
-								/>
-							</TabsContent>
-						) : (
-							<TabsContent value="schedule">
-								<PurchaseScheduleView
-									items={items}
-									onInspect={inspect}
-									forecastEnd={forecastEnd}
-								/>
-							</TabsContent>
-						)}
+						<TabsContent value="priority">
+							<PurchasePriorityList
+								items={items}
+								onInspect={inspect}
+								onMove={actions.onMove}
+								locked={locked}
+							/>
+						</TabsContent>
+						<TabsContent value="schedule">
+							<PurchaseScheduleView
+								items={items}
+								onInspect={inspect}
+								forecastEnd={forecastEnd}
+							/>
+						</TabsContent>
 					</Tabs>
 				</>
 			)}

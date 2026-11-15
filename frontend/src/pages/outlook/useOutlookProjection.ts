@@ -1,6 +1,9 @@
 import type { Projection, RangeResult } from "../../domain/result.ts";
 import { usePinnedEvaluations } from "../../state/pinnedEvaluations.ts";
-import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
+import {
+	DEFAULT_PROJECTION_YEARS,
+	useRemoteProjection,
+} from "../../state/useRemoteProjection.ts";
 import {
 	useSavedAccounts,
 	useSavedEvaluations,
@@ -27,10 +30,9 @@ export function useOutlookProjection(): OutlookProjection {
 	const projection = useRemoteProjection({
 		enabled: (accounts?.length ?? 0) > 0,
 		// The chart no longer offers horizon or range switches, so Outlook
-		// pins the horizon instead of inheriting possibly stale persisted
-		// preferences. The stochastic range only feeds pinned threshold
-		// cards, so it is requested only while one is pinned.
-		years: 20,
+		// pins the shared horizon. The stochastic range only feeds pinned
+		// threshold cards, so it is requested only while one is pinned.
+		years: DEFAULT_PROJECTION_YEARS,
 		ranges:
 			evaluations?.some((evaluation) =>
 				(pinnedIds ?? []).includes(evaluation.id),

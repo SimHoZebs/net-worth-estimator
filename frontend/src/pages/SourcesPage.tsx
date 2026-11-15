@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { AccountPage } from "../auth/AccountPage.tsx";
 import {
 	Tabs,
@@ -21,9 +20,8 @@ const configTabs: Array<{ id: ConfigTab; label: string }> = [
 
 export function SourcesPage() {
 	// Tabs own UI state; each panel subscribes to its own queries.
-	const [tab, setTab] = useState<ConfigTab>("sync");
 	return (
-		<Tabs value={tab} onValueChange={(next) => setTab(next as ConfigTab)}>
+		<Tabs defaultValue="sync">
 			<TabsList
 				variant="line"
 				scrollable

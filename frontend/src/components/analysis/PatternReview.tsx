@@ -423,7 +423,6 @@ export function PatternReview({
 	names: Map<string, string>;
 	readOnly: boolean;
 }) {
-	const [tab, setTab] = useState<PatternReviewTab>("review");
 	const [rows, setRows] = useState(5);
 	const [openKey, setOpenKey] = useState<string | null>(null);
 	const groups = groupPatternReviews(findings);
@@ -442,9 +441,8 @@ export function PatternReview({
 				</p>
 			</header>
 			<Tabs
-				value={tab}
-				onValueChange={(next) => {
-					setTab(next as PatternReviewTab);
+				defaultValue="review"
+				onValueChange={() => {
 					setRows(5);
 					setOpenKey(null);
 				}}

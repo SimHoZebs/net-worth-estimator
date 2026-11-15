@@ -8,12 +8,7 @@ import {
 	getUserScope,
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
-import {
-	THEME_STORAGE_KEY,
-	UI_PREFS_STORAGE_KEY,
-	clearPersistedMemory,
-} from "./persisted.ts";
-import { resetUiStore, useUiStore } from "./uiStore.ts";
+import { THEME_STORAGE_KEY, clearPersistedMemory } from "./persisted.ts";
 import {
 	getThemePreference,
 	rehydrateThemeFromStorage,
@@ -129,10 +124,6 @@ beforeEach(async () => {
 	suspendUserScope();
 	stubStorage(memoryStorage());
 	clearPersistedMemory();
-	useUiStore.persist.setOptions({
-		name: UI_PREFS_STORAGE_KEY,
-	});
-	resetUiStore();
 	setThemePreference("system");
 	resetSafeSpendingSettings();
 	server.backend.clear();
@@ -203,25 +194,6 @@ describe("unified persisted prefs", () => {
 		).toEqual([123, 456]);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(456);
 	});
-	it("persists only UI years/ranges, without credential fields", async () => {
-		useUiStore.getState().setYears(10);
-		useUiStore.getState().setRanges(false);
-		// Persist writes are async-adjacent; flush a tick.
-		await new Promise((resolve) => setTimeout(resolve, 0));
-		const raw = window.localStorage.getItem(UI_PREFS_STORAGE_KEY) ?? "";
-		expect(raw).toContain('"years":10');
-		expect(raw).toContain('"ranges":false');
-		expect(raw).not.toMatch(/authToken|bearerToken/);
-		expect(useUiStore.getState()).not.toHaveProperty("authToken");
-	});
-
-	it("falls back to UI defaults on corrupt prefs", async () => {
-		window.localStorage.setItem(UI_PREFS_STORAGE_KEY, "{bad");
-		await useUiStore.persist.rehydrate();
-		expect(useUiStore.getState().years).toBe(20);
-		expect(useUiStore.getState().ranges).toBe(true);
-	});
-
 	it("reads the stored plain-string preference and keeps corrupt data safe", async () => {
 		window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
 		rehydrateThemeFromStorage();
@@ -366,8 +338,6 @@ describe("financial preference owner isolation", () => {
 
 	it("isolates the sample and API origins without changing global display preferences", async () => {
 		setThemePreference("dark");
-		useUiStore.getState().setYears(30);
-		useUiStore.getState().setRanges(false);
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 100 });
 		await refreshSafeSpendingSettings();
 		const foreign = acceptOwner(A, "https://different-api.example");
@@ -393,11 +363,7 @@ describe("financial preference owner isolation", () => {
 		});
 		suspendUserScope();
 		expect(getThemePreference()).toBe("dark");
-		expect(useUiStore.getState()).toMatchObject({ years: 30, ranges: false });
 		expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
-		expect(window.localStorage.getItem(UI_PREFS_STORAGE_KEY)).toContain(
-			'"years":30',
-		);
 	});
 
 	it("uses the backend when browser storage is blocked", async () => {

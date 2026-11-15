@@ -1,10 +1,4 @@
-import {
-	ArrowRightLeft,
-	ChevronLeft,
-	ChevronRight,
-	ListFilter,
-	Plus,
-} from "lucide-react";
+import { ArrowRightLeft, ListFilter, Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
 	type AccountTransaction,
@@ -26,6 +20,7 @@ import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
+import { TablePagination } from "../TablePagination.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { TransactionAnalysisProvider } from "../analysis/TransactionAnalysis.tsx";
 import { useTransferLinks } from "../../state/analyses.ts";
@@ -119,12 +114,6 @@ export function Transactions({
 		if (change.source !== undefined) onSourceChange?.(change.source);
 	};
 	const resetFilters = () => update(defaultAccountViewFilters);
-	const turnPage = (next: number) => {
-		setPage(next);
-		document
-			.getElementById(`${id}-table`)
-			?.scrollIntoView({ block: "nearest" });
-	};
 	const showsProjected = filters.source !== "historical";
 	if (!occurrences.length && !canRequestForecast)
 		return (
@@ -222,41 +211,13 @@ export function Transactions({
 							))}
 						</TransactionTable>
 					</TransactionAnalysisProvider>
-					<div className="flex items-center justify-between gap-4 border-b border-border py-4 max-sm:gap-2">
-						<span className="text-xs text-muted-foreground" role="status">
-							Showing {currentPage * PAGE_SIZE + 1}–
-							{Math.min((currentPage + 1) * PAGE_SIZE, filtered.length)} of{" "}
-							{filtered.length} transactions
-						</span>
-						{/* Real buttons with the long-standing pager names: the
-							preset pagination links renamed them and broke the
-							transaction-page contract, stalling filter tests. */}
-						<div className="flex items-center gap-3 max-sm:gap-1">
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								aria-label="Previous transaction page"
-								disabled={currentPage === 0}
-								onClick={() => turnPage(currentPage - 1)}
-							>
-								<ChevronLeft size={16} aria-hidden="true" />
-							</Button>
-							<span className="text-xs text-muted-foreground tabular-nums">
-								{currentPage + 1} / {pageCount}
-							</span>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								aria-label="Next transaction page"
-								disabled={currentPage >= pageCount - 1}
-								onClick={() => turnPage(currentPage + 1)}
-							>
-								<ChevronRight size={16} aria-hidden="true" />
-							</Button>
-						</div>
-					</div>
+					<TablePagination
+						page={currentPage}
+						pageCount={pageCount}
+						total={filtered.length}
+						pageSize={PAGE_SIZE}
+						onPage={setPage}
+					/>
 					{selected && (
 						<TransactionDetail
 							transaction={selected.transaction}

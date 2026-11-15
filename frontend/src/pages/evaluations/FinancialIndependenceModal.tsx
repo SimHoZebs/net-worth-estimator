@@ -1,5 +1,4 @@
 import { TriangleAlert } from "lucide-react";
-import { useState } from "react";
 import {
 	Sheet,
 	SheetBody,
@@ -24,8 +23,6 @@ import { IndependenceDataTable } from "./IndependenceDataTable.tsx";
 import { IndependenceEvidence } from "./IndependenceEvidence.tsx";
 import { IndependenceOverview } from "./IndependenceOverview.tsx";
 
-type InspectorTab = "overview" | "configure";
-
 export function FinancialIndependenceModal({
 	item,
 	analysis,
@@ -37,7 +34,6 @@ export function FinancialIndependenceModal({
 	range: FinancialIndependenceRange | null;
 	onClose: () => void;
 }) {
-	const [tab, setTab] = useState<InspectorTab>("overview");
 	const candidate =
 		analysis.candidates.find((row) => row.date === analysis.defaultDate) ??
 		analysis.candidates[0];
@@ -56,10 +52,7 @@ export function FinancialIndependenceModal({
 					</SheetDescription>
 				</SheetHeader>
 				<SheetBody className="flex flex-col gap-4">
-					<Tabs
-						value={tab}
-						onValueChange={(value) => setTab(value as InspectorTab)}
-					>
+					<Tabs defaultValue="overview">
 						<TabsList
 							variant="line"
 							scrollable

@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { FailureLedger } from "../../domain/constraintSnapshot.ts";
 import type { TransactionResult } from "../../domain/result.ts";
 import { AccountEntry } from "../AccountEntry.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
-import { transactionSelectionKey, useSelectedId } from "../entrySelection.ts";
+import { transactionSelectionKey } from "../entrySelection.ts";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 
@@ -31,7 +32,7 @@ export function ConstraintSnapshot({
 	// Local identity only: the row is resolved from the current ledger each
 	// render, so a refresh keeps the detail open while a removed row (or a
 	// removed saved rule) renders as no selection and closes it.
-	const [selectedId, setSelectedId] = useSelectedId();
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const selected =
 		selectedId === null
 			? null
