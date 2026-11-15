@@ -2,7 +2,7 @@ import { TransactionDetail } from "../../../components/activity/TransactionDetai
 import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import { useMemo } from "react";
-import { money } from "../../../domain/format.ts";
+import { exactMoney } from "../../../domain/format.ts";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { cn } from "@/lib/utils.ts";
 import {
@@ -47,16 +47,16 @@ export function SafeSpendingCyclePanel({
 	);
 	const dividers = useMemo<SpendingLimitDivider[]>(() => {
 		const items: SpendingLimitDivider[] = [];
-		if (cycle.thresholds?.safetyNetDate) {
+		if (cycle.thresholds?.safetyNetTransactionId) {
 			items.push({
-				date: cycle.thresholds.safetyNetDate,
+				transactionId: cycle.thresholds.safetyNetTransactionId,
 				tone: "warning",
 				label: labels.reserveStarts,
 			});
 		}
-		if (cycle.thresholds?.limitDate) {
+		if (cycle.thresholds?.limitTransactionId) {
 			items.push({
-				date: cycle.thresholds.limitDate,
+				transactionId: cycle.thresholds.limitTransactionId,
 				tone: "danger",
 				label: labels.spendingLimit,
 			});
@@ -74,7 +74,9 @@ export function SafeSpendingCyclePanel({
 								"m-0 text-base font-bold tabular-nums text-foreground [overflow-wrap:anywhere]",
 							)}
 						>
-							{cycle.summary.total === null ? "—" : money(cycle.summary.total)}
+							{cycle.summary.total === null
+								? "—"
+								: exactMoney(cycle.summary.total)}
 						</strong>
 					</div>
 					{cycle.summary.byCard.map((card) => (
@@ -84,7 +86,7 @@ export function SafeSpendingCyclePanel({
 						>
 							<span className="text-muted-foreground">{card.name}</span>
 							<span className="font-semibold text-foreground">
-								{card.amount === null ? "—" : money(card.amount)}
+								{card.amount === null ? "—" : exactMoney(card.amount)}
 							</span>
 						</div>
 					))}

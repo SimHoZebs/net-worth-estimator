@@ -50,15 +50,3 @@ export const transactionAmountStyles = cva(
 export const transactionShortfallRowStyles = cva(
 	"bg-warning-bg border-l-4 border-warning-text hover:bg-warning-bg",
 );
-
-export const transactionDividerLabelStyles = cva(
-	"block text-xs font-semibold whitespace-normal",
-	{
-		variants: {
-			tone: {
-				warning: "text-warning-text",
-				danger: "text-danger-text",
-			},
-		},
-	},
-);

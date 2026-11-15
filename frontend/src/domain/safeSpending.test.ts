@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { transactionFixture } from "../mocks/projection.ts";
 import {
-	cycleAllowance,
 	groupMandatorySpending,
 	monthEndIso,
-	nextMonthObligations,
 	nextMonthRange,
 } from "./safeSpending.ts";
 
@@ -23,81 +21,6 @@ describe("month helpers", () => {
 			start: "2027-01-01",
 			end: "2027-01-31",
 		});
-	});
-});
-
-describe("cycleAllowance", () => {
-	it("subtracts fixed obligations, spent, and reserve from paycheck", () => {
-		expect(
-			cycleAllowance({
-				paycheck: 7579,
-				fixedObligations: 5000,
-				spent: 1200,
-				reserve: 725,
-			}),
-		).toBe(654);
-	});
-
-	it("matches allowance plus spent", () => {
-		expect(
-			cycleAllowance({
-				paycheck: 7579,
-				fixedObligations: 5000,
-				spent: 1200,
-				reserve: 725,
-			}),
-		).toBe(7579 - 5000 - 1200 - 725);
-	});
-});
-
-describe("projection-derived safe spending", () => {
-	const transactions = [
-		transactionFixture({
-			date: "2026-10-10",
-			transactionId: "housing",
-			name: "Housing",
-			fromId: "checking",
-			toId: null,
-			requested: 3200,
-			realized: 3200,
-		}),
-		transactionFixture({
-			date: "2026-10-20",
-			transactionId: "living",
-			name: "Living",
-			fromId: "checking",
-			toId: null,
-			requested: 1000,
-			realized: 1000,
-		}),
-		transactionFixture({
-			date: "2026-11-01",
-			transactionId: "housing",
-			name: "Housing",
-			fromId: "checking",
-			toId: null,
-			requested: 3200,
-			realized: 3200,
-		}),
-		transactionFixture({
-			date: "2026-10-15",
-			transactionId: "pay",
-			name: "Pay",
-			fromId: null,
-			toId: "checking",
-			requested: 7579,
-			realized: 7579,
-		}),
-	];
-
-	it("sums next month obligations", () => {
-		expect(
-			nextMonthObligations({
-				transactions,
-				checkingIds: ["checking"],
-				todayIso: "2026-10-08",
-			}),
-		).toEqual({ total: 3200, start: "2026-11-01", end: "2026-11-30" });
 	});
 });
 

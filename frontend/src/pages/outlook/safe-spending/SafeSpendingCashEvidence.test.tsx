@@ -67,7 +67,10 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Synthetic due today");
 		expect(html).toContain("$711.12");
 		expect(html).toContain("$1,461.01");
-		expect(html).toContain("Outstanding bills through Nov 30");
+		expect(html).toContain("Outstanding bills</h3>");
+		expect(html).toContain("<ul");
+		expect(html).toContain("<li");
+		expect(html).not.toContain("Outstanding bills through Nov 30");
 		expect(html).not.toContain("Synthetic checking");
 		expect(html).not.toContain("2026-11-14T18:00:00.000Z");
 		expect(html).not.toContain("income excluded");

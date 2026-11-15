@@ -1,11 +1,10 @@
 # Safe card spending evidence
 
-Safe card spending answers two different questions. The card allowance estimates
-how much additional card spending the selected future paycheck can support.
-Cash after outstanding bills estimates what remains of the selected cash
-accounts after their outstanding obligations through the end of the month.
-Future income is excluded from the cash figure. Neither figure is a promise
-about the bank's eventual month-end balance.
+Safe spending answers how much can safely be spent and which recorded spending
+exceeds that amount. Cash after outstanding bills is the current available cash
+less outstanding obligations through the end of the month. The chart, remaining
+allowance, daily allowance, and transaction cutoff use that same cash-backed
+budget. Future paychecks do not increase money available to spend today.
 
 ## Calculation ownership
 
@@ -13,6 +12,18 @@ The backend owns the cash summary and its supporting obligation rows. The
 frontend renders those facts rather than independently summing a second set of
 transactions. The summary and other model reads carry a revision so consumers
 can avoid combining different model versions.
+
+One current-cycle derivation owns the spending ledger, budget, chart, and
+transaction crossing identities. Its budget reconciles recorded cycle spending
+with the server's current cash remainder. This is today's spending capacity
+applied to the cycle, not a reconstructed historical bank balance. The protected
+reserve reduces safe spending without changing the underlying cash remainder.
+An unavailable cash remainder disables dependent limits and cutoffs; it never
+falls back to a future paycheck. Cutoffs identify the exact transaction, retain
+that identity in either sort order, and do not turn a daily chart total into a
+transaction boundary.
+The cutoff replaces that transaction's existing row divider, with its label
+centered in the line. It does not insert another table row or a second border.
 
 The summary accepts an explicit inclusive `start` and `end` calendar date.
 It always returns evidenced available cash at `start` and conditional
@@ -50,6 +61,8 @@ explanatory allowance and paycheck captions. Bills remain visible in their
 existing section. Show known balances even when a dependent estimate is
 unavailable; omit unsupported historical metrics rather than filling the page
 with blank rows. Last cycle shows totals only, with transactions in the drawer.
+The bills section has one heading and total, followed by a visibly separate list
+of bills with muted due dates and individual row dividers.
 
 Bill dates are calendar dates under the existing UTC calendar convention.
 Observation timestamps are instants. Changing the overall projection start or

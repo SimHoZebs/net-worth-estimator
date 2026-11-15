@@ -1,9 +1,10 @@
 export const SAFE_SPENDING_LABELS = {
+	title: "Safe spending",
 	cashAccounts: "Cash accounts",
 	cardSpendingSoFar: "Spending so far",
 	projectedSpending: "Projected at average rate",
-	spendingPace: "Card spending pace",
-	spendingLimit: "Card spending limit",
+	spendingPace: "Spending pace",
+	spendingLimit: "Spending limit",
 	historicalBudget: "Historical budget",
 	cycleSpending: "Spending this cycle",
 	cashAfterOutstandingBills: "Cash after outstanding bills",

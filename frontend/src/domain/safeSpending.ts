@@ -52,50 +52,6 @@ export function checkingAccountId(accounts: Account[]): string | null {
 	return anyCash?.id ?? null;
 }
 
-/** Next calendar month's fixed obligations from the spendable accounts. */
-export function nextMonthObligations({
-	transactions,
-	checkingIds,
-	todayIso,
-}: {
-	transactions: TransactionResult[];
-	checkingIds: string[];
-	todayIso: string;
-}): { total: number; start: string; end: string } {
-	const { start, end } = nextMonthRange(todayIso);
-	const sources = new Set(checkingIds);
-	const total = transactions
-		.filter(
-			(transaction) =>
-				transaction.fromId !== null &&
-				sources.has(transaction.fromId) &&
-				transaction.date >= start &&
-				transaction.date <= end &&
-				transaction.requested > 0,
-		)
-		.reduce((sum, transaction) => sum + transaction.requested, 0);
-	return { total, start, end };
-}
-
-/**
- * Credit-card cycle allowance: expected next paycheck minus next month's
- * fixed obligations, spending already committed this cycle, and the
- * protected reserve. Independent of the current available balance.
- */
-export function cycleAllowance({
-	paycheck,
-	fixedObligations,
-	spent,
-	reserve,
-}: {
-	paycheck: number;
-	fixedObligations: number;
-	spent: number;
-	reserve: number;
-}): number {
-	return paycheck - fixedObligations - spent - reserve;
-}
-
 export interface MandatorySpendingGroup {
 	transactionId: string;
 	name: string;

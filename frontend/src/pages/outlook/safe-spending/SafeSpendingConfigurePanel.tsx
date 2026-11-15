@@ -4,7 +4,6 @@ import { Field, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import type { Account } from "../../../domain/model.ts";
-import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
 import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
 import { clampStatementDay } from "../../../state/useSafeSpendingSettings.ts";
 import type {
@@ -12,30 +11,25 @@ import type {
 	SafeSpendingConfigHints,
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
-import { IncomeSourcesFieldset } from "./IncomeSourcesFieldset.tsx";
 import { formatRuleDetail, TogglePill } from "./TogglePill.tsx";
 
 export function SafeSpendingConfigurePanel({
 	config,
-	income,
 	billCandidates,
 	trackedBillIds,
 	accounts,
 	onToggleBill,
 	onToggleAccount,
 	onToggleSpendingAccount,
-	onToggleIncomeAccount,
 	onUpdateConfig,
 }: {
 	config: SafeSpendingConfigHints;
-	income: SafeSpendingIncome;
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Account[];
 	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
-	onToggleIncomeAccount: (accountId: string) => void;
 	onUpdateConfig: (next: Partial<TotalCycleSettings>) => void;
 }) {
 	const accountsById = useMemo(
@@ -77,28 +71,6 @@ export function SafeSpendingConfigurePanel({
 					}
 				/>
 			</Field>
-			<FieldSet>
-				<FieldLegend variant="label">Income accounts</FieldLegend>
-				<div className="flex flex-wrap gap-2">
-					{config.incomeAccounts.map((account) => {
-						const full = accountsById.get(account.id);
-						const checked = config.trackedIncomeIds.includes(account.id);
-						if (!full) return null;
-						return (
-							<AccountToggle
-								key={account.id}
-								account={full}
-								checked={checked}
-								onToggle={() => onToggleIncomeAccount(account.id)}
-							/>
-						);
-					})}
-				</div>
-			</FieldSet>
-			<IncomeSourcesFieldset
-				income={income}
-				onChange={(incomeScheduleIds) => onUpdateConfig({ incomeScheduleIds })}
-			/>
 			<FieldSet>
 				<FieldLegend variant="label">{labels.cashAccounts}</FieldLegend>
 				<div className="flex flex-wrap gap-2">

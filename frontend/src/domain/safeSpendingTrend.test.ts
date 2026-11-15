@@ -52,11 +52,13 @@ describe("safeSpendingTrend", () => {
 			["2026-01-25", 750],
 		]);
 		expect(trend.safetyNetHit).toEqual({
+			transactionId: "charge-2026-01-23-250",
 			date: "2026-01-23",
 			amount: 350,
 			projected: false,
 		});
 		expect(trend.limitHit).toEqual({
+			transactionId: "charge-2026-01-25-400",
 			date: "2026-01-25",
 			amount: 750,
 			projected: false,
@@ -164,7 +166,7 @@ describe("safeSpendingTrend", () => {
 		expect(trend.limitHit).toBeNull();
 	});
 
-	it("marks the first real charge when thresholds are already negative", () => {
+	it("does not attribute a negative opening budget to the first charge", () => {
 		const trend = safeSpendingTrend({
 			transactions: [charge("2026-01-23", 50)],
 			cycleStart: "2026-01-20",
@@ -173,16 +175,8 @@ describe("safeSpendingTrend", () => {
 			limit: -100,
 			safetyNet: -200,
 		});
-		expect(trend.limitHit).toEqual({
-			date: "2026-01-23",
-			amount: 50,
-			projected: false,
-		});
-		expect(trend.safetyNetHit).toEqual({
-			date: "2026-01-23",
-			amount: 50,
-			projected: false,
-		});
+		expect(trend.limitHit).toBeNull();
+		expect(trend.safetyNetHit).toBeNull();
 	});
 
 	it("clamps a today outside the cycle to the cycle edge", () => {

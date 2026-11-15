@@ -109,43 +109,46 @@ export function SafeSpendingCashEvidence({
 					</dl>
 				)}
 			{!historical && (
-				<div className="grid gap-2">
-					<div className="flex justify-between gap-3 text-sm">
-						<span>Outstanding bills</span>
-						<strong className="tabular-nums">
+				<div className="mt-1 grid gap-3 border-t border-border pt-4">
+					<div className="flex items-center justify-between gap-3">
+						<h3 className="m-0 text-sm font-semibold">Outstanding bills</h3>
+						<strong className="text-base tabular-nums">
 							{amountText(summary.outstandingBillsTotal)}
 						</strong>
 					</div>
-					<div
-						className="grid gap-2"
+					{(summary.outstandingObligations ?? []).length === 0 && (
+						<p className="m-0 text-xs text-muted-foreground">
+							No outstanding bills.
+						</p>
+					)}
+					{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none. */}
+					<ul
+						className="m-0 list-none divide-y divide-border p-0"
+						role="list"
 						aria-label="Outstanding bills in selected range"
 					>
-						<h4 className="m-0 text-sm">
-							Outstanding bills through {monthDay(summary.end)}
-						</h4>
-						{(summary.outstandingObligations ?? []).length === 0 && (
-							<p className="m-0 text-xs text-muted-foreground">
-								No outstanding bills.
-							</p>
-						)}
 						{(summary.outstandingObligations ?? []).map((row) => (
-							<div key={row.id} className="grid gap-1 text-sm">
-								<div className="flex justify-between gap-3">
+							<li
+								key={row.id}
+								className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
+							>
+								<div className="grid min-w-0 gap-1">
 									<span>{row.name}</span>
-									<strong className="tabular-nums">
-										{amountText(row.amount)}
-									</strong>
+									<p className="m-0 text-xs text-muted-foreground">
+										{monthDay(row.date)}
+										{row.status === "pending-coverage-unknown" &&
+											" · Pending payment coverage unknown"}
+										{row.status === "payment-status-unknown" &&
+											" · Payment status unknown"}
+									</p>
 								</div>
-								<p className="m-0 text-xs text-muted-foreground">
-									{monthDay(row.date)}
-									{row.status === "pending-coverage-unknown" &&
-										" · Pending payment coverage unknown"}
-									{row.status === "payment-status-unknown" &&
-										" · Payment status unknown"}
-								</p>
-							</div>
+								<span className="shrink-0 tabular-nums">
+									{amountText(row.amount)}
+								</span>
+							</li>
 						))}
-					</div>
+					</ul>
+					{/* oxlint-enable jsx-a11y/no-redundant-roles */}
 				</div>
 			)}
 		</section>

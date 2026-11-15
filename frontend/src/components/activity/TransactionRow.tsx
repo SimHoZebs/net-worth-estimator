@@ -24,10 +24,7 @@ import {
 } from "./TransferLinkSection.tsx";
 import { transferLinkForEdge } from "../../pages/flows/TransferMatchNote.tsx";
 import { findingLabel } from "../../domain/analysisFindings.ts";
-import {
-	transactionAmountStyles,
-	transactionDividerLabelStyles,
-} from "./activityStyles.ts";
+import { transactionAmountStyles } from "./activityStyles.ts";
 import { cn } from "@/lib/utils.ts";
 
 export function TransactionRow({
@@ -127,6 +124,7 @@ export function TransactionRow({
 			tone={tone}
 			title={transaction.name}
 			divider={divider?.tone}
+			dividerLabel={divider?.label}
 			shortfall={transaction.shortfall > 0.01 && shortfall}
 			slots={{
 				subtitle: labelCounterparty && (
@@ -194,13 +192,6 @@ export function TransactionRow({
 					{transaction.shortfall > 0.01 && (
 						<small className="block text-xs text-warning-text">
 							{exactMoney(transaction.requested)} planned
-						</small>
-					)}
-					{divider && (
-						<small
-							className={transactionDividerLabelStyles({ tone: divider.tone })}
-						>
-							{divider.label}
 						</small>
 					)}
 					{onRemove && (

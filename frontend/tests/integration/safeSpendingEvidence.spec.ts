@@ -19,7 +19,11 @@ const amount = (value: number) => ({
 
 // Synthetic reproduction: a newer investment observation must not advance the
 // checking cut, today's bills must survive, and Nov 30 income is not cash now.
-async function seedEvidence(api: APIRequestContext, pending = false) {
+async function seedEvidence(
+	api: APIRequestContext,
+	pending = false,
+	crossing = false,
+) {
 	// The existing fixture bank snapshot maps its single bridge to checking.
 	const checkingId = pending ? "checking" : "evidence-checking";
 	if (pending) {
@@ -114,12 +118,33 @@ async function seedEvidence(api: APIRequestContext, pending = false) {
 			name: "Synthetic card charge",
 			sourceAccountId: "evidence-card",
 			destinations: [],
-			amount: amount(50),
-			transactionTime: Date.parse("2026-11-13T12:00:00Z") / 1000,
-			postedTime: Date.parse("2026-11-13T12:00:00Z") / 1000,
+			amount: amount(crossing ? 100 : 50),
+			transactionTime:
+				Date.parse(crossing ? "2026-11-09T10:00:00Z" : "2026-11-13T12:00:00Z") /
+				1000,
+			postedTime:
+				Date.parse(crossing ? "2026-11-09T10:00:00Z" : "2026-11-13T12:00:00Z") /
+				1000,
 			enabled: true,
 		},
 	];
+	if (crossing) {
+		for (const [suffix, name, time] of [
+			["e005", "Synthetic crossing purchase", "12:00:00"],
+			["e006", "Synthetic later purchase", "15:00:00"],
+		]) {
+			transactions.push({
+				id: `01900000-0000-7000-8000-00000000${suffix}`,
+				name,
+				sourceAccountId: "evidence-card",
+				destinations: [],
+				amount: amount(200),
+				transactionTime: Date.parse(`2026-11-09T${time}Z`) / 1000,
+				postedTime: Date.parse(`2026-11-09T${time}Z`) / 1000,
+				enabled: true,
+			});
+		}
+	}
 	const imported = await api.post(`${FIXTURE_API}/v1/model/import`, {
 		data: {
 			model: {
@@ -254,7 +279,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			checkingAvailable: 1244.43,
 			cashAfterBills: -216.58,
 		});
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(
 			card.getByText("Cash after outstanding bills", { exact: true }),
 		).toBeVisible();
@@ -268,8 +293,16 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			/The .+ paychecks? (pays|pay|paid) this statement/,
 		);
 		await expect(
-			card.getByText("Outstanding bills through Nov 30"),
+			card.getByRole("heading", { name: "Outstanding bills", exact: true }),
 		).toBeVisible();
+		await expect(
+			card
+				.getByRole("list", { name: "Outstanding bills in selected range" })
+				.getByRole("listitem"),
+		).toHaveCount(5);
+		await expect(
+			card.getByText("Outstanding bills through Nov 30"),
+		).toHaveCount(0);
 		await expect(
 			card.getByText("Synthetic due today A", { exact: true }),
 		).toBeVisible();
@@ -285,7 +318,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			0,
 		);
 		await expect(
-			card.getByLabel("Card spending pace", { exact: true }),
+			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
 		await card.getByRole("button", { name: "Last cycle", exact: true }).click();
 		await expect(card.getByTestId("recorded-charges-value")).toHaveText(
@@ -307,7 +340,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			.focus();
 		await page.keyboard.press("Enter");
 		const drawer = page.getByRole("dialog", {
-			name: "Safe card spending",
+			name: "Safe spending",
 			exact: true,
 		});
 		const paymentRow = drawer.getByText("Synthetic one-time card settlement", {
@@ -334,7 +367,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		await expect(inlinePayment).toHaveCount(0);
 		await expect(card).not.toContainText(/[-−]\$1,385/);
 		await expect(
-			card.getByLabel("Card spending pace", { exact: true }),
+			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
 		const historical = await api.get(
 			`${FIXTURE_API}/v1/safe-spending-summary?start=2026-10-19&end=2026-10-19`,
@@ -365,14 +398,14 @@ test("included bill changes refresh cash evidence without reloading", async ({
 			outstandingBillsTotal: 1461.01,
 			cashAfterBills: -216.58,
 		});
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
 		for (const included of [false, true]) {
 			await card
 				.getByRole("button", { name: "Configure", exact: true })
 				.click();
 			const drawer = page.getByRole("dialog", {
-				name: "Safe card spending",
+				name: "Safe spending",
 				exact: true,
 			});
 			const bill = drawer.getByRole("button", {
@@ -417,6 +450,130 @@ test("included bill changes refresh cash evidence without reloading", async ({
 	}
 });
 
+test("current cash budget and exact crossing survive inline history, sorting and future salary changes", async ({
+	page,
+}) => {
+	const api = await request.newContext();
+	try {
+		await seedEvidence(api, false, true);
+		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
+		await page.goto("/outlook");
+		const card = page.getByRole("region", {
+			name: "Safe spending",
+			exact: true,
+		});
+		const checkCurrent = async () => {
+			await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
+			await expect(card.getByTestId("spend-value")).toHaveText("$0.00");
+			await expect(
+				card.getByText("Over limit by $216.58", { exact: true }),
+			).toBeVisible();
+			await expect(card.getByTestId("perday-value")).toHaveText("$0.00");
+			await expect(
+				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
+			).toHaveText(/\$283\.42 limit was crossed on Nov 9, 2026/);
+		};
+		await checkCurrent();
+		await card.getByRole("button", { name: "Last cycle", exact: true }).click();
+		await expect(card.getByTestId("recorded-charges-value")).toBeVisible();
+		await card
+			.getByRole("button", { name: "This cycle transactions", exact: true })
+			.click();
+		const drawer = page.getByRole("dialog", {
+			name: "Safe spending",
+			exact: true,
+		});
+		const checkCrossing = async () => {
+			const table = drawer.getByRole("table");
+			await expect(table.locator("tbody > tr")).toHaveCount(3);
+			await expect(table.getByRole("separator")).toHaveCount(0);
+			const row = table.getByRole("row").filter({
+				has: page.getByRole("button", {
+					name: /View Synthetic crossing purchase on/,
+				}),
+			});
+			await expect(row).toContainText("Spending limit");
+			await expect(row).toHaveClass(/border-b-0/);
+			await expect(
+				row.locator('[data-spending-divider="danger"]'),
+			).toContainText("Spending limit");
+			await expect(
+				row.locator("td").last().locator(":scope > span").first(),
+			).not.toContainText("Spending limit");
+			const geometry = await row.evaluate((element) => {
+				const marker = element.querySelector(
+					'[data-spending-divider="danger"]',
+				)!;
+				const label = marker.children[1]!;
+				const rowBounds = element.getBoundingClientRect();
+				const labelBounds = label.getBoundingClientRect();
+				return {
+					offset: Math.abs(
+						(labelBounds.left + labelBounds.right) / 2 -
+							(rowBounds.left + rowBounds.right) / 2,
+					),
+					border: getComputedStyle(element).borderBottomWidth,
+					left: getComputedStyle(marker.children[0]!).borderTopWidth,
+					right: getComputedStyle(marker.children[2]!).borderTopWidth,
+				};
+			});
+			expect(geometry.offset).toBeLessThan(1);
+			expect(geometry.border).toBe("0px");
+			expect(geometry.left).toBe("2px");
+			expect(geometry.right).toBe("2px");
+			await expect(
+				table.getByRole("row").filter({ hasText: "Spending limit" }),
+			).toHaveCount(1);
+		};
+		await checkCrossing();
+		await drawer.getByRole("button", { name: "Newest first" }).click();
+		await checkCrossing();
+		await page.keyboard.press("Escape");
+		await card.getByRole("button", { name: "This cycle", exact: true }).click();
+		await checkCurrent();
+		const changed = await api.post(
+			`${FIXTURE_API}/v1/schedules/evidence-salary/amend`,
+			{ data: { amount: amount(99999.99) } },
+		);
+		expect(changed.ok(), await changed.text()).toBe(true);
+		await page.reload();
+		await checkCurrent();
+		await card
+			.getByRole("button", { name: "This cycle transactions", exact: true })
+			.click();
+		await checkCrossing();
+		await page.keyboard.press("Escape");
+		await card.getByRole("button", { name: "Configure", exact: true }).click();
+		await expect(
+			drawer.getByText("Income accounts", { exact: true }),
+		).toHaveCount(0);
+		await expect(
+			drawer.getByText("Income sources", { exact: true }),
+		).toHaveCount(0);
+		await page.keyboard.press("Escape");
+		await page.route("**/v1/safe-spending-summary?**", async (route) => {
+			const response = await route.fetch();
+			const body = await response.json();
+			await route.fulfill({
+				response,
+				json: { ...body, status: "uncertain", cashAfterBills: null },
+			});
+		});
+		await page.reload();
+		await expect(card.getByTestId("spend-value")).toHaveText("—");
+		await expect(card.getByTestId("perday-value")).toHaveText("—");
+		await card
+			.getByRole("button", { name: "This cycle transactions", exact: true })
+			.click();
+		await expect(drawer.getByRole("table").locator("tbody > tr")).toHaveCount(
+			3,
+		);
+		await expect(drawer.locator("[data-spending-divider]")).toHaveCount(0);
+	} finally {
+		await api.dispose();
+	}
+});
+
 test("an older unclaimed pending payment preserves observed cash without subtracting a hold twice", async ({
 	page,
 }) => {
@@ -453,7 +610,7 @@ test("an older unclaimed pending payment preserves observed cash without subtrac
 		}
 		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
 		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(
 			card.getByText("Cash after outstanding bills", { exact: true }),
 		).toBeVisible();

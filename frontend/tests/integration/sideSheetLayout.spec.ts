@@ -153,9 +153,11 @@ test("transaction detail sheet keeps the dirty-close guard", async ({
 test("configure and transaction sheets share the canonical shell", async ({
 	page,
 }) => {
+	// Exercise scrolling independently of how many Configure fields exist.
+	await page.setViewportSize({ width: 1280, height: 480 });
 	await seedCardCharge();
 	await page.goto("/outlook");
-	const card = page.getByRole("region", { name: "Safe card spending" });
+	const card = page.getByRole("region", { name: "Safe spending" });
 	await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
 	// Configure opens from the same card whose transactions open the detail.
 	await card.getByRole("button", { name: "Configure", exact: true }).click();
@@ -170,8 +172,7 @@ test("configure and transaction sheets share the canonical shell", async ({
 	const configureBody = configure.locator(':scope > [data-slot="sheet-body"]');
 	await expect(configureHeader).toHaveCount(1);
 	await expect(configureBody).toHaveCount(1);
-	// The configure form is long content: the body actually scrolls while
-	// the fixed header stays put.
+	// In a short viewport the body scrolls while the fixed header stays put.
 	const scrolled = await configureBody.evaluate((el) => {
 		const overflows = el.scrollHeight > el.clientHeight;
 		if (overflows) el.scrollTop = el.scrollHeight;
@@ -258,7 +259,7 @@ test.describe("side sheet narrow layout", () => {
 	});
 	test("configure sheet fills the mobile viewport", async ({ page }) => {
 		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const sheet = page.locator('[data-slot="sheet-content"]').first();
@@ -273,7 +274,7 @@ test.describe("side sheet very narrow layout", () => {
 	test.use({ viewport: { width: 320, height: 700 } });
 	test("configure sheet fills the small viewport", async ({ page }) => {
 		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const sheet = page.locator('[data-slot="sheet-content"]').first();
@@ -302,7 +303,7 @@ test.describe("side sheet dark theme", () => {
 	});
 	test("configure sheet keeps the canonical shell", async ({ page }) => {
 		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const sheet = page.locator('[data-slot="sheet-content"]').first();

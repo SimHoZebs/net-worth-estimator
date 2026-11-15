@@ -2,7 +2,10 @@ import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Transaction } from "../../../domain/model.ts";
 import { financialModelFixture } from "../../../mocks/financialModel.ts";
-import { projectionFixture } from "../../../mocks/projection.ts";
+import {
+	projectionFixture,
+	transactionFixture,
+} from "../../../mocks/projection.ts";
 import { useCardCycleActivity } from "./useCardCycleActivity.ts";
 
 const card = {
@@ -66,6 +69,48 @@ const input = {
 };
 
 describe("useCardCycleActivity", () => {
+	it("reads saved card purchases through today independently of an older checkpoint", () => {
+		const saved = purchase("after-checkpoint", "2026-11-14", 100);
+		const { result } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				startDate: "2026-11-13",
+				displayToday: "2026-11-15",
+				transactions: [
+					saved,
+					purchase("future", "2026-11-16", 999),
+					purchase("disabled-after", "2026-11-14", 999, { enabled: false }),
+				],
+				projection: projectionFixture({
+					transactions: [
+						transactionFixture({
+							transactionId: saved.id,
+							date: "2026-11-14",
+							fromId: card.id,
+							toId: null,
+							requested: 100,
+							realized: 100,
+						}),
+						transactionFixture({
+							transactionId: "projected-only-schedule",
+							date: "2026-11-14",
+							fromId: card.id,
+							toId: null,
+							requested: 999,
+							realized: 999,
+						}),
+					],
+				}),
+			}),
+		);
+		expect(result.current.perAccount[0]!.derived).toBe(100);
+		expect(
+			result.current.perAccount[0]!.inCycle.map((row) => [
+				row.transactionId,
+				row.source,
+			]),
+		).toEqual([[saved.id, "historical"]]);
+	});
 	it("uses closing balances despite incomplete purchases and keeps the new-cycle ledger separate", () => {
 		const { result } = renderHook(() => useCardCycleActivity(input));
 		expect(result.current.closedCycle).toMatchObject({
@@ -144,7 +189,9 @@ describe("useCardCycleActivity", () => {
 				displayToday: "2026-10-22",
 			}),
 		);
-		expect(result.current.perAccount[0]!.derived).toBe(150);
+		// The saved Oct 22 purchase is now recorded too, independently of the
+		// Oct 21 balance checkpoint. Future Oct 23 holds remain outside today.
+		expect(result.current.perAccount[0]!.derived).toBe(1149);
 		const currentPending =
 			result.current.chargeCycles.cycle.transactions.filter(
 				(row) => row.pending,

@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import {
 	compactMoney,
 	dateLabel,
+	exactMoney,
 	money,
 	monthDay,
 } from "../../../domain/format.ts";
@@ -23,9 +24,9 @@ function paceLabel(
 	tone: "normal" | "warning" | "danger";
 } {
 	const limitName = historical ? "historical budget" : "limit";
-	if (trend.limitHit) {
+	if (trend.limitHit || (trend.limit !== null && trend.limit < 0)) {
 		return {
-			text: trend.limitHit.projected
+			text: trend.limitHit?.projected
 				? `${historical ? "Budget" : "Limit"} ~ ${monthDay(trend.limitHit.date)}`
 				: `Over ${limitName}`,
 			tone: "danger",
@@ -57,10 +58,10 @@ function legendSwatch(dashed: boolean, tone: string) {
 }
 
 /**
- * Card spending pace. The solid line is recorded spending through today, the
+ * Spending pace. The solid line is recorded spending through today, the
  * dashed continuation is the average daily rate carried to cycle end, and the
  * horizontal rules mark the protected reserve and the spending threshold.
- * Open statements call the threshold the card spending limit; closed
+ * Open statements call the threshold the current spending limit; closed
  * statements call it the historical budget. Colors match the list dividers
  * that mark the same crossings.
  */
@@ -173,7 +174,7 @@ export function SafeSpendingTrendChart({
 						y: {
 							label: {
 								format: (value) =>
-									typeof value === "number" ? money(value) : "",
+									typeof value === "number" ? exactMoney(value) : "",
 							},
 						},
 					}),
@@ -218,7 +219,7 @@ export function SafeSpendingTrendChart({
 								: typeof datum.amount === "number"
 									? datum.amount
 									: Number(point.yValue);
-						return `${dateLabel(date, true)}: ${money(spent)}${datum.projected ? " projected" : ""}`;
+						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}`;
 					},
 				},
 			}),
@@ -248,22 +249,22 @@ export function SafeSpendingTrendChart({
 					: "Spending is already over the spending limit."
 				: trend.limitHit
 					? trend.limitHit.projected
-						? `The ${money(trend.limit)} ${limitName} is reached around ${dateLabel(trend.limitHit.date, true)}.`
-						: `The ${money(trend.limit)} ${limitName} was crossed on ${dateLabel(trend.limitHit.date, true)}.`
+						? `The ${exactMoney(trend.limit)} ${limitName} is reached around ${dateLabel(trend.limitHit.date, true)}.`
+						: `The ${exactMoney(trend.limit)} ${limitName} was crossed on ${dateLabel(trend.limitHit.date, true)}.`
 					: trend.limit <= 0
 						? historical
 							? "The paychecks in this cycle did not cover its bills."
-							: "The current income does not cover next month's bills."
-						: `The ${money(trend.limit)} ${limitName} is not reached this cycle.`
+							: "The current cash-backed budget is already exhausted at cycle entry."
+						: `The ${exactMoney(trend.limit)} ${limitName} is not reached this cycle.`
 			: "";
 	const description =
-		`Card spending reached ${money(current)} by ${dateLabel(lastActual!.date, true)}. ` +
+		`Spending reached ${exactMoney(current)} by ${dateLabel(lastActual!.date, true)}. ` +
 		(trend.averageDaily > 0
 			? `The average rate is ${money(trend.averageDaily)} a day. `
 			: "") +
 		limitText +
 		(showThresholds && trend.safetyNet !== null && trend.safetyNet > 0
-			? ` The protected reserve starts at ${money(trend.safetyNet)}.`
+			? ` The protected reserve starts at ${exactMoney(trend.safetyNet)}.`
 			: "");
 
 	return (

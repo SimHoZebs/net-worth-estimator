@@ -5,9 +5,13 @@ import { mandatoryTransactions } from "@/domain/safeSpending.ts";
 import { safeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
 import { sortTransactionsByDate } from "@/domain/transactionSort.ts";
 import type { TransactionOrder } from "@/domain/transactionSort.ts";
-import type { SafeSpendingMandatorySection } from "./safeSpendingDetailModel.ts";
+import type {
+	SafeSpendingMandatorySection,
+	SafeSpendingClosedCycle,
+} from "./safeSpendingDetailModel.ts";
+import type { AccountTransaction } from "@/domain/accountActivity.ts";
 import { buildCycleView } from "./safeSpendingDetailModel.ts";
-import type { CycleViewInput, CycleViewResult } from "./cycleView.ts";
+import type { CycleViewResult } from "./cycleView.ts";
 
 /** Recorded activity is evidence of charges, not cash at close or a historical budget. */
 export function historicalCycleView({
@@ -18,7 +22,10 @@ export function historicalCycleView({
 	accounts,
 	savedTransactions,
 	transactionOrder,
-}: Pick<CycleViewInput, "closedCycle" | "cardTransactions" | "spendingIds"> & {
+}: {
+	closedCycle: SafeSpendingClosedCycle;
+	cardTransactions: AccountTransaction[];
+	spendingIds: string[];
 	billResults: TransactionResult[];
 	accounts: Account[];
 	savedTransactions: Transaction[];
@@ -49,7 +56,7 @@ export function historicalCycleView({
 		cycleStart: closedCycle.start,
 		cycleEnd: closedCycle.end,
 		closedCycle,
-		funding: { paycheck: 0, date: null, endDate: null, fixedBills: 0 },
+		remaining: null,
 		cardSpent: null,
 		cardSpentByCard: [],
 		reserve: 0,

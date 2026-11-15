@@ -1,22 +1,18 @@
 import type { AccountTransaction } from "@/domain/accountActivity.ts";
-import type { TransactionResult } from "@/domain/result.ts";
-import { nextMonthObligations } from "@/domain/safeSpending.ts";
-import { safeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
+import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
 import {
-	buildCycleView,
-	type CycleView,
-	type StatementFunding,
-} from "./safeSpendingDetailModel.ts";
+	safeSpendingTrend,
+	spendingLedger,
+} from "@/domain/safeSpendingTrend.ts";
+import { buildCycleView, type CycleView } from "./safeSpendingDetailModel.ts";
+import { monthEndIso } from "@/domain/safeSpending.ts";
 
 export interface CycleViewInput {
 	cycle: { start: string; end: string };
 	referenceDay: string;
-	spendingIds: string[];
-	obligationResults: TransactionResult[];
-	cardTransactions: AccountTransaction[];
-	cardSpent: number | null;
+	transactions: AccountTransaction[];
+	cashSummary?: SafeSpendingSummary;
 	cardSpentByCard: { id: string; name: string; amount: number | null }[];
-	funding: StatementFunding;
 	reserve: number;
 	closedCycle: CycleView["heroes"]["closedCycle"];
 	fullDaysLeft: number;
@@ -28,49 +24,63 @@ export interface CycleViewResult {
 }
 
 /**
- * Current card allowance and pace. Cash evidence is owned by the server summary.
+ * One current cash-backed budget. Capacity reconstructs the current budget over
+ * recorded cycle spending; it is neither historical bank cash nor an old budget.
+ * Known cash already includes recorded bank movements: purchases are not deducted
+ * from it again. Future income never enters this calculation.
  */
 export function cycleView({
 	cycle,
 	referenceDay,
-	spendingIds,
-	obligationResults,
-	cardTransactions,
-	cardSpent,
+	transactions,
+	cashSummary,
 	cardSpentByCard,
-	funding,
 	reserve,
 	closedCycle,
 	fullDaysLeft,
-}: CycleViewInput): CycleViewResult {
-	const fixedBills = spendingIds.length
-		? nextMonthObligations({
-				transactions: obligationResults,
-				checkingIds: spendingIds,
-				todayIso: cycle.end,
-			}).total
-		: 0;
-	const fundingWithBills = { ...funding, fixedBills };
-	const view = buildCycleView({
+}: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
+	const ledger = spendingLedger({
+		transactions,
 		cycleStart: cycle.start,
 		cycleEnd: cycle.end,
-		closedCycle,
-		funding: fundingWithBills,
-		cardSpent,
-		cardSpentByCard,
-		reserve,
-		fullDaysLeft,
+		todayIso: referenceDay,
 	});
-	const limit = funding.paycheck - fixedBills;
+	const spent =
+		ledger.reduce((total, row) => total + Math.round(row.amount * 100), 0) /
+		100;
+	const remaining =
+		cashSummary?.status === "available" &&
+		cashSummary.start === referenceDay &&
+		cashSummary.end === monthEndIso(referenceDay) &&
+		cashSummary.cashAfterBills !== null &&
+		Number.isFinite(cashSummary.cashAfterBills)
+			? cashSummary.cashAfterBills
+			: null;
+	const protectedReserve = Math.max(0, reserve);
+	const capacity =
+		remaining === null ? null : Math.round((spent + remaining) * 100) / 100;
 	return {
-		view,
+		ledger,
+		view: buildCycleView({
+			cycleStart: cycle.start,
+			cycleEnd: cycle.end,
+			closedCycle,
+			remaining,
+			cardSpent: spent,
+			cardSpentByCard,
+			reserve: protectedReserve,
+			fullDaysLeft,
+		}),
 		trend: safeSpendingTrend({
-			transactions: cardTransactions,
+			transactions: ledger,
 			cycleStart: cycle.start,
 			cycleEnd: cycle.end,
 			todayIso: referenceDay,
-			limit,
-			safetyNet: limit - reserve,
+			limit: capacity,
+			safetyNet:
+				capacity === null
+					? null
+					: Math.round((capacity - protectedReserve) * 100) / 100,
 		}),
 	};
 }

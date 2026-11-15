@@ -36,7 +36,7 @@ export function SafeSpendingDetailShell({
 	onClose: () => void;
 	children: React.ReactNode;
 }) {
-	const title = "Safe card spending";
+	const title = "Safe spending";
 	const counts: Partial<Record<SafeSpendingDetailTab, number>> = cycleCounts;
 	const id = useId();
 	return (

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { TransactionRow } from "../../../components/activity/TransactionRow.tsx";
 import { TransactionTable } from "../../../components/activity/TransactionTable.tsx";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
@@ -35,46 +34,10 @@ export function SafeSpendingSectionHeader({
 }
 
 export interface SpendingLimitDivider {
-	/** Transaction date whose cumulative spending crossed the threshold. */
-	date: string;
+	/** Exact ledger row which first made shared remaining headroom negative. */
+	transactionId: string;
 	tone: "warning" | "danger";
 	label: string;
-}
-
-function ThresholdDivider({
-	tone,
-	label,
-}: Pick<SpendingLimitDivider, "tone" | "label">) {
-	return (
-		<tr>
-			<td colSpan={3} className="border-0 p-0">
-				<div
-					role="separator"
-					aria-label={label}
-					className="flex items-center gap-3 py-1"
-				>
-					<span
-						aria-hidden="true"
-						className={
-							tone === "danger"
-								? "h-0.5 flex-1 rounded-md bg-danger-text"
-								: "flex-1 border-t-2 [border-top-style:dashed] border-warning-text"
-						}
-					/>
-					<span
-						aria-hidden="true"
-						className={
-							tone === "danger"
-								? "text-xs font-semibold whitespace-nowrap text-danger-text"
-								: "text-xs font-semibold whitespace-nowrap text-warning-text"
-						}
-					>
-						{label}
-					</span>
-				</div>
-			</td>
-		</tr>
-	);
 }
 
 export function TransactionSectionView({
@@ -110,31 +73,14 @@ export function TransactionSectionView({
 			</div>
 		);
 	}
-	const dividerByDate = new Map<string, SpendingLimitDivider>();
+	const dividerById = new Map<string, SpendingLimitDivider>();
 	for (const divider of dividers) {
-		const existing = dividerByDate.get(divider.date);
+		const existing = dividerById.get(divider.transactionId);
 		if (!existing || divider.tone === "danger") {
-			dividerByDate.set(divider.date, divider);
+			dividerById.set(divider.transactionId, divider);
 		}
 	}
-	// The latest transaction date has no newer row to carry its bottom
-	// border. Keep that boundary as a standalone divider at the list edge.
-	const latestDate = transactions.reduce(
-		(latest, transaction) =>
-			transaction.date > latest ? transaction.date : latest,
-		transactions[0]!.date,
-	);
-	const edgeDivider = dividerByDate.get(latestDate) ?? null;
-	const rowDividers = new Map<string, SpendingLimitDivider>();
-	for (let index = 0; index < transactions.length - 1; index++) {
-		const current = transactions[index]!;
-		const next = transactions[index + 1]!;
-		if (current.date === next.date) continue;
-		const boundaryDate = current.date < next.date ? current.date : next.date;
-		const divider = dividerByDate.get(boundaryDate);
-		if (divider) rowDividers.set(current.id, divider);
-	}
-	const rows: ReactNode[] = transactions.map((transaction) => (
+	const rows = transactions.map((transaction) => (
 		<TransactionRow
 			key={transaction.id}
 			transaction={transaction}
@@ -142,21 +88,11 @@ export function TransactionSectionView({
 				savedTransactions.get(transaction.transactionId) ?? null
 			}
 			onEdit={(savedTransaction) => onInspect(transaction, savedTransaction)}
-			divider={rowDividers.get(transaction.id)}
+			divider={dividerById.get(transaction.id)}
 			shortfall={shortfall}
 			shortfallLabel={shortfallLabel}
 		/>
 	));
-	if (edgeDivider && order === "newest") {
-		rows.unshift(
-			<ThresholdDivider key={`divider-${edgeDivider.date}`} {...edgeDivider} />,
-		);
-	}
-	if (edgeDivider && order === "oldest") {
-		rows.push(
-			<ThresholdDivider key={`divider-${edgeDivider.date}`} {...edgeDivider} />,
-		);
-	}
 	return (
 		<TransactionTable
 			className="border-t-0"

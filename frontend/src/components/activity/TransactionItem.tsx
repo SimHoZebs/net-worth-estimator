@@ -34,6 +34,7 @@ export function TransactionItemRow({
 	selectDisabled = false,
 	dimmed = false,
 	divider,
+	dividerLabel,
 	shortfall,
 	slots,
 }: {
@@ -47,6 +48,8 @@ export function TransactionItemRow({
 	selectDisabled?: boolean;
 	dimmed?: boolean;
 	divider?: "warning" | "danger";
+	/** Centered in this row's existing divider, without a spacer row. */
+	dividerLabel?: string;
 	shortfall?: boolean;
 	slots?: TransactionItemSlots;
 }) {
@@ -54,6 +57,7 @@ export function TransactionItemRow({
 		<TableRow
 			className={cn(
 				transactionRowStyles({ dimmed, divider }),
+				dividerLabel && "relative border-b-0",
 				shortfall && transactionShortfallRowStyles(),
 			)}
 		>
@@ -102,6 +106,39 @@ export function TransactionItemRow({
 			</TableHead>
 			<TableCell className={transactionCellStyles({ column: "amount" })}>
 				<span className="flex flex-col items-end gap-0.5">{amount}</span>
+				{divider && dividerLabel && (
+					<span
+						data-spending-divider={divider}
+						className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex translate-y-1/2 items-center gap-3"
+					>
+						<span
+							aria-hidden="true"
+							className={cn(
+								"flex-1 border-t-2",
+								divider === "danger"
+									? "border-danger-text"
+									: "[border-top-style:dashed] border-warning-text",
+							)}
+						/>
+						<span
+							className={cn(
+								"text-xs font-semibold whitespace-nowrap",
+								divider === "danger" ? "text-danger-text" : "text-warning-text",
+							)}
+						>
+							{dividerLabel}
+						</span>
+						<span
+							aria-hidden="true"
+							className={cn(
+								"flex-1 border-t-2",
+								divider === "danger"
+									? "border-danger-text"
+									: "[border-top-style:dashed] border-warning-text",
+							)}
+						/>
+					</span>
+				)}
 			</TableCell>
 		</TableRow>
 	);

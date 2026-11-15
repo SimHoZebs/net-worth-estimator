@@ -82,9 +82,9 @@ test.describe("net worth header narrow layout", () => {
 			await page.clock.setFixedTime(new Date(`${anchor}T12:00:00Z`));
 		}
 		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(
-			card.getByRole("heading", { name: "Safe card spending" }),
+			card.getByRole("heading", { name: "Safe spending" }),
 		).toBeVisible();
 		// Loaded body only: the pending skeleton carries aria-busy.
 		await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);

@@ -41,7 +41,11 @@ export function safeSpendingSummaryOptions(
 	});
 }
 
-export function useSafeSpendingSummary(start: string, end: string) {
+export function useSafeSpendingSummary(
+	start: string,
+	end: string,
+	enabled = true,
+) {
 	const scope = useUserScope();
 	const savingSettings =
 		useIsMutating(
@@ -65,7 +69,8 @@ export function useSafeSpendingSummary(start: string, end: string) {
 	const query = useQuery(
 		{
 			...safeSpendingSummaryOptions(start, end, revisions, scope),
-			enabled: scope.status === "ready" && coherent && !savingSettings,
+			enabled:
+				enabled && scope.status === "ready" && coherent && !savingSettings,
 			refetchOnMount: "always",
 		},
 		serverQueryClient(),
@@ -96,6 +101,7 @@ export function useSafeSpendingSummary(start: string, end: string) {
 	return {
 		...query,
 		data:
+			enabled &&
 			coherent &&
 			!savingSettings &&
 			!query.isFetching &&

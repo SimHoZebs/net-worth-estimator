@@ -1,6 +1,7 @@
 import type { AccountTransaction } from "./accountActivity.ts";
 import { isCycleOutflow } from "./cardCycle.ts";
 import { daysBetweenInclusive, shiftDate } from "./format.ts";
+import { sortTransactionsByDate } from "./transactionSort.ts";
 
 export interface SafeSpendingTrendPoint {
 	date: string;
@@ -9,6 +10,7 @@ export interface SafeSpendingTrendPoint {
 }
 
 export interface SafeSpendingThresholdHit {
+	transactionId?: string;
 	date: string;
 	amount: number;
 	projected: boolean;
@@ -32,9 +34,7 @@ function firstHit(
 ): SafeSpendingThresholdHit | null {
 	if (threshold === null || !Number.isFinite(threshold)) return null;
 	for (const point of points) {
-		// A negative threshold is already exceeded at zero spending. The
-		// first real charge is the first row a divider can follow.
-		if (point.spent <= 0 && threshold < 0) continue;
+		if (threshold < 0) return null;
 		if (point.spent > threshold) {
 			return {
 				date: point.date,
@@ -46,12 +46,81 @@ function firstHit(
 	return null;
 }
 
+/** Recorded spending only, in stable chronology shared by totals and crossings. */
+export function spendingLedger({
+	transactions,
+	cycleStart,
+	cycleEnd,
+	todayIso,
+}: {
+	transactions: readonly AccountTransaction[];
+	cycleStart: string;
+	cycleEnd: string;
+	todayIso: string;
+}): AccountTransaction[] {
+	const seen = new Set<string>();
+	return sortTransactionsByDate({
+		items: transactions
+			.filter(
+				(row) =>
+					row.source === "historical" &&
+					isCycleOutflow(row) &&
+					row.flow !== "transfer" &&
+					row.amount !== 0 &&
+					row.date >= cycleStart &&
+					row.date <= cycleEnd &&
+					row.date <= todayIso,
+			)
+			.filter((row) => {
+				// Account selections can overlap. Count the same recorded financial
+				// effect once, without merging distinct split effects or saved IDs.
+				const identity = JSON.stringify([
+					row.transactionId,
+					row.date,
+					row.direction,
+					row.flow,
+					row.from,
+					row.to,
+					row.amount,
+				]);
+				if (seen.has(identity)) return false;
+				seen.add(identity);
+				return true;
+			}),
+		getDate: (row) => row.sortDate ?? row.date,
+		getId: (row) => row.id,
+		order: "oldest",
+	});
+}
+
+function ledgerHit(
+	ledger: readonly AccountTransaction[],
+	threshold: number | null,
+): SafeSpendingThresholdHit | null {
+	if (threshold === null || !Number.isFinite(threshold) || threshold < 0)
+		return null;
+	let spentCents = 0;
+	for (const row of ledger) {
+		const before = spentCents;
+		spentCents += Math.round(row.amount * 100);
+		const thresholdCents = Math.round(threshold * 100);
+		if (before <= thresholdCents && spentCents > thresholdCents) {
+			return {
+				date: row.date,
+				amount: spentCents / 100,
+				projected: false,
+				transactionId: row.id,
+			};
+		}
+	}
+	return null;
+}
+
 /**
- * Daily cumulative card spending for one statement cycle. Actual rows run
+ * Daily cumulative spending for one statement cycle. Actual rows run
  * from the cycle start through today; projected rows continue from today at
- * the average daily rate. Threshold hits mark the first day cumulative
- * spending passes each amount, so the same dates drive the list dividers and
- * the pace chart.
+ * the average daily rate. Actual crossings retain the exact ledger row identity,
+ * even when several charges share a day. Negative opening capacity has no causal row.
  */
 export function safeSpendingTrend({
 	transactions,
@@ -84,11 +153,19 @@ export function safeSpendingTrend({
 	if (end < start) return empty;
 
 	const daily = new Map<string, number>();
-	for (const transaction of transactions) {
-		if (!isCycleOutflow(transaction) || transaction.amount <= 0) continue;
+	const ledger = spendingLedger({
+		transactions,
+		cycleStart: start,
+		cycleEnd: end,
+		todayIso: today,
+	});
+	for (const transaction of ledger) {
 		const date = transaction.date.slice(0, 10);
 		if (date < start || date > today) continue;
-		daily.set(date, (daily.get(date) ?? 0) + transaction.amount);
+		daily.set(
+			date,
+			(daily.get(date) ?? 0) + Math.round(transaction.amount * 100),
+		);
 	}
 
 	const actual: SafeSpendingTrendPoint[] = [];
@@ -96,7 +173,7 @@ export function safeSpendingTrend({
 	const elapsedDays = daysBetweenInclusive(start, today);
 	for (let offset = 0; offset < elapsedDays; offset++) {
 		const date = shiftDate({ date: start, days: offset });
-		cumulative = roundCents(cumulative + (daily.get(date) ?? 0));
+		cumulative = roundCents(cumulative + (daily.get(date) ?? 0) / 100);
 		actual.push({ date, spent: cumulative, projected: false });
 	}
 
@@ -121,7 +198,8 @@ export function safeSpendingTrend({
 		limit,
 		safetyNet,
 		averageDaily,
-		limitHit: firstHit(actual, limit) ?? firstHit(projected, limit),
-		safetyNetHit: firstHit(actual, safetyNet) ?? firstHit(projected, safetyNet),
+		limitHit: ledgerHit(ledger, limit) ?? firstHit(projected, limit),
+		safetyNetHit:
+			ledgerHit(ledger, safetyNet) ?? firstHit(projected, safetyNet),
 	};
 }

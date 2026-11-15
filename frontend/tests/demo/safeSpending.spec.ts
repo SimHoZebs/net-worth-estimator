@@ -9,16 +9,16 @@ test("seeded account demo", async ({ page }) => {
 	await page.clock.setFixedTime(new Date(`${anchor}T12:00:00Z`));
 	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	await expect(
-		page.getByRole("heading", { name: "Safe card spending" }),
+		page.getByRole("heading", { name: "Safe spending" }),
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
 		await expect(
 			page.getByText("Cash after outstanding bills", { exact: true }),
 		).toBeVisible();
-		await expect(page.getByText("Card spending pace")).toBeVisible();
+		await expect(page.getByText("Spending pace")).toBeVisible();
 		await expect(
-			page.getByRole("separator", { name: "Card spending limit" }),
-		).toBeVisible();
+			page.getByRole("separator", { name: "Spending limit" }),
+		).toHaveCount(0);
 		await expect(
 			page.getByText("Protected reserve starts", { exact: true }),
 		).toBeVisible();
@@ -33,7 +33,7 @@ test("seeded account demo", async ({ page }) => {
 	await page.getByRole("button", { name: "This cycle transactions" }).click();
 	await expect(
 		page
-			.getByRole("dialog", { name: "Safe card spending" })
+			.getByRole("dialog", { name: "Safe spending" })
 			.getByRole("heading", { name: "Spending this cycle" }),
 	).toBeVisible();
 	// Keep the headed browser open until the developer stops the command.

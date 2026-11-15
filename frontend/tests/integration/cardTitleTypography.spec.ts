@@ -58,12 +58,12 @@ test("safe-spending card title heading matches the canonical composition", async
 	page,
 }) => {
 	await page.goto("/outlook");
-	const card = page.getByRole("region", { name: "Safe card spending" });
+	const card = page.getByRole("region", { name: "Safe spending" });
 	const title = card.locator(
 		':scope > [data-slot="card-header"] > [data-slot="card-title"]',
 	);
 	await expect(title).toHaveCount(1);
-	const heading = title.getByRole("heading", { name: "Safe card spending" });
+	const heading = title.getByRole("heading", { name: "Safe spending" });
 	await expectLoadedCard(card);
 	await expectCanonicalTitle(heading, title, "16px");
 	// Layout, identity, and semantics survive the inheritance rule.
@@ -78,11 +78,11 @@ test("safe-spending card title heading inherits the sm composition", async ({
 	page,
 }) => {
 	await page.goto("/outlook");
-	const card = page.getByRole("region", { name: "Safe card spending" });
+	const card = page.getByRole("region", { name: "Safe spending" });
 	const title = card.locator(
 		':scope > [data-slot="card-header"] > [data-slot="card-title"]',
 	);
-	const heading = title.getByRole("heading", { name: "Safe card spending" });
+	const heading = title.getByRole("heading", { name: "Safe spending" });
 	await expectLoadedCard(card);
 	await expectCanonicalTitle(heading, title, "16px");
 	await card.evaluate((el) => {
@@ -105,12 +105,12 @@ test.describe("card title heading narrow layout", () => {
 		page,
 	}) => {
 		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe card spending" });
+		const card = page.getByRole("region", { name: "Safe spending" });
 		const title = card.locator(
 			':scope > [data-slot="card-header"] > [data-slot="card-title"]',
 		);
 		const heading = title.getByRole("heading", {
-			name: "Safe card spending",
+			name: "Safe spending",
 		});
 		await expectLoadedCard(card);
 		await expectCanonicalTitle(heading, title, "16px");

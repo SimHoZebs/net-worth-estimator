@@ -23,7 +23,6 @@ import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 export function useCardCycleActivity({
 	accounts,
 	transactions,
-	startDate,
 	checkpoints,
 	projection,
 	cards,
@@ -60,8 +59,9 @@ export function useCardCycleActivity({
 						accountId,
 						accounts,
 						transactions,
-						startDate,
-						projection,
+						// A saved purchase after the balance checkpoint is still a
+						// recorded purchase. Schedules/projections are not actuals.
+						startDate: displayToday,
 					});
 					return {
 						accountId,
@@ -102,7 +102,6 @@ export function useCardCycleActivity({
 	}, [
 		accounts,
 		transactions,
-		startDate,
 		checkpoints,
 		projection,
 		cards,

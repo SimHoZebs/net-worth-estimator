@@ -137,7 +137,9 @@ export function transactionToDisplay(
 		transactionTime:
 			typeof extra.transactionTime === "number" && extra.transactionTime > 0
 				? extra.transactionTime
-				: null,
+				: typeof extra.postedTime === "number" && extra.postedTime > 0
+					? extra.postedTime
+					: null,
 		receiptIds: Array.isArray(extra.receiptIds)
 			? extra.receiptIds.filter(
 					(id): id is string => typeof id === "string" && id !== "",
