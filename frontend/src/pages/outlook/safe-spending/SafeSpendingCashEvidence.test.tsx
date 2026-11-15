@@ -57,7 +57,7 @@ const render = (data: SafeSpendingSummary, historical = false) =>
 	);
 
 describe("safe spending cash evidence", () => {
-	it("renders the server amount and due-today rows with exact independent observation provenance", () => {
+	it("renders exact server amounts and the visible outstanding bills list without diagnostics", () => {
 		const html = render(summary());
 		expect(html).toContain("-$216.58");
 		expect(html).not.toContain("Short by");
@@ -65,11 +65,14 @@ describe("safe spending cash evidence", () => {
 			/class="[^"]*text-danger-text[^"]*" data-testid="left-value"/,
 		);
 		expect(html).toContain("Synthetic due today");
-		expect(html).toContain("Synthetic checking");
-		expect(html).toContain("2026-11-14T18:00:00.000Z");
-		expect(html).toContain("Bills due Nov 15 – Nov 30");
-		expect(html).toContain("Nov 15–30 bills · income excluded");
-		expect(html).toContain("Future income and earlier bills are excluded.");
+		expect(html).toContain("$711.12");
+		expect(html).toContain("$1,461.01");
+		expect(html).toContain("Outstanding bills through Nov 30");
+		expect(html).not.toContain("Synthetic checking");
+		expect(html).not.toContain("2026-11-14T18:00:00.000Z");
+		expect(html).not.toContain("income excluded");
+		expect(html).not.toContain("Future income and earlier bills are excluded.");
+		expect(html).not.toContain("<details");
 		expect(html).not.toContain("Cash accounts");
 		expect(html).not.toContain('role="img"');
 	});
@@ -82,9 +85,8 @@ describe("safe spending cash evidence", () => {
 			}),
 		);
 		expect(html).toContain('data-testid="left-value">—');
-		expect(html).toContain(
-			"A pending payment may already be included in available cash, so the exact remainder is unavailable.",
-		);
+		expect(html).toContain("Remainder uncertain");
+		expect(html).toContain("$1,244.43");
 		expect(html).not.toContain("-$216.58");
 		expect(html).not.toContain("Short by");
 	});
@@ -101,10 +103,8 @@ describe("safe spending cash evidence", () => {
 		expect(html).toMatch(
 			/Synthetic checking · observed available<\/dt><dd[^>]*>\$1,244.43/,
 		);
-		expect(html).toContain("Posted $1,608.05 · Available $1,244.43");
-		expect(html).toContain(
-			"A pending payment may already be included in available cash, so the exact remainder is unavailable.",
-		);
+		expect(html).not.toContain("Posted");
+		expect(html).toContain("Remainder uncertain");
 		expect(html).not.toContain("-$216.58");
 	});
 	it.each([0, 100])(
@@ -115,7 +115,7 @@ describe("safe spending cash evidence", () => {
 			expect(html).not.toContain("text-danger-text");
 		},
 	);
-	it("explains a posted payment's unresolved hold coverage", () => {
+	it("preserves uncertainty for a posted payment with unresolved hold coverage", () => {
 		const html = render(
 			summary({
 				cashAfterBills: null,
@@ -123,13 +123,12 @@ describe("safe spending cash evidence", () => {
 				reasons: ["posted-hold-coverage-unknown"],
 			}),
 		);
-		expect(html).toContain(
-			"A posted payment may still be covered by a hold in the observed available balance",
-		);
+		expect(html).toContain("Remainder uncertain");
+		expect(html).toContain('data-testid="left-value">—');
 		expect(html).not.toContain("posted-hold-coverage-unknown");
 	});
 	it.each(["new-internal-reason", "__proto__"])(
-		"uses a generic explanation for unknown reason %s",
+		"preserves uncertainty without exposing internal reason %s",
 		(reason) => {
 			const html = render(
 				summary({
@@ -138,7 +137,7 @@ describe("safe spending cash evidence", () => {
 					reasons: [reason],
 				}),
 			);
-			expect(html).toContain("Some cash evidence could not be verified.");
+			expect(html).toContain("Remainder uncertain");
 			expect(html).not.toContain(reason);
 		},
 	);
@@ -197,9 +196,7 @@ describe("safe spending cash evidence", () => {
 		);
 		expect(html).toContain("No balance recorded at close");
 		expect(html).not.toContain("1,244.43");
-		expect(html).toContain(
-			"An observed posted balance is not an available balance.",
-		);
+		expect(html).not.toContain("An observed posted balance");
 	});
 	it("keeps a posted close observation distinct from missing available cash", () => {
 		const html = render(
@@ -225,33 +222,39 @@ describe("safe spending cash evidence", () => {
 			true,
 		);
 		expect(html).not.toContain('data-testid="close-cash-value"');
-		expect(html).toContain("Posted $500.00 · Available —");
-		expect(html).toContain("Available cash at close is not evidenced");
+		expect(html).not.toContain("$500.00");
+		expect(html).toContain("No balance recorded at close");
 	});
-	it("keeps known cash visible while collapsing verbose and duplicate uncertainty explanations", () => {
+	it("keeps known cash and bills visible after removing Details and all its contents", () => {
 		const html = render(
 			summary({
 				cashAfterBills: null,
 				status: "uncertain",
+				confirmedMovements: [
+					{
+						transactionId: "movement",
+						accountId: "checking",
+						name: "Diagnostic movement",
+						effectiveAt: 1794744000,
+						postedAt: 1794744000,
+						amount: -12.34,
+					},
+				],
 				reasons: [
 					"pending-after-baseline-coverage-unknown",
 					"pending-obligation-coverage-unknown",
 				],
 			}),
 		);
-		const collapsed = html.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
-		expect(collapsed).toContain("$1,244.43");
-		expect(collapsed).toContain("Remainder uncertain");
-		expect(collapsed).not.toContain("Posted");
-		expect(collapsed).not.toContain("pending payment");
-		expect(collapsed).not.toContain("Synthetic due today");
-		expect(html).toContain(
-			'<details><summary class="text-sm">Details</summary>',
-		);
-		expect(html).toContain(
-			'<details><summary class="text-sm">Bills $1,461.01</summary>',
-		);
-		expect(html).not.toContain("<details open");
-		expect(html.match(/A pending payment may already/g)).toHaveLength(1);
+		expect(html).toContain("$1,244.43");
+		expect(html).toContain("Remainder uncertain");
+		expect(html).toContain("Synthetic due today");
+		expect(html).not.toContain("Posted");
+		expect(html).not.toContain("pending payment");
+		expect(html).not.toContain("Diagnostic movement");
+		expect(html).not.toContain("Cash account observations");
+		expect(html).not.toContain("Confirmed cash movements");
+		expect(html).not.toContain("Details");
+		expect(html).not.toContain("<details");
 	});
 });

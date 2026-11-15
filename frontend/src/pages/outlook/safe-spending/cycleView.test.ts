@@ -75,6 +75,23 @@ export function historicalFixture(transactionIds: string[] | null = null) {
 }
 
 describe("historical cycle evidence", () => {
+	it("keeps current spending decision rows without card allowance or paycheck captions", () => {
+		const { view, section } = historicalFixture();
+		const html = renderToStaticMarkup(
+			createElement(SafeSpendingBillsPanel, {
+				...view,
+				cashEvidence: "Known cash evidence",
+				section,
+				closed: false,
+			}),
+		);
+		expect(html).toContain("Known cash evidence");
+		expect(html).toContain('data-testid="spend-value"');
+		expect(html).toContain('data-testid="perday-value"');
+		expect(html).not.toContain("Card allowance");
+		expect(html).not.toContain("paycheck");
+		expect(html).not.toContain("this statement");
+	});
 	it("captions the selected closed cycle rather than the current closing countdown", () => {
 		expect(
 			cycleCaption({

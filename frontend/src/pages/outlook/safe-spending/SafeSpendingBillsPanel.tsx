@@ -5,9 +5,7 @@ import type {
 	CycleAllocation,
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
-	StatementFunding,
 } from "./safeSpendingDetailModel.ts";
-import { bundleDatesText } from "./safeSpendingDetailModel.ts";
 import { describeAllowance } from "./allowanceView.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 const SafeSpendingTrendChart = lazy(() =>
@@ -114,7 +112,6 @@ export function SafeSpendingBillsPanel({
 	allocation,
 	trend,
 	section,
-	funding,
 	closed = false,
 }: {
 	heroes: SafeSpendingHeroes;
@@ -122,23 +119,12 @@ export function SafeSpendingBillsPanel({
 	allocation: CycleAllocation;
 	trend?: SafeSpendingTrend;
 	section: SafeSpendingMandatorySection;
-	/** The payday bundle that settles this statement. */
-	funding: StatementFunding;
 	/** The statement already closed; the payday and pace are historical. */
 	closed?: boolean;
 }) {
 	const limitWord = closed ? "budget" : "limit";
 	const amountText = (value: number | null) =>
 		value === null ? "—" : money(value);
-	// The funding payday for this statement lands after it closes, so it
-	// captions the decision rows — never the cash that is already here.
-	const fundingDates = bundleDatesText(funding);
-	const fundingCaption =
-		fundingDates === null
-			? "No projected paycheck"
-			: funding.endDate !== null && funding.endDate !== funding.date
-				? `The ${fundingDates} paychecks ${closed ? "paid" : "pay"} this statement`
-				: `The ${fundingDates} paycheck ${closed ? "paid" : "pays"} this statement`;
 	const allowanceView = describeAllowance({
 		allowance: allocation.allowance,
 		theoretical: heroes.theoretical,
@@ -213,9 +199,6 @@ export function SafeSpendingBillsPanel({
 					</>
 				) : (
 					<>
-						<p className="m-0 text-xs text-muted-foreground">
-							Card allowance · separate from cash
-						</p>
 						<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
 							<StatRow
 								label={spendLabel}
@@ -241,9 +224,6 @@ export function SafeSpendingBillsPanel({
 								qualifier={dailyQualifier}
 							/>
 						</div>
-						<p className="m-0 text-xs text-muted-foreground">
-							{fundingCaption}
-						</p>
 						{!allocation.available && (
 							<p className="m-0 text-xs text-muted-foreground">
 								Closed card balance unavailable

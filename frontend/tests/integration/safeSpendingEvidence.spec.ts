@@ -259,31 +259,25 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			card.getByText("Cash after outstanding bills", { exact: true }),
 		).toBeVisible();
 		await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
-		const details = card.locator("summary").filter({ hasText: /^Details$/ });
-		await expect(card.getByLabel("Cash account observations")).toBeHidden();
-		await details.focus();
-		await page.keyboard.press("Enter");
-		await expect(card.getByLabel("Cash account observations")).toBeVisible();
+		await expect(card.locator("details")).toHaveCount(0);
+		await expect(card.getByLabel("Cash account observations")).toHaveCount(0);
+		await expect(card.getByLabel("Confirmed cash movements")).toHaveCount(0);
+		await expect(card).not.toContainText("income excluded");
+		await expect(card).not.toContainText("Card allowance · separate from cash");
+		await expect(card).not.toContainText(
+			/The .+ paychecks? (pays|pay|paid) this statement/,
+		);
 		await expect(
-			card.getByText("Posted $1,608.05 · Available $1,244.43"),
+			card.getByText("Outstanding bills through Nov 30"),
 		).toBeVisible();
-		await page.keyboard.press("Space");
-		await expect(card.getByLabel("Cash account observations")).toBeHidden();
-		const bills = card.locator("summary").filter({ hasText: /^Bills / });
-		await expect(
-			card.getByText("Synthetic due today A", { exact: true }),
-		).toBeHidden();
-		await bills.focus();
-		await page.keyboard.press("Enter");
 		await expect(
 			card.getByText("Synthetic due today A", { exact: true }),
 		).toBeVisible();
 		await expect(
 			card.getByText("Synthetic due today B", { exact: true }),
 		).toBeVisible();
-		await expect(card).toContainText("Synthetic checking");
-		await expect(card).toContainText(/Nov 14/);
-		await expect(card).toContainText(/available/i);
+		await expect(card.getByText("$1,244.43", { exact: true })).toBeVisible();
+		await expect(card.getByText("$1,461.01", { exact: true })).toBeVisible();
 		await expect(card.getByText("Cash accounts", { exact: true })).toHaveCount(
 			0,
 		);
@@ -307,11 +301,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			exact: true,
 		});
 		await expect(inlinePayment).toHaveCount(0);
-		await card
-			.locator("summary")
-			.filter({ hasText: /^Details$/ })
-			.click();
-		await expect(inlinePayment).toHaveCount(0);
+		await expect(card.locator("details")).toHaveCount(0);
 		await card
 			.getByRole("button", { name: "Last cycle transactions", exact: true })
 			.focus();
@@ -415,15 +405,6 @@ test("included bill changes refresh cash evidence without reloading", async ({
 			await expect(card.getByTestId("left-value")).toHaveText(
 				included ? /[-−]\$216\.58/ : "$494.54",
 			);
-			if (
-				!(await card
-					.getByText("Synthetic due today B", { exact: true })
-					.isVisible())
-			)
-				await card
-					.locator("summary")
-					.filter({ hasText: /^Bills / })
-					.click();
 			await expect(
 				card.getByText("Synthetic due today A", { exact: true }),
 			).toHaveCount(included ? 1 : 0);
@@ -481,7 +462,7 @@ test("an older unclaimed pending payment preserves observed cash without subtrac
 			card.getByText("Available cash", { exact: true }),
 		).toBeVisible();
 		await expect(card.getByText("$1,244.43", { exact: true })).toBeVisible();
-		await expect(card.getByLabel("Cash account observations")).toBeHidden();
+		await expect(card.getByLabel("Cash account observations")).toHaveCount(0);
 	} finally {
 		await api.dispose();
 	}

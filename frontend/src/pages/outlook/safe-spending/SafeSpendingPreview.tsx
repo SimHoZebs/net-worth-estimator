@@ -628,7 +628,6 @@ export function SafeSpendingPreview({
 									/>
 								}
 								allocation={inlineView.view.allocation}
-								funding={inlineView.view.funding}
 								trend={inlineView.trend}
 								section={lastView.section}
 								closed={cycleViewTab === "last-cycle"}

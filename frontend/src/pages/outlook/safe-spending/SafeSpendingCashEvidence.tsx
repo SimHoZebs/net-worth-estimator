@@ -1,37 +1,11 @@
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { dateLabel, exactMoney, monthDay } from "@/domain/format.ts";
+import { exactMoney, monthDay } from "@/domain/format.ts";
 import { cn } from "@/lib/utils.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 const amountText = (amount: number | null) =>
 	amount === null ? "—" : exactMoney(amount);
-const pendingCoverageExplanation =
-	"A pending payment may already be included in available cash, so the exact remainder is unavailable.";
-const reasonExplanations: Record<string, string> = {
-	"cash-baseline-missing": "No cash observation covers this date.",
-	"available-balance-missing":
-		"The observation does not include an available balance.",
-	"cash-accounts-missing": "No selected cash account has usable cash evidence.",
-	"pending-after-baseline-coverage-unknown": pendingCoverageExplanation,
-	"pending-obligation-coverage-unknown": pendingCoverageExplanation,
-	"posted-hold-coverage-unknown":
-		"A posted payment may still be covered by a hold in the observed available balance, so the exact remainder is unavailable.",
-	"scheduled-payment-status-unknown":
-		"A scheduled bill may already be paid and included in the cash observation. Its payment status is unverified.",
-	"posted-routing-unknown":
-		"The cash account affected by a recorded payment is unverified.",
-	"posted-amount-unavailable":
-		"A recorded cash movement has an unresolved amount.",
-	"obligation-routing-unknown":
-		"The cash account responsible for a bill is unverified.",
-	"obligation-amount-unavailable": "A bill has an unresolved amount.",
-	"negative-obligation-amount": "A bill has an invalid negative amount.",
-};
-const reasonText = (reason: string) =>
-	Object.hasOwn(reasonExplanations, reason)
-		? reasonExplanations[reason]
-		: "Some cash evidence could not be verified.";
 
 /** All monetary values and supporting rows come from the same server response. */
 export function SafeSpendingCashEvidence({
@@ -66,17 +40,6 @@ export function SafeSpendingCashEvidence({
 		? summary.checkingAvailable
 		: summary.cashAfterBills;
 	const hasShortfall = !historical && cashValue !== null && cashValue < 0;
-	const billWindow = `${monthDay(summary.start)}–${summary.start.slice(0, 7) === summary.end.slice(0, 7) ? Number(summary.end.slice(8)) : monthDay(summary.end)}`;
-	const explanations = [
-		...new Set(
-			[
-				...(summary.reasons ?? []),
-				...(summary.baselines ?? []).flatMap(
-					(baseline) => baseline.reasons ?? [],
-				),
-			].map(reasonText),
-		),
-	];
 	return (
 		<section className="grid content-start gap-3" aria-label="Cash evidence">
 			{(!historical || cashValue !== null) && (
@@ -97,11 +60,12 @@ export function SafeSpendingCashEvidence({
 							{amountText(cashValue)}
 						</strong>
 					</div>
-					<p className="m-0 text-xs text-muted-foreground">
-						{historical
-							? `Available cash evidence · ${monthDay(summary.start)} · Excludes future income`
-							: `${billWindow} bills · income excluded`}
-					</p>
+					{historical && (
+						<p className="m-0 text-xs text-muted-foreground">
+							Available cash evidence · {monthDay(summary.start)} · Excludes
+							future income
+						</p>
+					)}
 				</>
 			)}
 			{historical && summary.checkingAvailable === null && (
@@ -145,14 +109,20 @@ export function SafeSpendingCashEvidence({
 					</dl>
 				)}
 			{!historical && (
-				<details>
-					<summary className="text-sm">
-						Bills {amountText(summary.outstandingBillsTotal)}
-					</summary>
+				<div className="grid gap-2">
+					<div className="flex justify-between gap-3 text-sm">
+						<span>Outstanding bills</span>
+						<strong className="tabular-nums">
+							{amountText(summary.outstandingBillsTotal)}
+						</strong>
+					</div>
 					<div
-						className="grid gap-2 pt-2"
+						className="grid gap-2"
 						aria-label="Outstanding bills in selected range"
 					>
+						<h4 className="m-0 text-sm">
+							Outstanding bills through {monthDay(summary.end)}
+						</h4>
 						{(summary.outstandingObligations ?? []).length === 0 && (
 							<p className="m-0 text-xs text-muted-foreground">
 								No outstanding bills.
@@ -176,81 +146,8 @@ export function SafeSpendingCashEvidence({
 							</div>
 						))}
 					</div>
-				</details>
-			)}
-			<details>
-				<summary className="text-sm">Details</summary>
-				<div className="grid gap-3 pt-2">
-					{!historical && (
-						<p className="m-0 text-xs text-muted-foreground">
-							Bills due {monthDay(summary.start)} – {monthDay(summary.end)}.
-							Future income and earlier bills are excluded.
-						</p>
-					)}
-					{historical && summary.checkingAvailable === null && (
-						<p className="m-0 text-xs text-muted-foreground">
-							Available cash at close is not evidenced. An observed posted
-							balance is not an available balance.
-						</p>
-					)}
-					{explanations.map((explanation) => (
-						<p key={explanation} className="m-0 text-xs text-muted-foreground">
-							{explanation}
-						</p>
-					))}
-					<div className="grid gap-2" aria-label="Cash account observations">
-						{(summary.baselines ?? []).map((baseline) => {
-							const instant =
-								baseline.observedAt === null
-									? null
-									: new Date(baseline.observedAt * 1000).toISOString();
-							return (
-								<div
-									key={baseline.accountId}
-									className="grid gap-1 text-xs text-muted-foreground"
-								>
-									<p className="m-0">
-										{baseline.accountName} ·{" "}
-										{baseline.basis === "missing"
-											? "Observation unavailable"
-											: baseline.basis}
-										{instant && (
-											<>
-												{" "}
-												·{" "}
-												<time dateTime={instant}>
-													{dateLabel(instant, true)} · {instant.slice(11, 19)}{" "}
-													UTC
-												</time>
-											</>
-										)}
-									</p>
-									<p className="m-0">
-										Posted {amountText(baseline.postedBalance)} · Available{" "}
-										{amountText(baseline.availableBalance)}
-									</p>
-								</div>
-							);
-						})}
-					</div>
-					{!historical && (summary.confirmedMovements ?? []).length > 0 && (
-						<div className="grid gap-2" aria-label="Confirmed cash movements">
-							<h4 className="m-0 text-sm">
-								Confirmed movements since each observation
-							</h4>
-							{(summary.confirmedMovements ?? []).map((row) => (
-								<div
-									key={`${row.transactionId}-${row.accountId}`}
-									className="flex justify-between gap-3 text-sm"
-								>
-									<span>{row.name}</span>
-									<span className="tabular-nums">{exactMoney(row.amount)}</span>
-								</div>
-							))}
-						</div>
-					)}
 				</div>
-			</details>
+			)}
 		</section>
 	);
 }

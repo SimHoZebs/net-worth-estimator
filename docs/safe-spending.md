@@ -45,10 +45,11 @@ difference does not establish which individual payments are covered. Missing or
 ambiguous evidence must be reported rather than hidden behind a precise,
 apparently certain amount.
 
-Keep the default panel concise. Supporting observations, payment-coverage
-explanations, and movements belong in a closed native disclosure. Show known
-balances even when a dependent estimate is unavailable; omit unsupported
-historical metrics rather than filling the page with blank rows.
+Keep the panel concise, without an inline diagnostic Details section or
+explanatory allowance and paycheck captions. Bills remain visible in their
+existing section. Show known balances even when a dependent estimate is
+unavailable; omit unsupported historical metrics rather than filling the page
+with blank rows. Last cycle shows totals only, with transactions in the drawer.
 
 Bill dates are calendar dates under the existing UTC calendar convention.
 Observation timestamps are instants. Changing the overall projection start or
