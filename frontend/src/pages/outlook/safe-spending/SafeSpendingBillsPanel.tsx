@@ -100,9 +100,14 @@ export function SafeSpendingBillsPanel({
 				? Math.max(0, heroes.dailySafe)
 				: Math.max(0, heroes.dailyTheoretical);
 	return (
-		<div className="grid content-start gap-4">
+		<div
+			className={cn(
+				"grid content-start gap-4",
+				trend && "sm:grid-cols-2 sm:items-start sm:gap-6",
+			)}
+		>
 			{trend && (
-				<div className="grid content-start gap-4">
+				<div className="grid min-w-0 content-start gap-4">
 					<Suspense
 						fallback={
 							<div aria-busy="true">
@@ -114,58 +119,60 @@ export function SafeSpendingBillsPanel({
 					</Suspense>
 				</div>
 			)}
-			{cashEvidence}
-			<div className="grid content-start gap-4">
-				{closed ? (
-					<>
-						<StatRow
-							label={labels.recordedCharges}
-							value={
-								heroes.committedTotal === null
-									? "—"
-									: exactMoney(heroes.committedTotal)
-							}
-							testId="recorded-charges-value"
-						/>
-						{heroes.closedCycle.total !== null && (
+			<div className="grid min-w-0 content-start gap-4">
+				{cashEvidence}
+				<div className="grid content-start gap-4">
+					{closed ? (
+						<>
 							<StatRow
-								label="Closed card balance"
-								value={amountText(heroes.closedCycle.total)}
-								testId="closed-card-value"
+								label={labels.recordedCharges}
+								value={
+									heroes.committedTotal === null
+										? "—"
+										: exactMoney(heroes.committedTotal)
+								}
+								testId="recorded-charges-value"
 							/>
-						)}
-					</>
-				) : (
-					<>
-						<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-							<StatRow
-								label={spendLabel}
-								value={amountText(allowanceView.primary)}
-								tone={allowanceView.tone}
-								testId="spend-value"
-								qualifier={spendQualifier}
-							/>
-							<StatRow
-								label={labels.perDay}
-								value={dailyValue === null ? "—" : exactMoney(dailyValue)}
-								testId="perday-value"
-							/>
-						</div>
-						{!allocation.available && (
-							<p className="m-0 text-xs text-muted-foreground">
-								Current cash evidence unavailable
-							</p>
-						)}
-					</>
+							{heroes.closedCycle.total !== null && (
+								<StatRow
+									label="Closed card balance"
+									value={amountText(heroes.closedCycle.total)}
+									testId="closed-card-value"
+								/>
+							)}
+						</>
+					) : (
+						<>
+							<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+								<StatRow
+									label={spendLabel}
+									value={amountText(allowanceView.primary)}
+									tone={allowanceView.tone}
+									testId="spend-value"
+									qualifier={spendQualifier}
+								/>
+								<StatRow
+									label={labels.perDay}
+									value={dailyValue === null ? "—" : exactMoney(dailyValue)}
+									testId="perday-value"
+								/>
+							</div>
+							{!allocation.available && (
+								<p className="m-0 text-xs text-muted-foreground">
+									Current cash evidence unavailable
+								</p>
+							)}
+						</>
+					)}
+				</div>
+				{closed && (
+					<StatRow
+						label="Cash payments"
+						value={exactMoney(section.total)}
+						testId="cash-payments-value"
+					/>
 				)}
 			</div>
-			{closed && (
-				<StatRow
-					label="Cash payments"
-					value={exactMoney(section.total)}
-					testId="cash-payments-value"
-				/>
-			)}
 		</div>
 	);
 }
