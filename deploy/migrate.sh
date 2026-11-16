@@ -466,10 +466,13 @@ fi
 # dry run must also report zero deletable rows before exiting early. The dry
 # run executes on a private read-only backup copy so the original database
 # and its WAL sidecars stay byte-identical.
-# The dry run binary comes from the target image and loads accounts through
-# the current store, so this gate must cover every additive column that store
-# reads. A source that predates one falls through to the full path, which
-# provisions that column on the candidate before pruning.
+# The dry run binary comes from the target image and validates the complete
+# current schema at open time against requiredSchemaColumns, the analysis
+# triggers, and the receipt/blob objects. A source that predates any of those
+# requirements cannot be dry run, so the gate below must carry every additive
+# one and a failed dry run falls through to the full path instead of stranding
+# the window. The full path provisions the candidate and keeps a verified
+# backup either way.
 if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
@@ -478,16 +481,19 @@ if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purch
     fail "Candidate no-op dry-run backup failed; refusing to report verified."
   fi
   dry_out=""
-  if ! dry_out=$(prune-noop-checkpoints --db "$dry_copy" --dry-run 2>&1); then
-    rm -rf "$dry_dir"
-    printf 'migrate: candidate no-op dry run failed: %s\n' "$dry_out" >&2
-    fail "Candidate no-op dry run failed without backup; refusing to report verified."
+  dry_ok=0
+  if dry_out=$(prune-noop-checkpoints --db "$dry_copy" --dry-run 2>&1); then
+    dry_ok=1
+  else
+    printf 'migrate: candidate no-op dry run failed, using the full path: %s\n' "$dry_out" >&2
   fi
   rm -rf "$dry_dir"
-  case "$dry_out" in
-    *" 0 deletable,"*) info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
-      exit 0 ;;
-  esac
+  if [ "$dry_ok" = 1 ]; then
+    case "$dry_out" in
+      *" 0 deletable,"*) info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+        exit 0 ;;
+    esac
+  fi
 fi
 
 # Snapshot the original with the SQLite backup API into a new private

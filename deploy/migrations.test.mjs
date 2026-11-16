@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
@@ -666,6 +666,7 @@ test("pre-display-basis database provisions the column before the no-op prune", 
 
   const result = await migrate(db);
   assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.doesNotMatch(result.stderr, /candidate no-op dry run failed/);
   assert.match(result.stdout, /noop checkpoint prune complete/);
 
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';"), "1");
@@ -681,6 +682,37 @@ test("pre-display-basis database provisions the column before the no-op prune", 
   const repeat = await migrate(db);
   assert.match(repeat.stdout, /verified, nothing to do/);
   assert.equal(await sha256File(db), hashAfter);
+});
+
+test("failed no-op dry run falls through to the full path with a backup", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-dryfail-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO account_displays(user_id, account_id, display_json) VALUES ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,provider,observed_at) VALUES
+    ('${owner}',1,0,'checking',100,'banksync','simplefin',${DAY_CLOSE_0310}),
+    ('${owner}',2,1,'checking',100,'banksync','simplefin',${DAY_CLOSE_0311});`);
+  const stub = join(directory, "stub");
+  await mkdir(stub);
+  // Model a target-image requirement the gate cannot know about: the tool
+  // rejects the private early-exit copy but accepts the provisioned candidate.
+  await writeFile(
+    join(stub, "prune-noop-checkpoints"),
+    `#!/bin/sh\nprev=""; db=""\nfor arg in "$@"; do [ "$prev" = "--db" ] && db="$arg"; prev="$arg"; done\n[ -n "$db" ] || exit 2\ncase "$db" in\n  *.noop-dry.*) echo "stub: current database schema required: incomplete table accounts" >&2; exit 1 ;;\nesac\nexec "${join(tools, "prune-noop-checkpoints")}" "$@"\n`,
+    { mode: 0o755 },
+  );
+
+  const result = await migrate(db, { PATH: `${stub}${delimiter}${tools}${delimiter}${process.env.PATH}` });
+  assert.match(result.stderr, /candidate no-op dry run failed, using the full path: stub: current database schema required: incomplete table accounts/);
+  assert.match(result.stdout, /noop checkpoint prune complete/);
+  assert.equal(await rows(db, `SELECT COUNT(*) FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0311};`), "0");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal((await backups(directory)).length, 1);
+
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
 });
 
 test("partial projection schema fails closed with the original unchanged", async (t) => {  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-projection-partial-"));
