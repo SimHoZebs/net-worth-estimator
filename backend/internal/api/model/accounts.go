@@ -98,10 +98,10 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 	}
 	// A created account without a basis shows available. Default empty
 	// only; unknown values stay raw so validation rejects them like PATCH.
-	if (account.DisplayBasis == "") {
+	if account.DisplayBasis == "" {
 		account.DisplayBasis = types.DisplayBasisAvailable
 	}
-	if (account.DisplayBasis != "" && !account.DisplayBasis.Valid()) {
+	if account.DisplayBasis != "" && !account.DisplayBasis.Valid() {
 		return nil, huma.Error422UnprocessableEntity("displayBasis must be available or posted")
 	}
 	balance, observedAt, err := accountObservation(input.Body)
