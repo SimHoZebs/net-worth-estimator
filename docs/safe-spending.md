@@ -25,6 +25,10 @@ transaction boundary.
 The cutoff replaces that transaction's existing row divider, with its label
 centered in the line. It does not insert another table row or a second border.
 
+Pending charges and pending refunds both count in recorded spending, counted
+once on their transaction date. Pending status never excludes a row from the
+ledger; only voided, disabled, or future-dated rows are left out.
+
 ## Monthly income threshold
 
 The income threshold compares recorded spending with the expected pay from the

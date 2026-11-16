@@ -343,11 +343,11 @@ describe("monthly income comparison", () => {
 			],
 		});
 		expect(result.trend.monthlyIncome).toMatchObject({
-			spent: 100,
-			hit: { transactionId: "first-positive", amount: 0 },
+			spent: -800,
+			hit: null,
 		});
 	});
-	it("retains disabled pending card commitments without crediting pending refunds or income", () => {
+	it("retains disabled pending card commitments and nets pending refunds", () => {
 		const rows = currentSpendingActivity(
 			[
 				{
@@ -382,12 +382,13 @@ describe("monthly income comparison", () => {
 		expect(result.ledger.map((row) => row.id)).toEqual([
 			"pending-card",
 			"second-pending-card",
+			"pending-refund",
 		]);
-		expect(result.view.heroes.committedTotal).toBe(34.02);
-		expect(result.trend.actual.at(-1)?.spent).toBe(34.02);
+		expect(result.view.heroes.committedTotal).toBe(-65.98);
+		expect(result.trend.actual.at(-1)?.spent).toBe(-65.98);
 		expect(result.trend.monthlyIncome).toMatchObject({
 			amount: 32.11,
-			spent: 34.02,
+			spent: -65.98,
 			hit: { transactionId: "second-pending-card" },
 		});
 	});

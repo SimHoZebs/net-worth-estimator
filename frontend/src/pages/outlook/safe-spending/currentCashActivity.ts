@@ -94,7 +94,6 @@ export function currentCashActivity({
 			const original = saved.get(row.transactionId);
 			return (
 				original?.enabled &&
-				!row.pending &&
 				!row.void &&
 				(row.direction === "out" ||
 					row.flow === "income" ||

@@ -79,7 +79,6 @@ export function spendingLedger({
 					(row.direction === "out"
 						? isCycleOutflow(row)
 						: row.spendingAmount !== undefined &&
-							!row.pending &&
 							!row.excluded &&
 							!row.void) &&
 					row.flow !== "transfer" &&
