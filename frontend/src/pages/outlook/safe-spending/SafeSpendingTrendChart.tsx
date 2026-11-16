@@ -337,7 +337,7 @@ export function SafeSpendingTrendChart({
 									? datum.amount
 									: Number(point.yValue);
 						const bump = bumpByDate.get(date);
-						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${bump ? ` incl. ${exactMoney(bump.amount)} recurring` : ""}`;
+						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${bump ? ` incl. ${exactMoney(bump.amount)} bills` : ""}`;
 					},
 				},
 			}),
@@ -402,8 +402,8 @@ export function SafeSpendingTrendChart({
 		scheduledBumps
 			.map((bump) =>
 				bump.name
-					? ` Includes ${exactMoney(bump.amount)} ${bump.name} on ${dateLabel(bump.date, true)}.`
-					: ` Includes ${exactMoney(bump.amount)} recurring on ${dateLabel(bump.date, true)}.`,
+					? ` Includes ${exactMoney(bump.amount)} ${bump.name} bill on ${dateLabel(bump.date, true)}.`
+					: ` Includes ${exactMoney(bump.amount)} recurring bill on ${dateLabel(bump.date, true)}.`,
 			)
 			.join("");
 
@@ -475,7 +475,7 @@ export function SafeSpendingTrendChart({
 							aria-hidden="true"
 							className="inline-block h-2 w-2 shrink-0 rounded-full bg-chart-5"
 						/>
-						Recurring charges
+						{labels.recurringBills}
 					</li>
 				)}
 				{showThresholds && trend.safetyNet !== null && trend.safetyNet > 0 && (

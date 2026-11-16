@@ -14,5 +14,6 @@ export const SAFE_SPENDING_LABELS = {
 	reserve: "Protected reserve",
 	reserveStarts: "Reserve",
 	recordedCharges: "Recorded card charges",
+	recurringBills: "Recurring bills",
 	cycleStart: "Cycle start day",
 } as const;

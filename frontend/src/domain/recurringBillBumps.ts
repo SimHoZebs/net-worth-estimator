@@ -3,36 +3,38 @@ import type { Transaction } from "./model.ts";
 import { literalAmountOf } from "./transactionRows.ts";
 import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
 
-export interface CardScheduledBump {
+export interface RecurringBillBump {
 	date: string;
 	amount: number;
 	name?: string;
 }
 
 /**
- * Known future card charges in (today, cycleEnd]. Schedule occurrences expand
- * through the cycle end and future one-time outflows from tracked cards add
- * discrete steps. Already claimed schedule occurrences are skipped once.
+ * Future occurrences of the included recurring bills in (today, cycleEnd].
+ * Only the Included bills selection counts, matching the backend outstanding
+ * bills scope. Transfer occurrences never count as spending, mirroring the
+ * recorded ledger where transfers carry no spending amount. Already claimed
+ * occurrences are skipped once.
  */
-export function cardScheduledOutflows({
+export function recurringBillBumps({
 	schedules,
 	transactions,
-	trackedIds,
+	trackedBillIds,
 	accountIds,
 	today,
 	cycleEnd,
 }: {
 	schedules: Schedule[];
 	transactions: Transaction[];
-	trackedIds: string[];
+	trackedBillIds: string[];
 	accountIds?: string[];
 	today: string;
 	cycleEnd: string;
-}): CardScheduledBump[] {
+}): RecurringBillBump[] {
 	const start = today.slice(0, 10);
 	const end = cycleEnd.slice(0, 10);
-	if (!trackedIds.length || end < start) return [];
-	const tracked = new Set(trackedIds);
+	if (!trackedBillIds.length || end < start) return [];
+	const tracked = new Set(trackedBillIds);
 	const accounts = accountIds ? new Set(accountIds) : null;
 	const roundCents = (value: number) => Math.round(value * 100) / 100;
 
@@ -58,11 +60,8 @@ export function cardScheduledOutflows({
 
 	for (const schedule of schedules) {
 		if (!schedule.enabled) continue;
-		if (
-			schedule.sourceAccountId === null ||
-			!tracked.has(schedule.sourceAccountId)
-		)
-			continue;
+		if (!tracked.has(schedule.id)) continue;
+		if (schedule.sourceAccountId === null) continue;
 		if (
 			schedule.destinations &&
 			schedule.destinations.some((id) => accounts?.has(id))
@@ -82,18 +81,6 @@ export function cardScheduledOutflows({
 			if (claimed.has(`${schedule.id}|${day}`)) continue;
 			add(day, each, schedule.name || schedule.id);
 		}
-	}
-
-	for (const row of transactions) {
-		if (row.kind !== "transaction") continue;
-		if (!row.enabled || row.void) continue;
-		if (!row.amountKnown) continue;
-		if (!Number.isFinite(row.amount) || row.amount <= 0) continue;
-		if (row.fromId === null || !tracked.has(row.fromId)) continue;
-		const day = row.startDate.slice(0, 10);
-		if (day <= start || day > end) continue;
-		if (row.toId !== null && accounts?.has(row.toId)) continue;
-		add(day, row.amount, row.name || row.id);
 	}
 
 	return [...byDate.entries()]

@@ -73,7 +73,7 @@ import {
 	expectedMonthlyIncome,
 	incomeSourceCandidates,
 } from "@/domain/safeSpendingIncome.ts";
-import { cardScheduledOutflows } from "@/domain/cardScheduledOutflows.ts";
+import { recurringBillBumps } from "@/domain/recurringBillBumps.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -347,12 +347,12 @@ export function SafeSpendingPreview({
 			),
 		[transactions, currentCardTransactions, directSpending],
 	);
-	const cardBumps = useMemo(
+	const billBumps = useMemo(
 		() =>
-			cardScheduledOutflows({
+			recurringBillBumps({
 				schedules: savedRules ?? [],
 				transactions: transactions ?? [],
-				trackedIds,
+				trackedBillIds,
 				accountIds: (accounts ?? []).map((account) => account.id),
 				today: displayToday,
 				cycleEnd: cycle.cycleEnd,
@@ -362,7 +362,7 @@ export function SafeSpendingPreview({
 			cycle.cycleEnd,
 			displayToday,
 			savedRules,
-			trackedIds,
+			trackedBillIds,
 			transactions,
 		],
 	);
@@ -383,7 +383,7 @@ export function SafeSpendingPreview({
 				reserve: settings.reserve,
 				closedCycle,
 				fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
-				scheduledOutflows: cardBumps,
+				scheduledOutflows: billBumps,
 			}),
 		[
 			cycle.cycleStart,
@@ -397,7 +397,7 @@ export function SafeSpendingPreview({
 			currentCardByCard,
 			settings.reserve,
 			closedCycle,
-			cardBumps,
+			billBumps,
 		],
 	);
 	const lastView = useMemo(

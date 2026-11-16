@@ -107,13 +107,13 @@ describe("scheduled recurring bumps", () => {
 		const html = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, { trend }),
 		);
-		expect(html).toContain("Recurring charges");
-		expect(html).toContain("Includes $55.00 Sub on Nov 10, 2026.");
+		expect(html).toContain("Recurring bills");
+		expect(html).toContain("Includes $55.00 Sub bill on Nov 10, 2026.");
 		const without = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, {
 				trend: { ...trend, scheduledBumps: [] },
 			}),
 		);
-		expect(without).not.toContain("Recurring charges");
+		expect(without).not.toContain("Recurring bills");
 	});
 });

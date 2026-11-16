@@ -2,9 +2,9 @@ import type { AccountTransaction } from "./accountActivity.ts";
 import { isCycleOutflow } from "./cardCycle.ts";
 import { daysBetweenInclusive, shiftDate } from "./format.ts";
 import { sortTransactionsByDate } from "./transactionSort.ts";
-import type { CardScheduledBump } from "./cardScheduledOutflows.ts";
+import type { RecurringBillBump } from "./recurringBillBumps.ts";
 
-export type SafeSpendingScheduledBump = CardScheduledBump;
+export type SafeSpendingScheduledBump = RecurringBillBump;
 
 export interface SafeSpendingTrendPoint {
 	date: string;
@@ -137,7 +137,7 @@ export function ledgerHit(
 /**
  * Daily cumulative spending for one statement cycle. Actual rows run
  * from the cycle start through today; projected rows continue from today at
- * the average daily rate plus discrete steps for known future card charges.
+ * the average daily rate plus discrete steps for scheduled future outflows.
  * Actual crossings retain the exact ledger row identity,
  * even when several charges share a day. Negative opening capacity has no causal row.
  */
