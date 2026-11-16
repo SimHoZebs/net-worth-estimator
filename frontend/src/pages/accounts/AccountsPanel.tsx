@@ -1,5 +1,6 @@
 import { LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
+import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Empty,
@@ -68,10 +69,17 @@ export function AccountsPanel({
 			)}
 			<TableBody>
 				{accounts.map((account) => {
-					// Current balance is the bank-reported available figure only.
-					// The modeled balance is projection and net-worth authority,
-					// never a substitute for missing current evidence.
+					// Current balance is the bank-reported available figure when the
+					// bank reported one. Manual accounts have no bank evidence, so
+					// their saved balance stays their current figure. Synced or
+					// grouped accounts without evidence show unavailable rather
+					// than borrowing the modeled balance.
 					const available = account.availableBalance ?? null;
+					const current =
+						available ??
+						(!account.readOnly && !isGroupedDisplay(account)
+							? account.balance
+							: null);
 					return (
 						<TableRow
 							key={account.id}
@@ -102,10 +110,10 @@ export function AccountsPanel({
 							</TableHead>
 							<TableCell className="tabular-nums max-sm:p-4">
 								<div>
-									{available === null ? (
+									{current === null ? (
 										<span className="text-muted-foreground">Unavailable</span>
 									) : (
-										money(available)
+										money(current)
 									)}
 								</div>
 							</TableCell>

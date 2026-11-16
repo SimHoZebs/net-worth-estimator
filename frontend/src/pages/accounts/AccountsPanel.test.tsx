@@ -48,9 +48,14 @@ describe("accounts panel current balance", () => {
 		expect(html).toContain("$0");
 		expect(html).not.toContain("Unavailable");
 	});
-	it("shows unavailable when no current available observation exists", () => {
-		const html = render([account({ availableBalance: null })]);
+	it("shows unavailable when a synced account reports no available figure", () => {
+		const html = render([account({ availableBalance: null, readOnly: true })]);
 		expect(html).toContain("Unavailable");
 		expect(html).not.toContain("$798");
+	});
+	it("shows the saved balance for manual accounts without bank evidence", () => {
+		const html = render([account({ availableBalance: null, readOnly: false })]);
+		expect(html).toContain("$798");
+		expect(html).not.toContain("Unavailable");
 	});
 });
