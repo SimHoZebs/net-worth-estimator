@@ -11,10 +11,13 @@ function accountKindOf(kind: string): Account["kind"] {
 
 /**
  * Saved balance row as a display account. The row query owns the data: the
- * balance, balance-check presence, sync ownership, and archived state all
- * come from the server. Backend no-bound sentinels count as absent before
+ * modeled balance, balance-check presence, sync ownership, and archived state
+ * all come from the server. Backend no-bound sentinels count as absent before
  * clamping, so a missing floor shows as zero and a missing ceiling as
- * unbounded; negative backend bounds clamp the same way.
+ * unbounded. The modeled amount stays the net-worth and projection authority;
+ * availableBalance is the bank-reported current figure and stays null when
+ * the bank reported none. Current-balance surfaces read only the latter, and
+ * a reported zero is a real observation rather than missing evidence.
  */
 export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 	const floor = row.minBalance;
@@ -47,15 +50,9 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 				? "Balance check"
 				: "No balance check",
 		readOnly: row.readOnly,
-		...(row.institution
-			? { institution: row.institution }
-			: {}),
-		...(row.syncedName
-			? { syncedName: row.syncedName }
-			: {}),
-		...(row.currency
-			? { currency: row.currency }
-			: {}),
+		...(row.institution ? { institution: row.institution } : {}),
+		...(row.syncedName ? { syncedName: row.syncedName } : {}),
+		...(row.currency ? { currency: row.currency } : {}),
 	};
 }
 

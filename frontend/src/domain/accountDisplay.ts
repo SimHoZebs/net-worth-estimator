@@ -91,6 +91,16 @@ export function toDisplayAccounts(accounts: Account[]): Account[] {
 					c.observedAt === components[0]?.observedAt &&
 					c.observedBalance !== null,
 			);
+			// A grouped current figure exists only when every component has its
+			// own bank-reported available observation. A reported zero counts;
+			// any missing component leaves the group unavailable rather than
+			// borrowing the modeled balance.
+			const availableBalances = members.map((c) => c.account!.availableBalance);
+			const availableBalance = availableBalances.every(
+				(value): value is number => value != null,
+			)
+				? availableBalances.reduce((sum, value) => sum + value, 0)
+				: null;
 			return {
 				...a,
 				name: display.name,
@@ -105,7 +115,7 @@ export function toDisplayAccounts(accounts: Account[]): Account[] {
 					: null,
 				observedAt: sameObservation ? components[0]!.observedAt : null,
 				balanceCheck: sameObservation,
-				availableBalance: null,
+				availableBalance,
 			};
 		});
 }

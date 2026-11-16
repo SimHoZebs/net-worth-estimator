@@ -49,15 +49,17 @@ export function AccountsPanel({
 			containerClassName="max-w-full"
 			containerProps={{
 				role: "region",
-				"aria-label": "Accounts with balances.",
+				"aria-label": "Accounts and current available balances.",
 			}}
 		>
-			<TableCaption className="sr-only">Accounts with balances.</TableCaption>
+			<TableCaption className="sr-only">
+				Accounts and current available balances.
+			</TableCaption>
 			{showHeaders && (
 				<TableHeader>
 					<TableRow>
 						<TableHead className="max-sm:p-4">Account</TableHead>
-						<TableHead className="max-sm:p-4">Balance</TableHead>
+						<TableHead className="max-sm:p-4">Available balance</TableHead>
 						<TableHead className="max-sm:p-4">
 							<span className="sr-only">Actions</span>
 						</TableHead>
@@ -65,60 +67,72 @@ export function AccountsPanel({
 				</TableHeader>
 			)}
 			<TableBody>
-				{accounts.map((account) => (
-					<TableRow
-						key={account.id}
-						className="group cursor-pointer hover:bg-muted"
-						onClick={(event) => {
-							if ((event.target as HTMLElement).closest("button")) return;
-							onAccount(account.id);
-						}}
-					>
-						<TableHead scope="row" className="py-5 max-sm:px-4 max-sm:py-5">
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="group h-auto justify-start gap-3 px-1 py-0.5 text-left font-normal"
-								aria-label={`Open ${account.name} transactions`}
-								onClick={() => onAccount(account.id)}
-							>
-								<AccountLabel
-									account={account}
-									nameClassName="group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
-									suffix={!account.enabled ? " · excluded" : undefined}
-								/>
-								{account.readOnly && (
-									<LockKeyhole size={14} aria-label="Read-only record" />
-								)}
-							</Button>
-						</TableHead>
-						<TableCell className="tabular-nums max-sm:p-4">
-							<div>{money(account.balance)}</div>
-						</TableCell>
-						<TableCell className="max-sm:p-4">
-							<div className="flex justify-end gap-1">
+				{accounts.map((account) => {
+					// Current balance is the bank-reported available figure only.
+					// The modeled balance is projection and net-worth authority,
+					// never a substitute for missing current evidence.
+					const available = account.availableBalance ?? null;
+					return (
+						<TableRow
+							key={account.id}
+							className="group cursor-pointer hover:bg-muted"
+							onClick={(event) => {
+								if ((event.target as HTMLElement).closest("button")) return;
+								onAccount(account.id);
+							}}
+						>
+							<TableHead scope="row" className="py-5 max-sm:px-4 max-sm:py-5">
 								<Button
+									type="button"
 									variant="ghost"
-									size="icon-sm"
-									aria-label={`Edit ${account.name}`}
-									onClick={() => onEdit(account)}
+									size="sm"
+									className="group h-auto justify-start gap-3 px-1 py-0.5 text-left font-normal"
+									aria-label={`Open ${account.name} transactions`}
+									onClick={() => onAccount(account.id)}
 								>
-									<Pencil aria-hidden="true" />
+									<AccountLabel
+										account={account}
+										nameClassName="group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
+										suffix={!account.enabled ? " · excluded" : undefined}
+									/>
+									{account.readOnly && (
+										<LockKeyhole size={14} aria-label="Read-only record" />
+									)}
 								</Button>
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									aria-label={`Remove ${account.name}`}
-									disabled={account.readOnly}
-									onClick={() => onRemove(account)}
-								>
-									<Trash2 aria-hidden="true" />
-								</Button>
-							</div>
-						</TableCell>
-					</TableRow>
-				))}
+							</TableHead>
+							<TableCell className="tabular-nums max-sm:p-4">
+								<div>
+									{available === null ? (
+										<span className="text-muted-foreground">Unavailable</span>
+									) : (
+										money(available)
+									)}
+								</div>
+							</TableCell>
+							<TableCell className="max-sm:p-4">
+								<div className="flex justify-end gap-1">
+									<Button
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Edit ${account.name}`}
+										onClick={() => onEdit(account)}
+									>
+										<Pencil aria-hidden="true" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Remove ${account.name}`}
+										disabled={account.readOnly}
+										onClick={() => onRemove(account)}
+									>
+										<Trash2 aria-hidden="true" />
+									</Button>
+								</div>
+							</TableCell>
+						</TableRow>
+					);
+				})}
 			</TableBody>
 		</Table>
 	);

@@ -8,10 +8,7 @@ import {
 	type PlannedPurchase,
 	type Transaction,
 } from "../domain/model.ts";
-import {
-	balanceRowToDisplay,
-	plannedPurchaseRowToDisplay,
-} from "./adapter.ts";
+import { balanceRowToDisplay, plannedPurchaseRowToDisplay } from "./adapter.ts";
 import type { AccountBalanceRow } from "./generated/model/accountBalanceRow.ts";
 import {
 	type BackendPlannedPurchase,
@@ -69,6 +66,33 @@ describe("balance rows to display accounts", () => {
 			observedBalance: 1000,
 			observedAt: 1773133200,
 		});
+	});
+	it("keeps the modeled balance as authority while carrying bank available cash", () => {
+		expect(
+			balanceRowToDisplay(
+				balanceRow({
+					balance: 798,
+					componentBalance: 798.01,
+					availableBalance: 1244.43,
+				}),
+			),
+		).toMatchObject({ balance: 798.01, availableBalance: 1244.43 });
+	});
+	it("keeps a bank-reported zero available figure as current evidence", () => {
+		expect(
+			balanceRowToDisplay(
+				balanceRow({
+					balance: 100,
+					componentBalance: 50,
+					availableBalance: 0,
+				}),
+			),
+		).toMatchObject({ balance: 50, availableBalance: 0 });
+	});
+	it("leaves current available evidence missing when the row reports none", () => {
+		expect(
+			balanceRowToDisplay(balanceRow({ balance: 100, componentBalance: 50 })),
+		).toMatchObject({ balance: 50, availableBalance: null });
 	});
 	it("maps balance-check presence to balance verification and source labels", () => {
 		expect(balanceRowToDisplay(balanceRow())).toMatchObject({

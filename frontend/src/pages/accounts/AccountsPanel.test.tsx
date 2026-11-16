@@ -1,0 +1,56 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import type { Account } from "../../domain/model.ts";
+import { AccountsPanel } from "./AccountsPanel.tsx";
+
+function account(overrides: Partial<Account> = {}): Account {
+	return {
+		id: "cash",
+		name: "Cash",
+		kind: "cash",
+		enabled: true,
+		archived: false,
+		balance: 798.01,
+		minBalance: 0,
+		maxBalance: null,
+		color: null,
+		observedOn: "2026-01-31",
+		balanceCheck: true,
+		source: "Synced balance check",
+		readOnly: false,
+		observedAt: 1773133200,
+		observedBalance: 798.01,
+		availableBalance: 1244.43,
+		...overrides,
+	};
+}
+
+const render = (accounts: Account[]) =>
+	renderToStaticMarkup(
+		<AccountsPanel
+			accounts={accounts}
+			showHeaders
+			onAccount={() => {}}
+			onEdit={() => {}}
+			onRemove={() => {}}
+		/>,
+	);
+
+describe("accounts panel current balance", () => {
+	it("shows bank-reported available cash instead of the modeled balance", () => {
+		const html = render([account()]);
+		expect(html).toContain("Available balance");
+		expect(html).toContain("$1,244");
+		expect(html).not.toContain("$798");
+	});
+	it("shows a reported zero as a current balance", () => {
+		const html = render([account({ availableBalance: 0 })]);
+		expect(html).toContain("$0");
+		expect(html).not.toContain("Unavailable");
+	});
+	it("shows unavailable when no current available observation exists", () => {
+		const html = render([account({ availableBalance: null })]);
+		expect(html).toContain("Unavailable");
+		expect(html).not.toContain("$798");
+	});
+});

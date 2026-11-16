@@ -12,7 +12,11 @@ import { accountTrendRows } from "./chart.ts";
 import { projectionFixture, transactionFixture } from "../mocks/projection.ts";
 import { accountTransactions } from "./accountActivity.ts";
 
-function account(id: string, balance: number): Account {
+function account(
+	id: string,
+	balance: number,
+	availableBalance: number | null = null,
+): Account {
 	return {
 		id,
 		name: id,
@@ -29,6 +33,7 @@ function account(id: string, balance: number): Account {
 		readOnly: false,
 		observedAt: 100,
 		observedBalance: balance,
+		availableBalance,
 	};
 }
 function fixture() {
@@ -67,10 +72,11 @@ describe("visible accounts", () => {
 	});
 	it("leaves stored 1:1 passthrough rows untouched", () => {
 		const ordinary = passthrough("cash", 100);
+		ordinary.availableBalance = 0;
 		const grouped = toDisplayAccounts([ordinary, ...fixture()]);
 		expect(grouped).toHaveLength(3);
 		expect(grouped[0]).toBe(ordinary);
-		expect(grouped[0]).toMatchObject({ maxBalance: 0 });
+		expect(grouped[0]).toMatchObject({ maxBalance: 0, availableBalance: 0 });
 		expect(componentIds(grouped[0]!)).toEqual(["cash"]);
 		expect(isGroupedDisplay(grouped[0])).toBe(false);
 	});
@@ -99,6 +105,26 @@ describe("visible accounts", () => {
 			balanceCheck: false,
 			balance: -1020,
 		});
+	});
+	it("sums grouped current available evidence only when every component reports it", () => {
+		const raw = fixture();
+		raw[0]!.availableBalance = 1000;
+		raw[1]!.availableBalance = 44.43;
+		expect(toDisplayAccounts(raw)[0]).toMatchObject({
+			balance: -1020,
+			availableBalance: 1044.43,
+		});
+		raw[1]!.availableBalance = null;
+		expect(toDisplayAccounts(raw)[0]?.availableBalance).toBeNull();
+	});
+	it("keeps a reported zero in the grouped current available total", () => {
+		const raw = fixture();
+		raw[0]!.availableBalance = 0;
+		raw[1]!.availableBalance = 0;
+		expect(toDisplayAccounts(raw)[0]?.availableBalance).toBe(0);
+	});
+	it("does not derive current available evidence from modeled balances", () => {
+		expect(toDisplayAccounts(fixture())[0]?.availableBalance).toBeNull();
 	});
 	it("includes interest-only balances in projection lines", () => {
 		const accounts = toDisplayAccounts(fixture());

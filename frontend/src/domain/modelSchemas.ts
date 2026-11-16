@@ -66,8 +66,10 @@ export const accountSchema = z.object({
 		.nullable()
 		.optional(),
 	observedAt: z.number().int().nullable().optional(),
-	// Bank-reported available cash or available credit. Missing means the
-	// Bridge did not report it; it never replaces the posted balance.
+	// Bank-reported available cash or available credit. This is the
+	// owner-facing current balance; missing means unavailable and never
+	// falls back to the modeled balance above, which stays the net-worth
+	// and projection authority.
 	availableBalance: z
 		.number()
 		.finite()
