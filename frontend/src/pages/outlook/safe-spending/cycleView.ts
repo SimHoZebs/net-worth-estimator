@@ -5,7 +5,7 @@ import {
 	spendingLedger,
 	ledgerHit,
 	spendingAmount,
-	type SafeSpendingScheduledBump,
+	type SafeSpendingScheduledIncrease,
 } from "@/domain/safeSpendingTrend.ts";
 import { buildCycleView, type CycleView } from "./safeSpendingDetailModel.ts";
 import { monthEndIso } from "@/domain/safeSpending.ts";
@@ -21,7 +21,7 @@ export interface CycleViewInput {
 	fullDaysLeft: number;
 	/** Posted external cash inflows; null means evidence is unavailable. */
 	monthlyIncome?: number | null;
-	scheduledOutflows?: SafeSpendingScheduledBump[];
+	scheduledOutflows?: SafeSpendingScheduledIncrease[];
 }
 
 export interface CycleViewResult {

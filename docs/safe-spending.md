@@ -28,9 +28,9 @@ centered in the line. It does not insert another table row or a second border.
 Pending charges and pending refunds both count in recorded spending, counted
 once on their transaction date. Pending status never excludes a row from the
 ledger; only voided, disabled, or future-dated rows are left out. The projected
-chart continues the average daily rate and adds discrete steps for the backend
-outstanding bills due later in the cycle, the same rows the Bills section lists,
-so limit crossings reflect those bumps.
+chart continues the average daily rate and adds discrete increases for the
+recurring-schedule rows among the backend outstanding bills, the same rows
+the Bills section lists, so limit crossings reflect those increases.
 
 ## Monthly income threshold
 

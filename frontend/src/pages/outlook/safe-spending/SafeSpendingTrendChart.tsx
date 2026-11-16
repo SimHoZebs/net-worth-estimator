@@ -134,24 +134,30 @@ export function SafeSpendingTrendChart({
 	const showThresholds = trend.limit !== null || trend.safetyNet !== null;
 	const actual = trend.actual;
 	const projected = trend.projected;
-	const scheduledBumps = useMemo(
-		() => trend.scheduledBumps ?? [],
-		[trend.scheduledBumps],
+	const scheduledIncreases = useMemo(
+		() => trend.scheduledIncreases ?? [],
+		[trend.scheduledIncreases],
 	);
-	const bumpByDate = useMemo(
-		() => new Map(scheduledBumps.map((bump) => [bump.date.slice(0, 10), bump])),
-		[scheduledBumps],
-	);
-	const bumpDots = useMemo(
+	const increaseByDate = useMemo(
 		() =>
-			scheduledBumps.flatMap((bump) => {
-				const day = bump.date.slice(0, 10);
+			new Map(
+				scheduledIncreases.map((increase) => [
+					increase.date.slice(0, 10),
+					increase,
+				]),
+			),
+		[scheduledIncreases],
+	);
+	const increaseDots = useMemo(
+		() =>
+			scheduledIncreases.flatMap((increase) => {
+				const day = increase.date.slice(0, 10);
 				const point = projected.find(
 					(entry) => entry.date.slice(0, 10) === day,
 				);
 				return point ? [{ date: day, amount: point.spent }] : [];
 			}),
-		[scheduledBumps, projected],
+		[scheduledIncreases, projected],
 	);
 	const dates = useMemo(
 		() =>
@@ -254,9 +260,9 @@ export function SafeSpendingTrendChart({
 								}),
 							]
 						: []),
-					...(bumpDots.length
+					...(increaseDots.length
 						? [
-								dot(bumpDots, {
+								dot(increaseDots, {
 									x: "date",
 									y: "amount",
 									r: 4,
@@ -336,8 +342,8 @@ export function SafeSpendingTrendChart({
 								: typeof datum.amount === "number"
 									? datum.amount
 									: Number(point.yValue);
-						const bump = bumpByDate.get(date);
-						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${bump ? ` incl. ${exactMoney(bump.amount)} bills` : ""}`;
+						const increase = increaseByDate.get(date);
+						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${increase ? ` incl. ${exactMoney(increase.amount)} bills` : ""}`;
 					},
 				},
 			}),
@@ -353,8 +359,8 @@ export function SafeSpendingTrendChart({
 			trend.limitHit,
 			lastActual,
 			domain,
-			bumpByDate,
-			bumpDots,
+			increaseByDate,
+			increaseDots,
 		],
 	);
 	if (trend.spendingAvailable === false)
@@ -399,11 +405,11 @@ export function SafeSpendingTrendChart({
 		(showThresholds && trend.safetyNet !== null && trend.safetyNet > 0
 			? ` The protected reserve starts at ${exactMoney(trend.safetyNet)}.`
 			: "") +
-		scheduledBumps
-			.map((bump) =>
-				bump.name
-					? ` Includes ${exactMoney(bump.amount)} ${bump.name} bill on ${dateLabel(bump.date, true)}.`
-					: ` Includes ${exactMoney(bump.amount)} recurring bill on ${dateLabel(bump.date, true)}.`,
+		scheduledIncreases
+			.map((increase) =>
+				increase.name
+					? ` Includes ${exactMoney(increase.amount)} ${increase.name} bill on ${dateLabel(increase.date, true)}.`
+					: ` Includes ${exactMoney(increase.amount)} recurring bill on ${dateLabel(increase.date, true)}.`,
 			)
 			.join("");
 
@@ -469,7 +475,7 @@ export function SafeSpendingTrendChart({
 						{labels.projectedSpending}
 					</li>
 				)}
-				{scheduledBumps.length > 0 && (
+				{scheduledIncreases.length > 0 && (
 					<li className="flex items-center gap-2">
 						<span
 							aria-hidden="true"

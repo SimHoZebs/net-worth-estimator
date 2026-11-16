@@ -30,7 +30,7 @@ describe("current spending pace after refunds", () => {
 			projected: false,
 			transactionId: "purchase",
 		},
-		scheduledBumps: [],
+		scheduledIncreases: [],
 	};
 	it("pads negative net spending from a refund without clipping the recorded curve", () => {
 		const refundOnly = {
@@ -71,7 +71,7 @@ describe("current spending pace after refunds", () => {
 	});
 });
 
-describe("scheduled recurring bumps", () => {
+describe("scheduled recurring increases", () => {
 	it("covers bumped projection values in the chart domain", () => {
 		const trend: SafeSpendingTrend = {
 			actual: [{ date: "2026-11-09", spent: 10, projected: false }],
@@ -84,13 +84,13 @@ describe("scheduled recurring bumps", () => {
 			averageDaily: 5,
 			limitHit: { date: "2026-11-10", amount: 70, projected: true },
 			safetyNetHit: null,
-			scheduledBumps: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
+			scheduledIncreases: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
 		};
 		const [, high] = spendingChartDomain(trend);
 		expect(high).toBeCloseTo(75.6);
 	});
 
-	it("renders recurring legend and bump description", () => {
+	it("renders recurring legend and increase description", () => {
 		const trend: SafeSpendingTrend = {
 			actual: [{ date: "2026-11-09", spent: 10, projected: false }],
 			projected: [
@@ -102,7 +102,7 @@ describe("scheduled recurring bumps", () => {
 			averageDaily: 5,
 			limitHit: null,
 			safetyNetHit: null,
-			scheduledBumps: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
+			scheduledIncreases: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
 		};
 		const html = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, { trend }),
@@ -111,7 +111,7 @@ describe("scheduled recurring bumps", () => {
 		expect(html).toContain("Includes $55.00 Sub bill on Nov 10, 2026.");
 		const without = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, {
-				trend: { ...trend, scheduledBumps: [] },
+				trend: { ...trend, scheduledIncreases: [] },
 			}),
 		);
 		expect(without).not.toContain("Recurring bills");

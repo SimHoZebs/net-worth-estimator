@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SafeSpendingObligation } from "@/api/generated/model/safeSpendingObligation.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { Transaction } from "@/domain/model.ts";
-import { obligationBumps } from "./obligationBumps.ts";
+import { recurringBillIncreases } from "./recurringBillIncreases.ts";
 
 function obligation(
 	id: string,
@@ -73,17 +73,19 @@ const args = {
 	cycleEnd: "2026-11-30",
 };
 
-describe("obligationBumps", () => {
-	it("steps for backend bill rows in the bump window", () => {
-		const bumps = obligationBumps({
+describe("recurringBillIncreases", () => {
+	it("increases the projection for backend bill rows in the window", () => {
+		const increases = recurringBillIncreases({
 			obligations: [obligation("schedule:rent:2026-11-18", { name: "rent" })],
 			...args,
 		});
-		expect(bumps).toEqual([{ date: "2026-11-18", amount: 25, name: "rent" }]);
+		expect(increases).toEqual([
+			{ date: "2026-11-18", amount: 25, name: "rent" },
+		]);
 	});
 
 	it("ignores rows outside the window and unknown amounts", () => {
-		const bumps = obligationBumps({
+		const increases = recurringBillIncreases({
 			obligations: [
 				obligation("today", { date: "2026-11-15" }),
 				obligation("past", { date: "2026-11-14" }),
@@ -93,11 +95,26 @@ describe("obligationBumps", () => {
 			],
 			...args,
 		});
-		expect(bumps).toEqual([]);
+		expect(increases).toEqual([]);
+	});
+
+	it("ignores one-off rows with no recurring schedule", () => {
+		const increases = recurringBillIncreases({
+			obligations: [
+				obligation("transaction:onetime-laptop", {
+					name: "Laptop",
+					date: "2026-11-20",
+					scheduleId: null,
+					transactionId: "onetime-laptop",
+				}),
+			],
+			...args,
+		});
+		expect(increases).toEqual([]);
 	});
 
 	it("excludes transfers to known accounts", () => {
-		const bumps = obligationBumps({
+		const increases = recurringBillIncreases({
 			obligations: [
 				obligation("schedule:card-payment:2026-11-18", {
 					name: "card-payment",
@@ -113,11 +130,11 @@ describe("obligationBumps", () => {
 			today: args.today,
 			cycleEnd: args.cycleEnd,
 		});
-		expect(bumps).toEqual([]);
+		expect(increases).toEqual([]);
 	});
 
 	it("skips already claimed occurrences recorded in actual spending", () => {
-		const bumps = obligationBumps({
+		const increases = recurringBillIncreases({
 			obligations: [obligation("schedule:rent:2026-11-18")],
 			schedules: args.schedules,
 			transactions: [
@@ -130,11 +147,11 @@ describe("obligationBumps", () => {
 			today: args.today,
 			cycleEnd: args.cycleEnd,
 		});
-		expect(bumps).toEqual([]);
+		expect(increases).toEqual([]);
 	});
 
 	it("groups same-day rows and sums cents", () => {
-		const bumps = obligationBumps({
+		const increases = recurringBillIncreases({
 			obligations: [
 				obligation("schedule:rent:2026-11-20", {
 					date: "2026-11-20",
@@ -154,14 +171,14 @@ describe("obligationBumps", () => {
 			today: args.today,
 			cycleEnd: args.cycleEnd,
 		});
-		expect(bumps).toEqual([
+		expect(increases).toEqual([
 			{ date: "2026-11-20", amount: 25.01, name: "alpha, beta" },
 		]);
 	});
 
 	it("returns empty with an invalid range", () => {
 		expect(
-			obligationBumps({
+			recurringBillIncreases({
 				obligations: [obligation("schedule:rent:2026-11-18")],
 				...args,
 				today: "2026-12-01",

@@ -73,7 +73,7 @@ import {
 	expectedMonthlyIncome,
 	incomeSourceCandidates,
 } from "@/domain/safeSpendingIncome.ts";
-import { obligationBumps } from "@/domain/obligationBumps.ts";
+import { recurringBillIncreases } from "@/domain/recurringBillIncreases.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -347,9 +347,9 @@ export function SafeSpendingPreview({
 			),
 		[transactions, currentCardTransactions, directSpending],
 	);
-	const billBumps = useMemo(
+	const billIncreases = useMemo(
 		() =>
-			obligationBumps({
+			recurringBillIncreases({
 				obligations: currentCashSummary.data?.outstandingObligations ?? [],
 				schedules: savedRules ?? [],
 				transactions: transactions ?? [],
@@ -383,7 +383,7 @@ export function SafeSpendingPreview({
 				reserve: settings.reserve,
 				closedCycle,
 				fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
-				scheduledOutflows: billBumps,
+				scheduledOutflows: billIncreases,
 			}),
 		[
 			cycle.cycleStart,
@@ -397,7 +397,7 @@ export function SafeSpendingPreview({
 			currentCardByCard,
 			settings.reserve,
 			closedCycle,
-			billBumps,
+			billIncreases,
 		],
 	);
 	const lastView = useMemo(

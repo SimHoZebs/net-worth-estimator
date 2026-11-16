@@ -192,7 +192,7 @@ describe("safeSpendingTrend", () => {
 		expect(trend.projected).toEqual([]);
 	});
 
-	it("steps the projection for scheduled bumps on top of the slope", () => {
+	it("increases the projection for scheduled increases on top of the slope", () => {
 		const trend = safeSpendingTrend({
 			transactions: [charge("2026-01-21", 100)],
 			cycleStart: "2026-01-20",
@@ -202,7 +202,7 @@ describe("safeSpendingTrend", () => {
 			safetyNet: 10000,
 			scheduledOutflows: [{ date: "2026-01-23", amount: 60, name: "Sub" }],
 		});
-		expect(trend.scheduledBumps).toEqual([
+		expect(trend.scheduledIncreases).toEqual([
 			{ date: "2026-01-23", amount: 60, name: "Sub" },
 		]);
 		expect(trend.projected.map((point) => [point.date, point.spent])).toEqual([
@@ -214,7 +214,7 @@ describe("safeSpendingTrend", () => {
 		]);
 	});
 
-	it("projects bumps without an average rate", () => {
+	it("projects increases without an average rate", () => {
 		const trend = safeSpendingTrend({
 			transactions: [],
 			cycleStart: "2026-01-20",
@@ -232,7 +232,7 @@ describe("safeSpendingTrend", () => {
 		]);
 	});
 
-	it("moves threshold hits earlier for scheduled bumps", () => {
+	it("moves threshold hits earlier for scheduled increases", () => {
 		const without = safeSpendingTrend({
 			transactions: [charge("2026-01-21", 100)],
 			cycleStart: "2026-01-20",
@@ -255,7 +255,7 @@ describe("safeSpendingTrend", () => {
 		expect(withBump.limitHit?.projected).toBe(true);
 	});
 
-	it("sums same-date bumps and ignores out-of-window rows", () => {
+	it("sums same-date increases and ignores out-of-window rows", () => {
 		const trend = safeSpendingTrend({
 			transactions: [],
 			cycleStart: "2026-01-20",
@@ -272,7 +272,7 @@ describe("safeSpendingTrend", () => {
 				{ date: "2026-01-23", amount: Number.NaN },
 			],
 		});
-		expect(trend.scheduledBumps).toEqual([
+		expect(trend.scheduledIncreases).toEqual([
 			{ date: "2026-01-22", amount: 25, name: "alpha, beta" },
 		]);
 		expect(
