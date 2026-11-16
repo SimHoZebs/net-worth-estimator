@@ -512,12 +512,12 @@ test("current cash budget and exact crossing survive inline history, sorting and
 			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
 			).toHaveText(/\$283\.42 cash limit was crossed on Nov 9, 2026/);
-			await expect(card.getByTestId("monthly-income-value")).toHaveText(
-				"$150.00",
-			);
+			await expect(
+				card.getByRole("list", { name: "Spending pace legend" }),
+			).toContainText("Income limit");
 			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
-			).toHaveText(/Income crossed on Nov 9, 2026/);
+			).toHaveText(/Income this month: \$/);
 			const chart = card.getByLabel("Spending pace", { exact: true });
 			await expect(
 				chart.locator("text").filter({ hasText: /^Oct / }).first(),
@@ -553,9 +553,7 @@ test("current cash budget and exact crossing survive inline history, sorting and
 					name: /View Synthetic crossing purchase on/,
 				}),
 			});
-			await expect(row).toContainText(
-				"Income this month · Reserve · Cash limit",
-			);
+			await expect(row).toContainText("Reserve · Cash limit");
 			await expect(row).toHaveClass(/border-b-0/);
 			await expect(
 				row.locator('[data-spending-divider="danger"]'),
@@ -608,11 +606,11 @@ test("current cash budget and exact crossing survive inline history, sorting and
 		await page.keyboard.press("Escape");
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		await expect(
-			drawer.getByText("Income accounts", { exact: true }),
-		).toBeVisible();
-		await expect(
 			drawer.getByText("Recurring income sources", { exact: true }),
 		).toBeVisible();
+		await expect(
+			drawer.getByText("Income accounts", { exact: true }),
+		).toHaveCount(0);
 		await page.keyboard.press("Escape");
 		await page.route("**/v1/safe-spending-summary?**", async (route) => {
 			const response = await route.fetch();
@@ -631,16 +629,13 @@ test("current cash budget and exact crossing survive inline history, sorting and
 		await expect(drawer.getByRole("table").locator("tbody > tr")).toHaveCount(
 			3,
 		);
-		await expect(drawer.locator("[data-spending-divider]")).toHaveCount(1);
-		await expect(drawer.locator("[data-spending-divider]")).toContainText(
-			"Income this month",
-		);
+		await expect(drawer.locator("[data-spending-divider]")).toHaveCount(0);
 	} finally {
 		await api.dispose();
 	}
 });
 
-test("Configure preserves explicit recurring sources and counts only their linked receipts after reload", async ({
+test("Configure preserves explicit recurring sources and prices their November occurrences", async ({
 	page,
 }) => {
 	const api = await request.newContext();
@@ -656,9 +651,8 @@ test("Configure preserves explicit recurring sources and counts only their linke
 			name: "Safe spending",
 			exact: true,
 		});
-		await expect(card.getByTestId("monthly-income-value")).toHaveText(
-			"$150.00",
-		);
+		const legend = card.getByRole("list", { name: "Spending pace legend" });
+		await expect(legend).toContainText("Income limit");
 		const cashBefore = await card.getByTestId("left-value").textContent();
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const payroll = drawer.getByRole("button", {
@@ -680,21 +674,13 @@ test("Configure preserves explicit recurring sources and counts only their linke
 		};
 		await toggle(payroll);
 		await page.keyboard.press("Escape");
-		await expect(card.getByTestId("monthly-income-value")).toHaveCount(0);
-		await expect(
-			card.getByText(
-				"Monthly income unavailable. Check recurring income sources in Configure.",
-			),
-		).toBeVisible();
+		await expect(legend).not.toContainText("Income limit");
 		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		await toggle(other);
 		await page.keyboard.press("Escape");
 		await page.reload();
-		await expect(card.getByTestId("monthly-income-value")).toHaveText("$0.00");
-		await expect(
-			card.getByText("No received payments linked this month."),
-		).toBeVisible();
+		await expect(legend).toContainText("Income limit");
 		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		await expect(payroll).toHaveAttribute("aria-pressed", "false");
@@ -702,39 +688,11 @@ test("Configure preserves explicit recurring sources and counts only their linke
 		await toggle(payroll);
 		await page.keyboard.press("Escape");
 		await page.reload();
-		await expect(card.getByTestId("monthly-income-value")).toHaveText(
-			"$150.00",
-		);
+		await expect(legend).toContainText("Income limit");
 		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
 		const settings = await api.get(`${FIXTURE_API}/v1/safe-spending-settings`);
 		expect(await settings.json()).toMatchObject({
 			settings: {
-				incomeAccountIds: ["evidence-checking"],
-				incomeScheduleIds: ["evidence-other-income", "evidence-salary"],
-			},
-		});
-		await card.getByRole("button", { name: "Configure", exact: true }).click();
-		const incomeAccount = drawer
-			.getByRole("group", { name: "Income accounts", exact: true })
-			.getByRole("button", { name: "Synthetic checking cash", exact: true });
-		await expect(incomeAccount).toHaveAttribute("aria-pressed", "true");
-		await toggle(incomeAccount);
-		await expect(incomeAccount).toHaveAttribute("aria-pressed", "false");
-		await page.keyboard.press("Escape");
-		await page.reload();
-		await expect(card.getByTestId("monthly-income-value")).toHaveCount(0);
-		await expect(
-			card.getByText(
-				"Monthly income unavailable. Check recurring income sources in Configure.",
-			),
-		).toBeVisible();
-		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
-		await card.getByRole("button", { name: "Configure", exact: true }).click();
-		await expect(incomeAccount).toHaveAttribute("aria-pressed", "false");
-		const cleared = await api.get(`${FIXTURE_API}/v1/safe-spending-settings`);
-		expect(await cleared.json()).toMatchObject({
-			settings: {
-				incomeAccountIds: [],
 				incomeScheduleIds: ["evidence-other-income", "evidence-salary"],
 			},
 		});

@@ -18,11 +18,8 @@ export function SafeSpendingConfigurePanel({
 	billCandidates,
 	trackedBillIds,
 	accounts,
-	incomeAccounts,
-	incomeAccountIds,
 	incomeCandidates,
 	incomeScheduleIds,
-	onToggleIncomeAccount,
 	onToggleIncomeSource,
 	onToggleBill,
 	onToggleAccount,
@@ -33,11 +30,8 @@ export function SafeSpendingConfigurePanel({
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Account[];
-	incomeAccounts: Account[];
-	incomeAccountIds: string[];
 	incomeCandidates: Transaction[];
 	incomeScheduleIds: string[];
-	onToggleIncomeAccount: (id: string) => void;
 	onToggleIncomeSource: (id: string) => void;
 	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
@@ -117,32 +111,6 @@ export function SafeSpendingConfigurePanel({
 							/>
 						);
 					})}
-				</div>
-			</FieldSet>
-			<FieldSet>
-				<FieldLegend variant="label">Income accounts</FieldLegend>
-				<div className="flex flex-wrap gap-2">
-					{incomeAccounts.map((account) => (
-						<AccountToggle
-							key={account.id}
-							account={account}
-							checked={incomeAccountIds.includes(account.id)}
-							onToggle={() => onToggleIncomeAccount(account.id)}
-						/>
-					))}
-					{incomeAccountIds
-						.filter(
-							(id) => !incomeAccounts.some((account) => account.id === id),
-						)
-						.map((id) => (
-							<TogglePill
-								key={id}
-								name={`Unavailable account (${id})`}
-								detail="Remove selection"
-								checked
-								onToggle={() => onToggleIncomeAccount(id)}
-							/>
-						))}
 				</div>
 			</FieldSet>
 			<FieldSet>

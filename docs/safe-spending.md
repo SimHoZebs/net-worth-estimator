@@ -27,40 +27,29 @@ centered in the line. It does not insert another table row or a second border.
 
 ## Monthly income threshold
 
-The income threshold compares recorded spending with income received in the
-same UTC calendar month, from month-start through today. It excludes projected
-paychecks, pending income, and transfers between the user's accounts. Recorded
-bill payments count as spending once; scheduled future bills are not recorded
-spending. Income uses only posted actual transactions explicitly linked by their
-canonical occurrence claim to a selected recurring income source. Configure saves
-income accounts independently of spending accounts and preserves explicit source
-choices. Categories, names, amounts, and near dates never establish that link.
-A category-only INCOME payment is excluded; a selected linked receipt counts even
-when its category is missing or wrong. Explicitly linked reversals retain their
-net effect. Internal transfers, disabled, void, pending and future rows are excluded;
-actual transaction IDs are counted once. No selected sources or a saved source
-that is unavailable makes the income threshold unavailable, without changing known
-cash. Valid selected sources with no received payments produce known zero income.
-Ending or disabling a selected source's future recurrence does not erase its
-linked receipts or its explicit selection. Clearing all income accounts saves
-explicit none, separately from the initial automatic account selection.
-An eligible payment with an unresolved amount makes income unavailable.
+The income threshold compares recorded spending with the expected pay from the
+selected recurring income sources for the same UTC calendar month. Each
+selected source contributes its scheduled occurrences in that month, so an
+end-of-month paycheck counts for the month even when it falls outside the
+statement cycle. Categories, names, amounts, and near dates never establish
+that link, and transfers between the user's accounts never count. Income scope
+is the shared cash scope: there is no separate income-account selection.
+No selected sources makes the income threshold unavailable, without changing
+known cash. Selected sources with no occurrence this month produce known zero
+income. An expected amount that cannot be resolved makes income unavailable.
+Eligible spending with an unresolved amount does the same.
 
 The income threshold is a separate warning, not a cash deduction or a replacement
 for the cash-backed limit. Savings can leave cash available while spending exceeds
-this month's income. Conversely, having earned income does not prove cash remains.
+this month's pay. Conversely, having expected pay does not prove cash remains.
 
-Chart ceilings share the cycle's cumulative-spending coordinates. The cash ceiling
-is cycle spending plus cash after bills. The income ceiling is cycle spending plus
-monthly income minus monthly spending. This accounts for spending outside the
-visible cycle so a statement cycle crossing month-start never compares different
-calendar windows.
-The chart shows actual received income separately from the translated line and
-visibly states the cycle adjustment whenever those coordinates differ.
-Exact crossing identities come from the same recorded ledger as the monthly totals. An income
-limit crossed before the visible cycle is already exceeded at its start, not
-caused by its first displayed transaction. Missing income evidence does not
-disable known cash evidence, and missing cash evidence does not invent income.
+The chart plots the expected monthly pay directly as the income line, with no
+cycle offset math. Exact crossing identities come from the same recorded ledger
+as the monthly totals. An income limit crossed before the visible cycle is
+already exceeded at its start, not caused by its first displayed transaction.
+Missing income evidence does not disable known cash evidence, and missing cash
+evidence does not invent income. No text sits between the graph and its legend;
+the line, the legend entry, and the exact in-row divider carry the threshold.
 
 Use short labels with enough context to distinguish cash, reserve, monthly income,
 and actual versus projected values. Preserve dates, financial qualifiers, action

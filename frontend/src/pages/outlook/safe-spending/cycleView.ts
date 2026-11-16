@@ -103,7 +103,7 @@ export function cycleView({
 		const coordinate =
 			monthlySpent === null || ledger.some((row) => row.spendingAmountUnknown)
 				? null
-				: Math.round((monthlyIncome + spent - monthlySpent) * 100) / 100;
+				: Math.round(monthlyIncome * 100) / 100;
 		trend.monthlyIncome = {
 			amount: monthlyIncome,
 			spent: monthlySpent,
@@ -115,12 +115,7 @@ export function cycleView({
 					: cycle.end,
 			hit:
 				hit && coordinate !== null && hit.date >= cycle.start
-					? {
-							...hit,
-							amount:
-								Math.round((hit.amount + spent - (monthlySpent ?? 0)) * 100) /
-								100,
-						}
+					? { ...hit, amount: coordinate }
 					: null,
 		};
 	}

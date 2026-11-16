@@ -34,7 +34,6 @@ import { visibleAccounts } from "@/domain/model.ts";
 import { spendingLedger, spendingAmount } from "@/domain/safeSpendingTrend.ts";
 import {
 	currentCashActivity,
-	receivedMonthlyIncome,
 	currentSpendingActivity,
 } from "./currentCashActivity.ts";
 import type { Projection } from "@/domain/result.ts";
@@ -70,7 +69,10 @@ import { useOutlookProjection } from "@/pages/outlook/useOutlookProjection.ts";
 import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
 import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
-import { incomeSourceCandidates } from "@/domain/safeSpendingIncome.ts";
+import {
+	expectedMonthlyIncome,
+	incomeSourceCandidates,
+} from "@/domain/safeSpendingIncome.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -201,23 +203,16 @@ export function SafeSpendingPreview({
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
 	}, [settings.spendingAccountIds, spendableAccounts, accounts]);
-	// Income scope is independent of cash/spending scope. A saved missing ID
-	// remains explicit and unavailable rather than silently choosing a replacement.
-	const incomeIds = useMemo(() => {
-		if (settings.incomeAccountIds !== null) return settings.incomeAccountIds;
-		const fallback = checkingAccountId(accounts ?? []);
-		return fallback ? [fallback] : [];
-	}, [settings.incomeAccountIds, accounts]);
-	const incomeCandidates = useMemo(
+		const incomeCandidates = useMemo(
 		() =>
 			incomeSourceCandidates({
 				accounts: accounts ?? [],
 				rules,
-				incomeAccountIds: incomeIds,
+				spendingIds,
 				incomeScheduleIds: settings.incomeScheduleIds,
 				today: displayToday,
 			}),
-		[accounts, rules, incomeIds, settings.incomeScheduleIds, displayToday],
+		[accounts, rules, spendingIds, settings.incomeScheduleIds, displayToday],
 	);
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
@@ -357,13 +352,11 @@ export function SafeSpendingPreview({
 				cycle: { start: cycle.cycleStart, end: cycle.cycleEnd },
 				referenceDay: displayToday,
 				transactions: currentSpendingTransactions,
-				monthlyIncome: receivedMonthlyIncome({
-					accounts: accounts ?? [],
-					transactions: transactions ?? [],
-					rules,
-					incomeAccountIds: incomeIds,
+				monthlyIncome: expectedMonthlyIncome({
+					schedules: savedRules ?? [],
 					incomeScheduleIds: settings.incomeScheduleIds,
-					today: displayToday,
+					monthStart: `${displayToday.slice(0, 7)}-01`,
+					monthEnd: monthEndIso(displayToday),
 				}),
 				cashSummary: currentCashSummary.data,
 				cardSpentByCard: currentCardByCard,
@@ -377,10 +370,7 @@ export function SafeSpendingPreview({
 			cycle.daysLeft,
 			displayToday,
 			currentSpendingTransactions,
-			accounts,
-			transactions,
-			rules,
-			incomeIds,
+			savedRules,
 			settings.incomeScheduleIds,
 			currentCashSummary.data,
 			currentCardByCard,
@@ -512,12 +502,6 @@ export function SafeSpendingPreview({
 			: [...explicit, accountId];
 		updateSettings({ spendingAccountIds: next.length ? next : null });
 	};
-	const toggleIncomeAccount = (id: string) =>
-		updateSettings({
-			incomeAccountIds: incomeIds.includes(id)
-				? incomeIds.filter((item) => item !== id)
-				: [...incomeIds, id],
-		});
 	const toggleIncomeSource = (id: string) =>
 		updateSettings({
 			incomeScheduleIds: settings.incomeScheduleIds.includes(id)
@@ -710,11 +694,8 @@ export function SafeSpendingPreview({
 							billCandidates={billCandidates}
 							trackedBillIds={trackedBillIds}
 							accounts={accounts ?? []}
-							incomeAccounts={spendableAccounts}
-							incomeAccountIds={incomeIds}
 							incomeCandidates={incomeCandidates}
 							incomeScheduleIds={settings.incomeScheduleIds}
-							onToggleIncomeAccount={toggleIncomeAccount}
 							onToggleIncomeSource={toggleIncomeSource}
 							onToggleBill={toggleBill}
 							onToggleAccount={toggleAccount}
