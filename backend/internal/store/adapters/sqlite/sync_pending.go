@@ -256,6 +256,16 @@ func writeBankValues(tx *userTx, id string, transaction types.Transaction) error
 	if claimed != 0 {
 		pending, enabled = false, true
 	}
+	posted := transaction.PostedTime
+	if posted <= 0 {
+		var storedPosted int64
+		_ = tx.QueryRow(`SELECT posted_time FROM transactions WHERE id = ? AND user_id = :user_id`, id).Scan(&storedPosted)
+		if storedPosted > 0 {
+			posted = storedPosted
+		} else if !pending && transaction.TransactionTime > 0 {
+			posted = transaction.TransactionTime
+		}
+	}
 	amount, err := json.Marshal(transaction.Amount)
 	if err != nil {
 		return err
@@ -265,7 +275,7 @@ func writeBankValues(tx *userTx, id string, transaction types.Transaction) error
 		return err
 	}
 	result, err := tx.Exec(`UPDATE transactions SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
-		transaction.Name, nullable(transaction.SourceAccountID), string(destinations), string(amount), transaction.PostedTime, transaction.TransactionTime, boolToInt(pending), boolToInt(transaction.Void), id, SourceUser)
+		transaction.Name, nullable(transaction.SourceAccountID), string(destinations), string(amount), posted, transaction.TransactionTime, boolToInt(pending), boolToInt(transaction.Void), id, SourceUser)
 	if err != nil {
 		return err
 	}

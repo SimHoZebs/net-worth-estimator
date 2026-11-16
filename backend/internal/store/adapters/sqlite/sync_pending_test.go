@@ -84,6 +84,57 @@ func TestClaimedPendingSurvivesBankRefresh(t *testing.T) {
 	}
 }
 
+func TestClaimedSettledPreservesPostedTimeOnPendingRefresh(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	settled := bankSeedTransaction("BANK OF AMERICA ONLINE PMT", "prime_card", "363.62", false)
+	settled.PostedTime = 1794657600
+	settled.TransactionTime = 1794657600
+	if first := applyDirectives(t, database, []BankDirective{bankUpsertDirective(settled, ProviderSimpleFIN, "bridge-prime", "post1")}); first.SettledInserted != 1 {
+		t.Fatalf("seed = %+v", first)
+	}
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Transactions) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	id := loaded.Transactions[0].ID
+	if _, err := database.CreateSchedule(testRuleFixture("rent")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	if _, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: id,
+		Claim:         types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-11-14"},
+	}}); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	// The bridge still reports the authorization as pending with no posted
+	// date. The claimed occurrence must keep its verified posted instant so
+	// the model stays valid and balances keep serving.
+	pendingRefresh := bankSeedTransaction("BANK OF AMERICA ONLINE PMT", "prime_card", "363.62", true)
+	pendingRefresh.PostedTime = 0
+	pendingRefresh.TransactionTime = 1794657600
+	if second := applyDirectives(t, database, []BankDirective{bankUpsertDirective(pendingRefresh, ProviderSimpleFIN, "bridge-prime", "post1")}); second.PendingUpdated != 1 {
+		t.Fatalf("refresh = %+v", second)
+	}
+	after, err := database.LoadModel()
+	if err != nil || len(after.Transactions) != 1 {
+		t.Fatalf("rows = %+v, err %v", after, err)
+	}
+	row := after.Transactions[0]
+	if row.ID != id {
+		t.Fatalf("refresh changed identity: %s", row.ID)
+	}
+	if row.Pending || !row.Enabled {
+		t.Fatalf("claimed row demoted by refresh: %+v", row)
+	}
+	if row.PostedTime != 1794657600 {
+		t.Fatalf("claimed posted time lost: %+v", row)
+	}
+	if row.Claim == nil || row.Claim.ScheduleID != "rent" {
+		t.Fatalf("claim lost on refresh: %+v", row)
+	}
+}
+
 func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
