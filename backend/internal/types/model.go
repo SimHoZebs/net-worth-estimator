@@ -74,6 +74,30 @@ func (k AccountKind) Valid() bool {
 	return ok
 }
 
+// DisplayBasis selects which bank evidence figure is the owner-facing
+// current balance. Available is the bank-reported available figure;
+// posted is the posted (observed) balance. It never changes the modeled
+// balance, which stays the net-worth and projection authority.
+type DisplayBasis string
+
+const (
+	DisplayBasisAvailable DisplayBasis = "available"
+	DisplayBasisPosted    DisplayBasis = "posted"
+)
+
+func (b DisplayBasis) Valid() bool {
+	return b == DisplayBasisAvailable || b == DisplayBasisPosted
+}
+
+// NormalizeDisplayBasis maps an absent or unknown basis to available,
+// the default owner-facing figure.
+func NormalizeDisplayBasis(b DisplayBasis) DisplayBasis {
+	if !b.Valid() {
+		return DisplayBasisAvailable
+	}
+	return b
+}
+
 type Account struct {
 	Display    *AccountDisplay `json:"display,omitempty"`
 	ID         string          `json:"id"`
@@ -83,6 +107,9 @@ type Account struct {
 	MaxBalance *float64        `json:"maxBalance"` // nil = NoCeiling sentinel on the wire
 	Color      *string         `json:"color"`
 	Enabled    bool            `json:"enabled"`
+	// DisplayBasis chooses the owner-facing current balance: available
+	// (default) or posted. It is owner config, never bank evidence.
+	DisplayBasis DisplayBasis `json:"displayBasis,omitempty"`
 }
 
 func (a *Account) MinBalanceValue() float64 {

@@ -3,7 +3,7 @@ import type { Account } from "../../domain/model.ts";
 import { ACCOUNT_TYPE_LABELS } from "../../domain/accountKinds.ts";
 import type { AccountKind } from "../../api/contracts.ts";
 import { accountKindIcons } from "../AccountIcon.tsx";
-import { dateLabel } from "../../domain/format.ts";
+import { dateLabel, money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field.tsx";
@@ -83,7 +83,14 @@ export function AccountDetails({
 	readOnly: boolean;
 }) {
 	const locked = readOnly || edit.saving;
+	// The display basis is owner config, not bank evidence, so it stays
+	// editable on synced accounts. A workspace-level read-only view still
+	// locks it: readOnly without account.readOnly means the session, not
+	// the bank, forbids writes.
+	const basisLocked = edit.saving || (readOnly && !account.readOnly);
 	const { draft, formId } = edit;
+	const posted = account.observedBalance ?? account.balance;
+	const available = account.availableBalance ?? null;
 	const kindOptions = (["cash", "investment", "property", "debt"] as const).map(
 		(kind: AccountKind) => ({
 			value: kind,
@@ -224,6 +231,62 @@ export function AccountDetails({
 				)}
 			</PropertyField>
 			<BankDetails account={account} />
+			<PropertyField
+				label="Posted balance"
+				description="Posted total from the latest balance check, or the saved balance when unobserved. Never the projection."
+			>
+				<span className="text-sm font-medium tabular-nums">
+					{money(posted)}
+				</span>
+			</PropertyField>
+			<PropertyField
+				label="Available balance"
+				description="Bank-reported available cash or credit. Unavailable means the bank reported no figure."
+			>
+				<span className="text-sm font-medium tabular-nums">
+					{available === null ? (
+						<span className="text-muted-foreground">Unavailable</span>
+					) : (
+						money(available)
+					)}
+				</span>
+			</PropertyField>
+			<PropertyField
+				label="Display value"
+				htmlFor={`${formId}-display-basis`}
+				description="Which total the account list and header show. The modeled balance stays the net-worth authority either way."
+			>
+				<Select
+					value={draft.displayBasis}
+					disabled={basisLocked}
+					onValueChange={(basis) =>
+						edit.update(
+							{
+								displayBasis:
+									parseUnion(basis, ["available", "posted"] as const) ??
+									"available",
+							},
+							"display",
+						)
+					}
+				>
+					<SelectTrigger
+						id={`${formId}-display-basis`}
+						aria-label="Display value"
+						className="w-48"
+					>
+						<SelectValue>
+							{(value: string | null) =>
+								value === "posted" ? "Posted" : "Available"
+							}
+						</SelectValue>
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="available">Available</SelectItem>
+						<SelectItem value="posted">Posted</SelectItem>
+					</SelectContent>
+				</Select>
+			</PropertyField>
 			{draft.kind === "debt" && (
 				<PaymentTermsSection accountId={account.id} readOnly={locked} />
 			)}

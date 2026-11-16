@@ -39,6 +39,7 @@ export const financialModelFixture: FinancialModelFixture = {
 			observedOn: "2026-09-24",
 			balanceCheck: true,
 			source: "Example entry",
+			displayBasis: "available",
 			readOnly: false,
 		},
 		{
@@ -54,6 +55,7 @@ export const financialModelFixture: FinancialModelFixture = {
 			observedOn: "2026-09-24",
 			balanceCheck: true,
 			source: "Example entry",
+			displayBasis: "available",
 			readOnly: false,
 		},
 		{
@@ -69,6 +71,7 @@ export const financialModelFixture: FinancialModelFixture = {
 			observedOn: "2026-09-24",
 			balanceCheck: true,
 			source: "Example entry",
+			displayBasis: "available",
 			readOnly: false,
 		},
 		{
@@ -84,6 +87,7 @@ export const financialModelFixture: FinancialModelFixture = {
 			observedOn: "2026-09-24",
 			balanceCheck: true,
 			source: "Example entry",
+			displayBasis: "available",
 			readOnly: false,
 		},
 		{
@@ -99,6 +103,7 @@ export const financialModelFixture: FinancialModelFixture = {
 			observedOn: "2026-09-01",
 			balanceCheck: false,
 			source: "Example home estimate",
+			displayBasis: "available",
 			readOnly: false,
 		},
 		{
@@ -114,6 +119,7 @@ export const financialModelFixture: FinancialModelFixture = {
 			observedOn: "2026-09-24",
 			balanceCheck: true,
 			source: "Example entry",
+			displayBasis: "available",
 			readOnly: false,
 		},
 	],

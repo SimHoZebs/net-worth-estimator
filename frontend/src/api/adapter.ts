@@ -16,8 +16,9 @@ function accountKindOf(kind: string): Account["kind"] {
  * clamping, so a missing floor shows as zero and a missing ceiling as
  * unbounded. The modeled amount stays the net-worth and projection authority;
  * availableBalance is the bank-reported current figure and stays null when
- * the bank reported none. Current-balance surfaces read only the latter, and
- * a reported zero is a real observation rather than missing evidence.
+ * the bank reported none. Current-balance surfaces read the account's display
+ * basis (available by default, posted on owner choice), and a reported zero
+ * is a real observation rather than missing evidence.
  */
 export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 	const floor = row.minBalance;
@@ -43,6 +44,7 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 		observedAt: row.observedAt ?? null,
 		observedBalance: row.observedBalance ?? null,
 		availableBalance: row.availableBalance ?? null,
+		displayBasis: row.displayBasis === "posted" ? "posted" : "available",
 		balanceCheck: row.hasCheckpoint,
 		source: row.syncOwned
 			? "Synced balance check"

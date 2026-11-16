@@ -27,6 +27,7 @@ export interface AccountEditValues {
 	kind: Account["kind"];
 	enabled: boolean;
 	balance: number;
+	displayBasis: Account["displayBasis"];
 	minBalance: number;
 	maxBalance: number | null;
 	noCeiling: boolean;
@@ -61,6 +62,7 @@ export function accountUpdateBody({
 		name: values.name,
 		kind: values.kind,
 		enabled: values.enabled,
+		displayBasis: values.displayBasis,
 		...(minEdited
 			? { minBalance: values.minBalance }
 			: rawMin != null

@@ -218,8 +218,8 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 		color := nullable(account.Color)
 		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, user_id) VALUES (?,?,?,?,?,?,?,?, :user_id)`,
-			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
+			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?, :user_id)`,
+			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), boolToInt(account.Enabled),
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
 		}
@@ -545,7 +545,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, enabled FROM accounts WHERE user_id = :user_id ORDER BY position`)
+	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, display_basis, enabled FROM accounts WHERE user_id = :user_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -555,11 +555,13 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		var kind string
 		var minBalance, maxBalance sql.NullFloat64
 		var color sql.NullString
+		var basis string
 		var enabled int64
-		if err := accountRows.Scan(&account.ID, &account.Name, &kind, &minBalance, &maxBalance, &color, &enabled); err != nil {
+		if err := accountRows.Scan(&account.ID, &account.Name, &kind, &minBalance, &maxBalance, &color, &basis, &enabled); err != nil {
 			return nil, err
 		}
 		account.Kind = types.AccountKind(kind)
+		account.DisplayBasis = types.NormalizeDisplayBasis(types.DisplayBasis(basis))
 		if minBalance.Valid {
 			value := minBalance.Float64
 			account.MinBalance = &value

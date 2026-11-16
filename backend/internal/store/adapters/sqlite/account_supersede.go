@@ -198,8 +198,8 @@ func supersedeAccountProfile(tx *userTx, manual types.Account, syncedID string) 
 		return fmt.Errorf("read account position %s: %w", manual.ID, err)
 	}
 	if _, err := tx.Exec(
-		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, position = ? WHERE id = ? AND user_id = :user_id`,
-		manual.Name, string(manual.Kind), valueOr(manual.MinBalance, types.NoFloor), valueOr(manual.MaxBalance, types.NoCeiling), nullable(manual.Color), position, syncedID,
+		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, display_basis = ?, position = ? WHERE id = ? AND user_id = :user_id`,
+		manual.Name, string(manual.Kind), valueOr(manual.MinBalance, types.NoFloor), valueOr(manual.MaxBalance, types.NoCeiling), nullable(manual.Color), string(types.NormalizeDisplayBasis(manual.DisplayBasis)), position, syncedID,
 	); err != nil {
 		return fmt.Errorf("move account profile %s to %s: %w", manual.ID, syncedID, err)
 	}

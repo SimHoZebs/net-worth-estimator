@@ -26,6 +26,7 @@ function account(id: string, name: string, archived = false): Account {
 		observedOn: "2026-01-31",
 		balanceCheck: false,
 		source: "test",
+		displayBasis: "available",
 		readOnly: false,
 	};
 }

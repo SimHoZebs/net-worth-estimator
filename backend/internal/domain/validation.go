@@ -175,6 +175,11 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 				fmt.Sprintf("Account '%s' has kind '%s'. Expected one of %s.", account.ID, account.Kind, joinAccountKinds()),
 				pathWithField([]any{"accounts", index}, "kind")...)
 		}
+		if account.DisplayBasis != "" && !account.DisplayBasis.Valid() {
+			addIssue(&issues, types.SeverityError, "account.displayBasis.unknown",
+				fmt.Sprintf("Account '%s' has display basis '%s'. Expected available or posted.", account.ID, account.DisplayBasis),
+				pathWithField([]any{"accounts", index}, "displayBasis")...)
+		}
 	}
 
 	checkpointKeys := map[string]bool{}

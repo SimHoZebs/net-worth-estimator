@@ -26,6 +26,7 @@ export type AccountEditField =
 	| "enabled"
 	| "protected"
 	| "ceiling"
+	| "display"
 	| "time";
 
 export function useAccountEdit(
@@ -38,6 +39,8 @@ export function useAccountEdit(
 		balance: String(account.balance),
 		kind: account.kind,
 		enabled: account.enabled,
+		displayBasis: (account.displayBasis ??
+			"available") as Account["displayBasis"],
 		minBalance: String(account.minBalance),
 		maxBalance: account.maxBalance === null ? "" : String(account.maxBalance),
 		noCeiling: account.maxBalance === null,
@@ -74,8 +77,9 @@ export function useAccountEdit(
 	const update = (patch: Partial<typeof source>, field: AccountEditField) => {
 		// The kind selector stays available on synced accounts: kind is a
 		// user-configured label, and changing it is the supported way to
-		// update the type there.
-		if (saving || (readOnly && field !== "kind")) return;
+		// update the type there. The display basis is owner config too,
+		// so it stays editable wherever kind does.
+		if (saving || (readOnly && field !== "kind" && field !== "display")) return;
 		edit.update(patch);
 		setActiveField(field);
 		if (field === "balance" && observedAt === null)
@@ -93,10 +97,15 @@ export function useAccountEdit(
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving) return;
-		// Synced accounts lock every field except kind. A kind change
-		// writes only the kind plus the current bounds verbatim.
+		// Synced accounts lock every field except kind and display basis. A
+		// kind change writes only the kind plus the current bounds verbatim;
+		// a basis change rides along as owner config.
 		if (readOnly) {
-			if (edit.value.kind === account.kind) {
+			const kindChanged = edit.value.kind !== account.kind;
+			const basisChanged =
+				(edit.value.displayBasis ?? "available") !==
+				(account.displayBasis ?? "available");
+			if (!kindChanged && !basisChanged) {
 				reset();
 				return;
 			}
@@ -127,6 +136,7 @@ export function useAccountEdit(
 					color: account.color,
 				},
 				edit.value.kind,
+				basisChanged ? edit.value.displayBasis : undefined,
 			);
 			setSaving(false);
 			if (ok) {
@@ -221,6 +231,7 @@ export function useAccountEdit(
 							balance,
 							kind: edit.value.kind,
 							enabled: edit.value.enabled,
+							displayBasis: edit.value.displayBasis,
 							minBalance,
 							maxBalance,
 							noCeiling: edit.value.noCeiling,

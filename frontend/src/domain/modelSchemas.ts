@@ -67,9 +67,9 @@ export const accountSchema = z.object({
 		.optional(),
 	observedAt: z.number().int().nullable().optional(),
 	// Bank-reported available cash or available credit. This is the
-	// owner-facing current balance; missing means unavailable and never
-	// falls back to the modeled balance above, which stays the net-worth
-	// and projection authority.
+	// owner-facing current balance when displayBasis is available;
+	// missing means unavailable and never falls back to the modeled
+	// balance above, which stays the net-worth and projection authority.
 	availableBalance: z
 		.number()
 		.finite()
@@ -77,6 +77,10 @@ export const accountSchema = z.object({
 		.max(1e10)
 		.nullable()
 		.optional(),
+	// Owner-facing current-balance basis. Available is the bank-reported
+	// figure above; posted is the posted (observed) balance. The modeled
+	// balance stays the net-worth and projection authority either way.
+	displayBasis: z.enum(["available", "posted"]).default("available"),
 });
 
 export const plannedPurchaseSchema = z.object({

@@ -71,6 +71,9 @@ type accountBalanceRow struct {
 	// AvailableBalance is the latest observation's bank-reported available
 	// cash or credit. Nil when the bank reported none.
 	AvailableBalance *float64 `json:"availableBalance,omitempty"`
+	// DisplayBasis selects the owner-facing current balance: available
+	// (the default) or posted. It never changes the modeled balance.
+	DisplayBasis types.DisplayBasis `json:"displayBasis,omitempty"`
 }
 
 type accountBalancesOutput struct {
@@ -206,6 +209,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				ObservedBalance:  adjusted.ObservedBalance,
 				ObservedAt:       adjusted.ObservedAt,
 				AvailableBalance: adjusted.AvailableBalance,
+				DisplayBasis:     account.DisplayBasis,
 			}
 			if components[account.ID] {
 				value := adjusted.UnroundedBalance

@@ -186,6 +186,19 @@ describe("balance rows to display accounts", () => {
 			"cash",
 		]);
 	});
+
+	it("defaults the display basis to available", () => {
+		expect(balanceRowToDisplay(balanceRow()).displayBasis).toBe("available");
+		expect(
+			balanceRowToDisplay(balanceRow({ displayBasis: undefined })).displayBasis,
+		).toBe("available");
+	});
+
+	it("carries an explicit posted display basis", () => {
+		expect(
+			balanceRowToDisplay(balanceRow({ displayBasis: "posted" })).displayBasis,
+		).toBe("posted");
+	});
 });
 
 describe("planned purchase rows to display purchases", () => {
@@ -223,6 +236,7 @@ describe("display visibility helpers over saved rows", () => {
 			observedOn: "2026-01-31",
 			balanceCheck: true,
 			source: "Balance check",
+			displayBasis: "available",
 			readOnly: false,
 		},
 		{
@@ -238,6 +252,7 @@ describe("display visibility helpers over saved rows", () => {
 			observedOn: "2026-01-31",
 			balanceCheck: true,
 			source: "Balance check",
+			displayBasis: "available",
 			readOnly: false,
 		},
 	];

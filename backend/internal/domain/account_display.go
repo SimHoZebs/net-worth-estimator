@@ -28,8 +28,8 @@ func BuildLoan(id, interestID, interestRuleID, paymentRuleID string, terms types
 	zero := 0.0
 	name := strings.TrimSpace(terms.Name)
 	display := &types.AccountDisplay{Name: name, Components: []types.AccountComponent{{AccountID: id, Role: "principal"}, {AccountID: interestID, Role: "interest"}}, InterestScheduleID: interestRuleID, PaymentScheduleID: paymentRuleID}
-	principal := types.Account{ID: id, Name: name + " (Principal)", Kind: "debt", MaxBalance: &zero, Enabled: terms.Enabled, Display: display}
-	interest := types.Account{ID: interestID, Name: name + " (Interest)", Kind: "debt", MaxBalance: &zero, Enabled: terms.Enabled}
+	principal := types.Account{ID: id, Name: name + " (Principal)", Kind: "debt", MaxBalance: &zero, Enabled: terms.Enabled, Display: display, DisplayBasis: types.DisplayBasisAvailable}
+	interest := types.Account{ID: interestID, Name: name + " (Interest)", Kind: "debt", MaxBalance: &zero, Enabled: terms.Enabled, DisplayBasis: types.DisplayBasisAvailable}
 	charge := types.Schedule{ID: interestRuleID, Name: name + " Interest", SourceAccountID: &interestID, Frequency: terms.InterestFrequency, StartDate: terms.InterestStartDate, Enabled: terms.Enabled, Priority: 6,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "abs(principal) * rate"}, Inputs: map[string]types.AmountInputBinding{
 			"principal": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": id}},

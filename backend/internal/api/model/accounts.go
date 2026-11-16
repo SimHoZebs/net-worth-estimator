@@ -18,6 +18,9 @@ type accountBody struct {
 	MaxBalance *float64          `json:"maxBalance,omitempty"`
 	Color      *string           `json:"color,omitempty"`
 	Enabled    bool              `json:"enabled"`
+	// DisplayBasis chooses the owner-facing current balance: available
+	// (the default) or posted. It never changes the modeled balance.
+	DisplayBasis types.DisplayBasis `json:"displayBasis,omitempty"`
 	// Balance with ObservedAt records the opening (create) or moved (update)
 	// balance observation atomically with the account write, so callers
 	// never sequence a second checkpoint request. Omitted balance leaves
@@ -37,6 +40,7 @@ func (b accountBody) toAccount(id string) types.Account {
 		Name: b.Name, Kind: b.Kind,
 		MinBalance: b.MinBalance, MaxBalance: b.MaxBalance,
 		Color: b.Color, Enabled: b.Enabled,
+		DisplayBasis: b.DisplayBasis,
 	}
 	if b.ID != nil {
 		out.ID = *b.ID
@@ -56,6 +60,19 @@ type accountOutput struct {
 }
 
 func accountID(account types.Account) string { return account.ID }
+
+// findModelAccount returns the stored account with id, or nil when absent.
+func findModelAccount(model *types.FinancialModel, id string) *types.Account {
+	if model == nil {
+		return nil
+	}
+	for i := range model.Accounts {
+		if model.Accounts[i].ID == id {
+			return &model.Accounts[i]
+		}
+	}
+	return nil
+}
 
 func accountObservation(body accountBody) (*float64, int64, error) {
 	if body.Balance == nil && body.ObservedAt == nil {
@@ -78,6 +95,14 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
 		account.ID = id.String()
+	}
+	// A created account without a basis shows available. Default empty
+	// only; unknown values stay raw so validation rejects them like PATCH.
+	if (account.DisplayBasis == "") {
+		account.DisplayBasis = types.DisplayBasisAvailable
+	}
+	if (account.DisplayBasis != "" && !account.DisplayBasis.Valid()) {
+		return nil, huma.Error422UnprocessableEntity("displayBasis must be available or posted")
 	}
 	balance, observedAt, err := accountObservation(input.Body)
 	if err != nil {
@@ -109,26 +134,60 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 		return nil, err
 	}
 	guard := func(model *types.FinancialModel) error {
-		if err := requireOrdinaryAccount(model, input.ID); err != nil {
-			return err
-		}
-		if account.Kind != types.AccountKindDebt {
-			return nil
-		}
-		for _, existing := range model.Accounts {
-			if existing.ID != input.ID {
-				continue
-			}
-			if existing.Kind == types.AccountKindDebt {
+		if requireOrdinaryAccount(model, input.ID) == nil {
+			if account.Kind != types.AccountKindDebt {
 				return nil
 			}
-			return huma.Error422UnprocessableEntity("Convert an existing account to debt through PUT /v1/loans/{id} so principal, interest, and rules stay consistent.")
+			for _, existing := range model.Accounts {
+				if existing.ID != input.ID {
+					continue
+				}
+				if existing.Kind == types.AccountKindDebt {
+					return nil
+				}
+				return huma.Error422UnprocessableEntity("Convert an existing account to debt through PUT /v1/loans/{id} so principal, interest, and rules stay consistent.")
+			}
+			return nil
+		}
+		// A grouped visible account accepts display-basis-only updates:
+		// the visible row owns the choice, and nothing else on a loan
+		// may change outside its loan form.
+		existing := findModelAccount(model, input.ID)
+		if existing == nil || existing.Display == nil || types.IsPassthroughDisplay(existing.Display, existing.ID) {
+			return requireOrdinaryAccount(model, input.ID)
+		}
+		basis := input.Body.DisplayBasis
+		body := input.Body
+		nameOK := body.Name == existing.Name ||
+			(existing.Display != nil && body.Name == existing.Display.Name)
+		if body.Balance != nil || body.MinBalance != nil || body.MaxBalance != nil || body.Color != nil ||
+			!nameOK || body.Kind != existing.Kind || body.Enabled != existing.Enabled {
+			return huma.Error409Conflict("Edit this account through its loan form so principal, interest, and rules stay consistent.")
+		}
+		if basis == "" || !basis.Valid() {
+			return huma.Error422UnprocessableEntity("displayBasis must be available or posted")
 		}
 		return nil
 	}
 	row, issues, saved, revision, err := runFinanceRowWriteGuarded(s, guard, func(model *types.FinancialModel) {
-		account.Display = types.PassthroughDisplay(account.ID, account.Name)
-		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
+		if existing := findModelAccount(model, input.ID); existing != nil && existing.Display != nil && !types.IsPassthroughDisplay(existing.Display, existing.ID) {
+			// Basis-only: persist stored scalars and the grouped display
+			// verbatim so the loan linkage survives. The persist closure
+			// below writes this same account.
+			account = *existing
+			account.DisplayBasis = input.Body.DisplayBasis
+			model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
+		} else {
+			account.Display = types.PassthroughDisplay(account.ID, account.Name)
+			if account.DisplayBasis == "" {
+				if stored := findModelAccount(model, account.ID); stored != nil {
+					account.DisplayBasis = stored.DisplayBasis
+				} else {
+					account.DisplayBasis = types.DisplayBasisAvailable
+				}
+			}
+			model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
+		}
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
 			model.Checkpoints = replaceByID(model.Checkpoints, checkpointKey(pending), checkpointKey, pending)

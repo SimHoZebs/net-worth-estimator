@@ -516,6 +516,7 @@ describe("canonical recorded cash selection", () => {
 		observedOn: "2026-11-15",
 		balanceCheck: false,
 		source: "manual",
+		displayBasis: "available",
 		readOnly: false,
 	};
 	function cash(id: string, overrides: Partial<Transaction> = {}): Transaction {

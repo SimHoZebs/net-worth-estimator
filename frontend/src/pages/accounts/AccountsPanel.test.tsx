@@ -21,6 +21,7 @@ function account(overrides: Partial<Account> = {}): Account {
 		observedAt: 1773133200,
 		observedBalance: 798.01,
 		availableBalance: 1244.43,
+		displayBasis: "available",
 		...overrides,
 	};
 }
@@ -39,7 +40,7 @@ const render = (accounts: Account[]) =>
 describe("accounts panel current balance", () => {
 	it("shows bank-reported available cash instead of the modeled balance", () => {
 		const html = render([account()]);
-		expect(html).toContain("Available balance");
+		expect(html).toContain("Current balance");
 		expect(html).toContain("$1,244");
 		expect(html).not.toContain("$798");
 	});
@@ -55,6 +56,26 @@ describe("accounts panel current balance", () => {
 	});
 	it("shows the saved balance for manual accounts without bank evidence", () => {
 		const html = render([account({ availableBalance: null, readOnly: false })]);
+		expect(html).toContain("$798");
+		expect(html).not.toContain("Unavailable");
+	});
+	it("shows the posted total when the account basis is posted", () => {
+		const html = render([
+			account({ displayBasis: "posted", observedBalance: 798.01 }),
+		]);
+		expect(html).toContain("$798");
+		expect(html).not.toContain("$1,244");
+		expect(html).not.toContain("Unavailable");
+	});
+	it("falls back to the saved balance for posted basis without observation", () => {
+		const html = render([
+			account({
+				displayBasis: "posted",
+				observedBalance: null,
+				availableBalance: null,
+				readOnly: false,
+			}),
+		]);
 		expect(html).toContain("$798");
 		expect(html).not.toContain("Unavailable");
 	});

@@ -46,6 +46,8 @@ export interface BackendAccount extends HumaMetadata {
 	maxBalance: number | null;
 	color: string | null;
 	enabled: boolean;
+	/** Owner-facing current-balance basis: available (default) or posted. */
+	displayBasis?: "available" | "posted";
 }
 export type Account = BackendAccount;
 

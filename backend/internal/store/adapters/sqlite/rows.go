@@ -219,8 +219,8 @@ func insertAccountTx(tx *userTx, account *types.Account) error {
 	maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 	color := nullable(account.Color)
 	if _, err := tx.Exec(
-		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, user_id) VALUES (?,?,?,?,?,?,?,?, :user_id)`,
-		account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
+		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?, :user_id)`,
+		account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), boolToInt(account.Enabled),
 	); err != nil {
 		return fmt.Errorf("insert account %s: %w", account.ID, err)
 	}
@@ -239,8 +239,8 @@ func updateAccountTx(tx *userTx, account *types.Account) error {
 	maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 	color := nullable(account.Color)
 	if _, err := tx.Exec(
-		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, enabled = ? WHERE id = ? AND user_id = :user_id`,
-		account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled), account.ID,
+		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, display_basis = ?, enabled = ? WHERE id = ? AND user_id = :user_id`,
+		account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), boolToInt(account.Enabled), account.ID,
 	); err != nil {
 		return fmt.Errorf("update account %s: %w", account.ID, err)
 	}
@@ -279,6 +279,7 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		}
 		account.ID = id
 	}
+	account.DisplayBasis = types.NormalizeDisplayBasis(account.DisplayBasis)
 	if account.Display == nil {
 		account.Display = types.PassthroughDisplay(account.ID, account.Name)
 	}
@@ -305,6 +306,7 @@ func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *f
 		}
 		account.ID = id
 	}
+	account.DisplayBasis = types.NormalizeDisplayBasis(account.DisplayBasis)
 	if account.Display == nil {
 		account.Display = types.PassthroughDisplay(account.ID, account.Name)
 	}
@@ -337,6 +339,7 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 	if account.ID == "" {
 		return types.Account{}, NotFound("")
 	}
+	account.DisplayBasis = types.NormalizeDisplayBasis(account.DisplayBasis)
 	if err := withRowTx(s.db, func(tx *userTx) error {
 		if err := updateAccountTx(tx, &account); err != nil {
 			return err
@@ -370,6 +373,7 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 	if account.ID == "" {
 		return types.Account{}, NotFound("")
 	}
+	account.DisplayBasis = types.NormalizeDisplayBasis(account.DisplayBasis)
 	if err := withRowTx(s.db, func(tx *userTx) error {
 		if err := updateAccountTx(tx, &account); err != nil {
 			return err
@@ -915,8 +919,8 @@ func EnsureLinkedAccount(tx *userTx, bridgeAccountID, bridgeName, institution, c
 		name = "Synced account"
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, user_id) VALUES (?,?,?,?,?,?,?,?, :user_id)`,
-		id, position, name, string(types.AccountKindCash), types.NoFloor, types.NoCeiling, nil, 1,
+		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?, :user_id)`,
+		id, position, name, string(types.AccountKindCash), types.NoFloor, types.NoCeiling, nil, string(types.DisplayBasisAvailable), 1,
 	); err != nil {
 		return "", false, fmt.Errorf("provision account for %s: %w", bridgeAccountID, err)
 	}

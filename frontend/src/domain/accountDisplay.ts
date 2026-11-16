@@ -22,6 +22,24 @@ export function componentIds(account: DisplayIdentity): string[] {
 	return account.display?.components.map((c) => c.accountId) ?? [account.id];
 }
 
+/**
+ * The owner-facing current balance for one display account. Posted basis
+ * shows the posted (observed) total, falling back to the modeled balance
+ * when unobserved. Available basis (the default) shows the bank-reported
+ * figure; manual accounts without bank evidence keep their saved balance,
+ * while synced or grouped accounts without evidence show unavailable
+ * rather than borrowing the modeled balance.
+ */
+export function displayCurrentBalance(account: Account): number | null {
+	if ((account.displayBasis ?? "available") === "posted") {
+		return account.observedBalance ?? account.balance;
+	}
+	const available = account.availableBalance ?? null;
+	if (available !== null) return available;
+	if (!account.readOnly && !isGroupedDisplay(account)) return account.balance;
+	return null;
+}
+
 export function displayBalance(
 	account: DisplayIdentity,
 	balances: Record<string, number>,

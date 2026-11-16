@@ -144,6 +144,7 @@ func schemaStatements() []string {
 			min_balance REAL,
 			max_balance REAL,
 			color TEXT,
+			display_basis TEXT NOT NULL DEFAULT 'available',
 			enabled INTEGER NOT NULL,
 			PRIMARY KEY (user_id, id)
 		)`,
@@ -738,7 +739,7 @@ var requiredSchemaColumns = map[string]string{
 	"split_settlements":               "settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_transaction_id, actor_id, request_id, created_at",
 	"split_settlement_requests":       "actor_id, request_id, settlement_id, input_hash, created_at",
 	"friendships":                     "user_id, friend_user_id, display_name, created_at",
-	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
+	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, display_basis, enabled",
 	"account_displays":                "user_id, account_id, display_json",
 	"checkpoints":                     "user_id, id, position, model_account_id, balance, source, provider, observed_at",
 	"checkpoint_available_balances":   "user_id, model_account_id, observed_at, available_balance",

@@ -3,6 +3,7 @@ import type { Account } from "./model.ts";
 import {
 	componentIds,
 	displayBalance,
+	displayCurrentBalance,
 	isGroupedDisplay,
 	toDisplayAccounts,
 	toDisplayTransaction,
@@ -34,6 +35,7 @@ function account(
 		observedAt: 100,
 		observedBalance: balance,
 		availableBalance,
+		displayBasis: "available",
 	};
 }
 function fixture() {
@@ -125,6 +127,42 @@ describe("visible accounts", () => {
 	});
 	it("does not derive current available evidence from modeled balances", () => {
 		expect(toDisplayAccounts(fixture())[0]?.availableBalance).toBeNull();
+	});
+	it("derives the grouped current figure from the visible account basis", () => {
+		const raw = fixture();
+		raw[0]!.availableBalance = 1000;
+		raw[1]!.availableBalance = 44.43;
+		const grouped = toDisplayAccounts(raw)[0]!;
+		expect(displayCurrentBalance(grouped)).toBe(1044.43);
+		grouped.displayBasis = "posted";
+		expect(displayCurrentBalance(grouped)).toBe(-1020);
+	});
+	describe("displayCurrentBalance", () => {
+		it("shows available evidence by default", () => {
+			expect(displayCurrentBalance(account("cash", 100, 44.43))).toBe(44.43);
+		});
+		it("shows a reported zero as a current balance", () => {
+			expect(displayCurrentBalance(account("cash", 100, 0))).toBe(0);
+		});
+		it("shows the posted total when the basis is posted", () => {
+			const row = account("cash", 100, 44.43);
+			row.displayBasis = "posted";
+			expect(displayCurrentBalance(row)).toBe(100);
+		});
+		it("falls back to the saved balance for posted basis without observation", () => {
+			const row = account("cash", 100, null);
+			row.displayBasis = "posted";
+			row.observedBalance = null;
+			expect(displayCurrentBalance(row)).toBe(100);
+		});
+		it("shows the saved balance for manual accounts without bank evidence", () => {
+			expect(displayCurrentBalance(account("cash", 100, null))).toBe(100);
+		});
+		it("shows unavailable for synced accounts without bank evidence", () => {
+			const row = account("cash", 100, null);
+			row.readOnly = true;
+			expect(displayCurrentBalance(row)).toBeNull();
+		});
 	});
 	it("includes interest-only balances in projection lines", () => {
 		const accounts = toDisplayAccounts(fixture());

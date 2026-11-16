@@ -10,6 +10,9 @@
 					"display": {
 						"$ref": "#/components/schemas/AccountDisplay"
 					},
+					"displayBasis": {
+						"type": "string"
+					},
 					"enabled": {
 						"type": "boolean"
 					},
@@ -69,6 +72,9 @@
 					},
 					"display": {
 						"$ref": "#/components/schemas/AccountDisplay"
+					},
+					"displayBasis": {
+						"type": "string"
 					},
 					"enabled": {
 						"type": "boolean"
@@ -176,6 +182,9 @@
 						"type": "number"
 					},
 					"color": {
+						"type": "string"
+					},
+					"displayBasis": {
 						"type": "string"
 					},
 					"enabled": {

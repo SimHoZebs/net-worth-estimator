@@ -1,6 +1,6 @@
 import { LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
-import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
+import { displayCurrentBalance } from "../../domain/accountDisplay.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Empty,
@@ -50,17 +50,17 @@ export function AccountsPanel({
 			containerClassName="max-w-full"
 			containerProps={{
 				role: "region",
-				"aria-label": "Accounts and current available balances.",
+				"aria-label": "Accounts and current balances.",
 			}}
 		>
 			<TableCaption className="sr-only">
-				Accounts and current available balances.
+				Accounts and current balances.
 			</TableCaption>
 			{showHeaders && (
 				<TableHeader>
 					<TableRow>
 						<TableHead className="max-sm:p-4">Account</TableHead>
-						<TableHead className="max-sm:p-4">Available balance</TableHead>
+						<TableHead className="max-sm:p-4">Current balance</TableHead>
 						<TableHead className="max-sm:p-4">
 							<span className="sr-only">Actions</span>
 						</TableHead>
@@ -69,17 +69,13 @@ export function AccountsPanel({
 			)}
 			<TableBody>
 				{accounts.map((account) => {
-					// Current balance is the bank-reported available figure when the
-					// bank reported one. Manual accounts have no bank evidence, so
-					// their saved balance stays their current figure. Synced or
-					// grouped accounts without evidence show unavailable rather
-					// than borrowing the modeled balance.
-					const available = account.availableBalance ?? null;
-					const current =
-						available ??
-						(!account.readOnly && !isGroupedDisplay(account)
-							? account.balance
-							: null);
+					// Current balance follows the account's display basis:
+					// posted shows the posted total, available (the default)
+					// shows the bank-reported figure. Manual accounts without
+					// bank evidence keep their saved balance; synced or
+					// grouped accounts without evidence show unavailable
+					// rather than borrowing the modeled balance.
+					const current = displayCurrentBalance(account);
 					return (
 						<TableRow
 							key={account.id}

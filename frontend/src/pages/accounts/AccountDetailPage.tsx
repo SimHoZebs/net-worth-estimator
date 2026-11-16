@@ -37,6 +37,7 @@ import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
 import { LoanDetails } from "../../components/activity/LoanDetails.tsx";
 import {
 	componentIds,
+	displayCurrentBalance,
 	isGroupedDisplay,
 	toDisplayTransaction,
 } from "../../domain/accountDisplay.ts";
@@ -230,29 +231,29 @@ export function AccountDetailView({
 					onSubmit={(event) => void edit.submit(event)}
 				>
 					{(() => {
-						// The header shows the owner-facing current balance. Bank
-						// evidence wins when present; manual accounts keep the
-						// balance editor; synced or grouped accounts without evidence
-						// show unavailable rather than the modeled figure. The form
+						// The header shows the owner-facing current balance. Manual
+						// accounts keep the balance editor; synced or grouped
+						// accounts show the display-basis value: posted shows the
+						// posted total, available shows the bank-reported figure
+						// or unavailable when the bank reported none. The form
 						// stays mounted so the name field and the sticky save
 						// button keep working in every branch.
-						const available = account.availableBalance ?? null;
-						const showAvailable =
-							available !== null ||
-							account.readOnly ||
-							isGroupedDisplay(account);
-						if (!showAvailable) {
+						if (!account.readOnly && !isGroupedDisplay(account)) {
 							return <AccountBalanceValue edit={edit} readOnly={locked} />;
 						}
+						const posted = (account.displayBasis ?? "available") === "posted";
+						const current = displayCurrentBalance(account);
 						return (
 							<div className="flex min-w-0 flex-col items-start gap-2 pt-1 pb-2 md:items-end">
 								<Field orientation="vertical" className="w-full md:items-end">
-									<FieldTitle>Available balance</FieldTitle>
+									<FieldTitle>
+										{posted ? "Posted balance" : "Available balance"}
+									</FieldTitle>
 									<div className="w-auto tabular-nums text-lg font-semibold md:text-right">
-										{available === null ? (
+										{current === null ? (
 											<span className="text-muted-foreground">Unavailable</span>
 										) : (
-											money(available)
+											money(current)
 										)}
 									</div>
 								</Field>

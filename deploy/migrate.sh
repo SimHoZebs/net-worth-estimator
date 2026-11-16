@@ -1417,6 +1417,32 @@ esac
 test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
   || fail "Candidate account_links institution column is missing. Original unchanged; backup retained at $backup. Keep the API stopped."
 
+# Provision the account display-basis column additively on the candidate.
+# Fresh databases already carry it from setupdb; existing deployments gain
+# it here defaulting to available, so every current balance keeps showing
+# the available figure until the owner switches one account to posted.
+basis_count=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';") \
+  || fail "Cannot inspect accounts display_basis column. Original unchanged; backup retained at $backup. Keep the API stopped."
+case "$basis_count" in
+  0)
+    sqlite3 "$candidate" "ALTER TABLE accounts ADD COLUMN display_basis TEXT NOT NULL DEFAULT 'available';" \
+      || fail "Cannot add accounts display_basis column. Original unchanged; backup retained at $backup. Keep the API stopped."
+    ;;
+  1) ;;
+  *) fail "Unexpected accounts display_basis count. Original unchanged; backup retained at $backup. Keep the API stopped." ;;
+esac
+# Defensive normalization: only the two known bases may be stored. The
+# column default covers existing rows, so this updates nothing on a normal
+# run and fails closed on unexpected content.
+if ! sqlite3 "$candidate" "UPDATE accounts SET display_basis = 'available' WHERE display_basis IS NULL OR display_basis NOT IN ('available','posted');" > "$backup/display-basis.log" 2>&1; then
+  printf 'migrate: display basis normalization failed: %s\n' "$(cat "$backup/display-basis.log")" >&2
+  fail "Candidate display basis normalization failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';")" = 1 \
+  || fail "Candidate accounts display_basis column is missing. Original unchanged; backup retained at $backup. Keep the API stopped."
+test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM accounts WHERE display_basis IS NULL OR display_basis NOT IN ('available','posted');")" = 0 \
+  || fail "Candidate accounts carry an unknown display basis. Original unchanged; backup retained at $backup. Keep the API stopped."
+
 # Prune historical forward no-op bank checkpoints on the candidate. The
 # runtime sync path already skips these rows; this removes rows that predate
 # that guard. Owner rows, first observations, and changed available balances
@@ -1462,10 +1488,14 @@ suppressed_state "$db" || fail "Published database failed suppression-key verifi
 available_state "$db" || fail "Published database failed available-balance verification. Recover from the verified backup at $backup. Keep the API stopped."
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
   || fail "Published database is missing the account_links institution column. Recover from the verified backup at $backup. Keep the API stopped."
+test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';")" = 1 \
+  || fail "Published database is missing the accounts display_basis column. Recover from the verified backup at $backup. Keep the API stopped."
+test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM accounts WHERE display_basis IS NULL OR display_basis NOT IN ('available','posted');")" = 0 \
+  || fail "Published database carries an unknown display basis. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
 if [ "$mode" = convert ]; then
-  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, pruned no-op checkpoints, and provisioned Analysis, unified projection, and account institution schema from $backup."
+  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, pruned no-op checkpoints, and provisioned Analysis, unified projection, account institution, and account display-basis schema from $backup."
 else
-  info "Completed current application, unified projection, and account institution schema with no-op checkpoint prune on final checkpoints from $backup."
+  info "Completed current application, unified projection, account institution, and account display-basis schema with no-op checkpoint prune on final checkpoints from $backup."
 fi

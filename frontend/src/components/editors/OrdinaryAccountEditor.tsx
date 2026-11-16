@@ -85,6 +85,7 @@ export function OrdinaryAccountEditor({
 			name: trimmedName,
 			kind,
 			enabled,
+			displayBasis: item?.displayBasis ?? "available",
 			minBalance: parseDisplayNumber(minBalance) ?? 0,
 			...(maxBalance.trim() && parseDisplayNumber(maxBalance) !== null
 				? { maxBalance: parseDisplayNumber(maxBalance) as number }

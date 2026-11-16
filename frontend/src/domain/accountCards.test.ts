@@ -16,6 +16,7 @@ function account(overrides: Partial<Account> = {}): Account {
 		observedOn: "2026-01-31",
 		balanceCheck: true,
 		source: "Synced balance check",
+		displayBasis: "available",
 		readOnly: true,
 		...overrides,
 	};
