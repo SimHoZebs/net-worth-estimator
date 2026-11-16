@@ -39,11 +39,12 @@
 - Split independent workstreams across parallel backgrounded subagents under a single orchestrator that owns the branch.
 - Retain final ownership of audit verification and shipment and remain the final entity that ships the change.
 - Prefer subagent models in this order with the listed effort as provider slash model hash variant.
-  1. `opencode/longcat-2.5-free` at max effort where supported
-  2. `opencode/deepseek-v4.1-flash-free#max`
-  3. `opencode-go/muse-spark-1.3-contributor#xhigh`
-  4. `openai/gpt-6.1-terra#medium`
-  5. Own model as last resort
+  1. `opencode-go/hy4-flash-free#high` at max effort where supported
+  2. `opencode/longcat-2.5-free` at max effort where supported
+  3. `opencode/deepseek-v4.1-flash-free#max`
+  4. `opencode-go/muse-spark-1.3-contributor#xhigh`
+  5. `openai/gpt-6.1-terra#medium`
+  6. Own model as last resort
 
 ## Start and verify
 
