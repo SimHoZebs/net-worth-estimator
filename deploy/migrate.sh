@@ -417,6 +417,8 @@ transaction_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema 
   || fail "Cannot inspect transaction-ID audit table."
 institution_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';") \
   || fail "Cannot inspect account_links institution column."
+basis_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';") \
+  || fail "Cannot inspect accounts display_basis column."
 transactions_split=0
 if [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_sim';")" = 1 ] && \
    [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'destination_account_ids';")" = 1 ]; then
@@ -464,7 +466,11 @@ fi
 # dry run must also report zero deletable rows before exiting early. The dry
 # run executes on a private read-only backup copy so the original database
 # and its WAL sidecars stay byte-identical.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ]; then
+# The dry run binary comes from the target image and loads accounts through
+# the current store, so this gate must cover every additive column that store
+# reads. A source that predates one falls through to the full path, which
+# provisions that column on the candidate before pruning.
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -474,6 +480,7 @@ if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purch
   dry_out=""
   if ! dry_out=$(prune-noop-checkpoints --db "$dry_copy" --dry-run 2>&1); then
     rm -rf "$dry_dir"
+    printf 'migrate: candidate no-op dry run failed: %s\n' "$dry_out" >&2
     fail "Candidate no-op dry run failed without backup; refusing to report verified."
   fi
   rm -rf "$dry_dir"

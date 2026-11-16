@@ -649,6 +649,40 @@ test("historical forward no-op checkpoints are pruned with owner rows preserved"
   assert.deepEqual(await backups(directory), backupsBefore);
 });
 
+test("pre-display-basis database provisions the column before the no-op prune", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-basis-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO account_displays(user_id, account_id, display_json) VALUES ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');`);
+  // Model the deployed database from before accounts carried display_basis.
+  // The target image's prune tool loads the current store, which selects it,
+  // so the read-only path may not run against this source.
+  await sqlite(db, `ALTER TABLE accounts DROP COLUMN display_basis;`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,provider,observed_at) VALUES
+    ('${owner}',1,0,'checking',100,'banksync','simplefin',${DAY_CLOSE_0310}),
+    ('${owner}',2,1,'checking',100,'banksync','simplefin',${DAY_CLOSE_0311});`);
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.match(result.stdout, /noop checkpoint prune complete/);
+
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';"), "1");
+  assert.equal(await rows(db, "SELECT DISTINCT display_basis FROM accounts;"), "available");
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, `SELECT COUNT(*) FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0311};`), "0");
+  assert.equal(await rows(db, `SELECT balance FROM checkpoints WHERE observed_at = ${DAY_CLOSE_0310};`), "100.0");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal((await backups(directory)).length, 1);
+
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
 test("partial projection schema fails closed with the original unchanged", async (t) => {  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-projection-partial-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
