@@ -5,6 +5,7 @@ import {
 	spendingLedger,
 	ledgerHit,
 	spendingAmount,
+	type SafeSpendingScheduledBump,
 } from "@/domain/safeSpendingTrend.ts";
 import { buildCycleView, type CycleView } from "./safeSpendingDetailModel.ts";
 import { monthEndIso } from "@/domain/safeSpending.ts";
@@ -20,6 +21,7 @@ export interface CycleViewInput {
 	fullDaysLeft: number;
 	/** Posted external cash inflows; null means evidence is unavailable. */
 	monthlyIncome?: number | null;
+	scheduledOutflows?: SafeSpendingScheduledBump[];
 }
 
 export interface CycleViewResult {
@@ -43,6 +45,7 @@ export function cycleView({
 	closedCycle,
 	fullDaysLeft,
 	monthlyIncome,
+	scheduledOutflows,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
 	const monthStart = `${referenceDay.slice(0, 7)}-01`;
 	const recorded = spendingLedger({
@@ -85,6 +88,7 @@ export function cycleView({
 			capacity === null
 				? null
 				: Math.round((capacity - protectedReserve) * 100) / 100,
+		scheduledOutflows,
 	});
 	if (
 		monthlyIncome !== null &&

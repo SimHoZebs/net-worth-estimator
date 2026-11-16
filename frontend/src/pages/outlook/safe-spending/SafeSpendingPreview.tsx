@@ -73,6 +73,7 @@ import {
 	expectedMonthlyIncome,
 	incomeSourceCandidates,
 } from "@/domain/safeSpendingIncome.ts";
+import { cardScheduledOutflows } from "@/domain/cardScheduledOutflows.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -203,7 +204,7 @@ export function SafeSpendingPreview({
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
 	}, [settings.spendingAccountIds, spendableAccounts, accounts]);
-		const incomeCandidates = useMemo(
+	const incomeCandidates = useMemo(
 		() =>
 			incomeSourceCandidates({
 				accounts: accounts ?? [],
@@ -346,6 +347,25 @@ export function SafeSpendingPreview({
 			),
 		[transactions, currentCardTransactions, directSpending],
 	);
+	const cardBumps = useMemo(
+		() =>
+			cardScheduledOutflows({
+				schedules: savedRules ?? [],
+				transactions: transactions ?? [],
+				trackedIds,
+				accountIds: (accounts ?? []).map((account) => account.id),
+				today: displayToday,
+				cycleEnd: cycle.cycleEnd,
+			}),
+		[
+			accounts,
+			cycle.cycleEnd,
+			displayToday,
+			savedRules,
+			trackedIds,
+			transactions,
+		],
+	);
 	const currentView = useMemo(
 		() =>
 			cycleView({
@@ -363,6 +383,7 @@ export function SafeSpendingPreview({
 				reserve: settings.reserve,
 				closedCycle,
 				fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
+				scheduledOutflows: cardBumps,
 			}),
 		[
 			cycle.cycleStart,
@@ -376,6 +397,7 @@ export function SafeSpendingPreview({
 			currentCardByCard,
 			settings.reserve,
 			closedCycle,
+			cardBumps,
 		],
 	);
 	const lastView = useMemo(

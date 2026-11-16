@@ -27,7 +27,10 @@ centered in the line. It does not insert another table row or a second border.
 
 Pending charges and pending refunds both count in recorded spending, counted
 once on their transaction date. Pending status never excludes a row from the
-ledger; only voided, disabled, or future-dated rows are left out.
+ledger; only voided, disabled, or future-dated rows are left out. The projected
+chart continues the average daily rate and adds discrete steps for known future
+card charges from enabled recurring schedules and future one-time card outflows
+within the cycle, so limit crossings reflect those bumps.
 
 ## Monthly income threshold
 

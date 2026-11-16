@@ -191,4 +191,92 @@ describe("safeSpendingTrend", () => {
 		expect(trend.actual.at(-1)?.date).toBe("2026-01-24");
 		expect(trend.projected).toEqual([]);
 	});
+
+	it("steps the projection for scheduled bumps on top of the slope", () => {
+		const trend = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-25",
+			todayIso: "2026-01-21",
+			limit: 10000,
+			safetyNet: 10000,
+			scheduledOutflows: [{ date: "2026-01-23", amount: 60, name: "Sub" }],
+		});
+		expect(trend.scheduledBumps).toEqual([
+			{ date: "2026-01-23", amount: 60, name: "Sub" },
+		]);
+		expect(trend.projected.map((point) => [point.date, point.spent])).toEqual([
+			["2026-01-21", 100],
+			["2026-01-22", 150],
+			["2026-01-23", 260],
+			["2026-01-24", 310],
+			["2026-01-25", 360],
+		]);
+	});
+
+	it("projects bumps without an average rate", () => {
+		const trend = safeSpendingTrend({
+			transactions: [],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-23",
+			todayIso: "2026-01-21",
+			limit: 10000,
+			safetyNet: 10000,
+			scheduledOutflows: [{ date: "2026-01-22", amount: 40 }],
+		});
+		expect(trend.averageDaily).toBe(0);
+		expect(trend.projected.map((point) => [point.date, point.spent])).toEqual([
+			["2026-01-21", 0],
+			["2026-01-22", 40],
+			["2026-01-23", 40],
+		]);
+	});
+
+	it("moves threshold hits earlier for scheduled bumps", () => {
+		const without = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-02-19",
+			todayIso: "2026-01-21",
+			limit: 400,
+			safetyNet: 300,
+		});
+		const withBump = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-02-19",
+			todayIso: "2026-01-21",
+			limit: 400,
+			safetyNet: 300,
+			scheduledOutflows: [{ date: "2026-01-22", amount: 200 }],
+		});
+		expect(without.limitHit?.date).toBe("2026-01-28");
+		expect(withBump.limitHit?.date).toBe("2026-01-24");
+		expect(withBump.limitHit?.projected).toBe(true);
+	});
+
+	it("sums same-date bumps and ignores out-of-window rows", () => {
+		const trend = safeSpendingTrend({
+			transactions: [],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-23",
+			todayIso: "2026-01-21",
+			limit: 10000,
+			safetyNet: 10000,
+			scheduledOutflows: [
+				{ date: "2026-01-22", amount: 10, name: "alpha" },
+				{ date: "2026-01-22", amount: 15, name: "beta" },
+				{ date: "2026-01-21", amount: 999 },
+				{ date: "2026-01-24", amount: 999 },
+				{ date: "2026-01-23", amount: 0 },
+				{ date: "2026-01-23", amount: Number.NaN },
+			],
+		});
+		expect(trend.scheduledBumps).toEqual([
+			{ date: "2026-01-22", amount: 25, name: "alpha, beta" },
+		]);
+		expect(
+			trend.projected.find((point) => point.date === "2026-01-22")?.spent,
+		).toBe(25);
+	});
 });
