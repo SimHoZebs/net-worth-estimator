@@ -2,9 +2,9 @@ import type { AccountTransaction } from "./accountActivity.ts";
 import { isCycleOutflow } from "./cardCycle.ts";
 import { daysBetweenInclusive, shiftDate } from "./format.ts";
 import { sortTransactionsByDate } from "./transactionSort.ts";
-import type { RecurringBillBump } from "./recurringBillBumps.ts";
+import type { ObligationBump } from "./obligationBumps.ts";
 
-export type SafeSpendingScheduledBump = RecurringBillBump;
+export type SafeSpendingScheduledBump = ObligationBump;
 
 export interface SafeSpendingTrendPoint {
 	date: string;
