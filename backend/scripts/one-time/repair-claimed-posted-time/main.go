@@ -66,7 +66,7 @@ func upgrade(path string, dryRun bool) (int, error) {
 		return 0, err
 	}
 	type invalid struct {
-		user, id string
+		user, id           string
 		posted, transacted int64
 	}
 	var bad []invalid
