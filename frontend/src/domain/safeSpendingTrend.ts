@@ -237,7 +237,15 @@ export function safeSpendingTrend({
 				Math.round(increase.amount * 100),
 			]),
 		);
-		let increaseCents = increaseCentsByDate.get(today) ?? 0;
+		const todaysIncreaseCents = increaseCentsByDate.get(today) ?? 0;
+		if (todaysIncreaseCents > 0) {
+			projected.push({
+				date: today,
+				spent: roundCents(cumulative),
+				projected: true,
+			});
+		}
+		let increaseCents = todaysIncreaseCents;
 		projected.push({
 			date: today,
 			spent: roundCents(cumulative + increaseCents / 100),

@@ -280,7 +280,7 @@ describe("safeSpendingTrend", () => {
 		).toBe(25);
 	});
 
-	it("lifts today for increases due today", () => {
+	it("joins recorded and projected lines for increases due today", () => {
 		const trend = safeSpendingTrend({
 			transactions: [charge("2026-01-21", 100)],
 			cycleStart: "2026-01-20",
@@ -294,7 +294,25 @@ describe("safeSpendingTrend", () => {
 			{ date: "2026-01-21", amount: 60, name: "Sub" },
 		]);
 		expect(trend.projected.map((point) => [point.date, point.spent])).toEqual([
+			["2026-01-21", 100],
 			["2026-01-21", 160],
+			["2026-01-22", 210],
+			["2026-01-23", 260],
+		]);
+	});
+
+	it("keeps a single anchor today without a same-day increase", () => {
+		const trend = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-23",
+			todayIso: "2026-01-21",
+			limit: 10000,
+			safetyNet: 10000,
+			scheduledOutflows: [{ date: "2026-01-22", amount: 60, name: "Sub" }],
+		});
+		expect(trend.projected.map((point) => [point.date, point.spent])).toEqual([
+			["2026-01-21", 100],
 			["2026-01-22", 210],
 			["2026-01-23", 260],
 		]);

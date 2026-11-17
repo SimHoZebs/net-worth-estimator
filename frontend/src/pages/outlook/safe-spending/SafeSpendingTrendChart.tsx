@@ -14,9 +14,51 @@ import {
 	monthDay,
 	shiftDate,
 } from "../../../domain/format.ts";
-import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
+import type {
+	SafeSpendingScheduledIncrease,
+	SafeSpendingTrend,
+	SafeSpendingTrendPoint,
+} from "../../../domain/safeSpendingTrend.ts";
 import { cn } from "@/lib/utils.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
+
+/** Income rule drawn across the full chart range at the earned coordinate. */
+export function incomeRuleLine(
+	trend: SafeSpendingTrend,
+	historical = false,
+): { date: string; amount: number; income: true }[] {
+	const earned = historical ? undefined : trend.monthlyIncome;
+	if (!earned || earned.coordinate === null) return [];
+	const start = trend.actual[0]?.date;
+	const end = trend.projected.at(-1)?.date ?? trend.actual.at(-1)?.date;
+	if (!start || !end) return [];
+	return Array.from(
+		{ length: daysBetweenInclusive(start, end) },
+		(_, days) => ({
+			date: shiftDate({ date: start, days }),
+			amount: earned.coordinate as number,
+			income: true as const,
+		}),
+	);
+}
+
+/** One dot per recurring bill, placed on the dated total after increases. */
+export function recurringIncreaseDots(
+	projected: readonly SafeSpendingTrendPoint[],
+	scheduledIncreases: readonly SafeSpendingScheduledIncrease[],
+): { date: string; amount: number }[] {
+	return scheduledIncreases.flatMap((increase) => {
+		const day = increase.date.slice(0, 10);
+		for (let index = projected.length - 1; index >= 0; index--) {
+			const entry = projected[index];
+			if (!entry) continue;
+			if (entry.date.slice(0, 10) === day) {
+				return [{ date: day, amount: entry.spent }];
+			}
+		}
+		return [];
+	});
+}
 
 export function paceLabel(
 	trend: SafeSpendingTrend,
@@ -118,18 +160,8 @@ export function SafeSpendingTrendChart({
 }) {
 	const earned = historical ? undefined : trend.monthlyIncome;
 	const earnedLine = useMemo(
-		() =>
-			earned && earned.coordinate !== null
-				? Array.from(
-						{ length: daysBetweenInclusive(earned.start, earned.end) },
-						(_, days) => ({
-							date: shiftDate({ date: earned.start, days }),
-							amount: earned.coordinate,
-							income: true,
-						}),
-					)
-				: [],
-		[earned],
+		() => incomeRuleLine(trend, historical),
+		[trend, historical],
 	);
 	const showThresholds = trend.limit !== null || trend.safetyNet !== null;
 	const actual = trend.actual;
@@ -149,14 +181,7 @@ export function SafeSpendingTrendChart({
 		[scheduledIncreases],
 	);
 	const increaseDots = useMemo(
-		() =>
-			scheduledIncreases.flatMap((increase) => {
-				const day = increase.date.slice(0, 10);
-				const point = projected.find(
-					(entry) => entry.date.slice(0, 10) === day,
-				);
-				return point ? [{ date: day, amount: point.spent }] : [];
-			}),
+		() => recurringIncreaseDots(projected, scheduledIncreases),
 		[scheduledIncreases, projected],
 	);
 	const dates = useMemo(
@@ -218,6 +243,7 @@ export function SafeSpendingTrendChart({
 								lineY(projected, {
 									x: "date",
 									y: "spent",
+									key: (point) => `${point.date}|${point.spent}`,
 									stroke: "var(--primary)",
 									strokeWidth: 2,
 									strokeDasharray: "6 4",

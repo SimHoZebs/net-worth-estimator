@@ -3,7 +3,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SafeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
 import {
+	incomeRuleLine,
 	paceLabel,
+	recurringIncreaseDots,
 	SafeSpendingTrendChart,
 	spendingChartDomain,
 } from "./SafeSpendingTrendChart.tsx";
@@ -71,6 +73,89 @@ describe("current spending pace after refunds", () => {
 	});
 });
 
+describe("income rule extent", () => {
+	const base: SafeSpendingTrend = {
+		actual: [
+			{ date: "2026-11-09", spent: 10, projected: false },
+			{ date: "2026-11-10", spent: 20, projected: false },
+		],
+		projected: [
+			{ date: "2026-11-10", spent: 20, projected: true },
+			{ date: "2026-11-12", spent: 40, projected: true },
+		],
+		limit: 100,
+		safetyNet: 80,
+		averageDaily: 10,
+		limitHit: null,
+		safetyNetHit: null,
+		scheduledIncreases: [],
+		monthlyIncome: {
+			amount: 90,
+			spent: 20,
+			coordinate: 90,
+			start: "2026-11-01",
+			end: "2026-11-30",
+			hit: null,
+		},
+	};
+
+	it("covers the full chart range at the earned coordinate", () => {
+		const line = incomeRuleLine(base);
+		expect(line.map((point) => point.date)).toEqual([
+			"2026-11-09",
+			"2026-11-10",
+			"2026-11-11",
+			"2026-11-12",
+		]);
+		expect(line.every((point) => point.amount === 90)).toBe(true);
+		expect(line.every((point) => point.income)).toBe(true);
+	});
+
+	it("falls back to recorded days when no projection remains", () => {
+		const line = incomeRuleLine({ ...base, projected: [] });
+		expect(line.map((point) => point.date)).toEqual([
+			"2026-11-09",
+			"2026-11-10",
+		]);
+	});
+
+	it("hides the income rule for historical views without a coordinate", () => {
+		expect(incomeRuleLine(base, true)).toEqual([]);
+		expect(
+			incomeRuleLine({
+				...base,
+				monthlyIncome: { ...base.monthlyIncome!, coordinate: null },
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("recurring increase dots on shared dates", () => {
+	it("places the dot on the dated total after same-day increases", () => {
+		const projected: SafeSpendingTrend["projected"] = [
+			{ date: "2026-11-09", spent: 100, projected: true },
+			{ date: "2026-11-09", spent: 160, projected: true },
+			{ date: "2026-11-10", spent: 210, projected: true },
+		];
+		expect(
+			recurringIncreaseDots(projected, [
+				{ date: "2026-11-09", amount: 60, name: "Sub" },
+			]),
+		).toEqual([{ date: "2026-11-09", amount: 160 }]);
+	});
+
+	it("keeps future dated totals for later recurring bills", () => {
+		const projected: SafeSpendingTrend["projected"] = [
+			{ date: "2026-11-09", spent: 100, projected: true },
+			{ date: "2026-11-10", spent: 210, projected: true },
+		];
+		expect(
+			recurringIncreaseDots(projected, [
+				{ date: "2026-11-10", amount: 60, name: "Sub" },
+			]),
+		).toEqual([{ date: "2026-11-10", amount: 210 }]);
+	});
+});
 describe("scheduled recurring increases", () => {
 	it("covers bumped projection values in the chart domain", () => {
 		const trend: SafeSpendingTrend = {
