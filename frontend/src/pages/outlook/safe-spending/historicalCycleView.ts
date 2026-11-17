@@ -1,4 +1,5 @@
-import { monthDay, sum } from "@/domain/format.ts";
+import { monthDay } from "@/domain/format.ts";
+import { sumCents } from "@/domain/safeSpendingMath.ts";
 import type { Account, Transaction } from "@/domain/model.ts";
 import type { TransactionResult } from "@/domain/result.ts";
 import { mandatoryTransactions } from "@/domain/safeSpending.ts";
@@ -17,7 +18,7 @@ import type { CycleViewResult } from "./cycleView.ts";
 export function historicalCycleView({
 	closedCycle,
 	cardTransactions,
-	billResults,
+	cashPaymentRows,
 	spendingIds,
 	accounts,
 	savedTransactions,
@@ -26,14 +27,14 @@ export function historicalCycleView({
 	closedCycle: SafeSpendingClosedCycle;
 	cardTransactions: AccountTransaction[];
 	spendingIds: string[];
-	billResults: TransactionResult[];
+	cashPaymentRows: TransactionResult[];
 	accounts: Account[];
 	savedTransactions: Transaction[];
 	transactionOrder: TransactionOrder;
 }): CycleViewResult & { section: SafeSpendingMandatorySection } {
 	const transactions = sortTransactionsByDate({
 		items: mandatoryTransactions({
-			transactions: billResults.filter((row) => row.posted === true),
+			transactions: cashPaymentRows.filter((row) => row.posted === true),
 			checkingIds: spendingIds,
 			start: closedCycle.start,
 			end: closedCycle.end,
@@ -71,7 +72,7 @@ export function historicalCycleView({
 		section: {
 			title: "Cash payments this cycle",
 			subtitle: `Recorded amounts · ${monthDay(closedCycle.start)} – ${monthDay(closedCycle.end)}`,
-			total: sum(transactions.map((row) => row.amount)),
+			total: sumCents(transactions),
 			transactions,
 		},
 	};

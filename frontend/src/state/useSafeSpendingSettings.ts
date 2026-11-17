@@ -12,6 +12,11 @@ import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
 } from "@/domain/safeSpending.ts";
+import { clampStatementDay } from "@/domain/cardCycle.ts";
+import {
+	resolveEffectiveIds,
+	toggleEffectiveId,
+} from "@/domain/safeSpendingSelection.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
@@ -21,16 +26,7 @@ import { userResourceKey } from "@/state/workspaceResources.ts";
 // the base projection identity, so edits do not rerun the base simulation.
 export type TotalCycleSettings = SafeSpendingSettings;
 
-export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
-	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
-	reserve: DEFAULT_PROTECTED_RESERVE,
-	accountIds: null,
-	spendingAccountIds: null,
-	incomeAccountIds: null,
-	incomeScheduleIds: [],
-	transactionIds: null,
-	statementDaySet: false,
-});
+export { clampStatementDay, resolveEffectiveIds, toggleEffectiveId };
 
 function stringIds(value: unknown): string[] | null {
 	if (!Array.isArray(value)) return null;
@@ -40,52 +36,82 @@ function stringIds(value: unknown): string[] | null {
 	return ids.length ? ids : null;
 }
 
-export function clampStatementDay(value: unknown): number {
-	return Math.min(
-		28,
-		Math.max(1, Math.floor(Number(value) || DEFAULT_CYCLE_STATEMENT_DAY)),
-	);
+/** One field list drives defaults, sanitizing and optimistic merges. */
+const settingsFields = {
+	statementDay: {
+		default: DEFAULT_CYCLE_STATEMENT_DAY,
+		read: (value: unknown) => clampStatementDay(value),
+	},
+	reserve: {
+		default: DEFAULT_PROTECTED_RESERVE,
+		read: (value: unknown) =>
+			Math.max(
+				0,
+				Number.isFinite(Number(value))
+					? Number(value)
+					: DEFAULT_PROTECTED_RESERVE,
+			),
+	},
+	accountIds: {
+		default: null as string[] | null,
+		read: stringIds,
+	},
+	spendingAccountIds: {
+		default: null as string[] | null,
+		read: stringIds,
+	},
+	incomeScheduleIds: {
+		default: [] as string[],
+		read: (value: unknown) => [...new Set(stringIds(value) ?? [])],
+	},
+	transactionIds: {
+		default: null as string[] | null,
+		read: stringIds,
+	},
+	statementDaySet: {
+		default: false,
+		read: (value: unknown) => value === true,
+	},
+};
+
+type SettingKey = keyof TotalCycleSettings;
+const settingKeys = Object.keys(settingsFields) as SettingKey[];
+
+function freshSetting<K extends SettingKey>(key: K): TotalCycleSettings[K] {
+	const value = settingsFields[key].default;
+	return (Array.isArray(value) ? [...value] : value) as TotalCycleSettings[K];
 }
 
-/** Single null-means-all resolver: stored `null` means every known id;
- * unknown ids drop out; an empty selection falls back to the full set so a
- * deleted account never silently empties the effective set. Pass `fallback`
- * to override the empty-selection result (e.g. the detected checking
- * account instead of every account). */
-export function resolveEffectiveIds(
-	stored: string[] | null,
-	knownIds: string[],
-	fallback?: string[],
-): string[] {
-	const known = new Set(knownIds);
-	const fallbackIds = (fallback ?? knownIds).filter((id) => known.has(id));
-	if (!stored) return fallbackIds;
-	const selected = stored.filter((id) => known.has(id));
-	return selected.length ? selected : fallbackIds;
-}
+export const defaultSafeSpendingSettings = (): TotalCycleSettings => {
+	const result = {} as TotalCycleSettings;
+	for (const key of settingKeys)
+		(result as unknown as Record<string, unknown>)[key] = freshSetting(key);
+	return result;
+};
+
 export function sanitizeSafeSpendingSettings(
 	value: unknown,
 ): TotalCycleSettings {
-	const fallback = defaultSafeSpendingSettings();
-	if (typeof value !== "object" || value === null) return fallback;
+	const result = defaultSafeSpendingSettings();
+	if (typeof value !== "object" || value === null) return result;
 	const record = value as Record<string, unknown>;
-	return {
-		statementDay: clampStatementDay(record.statementDay),
-		statementDaySet: record.statementDaySet === true,
-		reserve: Math.max(
-			0,
-			Number.isFinite(Number(record.reserve))
-				? Number(record.reserve)
-				: DEFAULT_PROTECTED_RESERVE,
-		),
-		accountIds: stringIds(record.accountIds),
-		spendingAccountIds: stringIds(record.spendingAccountIds),
-		incomeAccountIds: Array.isArray(record.incomeAccountIds)
-			? (stringIds(record.incomeAccountIds) ?? [])
-			: null,
-		incomeScheduleIds: [...new Set(stringIds(record.incomeScheduleIds) ?? [])],
-		transactionIds: stringIds(record.transactionIds),
-	};
+	for (const key of settingKeys)
+		(result as unknown as Record<string, unknown>)[key] = settingsFields[
+			key
+		].read(record[key]);
+	return result;
+}
+
+function mergeSettings(
+	previous: TotalCycleSettings,
+	next: Partial<TotalCycleSettings>,
+): TotalCycleSettings {
+	const merged = defaultSafeSpendingSettings();
+	for (const key of settingKeys) {
+		(merged as unknown as Record<string, unknown>)[key] =
+			next[key] !== undefined ? next[key] : previous[key];
+	}
+	return merged;
 }
 
 interface SafeSpendingSettingsState extends TotalCycleSettings {
@@ -134,26 +160,7 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 		)
 			return;
 		const previous = getSafeSpendingSettings(scope);
-		const snapshot: TotalCycleSettings = {
-			statementDay: next.statementDay ?? previous.statementDay,
-			statementDaySet: next.statementDaySet ?? previous.statementDaySet,
-			reserve: next.reserve ?? previous.reserve,
-			accountIds:
-				next.accountIds !== undefined ? next.accountIds : previous.accountIds,
-			spendingAccountIds:
-				next.spendingAccountIds !== undefined
-					? next.spendingAccountIds
-					: previous.spendingAccountIds,
-			incomeAccountIds:
-				next.incomeAccountIds !== undefined
-					? next.incomeAccountIds
-					: previous.incomeAccountIds,
-			incomeScheduleIds: next.incomeScheduleIds ?? previous.incomeScheduleIds,
-			transactionIds:
-				next.transactionIds !== undefined
-					? next.transactionIds
-					: previous.transactionIds,
-		};
+		const snapshot = mergeSettings(previous, next);
 		const cache = serverQueryClient();
 		const key = safeSpendingSettingsKey(scope);
 		void cache.cancelQueries({ queryKey: key, exact: true });

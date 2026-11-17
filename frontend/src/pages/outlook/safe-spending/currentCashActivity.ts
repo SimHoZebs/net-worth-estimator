@@ -3,7 +3,7 @@ import {
 	type AccountTransaction,
 } from "@/domain/accountActivity.ts";
 import type { Account, Transaction } from "@/domain/model.ts";
-import { transactionCategoryLabels } from "@/domain/categories.ts";
+import { isSpendCategory } from "@/domain/safeSpendingMath.ts";
 
 /** Preserve exact chronology through display projection, including posted-time
  * fallback already resolved by transactionToDisplay for untimed transactions. */
@@ -19,14 +19,7 @@ export function currentSpendingActivity(
 			row = { ...row, direction: "out" };
 		const category = saved.get(row.transactionId)?.category;
 		const transfer = row.flow === "transfer";
-		const expenseCredit =
-			row.direction === "in" &&
-			category !== undefined &&
-			category !== null &&
-			Object.hasOwn(transactionCategoryLabels, category) &&
-			category !== "INCOME" &&
-			category !== "TRANSFER_IN" &&
-			category !== "TRANSFER_OUT";
+		const expenseCredit = row.direction === "in" && isSpendCategory(category);
 		row = {
 			...row,
 			spendingAmountUnknown:
@@ -39,11 +32,7 @@ export function currentSpendingActivity(
 					? 0
 					: row.direction === "out"
 						? row.amount
-						: category &&
-							  Object.hasOwn(transactionCategoryLabels, category) &&
-							  category !== "INCOME" &&
-							  category !== "TRANSFER_IN" &&
-							  category !== "TRANSFER_OUT"
+						: isSpendCategory(category)
 							? -row.amount
 							: 0,
 		};

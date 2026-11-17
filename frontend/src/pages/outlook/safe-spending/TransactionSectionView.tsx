@@ -47,10 +47,7 @@ export function TransactionSectionView({
 	savedTransactions,
 	onInspect,
 	order,
-	showHeaders = false,
 	dividers = [],
-	shortfall,
-	shortfallLabel,
 }: {
 	transactions: AccountTransaction[];
 	caption: string;
@@ -61,10 +58,7 @@ export function TransactionSectionView({
 		savedTransaction: Transaction,
 	) => void;
 	order: TransactionOrder;
-	showHeaders?: boolean;
 	dividers?: SpendingLimitDivider[];
-	shortfall?: boolean;
-	shortfallLabel?: string;
 }) {
 	if (!transactions.length) {
 		return (
@@ -96,15 +90,12 @@ export function TransactionSectionView({
 			}
 			onEdit={(savedTransaction) => onInspect(transaction, savedTransaction)}
 			divider={dividerById.get(transaction.id)}
-			shortfall={shortfall}
-			shortfallLabel={shortfallLabel}
 		/>
 	));
 	return (
 		<TransactionTable
 			className="border-t-0"
 			caption={`${caption}, ${order === "oldest" ? "oldest first" : "newest first"}`}
-			showHeaders={showHeaders}
 		>
 			{rows}
 		</TransactionTable>

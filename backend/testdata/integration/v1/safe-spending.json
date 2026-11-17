@@ -339,7 +339,6 @@
         "reserve": 725,
         "accountIds": null,
         "spendingAccountIds": null,
-        "incomeAccountIds": null,
         "incomeScheduleIds": [
           "salary",
           "partner-income"

@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { Transaction } from "@/domain/model.ts";
 import { transactionFixture } from "@/mocks/projection.ts";
-import {
-	safeSpendingResults,
-	selectObligationResults,
-} from "./safeSpendingHistory.ts";
+import { safeSpendingResults } from "./safeSpendingHistory.ts";
 
 const posted = (overrides: Partial<Transaction>): Transaction => ({
 	kind: "transaction",
@@ -207,7 +203,7 @@ describe("safeSpendingResults", () => {
 		).toHaveLength(1);
 	});
 
-	it("does not synthesize bill occurrences the server did not project", () => {
+	it("does not synthesize bill occurrences without selected bill schedules", () => {
 		const results = safeSpendingResults({
 			transactions: [],
 			projectionTransactions: [],
@@ -215,92 +211,85 @@ describe("safeSpendingResults", () => {
 		expect(results).toEqual([]);
 	});
 
-	it("synthesizes a selected bill before the projection start when server has none", () => {
-		const scheduleFixture = {
-			id: "rent",
-			name: "Rent",
-			sourceAccountId: "checking",
-			destinations: [],
-			amount: {
-				resolver: "expression",
-				config: { expression: "1500" },
-				inputs: {},
-			},
-			frequency: "monthly",
-			startDate: "2026-01-01",
-			endDate: null,
-			annualCap: null,
-			priority: 1,
-			enabled: true,
-		} as unknown as Schedule;
+	it("expands selected bill schedules into the window, once per occurrence", () => {
 		const results = safeSpendingResults({
 			transactions: [],
 			projectionTransactions: [],
-			schedules: [scheduleFixture],
-			billScheduleIds: ["rent"],
+			billSchedules: [
+				{
+					id: "rent",
+					name: "Rent",
+					sourceAccountId: "checking",
+					destinations: [],
+					amount: {
+						resolver: "expression",
+						config: { expression: "1200" },
+						inputs: {},
+					},
+					frequency: "monthly",
+					startDate: "2026-10-15",
+					endDate: null,
+					annualCap: null,
+					priority: 1,
+					enabled: true,
+				},
+			],
 			billWindowStart: "2026-10-01",
-			billWindowEnd: "2026-10-31",
+			billWindowEnd: "2026-11-30",
 		});
-		expect(results.map((row) => row.date)).toContain("2026-10-01");
-		expect(results[0]?.transactionId).toBe("rent");
+		expect(
+			results
+				.filter((row) => row.transactionId === "rent")
+				.map((row) => [row.date, row.requested]),
+		).toEqual([
+			["2026-10-15", 1200],
+			["2026-11-15", 1200],
+		]);
 	});
 
-	it("keeps every posted outflow without near-match dedupe", () => {
-		const unclaimed = transactionFixture({
-			date: "2026-11-01",
-			transactionId: "unclaimed",
-			fromId: "checking",
-			requested: 50,
-			posted: true,
-			claimed: false,
-		});
-		const claimed = transactionFixture({
-			date: "2026-11-02",
-			transactionId: "claimed",
-			fromId: "checking",
-			requested: 60,
-			posted: true,
-			claimed: true,
-		});
-		const projected = transactionFixture({
-			date: "2026-11-01",
-			transactionId: "bill-rule",
-			fromId: "checking",
-			requested: 70,
-		});
-		const distinct = transactionFixture({
-			date: "2026-11-01",
-			transactionId: "distinct",
-			fromId: "checking",
-			requested: 500,
-			posted: true,
-			claimed: false,
-		});
-		expect(
-			selectObligationResults(
-				[unclaimed, distinct, claimed, projected],
-				null,
-			).map((row) => row.transactionId),
-		).toEqual(["unclaimed", "distinct", "claimed", "bill-rule"]);
-		expect(
-			selectObligationResults(
-				[unclaimed, claimed, projected],
-				["unclaimed"],
-			).map((row) => row.transactionId),
-		).toEqual(["unclaimed"]);
-	});
-
-	it("keeps an unclaimed posted one-time outflow when no projected bill represents it", () => {
-		const actual = transactionFixture({
-			date: "2026-03-06",
-			transactionId: "renovation",
-			fromId: "checking",
-			requested: 9000,
-			posted: true,
-			claimed: false,
+	it("does not duplicate an occurrence claimed by a posted row", () => {
+		const results = safeSpendingResults({
+			transactions: [
+				posted({
+					id: "rent-payment",
+					name: "Rent payment",
+					amount: 1200,
+					fromId: "checking",
+					startDate: "2026-10-15",
+					claimScheduleId: "rent",
+					claimOccurrenceDate: "2026-10-15",
+				}),
+			],
+			projectionTransactions: [],
+			billSchedules: [
+				{
+					id: "rent",
+					name: "Rent",
+					sourceAccountId: "checking",
+					destinations: [],
+					amount: {
+						resolver: "expression",
+						config: { expression: "1200" },
+						inputs: {},
+					},
+					frequency: "monthly",
+					startDate: "2026-10-15",
+					endDate: null,
+					annualCap: null,
+					priority: 1,
+					enabled: true,
+				},
+			],
+			billWindowStart: "2026-10-01",
+			billWindowEnd: "2026-11-30",
 		});
 		expect(
-			selectObligationResults([actual], null).map((row) => row.transactionId),
-		).toEqual(["renovation"]);
+			results
+				.filter((row) => row.transactionId === "rent")
+				.map((row) => [row.date, row.posted === true]),
+		).toEqual([
+			["2026-10-15", true],
+			["2026-11-15", false],
+		]);
 	});
 });

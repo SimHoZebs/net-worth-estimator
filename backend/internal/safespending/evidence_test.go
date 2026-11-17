@@ -85,13 +85,13 @@ func TestOldMultiDestinationFactDoesNotPoisonObservedCash(t *testing.T) {
 	tx.Destinations = []string{"one", "two"}
 	m.Transactions = []types.Transaction{tx}
 	s := Build(m, nil, "2026-11-15", testEnd)
-	if s.Status != "available" || slices.Contains(s.Reasons, "posted-routing-unknown") {
+	if s.Status != "available" || slices.Contains(s.Reasons, ReasonPostedRoutingUnknown) {
 		t.Fatalf("old routing %+v", s)
 	}
 	assertMoney(t, s.CashAfterBills, 1244.43)
 	m.Transactions[0].TransactionTime = stamp("2026-11-14T21:00:00Z")
 	s = Build(m, nil, "2026-11-15", testEnd)
-	if s.CashAfterBills != nil || !slices.Contains(s.Reasons, "posted-routing-unknown") {
+	if s.CashAfterBills != nil || !slices.Contains(s.Reasons, ReasonPostedRoutingUnknown) {
 		t.Fatalf("new routing %+v", s)
 	}
 }
@@ -138,7 +138,7 @@ func TestDynamicRecordedAmountsCannotBorrowLaterObservation(t *testing.T) {
 	tx.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "balance * .1"}, Inputs: map[string]types.AmountInputBinding{"balance": {Source: "provider", Provider: "account-balance", Arguments: map[string]any{"id": "checking"}}}}
 	m.Transactions = []types.Transaction{tx}
 	s := Build(m, nil, "2026-11-15", testEnd)
-	if s.CashAfterBills != nil || s.CheckingAvailable != nil || !slices.Contains(s.Reasons, "posted-amount-unavailable") {
+	if s.CashAfterBills != nil || s.CheckingAvailable != nil || !slices.Contains(s.Reasons, ReasonPostedAmountUnavailable) {
 		t.Fatalf("dynamic amount guessed %+v", s)
 	}
 	// Once a later actual observation incorporates that transaction, it no
@@ -204,7 +204,7 @@ func TestBillWindowOmitsEarlierSchedulesAndSameDayObservationMakesPaymentUnknown
 				m.Checkpoints[0].ObservedAt = stamp("2026-11-15T08:00:00Z")
 				s = Build(m, nil, "2026-11-15", testEnd)
 				assertMoney(t, s.CheckingAvailable, 1244.43)
-				if s.Status != "uncertain" || s.CashAfterBills != nil || !slices.Contains(s.Reasons, "scheduled-payment-status-unknown") || s.OutstandingObligations[0].Status != "payment-status-unknown" {
+				if s.Status != "uncertain" || s.CashAfterBills != nil || !slices.Contains(s.Reasons, ReasonScheduledPaymentStatusUnknown) || s.OutstandingObligations[0].Status != "payment-status-unknown" {
 					t.Fatalf("same-day payment status guessed %+v", s)
 				}
 			}
@@ -283,7 +283,7 @@ func TestPendingOutsideBillWindowRespectsObservationCut(t *testing.T) {
 		assertMoney(t, s.OutstandingBillsTotal, 0)
 		assertMoney(t, s.Baselines[0].AvailableBalance, 1244.43)
 		if claimedOutside {
-			if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil || !slices.Contains(s.Baselines[0].Reasons, "pending-after-baseline-coverage-unknown") {
+			if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil || !slices.Contains(s.Baselines[0].Reasons, ReasonPendingAfterBaselineCoverageUnknown) {
 				t.Fatalf("post-observation coverage uncertainty silently dropped %+v", s)
 			}
 		} else {

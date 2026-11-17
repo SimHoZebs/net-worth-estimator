@@ -18,6 +18,9 @@ transaction crossing identities. Its budget reconciles recorded cycle spending
 with the server's current cash remainder. This is today's spending capacity
 applied to the cycle, not a reconstructed historical bank balance. The protected
 reserve reduces safe spending without changing the underlying cash remainder.
+One effective-selection resolver owns card, cash-account, and bill ids: stored
+`null` means all known ids, unknown ids drop out, and toggles normalize through
+that same resolver so checkboxes and calculations cannot disagree.
 An unavailable cash remainder disables dependent limits and cutoffs; it never
 falls back to a future paycheck. Cutoffs identify the exact transaction, retain
 that identity in either sort order, and do not turn a daily chart total into a
@@ -27,10 +30,13 @@ centered in the line. It does not insert another table row or a second border.
 
 Pending charges and pending refunds both count in recorded spending, counted
 once on their transaction date. Pending status never excludes a row from the
-ledger; only voided, disabled, or future-dated rows are left out. The projected
-chart continues the average daily rate and adds discrete increases for the
-recurring-schedule rows among the backend outstanding bills, the same rows
-the Bills section lists, so limit crossings reflect those increases.
+ledger; only voided, disabled, or future-dated rows are left out. Bills are the
+selected recurring transactions whose source is a selected cash account and
+whose occurrence falls inside the visible cycle. One bill definition supplies
+both the Bills list and the chart's discrete projected increases, so a limit
+crossing reflects exactly the bills the user selected. Backend outstanding
+obligations remain a separate cash fact: they reduce cash after bills through
+month end and are not the Bills list.
 
 ## Monthly income threshold
 

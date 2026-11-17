@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -9,12 +8,12 @@ import (
 )
 
 func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedTransactions, deletedRules map[string]bool) error {
-	var raw string
-	if err := tx.QueryRow(`SELECT settings_json FROM safe_spending_settings WHERE id = 1 AND user_id = :user_id`).Scan(&raw); err != nil {
-		if err == sql.ErrNoRows {
-			return nil
-		}
+	raw, found, err := readSettingsJSON(tx, `SELECT settings_json FROM safe_spending_settings WHERE id = 1 AND user_id = :user_id`)
+	if err != nil {
 		return fmt.Errorf("read safe spending settings: %w", err)
+	}
+	if !found {
+		return nil
 	}
 	var settings types.SafeSpendingSettings
 	if err := json.Unmarshal([]byte(raw), &settings); err != nil {
@@ -22,15 +21,10 @@ func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedTransac
 	}
 	settings.AccountIDs = supersedeReplaceIDs(settings.AccountIDs, manualID, syncedID)
 	settings.SpendingAccountIDs = supersedeReplaceIDs(settings.SpendingAccountIDs, manualID, syncedID)
-	settings.IncomeAccountIDs = supersedeReplaceIDs(settings.IncomeAccountIDs, manualID, syncedID)
 	settings.TransactionIDs = supersedeRemoveIDs(settings.TransactionIDs, deletedTransactions)
 	settings.IncomeScheduleIDs = supersedeRemoveIDs(settings.IncomeScheduleIDs, deletedRules)
-	encoded, err := json.Marshal(settings)
-	if err != nil {
-		return fmt.Errorf("encode safe spending settings: %w", err)
-	}
-	if _, err := tx.Exec(`UPDATE safe_spending_settings SET settings_json = ? WHERE id = 1 AND user_id = :user_id`, string(encoded)); err != nil {
-		return fmt.Errorf("update safe spending settings: %w", err)
+	if err := writeSettingsJSON(tx, `UPDATE safe_spending_settings SET settings_json = ? WHERE id = 1 AND user_id = :user_id`, settings); err != nil {
+		return fmt.Errorf("write safe spending settings: %w", err)
 	}
 	return nil
 }
@@ -39,12 +33,12 @@ func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedTransac
 // replacement. Card IDs live in sync_credentials, beside the Bridge key, and
 // are validated against the model on every card-set write.
 func supersedeSyncCards(tx *userTx, manualID, syncedID string) error {
-	var raw string
-	if err := tx.QueryRow(`SELECT cards_json FROM sync_credentials WHERE id = 1 AND user_id = :user_id`).Scan(&raw); err != nil {
-		if err == sql.ErrNoRows {
-			return nil
-		}
+	raw, found, err := readSettingsJSON(tx, `SELECT cards_json FROM sync_credentials WHERE id = 1 AND user_id = :user_id`)
+	if err != nil {
 		return fmt.Errorf("read sync cards: %w", err)
+	}
+	if !found {
+		return nil
 	}
 	cards := []string{}
 	if raw != "" {
@@ -53,12 +47,8 @@ func supersedeSyncCards(tx *userTx, manualID, syncedID string) error {
 		}
 	}
 	cards = supersedeReplaceIDs(cards, manualID, syncedID)
-	encoded, err := json.Marshal(cards)
-	if err != nil {
-		return fmt.Errorf("encode sync cards: %w", err)
-	}
-	if _, err := tx.Exec(`UPDATE sync_credentials SET cards_json = ? WHERE id = 1 AND user_id = :user_id`, string(encoded)); err != nil {
-		return fmt.Errorf("update sync cards: %w", err)
+	if err := writeSettingsJSON(tx, `UPDATE sync_credentials SET cards_json = ? WHERE id = 1 AND user_id = :user_id`, cards); err != nil {
+		return fmt.Errorf("write sync cards: %w", err)
 	}
 	return nil
 }

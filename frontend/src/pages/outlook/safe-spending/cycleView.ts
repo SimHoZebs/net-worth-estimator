@@ -9,6 +9,11 @@ import {
 } from "@/domain/safeSpendingTrend.ts";
 import { buildCycleView, type CycleView } from "./safeSpendingDetailModel.ts";
 import { monthEndIso } from "@/domain/safeSpending.ts";
+import {
+	hasUnknownSpending,
+	roundCents,
+	sumCents,
+} from "@/domain/safeSpendingMath.ts";
 
 export interface CycleViewInput {
 	cycle: { start: string; end: string };
@@ -60,11 +65,7 @@ export function cycleView({
 		cycleEnd: cycle.end,
 		todayIso: referenceDay,
 	});
-	const spent =
-		ledger.reduce(
-			(total, row) => total + Math.round(spendingAmount(row) * 100),
-			0,
-		) / 100;
+	const spent = sumCents(ledger, spendingAmount);
 	const remaining =
 		cashSummary?.status === "available" &&
 		cashSummary.start === referenceDay &&
@@ -74,10 +75,11 @@ export function cycleView({
 			? cashSummary.cashAfterBills
 			: null;
 	const protectedReserve = Math.max(0, reserve);
+	const unknownSpending = hasUnknownSpending(ledger);
 	const capacity =
-		remaining === null || ledger.some((row) => row.spendingAmountUnknown)
+		remaining === null || unknownSpending
 			? null
-			: Math.round((spent + remaining) * 100) / 100;
+			: roundCents(spent + remaining);
 	const trend = safeSpendingTrend({
 		transactions: ledger,
 		cycleStart: cycle.start,
@@ -85,9 +87,7 @@ export function cycleView({
 		todayIso: referenceDay,
 		limit: capacity,
 		safetyNet:
-			capacity === null
-				? null
-				: Math.round((capacity - protectedReserve) * 100) / 100,
+			capacity === null ? null : roundCents(capacity - protectedReserve),
 		scheduledOutflows,
 	});
 	if (
@@ -96,18 +96,15 @@ export function cycleView({
 		Number.isFinite(monthlyIncome)
 	) {
 		const monthlyLedger = recorded.filter((row) => row.date >= monthStart);
-		const monthlySpent = monthlyLedger.some((row) => row.spendingAmountUnknown)
+		const monthlySpent = hasUnknownSpending(monthlyLedger)
 			? null
-			: monthlyLedger.reduce(
-					(total, row) => total + Math.round(spendingAmount(row) * 100),
-					0,
-				) / 100;
+			: sumCents(monthlyLedger, spendingAmount);
 		const hit =
 			monthlySpent === null ? null : ledgerHit(monthlyLedger, monthlyIncome);
 		const coordinate =
-			monthlySpent === null || ledger.some((row) => row.spendingAmountUnknown)
+			monthlySpent === null || unknownSpending
 				? null
-				: Math.round(monthlyIncome * 100) / 100;
+				: roundCents(monthlyIncome);
 		trend.monthlyIncome = {
 			amount: monthlyIncome,
 			spent: monthlySpent,
@@ -130,7 +127,7 @@ export function cycleView({
 			cycleEnd: cycle.end,
 			closedCycle,
 			remaining,
-			cardSpent: ledger.some((row) => row.spendingAmountUnknown) ? null : spent,
+			cardSpent: unknownSpending ? null : spent,
 			cardSpentByCard,
 			reserve: protectedReserve,
 			fullDaysLeft,

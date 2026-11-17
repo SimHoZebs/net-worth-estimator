@@ -29,7 +29,7 @@ func TestUnknownPostedMovementInvalidatesOnlyAffectedBalanceDependencies(t *test
 			m.Transactions = []types.Transaction{unknown, laterKnown}
 			s := Build(m, nil, "2026-11-15", testEnd)
 			assertMoney(t, s.CheckingAvailable, 1244.43)
-			if s.Status != "uncertain" || s.CashAfterBills != nil || s.OutstandingBillsTotal != nil || !slices.Contains(s.Reasons, "obligation-amount-unavailable") || len(s.OutstandingObligations) != 2 {
+			if s.Status != "uncertain" || s.CashAfterBills != nil || s.OutstandingBillsTotal != nil || !slices.Contains(s.Reasons, ReasonObligationAmountUnavailable) || len(s.OutstandingObligations) != 2 {
 				t.Fatalf("stale provider evidence presented as known %+v", s)
 			}
 			for _, row := range s.OutstandingObligations {
@@ -85,7 +85,7 @@ func TestUnknownNewerClaimInvalidatesLatestAmountEvenWhenBalanceObservationCover
 			}
 			s := Build(m, nil, "2026-11-15", testEnd)
 			assertMoney(t, s.CheckingAvailable, 1244.43)
-			if s.Status != "uncertain" || s.CashAfterBills != nil || s.OutstandingBillsTotal != nil || len(s.OutstandingObligations) != 1 || s.OutstandingObligations[0].Amount != nil || !slices.Contains(s.Reasons, "obligation-amount-unavailable") {
+			if s.Status != "uncertain" || s.CashAfterBills != nil || s.OutstandingBillsTotal != nil || len(s.OutstandingObligations) != 1 || s.OutstandingObligations[0].Amount != nil || !slices.Contains(s.Reasons, ReasonObligationAmountUnavailable) {
 				t.Fatalf("stale October amount survived unknown November claim %+v", s)
 			}
 			// A later independently known claim restores latest amount evidence;

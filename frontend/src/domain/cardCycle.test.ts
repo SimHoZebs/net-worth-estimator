@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { AccountTransaction } from "./accountActivity.ts";
 import {
 	cycleOutflowTransactions,
-	cycleSpentSoFar,
 	resolveStatementCycle,
 } from "./cardCycle.ts";
 
@@ -73,7 +72,6 @@ describe("cycle card charges", () => {
 			todayIso: "2026-10-22",
 		};
 		expect(cycleOutflowTransactions(input)).toEqual([recorded, pending]);
-		expect(cycleSpentSoFar(input)).toBe(50);
 		expect(pending.excluded).toBe(true);
 	});
 
@@ -93,6 +91,5 @@ describe("cycle card charges", () => {
 			"2026-10-20",
 			"2026-10-22",
 		]);
-		expect(cycleSpentSoFar(input)).toBe(50);
 	});
 });

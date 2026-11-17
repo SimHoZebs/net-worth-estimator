@@ -88,7 +88,6 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		StatementDay: 1, Reserve: 0,
 		AccountIDs:         []string{"manual"},
 		SpendingAccountIDs: []string{"manual"},
-		IncomeAccountIDs:   []string{"manual"},
 		IncomeScheduleIDs:  []string{"01900000-0000-7000-8000-0000000000b4"},
 		TransactionIDs:     []string{sharingTransactionA},
 		StatementDaySet:    true,
@@ -194,7 +193,6 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}
 	if len(settings.AccountIDs) != 1 || settings.AccountIDs[0] != "synced" ||
 		len(settings.SpendingAccountIDs) != 1 || settings.SpendingAccountIDs[0] != "synced" ||
-		len(settings.IncomeAccountIDs) != 1 || settings.IncomeAccountIDs[0] != "synced" ||
 		len(settings.TransactionIDs) != 0 || len(settings.IncomeScheduleIDs) != 1 || settings.IncomeScheduleIDs[0] != "01900000-0000-7000-8000-0000000000b4" {
 		t.Fatalf("safe spending settings did not move: %+v", settings)
 	}

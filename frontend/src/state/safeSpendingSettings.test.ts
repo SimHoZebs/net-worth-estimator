@@ -4,18 +4,23 @@ import {
 	sanitizeSafeSpendingSettings,
 } from "./useSafeSpendingSettings.ts";
 
-describe("explicit income-account selection", () => {
-	it("preserves explicit none separately from the initial automatic selection", () => {
+describe("sanitizeSafeSpendingSettings", () => {
+	it("keeps an explicit empty income-schedule selection", () => {
 		expect(
-			sanitizeSafeSpendingSettings({ incomeAccountIds: [] }).incomeAccountIds,
-		).toEqual([]);
+			sanitizeSafeSpendingSettings({ incomeScheduleIds: [] }),
+		).toMatchObject({ incomeScheduleIds: [] });
+	});
+
+	it("deduplicates income schedules and keeps the raw stored selections", () => {
 		expect(
-			sanitizeSafeSpendingSettings({ incomeAccountIds: null }).incomeAccountIds,
-		).toBeNull();
-		expect(
-			sanitizeSafeSpendingSettings({ incomeAccountIds: ["cash"] })
-				.incomeAccountIds,
-		).toEqual(["cash"]);
+			sanitizeSafeSpendingSettings({
+				spendingAccountIds: ["checking", "gone"],
+				incomeScheduleIds: ["salary", "salary", "bonus"],
+			}),
+		).toMatchObject({
+			spendingAccountIds: ["checking", "gone"],
+			incomeScheduleIds: ["salary", "bonus"],
+		});
 	});
 });
 

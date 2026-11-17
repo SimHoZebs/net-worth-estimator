@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
+import type { TransactionResult } from "@/domain/result.ts";
 import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
 
 function summary(
@@ -35,7 +36,7 @@ function summary(
 				transactionId: null,
 				scheduleId: "test",
 				accountId: "checking",
-				name: "Synthetic due today",
+				name: "Backend obligation not shown as bill",
 				date: "2026-11-15",
 				amount: 711.12,
 				status: "outstanding",
@@ -45,11 +46,33 @@ function summary(
 	};
 }
 
-const render = (data: SafeSpendingSummary, historical = false) =>
+const bill = (
+	overrides: Partial<TransactionResult> = {},
+): TransactionResult => ({
+	date: "2026-11-15",
+	transactionId: "bill-a",
+	name: "Selected bill A",
+	requested: 711.12,
+	realized: 711.12,
+	fromId: "checking",
+	toId: null,
+	available: null,
+	constraint: null,
+	accountDeltas: [],
+	posted: false,
+	...overrides,
+});
+
+const render = (
+	data: SafeSpendingSummary,
+	closed = false,
+	bills: readonly TransactionResult[] = [],
+) =>
 	renderToStaticMarkup(
 		<SafeSpendingCashEvidence
 			summary={data}
-			historical={historical}
+			closed={closed}
+			bills={bills}
 			pending={false}
 			error={false}
 			onRetry={() => {}}
@@ -57,27 +80,37 @@ const render = (data: SafeSpendingSummary, historical = false) =>
 	);
 
 describe("safe spending cash evidence", () => {
-	it("renders exact server amounts and the visible outstanding bills list without diagnostics", () => {
-		const html = render(summary());
+	it("renders the exact server cash fact and bills from the selected-cycle bill rows", () => {
+		const html = render(summary(), false, [
+			bill(),
+			bill({
+				transactionId: "bill-b",
+				name: "Selected bill B",
+				date: "2026-11-20",
+				requested: 98.92,
+			}),
+		]);
 		expect(html).toContain("-$216.58");
-		expect(html).not.toContain("Short by");
 		expect(html).toMatch(
 			/class="[^"]*text-danger-text[^"]*" data-testid="left-value"/,
 		);
-		expect(html).toContain("Synthetic due today");
-		expect(html).toContain("$711.12");
-		expect(html).toContain("$1,461.01");
 		expect(html).toContain("Bills</h3>");
-		expect(html).toContain("<ul");
-		expect(html).toContain("<li");
-		expect(html).not.toContain("Outstanding bills through Nov 30");
-		expect(html).not.toContain("Synthetic checking");
-		expect(html).not.toContain("2026-11-14T18:00:00.000Z");
-		expect(html).not.toContain("income excluded");
-		expect(html).not.toContain("Future income and earlier bills are excluded.");
-		expect(html).not.toContain("<details");
-		expect(html).not.toContain("Cash accounts");
-		expect(html).not.toContain('role="img"');
+		expect(html).toContain("$810.04");
+		expect(html).toContain("Selected bill A");
+		expect(html).toContain("Selected bill B");
+		expect(html).toContain("Nov 15");
+		expect(html).toContain("Nov 20");
+		expect(html).toContain('aria-label="Bills in this cycle"');
+		expect(html).not.toContain("Backend obligation not shown as bill");
+		expect(html).not.toContain("$1,461.01");
+		expect(html).toContain("$1,244.43");
+	});
+	it("withholds the total and list when no bills are selected in the cycle", () => {
+		const html = render(summary());
+		expect(html).toContain("Bills</h3>");
+		expect(html).toContain('data-testid="left-value">-$216.58');
+		expect(html).toContain("No bills.");
+		expect(html).not.toContain("$711.12");
 	});
 	it("renders uncertain cash as unavailable instead of performing local arithmetic", () => {
 		const html = render(
@@ -91,7 +124,6 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Remainder uncertain");
 		expect(html).toContain("$1,244.43");
 		expect(html).not.toContain("-$216.58");
-		expect(html).not.toContain("Short by");
 	});
 	it("preserves independent baseline evidence when the current cash aggregate is uncertain", () => {
 		const html = render(
@@ -114,7 +146,6 @@ describe("safe spending cash evidence", () => {
 		"does not label non-negative cash %s as a shortfall",
 		(cashAfterBills) => {
 			const html = render(summary({ cashAfterBills }));
-			expect(html).not.toContain("Short by");
 			expect(html).not.toContain("text-danger-text");
 		},
 	);
@@ -147,24 +178,13 @@ describe("safe spending cash evidence", () => {
 	it("marks an in-range scheduled payment with unresolved payment evidence", () => {
 		const html = render(
 			summary({
-				cashAfterBills: null,
 				status: "uncertain",
 				reasons: ["scheduled-payment-status-unknown"],
-				outstandingObligations: [
-					{
-						id: "unknown-payment",
-						transactionId: null,
-						scheduleId: "test",
-						accountId: "checking",
-						name: "Unknown payment",
-						date: "2026-11-15",
-						amount: 100,
-						status: "payment-status-unknown",
-					},
-				],
+				checkingAvailable: null,
+				cashAfterBills: null,
 			}),
 		);
-		expect(html).toContain("Payment status unknown");
+		expect(html).toContain("Remainder uncertain");
 		expect(html).toContain('data-testid="left-value">—');
 	});
 	it("renders genuine close cash rather than the conditional result of a one-day range", () => {
@@ -179,8 +199,7 @@ describe("safe spending cash evidence", () => {
 			true,
 		);
 		expect(html).toContain("$450.25");
-		expect(html).not.toContain("Cash balance at close unavailable");
-		expect(html).not.toContain("Synthetic due today");
+		expect(html).not.toContain("Backend obligation not shown as bill");
 		expect(html).not.toContain("$10,000.00");
 		expect(html).toContain("Available cash at close");
 	});
@@ -199,7 +218,6 @@ describe("safe spending cash evidence", () => {
 		);
 		expect(html).toContain("No balance recorded at close");
 		expect(html).not.toContain("1,244.43");
-		expect(html).not.toContain("An observed posted balance");
 	});
 	it("shows no close value when the close has no recorded observation", () => {
 		const html = render(
@@ -255,7 +273,7 @@ describe("safe spending cash evidence", () => {
 		);
 		expect(html).toContain("Remainder uncertain");
 	});
-	it("keeps known cash and bills visible after removing Details and all its contents", () => {
+	it("keeps server cash facts visible without rendering backend diagnostic movements", () => {
 		const html = render(
 			summary({
 				cashAfterBills: null,
@@ -278,13 +296,7 @@ describe("safe spending cash evidence", () => {
 		);
 		expect(html).toContain("$1,244.43");
 		expect(html).toContain("Remainder uncertain");
-		expect(html).toContain("Synthetic due today");
 		expect(html).not.toContain("Posted");
-		expect(html).not.toContain("pending payment");
 		expect(html).not.toContain("Diagnostic movement");
-		expect(html).not.toContain("Cash account observations");
-		expect(html).not.toContain("Confirmed cash movements");
-		expect(html).not.toContain("Details");
-		expect(html).not.toContain("<details");
 	});
 });

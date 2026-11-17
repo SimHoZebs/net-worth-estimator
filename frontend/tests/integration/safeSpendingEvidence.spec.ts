@@ -248,7 +248,6 @@ async function seedEvidence(
 			reserve: 0,
 			accountIds: ["evidence-card"],
 			spendingAccountIds: [checkingId],
-			incomeAccountIds: [checkingId],
 			incomeScheduleIds: ["evidence-salary"],
 			transactionIds: pending
 				? [
@@ -337,11 +336,11 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		).toBeVisible();
 		await expect(
 			card
-				.getByRole("list", { name: "Outstanding bills in selected range" })
+				.getByRole("list", { name: "Bills in this cycle" })
 				.getByRole("listitem"),
-		).toHaveCount(5);
+		).toHaveCount(2);
 		await expect(
-			card.getByText("Outstanding bills through Nov 30"),
+			card.getByText("Synthetic later bill A", { exact: true }),
 		).toHaveCount(0);
 		await expect(
 			card.getByText("Synthetic due today A", { exact: true }),
@@ -350,13 +349,6 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			card.getByText("Synthetic due today B", { exact: true }),
 		).toBeVisible();
 		await expect(card.getByText("$1,244.43", { exact: true })).toBeVisible();
-		await expect(card.getByText("$1,461.01", { exact: true })).toBeVisible();
-		await expect(card.getByText("Cash accounts", { exact: true })).toHaveCount(
-			0,
-		);
-		await expect(card.getByRole("img", { name: /^Cash balance / })).toHaveCount(
-			0,
-		);
 		await expect(
 			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();

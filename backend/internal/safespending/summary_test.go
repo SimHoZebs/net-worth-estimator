@@ -61,7 +61,7 @@ func TestClaimsReplaceOccurrencesAndPendingCoverageNeverGuessed(t *testing.T) {
 			m.Transactions = []types.Transaction{tx, payment("distinct", 10, "2026-11-16T12:00:00Z")}
 			s := Build(m, nil, "2026-11-15", testEnd)
 			if pending {
-				if len(s.OutstandingObligations) != 2 || s.OutstandingObligations[0].ID != "transaction:stable-bank-id" || s.CashAfterBills != nil || !slices.Contains(s.Reasons, "pending-obligation-coverage-unknown") {
+				if len(s.OutstandingObligations) != 2 || s.OutstandingObligations[0].ID != "transaction:stable-bank-id" || s.CashAfterBills != nil || !slices.Contains(s.Reasons, ReasonPendingObligationCoverageUnknown) {
 					t.Fatalf("pending %+v", s)
 				}
 				assertMoney(t, s.OutstandingBillsTotal, 610)

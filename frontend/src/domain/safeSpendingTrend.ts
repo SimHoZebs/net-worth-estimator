@@ -3,6 +3,14 @@ import { isCycleOutflow } from "./cardCycle.ts";
 import { daysBetweenInclusive, shiftDate } from "./format.ts";
 import { sortTransactionsByDate } from "./transactionSort.ts";
 import type { RecurringBillIncrease } from "./recurringBillIncreases.ts";
+import {
+	groupByDate,
+	hasUnknownSpending,
+	inWindow,
+	occurrenceKey,
+	roundCents,
+	sumCents,
+} from "./safeSpendingMath.ts";
 
 export type SafeSpendingScheduledIncrease = RecurringBillIncrease;
 
@@ -38,8 +46,6 @@ export interface SafeSpendingTrend {
 	safetyNetHit: SafeSpendingThresholdHit | null;
 	scheduledIncreases: SafeSpendingScheduledIncrease[];
 }
-
-const roundCents = (value: number) => Math.round(value * 100) / 100;
 
 export const spendingAmount = (row: AccountTransaction): number =>
 	row.spendingAmount ?? row.amount;
@@ -85,16 +91,14 @@ export function spendingLedger({
 						: row.spendingAmount !== undefined && !row.excluded && !row.void) &&
 					row.flow !== "transfer" &&
 					(spendingAmount(row) !== 0 || row.spendingAmountUnknown === true) &&
-					row.date >= cycleStart &&
-					row.date <= cycleEnd &&
+					inWindow(row.date, cycleStart, cycleEnd) &&
 					row.date <= todayIso,
 			)
 			.filter((row) => {
 				// Account selections can overlap. Count the same recorded financial
 				// effect once, without merging distinct split effects or saved IDs.
 				const identity = JSON.stringify([
-					row.transactionId,
-					row.date,
+					occurrenceKey(row.transactionId, row.date),
 					row.direction,
 					row.flow,
 					row.from,
@@ -134,6 +138,111 @@ export function ledgerHit(
 	return null;
 }
 
+/** Recurring increases due from today through cycle end, one row per day.
+ * Names of same-day bills collect in stable first-seen order. */
+function scheduledIncreasesFor(
+	outflows: readonly SafeSpendingScheduledIncrease[],
+	today: string,
+	end: string,
+): SafeSpendingScheduledIncrease[] {
+	return groupByDate(
+		outflows.filter(
+			(increase) =>
+				inWindow(increase.date, today, end) &&
+				Number.isFinite(increase.amount) &&
+				increase.amount > 0,
+		),
+		(increase) => increase.amount,
+		(increase) => increase.name,
+	);
+}
+
+/** Cumulative recorded spending for each elapsed day of the cycle. */
+function actualSeries({
+	ledger,
+	start,
+	today,
+}: {
+	ledger: readonly AccountTransaction[];
+	start: string;
+	today: string;
+}): SafeSpendingTrendPoint[] {
+	const rowsByDay = new Map<string, AccountTransaction[]>();
+	for (const row of ledger) {
+		if (!inWindow(row.date, start, today)) continue;
+		const day = row.date.slice(0, 10);
+		const rows = rowsByDay.get(day) ?? [];
+		rows.push(row);
+		rowsByDay.set(day, rows);
+	}
+
+	const points: SafeSpendingTrendPoint[] = [];
+	let cumulative = 0;
+	const elapsedDays = daysBetweenInclusive(start, today);
+	for (let offset = 0; offset < elapsedDays; offset++) {
+		const date = shiftDate({ date: start, days: offset });
+		const rows = rowsByDay.get(date);
+		cumulative = roundCents(
+			cumulative + (rows ? sumCents(rows, spendingAmount) : 0),
+		);
+		points.push({ date, spent: cumulative, projected: false });
+	}
+	return points;
+}
+
+/** Average daily rate plus scheduled increases for the remaining cycle. */
+function projectedSeries({
+	cumulative,
+	averageDaily,
+	today,
+	end,
+	increases,
+}: {
+	cumulative: number;
+	averageDaily: number;
+	today: string;
+	end: string;
+	increases: readonly SafeSpendingScheduledIncrease[];
+}): SafeSpendingTrendPoint[] {
+	const remainingDays = Math.max(0, daysBetweenInclusive(today, end) - 1);
+	if (remainingDays <= 0 || (averageDaily <= 0 && increases.length === 0))
+		return [];
+
+	const increaseCentsByDate = new Map(
+		increases.map((increase) => [
+			increase.date.slice(0, 10),
+			Math.round(increase.amount * 100),
+		]),
+	);
+	const todaysIncreaseCents = increaseCentsByDate.get(today) ?? 0;
+	const projected: SafeSpendingTrendPoint[] = [];
+	if (todaysIncreaseCents > 0) {
+		projected.push({
+			date: today,
+			spent: roundCents(cumulative),
+			projected: true,
+		});
+	}
+	let increaseCents = todaysIncreaseCents;
+	projected.push({
+		date: today,
+		spent: roundCents(cumulative + increaseCents / 100),
+		projected: true,
+	});
+	for (let offset = 1; offset <= remainingDays; offset++) {
+		const date = shiftDate({ date: today, days: offset });
+		increaseCents += increaseCentsByDate.get(date) ?? 0;
+		projected.push({
+			date,
+			spent: roundCents(
+				cumulative + averageDaily * offset + increaseCents / 100,
+			),
+			projected: true,
+		});
+	}
+	return projected;
+}
+
 /**
  * Daily cumulative spending for one statement cycle. Actual rows run
  * from the cycle start through today; projected rows continue from today at
@@ -163,26 +272,11 @@ export function safeSpendingTrend({
 	const end = cycleEnd.slice(0, 10);
 	const rawToday = todayIso.slice(0, 10);
 	const today = rawToday < start ? start : rawToday > end ? end : rawToday;
-	const grouped = new Map<string, { cents: number; names: string[] }>();
-	for (const increase of scheduledOutflows) {
-		const day = increase.date.slice(0, 10);
-		if (day < today || day > end) continue;
-		if (!Number.isFinite(increase.amount) || increase.amount <= 0) continue;
-		const entry = grouped.get(day) ?? { cents: 0, names: [] as string[] };
-		entry.cents += Math.round(increase.amount * 100);
-		if (increase.name && !entry.names.includes(increase.name))
-			entry.names.push(increase.name);
-		grouped.set(day, entry);
-	}
-	const scheduledIncreases: SafeSpendingScheduledIncrease[] = [
-		...grouped.entries(),
-	]
-		.map(([date, entry]) => ({
-			date,
-			amount: roundCents(entry.cents / 100),
-			...(entry.names.length ? { name: entry.names.join(", ") } : {}),
-		}))
-		.sort((left, right) => (left.date < right.date ? -1 : 1));
+	const scheduledIncreases = scheduledIncreasesFor(
+		scheduledOutflows,
+		today,
+		end,
+	);
 	const empty: SafeSpendingTrend = {
 		actual: [],
 		projected: [],
@@ -195,74 +289,27 @@ export function safeSpendingTrend({
 	};
 	if (end < start) return { ...empty, scheduledIncreases: [] };
 
-	const daily = new Map<string, number>();
 	const ledger = spendingLedger({
 		transactions,
 		cycleStart: start,
 		cycleEnd: end,
 		todayIso: today,
 	});
-	if (ledger.some((row) => row.spendingAmountUnknown)) {
+	if (hasUnknownSpending(ledger)) {
 		return { ...empty, spendingAvailable: false, limit: null, safetyNet: null };
 	}
-	for (const transaction of ledger) {
-		const date = transaction.date.slice(0, 10);
-		if (date < start || date > today) continue;
-		daily.set(
-			date,
-			(daily.get(date) ?? 0) + Math.round(spendingAmount(transaction) * 100),
-		);
-	}
 
-	const actual: SafeSpendingTrendPoint[] = [];
-	let cumulative = 0;
-	const elapsedDays = daysBetweenInclusive(start, today);
-	for (let offset = 0; offset < elapsedDays; offset++) {
-		const date = shiftDate({ date: start, days: offset });
-		cumulative = roundCents(cumulative + (daily.get(date) ?? 0) / 100);
-		actual.push({ date, spent: cumulative, projected: false });
-	}
-
+	const actual = actualSeries({ ledger, start, today });
+	const cumulative = actual.at(-1)?.spent ?? 0;
 	const averageDaily =
 		actual.length > 0 ? roundCents(cumulative / actual.length) : 0;
-	const remainingDays = Math.max(0, daysBetweenInclusive(today, end) - 1);
-	const projected: SafeSpendingTrendPoint[] = [];
-	if (
-		remainingDays > 0 &&
-		(averageDaily > 0 || scheduledIncreases.length > 0)
-	) {
-		const increaseCentsByDate = new Map(
-			scheduledIncreases.map((increase) => [
-				increase.date.slice(0, 10),
-				Math.round(increase.amount * 100),
-			]),
-		);
-		const todaysIncreaseCents = increaseCentsByDate.get(today) ?? 0;
-		if (todaysIncreaseCents > 0) {
-			projected.push({
-				date: today,
-				spent: roundCents(cumulative),
-				projected: true,
-			});
-		}
-		let increaseCents = todaysIncreaseCents;
-		projected.push({
-			date: today,
-			spent: roundCents(cumulative + increaseCents / 100),
-			projected: true,
-		});
-		for (let offset = 1; offset <= remainingDays; offset++) {
-			const date = shiftDate({ date: today, days: offset });
-			increaseCents += increaseCentsByDate.get(date) ?? 0;
-			projected.push({
-				date,
-				spent: roundCents(
-					cumulative + averageDaily * offset + increaseCents / 100,
-				),
-				projected: true,
-			});
-		}
-	}
+	const projected = projectedSeries({
+		cumulative,
+		averageDaily,
+		today,
+		end,
+		increases: scheduledIncreases,
+	});
 
 	return {
 		actual,

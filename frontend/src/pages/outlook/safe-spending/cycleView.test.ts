@@ -3,7 +3,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AccountTransaction } from "@/domain/accountActivity.ts";
 import { transactionFixture } from "@/mocks/projection.ts";
-import { selectObligationResults } from "@/domain/safeSpendingHistory.ts";
 import { historicalCycleView } from "./historicalCycleView.ts";
 import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
 import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
@@ -36,7 +35,7 @@ export const recordedCharge: AccountTransaction = {
 	void: false,
 };
 
-export function historicalFixture(transactionIds: string[] | null = null) {
+export function historicalFixture() {
 	return historicalCycleView({
 		closedCycle: {
 			start: "2026-09-20",
@@ -45,28 +44,25 @@ export function historicalFixture(transactionIds: string[] | null = null) {
 			cards: [],
 		},
 		cardTransactions: [recordedCharge],
-		billResults: selectObligationResults(
-			[
-				transactionFixture({
-					transactionId: "one-time-card-settlement",
-					name: "Recorded card payment",
-					date: "2026-10-01",
-					fromId: "checking",
-					toId: "test_card",
-					requested: 80,
-					realized: 80,
-					posted: true,
-				}),
-				transactionFixture({
-					date: "2026-10-02",
-					fromId: "checking",
-					requested: 900,
-					realized: 900,
-					posted: false,
-				}),
-			],
-			transactionIds,
-		),
+		cashPaymentRows: [
+			transactionFixture({
+				transactionId: "one-time-card-settlement",
+				name: "Recorded card payment",
+				date: "2026-10-01",
+				fromId: "checking",
+				toId: "test_card",
+				requested: 80,
+				realized: 80,
+				posted: true,
+			}),
+			transactionFixture({
+				date: "2026-10-02",
+				fromId: "checking",
+				requested: 900,
+				realized: 900,
+				posted: false,
+			}),
+		],
 		spendingIds: ["checking"],
 		accounts: [],
 		savedTransactions: [],
@@ -129,11 +125,6 @@ describe("historical cycle evidence", () => {
 		expect(section.transactions[0]?.transactionId).toBe(
 			"one-time-card-settlement",
 		);
-	});
-	it("honors an explicit bill selection without inventing a claim for a one-time settlement", () => {
-		const { section } = historicalFixture(["selected-schedule"]);
-		expect(section.transactions).toEqual([]);
-		expect(section.total).toBe(0);
 	});
 	it("renders unavailable close cash without latest cash bars or budget claims", () => {
 		const { view, section } = historicalFixture();

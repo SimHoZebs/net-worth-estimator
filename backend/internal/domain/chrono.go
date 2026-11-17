@@ -21,6 +21,12 @@ func dayCloseUnix(date string) int64 {
 	return MustParseIsoDate(date).Add(24*time.Hour - time.Second).Unix()
 }
 
+// DayCloseUnix is the exported form used by callers that need a validated
+// YYYY-MM-DD day-close cut without parsing RFC 3339 timestamps.
+func DayCloseUnix(date string) int64 {
+	return dayCloseUnix(date)
+}
+
 // ParseAsOfCut resolves an as-of cut to an instant and its calendar day.
 // A "YYYY-MM-DD" date means the day-close cut at the end of that
 // UTC day (inclusive). An RFC 3339 timestamp means

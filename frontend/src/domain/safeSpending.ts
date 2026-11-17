@@ -9,6 +9,7 @@ import {
 	type Transaction,
 } from "./model.ts";
 import type { TransactionResult } from "./result.ts";
+import { inWindow, occurrenceKey } from "./safeSpendingMath.ts";
 
 // Server ownership: every amount summed here originates server-side.
 // Only the windows stay client-side; do not add new windowed sums here.
@@ -52,68 +53,25 @@ export function checkingAccountId(accounts: Account[]): string | null {
 	return anyCash?.id ?? null;
 }
 
-export interface MandatorySpendingGroup {
-	transactionId: string;
-	name: string;
-	total: number;
-	count: number;
-	dates: string[];
-}
-
-/**
- * Bills in an inclusive date window: outflows from the spendable accounts
- * grouped by transaction, sorted by total descending. Powers the bills
- * visualization (remaining bills this month, fixed obligations next month).
- */
-export function groupMandatorySpending({
-	transactions,
-	checkingIds,
-	start,
-	end,
-}: {
-	transactions: TransactionResult[];
-	checkingIds: string[];
-	start: string;
-	end: string;
-}): MandatorySpendingGroup[] {
-	const sources = new Set(checkingIds);
-	const groups = new Map<string, MandatorySpendingGroup>();
-	const dateSets = new Map<string, Set<string>>();
-	for (const transaction of transactions) {
-		if (transaction.fromId === null || !sources.has(transaction.fromId))
-			continue;
-		if (transaction.requested <= 0) continue;
-		if (transaction.date < start || transaction.date > end) continue;
-		const key = transaction.transactionId;
-		const existing = groups.get(key);
-		if (existing) {
-			existing.total += transaction.requested;
-			existing.count += 1;
-			dateSets.get(key)!.add(transaction.date);
-		} else {
-			groups.set(key, {
-				transactionId: transaction.transactionId,
-				name: transaction.name || transaction.transactionId,
-				total: transaction.requested,
-				count: 1,
-				dates: [],
-			});
-			dateSets.set(key, new Set([transaction.date]));
-		}
-	}
-	for (const [key, group] of groups) {
-		group.dates = [...dateSets.get(key)!].sort();
-	}
-	return [...groups.values()].sort(
-		(a, b) => b.total - a.total || a.name.localeCompare(b.name),
+/** One predicate for a bill occurrence in a mandatory window. */
+function isMandatoryOccurrence(
+	row: TransactionResult,
+	sources: ReadonlySet<string>,
+	start: string,
+	end: string,
+): boolean {
+	return (
+		row.fromId !== null &&
+		sources.has(row.fromId) &&
+		row.requested > 0 &&
+		inWindow(row.date, start, end)
 	);
 }
 
 /**
- * Per-occurrence bill rows for a mandatory window: the same occurrences
- * backing groupMandatorySpending, shaped as AccountTransactions so the
- * bills tab renders the shared TransactionRow. Requested amounts sum to
- * the group totals; partially paid occurrences surface as shortfalls.
+ * Per-occurrence bill rows for a mandatory window, shaped as
+ * AccountTransactions so the bills tab renders the shared TransactionRow.
+ * Partially paid occurrences surface as shortfalls.
  */
 export function mandatoryTransactions({
 	transactions,
@@ -140,16 +98,13 @@ export function mandatoryTransactions({
 	);
 	let index = 0;
 	for (const transaction of transactions) {
-		if (transaction.fromId === null || !sources.has(transaction.fromId))
-			continue;
-		if (transaction.requested <= 0) continue;
-		if (transaction.date < start || transaction.date > end) continue;
+		if (!isMandatoryOccurrence(transaction, sources, start, end)) continue;
 		const counterparty = transaction.toId
 			? (names.get(transaction.toId) ?? "Unknown account")
 			: externalCounterpartyName("out");
 		const amount = Math.max(0, transaction.realized);
 		rows.push({
-			id: `mandatory-${transaction.transactionId}-${transaction.date}-${index++}`,
+			id: `mandatory-${occurrenceKey(transaction.transactionId, transaction.date)}-${index++}`,
 			transactionId: transaction.transactionId,
 			date: transaction.date,
 			name: transaction.name || transaction.transactionId,
@@ -157,7 +112,7 @@ export function mandatoryTransactions({
 			direction: "out",
 			flow: transaction.toId ? "transfer" : "expense",
 			counterparty,
-			from: names.get(transaction.fromId) ?? "Unknown account",
+			from: names.get(transaction.fromId!) ?? "Unknown account",
 			to: counterparty,
 			amount,
 			requested: transaction.requested,

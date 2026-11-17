@@ -20,6 +20,7 @@ import {
 	type SafeSpendingDetailTab,
 	type SafeSpendingCycleTab,
 } from "./safeSpendingDetailModel.ts";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingDetailShell({
 	tab,
@@ -36,7 +37,7 @@ export function SafeSpendingDetailShell({
 	onClose: () => void;
 	children: React.ReactNode;
 }) {
-	const title = "Safe spending";
+	const title = labels.title;
 	const counts: Partial<Record<SafeSpendingDetailTab, number>> = cycleCounts;
 	const id = useId();
 	return (

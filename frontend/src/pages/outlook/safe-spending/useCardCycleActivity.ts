@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import type { BackendCheckpoint } from "../../../api/contracts.ts";
 import { accountTransactions } from "../../../domain/accountActivity.ts";
 import {
-	cycleSpentSoFar,
 	cycleOutflowTransactions,
 	resolveStatementCycle,
 } from "../../../domain/cardCycle.ts";
@@ -33,7 +32,6 @@ export function useCardCycleActivity({
 }: {
 	accounts: Account[];
 	transactions: Transaction[];
-	startDate: string;
 	checkpoints: BackendCheckpoint[];
 	projection: Projection | null;
 	cards: { id: string; name: string }[];
@@ -66,11 +64,6 @@ export function useCardCycleActivity({
 					return {
 						accountId,
 						name: cardById.get(accountId) ?? accountId,
-						derived: cycleSpentSoFar({
-							transactions: activity,
-							cycleStart: cycle.cycleStart,
-							todayIso: displayToday,
-						}),
 						inCycle: cycleOutflowTransactions({
 							transactions: activity,
 							cycleStart: cycle.cycleStart,

@@ -4539,12 +4539,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"incomeAccountIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
 					"incomeScheduleIds": {
 						"items": {
 							"type": "string"
@@ -4583,7 +4577,6 @@
 					"reserve",
 					"accountIds",
 					"spendingAccountIds",
-					"incomeAccountIds",
 					"incomeScheduleIds",
 					"transactionIds",
 					"statementDaySet"

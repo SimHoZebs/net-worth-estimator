@@ -2,7 +2,6 @@ import { TransactionDetail } from "../../../components/activity/TransactionDetai
 import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import { useMemo } from "react";
-import { exactMoney } from "../../../domain/format.ts";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { cn } from "@/lib/utils.ts";
 import {
@@ -15,6 +14,7 @@ import type {
 	SafeSpendingChargeCycle,
 	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
+import { amountText } from "./amountText.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingCyclePanel({
@@ -25,7 +25,6 @@ export function SafeSpendingCyclePanel({
 	readOnly,
 	transactionOrder,
 	onTransactionOrderChange,
-	showHeaders = false,
 }: {
 	cycle: SafeSpendingChargeCycle;
 	cashPayments?: SafeSpendingMandatorySection;
@@ -35,7 +34,6 @@ export function SafeSpendingCyclePanel({
 	readOnly: boolean;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
-	showHeaders?: boolean;
 }) {
 	const savedById = useMemo(
 		() => new Map(transactions.map((saved) => [saved.id, saved])),
@@ -81,9 +79,7 @@ export function SafeSpendingCyclePanel({
 								"m-0 text-base font-bold tabular-nums text-foreground [overflow-wrap:anywhere]",
 							)}
 						>
-							{cycle.summary.total === null
-								? "—"
-								: exactMoney(cycle.summary.total)}
+							{amountText(cycle.summary.total)}
 						</strong>
 					</div>
 					{cycle.summary.byCard.map((card) => (
@@ -93,7 +89,7 @@ export function SafeSpendingCyclePanel({
 						>
 							<span className="text-muted-foreground">{card.name}</span>
 							<span className="font-semibold text-foreground">
-								{card.amount === null ? "—" : exactMoney(card.amount)}
+								{amountText(card.amount)}
 							</span>
 						</div>
 					))}
@@ -123,7 +119,6 @@ export function SafeSpendingCyclePanel({
 				savedTransactions={savedById}
 				onInspect={inspect}
 				order={transactionOrder}
-				showHeaders={showHeaders}
 				dividers={dividers}
 			/>
 			{cashPayments && (
@@ -140,7 +135,6 @@ export function SafeSpendingCyclePanel({
 						savedTransactions={savedById}
 						onInspect={inspect}
 						order={transactionOrder}
-						showHeaders={showHeaders}
 					/>
 				</>
 			)}

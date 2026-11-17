@@ -1,25 +1,27 @@
+import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { Transaction } from "./model.ts";
 import type { TransactionResult } from "./result.ts";
-import { literalAmountOf } from "./transactionRows.ts";
+import { occurrenceKey } from "./safeSpendingMath.ts";
 import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
+import { literalAmountOf } from "./transactionRows.ts";
 
 /**
  * Posted rows joined to the projection under shared rule identities.
- * Only explicit claims attach a recorded row to a rule. Historical bills come from the one-time
- * schedule fill until the server exposes historical occurrences.
+ * Only explicit claims attach a recorded row to a rule; an unclaimed posted
+ * outflow stays on its own day. Same-day projected fragments survive because
+ * occurrences are keyed by rule, day, route and amount rather than merged.
  */
 export function safeSpendingResults({
 	transactions,
 	projectionTransactions,
-	schedules = [],
-	billScheduleIds = [],
+	billSchedules = [],
 	billWindowStart,
 	billWindowEnd,
 }: {
 	transactions: Transaction[];
 	projectionTransactions: TransactionResult[];
-	schedules?: import("@/api/generated/model/schedule.ts").Schedule[];
-	billScheduleIds?: string[];
+	/** Selected recurring schedules, expanded to dated bill occurrences. */
+	billSchedules?: readonly Schedule[];
 	billWindowStart?: string;
 	billWindowEnd?: string;
 }): TransactionResult[] {
@@ -34,7 +36,7 @@ export function safeSpendingResults({
 		// itself happens when it happened.
 		const claimDate = row.claimOccurrenceDate;
 		if (row.claimScheduleId && claimDate)
-			claimedKeys.add(`${transactionId}|${claimDate}`);
+			claimedKeys.add(occurrenceKey(transactionId, claimDate));
 		posted.push({
 			date: row.startDate,
 			transactionId,
@@ -54,16 +56,11 @@ export function safeSpendingResults({
 
 	const combined: TransactionResult[] = [];
 	const seen = new Set<string>();
-	const existing = new Set<string>();
-	// A claimed guess stays taken even though the fulfilling row shows its
-	// own day: the server fill must not resurrect it.
-	for (const key of claimedKeys) existing.add(key);
 	const add = (row: TransactionResult) => {
-		const occurrenceKey = `${row.transactionId}|${row.date}`;
-		const key = `${occurrenceKey}|${row.fromId}|${row.toId}|${row.requested}`;
-		if (seen.has(key)) return;
-		seen.add(key);
-		existing.add(occurrenceKey);
+		const key = occurrenceKey(row.transactionId, row.date);
+		const identity = `${key}|${row.fromId}|${row.toId}|${row.requested}`;
+		if (seen.has(identity)) return;
+		seen.add(identity);
 		combined.push(row);
 	};
 	// Posted deposits are distinct evidence: keep each even when two share
@@ -72,23 +69,24 @@ export function safeSpendingResults({
 	const postedOccurrences = new Set<string>();
 	for (const row of posted) {
 		combined.push(row);
-		postedOccurrences.add(`${row.transactionId}|${row.date}`);
+		postedOccurrences.add(occurrenceKey(row.transactionId, row.date));
 	}
 	for (const row of projectionTransactions) {
-		if (claimedKeys.has(`${row.transactionId}|${row.date}`)) continue;
-		if (postedOccurrences.has(`${row.transactionId}|${row.date}`)) continue;
+		if (claimedKeys.has(occurrenceKey(row.transactionId, row.date))) continue;
+		if (postedOccurrences.has(occurrenceKey(row.transactionId, row.date)))
+			continue;
 		add(row);
 	}
-	for (const key of postedOccurrences) existing.add(key);
+	// The projection does not carry schedule occurrences that already settled,
+	// so the selected bills are expanded here. A claimed occurrence is already
+	// represented by its posted row and must not be duplicated.
 	if (
 		billWindowStart !== undefined &&
 		billWindowEnd !== undefined &&
-		schedules.length > 0 &&
-		billScheduleIds.length > 0
+		billSchedules.length > 0
 	) {
-		const selected = new Set(billScheduleIds);
-		for (const schedule of schedules) {
-			if (!schedule.enabled || !selected.has(schedule.id)) continue;
+		for (const schedule of billSchedules) {
+			if (!schedule.enabled) continue;
 			const amount = literalAmountOf(schedule.amount);
 			if (amount === null || amount <= 0) continue;
 			for (const date of scheduleOccurrenceDates({
@@ -98,8 +96,9 @@ export function safeSpendingResults({
 				through: billWindowEnd,
 			})) {
 				if (date < billWindowStart) continue;
-				if (existing.has(`${schedule.id}|${date}`)) continue;
-				const row: TransactionResult = {
+				if (claimedKeys.has(occurrenceKey(schedule.id, date))) continue;
+				if (postedOccurrences.has(occurrenceKey(schedule.id, date))) continue;
+				add({
 					date,
 					transactionId: schedule.id,
 					name: schedule.name || schedule.id,
@@ -110,27 +109,9 @@ export function safeSpendingResults({
 					available: null,
 					constraint: null,
 					accountDeltas: [],
-				};
-				add(row);
+				});
 			}
 		}
 	}
 	return combined;
-}
-
-/**
- * Obligations are the selected bill rules plus projected one-time rows.
- * A posted outflow without a claim stays in the cash stream. No near-match
- * grouping: amounts never merge rows, so a distinct same-day outflow
- * always survives alongside a projected bill.
- */
-export function selectObligationResults(
-	results: TransactionResult[],
-	transactionIds: string[] | null,
-): TransactionResult[] {
-	if (transactionIds) {
-		const selected = new Set(transactionIds);
-		return results.filter((row) => selected.has(row.transactionId));
-	}
-	return results;
 }

@@ -22,12 +22,16 @@ import type {
 import { cn } from "@/lib/utils.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
+/** One label for the spending threshold, shared by the badge and prose. */
+const limitName = (closed: boolean) =>
+	closed ? "historical budget" : "cash limit";
+
 /** Income rule drawn across the full chart range at the earned coordinate. */
 export function incomeRuleLine(
 	trend: SafeSpendingTrend,
-	historical = false,
+	closed = false,
 ): { date: string; amount: number; income: true }[] {
-	const earned = historical ? undefined : trend.monthlyIncome;
+	const earned = closed ? undefined : trend.monthlyIncome;
 	if (!earned || earned.coordinate === null) return [];
 	const start = trend.actual[0]?.date;
 	const end = trend.projected.at(-1)?.date ?? trend.actual.at(-1)?.date;
@@ -62,16 +66,16 @@ export function recurringIncreaseDots(
 
 export function paceLabel(
 	trend: SafeSpendingTrend,
-	historical: boolean,
+	closed: boolean,
 ): {
 	text: string | null;
 	tone: "normal" | "warning" | "danger";
 } {
-	const limitName = historical ? "historical budget" : "cash limit";
+	const name = limitName(closed);
 	const current = trend.actual.at(-1);
 	if (trend.limit !== null && (current?.spent ?? 0) > trend.limit) {
 		return {
-			text: `Over ${limitName}`,
+			text: `Over ${name}`,
 			tone: "danger",
 		};
 	}
@@ -83,7 +87,7 @@ export function paceLabel(
 	);
 	if (futureLimit)
 		return {
-			text: `${historical ? "Budget" : "Cash limit"} ~ ${monthDay(futureLimit.date)}`,
+			text: `${closed ? "Budget" : labels.spendingLimit} ~ ${monthDay(futureLimit.date)}`,
 			tone: "danger",
 		};
 	if (trend.safetyNet !== null && (current?.spent ?? 0) > trend.safetyNet) {
@@ -123,9 +127,9 @@ function legendSwatch(dashed: boolean, tone: string) {
 /** Include signed net spending and ceilings, with room around negative values. */
 export function spendingChartDomain(
 	trend: SafeSpendingTrend,
-	historical = false,
+	closed = false,
 ): [number, number] {
-	const income = historical ? undefined : trend.monthlyIncome;
+	const income = closed ? undefined : trend.monthlyIncome;
 	const values = [
 		0,
 		...trend.actual.map((point) => point.spent),
@@ -152,16 +156,16 @@ export function spendingChartDomain(
  */
 export function SafeSpendingTrendChart({
 	trend,
-	historical = false,
+	closed = false,
 }: {
 	trend: SafeSpendingTrend;
 	/** Label the threshold as the closed cycle's historical budget. */
-	historical?: boolean;
+	closed?: boolean;
 }) {
-	const earned = historical ? undefined : trend.monthlyIncome;
+	const earned = closed ? undefined : trend.monthlyIncome;
 	const earnedLine = useMemo(
-		() => incomeRuleLine(trend, historical),
-		[trend, historical],
+		() => incomeRuleLine(trend, closed),
+		[trend, closed],
 	);
 	const showThresholds = trend.limit !== null || trend.safetyNet !== null;
 	const actual = trend.actual;
@@ -195,8 +199,8 @@ export function SafeSpendingTrendChart({
 	);
 	const lastActual = actual.at(-1);
 	const domain = useMemo(
-		() => spendingChartDomain(trend, historical),
-		[trend, historical],
+		() => spendingChartDomain(trend, closed),
+		[trend, closed],
 	);
 	const definition = useMemo(
 		() =>
@@ -399,25 +403,25 @@ export function SafeSpendingTrendChart({
 	if (!actual.length) return null;
 
 	const pace = showThresholds
-		? paceLabel(trend, historical)
+		? paceLabel(trend, closed)
 		: { text: `${money(trend.averageDaily)} a day`, tone: "normal" as const };
 	const current = lastActual?.spent ?? 0;
-	const limitName = historical ? "historical budget" : "cash limit";
+	const name = limitName(closed);
 	const limitText =
 		showThresholds && trend.limit !== null
 			? trend.limitHit && trend.limit <= 0
-				? historical
+				? closed
 					? "The paychecks in this cycle did not cover its bills."
 					: "Spending is already over the spending limit."
 				: trend.limitHit
 					? trend.limitHit.projected
-						? `The ${exactMoney(trend.limit)} ${limitName} is reached around ${dateLabel(trend.limitHit.date, true)}.`
-						: `The ${exactMoney(trend.limit)} ${limitName} was crossed on ${dateLabel(trend.limitHit.date, true)}.`
+						? `The ${exactMoney(trend.limit)} ${name} is reached around ${dateLabel(trend.limitHit.date, true)}.`
+						: `The ${exactMoney(trend.limit)} ${name} was crossed on ${dateLabel(trend.limitHit.date, true)}.`
 					: trend.limit <= 0
-						? historical
+						? closed
 							? "The paychecks in this cycle did not cover its bills."
 							: "The current cash-backed budget is already exhausted at cycle entry."
-						: `The ${exactMoney(trend.limit)} ${limitName} is not reached this cycle.`
+						: `The ${exactMoney(trend.limit)} ${name} is not reached this cycle.`
 			: "";
 	const description =
 		`Spending reached ${exactMoney(current)} by ${dateLabel(lastActual!.date, true)}. ` +
@@ -519,7 +523,7 @@ export function SafeSpendingTrendChart({
 				{showThresholds && trend.limit !== null && trend.limit > 0 && (
 					<li className="flex items-center gap-2">
 						{legendSwatch(true, "border-danger-solid")}
-						{historical ? labels.historicalBudget : labels.spendingLimit}
+						{closed ? labels.historicalBudget : labels.spendingLimit}
 					</li>
 				)}
 			</ul>

@@ -33,16 +33,30 @@ func posted(t types.Transaction, cut int64) bool {
 // Build uses one model snapshot. Cash is evidenced through the start UTC day;
 // bills are conditional requested amounts within the inclusive date window.
 func Build(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string) types.SafeSpendingSummary {
-	day := domain.MustParseIsoDate(start)
-	return BuildAtCut(model, settings, start, end, day.AddDate(0, 0, 1).Unix()-1)
+	return BuildAtCut(model, settings, start, end, domain.DayCloseUnix(start))
+}
+
+// cutState carries the evidence assembled during one BuildAtCut pass. The
+// helpers below advance it through checkpoint selection, confirmed replay,
+// baseline derivation and the final availability gate.
+type cutState struct {
+	s              *types.SafeSpendingSummary
+	model          *types.FinancialModel
+	settings       *types.SafeSpendingSettings
+	latest         map[string]types.Checkpoint
+	selected       map[string]bool
+	balances       map[string]float64
+	transactions   []types.Transaction
+	ctx            *amounts
+	cut            int64
+	knownAvailable bool
 }
 
 // BuildAtCut explicitly bounds observed facts without a domain wall clock.
 // The API supplies its captured request instant so authored future-today facts
 // remain conditional instead of masquerading as cash already observed.
 func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string, factualCut int64) types.SafeSpendingSummary {
-	day := domain.MustParseIsoDate(start)
-	cut := min(day.AddDate(0, 0, 1).Unix()-1, factualCut)
+	cut := min(domain.DayCloseUnix(start), factualCut)
 	s := types.SafeSpendingSummary{Start: start, End: end, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, OutstandingObligations: []types.SafeSpendingObligation{}}
 	if settings == nil {
 		settings = &types.SafeSpendingSettings{}
@@ -50,6 +64,24 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 	if model == nil {
 		model = &types.FinancialModel{}
 	}
+	st := &cutState{
+		s:        &s,
+		model:    model,
+		settings: settings,
+		latest:   pickCheckpoints(model, cut),
+		selected: map[string]bool{},
+		balances: map[string]float64{},
+		cut:      cut,
+	}
+	st.replayConfirmed()
+	st.deriveBaselines()
+	st.gateStatus()
+	return s
+}
+
+// pickCheckpoints keeps the newest observation at or before the cut for each
+// account. Later checkpoints are not evidence at this instant.
+func pickCheckpoints(model *types.FinancialModel, cut int64) map[string]types.Checkpoint {
 	latest := map[string]types.Checkpoint{}
 	for _, cp := range model.Checkpoints {
 		if cp.ObservedAt <= cut {
@@ -59,18 +91,22 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 			}
 		}
 	}
-	selected := map[string]bool{}
-	s.SelectedAccountIDs = effectiveAccounts(model, settings, latest)
-	for _, id := range s.SelectedAccountIDs {
-		selected[id] = true
+	return latest
+}
+
+// replayConfirmed resolves posted facts in instant order, maintaining the
+// observed balances that baselines and conditional amounts read afterward.
+func (st *cutState) replayConfirmed() {
+	st.s.SelectedAccountIDs = effectiveAccounts(st.model, st.settings, st.latest)
+	for _, id := range st.s.SelectedAccountIDs {
+		st.selected[id] = true
 	}
-	balances := map[string]float64{}
-	for id, cp := range latest {
-		balances[id] = cp.Balance
+	for id, cp := range st.latest {
+		st.balances[id] = cp.Balance
 	}
-	transactions := slices.Clone(model.Transactions)
-	sort.SliceStable(transactions, func(i, j int) bool {
-		a, b := transactions[i], transactions[j]
+	st.transactions = slices.Clone(st.model.Transactions)
+	sort.SliceStable(st.transactions, func(i, j int) bool {
+		a, b := st.transactions[i], st.transactions[j]
 		ai, bi := domain.TransactionInstant(&a), domain.TransactionInstant(&b)
 		if ai != bi {
 			return ai < bi
@@ -81,43 +117,43 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 		return a.ExecutionOrder < b.ExecutionOrder
 	})
 	// Recorded amounts resolve against observed facts only, never schedule replay.
-	ctx := newAmounts(model, balances)
+	st.ctx = newAmounts(st.model, st.balances)
 	invalidate := func(tx types.Transaction, instant int64, cause string) {
-		for _, account := range model.Accounts {
+		for _, account := range st.model.Accounts {
 			id := account.ID
-			cp, observed := latest[id]
+			cp, observed := st.latest[id]
 			if !touches(tx, id) || (observed && instant <= cp.ObservedAt) {
 				continue
 			}
 			// Provider inputs must not retain stale observed balances after
 			// an unresolved movement, even for unselected debt accounts.
-			delete(balances, id)
-			if selected[id] {
-				reason(&s.Reasons, cause)
+			delete(st.balances, id)
+			if st.selected[id] {
+				reason(&st.s.Reasons, cause)
 			}
 		}
 	}
-	for _, tx := range transactions {
-		if !posted(tx, cut) {
+	for _, tx := range st.transactions {
+		if !posted(tx, st.cut) {
 			continue
 		}
 		instant := domain.TransactionInstant(&tx)
 		if len(tx.Destinations) > 1 {
-			invalidate(tx, instant, "posted-routing-unknown")
+			invalidate(tx, instant, ReasonPostedRoutingUnknown)
 		}
-		amount, err := ctx.resolveFact(tx)
+		amount, err := st.ctx.resolveFact(tx)
 		if err != nil {
-			ctx.invalidateRecorded(tx)
-			invalidate(tx, instant, "posted-amount-unavailable")
+			st.ctx.invalidateRecorded(tx)
+			invalidate(tx, instant, ReasonPostedAmountUnavailable)
 			continue
 		}
-		ctx.record(tx, amount)
+		st.ctx.record(tx, amount)
 		if len(tx.Destinations) > 1 {
 			continue
 		}
-		for _, account := range model.Accounts {
+		for _, account := range st.model.Accounts {
 			id := account.ID
-			cp, ok := latest[id]
+			cp, ok := st.latest[id]
 			if !ok {
 				continue
 			}
@@ -128,23 +164,28 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 			if delta == 0 {
 				continue
 			}
-			if _, known := balances[id]; known {
-				balances[id] += delta
+			if _, known := st.balances[id]; known {
+				st.balances[id] += delta
 			}
-			if selected[id] {
-				s.ConfirmedMovements = append(s.ConfirmedMovements, types.SafeSpendingMovement{TransactionID: tx.ID, AccountID: id, Name: tx.Name, PostedAt: tx.PostedTime, EffectiveAt: instant, Amount: *money(delta)})
+			if st.selected[id] {
+				st.s.ConfirmedMovements = append(st.s.ConfirmedMovements, types.SafeSpendingMovement{TransactionID: tx.ID, AccountID: id, Name: tx.Name, PostedAt: tx.PostedTime, EffectiveAt: instant, Amount: *money(delta)})
 			}
 		}
 	}
+}
+
+// deriveBaselines records the observed cash per selected account and decides
+// when the summed available figure is exact enough to publish.
+func (st *cutState) deriveBaselines() {
 	available := 0.0
-	for _, a := range model.Accounts {
-		if !selected[a.ID] {
+	for _, a := range st.model.Accounts {
+		if !st.selected[a.ID] {
 			continue
 		}
 		b := types.SafeSpendingBaseline{AccountID: a.ID, AccountName: a.Name, Basis: "missing", Status: "missing", Reasons: []string{}}
-		cp, ok := latest[a.ID]
+		cp, ok := st.latest[a.ID]
 		if !ok {
-			reason(&b.Reasons, "cash-baseline-missing")
+			reason(&b.Reasons, ReasonCashBaselineMissing)
 		} else {
 			b.ObservedAt = &cp.ObservedAt
 			b.PostedBalance = &cp.Balance
@@ -159,9 +200,9 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 			} else {
 				b.Basis = "available"
 				b.Status = "available"
-				available += *cp.AvailableBalance + balances[a.ID] - cp.Balance
+				available += *cp.AvailableBalance + st.balances[a.ID] - cp.Balance
 			}
-			for _, tx := range transactions {
+			for _, tx := range st.transactions {
 				if !fact(tx) || !touches(tx, a.ID) {
 					continue
 				}
@@ -170,13 +211,13 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 				// bank-reported available cash or need another deduction. The
 				// observation proves the balance, not which holds it covers;
 				// claimed bills retain their separate coverage uncertainty.
-				if tx.Pending && instant <= cut && instant > cp.ObservedAt {
-					reason(&b.Reasons, "pending-after-baseline-coverage-unknown")
+				if tx.Pending && instant <= st.cut && instant > cp.ObservedAt {
+					reason(&b.Reasons, ReasonPendingAfterBaselineCoverageUnknown)
 				}
 				// A newly posted debit may settle a hold already in available cash.
 				// Aggregate gaps cannot identify which transaction held that cash.
-				if posted(tx, cut) && instant > cp.ObservedAt && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID && cp.AvailableBalance != nil && math.Abs(cp.Balance-*cp.AvailableBalance) > .005 {
-					reason(&b.Reasons, "posted-hold-coverage-unknown")
+				if posted(tx, st.cut) && instant > cp.ObservedAt && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID && cp.AvailableBalance != nil && math.Abs(cp.Balance-*cp.AvailableBalance) > .005 {
+					reason(&b.Reasons, ReasonPostedHoldCoverageUnknown)
 				}
 			}
 			if len(b.Reasons) > 0 {
@@ -184,37 +225,41 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 			}
 		}
 		for _, r := range b.Reasons {
-			reason(&s.Reasons, r)
+			reason(&st.s.Reasons, r)
 		}
-		s.Baselines = append(s.Baselines, b)
+		st.s.Baselines = append(st.s.Baselines, b)
 	}
-	if len(selected) == 0 {
-		reason(&s.Reasons, "cash-accounts-missing")
+	if len(st.selected) == 0 {
+		reason(&st.s.Reasons, ReasonCashAccountsMissing)
 	}
-	knownAvailable := len(selected) > 0
-	exactAvailable := knownAvailable && !slices.Contains(s.Reasons, "posted-amount-unavailable") && !slices.Contains(s.Reasons, "posted-routing-unknown")
-	for _, b := range s.Baselines {
+	st.knownAvailable = len(st.selected) > 0
+	exactAvailable := st.knownAvailable && !slices.Contains(st.s.Reasons, ReasonPostedAmountUnavailable) && !slices.Contains(st.s.Reasons, ReasonPostedRoutingUnknown)
+	for _, b := range st.s.Baselines {
 		if b.Basis == "missing" {
-			knownAvailable = false
+			st.knownAvailable = false
 		}
 		if b.Status != "available" {
 			exactAvailable = false
 		}
 	}
 	if exactAvailable {
-		s.CheckingAvailable = money(available)
+		st.s.CheckingAvailable = money(available)
 	}
-	buildObligations(&s, model, settings, selected, latest, ctx, cut)
-	if len(s.Reasons) > 0 {
-		s.Status = "uncertain"
+}
+
+// gateStatus adds conditional obligations and resolves the final status and
+// cash-after-bills figure. The financial window stays unchanged.
+func (st *cutState) gateStatus() {
+	buildObligations(st.s, st.model, st.settings, st.selected, st.latest, st.ctx, st.cut)
+	if len(st.s.Reasons) > 0 {
+		st.s.Status = "uncertain"
 	}
-	if !knownAvailable {
-		s.Status = "missing"
+	if !st.knownAvailable {
+		st.s.Status = "missing"
 	}
-	if s.Status == "available" && s.CheckingAvailable != nil && s.OutstandingBillsTotal != nil {
-		s.CashAfterBills = money(*s.CheckingAvailable - *s.OutstandingBillsTotal)
+	if st.s.Status == "available" && st.s.CheckingAvailable != nil && st.s.OutstandingBillsTotal != nil {
+		st.s.CashAfterBills = money(*st.s.CheckingAvailable - *st.s.OutstandingBillsTotal)
 	}
-	return s
 }
 
 func touches(tx types.Transaction, id string) bool {

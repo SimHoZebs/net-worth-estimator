@@ -34,7 +34,6 @@ function purchase(
 	};
 }
 
-const sourceStartDate = "2026-10-21";
 const sourceAccounts = [...financialModelFixture.accounts, card, otherCard];
 const sourceTransactions = [
 	purchase("before-closed", "2026-09-19", 999),
@@ -54,7 +53,6 @@ const sourceTransactions = [
 const input = {
 	accounts: sourceAccounts,
 	transactions: sourceTransactions,
-	startDate: sourceStartDate,
 	checkpoints: [
 		{ AccountId: card.id, Balance: -500, observedAt: 1792454399 },
 		{ AccountId: otherCard.id, Balance: -700, observedAt: 1792454399 },
@@ -74,7 +72,6 @@ describe("useCardCycleActivity", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
-				startDate: "2026-11-13",
 				displayToday: "2026-11-15",
 				transactions: [
 					saved,
@@ -103,7 +100,6 @@ describe("useCardCycleActivity", () => {
 				}),
 			}),
 		);
-		expect(result.current.perAccount[0]!.derived).toBe(100);
 		expect(
 			result.current.perAccount[0]!.inCycle.map((row) => [
 				row.transactionId,
@@ -118,7 +114,6 @@ describe("useCardCycleActivity", () => {
 			end: "2026-10-19",
 			total: 500,
 		});
-		expect(result.current.perAccount[0]!.derived).toBe(75);
 		expect(
 			result.current.chargeCycles.cycle.transactions.map(
 				(row) => row.transactionId,
@@ -191,7 +186,6 @@ describe("useCardCycleActivity", () => {
 		);
 		// The saved Oct 22 purchase is now recorded too, independently of the
 		// Oct 21 balance checkpoint. Future Oct 23 holds remain outside today.
-		expect(result.current.perAccount[0]!.derived).toBe(1149);
 		const currentPending =
 			result.current.chargeCycles.cycle.transactions.filter(
 				(row) => row.pending,
@@ -233,7 +227,6 @@ describe("useCardCycleActivity", () => {
 				transactions: [...sourceTransactions, voidCurrent, voidClosed],
 			}),
 		);
-		expect(result.current.perAccount[0]!.derived).toBe(75);
 		expect(
 			result.current.chargeCycles.cycle.transactions.map(
 				(row) => row.transactionId,

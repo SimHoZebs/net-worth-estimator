@@ -1,24 +1,30 @@
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { exactMoney, monthDay } from "@/domain/format.ts";
+import { monthDay } from "@/domain/format.ts";
+import type { TransactionResult } from "@/domain/result.ts";
+import { sumCents } from "@/domain/safeSpendingMath.ts";
 import { cn } from "@/lib/utils.ts";
+import { amountText } from "./amountText.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
-const amountText = (amount: number | null) =>
-	amount === null ? "—" : exactMoney(amount);
-
-/** All monetary values and supporting rows come from the same server response. */
+/**
+ * All cash facts come from the server response. The visible Bills list is the
+ * separate, locally owned bill definition: selected recurring transactions
+ * for the selected cash accounts inside the current safe card cycle.
+ */
 export function SafeSpendingCashEvidence({
 	summary,
 	pending,
 	error,
-	historical,
+	closed,
+	bills,
 	onRetry,
 }: {
 	summary?: SafeSpendingSummary;
 	pending: boolean;
 	error: boolean;
-	historical: boolean;
+	closed: boolean;
+	bills: readonly TransactionResult[];
 	onRetry: () => void;
 }) {
 	if (!summary)
@@ -36,17 +42,15 @@ export function SafeSpendingCashEvidence({
 				)}
 			</div>
 		);
-	const cashValue = historical
-		? summary.checkingAvailable
-		: summary.cashAfterBills;
-	const hasShortfall = !historical && cashValue !== null && cashValue < 0;
+	const cashValue = closed ? summary.checkingAvailable : summary.cashAfterBills;
+	const hasShortfall = !closed && cashValue !== null && cashValue < 0;
 	return (
 		<section className="grid content-start gap-3" aria-label="Cash evidence">
-			{(!historical || cashValue !== null) && (
+			{(!closed || cashValue !== null) && (
 				<>
 					<div className="flex items-center justify-between gap-3">
 						<h3 className="m-0 text-sm text-muted-foreground">
-							{historical
+							{closed
 								? "Available cash at close"
 								: labels.cashAfterOutstandingBills}
 						</h3>
@@ -55,12 +59,12 @@ export function SafeSpendingCashEvidence({
 								"text-base tabular-nums",
 								hasShortfall && "text-danger-text",
 							)}
-							data-testid={historical ? "close-cash-value" : "left-value"}
+							data-testid={closed ? "close-cash-value" : "left-value"}
 						>
 							{amountText(cashValue)}
 						</strong>
 					</div>
-					{historical && (
+					{closed && (
 						<p className="m-0 text-xs text-muted-foreground">
 							Available cash evidence · {monthDay(summary.start)} · Excludes
 							future income
@@ -68,19 +72,19 @@ export function SafeSpendingCashEvidence({
 					)}
 				</>
 			)}
-			{historical && summary.checkingAvailable === null && (
+			{closed && summary.checkingAvailable === null && (
 				<p className="m-0 text-sm text-muted-foreground">
 					No balance recorded at close
 				</p>
 			)}
-			{!historical && summary.status !== "available" && (
+			{!closed && summary.status !== "available" && (
 				<p className="m-0 text-sm text-muted-foreground">
 					{summary.status === "uncertain"
 						? "Remainder uncertain"
 						: "Remainder unavailable"}
 				</p>
 			)}
-			{!historical &&
+			{!closed &&
 				(summary.checkingAvailable === null ||
 					summary.checkingAvailable !== cashValue) && (
 					<dl className="m-0 grid gap-2 text-sm">
@@ -123,42 +127,38 @@ export function SafeSpendingCashEvidence({
 						)}
 					</dl>
 				)}
-			{!historical && (
+			{!closed && (
 				<div className="mt-1 grid gap-3 border-t border-border pt-4">
 					<div className="flex items-center justify-between gap-3">
-						<h3 className="m-0 text-sm font-semibold">Bills</h3>
+						<h3 className="m-0 text-sm font-semibold">{labels.bills}</h3>
 						<strong className="text-base tabular-nums">
-							{amountText(summary.outstandingBillsTotal)}
+							{amountText(
+								bills.length ? sumCents(bills, (row) => row.requested) : null,
+							)}
 						</strong>
 					</div>
-					{(summary.outstandingObligations ?? []).length === 0 && (
-						<p className="m-0 text-xs text-muted-foreground">
-							No outstanding bills.
-						</p>
+					{bills.length === 0 && (
+						<p className="m-0 text-xs text-muted-foreground">No bills.</p>
 					)}
 					{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none. */}
 					<ul
 						className="m-0 list-none divide-y divide-border p-0"
 						role="list"
-						aria-label="Outstanding bills in selected range"
+						aria-label={labels.billsInCycle}
 					>
-						{(summary.outstandingObligations ?? []).map((row) => (
+						{bills.map((row, index) => (
 							<li
-								key={row.id}
+								key={`${row.transactionId}-${row.date}-${index}`}
 								className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
 							>
 								<div className="grid min-w-0 gap-1">
 									<span>{row.name}</span>
 									<p className="m-0 text-xs text-muted-foreground">
 										{monthDay(row.date)}
-										{row.status === "pending-coverage-unknown" &&
-											" · Pending payment coverage unknown"}
-										{row.status === "payment-status-unknown" &&
-											" · Payment status unknown"}
 									</p>
 								</div>
 								<span className="shrink-0 tabular-nums">
-									{amountText(row.amount)}
+									{amountText(row.requested)}
 								</span>
 							</li>
 						))}

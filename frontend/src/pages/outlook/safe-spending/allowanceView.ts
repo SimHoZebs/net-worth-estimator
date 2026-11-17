@@ -1,7 +1,8 @@
 /**
  * Display-only classification for the card spending allowance hero.
- * Formulas live in buildCycleView; this helper only describes how to
- * render the already-computed allowance and hard-limit figures.
+ * buildCycleView computes the allowance and theoretical headroom; this helper
+ * classifies them for rendering and derives reserve consumption and hard-limit
+ * overrun from those already-computed figures.
  */
 export type AllowancePhase =
 	| "unavailable"
@@ -42,12 +43,13 @@ export function describeAllowance({
 			overLimit: 0,
 		};
 	}
+	const intoReserve = Math.min(reserve, Math.max(0, -allowance));
 	if (theoretical < 0) {
 		return {
 			phase: "over-limit",
 			primary: 0,
 			tone: "negative",
-			intoReserve: Math.min(reserve, Math.max(0, -allowance)),
+			intoReserve,
 			overLimit: Math.max(0, -theoretical),
 		};
 	}
@@ -56,7 +58,7 @@ export function describeAllowance({
 			phase: "into-reserve",
 			primary: theoretical,
 			tone: "normal",
-			intoReserve: Math.min(reserve, Math.max(0, -allowance)),
+			intoReserve,
 			overLimit: 0,
 		};
 	}

@@ -1,6 +1,7 @@
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import type { ClosedCardBalances } from "../../../domain/closedCardBalances.ts";
 import { dateLabel } from "../../../domain/format.ts";
+import { roundCents } from "../../../domain/safeSpendingMath.ts";
 
 export const SAFE_SPENDING_DETAIL_TABS = [
 	{ id: "cycle", label: "This cycle", view: "charges" },
@@ -120,9 +121,7 @@ export function buildCycleView({
 }): CycleView {
 	const available = remaining !== null;
 	const theoretical = remaining ?? 0;
-	const allowance = available
-		? Math.round((theoretical - reserve) * 100) / 100
-		: 0;
+	const allowance = available ? roundCents(theoretical - reserve) : 0;
 	const days = Math.max(1, fullDaysLeft);
 	const dailySafe = allowance / days;
 	const dailyTheoretical = theoretical / days;
@@ -152,8 +151,4 @@ export interface SafeSpendingConfigHints {
 	trackedSpendingIds: string[];
 }
 
-export interface BillCandidate {
-	id: string;
-	name: string;
-	amount: number;
-}
+export type { BillCandidate } from "../../../domain/safeSpendingBills.ts";

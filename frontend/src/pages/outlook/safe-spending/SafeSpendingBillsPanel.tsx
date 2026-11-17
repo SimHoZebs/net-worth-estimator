@@ -7,6 +7,7 @@ import type {
 	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
 import { describeAllowance } from "./allowanceView.ts";
+import { amountText } from "./amountText.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 const SafeSpendingTrendChart = lazy(() =>
 	import("./SafeSpendingTrendChart.tsx").then((module) => ({
@@ -70,12 +71,10 @@ export function SafeSpendingBillsPanel({
 	cashEvidence: React.ReactNode;
 	allocation: CycleAllocation;
 	trend?: SafeSpendingTrend;
-	section: SafeSpendingMandatorySection;
+	section?: SafeSpendingMandatorySection;
 	/** The statement already closed; the payday and pace are historical. */
 	closed?: boolean;
 }) {
-	const amountText = (value: number | null) =>
-		value === null ? "—" : exactMoney(value);
 	const allowanceView = describeAllowance({
 		allowance: allocation.allowance,
 		theoretical: heroes.theoretical,
@@ -115,7 +114,7 @@ export function SafeSpendingBillsPanel({
 							</div>
 						}
 					>
-						<SafeSpendingTrendChart trend={trend} historical={closed} />
+						<SafeSpendingTrendChart trend={trend} closed={closed} />
 					</Suspense>
 				</div>
 			)}
@@ -126,11 +125,7 @@ export function SafeSpendingBillsPanel({
 						<>
 							<StatRow
 								label={labels.recordedCharges}
-								value={
-									heroes.committedTotal === null
-										? "—"
-										: exactMoney(heroes.committedTotal)
-								}
+								value={amountText(heroes.committedTotal)}
 								testId="recorded-charges-value"
 							/>
 							{heroes.closedCycle.total !== null && (
@@ -165,10 +160,10 @@ export function SafeSpendingBillsPanel({
 						</>
 					)}
 				</div>
-				{closed && (
+				{closed && section && (
 					<StatRow
-						label="Cash payments"
-						value={exactMoney(section.total)}
+						label={labels.cashPayments}
+						value={amountText(section.total)}
 						testId="cash-payments-value"
 					/>
 				)}
