@@ -8,6 +8,12 @@
 - Use markdown to structure large responses.
 - Use @simhozebs/pele-cli to generate PNG of mermaid diagrams to paste in chat for visual communication.
 
+## Feature implementation
+
+- Lead every feature plan with reuse of existing logic and components and describe how each one fits or must evolve.
+- Judge reuse against maintainability, DRY, and single responsibility and prefer the design that keeps those properties strongest.
+- Offer creation of something new only as a second option with a clear justification for why it is preferable to reuse.
+
 ## Latest state only
 
 - This is pre-production software. Keep only the current model, schema, API, configuration, and browser-storage formats.
