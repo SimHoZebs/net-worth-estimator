@@ -23,13 +23,12 @@ import {
 import { monthEndIso } from "@/domain/safeSpending.ts";
 import { inWindow } from "@/domain/safeSpendingMath.ts";
 import { billsInCycle } from "@/domain/safeSpendingBills.ts";
-import { safeSpendingResults } from "@/domain/safeSpendingHistory.ts";
+import { postedTransactionResults } from "@/domain/safeSpendingHistory.ts";
 import { spendingLedger, spendingAmount } from "@/domain/safeSpendingTrend.ts";
 import {
 	currentCashActivity,
 	currentSpendingActivity,
 } from "./currentCashActivity.ts";
-import type { Projection } from "@/domain/result.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
 import {
 	useSavedAccounts,
@@ -66,7 +65,6 @@ import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
-const EMPTY_TRANSACTIONS: Projection["transactions"] = [];
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 /** The saved-data frame renders immediately; only its body skeletonizes. */
@@ -127,7 +125,6 @@ export function SafeSpendingPreview({
 	);
 	// Hooks stay mounted while rows load, so derivations below are
 	// null-safe; the null gate before rendering only skips output.
-	const projectionTransactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
 	const settingsState = useSafeSpendingSettings();
 	const { updateSettings, ...settings } = settingsState;
 	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
@@ -196,39 +193,26 @@ export function SafeSpendingPreview({
 	const cashSummary =
 		cycleViewTab === "cycle" ? currentCashSummary : closedCashSummary;
 
-	// Posted rows join the projection under the same rule identities. Both
-	// cycle tabs read this one stream, so the closed tab sees the paycheck
-	// and bills that already happened.
+	// Bills are the selected recurring schedules' occurrences in the visible
+	// cycle. Nothing else is folded into this list.
 	const selectedBillSchedules = useMemo(
 		() => (savedRules ?? []).filter((rule) => trackedBillIds.includes(rule.id)),
 		[savedRules, trackedBillIds],
 	);
-	const historyResults = useMemo(
-		() =>
-			safeSpendingResults({
-				transactions: transactions ?? [],
-				projectionTransactions,
-				billSchedules: selectedBillSchedules,
-				billWindowStart: closedCycle.start,
-				billWindowEnd: monthEndIso(displayToday),
-			}),
-		[
-			transactions,
-			projectionTransactions,
-			selectedBillSchedules,
-			closedCycle.start,
-			displayToday,
-		],
-	);
 	const currentBills = useMemo(
 		() =>
 			billsInCycle(
-				historyResults,
+				selectedBillSchedules,
 				trackedBillIds,
 				cycle.cycleStart,
 				cycle.cycleEnd,
 			),
-		[historyResults, trackedBillIds, cycle.cycleStart, cycle.cycleEnd],
+		[selectedBillSchedules, trackedBillIds, cycle.cycleStart, cycle.cycleEnd],
+	);
+	// Recorded rows still feed the closed-cycle cash payments view.
+	const historyResults = useMemo(
+		() => postedTransactionResults(transactions ?? []),
+		[transactions],
 	);
 	// Recorded cash uses the cycle window directly: no earlier-month padding
 	// and no second, looser definition of the current cycle's lower bound.
@@ -361,9 +345,10 @@ export function SafeSpendingPreview({
 	const billIncreases = useMemo(
 		() =>
 			recurringBillIncreases({
-				bills: currentBills.filter((row) => !row.posted),
+				bills: currentBills,
+				transactions: transactions ?? [],
 			}),
-		[currentBills],
+		[currentBills, transactions],
 	);
 	const currentView = useMemo(
 		() =>

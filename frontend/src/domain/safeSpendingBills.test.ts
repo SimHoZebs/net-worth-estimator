@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
-import { transactionFixture } from "@/mocks/projection.ts";
 import {
 	billCandidates,
 	billsInCycle,
@@ -27,6 +26,16 @@ const schedule = (id: string, sourceAccountId: string | null, enabled = true) =>
 	}) as Schedule;
 
 describe("billCandidates", () => {
+	it("excludes calculated amounts that cannot be displayed as a bill", () => {
+		const recipe = schedule("percent", "checking");
+		recipe.amount = {
+			resolver: "expression",
+			config: { expression: "balance * 0.1" },
+			inputs: {},
+		};
+		expect(billCandidates([recipe], ["checking"])).toEqual([]);
+	});
+
 	it("keeps enabled schedules sourced from selected cash accounts", () => {
 		expect(
 			billCandidates(
@@ -52,30 +61,29 @@ describe("billCandidates", () => {
 });
 
 describe("billsInCycle", () => {
-	it("filters by bill id and inclusive cycle dates without posting checks", () => {
-		const rows = [
-			transactionFixture({
-				transactionId: "rent",
-				date: "2026-10-20",
-				posted: true,
-			}),
-			transactionFixture({
-				transactionId: "rent",
-				date: "2026-11-20",
-			}),
-			transactionFixture({
-				transactionId: "gym",
-				date: "2026-11-21",
-			}),
-			transactionFixture({
-				transactionId: "rent",
-				date: "2026-11-19",
-			}),
+	it("lists only the selected schedules' occurrences inside the cycle", () => {
+		const schedules = [
+			schedule("rent", "checking"),
+			schedule("gym", "checking"),
 		];
-		expect(billsInCycle(rows, ["rent"], "2026-10-20", "2026-11-20")).toEqual([
-			rows[0],
-			rows[1],
-			rows[3],
-		]);
+		const rows = billsInCycle(schedules, ["rent"], "2026-10-20", "2026-11-20");
+		expect(
+			rows.map((row) => [row.transactionId, row.date, row.requested]),
+		).toEqual([["rent", "2026-11-01", 120]]);
+	});
+
+	it("produces one row per occurrence with no duplicate from another source", () => {
+		const rows = billsInCycle(
+			[schedule("sallie", "checking")],
+			["sallie"],
+			"2026-11-01",
+			"2026-11-30",
+		);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({
+			transactionId: "sallie",
+			date: "2026-11-01",
+			requested: 120,
+		});
 	});
 });
