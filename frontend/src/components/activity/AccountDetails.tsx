@@ -6,7 +6,6 @@ import { accountKindIcons } from "../AccountIcon.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { Field, FieldLabel, FieldDescription } from "@/components/ui/field.tsx";
 import {
 	InputGroup,
 	InputGroupAddon,
@@ -25,22 +24,27 @@ import type { AccountEdit } from "./useAccountEdit.ts";
 function PropertyField({
 	label,
 	htmlFor,
-	description,
 	children,
 }: {
 	label: string;
 	htmlFor?: string;
-	description?: string;
 	children: ReactNode;
 }) {
+	const labelClassName =
+		"w-36 flex-none text-sm font-semibold text-muted-foreground";
 	return (
-		<Field orientation="horizontal">
-			<FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
+		<div className="flex items-center gap-4 border-t border-border pt-2 first:border-t-0">
+			{htmlFor ? (
+				<label htmlFor={htmlFor} className={labelClassName}>
+					{label}
+				</label>
+			) : (
+				<span className={labelClassName}>{label}</span>
+			)}
 			<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
 				{children}
 			</div>
-			{description && <FieldDescription>{description}</FieldDescription>}
-		</Field>
+		</div>
 	);
 }
 
@@ -231,18 +235,12 @@ export function AccountDetails({
 				)}
 			</PropertyField>
 			<BankDetails account={account} />
-			<PropertyField
-				label="Posted balance"
-				description="Posted total from the latest balance check, or the saved balance when unobserved. Never the projection."
-			>
+			<PropertyField label="Posted balance">
 				<span className="text-sm font-medium tabular-nums">
 					{money(posted)}
 				</span>
 			</PropertyField>
-			<PropertyField
-				label="Available balance"
-				description="Bank-reported available cash or credit. Unavailable means the bank reported no figure."
-			>
+			<PropertyField label="Available balance">
 				<span className="text-sm font-medium tabular-nums">
 					{available === null ? (
 						<span className="text-muted-foreground">Unavailable</span>
@@ -251,11 +249,7 @@ export function AccountDetails({
 					)}
 				</span>
 			</PropertyField>
-			<PropertyField
-				label="Display value"
-				htmlFor={`${formId}-display-basis`}
-				description="Which total the account list and header show. The modeled balance stays the net-worth authority either way."
-			>
+			<PropertyField label="Display value" htmlFor={`${formId}-display-basis`}>
 				<Select
 					value={draft.displayBasis}
 					disabled={basisLocked}
