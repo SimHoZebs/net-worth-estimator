@@ -93,18 +93,33 @@ export function SafeSpendingCashEvidence({
 							</div>
 						) : (
 							(summary.baselines ?? [])
-								.filter((baseline) => baseline.availableBalance !== null)
-								.map((baseline) => (
-									<div
-										key={baseline.accountId}
-										className="flex justify-between gap-3"
-									>
-										<dt>{baseline.accountName} · observed available</dt>
-										<dd className="m-0 tabular-nums">
-											{amountText(baseline.availableBalance)}
-										</dd>
-									</div>
-								))
+								.filter(
+									(baseline) =>
+										baseline.availableBalance !== null ||
+										(baseline.basis === "posted" &&
+											baseline.postedBalance !== null),
+								)
+								.map((baseline) => {
+									const observed = baseline.availableBalance !== null;
+									return (
+										<div
+											key={baseline.accountId}
+											className="flex justify-between gap-3"
+										>
+											<dt>
+												{baseline.accountName} ·{" "}
+												{observed ? "observed available" : "posted balance"}
+											</dt>
+											<dd className="m-0 tabular-nums">
+												{amountText(
+													observed
+														? baseline.availableBalance
+														: baseline.postedBalance,
+												)}
+											</dd>
+										</div>
+									);
+								})
 						)}
 					</dl>
 				)}

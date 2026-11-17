@@ -228,6 +228,45 @@ describe("safe spending cash evidence", () => {
 		expect(html).not.toContain("$500.00");
 		expect(html).toContain("No balance recorded at close");
 	});
+	it("lists posted baselines alongside observed available", () => {
+		const html = render(
+			summary({
+				checkingAvailable: null,
+				cashAfterBills: null,
+				status: "uncertain",
+				reasons: ["pending-after-baseline-coverage-unknown"],
+				baselines: [
+					{
+						accountId: "checking",
+						accountName: "Synthetic checking",
+						observedAt: Date.parse("2026-11-14T18:00:00Z") / 1000,
+						postedBalance: 1608.05,
+						availableBalance: 1244.43,
+						basis: "available",
+						status: "uncertain",
+						reasons: ["pending-after-baseline-coverage-unknown"],
+					},
+					{
+						accountId: "savings",
+						accountName: "Synthetic savings",
+						observedAt: Date.parse("2026-11-14T18:00:00Z") / 1000,
+						postedBalance: 500,
+						availableBalance: null,
+						basis: "posted",
+						status: "uncertain",
+						reasons: ["pending-after-baseline-coverage-unknown"],
+					},
+				],
+			}),
+		);
+		expect(html).toMatch(
+			/Synthetic checking · observed available<\/dt><dd[^>]*>\$1,244\.43/,
+		);
+		expect(html).toMatch(
+			/Synthetic savings · posted balance<\/dt><dd[^>]*>\$500\.00/,
+		);
+		expect(html).toContain("Remainder uncertain");
+	});
 	it("keeps known cash and bills visible after removing Details and all its contents", () => {
 		const html = render(
 			summary({
