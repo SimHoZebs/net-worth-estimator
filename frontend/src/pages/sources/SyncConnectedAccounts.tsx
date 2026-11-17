@@ -1,7 +1,7 @@
 import { Ellipsis, Landmark, Link2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
-import { AccountLabel } from "../../components/AccountIcon.tsx";
+import { AccountIcon } from "../../components/AccountIcon.tsx";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -21,6 +21,8 @@ import {
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
+	ItemMedia,
+	ItemTitle,
 } from "@/components/ui/item.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -114,17 +116,19 @@ export function SyncConnectedAccounts({
 								key={link.bridgeAccountId}
 								variant="outline"
 							>
+								{account ? (
+									<ItemMedia>
+										<AccountIcon account={account} />
+									</ItemMedia>
+								) : null}
 								<ItemContent>
-									{account ? (
-										<AccountLabel account={account} />
-									) : (
-										link.bridgeName || link.modelAccountId
-									)}
+									<ItemTitle>
+										{account
+											? account.name
+											: link.bridgeName || link.modelAccountId}
+									</ItemTitle>
 									{link.institution ? (
-										<ItemDescription>
-											{link.institution}
-											{link.bridgeName ? ` · ${link.bridgeName}` : ""}
-										</ItemDescription>
+										<ItemDescription>{link.institution}</ItemDescription>
 									) : null}
 								</ItemContent>
 								{canLink ? (
