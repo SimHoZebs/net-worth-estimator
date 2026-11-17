@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -98,7 +99,7 @@ func paymentGroups(ctx context.Context, transactions []types.AnalysisTransaction
 		if description == "" && payee == "" && merchantName == "" {
 			description = paymentStreamText(facts.Memo)
 		}
-		merchant := recurringKey(strings.Join([]string{description, payee, merchantName}, " "))
+		merchant := domain.NormalizedMerchantKey(strings.Join([]string{description, payee, merchantName}, " "))
 		if merchant == "" {
 			continue
 		}

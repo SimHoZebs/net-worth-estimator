@@ -88,3 +88,12 @@ pending seed.
 
 Validation requires each claimed occurrence to be a scheduled date of an
 existing rule, with one claim per rule and date.
+
+After bank sync, an unclaimed row that unambiguously matches one free
+occurrence is claimed automatically, with the same stored claim and gates as a
+manual link. A schedule created from a confirmed pattern stores that pattern's
+normalized merchant key on its promotion, so future movements are matched by
+the observed merchant identity instead of the editable schedule name. Renaming
+the schedule leaves its automatic claims intact. Schedules with no promotion
+keep the name-based match, and every other route, amount, date-window, and
+single-winner gate stays unchanged.

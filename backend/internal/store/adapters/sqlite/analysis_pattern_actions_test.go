@@ -23,7 +23,7 @@ func TestPatternActionsRollBackAcceptance(t *testing.T) {
 				if _, err := s.db.Exec(`CREATE TRIGGER fail_pattern_schedule BEFORE INSERT ON recurrence_rules BEGIN SELECT RAISE(ABORT, 'test failure'); END`); err != nil {
 					t.Fatal(err)
 				}
-				_, err = s.CreatePatternSchedule(finding.ID, preview.PatternKey, "verified-subject", rule)
+				_, err = s.CreatePatternSchedule(finding.ID, preview.PatternKey, preview.Merchant, "verified-subject", rule)
 			} else {
 				if _, err := s.CreateSchedule(rule); err != nil {
 					t.Fatal(err)

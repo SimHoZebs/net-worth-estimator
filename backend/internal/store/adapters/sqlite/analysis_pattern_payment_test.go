@@ -83,13 +83,17 @@ func TestPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	if rule.Frequency != types.FrequencyMonthly || rule.StartDate != "2026-04-15" || rule.Amount != "3000.00" || !rule.Enabled {
 		t.Fatalf("rule=%+v", rule)
 	}
-	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "verified-subject", types.Schedule{
+	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, preview.Merchant, "verified-subject", types.Schedule{
 		ID: uuid.NewString(), Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations,
 		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": rule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency: rule.Frequency, StartDate: rule.StartDate, Enabled: true,
 	})
 	if err != nil || created.ID == "" {
 		t.Fatalf("create=%+v err=%v", created, err)
+	}
+	promotion, err := s.FindPatternToNewSchedule(preview.PatternKey)
+	if err != nil || promotion.MerchantKey != preview.Merchant || promotion.ScheduleID != created.ID {
+		t.Fatalf("promotion=%+v err=%v", promotion, err)
 	}
 	model, err := s.LoadModel()
 	if err != nil || len(model.Schedules) != 1 {

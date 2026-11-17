@@ -246,7 +246,10 @@ remain the evidence, schedules remain the forecast.
   second active schedule for the same pattern with 409.
 - One active generated schedule belongs to one confirmed source pattern. The
   record lives in `analysis_promotions` beside the evidence, never inside the
-  financial rows. Disabling or deleting the schedule leaves findings and
+  financial rows. It also stores the normalized merchant key from the finding,
+  which bank-sync auto-claim uses to recognize future movements of the pattern.
+  Renaming the generated schedule therefore does not break its automatic
+  occurrence claims. Disabling or deleting the schedule leaves findings and
   feedback intact; a disabled or deleted schedule frees the pattern for a
   replacement.
 - The generated schedule always starts one full interval after the latest
@@ -286,7 +289,8 @@ projection stops double-counting and the recorded rows stay intact.
   only sets `claim.scheduleId` plus `claim.occurrenceDate`, exactly as the
   manual occurrence link in TransactionDetail does, but for the whole
   pattern at once with schedule guidance. Clearing a claim stays a manual
-  single-row edit.
+  single-row edit. This action creates no promotion record, so schedules linked
+  this way keep the name-based auto-claim fallback when no promotion exists.
 
 ## Transfer matching
 

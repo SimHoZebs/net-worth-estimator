@@ -58,7 +58,8 @@ type PatternToNewSchedulePreview struct {
 // disabling or deleting the schedule never removes findings or feedback. The
 // storage table keeps its established name.
 type PatternToNewSchedule struct {
-	PatternKey string `json:"patternKey"`
-	ScheduleID string `json:"scheduleId"`
-	CreatedAt  int64  `json:"createdAt"`
+	PatternKey  string `json:"patternKey"`
+	ScheduleID  string `json:"scheduleId"`
+	CreatedAt   int64  `json:"createdAt"`
+	MerchantKey string `json:"merchantKey"`
 }

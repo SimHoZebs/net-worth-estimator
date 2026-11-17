@@ -105,7 +105,7 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 		actor = s.actor(ctx)
 	}
 	row, issues, saved, revision, err := model.PersistFinanceSchedule(s.store, rule, func(schedule types.Schedule) (types.Schedule, error) {
-		return s.store.CreatePatternSchedule(input.ID, preview.PatternKey, actor, schedule)
+		return s.store.CreatePatternSchedule(input.ID, preview.PatternKey, preview.Merchant, actor, schedule)
 	})
 	if err != nil || !saved {
 		if err != nil {

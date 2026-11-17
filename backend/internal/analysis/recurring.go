@@ -6,7 +6,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -22,30 +21,6 @@ type Recurring struct{}
 func (Recurring) Type() string    { return "recurring" }
 func (Recurring) Version() string { return RecurringVersion }
 
-func recurringKey(text string) string {
-	cleaned := strings.Map(func(r rune) rune {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
-			return r
-		}
-		return ' '
-	}, strings.ToLower(text))
-	for _, token := range strings.Fields(cleaned) {
-		if len(token) < 3 {
-			continue
-		}
-		digits := true
-		for _, r := range token {
-			if r < '0' || r > '9' {
-				digits = false
-				break
-			}
-		}
-		if !digits {
-			return token
-		}
-	}
-	return ""
-}
 func recurringMedian(values []float64) float64 {
 	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)

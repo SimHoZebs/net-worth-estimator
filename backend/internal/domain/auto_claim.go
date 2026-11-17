@@ -62,6 +62,26 @@ func autoClaimNamesMatch(a, b string) bool {
 	return autoClaimTokensContain(left, right)
 }
 
+// autoClaimMerchantMatches gates a transaction against the normalized merchant
+// key persisted with a schedule's promotion. The key survives a rule rename;
+// the schedule name does not. It matches only when the descriptor normalizes to
+// the same key or carries that key as a whole token, never a substring, so a
+// mismatched promotion refuses a claim the old name-only gate would accept.
+func autoClaimMerchantMatches(name, key string) bool {
+	if key == "" {
+		return false
+	}
+	if NormalizedMerchantKey(name) == key {
+		return true
+	}
+	nameTokens := autoClaimNameTokens(name)
+	keyTokens := autoClaimNameTokens(key)
+	if len(nameTokens) == 0 || len(keyTokens) == 0 {
+		return false
+	}
+	return autoClaimTokensContain(nameTokens, keyTokens)
+}
+
 func autoClaimNameTokens(name string) []string {
 	upper := strings.ToUpper(strings.TrimSpace(name))
 	fields := strings.FieldsFunc(upper, func(r rune) bool {
@@ -159,7 +179,7 @@ func autoClaimDay(transaction types.Transaction) string {
 // MatchAutoClaim returns the single schedule occurrence a transaction records,
 // or nil when there is no unambiguous match. Zero or multiple winners means
 // no automatic claim, leaving the row for manual review.
-func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, claimed map[string]map[string]bool) *types.TransactionClaim {
+func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, claimed map[string]map[string]bool, merchantKeys map[string]string) *types.TransactionClaim {
 	if transaction.Claim != nil || transaction.Void {
 		return nil
 	}
@@ -192,7 +212,11 @@ func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, c
 		if !autoClaimRoutesMatch(transaction, *schedule) {
 			continue
 		}
-		if !autoClaimNamesMatch(transaction.Name, schedule.Name) {
+		if key := merchantKeys[schedule.ID]; key != "" {
+			if !autoClaimMerchantMatches(transaction.Name, key) {
+				continue
+			}
+		} else if !autoClaimNamesMatch(transaction.Name, schedule.Name) {
 			continue
 		}
 		scheduleCents, ok := autoClaimLiteralCents(schedule.Amount)
@@ -279,7 +303,7 @@ func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, c
 // FindAutoClaims maps every unclaimed transaction to its unambiguous schedule
 // occurrence. Callers apply the updates through the existing claim write
 // path so validation, pending clearing, and dirty marking stay uniform.
-func FindAutoClaims(transactions []types.Transaction, schedules []types.Schedule) []types.TransactionClaimUpdate {
+func FindAutoClaims(transactions []types.Transaction, schedules []types.Schedule, merchantKeys map[string]string) []types.TransactionClaimUpdate {
 	claimed := make(map[string]map[string]bool, len(schedules))
 	for i := range transactions {
 		transaction := &transactions[i]
@@ -299,7 +323,7 @@ func FindAutoClaims(transactions []types.Transaction, schedules []types.Schedule
 		if transaction.Claim != nil {
 			continue
 		}
-		match := MatchAutoClaim(*transaction, schedules, claimed)
+		match := MatchAutoClaim(*transaction, schedules, claimed, merchantKeys)
 		if match == nil {
 			continue
 		}

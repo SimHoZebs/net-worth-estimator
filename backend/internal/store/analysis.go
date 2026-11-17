@@ -19,9 +19,12 @@ type AnalysisStore interface {
 	ListAnalysisFeedback(filter types.AnalysisFeedbackFilter) ([]types.AnalysisFeedback, error)
 	PreviewPatternToNewSchedule(findingID string) (types.PatternToNewSchedulePreview, error)
 	// Pattern actions save acceptance and the finance change in one transaction.
-	CreatePatternSchedule(findingID, patternKey, actor string, schedule types.Schedule) (types.Schedule, error)
+	CreatePatternSchedule(findingID, patternKey, merchantKey, actor string, schedule types.Schedule) (types.Schedule, error)
 	SetPatternTransactionClaims(findingID, actor string, claims []types.TransactionClaimUpdate) ([]types.Transaction, error)
 	FindPatternToNewSchedule(patternKey string) (types.PatternToNewSchedule, error)
+	// ListPatternToNewSchedules returns every promotion row for the user, used
+	// to recover the persisted merchant key for auto-claim matching.
+	ListPatternToNewSchedules() ([]types.PatternToNewSchedule, error)
 	RecordPatternToNewSchedule(record types.PatternToNewSchedule) error
 	RemovePatternToNewSchedule(patternKey, ruleID string) error
 	PreviewPatternToExistingSchedule(findingID, ruleID string) (types.PatternToExistingSchedulePreview, error)

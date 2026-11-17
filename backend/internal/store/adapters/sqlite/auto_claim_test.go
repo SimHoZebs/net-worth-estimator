@@ -251,3 +251,84 @@ func TestAutoClaimSweepSkipsDisabledAndVoid(t *testing.T) {
 		t.Fatalf("claim rows = %d, want 0", got)
 	}
 }
+
+// TestAutoClaimSweepUsesPromotionMerchantKey proves a renamed schedule still
+// claims through the merchant key persisted with its promotion, while a
+// schedule with no promotion keeps matching by name.
+func TestAutoClaimSweepUsesPromotionMerchantKey(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "checking")
+	checking := "checking"
+
+	promoted := autoClaimSchedule("promoted", "checking")
+	promoted.Name = "Renamed Rule"
+	if _, err := database.CreateSchedule(promoted); err != nil {
+		t.Fatalf("create promoted schedule: %v", err)
+	}
+	byName := autoClaimSchedule("by-name", "checking")
+	byName.Name = "Plain Rent"
+	byName.Amount = autoClaimAmount("500")
+	if _, err := database.CreateSchedule(byName); err != nil {
+		t.Fatalf("create name schedule: %v", err)
+	}
+	if err := database.RecordPatternToNewSchedule(types.PatternToNewSchedule{
+		PatternKey:  "pattern-promoted",
+		ScheduleID:  "promoted",
+		MerchantKey: "rent",
+	}); err != nil {
+		t.Fatalf("record promotion: %v", err)
+	}
+
+	bankRow := func(name, amount, day string) types.Transaction {
+		return types.Transaction{
+			Name:            name,
+			Source:          SourceBankSync,
+			SourceAccountID: &checking,
+			Amount:          autoClaimAmount(amount),
+			PostedTime:      autoClaimNoon(day),
+			TransactionTime: autoClaimNoon(day),
+			Enabled:         true,
+		}
+	}
+	renamedDescriptor := bankRow("RENT PAYMENT", "1000", "2026-02-02")
+	if summary, err := database.ApplySync(nil, []BankDirective{{
+		Upsert: &BankUpsert{Transaction: renamedDescriptor, Keys: bankKeys(ProviderSimpleFIN, "bridge-checking", "renamed-desc")},
+	}}); err != nil || summary.SettledInserted != 1 {
+		t.Fatalf("seed renamed descriptor = %+v, err %v", summary, err)
+	}
+	nameDescriptor := bankRow("Plain Rent", "500", "2026-02-03")
+	if summary, err := database.ApplySync(nil, []BankDirective{{
+		Upsert: &BankUpsert{Transaction: nameDescriptor, Keys: bankKeys(ProviderSimpleFIN, "bridge-checking", "name-desc")},
+	}}); err != nil || summary.SettledInserted != 1 {
+		t.Fatalf("seed name descriptor = %+v, err %v", summary, err)
+	}
+
+	loaded, err := database.LoadModel()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var renamedID, nameID string
+	for _, transaction := range loaded.Transactions {
+		switch transaction.Name {
+		case "RENT PAYMENT":
+			renamedID = transaction.ID
+		case "Plain Rent":
+			nameID = transaction.ID
+		}
+	}
+	if renamedID == "" || nameID == "" {
+		t.Fatalf("bank ids missing: renamed=%q name=%q", renamedID, nameID)
+	}
+
+	if _, err := database.ApplySync(nil, nil); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	renamedAfter := findTransactionByID(t, database, renamedID)
+	if renamedAfter.Claim == nil || renamedAfter.Claim.ScheduleID != "promoted" || renamedAfter.Claim.OccurrenceDate != "2026-02-01" {
+		t.Fatalf("renamed descriptor claim = %+v, want promoted on 2026-02-01", renamedAfter.Claim)
+	}
+	nameAfter := findTransactionByID(t, database, nameID)
+	if nameAfter.Claim == nil || nameAfter.Claim.ScheduleID != "by-name" || nameAfter.Claim.OccurrenceDate != "2026-02-01" {
+		t.Fatalf("name descriptor claim = %+v, want by-name on 2026-02-01", nameAfter.Claim)
+	}
+}

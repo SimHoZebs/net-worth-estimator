@@ -142,10 +142,10 @@ BASE_DATE = "2023-01-15"
 
 SEED = 7
 
-# paymentStreamText/paymentReferenceToken/recurringKey reduce a description to
+# paymentStreamText/paymentReferenceToken/NormalizedMerchantKey reduce a description to
 # the first surviving token, so the alias key for a fixture row is the first
 # token of length >= 3 that is not all digits, a reference token, or "dept".
-# This mirrors backend/internal/analysis/recurring.go closely enough for exact
+# This mirrors backend/internal/domain/merchant_key.go closely enough for exact
 # MapProviderResolver keys; the harness reports the alias hit rate so any
 # mismatch is visible instead of silent.
 REFERENCE_TOKEN = re.compile(r"^(?:[a-z]{0,4}[0-9x]{4,}|[a-f0-9]{12,64})$")

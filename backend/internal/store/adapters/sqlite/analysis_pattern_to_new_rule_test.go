@@ -189,8 +189,12 @@ func TestPatternToNewScheduleTracksOneActiveRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RecordPatternToNewSchedule(types.PatternToNewSchedule{PatternKey: preview.PatternKey, ScheduleID: rule.ID}); err != nil {
+	if err := s.RecordPatternToNewSchedule(types.PatternToNewSchedule{PatternKey: preview.PatternKey, ScheduleID: rule.ID, MerchantKey: "grocer"}); err != nil {
 		t.Fatal(err)
+	}
+	record, err := s.FindPatternToNewSchedule(preview.PatternKey)
+	if err != nil || record.MerchantKey != "grocer" {
+		t.Fatalf("record=%+v err=%v", record, err)
 	}
 	blocked, err := s.PreviewPatternToNewSchedule(anchor.ID)
 	if err != nil || blocked.Creatable || blocked.ExistingScheduleID != rule.ID || blocked.Reason == "" {

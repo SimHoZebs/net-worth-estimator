@@ -122,7 +122,7 @@ func (s *sqliteStore) PreviewPatternToNewSchedule(findingID string) (types.Patte
 // disabled is still returned so callers can decide what active means.
 func (s *sqliteStore) FindPatternToNewSchedule(patternKey string) (types.PatternToNewSchedule, error) {
 	var record types.PatternToNewSchedule
-	err := s.db.QueryRow(`SELECT pattern_key, rule_id, created_at FROM analysis_promotions WHERE pattern_key = ? AND user_id = :user_id`, patternKey).Scan(&record.PatternKey, &record.ScheduleID, &record.CreatedAt)
+	err := s.db.QueryRow(`SELECT pattern_key, rule_id, created_at, merchant_key FROM analysis_promotions WHERE pattern_key = ? AND user_id = :user_id`, patternKey).Scan(&record.PatternKey, &record.ScheduleID, &record.CreatedAt, &record.MerchantKey)
 	if err == sql.ErrNoRows {
 		return record, store.ErrNotFound
 	}
@@ -141,9 +141,32 @@ func (s *sqliteStore) RecordPatternToNewSchedule(record types.PatternToNewSchedu
 	if created <= 0 {
 		created = time.Now().Unix()
 	}
-	_, err := s.db.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, user_id) VALUES (?, ?, ?, :user_id)
-		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at`, record.PatternKey, record.ScheduleID, created)
+	_, err := s.db.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, merchant_key, user_id) VALUES (?, ?, ?, ?, :user_id)
+		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at, merchant_key = excluded.merchant_key`, record.PatternKey, record.ScheduleID, created, record.MerchantKey)
 	return err
+}
+
+// ListPatternToNewSchedules returns every promotion row for the user. The
+// merchant key on each row lets auto-claim recognize a schedule even after its
+// display name was edited.
+func (s *sqliteStore) ListPatternToNewSchedules() ([]types.PatternToNewSchedule, error) {
+	rows, err := s.db.Query(`SELECT pattern_key, rule_id, created_at, merchant_key FROM analysis_promotions WHERE user_id = :user_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	records := []types.PatternToNewSchedule{}
+	for rows.Next() {
+		var record types.PatternToNewSchedule
+		if err := rows.Scan(&record.PatternKey, &record.ScheduleID, &record.CreatedAt, &record.MerchantKey); err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return records, nil
 }
 
 // RemovePatternToNewSchedule clears the record only when it still names the

@@ -32,7 +32,7 @@ useless for classification, volume-only); `Or4kool/transactions_data`
 | `[debit]`/`[credit]` marker | Dataset artifact; stripped before grouping, direction only |
 | Occurrence dates (monthly series) | Synthesized: fixed base date, exact 30-day spacing, deterministic ±1-day wobble, fixed seed |
 | Amounts | Synthesized per-category plausible bases with ±5% jitter (inside detector tolerance) |
-| Provider alias table | Derived from the dataset's own merchant strings (first-token heuristic mirroring `recurringKey`); hit rate reported so mismatch is visible |
+| Provider alias table | Derived from the dataset's own merchant strings (first-token heuristic mirroring `NormalizedMerchantKey`); hit rate reported so mismatch is visible |
 
 ## Real vs synthesized (MoneyData arm)
 

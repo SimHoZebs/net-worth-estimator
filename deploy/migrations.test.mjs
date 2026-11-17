@@ -309,6 +309,36 @@ test("pre-promotion Analysis source gains only the empty promotion and transfer 
   assert.equal(await analysisSnapshot(db), analysisBefore);
 });
 
+test("old four-column promotions gain merchant_key and keep their rows", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-merchant-key-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  // Model the deployed table that predates merchant_key. Assert the DROP so
+  // the fixture really starts with the old four columns on this SQLite build.
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';"), "1");
+  await sqlite(db, "ALTER TABLE analysis_promotions DROP COLUMN merchant_key;");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';"), "0");
+  await sqlite(db, `INSERT INTO analysis_promotions(user_id, pattern_key, rule_id, created_at) VALUES
+    ('${owner}','pattern-a','rule-a',1773140400),
+    ('${owner}','pattern-b','rule-b',1773140800);`);
+  const baseBefore = await rows(db, "SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY pattern_key;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';"), "1");
+  assert.equal(await rows(db, "SELECT user_id, pattern_key, rule_id, created_at, merchant_key FROM analysis_promotions ORDER BY pattern_key;"),
+    `${owner}|pattern-a|rule-a|1773140400|\n${owner}|pattern-b|rule-b|1773140800|`);
+  assert.equal(await rows(db, "SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY pattern_key;"), baseBefore);
+  assert.equal((await backups(directory)).length, 1);
+
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
 test("complete target repeats read-only and preserves owner disables byte-identical", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-repeat-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

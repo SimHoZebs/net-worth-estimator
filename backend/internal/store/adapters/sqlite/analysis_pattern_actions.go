@@ -32,7 +32,7 @@ func acceptRecurringPattern(tx *userTx, findingID, actor string) error {
 	return err
 }
 
-func (s *sqliteStore) CreatePatternSchedule(findingID, patternKey, actor string, schedule types.Schedule) (types.Schedule, error) {
+func (s *sqliteStore) CreatePatternSchedule(findingID, patternKey, merchantKey, actor string, schedule types.Schedule) (types.Schedule, error) {
 	err := withRowTx(s.db, func(tx *userTx) error {
 		if err := acceptRecurringPattern(tx, findingID, actor); err != nil {
 			return err
@@ -47,8 +47,8 @@ func (s *sqliteStore) CreatePatternSchedule(findingID, patternKey, actor string,
 		if err := insertRule(tx, position, &schedule); err != nil {
 			return err
 		}
-		_, err = tx.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, user_id) VALUES (?, ?, ?, :user_id)
-			ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at`, patternKey, schedule.ID, time.Now().Unix())
+		_, err = tx.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, merchant_key, user_id) VALUES (?, ?, ?, ?, :user_id)
+			ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at, merchant_key = excluded.merchant_key`, patternKey, schedule.ID, time.Now().Unix(), merchantKey)
 		return err
 	})
 	if err != nil {

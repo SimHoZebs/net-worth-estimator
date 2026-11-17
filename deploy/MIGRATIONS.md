@@ -47,6 +47,7 @@ target before its operator window is complete.
 | Bank source normalization | [bank-source README](../backend/scripts/one-time/bank-source/README.md) | Run on every supported target before deploying the strict settlement matcher. Both legacy counts must read zero before the API starts. |
 | No-op checkpoint prune | [noop-checkpoints README](../backend/scripts/one-time/noop-checkpoints/README.md) | Unverified on Compose, dev, and Northflank. Runs inside the body after provisioning; deletes only forward sync-owned zero-delta checkpoints. |
 | SimpleFIN v2 keys | Tool usage: `simplefin-v2-keys --db PATH (--mapping PATH \| --write-mapping PATH)` | Runs inside the body. When bare keys exist, supply `SIMPLEFIN_V2_MAPPING` as a mode-0600 JSON map produced by `--write-mapping` before the window; the map tool performs the only provider read. A missing, ambiguous, or colliding mapping fails before publication. No-op when no SimpleFIN rows exist. |
+| Promotion merchant key | Body in `deploy/migrate.sh` (additive `analysis_promotions.merchant_key`) | Pending one-time column addition; unverified on Compose, dev, and Northflank until operators run the body. Adds `merchant_key TEXT NOT NULL DEFAULT ''` to existing promotions with no row rewrites; the frozen offline DDL carries it for fresh sources. |
 
 ## Supported execution paths
 

@@ -44,7 +44,7 @@ func TestMatchAutoClaimPicksClosestUnclaimed(t *testing.T) {
 		Enabled:         true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-02", "1000", &account)
-	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{})
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
 	if match == nil || match.ScheduleID != "rent" || match.OccurrenceDate != "2026-02-01" {
 		t.Fatalf("match = %+v, want rent on 2026-02-01", match)
 	}
@@ -63,7 +63,7 @@ func TestMatchAutoClaimSkipsClaimedDate(t *testing.T) {
 	}}
 	claimed := map[string]map[string]bool{"rent": {"2026-02-01": true}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-02", "1000", &account)
-	if match := MatchAutoClaim(transaction, schedules, claimed); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, claimed, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for claimed date", match)
 	}
 }
@@ -75,7 +75,7 @@ func TestMatchAutoClaimRejectsAmbiguous(t *testing.T) {
 		{ID: "b", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", Enabled: true},
 	}
 	transaction := autoClaimTestTransaction("tx-1", "Gym", "2026-02-01", "50", &account)
-	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for ambiguous schedules", match)
 	}
 }
@@ -88,7 +88,7 @@ func TestMatchAutoClaimRejectsAmountOutsideTolerance(t *testing.T) {
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1200", &account)
-	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for amount outside tolerance", match)
 	}
 }
@@ -102,7 +102,7 @@ func TestFindAutoClaimsClaimsSequentially(t *testing.T) {
 	}}
 	first := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
 	second := autoClaimTestTransaction("tx-2", "Rent", "2026-02-02", "1000", &account)
-	updates := FindAutoClaims([]types.Transaction{first, second}, schedules)
+	updates := FindAutoClaims([]types.Transaction{first, second}, schedules, nil)
 	if len(updates) != 1 || updates[0].TransactionID != "tx-1" {
 		t.Fatalf("updates = %+v, want only tx-1", updates)
 	}
@@ -117,7 +117,7 @@ func TestMatchAutoClaimRejectsDisabled(t *testing.T) {
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
 	transaction.Enabled = false
-	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for disabled row", match)
 	}
 }
@@ -131,7 +131,7 @@ func TestMatchAutoClaimRejectsVoid(t *testing.T) {
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
 	transaction.Void = true
-	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for void row", match)
 	}
 }
@@ -146,7 +146,7 @@ func TestMatchAutoClaimAllowsPendingBankRow(t *testing.T) {
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
 	transaction.Enabled = false
 	transaction.Pending = true
-	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{})
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
 	if match == nil || match.ScheduleID != "rent" || match.OccurrenceDate != "2026-02-01" {
 		t.Fatalf("match = %+v, want pending bank row claimed on 2026-02-01", match)
 	}
@@ -160,7 +160,7 @@ func TestMatchAutoClaimRejectsDisabledSchedule(t *testing.T) {
 		StartDate: "2026-01-01", Enabled: false,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
-	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for disabled schedule", match)
 	}
 }
@@ -176,7 +176,7 @@ func TestFindAutoClaimsSkipsDisabledAndVoid(t *testing.T) {
 	disabled.Enabled = false
 	voided := autoClaimTestTransaction("tx-void", "Rent", "2026-02-01", "1000", &account)
 	voided.Void = true
-	updates := FindAutoClaims([]types.Transaction{disabled, voided}, schedules)
+	updates := FindAutoClaims([]types.Transaction{disabled, voided}, schedules, nil)
 	if len(updates) != 0 {
 		t.Fatalf("updates = %+v, want none for disabled/void rows", updates)
 	}
@@ -190,7 +190,7 @@ func TestMatchAutoClaimFindsOldDailySchedule(t *testing.T) {
 		StartDate: "2016-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Coffee", "2026-02-01", "5", &account)
-	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{})
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
 	if match == nil || match.ScheduleID != "daily" || match.OccurrenceDate != "2026-02-01" {
 		t.Fatalf("match = %+v, want daily on 2026-02-01", match)
 	}
@@ -203,7 +203,7 @@ func TestMatchAutoClaimPrefersCloserAmountOnSameDayDistance(t *testing.T) {
 		{ID: "b", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("55"), Frequency: types.FrequencyMonthly, StartDate: "2026-01-15", Enabled: true},
 	}
 	transaction := autoClaimTestTransaction("tx-1", "Gym", "2026-02-15", "50", &account)
-	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{})
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
 	if match == nil || match.ScheduleID != "a" {
 		t.Fatalf("match = %+v, want schedule a by closer amount", match)
 	}
@@ -221,7 +221,7 @@ func TestMatchAutoClaimRejectsSubstringName(t *testing.T) {
 	schedules[0].Destinations = []string{"checking", "savings"}
 	schedules[0].SourceAccountID = nil
 	transaction.SourceAccountID = nil
-	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}); match != nil {
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
 		t.Fatalf("match = %+v, want nil for substring-only name", match)
 	}
 }
@@ -234,8 +234,128 @@ func TestMatchAutoClaimAcceptsTokenSubsetDescriptor(t *testing.T) {
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "LYFT *STANDARD 10-30", "2026-01-08", "25", &account)
-	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{})
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
 	if match == nil || match.ScheduleID != "lyft" || match.OccurrenceDate != "2026-01-08" {
 		t.Fatalf("match = %+v, want lyft on 2026-01-08", match)
+	}
+}
+
+func TestNormalizedMerchantKey(t *testing.T) {
+	cases := []struct {
+		text, want string
+	}{
+		{"NETFLIX.COM BILLING", "netflix"},
+		{"  uber *trip 123 ", "uber"},
+		{"12345 67890", ""},
+		{"ab 12XYZ", "12xyz"},
+		{"CAFE 123", "cafe"},
+		{"A1 B2", ""},
+		{"", ""},
+	}
+	for _, item := range cases {
+		if got := NormalizedMerchantKey(item.text); got != item.want {
+			t.Errorf("NormalizedMerchantKey(%q) = %q, want %q", item.text, got, item.want)
+		}
+	}
+}
+
+func TestMatchAutoClaimPromotionKeySurvivesRename(t *testing.T) {
+	account := "checking"
+	schedules := []types.Schedule{{
+		ID: "sub", Name: "Monthly Subscription", SourceAccountID: &account,
+		Amount: autoClaimTestAmount("15"), Frequency: types.FrequencyMonthly,
+		StartDate: "2026-01-01", Enabled: true,
+	}}
+	merchantKeys := map[string]string{"sub": "netflix"}
+	transaction := autoClaimTestTransaction("tx-1", "NETFLIX.COM", "2026-02-02", "15", &account)
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, merchantKeys)
+	if match == nil || match.ScheduleID != "sub" || match.OccurrenceDate != "2026-02-01" {
+		t.Fatalf("match = %+v, want sub on 2026-02-01 from merchant key", match)
+	}
+}
+
+func TestMatchAutoClaimPromotionKeyMismatchRefusesNameMatch(t *testing.T) {
+	account := "checking"
+	schedules := []types.Schedule{{
+		ID: "sub", Name: "Netflix", SourceAccountID: &account,
+		Amount: autoClaimTestAmount("15"), Frequency: types.FrequencyMonthly,
+		StartDate: "2026-01-01", Enabled: true,
+	}}
+	merchantKeys := map[string]string{"sub": "uber"}
+	transaction := autoClaimTestTransaction("tx-1", "NETFLIX", "2026-02-01", "15", &account)
+	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, merchantKeys); match != nil {
+		t.Fatalf("match = %+v, want nil for mismatched promotion key", match)
+	}
+}
+
+func TestMatchAutoClaimPromotionKeyRespectsOtherGates(t *testing.T) {
+	account := "checking"
+	other := "savings"
+	baseSchedule := types.Schedule{
+		ID: "sub", Name: "Renamed", SourceAccountID: &account,
+		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		StartDate: "2026-01-01", Enabled: true,
+	}
+	merchantKeys := map[string]string{"sub": "rent"}
+	baseTransaction := func() types.Transaction {
+		return autoClaimTestTransaction("tx-1", "RENT PAYMENT", "2026-02-02", "1000", &account)
+	}
+
+	cases := []struct {
+		name      string
+		schedule  types.Schedule
+		transact  types.Transaction
+		claimed   map[string]map[string]bool
+		wantMatch bool
+	}{
+		{
+			name:      "all gates pass",
+			schedule:  baseSchedule,
+			transact:  baseTransaction(),
+			claimed:   map[string]map[string]bool{},
+			wantMatch: true,
+		},
+		{
+			name:      "route mismatch",
+			schedule:  baseSchedule,
+			transact:  autoClaimTestTransaction("tx-1", "RENT PAYMENT", "2026-02-02", "1000", &other),
+			claimed:   map[string]map[string]bool{},
+			wantMatch: false,
+		},
+		{
+			name:      "amount outside tolerance",
+			schedule:  baseSchedule,
+			transact:  autoClaimTestTransaction("tx-1", "RENT PAYMENT", "2026-02-02", "1200", &account),
+			claimed:   map[string]map[string]bool{},
+			wantMatch: false,
+		},
+		{
+			name:      "outside date window",
+			schedule:  baseSchedule,
+			transact:  autoClaimTestTransaction("tx-1", "RENT PAYMENT", "2026-01-20", "1000", &account),
+			claimed:   map[string]map[string]bool{},
+			wantMatch: false,
+		},
+		{
+			name:      "claimed date",
+			schedule:  baseSchedule,
+			transact:  baseTransaction(),
+			claimed:   map[string]map[string]bool{"sub": {"2026-02-01": true}},
+			wantMatch: false,
+		},
+	}
+	for _, item := range cases {
+		t.Run(item.name, func(t *testing.T) {
+			match := MatchAutoClaim(item.transact, []types.Schedule{item.schedule}, item.claimed, merchantKeys)
+			if item.wantMatch {
+				if match == nil || match.ScheduleID != "sub" || match.OccurrenceDate != "2026-02-01" {
+					t.Fatalf("match = %+v, want sub on 2026-02-01", match)
+				}
+				return
+			}
+			if match != nil {
+				t.Fatalf("match = %+v, want nil", match)
+			}
+		})
 	}
 }

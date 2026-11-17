@@ -47,6 +47,7 @@ CREATE INDEX analysis_feedback_finding ON analysis_feedback(user_id, finding_id,
 CREATE TABLE analysis_promotions (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+  merchant_key TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(user_id, pattern_key)
 );
 -- Confirmed transfer pairs link two detector-ranked opposite legs as one

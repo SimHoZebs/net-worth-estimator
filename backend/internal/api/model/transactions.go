@@ -218,6 +218,14 @@ func (s *handler) recordTransaction(_ context.Context, input *transactionInput) 
 		}
 		transaction.ID = id.String()
 	}
+	promotions, err := s.store.ListPatternToNewSchedules()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	merchantKeys := make(map[string]string, len(promotions))
+	for _, promotion := range promotions {
+		merchantKeys[promotion.ScheduleID] = promotion.MerchantKey
+	}
 	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		transaction.Destinations = displayDestinations(model, transaction.Destinations)
 		if transaction.Claim == nil {
@@ -234,7 +242,7 @@ func (s *handler) recordTransaction(_ context.Context, input *transactionInput) 
 				}
 				dates[existing.Claim.OccurrenceDate] = true
 			}
-			if match := domain.MatchAutoClaim(transaction, model.Schedules, claimed); match != nil {
+			if match := domain.MatchAutoClaim(transaction, model.Schedules, claimed, merchantKeys); match != nil {
 				transaction.Claim = match
 			}
 		}

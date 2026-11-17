@@ -8,7 +8,8 @@
 #      observation instants (23:59:59 UTC of their own Gregorian day), and
 #      legacy default-disabled settled bank rows recover their posted-time
 #      event times, all inside a single candidate transaction.
-#   2. Frozen SQL provisions Analysis on that candidate when needed.
+#   2. Frozen SQL provisions Analysis on that candidate when needed, and the
+#      promotion merchant-key column is added additively when absent.
 #   3. The standalone purchase tool converts retired purchase policies.
 #   4. The additive unified projection tables and columns are provisioned
 #      when absent; a partial group fails closed.
@@ -597,6 +598,7 @@ if [ "$analysis" = 5 ]; then
   if ! sqlite3 "$candidate" "CREATE TABLE analysis_promotions (
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+    merchant_key TEXT NOT NULL DEFAULT '',
     PRIMARY KEY(user_id, pattern_key)
   );" > "$backup/analysis.log" 2>&1; then
     fail "Candidate promotion upgrade failed. Original unchanged; backup retained at $backup."
@@ -1456,6 +1458,27 @@ test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('
 test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM accounts WHERE display_basis IS NULL OR display_basis NOT IN ('available','posted');")" = 0 \
   || fail "Candidate accounts carry an unknown display basis. Original unchanged; backup retained at $backup. Keep the API stopped."
 
+# Provision the analysis_promotions merchant-key column additively on the
+# candidate. Fresh databases already carry it from setupdb and the frozen
+# offline DDL; existing deployments gain it here defaulting to the empty key,
+# so every preexisting promotion stays linked only by its pattern key until
+# the owner claims a merchant for it. This runs after verify_same above and
+# before the prune tool opens the candidate, which validates current schema.
+merchant_key_count=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';") \
+  || fail "Cannot inspect analysis_promotions merchant_key column. Original unchanged; backup retained at $backup. Keep the API stopped."
+case "$merchant_key_count" in
+  0)
+    sqlite3 "$candidate" "ALTER TABLE analysis_promotions ADD COLUMN merchant_key TEXT NOT NULL DEFAULT '';" \
+      || fail "Cannot add analysis_promotions merchant_key column. Original unchanged; backup retained at $backup. Keep the API stopped."
+    ;;
+  1) ;;
+  *) fail "Unexpected analysis_promotions merchant_key count. Original unchanged; backup retained at $backup. Keep the API stopped." ;;
+esac
+test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';")" = 1 \
+  || fail "Candidate analysis_promotions merchant_key column is missing. Original unchanged; backup retained at $backup. Keep the API stopped."
+test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM analysis_promotions WHERE merchant_key IS NULL;")" = 0 \
+  || fail "Candidate promotions carry a NULL merchant key. Original unchanged; backup retained at $backup. Keep the API stopped."
+
 # Prune historical forward no-op bank checkpoints on the candidate. The
 # runtime sync path already skips these rows; this removes rows that predate
 # that guard. Owner rows, first observations, and changed available balances
@@ -1505,10 +1528,12 @@ test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account
   || fail "Published database is missing the accounts display_basis column. Recover from the verified backup at $backup. Keep the API stopped."
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM accounts WHERE display_basis IS NULL OR display_basis NOT IN ('available','posted');")" = 0 \
   || fail "Published database carries an unknown display basis. Recover from the verified backup at $backup. Keep the API stopped."
+test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';")" = 1 \
+  || fail "Published database is missing the analysis_promotions merchant_key column. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
 if [ "$mode" = convert ]; then
-  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, pruned no-op checkpoints, and provisioned Analysis, unified projection, account institution, and account display-basis schema from $backup."
+  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, pruned no-op checkpoints, and provisioned Analysis, unified projection, account institution, account display-basis, and promotion merchant-key schema from $backup."
 else
-  info "Completed current application, unified projection, account institution, and account display-basis schema with no-op checkpoint prune on final checkpoints from $backup."
+  info "Completed current application, unified projection, account institution, account display-basis, and promotion merchant-key schema with no-op checkpoint prune on final checkpoints from $backup."
 fi

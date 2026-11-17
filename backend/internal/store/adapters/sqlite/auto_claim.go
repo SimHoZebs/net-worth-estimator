@@ -18,7 +18,15 @@ func (s *sqliteStore) autoClaimSweep() error {
 	if model == nil || len(model.Schedules) == 0 {
 		return nil
 	}
-	updates := domain.FindAutoClaims(model.Transactions, model.Schedules)
+	promotions, err := s.ListPatternToNewSchedules()
+	if err != nil {
+		return err
+	}
+	merchantKeys := make(map[string]string, len(promotions))
+	for _, promotion := range promotions {
+		merchantKeys[promotion.ScheduleID] = promotion.MerchantKey
+	}
+	updates := domain.FindAutoClaims(model.Transactions, model.Schedules, merchantKeys)
 	if len(updates) == 0 {
 		return nil
 	}

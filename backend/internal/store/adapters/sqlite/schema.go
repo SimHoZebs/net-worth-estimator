@@ -713,7 +713,7 @@ var requiredSchemaColumns = map[string]string{
 	"analysis_runs":                   "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
 	"analysis_findings":               "user_id, id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
 	"analysis_feedback":               "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
-	"analysis_promotions":             "user_id, pattern_key, rule_id, created_at",
+	"analysis_promotions":             "user_id, pattern_key, rule_id, created_at, merchant_key",
 	"analysis_transfer_links":         "user_id, leg_a, leg_b, finding_id, actor, created_at",
 	"analysis_transfer_link_members":  "user_id, transaction_id, leg_a, leg_b",
 	"receipts":                        receiptColumns,
