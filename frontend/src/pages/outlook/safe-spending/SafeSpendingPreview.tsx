@@ -9,7 +9,7 @@ import {
 	sortTransactionsByDate,
 	type TransactionOrder,
 } from "@/domain/transactionSort.ts";
-import { dateLabel, sum, todayIso } from "@/domain/format.ts";
+import { sum, todayIso } from "@/domain/format.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
 	Card,
@@ -136,7 +136,6 @@ export function SafeSpendingPreview({
 		const start = (startDate ?? today).slice(0, 10);
 		return today >= start ? today : start;
 	});
-	const staleData = displayToday > (startDate ?? displayToday).slice(0, 10);
 
 	// Tracked cards are a user designation across every account. Before one
 	// is made, the default set stays the model's card accounts: `*_card`
@@ -550,9 +549,6 @@ export function SafeSpendingPreview({
 					</CardTitle>
 					<CardDescription>
 						{selectedCaption}
-						{cycleViewTab === "cycle" && staleData
-							? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
-							: ""}
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -579,9 +575,6 @@ export function SafeSpendingPreview({
 					</CardTitle>
 					<CardDescription>
 						{selectedCaption}
-						{cycleViewTab === "cycle" && staleData
-							? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
-							: ""}
 					</CardDescription>
 					{trackedIds.length > 0 && (
 						<CardAction>
