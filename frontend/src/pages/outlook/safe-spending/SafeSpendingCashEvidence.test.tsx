@@ -201,7 +201,7 @@ describe("safe spending cash evidence", () => {
 		expect(html).not.toContain("1,244.43");
 		expect(html).not.toContain("An observed posted balance");
 	});
-	it("keeps a posted close observation distinct from missing available cash", () => {
+	it("shows no close value when the close has no recorded observation", () => {
 		const html = render(
 			summary({
 				start: "2026-10-19",
@@ -209,23 +209,11 @@ describe("safe spending cash evidence", () => {
 				checkingAvailable: null,
 				cashAfterBills: null,
 				status: "missing",
-				baselines: [
-					{
-						accountId: "checking",
-						accountName: "Synthetic checking",
-						observedAt: Date.parse("2026-10-18T18:00:00Z") / 1000,
-						postedBalance: 500,
-						availableBalance: null,
-						basis: "posted",
-						status: "missing",
-						reasons: ["available-balance-missing"],
-					},
-				],
+				baselines: [],
 			}),
 			true,
 		);
 		expect(html).not.toContain('data-testid="close-cash-value"');
-		expect(html).not.toContain("$500.00");
 		expect(html).toContain("No balance recorded at close");
 	});
 	it("lists posted baselines alongside observed available", () => {

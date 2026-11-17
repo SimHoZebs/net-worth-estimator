@@ -72,9 +72,8 @@ and uses only the cash evidence, not the conditional bill estimate.
 Each selected cash account has its own observation boundary. A newer retirement
 or investment observation cannot advance checking's boundary. Available cash,
 when reported at that observation, is distinct from posted balance. When the
-bank reports no available figure but the posted observation remains intact,
-the summary counts the rolled-forward posted balance as cash and records
-basis posted. Subsequent confirmed movements are counted once. Transfers between selected cash accounts
+bank reports no available figure, the summary counts the reported posted
+balance as cash and records basis posted. Subsequent confirmed movements are counted once. Transfers between selected cash accounts
 do not create spending or income for the combined accounts.
 
 An obligation falling due today remains outstanding until there is evidence
@@ -116,7 +115,7 @@ spending. The same purchase must not be subtracted from cash again.
 
 A historical cash balance requires observations at or before the historical
 cut and applicable subsequent recorded movements. A missing available figure
-alone leaves cash known when posted evidence remains intact. Missing coverage
+alone leaves cash known at the reported posted balance. Missing coverage
 for a selected account makes the aggregate unavailable. Today's balance is never a
 substitute for a missing historical balance.
 

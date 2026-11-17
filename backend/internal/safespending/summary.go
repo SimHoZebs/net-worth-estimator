@@ -152,13 +152,10 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 			b.Basis = "posted"
 			b.Status = "uncertain"
 			if cp.AvailableBalance == nil {
-				// Intact posted evidence counts as cash with posted disclosure.
-				if rolled, intact := balances[a.ID]; intact {
-					b.Status = "available"
-					available += rolled
-				} else {
-					reason(&b.Reasons, "available-balance-missing")
-				}
+				// No bank available figure: fall back to the reported posted
+				// balance itself, marked with the posted basis.
+				b.Status = "available"
+				available += cp.Balance
 			} else {
 				b.Basis = "available"
 				b.Status = "available"
@@ -196,9 +193,8 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 	}
 	knownAvailable := len(selected) > 0
 	exactAvailable := knownAvailable && !slices.Contains(s.Reasons, "posted-amount-unavailable") && !slices.Contains(s.Reasons, "posted-routing-unknown")
-	// A missing available figure alone keeps cash known when posted evidence remains intact.
 	for _, b := range s.Baselines {
-		if b.Basis == "missing" || slices.Contains(b.Reasons, "available-balance-missing") {
+		if b.Basis == "missing" {
 			knownAvailable = false
 		}
 		if b.Status != "available" {

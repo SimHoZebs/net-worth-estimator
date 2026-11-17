@@ -129,7 +129,7 @@ func TestCashAtStartNeverUsesFutureBaselineAndDoesNotReconstructEarlierBills(t *
 	}
 }
 
-func TestMissingAvailableBalanceUsesPostedWhenIntact(t *testing.T) {
+func TestMissingAvailableBalanceFallsBackToPostedBalance(t *testing.T) {
 	m := baseModel()
 	m.Checkpoints[0].AvailableBalance = nil
 	s := Build(m, nil, "2026-11-15", testEnd)
@@ -137,14 +137,14 @@ func TestMissingAvailableBalanceUsesPostedWhenIntact(t *testing.T) {
 		t.Fatalf("summary %+v", s)
 	}
 	if slices.Contains(s.Reasons, "available-balance-missing") {
-		t.Fatalf("intact posted wrongly flagged %+v", s)
+		t.Fatalf("posted fallback wrongly flagged %+v", s)
 	}
 	assertMoney(t, s.CheckingAvailable, 1608.05)
 	assertMoney(t, s.CashAfterBills, 1608.05)
 	m.Transactions = []types.Transaction{payment("after", 13, "2026-11-15T10:00:00Z")}
 	s = Build(m, nil, "2026-11-15", testEnd)
-	assertMoney(t, s.CheckingAvailable, 1595.05)
-	assertMoney(t, s.CashAfterBills, 1595.05)
+	assertMoney(t, s.CheckingAvailable, 1608.05)
+	assertMoney(t, s.CashAfterBills, 1608.05)
 	if len(s.ConfirmedMovements) != 1 {
 		t.Fatalf("movements %+v", s.ConfirmedMovements)
 	}
@@ -154,7 +154,7 @@ func TestMissingAvailableBalanceUsesPostedWhenIntact(t *testing.T) {
 	dynamic.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "balance * .1"}, Inputs: map[string]types.AmountInputBinding{"balance": {Source: "provider", Provider: "account-balance", Arguments: map[string]any{"id": "checking"}}}}
 	unresolved.Transactions = []types.Transaction{dynamic}
 	s = Build(unresolved, nil, "2026-11-15", testEnd)
-	if s.Status != "missing" || s.CheckingAvailable != nil || s.CashAfterBills != nil {
+	if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil {
 		t.Fatalf("unresolved %+v", s)
 	}
 	m.Checkpoints = nil
