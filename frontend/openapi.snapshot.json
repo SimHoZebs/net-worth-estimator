@@ -5183,6 +5183,34 @@
 				"required": ["schedules", "revision"],
 				"type": "object"
 			},
+			"ScheduleOccurrencesOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ScheduleOccurrencesOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"occurrences": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"scheduleId": {
+						"type": "string"
+					}
+				},
+				"required": ["scheduleId", "occurrences", "revision"],
+				"type": "object"
+			},
 			"ScheduleRescheduleBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -9815,6 +9843,54 @@
 					}
 				},
 				"summary": "Move one schedule in same-day execution order"
+			}
+		},
+		"/v1/schedules/{id}/occurrences": {
+			"get": {
+				"operationId": "list-schedule-occurrences",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Last date YYYY-MM-DD inclusive; defaults to 3 calendar months after today UTC",
+						"explode": false,
+						"in": "query",
+						"name": "through",
+						"schema": {
+							"description": "Last date YYYY-MM-DD inclusive; defaults to 3 calendar months after today UTC",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ScheduleOccurrencesOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List occurrence dates for one schedule"
 			}
 		},
 		"/v1/schedules/{id}/reschedule": {

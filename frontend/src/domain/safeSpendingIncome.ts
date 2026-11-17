@@ -1,5 +1,5 @@
 import { literalAmountOf } from "./transactionRows.ts";
-import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
+import { scheduleOccurrenceDates } from "./scheduleExpansion.ts";
 import type { Account, Transaction } from "./model.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
 

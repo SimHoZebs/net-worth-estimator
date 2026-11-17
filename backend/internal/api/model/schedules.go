@@ -3,11 +3,13 @@ package model
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -237,6 +239,48 @@ func (s *handler) rescheduleSchedule(_ context.Context, input *struct {
 		return nil, huma.Error422UnprocessableEntity("startDate must be a YYYY-MM-DD calendar date")
 	}
 	return s.saveSchedule(next)
+}
+
+type scheduleOccurrencesOutput struct {
+	Body struct {
+		ScheduleID  string   `json:"scheduleId"`
+		Occurrences []string `json:"occurrences"`
+		Revision    string   `json:"revision"`
+	} `json:"body"`
+}
+
+// listScheduleOccurrences answers "on which dates does this schedule occur
+// up to this cut". Expansion is the same RuleScheduleDates the claim check
+// uses, so the schedule end-date cap applies once here instead of being
+// reimplemented in the claim UI. A transaction keeps its own happened day;
+// the claim stores the exact scheduled occurrence it fulfils.
+func (s *handler) listScheduleOccurrences(_ context.Context, input *struct {
+	ID      string `path:"id"`
+	Through string `query:"through" doc:"Last date YYYY-MM-DD inclusive; defaults to 3 calendar months after today UTC"`
+}) (*scheduleOccurrencesOutput, error) {
+	schedule, err := s.storedSchedule(input.ID)
+	if err != nil {
+		return nil, err
+	}
+	through := input.Through
+	if through == "" {
+		through = domain.DefaultScheduleOccurrencesThrough(time.Now().UTC().Format("2006-01-02"))
+	} else if !domain.IsValidIsoDate(through) {
+		return nil, huma.Error422UnprocessableEntity("through must be a YYYY-MM-DD calendar date")
+	}
+	model, err := s.store.LoadModel()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	revision, err := store.ModelETag(model)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	output := &scheduleOccurrencesOutput{}
+	output.Body.ScheduleID = schedule.ID
+	output.Body.Occurrences = domain.RuleScheduleDates(&schedule, through)
+	output.Body.Revision = revision
+	return output, nil
 }
 
 func (s *handler) deleteSchedule(_ context.Context, input *struct {

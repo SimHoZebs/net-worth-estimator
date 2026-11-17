@@ -19,8 +19,7 @@ import {
 	scheduleTransaction,
 	type AccountTransaction,
 } from "../../domain/accountActivity.ts";
-import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
-import { dateLabel, todayIso } from "../../domain/format.ts";
+import { dateLabel } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { AccountIconFallback } from "./AccountIconFallback.tsx";
 import { parseUnion } from "../../domain/guards.ts";
@@ -141,6 +140,7 @@ import {
 import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
 import { useSettleCandidates } from "../../state/settleCandidates.ts";
+import { useClaimOccurrenceOptions } from "../../state/scheduleOccurrences.ts";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
@@ -616,41 +616,16 @@ export function TransactionDetail({
 				: [],
 		[allTransactions, savedTransaction.kind, savedTransaction.id],
 	);
-	// Claim candidates: the selected schedule's dates through today,
-	// closest to the day the transaction actually happened first, already
-	// claimed dates removed. The row's own saved claim always stays listed.
+	// Claim candidates come from the server occurrence list for the selected
+	// schedule, closest to the day the transaction actually happened first.
+	// The row's own saved claim always stays listed.
 	const postedRef = savedTransaction.postedDate ?? savedTransaction.startDate;
-	const occurrenceOptions = useMemo(() => {
-		const scheduleId = edit.draft.claimScheduleId;
-		const schedule = scheduleId
-			? rawSchedules?.find((row) => row.id === scheduleId)
-			: undefined;
-		if (!schedule) return [];
-		const claimed = new Set<string>();
-		for (const row of allTransactions) {
-			if (
-				row.id !== savedTransaction.id &&
-				row.claimScheduleId === scheduleId &&
-				row.claimOccurrenceDate
-			)
-				claimed.add(row.claimOccurrenceDate);
-		}
-		const candidates = claimOccurrenceCandidates({
-			schedule,
-			through: todayIso(),
-			postedRef,
-			claimed,
-		});
-		const own = edit.draft.claimOccurrenceDate;
-		return own && !candidates.includes(own) ? [own, ...candidates] : candidates;
-	}, [
-		edit.draft.claimScheduleId,
-		edit.draft.claimOccurrenceDate,
-		rawSchedules,
-		allTransactions,
-		savedTransaction.id,
-		postedRef,
-	]);
+	const occurrenceOptions = useClaimOccurrenceOptions({
+		scheduleId: edit.draft.claimScheduleId || null,
+		happenedDay: postedRef,
+		currentTransactionId: savedTransaction.id,
+		selectedDate: edit.draft.claimOccurrenceDate || null,
+	});
 	const settleCandidates = useSettleCandidates(
 		savedTransaction.id,
 		transaction.void && !savedTransaction.pending,

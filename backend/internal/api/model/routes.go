@@ -46,6 +46,7 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "move-transaction", Method: "POST", Path: "/transactions/{id}/move", Summary: "Move one transaction in same-day execution order"}, s.moveTransaction)
 	huma.Register(api, huma.Operation{OperationID: "import-model", Method: "POST", Path: "/model/import", Summary: "Replace the reviewed model"}, s.importModel)
 	huma.Register(api, huma.Operation{OperationID: "list-schedules", Method: "GET", Path: "/schedules", Summary: "List schedules touching an account"}, s.listSchedules)
+	huma.Register(api, huma.Operation{OperationID: "list-schedule-occurrences", Method: "GET", Path: "/schedules/{id}/occurrences", Summary: "List occurrence dates for one schedule"}, s.listScheduleOccurrences)
 	huma.Register(api, huma.Operation{OperationID: "create-schedule", Method: "POST", Path: "/schedules", Summary: "Create one schedule"}, s.createSchedule)
 	huma.Register(api, huma.Operation{OperationID: "amend-schedule", Method: "POST", Path: "/schedules/{id}/amend", Summary: "Amend the terms of one schedule"}, s.amendSchedule)
 	huma.Register(api, huma.Operation{OperationID: "reschedule-schedule", Method: "POST", Path: "/schedules/{id}/reschedule", Summary: "Change the cadence or window of one schedule"}, s.rescheduleSchedule)

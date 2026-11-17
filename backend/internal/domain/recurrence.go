@@ -179,6 +179,18 @@ func RuleScheduleDates(rule *types.Schedule, endDate string) []string {
 	return dates
 }
 
+// ScheduleOccurrencesHorizonMonths is the named default forward window for
+// schedule occurrence reads when the caller omits `through`: three calendar
+// months after today UTC.
+const ScheduleOccurrencesHorizonMonths = 3
+
+// DefaultScheduleOccurrencesThrough returns the default `through` date for
+// schedule occurrence reads: today plus the named horizon, month-clamped
+// exactly like advanceDate (Jan 31 + 3mo clamps to Apr 30).
+func DefaultScheduleOccurrencesThrough(today string) string {
+	return AddMonthsClamped(today, ScheduleOccurrencesHorizonMonths)
+}
+
 // ruleOccursOn tests one date without expanding the whole prefix: advance
 // until reaching or passing the date. Daily rules with hundreds of claims
 // no longer re-expand the shared prefix per claim.

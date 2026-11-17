@@ -3,7 +3,7 @@ import type { TransactionResult } from "./result.ts";
 import { literalAmountOf } from "./transactionRows.ts";
 import { inWindow } from "./safeSpendingMath.ts";
 import { resolveEffectiveIds } from "./safeSpendingSelection.ts";
-import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
+import { scheduleOccurrenceDates } from "./scheduleExpansion.ts";
 
 export interface BillCandidate {
 	id: string;

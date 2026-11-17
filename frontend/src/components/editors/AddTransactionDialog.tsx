@@ -7,12 +7,10 @@ import {
 	refreshTransactions,
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
-import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
+import { useClaimOccurrenceOptions } from "../../state/scheduleOccurrences.ts";
 import {
 	useSavedAccounts,
-	useSavedSchedules,
 	useSavedStartDate,
-	useSavedTransactions,
 } from "../../state/savedState.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import {
@@ -57,9 +55,8 @@ export function AddTransactionDialog({
 			(catalog.data?.items ?? []).filter((item) => item.kind === "schedule"),
 		[catalog.data],
 	);
-	// The create form picks from the same scheduled occurrence list as the
-	// detail editor: closest to the new transaction's own day first.
-	const savedTransactions = useSavedTransactions();
+	// The create form picks from the server occurrence list for the chosen
+	// schedule: closest to the new transaction's own day first.
 	const [name, setName] = useState("");
 	const [amount, setAmount] = useState("500");
 	const [fromId, setFromId] = useState("");
@@ -68,34 +65,11 @@ export function AddTransactionDialog({
 	const [enabled, setEnabled] = useState(true);
 	const [claimScheduleId, setClaimRuleId] = useState("");
 	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState("");
-	const savedSchedules = useSavedSchedules();
-	const occurrenceOptions = useMemo(() => {
-		const schedule = (savedSchedules ?? []).find(
-			(row) => row.id === claimScheduleId,
-		);
-		if (!schedule) return [];
-		const claimed = new Set<string>();
-		for (const row of savedTransactions ?? []) {
-			if (row.claimScheduleId === claimScheduleId && row.claimOccurrenceDate)
-				claimed.add(row.claimOccurrenceDate);
-		}
-		if (claimOccurrenceDate) claimed.delete(claimOccurrenceDate);
-		const candidates = claimOccurrenceCandidates({
-			schedule,
-			through: todayIso(),
-			postedRef: startDate,
-			claimed,
-		});
-		return claimOccurrenceDate && !candidates.includes(claimOccurrenceDate)
-			? [claimOccurrenceDate, ...candidates]
-			: candidates;
-	}, [
-		savedSchedules,
-		claimScheduleId,
-		startDate,
-		claimOccurrenceDate,
-		savedTransactions,
-	]);
+	const occurrenceOptions = useClaimOccurrenceOptions({
+		scheduleId: claimScheduleId || null,
+		happenedDay: startDate,
+		selectedDate: claimOccurrenceDate || null,
+	});
 	const [saving, setSaving] = useState(false);
 	const [transactionTime, setTransactionTime] = useState("");
 	const [error, setError] = useState<string | null>(null);

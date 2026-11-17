@@ -375,7 +375,8 @@ export function ScheduleCapsule({
 				<p className="flex items-center gap-2">
 					<Link2 size={15} aria-hidden="true" />
 					<span>
-						Replaces {claimScheduleName ?? draft.claimScheduleId} on{" "}
+						Happened {dateLabel(draft.startDate, true)} · Replaces{" "}
+						{claimScheduleName ?? draft.claimScheduleId} occurrence on{" "}
 						{draft.claimOccurrenceDate
 							? dateLabel(draft.claimOccurrenceDate, true)
 							: "an unclaimed date"}
