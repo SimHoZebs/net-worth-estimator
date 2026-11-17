@@ -56,11 +56,18 @@ export function safeSpendingResults({
 
 	const combined: TransactionResult[] = [];
 	const seen = new Set<string>();
+	// Occurrence identities span the whole join, not just the cent-exact row
+	// identity. A bill fill must never add a second row for a schedule/day the
+	// projection already supplied, even when the two resolve to different
+	// amounts.
+	const existing = new Set<string>();
+	for (const key of claimedKeys) existing.add(key);
 	const add = (row: TransactionResult) => {
 		const key = occurrenceKey(row.transactionId, row.date);
 		const identity = `${key}|${row.fromId}|${row.toId}|${row.requested}`;
 		if (seen.has(identity)) return;
 		seen.add(identity);
+		existing.add(key);
 		combined.push(row);
 	};
 	// Posted deposits are distinct evidence: keep each even when two share
@@ -69,7 +76,9 @@ export function safeSpendingResults({
 	const postedOccurrences = new Set<string>();
 	for (const row of posted) {
 		combined.push(row);
-		postedOccurrences.add(occurrenceKey(row.transactionId, row.date));
+		const key = occurrenceKey(row.transactionId, row.date);
+		postedOccurrences.add(key);
+		existing.add(key);
 	}
 	for (const row of projectionTransactions) {
 		if (claimedKeys.has(occurrenceKey(row.transactionId, row.date))) continue;
@@ -96,8 +105,7 @@ export function safeSpendingResults({
 				through: billWindowEnd,
 			})) {
 				if (date < billWindowStart) continue;
-				if (claimedKeys.has(occurrenceKey(schedule.id, date))) continue;
-				if (postedOccurrences.has(occurrenceKey(schedule.id, date))) continue;
+				if (existing.has(occurrenceKey(schedule.id, date))) continue;
 				add({
 					date,
 					transactionId: schedule.id,

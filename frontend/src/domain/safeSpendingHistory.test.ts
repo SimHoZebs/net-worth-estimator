@@ -247,6 +247,46 @@ describe("safeSpendingResults", () => {
 		]);
 	});
 
+	it("does not duplicate a bill the projection already supplied at a different amount", () => {
+		const bill = {
+			id: "sallie",
+			name: "Sallie Mae Loan Payment",
+			sourceAccountId: "checking",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "91.08" },
+				inputs: {},
+			},
+			frequency: "monthly",
+			startDate: "2026-11-19",
+			endDate: null,
+			annualCap: null,
+			priority: 1,
+			enabled: true,
+		};
+		const results = safeSpendingResults({
+			transactions: [],
+			projectionTransactions: [
+				transactionFixture({
+					transactionId: "sallie",
+					name: "Sallie Mae Loan Payment",
+					date: "2026-11-19",
+					fromId: "checking",
+					toId: null,
+					requested: 91,
+					realized: 91,
+				}),
+			],
+			billSchedules: [bill],
+			billWindowStart: "2026-09-20",
+			billWindowEnd: "2026-11-30",
+		});
+		expect(
+			results.filter((row) => row.transactionId === "sallie"),
+		).toHaveLength(1);
+	});
+
 	it("does not duplicate an occurrence claimed by a posted row", () => {
 		const results = safeSpendingResults({
 			transactions: [
