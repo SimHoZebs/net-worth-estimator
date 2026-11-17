@@ -266,7 +266,7 @@ describe("safeSpendingTrend", () => {
 			scheduledOutflows: [
 				{ date: "2026-01-22", amount: 10, name: "alpha" },
 				{ date: "2026-01-22", amount: 15, name: "beta" },
-				{ date: "2026-01-21", amount: 999 },
+				{ date: "2026-01-20", amount: 999 },
 				{ date: "2026-01-24", amount: 999 },
 				{ date: "2026-01-23", amount: 0 },
 				{ date: "2026-01-23", amount: Number.NaN },
@@ -278,5 +278,25 @@ describe("safeSpendingTrend", () => {
 		expect(
 			trend.projected.find((point) => point.date === "2026-01-22")?.spent,
 		).toBe(25);
+	});
+
+	it("lifts today for increases due today", () => {
+		const trend = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-23",
+			todayIso: "2026-01-21",
+			limit: 10000,
+			safetyNet: 10000,
+			scheduledOutflows: [{ date: "2026-01-21", amount: 60, name: "Sub" }],
+		});
+		expect(trend.scheduledIncreases).toEqual([
+			{ date: "2026-01-21", amount: 60, name: "Sub" },
+		]);
+		expect(trend.projected.map((point) => [point.date, point.spent])).toEqual([
+			["2026-01-21", 160],
+			["2026-01-22", 210],
+			["2026-01-23", 260],
+		]);
 	});
 });

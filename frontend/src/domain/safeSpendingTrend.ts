@@ -138,7 +138,7 @@ export function ledgerHit(
  * Daily cumulative spending for one statement cycle. Actual rows run
  * from the cycle start through today; projected rows continue from today at
  * the average daily rate plus scheduled increases for recurring bills due
- * later in the cycle.
+ * today or later in the cycle.
  * Actual crossings retain the exact ledger row identity,
  * even when several charges share a day. Negative opening capacity has no causal row.
  */
@@ -166,7 +166,7 @@ export function safeSpendingTrend({
 	const grouped = new Map<string, { cents: number; names: string[] }>();
 	for (const increase of scheduledOutflows) {
 		const day = increase.date.slice(0, 10);
-		if (day <= today || day > end) continue;
+		if (day < today || day > end) continue;
 		if (!Number.isFinite(increase.amount) || increase.amount <= 0) continue;
 		const entry = grouped.get(day) ?? { cents: 0, names: [] as string[] };
 		entry.cents += Math.round(increase.amount * 100);
@@ -233,12 +233,16 @@ export function safeSpendingTrend({
 	) {
 		const increaseCentsByDate = new Map(
 			scheduledIncreases.map((increase) => [
-				increase.date,
+				increase.date.slice(0, 10),
 				Math.round(increase.amount * 100),
 			]),
 		);
-		let increaseCents = 0;
-		projected.push({ date: today, spent: cumulative, projected: true });
+		let increaseCents = increaseCentsByDate.get(today) ?? 0;
+		projected.push({
+			date: today,
+			spent: roundCents(cumulative + increaseCents / 100),
+			projected: true,
+		});
 		for (let offset = 1; offset <= remainingDays; offset++) {
 			const date = shiftDate({ date: today, days: offset });
 			increaseCents += increaseCentsByDate.get(date) ?? 0;

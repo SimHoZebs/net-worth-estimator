@@ -84,10 +84,24 @@ describe("recurringBillIncreases", () => {
 		]);
 	});
 
+	it("includes bills due today, which are outstanding but unrecorded", () => {
+		const increases = recurringBillIncreases({
+			obligations: [
+				obligation("schedule:rent:2026-11-15", {
+					date: "2026-11-15",
+					name: "rent",
+				}),
+			],
+			...args,
+		});
+		expect(increases).toEqual([
+			{ date: "2026-11-15", amount: 25, name: "rent" },
+		]);
+	});
+
 	it("ignores rows outside the window and unknown amounts", () => {
 		const increases = recurringBillIncreases({
 			obligations: [
-				obligation("today", { date: "2026-11-15" }),
 				obligation("past", { date: "2026-11-14" }),
 				obligation("after-end", { date: "2026-12-01" }),
 				obligation("unknown", { date: "2026-11-20", amount: null }),

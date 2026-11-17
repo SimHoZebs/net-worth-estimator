@@ -53,7 +53,7 @@ export function recurringBillIncreases({
 	const byDate = new Map<string, { cents: number; names: string[] }>();
 	for (const row of obligations) {
 		const day = row.date.slice(0, 10);
-		if (day <= start || day > end) continue;
+		if (day < start || day > end) continue;
 		if (row.scheduleId === null) continue;
 		if (row.amount === null || !Number.isFinite(row.amount) || row.amount <= 0)
 			continue;
