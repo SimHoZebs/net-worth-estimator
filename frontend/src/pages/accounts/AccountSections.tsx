@@ -143,16 +143,16 @@ function AccountsView({
 				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
 					<FieldLabel
 						htmlFor={searchId}
-						className="inline-flex items-center gap-2 text-muted-foreground"
+						className="inline-flex w-full items-center gap-2 text-muted-foreground sm:w-auto"
 					>
-						<Search size={16} aria-hidden="true" />
+						<Search size={16} aria-hidden="true" className="shrink-0" />
 						<span className="sr-only">Search accounts</span>
 						<Input
 							id={searchId}
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
 							placeholder="Find an account…"
-							className="w-32 sm:w-48"
+							className="w-full sm:w-48"
 						/>
 					</FieldLabel>
 					<Button
@@ -380,16 +380,16 @@ function TransactionsView({
 				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 max-sm:pb-4">
 					<FieldLabel
 						htmlFor={`${listId}-search`}
-						className="inline-flex items-center gap-2 text-muted-foreground"
+						className="inline-flex w-full items-center gap-2 text-muted-foreground sm:w-auto"
 					>
-						<Search size={16} aria-hidden="true" />
+						<Search size={16} aria-hidden="true" className="shrink-0" />
 						<span className="sr-only">Search transactions</span>
 						<Input
 							id={`${listId}-search`}
 							value={query}
 							onChange={(event) => search(event.target.value)}
 							placeholder="Find a transaction…"
-							className="w-32 sm:w-48"
+							className="w-full sm:w-48"
 						/>
 					</FieldLabel>
 					<div className="flex shrink-0 flex-wrap items-center gap-3">

@@ -46,7 +46,7 @@ export function AccountsPanel({
 		);
 	return (
 		<Table
-			className="border-collapse text-left"
+			className="border-collapse text-left max-sm:table-fixed"
 			containerClassName="max-w-full"
 			containerProps={{
 				role: "region",
@@ -56,12 +56,19 @@ export function AccountsPanel({
 			<TableCaption className="sr-only">
 				Accounts and current balances.
 			</TableCaption>
+			<colgroup>
+				<col />
+				<col className="max-sm:w-24" />
+				<col className="max-sm:w-[68px]" />
+			</colgroup>
 			{showHeaders && (
 				<TableHeader>
 					<TableRow>
-						<TableHead className="max-sm:p-4">Account</TableHead>
-						<TableHead className="max-sm:p-4">Current balance</TableHead>
-						<TableHead className="max-sm:p-4">
+						<TableHead className="max-sm:px-2 max-sm:py-3">Account</TableHead>
+						<TableHead className="text-right max-sm:whitespace-normal max-sm:px-1 max-sm:py-3">
+							Current balance
+						</TableHead>
+						<TableHead className="max-sm:px-1 max-sm:py-3">
 							<span className="sr-only">Actions</span>
 						</TableHead>
 					</TableRow>
@@ -85,26 +92,35 @@ export function AccountsPanel({
 								onAccount(account.id);
 							}}
 						>
-							<TableHead scope="row" className="py-5 max-sm:px-4 max-sm:py-5">
+							<TableHead
+								scope="row"
+								className="py-5 max-sm:min-w-0 max-sm:whitespace-normal max-sm:px-2 max-sm:py-4"
+							>
 								<Button
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="group h-auto justify-start gap-3 px-1 py-0.5 text-left font-normal"
+									className="group h-auto max-w-full justify-start gap-3 px-1 py-0.5 text-left font-normal max-sm:min-w-0 max-sm:gap-1.5 max-sm:px-0"
 									aria-label={`Open ${account.name} transactions`}
 									onClick={() => onAccount(account.id)}
 								>
 									<AccountLabel
 										account={account}
-										nameClassName="group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
+										title={account.name}
+										className="max-sm:gap-2"
+										nameClassName="truncate group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
 										suffix={!account.enabled ? " · excluded" : undefined}
 									/>
 									{account.readOnly && (
-										<LockKeyhole size={14} aria-label="Read-only record" />
+										<LockKeyhole
+											size={14}
+											aria-label="Read-only record"
+											className="shrink-0"
+										/>
 									)}
 								</Button>
 							</TableHead>
-							<TableCell className="tabular-nums max-sm:p-4">
+							<TableCell className="text-right tabular-nums max-sm:whitespace-nowrap max-sm:px-1 max-sm:py-4">
 								<div>
 									{current === null ? (
 										<span className="text-muted-foreground">Unavailable</span>
@@ -113,7 +129,7 @@ export function AccountsPanel({
 									)}
 								</div>
 							</TableCell>
-							<TableCell className="max-sm:p-4">
+							<TableCell className="max-sm:px-1 max-sm:py-4">
 								<div className="flex justify-end gap-1">
 									<Button
 										variant="ghost"
