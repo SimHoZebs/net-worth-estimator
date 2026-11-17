@@ -22,6 +22,7 @@ export interface FixtureOptions {
 		bridgeAccountId: string;
 		modelAccountId: string;
 		bridgeName: string;
+		institution?: string;
 		currency?: string;
 	};
 }

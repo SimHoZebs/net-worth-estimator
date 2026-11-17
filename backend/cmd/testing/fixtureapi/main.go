@@ -105,6 +105,15 @@ type bankAccountSeed struct {
 	Transactions    []simplefin.Transaction `json:"transactions"`
 }
 
+// syncLinkSeed is the single-link shape accepted by the fixture reset body.
+type syncLinkSeed struct {
+	BridgeAccountID string `json:"bridgeAccountId"`
+	ModelAccountID  string `json:"modelAccountId"`
+	BridgeName      string `json:"bridgeName"`
+	Institution     string `json:"institution"`
+	Currency        string `json:"currency"`
+}
+
 // fixtureInputError marks a reset body the harness rejects before touching
 // state. The handler answers it 400 so specs fail fast instead of reseeding.
 type fixtureInputError struct{ msg string }
@@ -456,12 +465,7 @@ func main() {
 			BankTransactions        []simplefin.Transaction `json:"bankTransactions"`
 			BankAccountTransactions []bankAccountSeed       `json:"bankAccountTransactions"`
 			Bulk                    *string                 `json:"bulk"`
-			SyncLink                *struct {
-				BridgeAccountID string `json:"bridgeAccountId"`
-				ModelAccountID  string `json:"modelAccountId"`
-				BridgeName      string `json:"bridgeName"`
-				Currency        string `json:"currency"`
-			} `json:"syncLink"`
+			SyncLink                *syncLinkSeed           `json:"syncLink"`
 		}
 		if request.Body != nil {
 			// An empty body is valid and keeps the current guard setting.
@@ -485,6 +489,7 @@ func main() {
 				BridgeAccountID: body.SyncLink.BridgeAccountID,
 				ModelAccountID:  body.SyncLink.ModelAccountID,
 				BridgeName:      body.SyncLink.BridgeName,
+				Institution:     body.SyncLink.Institution,
 				Currency:        body.SyncLink.Currency,
 				Origin:          store.LinkOriginAuto,
 			}); err != nil {

@@ -96,6 +96,28 @@ func TestFixtureBankAccountSeedWireContract(t *testing.T) {
 	}
 }
 
+// The reset body's syncLink carries the institution as a camelCase wire field.
+// This pins the contract the synced accounts subtitle depends on.
+func TestFixtureSyncLinkInstitutionWireContract(t *testing.T) {
+	var body struct {
+		SyncLink *syncLinkSeed `json:"syncLink"`
+	}
+	if err := json.Unmarshal([]byte(`{
+		"syncLink": {
+			"bridgeAccountId": "bridge-checking",
+			"modelAccountId": "checking",
+			"bridgeName": "Checking",
+			"institution": "Example Bank",
+			"currency": "USD"
+		}
+	}`), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.SyncLink == nil || body.SyncLink.Institution != "Example Bank" {
+		t.Fatalf("syncLink institution wire shape changed: %+v", body.SyncLink)
+	}
+}
+
 func TestFixtureResetMultiBridgeSeedsTransferLegs(t *testing.T) {
 	db, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "multi-bridge.db"))
 	if err != nil {
