@@ -2,17 +2,6 @@ import { Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TablePagination } from "../../components/TablePagination.tsx";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog.tsx";
-import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -30,19 +19,12 @@ import {
 } from "../../domain/transactionSort.ts";
 import { balanceRowToDisplay } from "../../api/adapter.ts";
 import {
-	isGroupedDisplay,
 	toDisplayAccounts,
 	toDisplayTransaction,
 } from "../../domain/accountDisplay.ts";
-import {
-	type Account,
-	visibleAccounts,
-	visibleTransactions,
-} from "../../domain/model.ts";
+import { visibleAccounts, visibleTransactions } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { performSave } from "../../state/workspaceWrites.ts";
 import {
-	refreshAccounts,
 	useAccountBalances,
 	useSchedules,
 	useTransactions,
@@ -52,7 +34,6 @@ import {
 	transactionToDisplay,
 } from "../../domain/transactionRows.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
-import { deleteAccount, deleteLoan } from "@/api/generated/endpoints.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
 import { useRouter } from "@tanstack/react-router";
@@ -96,9 +77,6 @@ function AccountsView({
 	onAccount: (id: string) => void;
 }) {
 	const [query, setQuery] = useState("");
-	const [remove, setRemove] = useState<Account | null>(null);
-	const [removing, setRemoving] = useState(false);
-	const [removeError, setRemoveError] = useState<string | null>(null);
 	const balances = useAccountBalances();
 	const searchId = useId();
 	const visible = useMemo(
@@ -113,130 +91,52 @@ function AccountsView({
 	const accounts = visible.filter((account) =>
 		account.name.toLowerCase().includes(query.toLowerCase()),
 	);
-	const deleteItem = async () => {
-		if (!remove || removing) return;
-		if (visible.length <= 1) {
-			setRemoveError(
-				"Keep at least one account. Add a replacement before removing this one.",
-			);
-			return;
-		}
-		setRemoving(true);
-		setRemoveError(null);
-		const ok = await performSave({
-			call: () =>
-				isGroupedDisplay(remove)
-					? deleteLoan(remove.id)
-					: deleteAccount(remove.id),
-			refresh: refreshAccounts,
-			failureMessage: "The account could not be removed.",
-		});
-		setRemoving(false);
-		// Success closes the dialog. A failure reaches the toast from the
-		// account write; the dialog stays open with the validation slot for
-		// retry. The only inline error here is the single-account guard below.
-		if (ok) setRemove(null);
-	};
 	return (
-		<>
-			<section>
-				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
-					<FieldLabel
-						htmlFor={searchId}
-						className="inline-flex w-full items-center gap-2 text-muted-foreground sm:w-auto"
-					>
-						<Search size={16} aria-hidden="true" className="shrink-0" />
-						<span className="sr-only">Search accounts</span>
-						<Input
-							id={searchId}
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-							placeholder="Find an account…"
-							className="w-full sm:w-48"
-						/>
-					</FieldLabel>
+		<section>
+			<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
+				<FieldLabel
+					htmlFor={searchId}
+					className="inline-flex w-full items-center gap-2 text-muted-foreground sm:w-auto"
+				>
+					<Search size={16} aria-hidden="true" className="shrink-0" />
+					<span className="sr-only">Search accounts</span>
+					<Input
+						id={searchId}
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+						placeholder="Find an account…"
+						className="w-full sm:w-48"
+					/>
+				</FieldLabel>
+				<Button
+					type="button"
+					variant="default"
+					size="sm"
+					className="max-sm:px-3 max-sm:py-2"
+					onClick={() => onEdit({ kind: "account", item: null })}
+				>
+					<Plus size={16} />
+					Add account
+				</Button>
+			</div>
+			{balances.isPending ? (
+				<p role="status">Loading accounts…</p>
+			) : balances.isError ? (
+				<p role="alert">
+					Accounts could not be loaded.{" "}
 					<Button
 						type="button"
-						variant="default"
+						variant="secondary"
 						size="sm"
-						className="max-sm:px-3 max-sm:py-2"
-						onClick={() => onEdit({ kind: "account", item: null })}
+						onClick={() => void balances.refetch()}
 					>
-						<Plus size={16} />
-						Add account
+						Retry
 					</Button>
-				</div>
-				{balances.isPending ? (
-					<p role="status">Loading accounts…</p>
-				) : balances.isError ? (
-					<p role="alert">
-						Accounts could not be loaded.{" "}
-						<Button
-							type="button"
-							variant="secondary"
-							size="sm"
-							onClick={() => void balances.refetch()}
-						>
-							Retry
-						</Button>
-					</p>
-				) : (
-					<AccountsPanel
-						accounts={accounts}
-						onAccount={onAccount}
-						onEdit={(item) => onEdit({ kind: "account", item })}
-						onRemove={setRemove}
-					/>
-				)}
-			</section>
-			{remove && (
-				<AlertDialog
-					open={true}
-					onOpenChange={(next) => {
-						if (!next && !removing) {
-							setRemove(null);
-							setRemoveError(null);
-						}
-					}}
-				>
-					<AlertDialogContent>
-						<AlertDialogHeader>
-							<p className="text-xs font-bold tracking-widest text-muted-foreground">
-								Changes
-							</p>
-							<AlertDialogTitle>Remove {remove.name}?</AlertDialogTitle>
-							<AlertDialogDescription>
-								Deletes the account and its balance history immediately.
-							</AlertDialogDescription>
-						</AlertDialogHeader>
-						{removeError && (
-							<Alert variant="destructive">
-								<AlertDescription>{removeError}</AlertDescription>
-							</Alert>
-						)}
-						<AlertDialogFooter>
-							<AlertDialogCancel
-								variant="secondary"
-								disabled={removing}
-								onClick={() => {
-									setRemove(null);
-									setRemoveError(null);
-								}}
-							>
-								Keep account
-							</AlertDialogCancel>
-							<AlertDialogAction
-								variant="destructive"
-								disabled={removing}
-								onClick={() => void deleteItem()}
-							>
-								{removing ? "Removing…" : "Remove account"}
-							</AlertDialogAction>
-						</AlertDialogFooter>
-					</AlertDialogContent>
-				</AlertDialog>
+				</p>
+			) : (
+				<AccountsPanel accounts={accounts} onAccount={onAccount} />
 			)}
-		</>
+		</section>
 	);
 }
 

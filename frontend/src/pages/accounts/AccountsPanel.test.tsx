@@ -28,13 +28,7 @@ function account(overrides: Partial<Account> = {}): Account {
 
 const render = (accounts: Account[]) =>
 	renderToStaticMarkup(
-		<AccountsPanel
-			accounts={accounts}
-			showHeaders
-			onAccount={() => {}}
-			onEdit={() => {}}
-			onRemove={() => {}}
-		/>,
+		<AccountsPanel accounts={accounts} showHeaders onAccount={() => {}} />,
 	);
 
 describe("accounts panel current balance", () => {

@@ -1,4 +1,4 @@
-import { LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
+import { LockKeyhole, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { displayCurrentBalance } from "../../domain/accountDisplay.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -24,14 +24,10 @@ export function AccountsPanel({
 	accounts,
 	showHeaders = false,
 	onAccount,
-	onEdit,
-	onRemove,
 }: {
 	accounts: Account[];
 	showHeaders?: boolean;
 	onAccount: (id: string) => void;
-	onEdit: (account: Account) => void;
-	onRemove: (account: Account) => void;
 }) {
 	if (!accounts.length)
 		return (
@@ -59,7 +55,6 @@ export function AccountsPanel({
 			<colgroup>
 				<col />
 				<col className="max-sm:w-24" />
-				<col className="max-sm:w-[68px]" />
 			</colgroup>
 			{showHeaders && (
 				<TableHeader>
@@ -67,9 +62,6 @@ export function AccountsPanel({
 						<TableHead className="max-sm:px-2 max-sm:py-3">Account</TableHead>
 						<TableHead className="text-right max-sm:whitespace-normal max-sm:px-1 max-sm:py-3">
 							Current balance
-						</TableHead>
-						<TableHead className="max-sm:px-1 max-sm:py-3">
-							<span className="sr-only">Actions</span>
 						</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -127,27 +119,6 @@ export function AccountsPanel({
 									) : (
 										money(current)
 									)}
-								</div>
-							</TableCell>
-							<TableCell className="max-sm:px-1 max-sm:py-4">
-								<div className="flex justify-end gap-1">
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label={`Edit ${account.name}`}
-										onClick={() => onEdit(account)}
-									>
-										<Pencil aria-hidden="true" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label={`Remove ${account.name}`}
-										disabled={account.readOnly}
-										onClick={() => onRemove(account)}
-									>
-										<Trash2 aria-hidden="true" />
-									</Button>
 								</div>
 							</TableCell>
 						</TableRow>
