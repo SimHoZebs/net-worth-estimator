@@ -380,12 +380,7 @@ export function SafeSpendingPreview({
 						: null,
 			},
 		};
-	}, [
-		selectedView,
-		transactionOrder,
-		selected.cycleStart,
-		selected.cycleEnd,
-	]);
+	}, [selectedView, transactionOrder, selected.cycleStart, selected.cycleEnd]);
 	// Saved rows hydrate after the card header. The header renders
 	// immediately; only the computed body waits for rows, settings,
 	// and the forecast.
@@ -469,7 +464,6 @@ export function SafeSpendingPreview({
 								</Button>
 							</div>
 							<SafeSpendingBillsPanel
-								heroes={selectedView.view.heroes}
 								cashEvidence={
 									<SafeSpendingCashEvidence
 										summary={cashSummary.data}

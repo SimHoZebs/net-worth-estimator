@@ -35,7 +35,9 @@ export const recordedCharge: AccountTransaction = {
 	void: false,
 };
 
-function summary(overrides: Partial<SafeSpendingSummary> = {}): SafeSpendingSummary {
+function summary(
+	overrides: Partial<SafeSpendingSummary> = {},
+): SafeSpendingSummary {
 	return {
 		revision: "synthetic",
 		selectedAccountIds: ["checking"],
@@ -90,8 +92,6 @@ describe("single selected-cycle budget", () => {
 			}),
 		);
 		expect(html).toContain("Known cash evidence");
-		expect(html).toContain('data-testid="spend-value"');
-		expect(html).toContain('data-testid="perday-value"');
 		expect(html).not.toContain("Card allowance");
 		expect(html).not.toContain("paycheck");
 		expect(html).not.toContain("this statement");
@@ -140,12 +140,12 @@ describe("single selected-cycle budget", () => {
 			}),
 		);
 		expect(html).toContain("Remainder unavailable");
-		expect(html).toContain('data-testid="spend-value"');
-		expect(html).toContain('data-testid="perday-value"');
 		expect(html).not.toContain("closed-card-value");
 		expect(html).not.toContain("recorded-charges-value");
 		expect(html).not.toContain("cash-payments-value");
-		expect(html).not.toContain("No cash evidence exists for an upcoming cycle.");
+		expect(html).not.toContain(
+			"No cash evidence exists for an upcoming cycle.",
+		);
 	});
 	it("captions the selected closed cycle rather than the current closing countdown", () => {
 		expect(
@@ -177,9 +177,7 @@ describe("single selected-cycle budget", () => {
 		).toBe("Nov 19, 2026 · 4 days left");
 	});
 	it("keeps one side-panel shape with spending, thresholds, and cash payments", () => {
-		const { view, trend } = cycleView(
-			selectedInput({ monthlyIncome: 600 }),
-		);
+		const { view, trend } = cycleView(selectedInput({ monthlyIncome: 600 }));
 		expect(trend.monthlyIncome?.amount).toBe(600);
 		const cashRow: AccountTransaction = {
 			...recordedCharge,
@@ -216,8 +214,7 @@ describe("single selected-cycle budget", () => {
 					},
 					thresholds: {
 						limitTransactionId: trend.limitHit?.transactionId ?? null,
-						safetyNetTransactionId:
-							trend.safetyNetHit?.transactionId ?? null,
+						safetyNetTransactionId: trend.safetyNetHit?.transactionId ?? null,
 						incomeTransactionId:
 							trend.monthlyIncome?.hit?.transactionId ?? null,
 					},

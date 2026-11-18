@@ -9,7 +9,6 @@ export const SAFE_SPENDING_LABELS = {
 	incomeLimit: "Income limit",
 	cycleSpending: "Spending this cycle",
 	cashAfterOutstandingBills: "Cash after bills",
-	perDay: "Per day",
 	reserve: "Protected reserve",
 	reserveStarts: "Reserve",
 	recurringBills: "Recurring bills",

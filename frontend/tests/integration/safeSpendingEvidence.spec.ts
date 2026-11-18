@@ -352,11 +352,11 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		await expect(
 			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
-		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
-		// Every offset lists the same main-card sections: spend, per day,
-		// cash evidence with the selected window's Bills, and pace.
-		await expect(card.getByTestId("spend-value")).toHaveText("—");
-		await expect(card.getByTestId("perday-value")).toHaveText("—");
+		await card
+			.getByRole("button", { name: "Previous cycle", exact: true })
+			.click();
+		// Every offset lists the same main-card sections: cash evidence with
+		// the selected window's Bills, and pace.
 		await expect(card.getByTestId("left-value")).toHaveText("—");
 		await expect(
 			card.getByText("Remainder unavailable", { exact: true }),
@@ -393,7 +393,9 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		).toBeVisible();
 		await expect(drawer).toContainText("Sep 20 – Oct 19");
 		// The unified summary lists the spent total before the per-card rows.
-		await expect(drawer.getByText("$125.00", { exact: true }).first()).toBeVisible();
+		await expect(
+			drawer.getByText("$125.00", { exact: true }).first(),
+		).toBeVisible();
 		const paymentRow = drawer.getByText("Synthetic one-time card settlement", {
 			exact: true,
 		});
@@ -423,8 +425,6 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		// Next offset lists the same main-card sections with unavailable future cash.
 		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
 		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
-		await expect(card.getByTestId("spend-value")).toHaveText("—");
-		await expect(card.getByTestId("perday-value")).toHaveText("—");
 		await expect(card.getByTestId("left-value")).toHaveText("—");
 		await expect(
 			card.getByRole("heading", { name: "Bills", exact: true }),
@@ -435,7 +435,9 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		await expect(card.getByTestId("closed-card-value")).toHaveCount(0);
 		await expect(card.getByTestId("cash-payments-value")).toHaveCount(0);
 		await expect(card.getByTestId("recorded-charges-value")).toHaveCount(0);
-		await card.getByRole("button", { name: "Transactions", exact: true }).click();
+		await card
+			.getByRole("button", { name: "Transactions", exact: true })
+			.click();
 		await expect(
 			drawer.getByRole("heading", { name: "Spending this cycle" }),
 		).toBeVisible();
@@ -537,17 +539,10 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		});
 		const checkCurrent = async (limit = "8,702.77") => {
 			await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
-			await expect(card.getByTestId("spend-value")).toHaveText("$0.00");
-			await expect(
-				card.getByText("Over limit by $216.58", { exact: true }),
-			).toBeVisible();
-			await expect(card.getByTestId("perday-value")).toHaveText("$0.00");
 			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
 			).toHaveText(
-				new RegExp(
-					`The \\$${limit} cash limit is not reached this cycle`,
-				),
+				new RegExp(`The \\$${limit} cash limit is not reached this cycle`),
 			);
 			await expect(
 				card.getByRole("list", { name: "Spending pace legend" }),
@@ -571,11 +566,11 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			expect(axisDates).toEqual([...axisDates].sort((a, b) => a - b));
 		};
 		await checkCurrent();
-		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
+		await card
+			.getByRole("button", { name: "Previous cycle", exact: true })
+			.click();
 		// Identical main-card sections for the past window, with close cash
 		// unavailable in this fixture.
-		await expect(card.getByTestId("spend-value")).toHaveText("—");
-		await expect(card.getByTestId("perday-value")).toHaveText("—");
 		await expect(card.getByTestId("left-value")).toHaveText("—");
 		await expect(
 			card.getByRole("heading", { name: "Bills", exact: true }),
@@ -603,8 +598,6 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		await checkCurrent();
 		// Identical main-card sections for the future window.
 		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
-		await expect(card.getByTestId("spend-value")).toHaveText("—");
-		await expect(card.getByTestId("perday-value")).toHaveText("—");
 		await expect(card.getByTestId("left-value")).toHaveText("—");
 		await expect(
 			card.getByRole("heading", { name: "Bills", exact: true }),
@@ -612,7 +605,9 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		await expect(
 			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
-		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
+		await card
+			.getByRole("button", { name: "Previous cycle", exact: true })
+			.click();
 		await checkCurrent();
 		await card
 			.getByRole("button", { name: "Transactions", exact: true })
@@ -626,9 +621,7 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			await expect(
 				table.getByRole("row").filter({ hasText: "Cash limit" }),
 			).toHaveCount(0);
-			await expect(drawer.locator("[data-spending-divider]")).toHaveCount(
-				0,
-			);
+			await expect(drawer.locator("[data-spending-divider]")).toHaveCount(0);
 		};
 		await checkCrossing();
 		await drawer.getByRole("button", { name: "Newest first" }).click();
@@ -664,8 +657,6 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			});
 		});
 		await page.reload();
-		await expect(card.getByTestId("spend-value")).toHaveText("—");
-		await expect(card.getByTestId("perday-value")).toHaveText("—");
 		await card
 			.getByRole("button", { name: "Transactions", exact: true })
 			.click();

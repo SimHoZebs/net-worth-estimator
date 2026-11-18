@@ -11,7 +11,6 @@ import {
 } from "./currentCashActivity.ts";
 import { transactionToDisplay } from "@/domain/transactionRows.ts";
 import { TransactionSectionView } from "./TransactionSectionView.tsx";
-import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
 import {
 	expectedMonthlyIncome,
 	incomeSourceCandidates,
@@ -93,21 +92,15 @@ const input: CycleViewInput = {
 };
 
 describe("one cash-backed current spending budget", () => {
-	it("renders a positive cash-backed allowance as exact dollars", () => {
+	it("keeps a positive cash-backed allowance in the model", () => {
 		const { view } = cycleView({
 			...input,
 			reserve: 0,
 			cashSummary: { ...summary, cashAfterBills: 100 },
 		});
-		const html = renderToStaticMarkup(
-			createElement(SafeSpendingBillsPanel, {
-				...view,
-				cashEvidence: "Cash after bills 100",
-			}),
-		);
-		expect(html).toContain("$100.00");
+		expect(view.allocation.allowance).toBe(100);
 	});
-	it("reconciles cash, reserve, daily allowance, trend, and the exact second row", () => {
+	it("reconciles cash, reserve, daily allowance, trend, and ledger", () => {
 		const { view, trend, ledger } = cycleView(input);
 		expect(view.heroes.theoretical).toBe(-216.58);
 		expect(view.heroes.safe).toBe(-916.58);
@@ -126,15 +119,6 @@ describe("one cash-backed current spending budget", () => {
 			"second-charge",
 			"third-charge",
 		]);
-		const html = renderToStaticMarkup(
-			createElement(SafeSpendingBillsPanel, {
-				...view,
-				trend: undefined,
-				cashEvidence: "Cash after bills -216.58",
-			}),
-		);
-		expect(html).toContain("Over limit by $216.58");
-		expect(html).not.toContain("$217");
 	});
 	it.each(["oldest", "newest"] as const)(
 		"anchors the divider to the same row in %s order",
