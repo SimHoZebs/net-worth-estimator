@@ -271,11 +271,8 @@ func TestAutoClaimSweepUsesPromotionMerchantKey(t *testing.T) {
 	if _, err := database.CreateSchedule(byName); err != nil {
 		t.Fatalf("create name schedule: %v", err)
 	}
-	if err := database.RecordPatternToNewSchedule(types.PatternToNewSchedule{
-		PatternKey:  "pattern-promoted",
-		ScheduleID:  "promoted",
-		MerchantKey: "rent",
-	}); err != nil {
+	if _, err := database.db.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, merchant_key, user_id) VALUES (?, ?, ?, ?, :user_id)
+		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at, merchant_key = excluded.merchant_key`, "pattern-promoted", "promoted", 0, "rent"); err != nil {
 		t.Fatalf("record promotion: %v", err)
 	}
 

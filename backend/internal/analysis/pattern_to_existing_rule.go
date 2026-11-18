@@ -6,7 +6,6 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -23,22 +22,19 @@ var (
 )
 
 // existingRuleIntervalDays converts a rule frequency to nominal days for drift
-// tolerance. It mirrors the detector cadences plus daily.
+// tolerance via the single cadence registry: the reverse direction of
+// recurringCadenceFrequency, so detector intervals and rule schedules cannot
+// drift apart.
 func existingRuleIntervalDays(frequency types.Frequency) (float64, bool) {
-	switch frequency {
-	case types.FrequencyDaily:
-		return 1, true
-	case types.FrequencyWeekly:
-		return 7, true
-	case types.FrequencyMonthly:
-		return 30.4375, true
-	case types.FrequencyQuarterly:
-		return 91.3125, true
-	case types.FrequencyAnnual:
-		return 365.25, true
-	default:
+	if frequency == "" {
 		return 0, false
 	}
+	for _, def := range patternCadenceDefs {
+		if def.frequency == frequency {
+			return def.days, true
+		}
+	}
+	return 0, false
 }
 
 // PatternToExistingScheduleInput carries everything adding needs: the confirmed anchor
@@ -52,20 +48,8 @@ type PatternToExistingScheduleInput struct {
 	OccurrenceIDs []string
 }
 
-// existingRuleTransactionDay derives the UTC calendar day for one transaction, using
-// transaction time with posted time as fallback.
-func existingRuleTransactionDay(transaction types.Transaction) (string, int64, error) {
-	stamp := transaction.TransactionTime
-	if stamp <= 0 {
-		stamp = transaction.PostedTime
-	}
-	if stamp <= 0 {
-		return "", 0, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
-	}
-	return time.Unix(stamp, 0).UTC().Format("2006-01-02"), stamp, nil
-}
-
-// parsePatternAmount formats a source decimal spelling as absolute dollars.
+// parsePatternAmount formats a source decimal spelling as absolute dollars
+// through the single cents formatter.
 func parsePatternAmount(raw string) (string, error) {
 	amount, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
@@ -74,28 +58,32 @@ func parsePatternAmount(raw string) (string, error) {
 	if math.IsNaN(amount) || math.IsInf(amount, 0) {
 		return "", fmt.Errorf("non-finite amount %q", raw)
 	}
-	if amount < 0 {
-		amount = -amount
-	}
-	return strconv.FormatFloat(math.Round(amount*100)/100, 'f', 2, 64), nil
+	return formatCents(math.Abs(amount)), nil
 }
 
-func existingRuleMatchesTransaction(rule types.Schedule, transaction types.Transaction) bool {
-	if (rule.SourceAccountID == nil) != (transaction.SourceAccountID == nil) {
-		return false
-	}
-	if rule.SourceAccountID != nil && *rule.SourceAccountID != *transaction.SourceAccountID {
-		return false
-	}
-	if len(rule.Destinations) != len(transaction.Destinations) {
-		return false
-	}
-	for i := range rule.Destinations {
-		if rule.Destinations[i] != transaction.Destinations[i] {
-			return false
+// patternDisplayAmount renders one recorded movement as absolute dollars for
+// link previews: immutable source facts first, then the saved amount
+// expression. Creation previews never use this fallback: they resolve
+// immutable facts amounts and report stale evidence when facts are missing,
+// because a generated rule must start from source truth. Linking only
+// assigns dates, so its display may fall back without changing product
+// amounts.
+func patternDisplayAmount(facts map[string]types.TransactionFacts, transactions map[string]types.Transaction, transactionID string) string {
+	if recorded, ok := facts[transactionID]; ok {
+		if parsed, err := parsePatternAmount(recorded.Amount); err == nil {
+			return parsed
 		}
 	}
-	return true
+	if transaction, ok := transactions[transactionID]; ok {
+		if expr, ok := transaction.Amount.Config["expression"]; ok {
+			if s, ok := expr.(string); ok {
+				if parsed, err := parsePatternAmount(s); err == nil {
+					return parsed
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // BuildPatternToExistingSchedule maps each recorded movement in a confirmed recurring
@@ -104,17 +92,9 @@ func existingRuleMatchesTransaction(rule types.Schedule, transaction types.Trans
 // the ordinary finance boundary.
 func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]types.PatternOccurrence, error) {
 	anchor := input.Anchor
-	if !IsSchedulePatternKind(anchor.Kind) {
-		return nil, ErrNotRecurring
-	}
-	if anchor.Status != "active" {
-		return nil, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
-	}
-	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
-		return nil, fmt.Errorf("%w: pattern needs review again", ErrPatternStale)
-	}
-	if len(input.OccurrenceIDs) == 0 {
-		return nil, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
+	occurrences, byID, err := resolvePatternOccurrences(anchor, input.OccurrenceIDs, input.Transactions, input.Facts, patternOccurrencePolicy{rejectDismissed: true, requireEnabled: true})
+	if err != nil {
+		return nil, err
 	}
 	rule := input.Rule
 	if rule.ID == "" {
@@ -130,39 +110,9 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	if !domain.IsValidIsoDate(rule.StartDate) {
 		return nil, fmt.Errorf("%w: rule schedule is unknown", ErrNoScheduleMatch)
 	}
-	byID := make(map[string]types.Transaction, len(input.Transactions))
-	for _, transaction := range input.Transactions {
-		byID[transaction.ID] = transaction
-	}
-	type occurrence struct {
-		id    string
-		day   string
-		stamp int64
-	}
-	occurrences := make([]occurrence, 0, len(input.OccurrenceIDs))
-	for _, id := range input.OccurrenceIDs {
-		transaction, ok := byID[id]
-		if !ok || transaction.Pending || transaction.Void {
-			return nil, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
-		}
-		if !transaction.Enabled {
-			return nil, fmt.Errorf("%w: a recorded movement is disabled", ErrPatternStale)
-		}
-		day, stamp, err := existingRuleTransactionDay(transaction)
-		if err != nil {
-			return nil, err
-		}
-		occurrences = append(occurrences, occurrence{id: id, day: day, stamp: stamp})
-	}
-	first := byID[input.OccurrenceIDs[0]]
 	for _, item := range occurrences {
 		transaction := byID[item.id]
-		if !equalRouting(transaction, first) {
-			return nil, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
-		}
-	}
-	for _, item := range occurrences {
-		if !existingRuleMatchesTransaction(rule, byID[item.id]) {
+		if !sameRouting(rule.SourceAccountID, rule.Destinations, transaction.SourceAccountID, transaction.Destinations) {
 			return nil, ErrRoutingMismatch
 		}
 	}
@@ -193,7 +143,6 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	for k, v := range taken {
 		used[k] = v
 	}
-	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].stamp < occurrences[j].stamp })
 	maxDay := occurrences[len(occurrences)-1].day
 	schedule := domain.RuleScheduleDates(&rule, maxDay)
 	if len(schedule) == 0 {
@@ -207,21 +156,7 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	}
 	assignments := make([]types.PatternOccurrence, 0, len(occurrences))
 	amountOf := func(transactionID string) string {
-		if facts, ok := input.Facts[transactionID]; ok {
-			if parsed, err := parsePatternAmount(facts.Amount); err == nil {
-				return parsed
-			}
-		}
-		if transaction, ok := byID[transactionID]; ok {
-			if expr, ok := transaction.Amount.Config["expression"]; ok {
-				if s, ok := expr.(string); ok {
-					if parsed, err := parsePatternAmount(s); err == nil {
-						return parsed
-					}
-				}
-			}
-		}
-		return ""
+		return patternDisplayAmount(input.Facts, byID, transactionID)
 	}
 	// Greedy oldest-first: each movement takes its nearest unused scheduled
 	// date. Skipped months stay skipped because no movement claims them.
@@ -249,7 +184,7 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 			}
 			if kept {
 				used[current.Claim.OccurrenceDate] = true
-				assignments = append(assignments, types.PatternOccurrence{TransactionID: item.id, Date: current.Claim.OccurrenceDate, Amount: amountOf(item.id)})
+				assignments = append(assignments, types.PatternOccurrence{PatternDatedAmount: types.PatternDatedAmount{Date: current.Claim.OccurrenceDate, Amount: amountOf(item.id)}, TransactionID: item.id})
 				continue
 			}
 		}
@@ -274,7 +209,7 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 			return nil, fmt.Errorf("%w: %s is %d days from its nearest free occurrence", ErrNoScheduleMatch, item.day, bestDiff)
 		}
 		used[best] = true
-		assignments = append(assignments, types.PatternOccurrence{TransactionID: item.id, Date: best, Amount: amountOf(item.id)})
+		assignments = append(assignments, types.PatternOccurrence{PatternDatedAmount: types.PatternDatedAmount{Date: best, Amount: amountOf(item.id)}, TransactionID: item.id})
 	}
 	sort.Slice(assignments, func(i, j int) bool { return assignments[i].TransactionID < assignments[j].TransactionID })
 	return assignments, nil

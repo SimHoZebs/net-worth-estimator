@@ -1,8 +1,6 @@
 package sqlite
 
 import (
-	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -16,47 +14,16 @@ import (
 // saved rows only; it never writes.
 func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string) (types.PatternToExistingSchedulePreview, error) {
 	var preview types.PatternToExistingSchedulePreview
-	var anchor types.AnalysisFinding
-	var detectionJSON, reviewJSON string
-	err := s.db.QueryRow(`SELECT f.id, f.analysis_type, f.detection_json, f.run_id, r.version, r.input_revision,
-		f.first_detected_at, f.last_checked_at, f.status, f.dismissed, f.review_json, f.feedback_revision
-		FROM analysis_findings f JOIN analysis_runs r ON r.user_id = f.user_id AND r.id = f.run_id
-		WHERE f.id = ? AND f.user_id = :user_id`, findingID).Scan(
-		&anchor.ID, &anchor.AnalysisType, &detectionJSON, &anchor.RunID, &anchor.AnalyzerVersion,
-		&anchor.InputRevision, &anchor.FirstDetectedAt, &anchor.LastCheckedAt, &anchor.Status,
-		&anchor.Dismissed, &reviewJSON, &anchor.FeedbackRevision)
-	if err == sql.ErrNoRows {
-		return preview, store.ErrNotFound
-	}
+	data, err := s.loadPatternPreviewData(findingID)
 	if err != nil {
 		return preview, err
 	}
-	if err := json.Unmarshal([]byte(detectionJSON), &anchor.AnalysisDetection); err != nil {
-		return preview, err
-	}
-	if err := json.Unmarshal([]byte(reviewJSON), &anchor.Review); err != nil {
-		return preview, err
-	}
+	anchor := data.anchor
+	occurrenceIDs := data.occurrenceIDs
+	model := data.model
+	facts := data.facts
 	if !analysis.IsSchedulePatternKind(anchor.Kind) {
 		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToExistingScheduleInvalid, anchor.Kind)
-	}
-	occurrenceIDs := []string{}
-	for _, evidence := range anchor.Evidence {
-		occurrenceIDs = append(occurrenceIDs, evidence.TransactionIDs...)
-	}
-	seen := map[string]bool{}
-	ordered := occurrenceIDs[:0]
-	for _, id := range occurrenceIDs {
-		if id == "" || seen[id] {
-			continue
-		}
-		seen[id] = true
-		ordered = append(ordered, id)
-	}
-	occurrenceIDs = ordered
-	model, err := s.LoadModel()
-	if err != nil {
-		return preview, err
 	}
 	var rule *types.Schedule
 	for i := range model.Schedules {
@@ -68,45 +35,17 @@ func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string)
 	if rule == nil {
 		return preview, fmt.Errorf("%w: rule %s not found", store.ErrPatternToExistingScheduleInvalid, ruleID)
 	}
-	facts := map[string]types.TransactionFacts{}
-	if len(occurrenceIDs) > 0 {
-		placeholders := ""
-		args := make([]any, 0, len(occurrenceIDs))
-		for i, id := range occurrenceIDs {
-			if i > 0 {
-				placeholders += ","
-			}
-			placeholders += "?"
-			args = append(args, id)
-		}
-		rows, err := s.db.Query(`SELECT transaction_id, facts_json FROM transaction_source_facts WHERE transaction_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
-		if err != nil {
-			return preview, err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var id, raw string
-			if err := rows.Scan(&id, &raw); err != nil {
-				return preview, err
-			}
-			var item types.TransactionFacts
-			if err := json.Unmarshal([]byte(raw), &item); err != nil {
-				return preview, err
-			}
-			facts[id] = item
-		}
-		if err := rows.Err(); err != nil {
-			return preview, err
-		}
-	}
 	preview = types.PatternToExistingSchedulePreview{
-		FindingID:    anchor.ID,
-		PatternKey:   analysis.RecurringPatternKey(anchor.Kind, anchor.Product, occurrenceIDs),
+		PatternPreviewHeader: types.PatternPreviewHeader{
+			FindingID:  anchor.ID,
+			PatternKey: analysis.RecurringPatternKey(anchor.Kind, anchor.Product, occurrenceIDs),
+			Merchant:   anchor.Provider,
+			Cadence:    anchor.Product,
+			AccountID:  accountOfPattern(model.Transactions, occurrenceIDs),
+		},
 		ScheduleID:   rule.ID,
 		ScheduleName: rule.Name,
-		Merchant:     anchor.Provider,
-		Cadence:      anchor.Product,
-		AccountID:    accountOfPattern(model.Transactions, occurrenceIDs),
+		Assignments:  []types.PatternOccurrence{},
 	}
 	if anchor.Status != "active" {
 		preview.Claimable = false

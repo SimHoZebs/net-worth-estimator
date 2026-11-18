@@ -76,7 +76,7 @@ func qa03RuleEvents(result *types.ProjectionResult) []types.TransactionEvent {
 
 func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *testing.T) {
 	scoped := openAPIStore(t)
-	findings := seedAPIRecurringPattern(t, scoped, "monthly")
+	findings := seedAPIPattern(t, scoped, "recurring", "monthly", "GROCER 123", "-30", "grocer", "outflow")
 	handler := New(scoped, Config{})
 	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule-preview"
 	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule"

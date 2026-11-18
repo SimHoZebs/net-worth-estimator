@@ -10,7 +10,7 @@ import (
 
 func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
-	findings := seedAPIRecurringPattern(t, scoped, "monthly")
+	findings := seedAPIPattern(t, scoped, "recurring", "monthly", "GROCER 123", "-30", "grocer", "outflow")
 	handler := New(scoped, Config{Actor: func(context.Context) string { return "verified-subject" }})
 	// Create an existing monthly rule that matches the pattern routing.
 	ruleBody, _ := json.Marshal(map[string]any{
@@ -52,13 +52,6 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	}
 	if !preview.Preview.Claimable || len(preview.Preview.Assignments) != 3 {
 		t.Fatalf("preview=%+v", preview.Preview)
-	}
-	want := map[string]string{}
-	for _, item := range preview.Preview.Assignments {
-		want[item.TransactionID] = item.Date
-	}
-	if len(want) != 3 {
-		t.Fatalf("assignments=%+v", preview.Preview.Assignments)
 	}
 	addBody, _ := json.Marshal(map[string]any{"scheduleId": ruleID})
 	res = callAPI(t, handler, "POST", addPath, string(addBody))

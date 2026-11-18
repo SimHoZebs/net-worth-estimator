@@ -38,22 +38,17 @@ func IsSchedulePatternKind(kind string) bool {
 }
 
 // recurringCadenceFrequencies maps detected cadences onto forecast rule
-// schedules. Biweekly has no rule schedule: rules expand weekly, monthly,
-// quarterly, or longer, so biweekly patterns stay visible without creation
-// until the product decides how they should repeat.
+// schedules via the single cadence registry. Biweekly has no rule schedule:
+// rules expand weekly, monthly, quarterly, or longer, so biweekly patterns
+// stay visible without creation until the product decides how they should
+// repeat.
 func recurringCadenceFrequency(cadence string) (types.Frequency, bool) {
-	switch cadence {
-	case "weekly":
-		return types.FrequencyWeekly, true
-	case "monthly":
-		return types.FrequencyMonthly, true
-	case "quarterly":
-		return types.FrequencyQuarterly, true
-	case "annual":
-		return types.FrequencyAnnual, true
-	default:
-		return "", false
+	for _, def := range patternCadenceDefs {
+		if def.id == cadence && def.detected {
+			return def.frequency, def.frequency != ""
+		}
 	}
+	return "", false
 }
 
 // RecurringPatternKey identifies one confirmed source pattern: the claim
@@ -74,8 +69,88 @@ type recurringOccurrence struct {
 	amount float64
 }
 
+// formatCents is the single cents formatter for pattern amounts: round
+// half away from the source decimal spelling to two places, absolute callers
+// pass absolute values in. parsePatternAmount is its parsing entry point.
 func formatCents(value float64) string {
 	return strconv.FormatFloat(math.Round(value*100)/100, 'f', 2, 64)
+}
+
+// patternOccurrencePolicy tunes the shared occurrence resolver per builder.
+// The resolver always enforces the kind/status/empty guards, the
+// pending/void/stale checks, the transaction-time fallback, oldest-first
+// ordering, and the single-account coherence check. Builders opt into only
+// the checks their contract needs: the existing-schedule path rejects
+// dismissed patterns and disabled movements, while the new-schedule path
+// requires immutable source amounts.
+type patternOccurrencePolicy struct {
+	rejectDismissed bool
+	requireEnabled  bool
+	requireAmount   bool
+}
+
+// resolvePatternOccurrences validates one confirmed pattern's recorded
+// movements and returns them oldest first with the transaction index behind
+// them. Stale evidence reports ErrPatternStale and movements spanning
+// accounts report ErrPatternIncoherent, so both preview builders share one
+// guard ordering: kind, status, dismissal, empty, per-movement staleness,
+// then coherence.
+func resolvePatternOccurrences(anchor types.AnalysisFinding, occurrenceIDs []string, transactions []types.Transaction, facts map[string]types.TransactionFacts, policy patternOccurrencePolicy) ([]recurringOccurrence, map[string]types.Transaction, error) {
+	if !IsSchedulePatternKind(anchor.Kind) {
+		return nil, nil, ErrNotRecurring
+	}
+	if anchor.Status != "active" {
+		return nil, nil, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
+	}
+	if policy.rejectDismissed && (anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected")) {
+		return nil, nil, fmt.Errorf("%w: pattern needs review again", ErrPatternStale)
+	}
+	if len(occurrenceIDs) == 0 {
+		return nil, nil, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
+	}
+	byID := make(map[string]types.Transaction, len(transactions))
+	for _, transaction := range transactions {
+		byID[transaction.ID] = transaction
+	}
+	occurrences := make([]recurringOccurrence, 0, len(occurrenceIDs))
+	for _, id := range occurrenceIDs {
+		transaction, ok := byID[id]
+		if !ok || transaction.Pending || transaction.Void {
+			return nil, nil, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+		}
+		if policy.requireEnabled && !transaction.Enabled {
+			return nil, nil, fmt.Errorf("%w: a recorded movement is disabled", ErrPatternStale)
+		}
+		var amount float64
+		if policy.requireAmount {
+			recorded, ok := facts[id]
+			if !ok {
+				return nil, nil, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			}
+			parsed, err := strconv.ParseFloat(recorded.Amount, 64)
+			if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) || parsed == 0 {
+				return nil, nil, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			}
+			amount = parsed
+		}
+		stamp := transaction.TransactionTime
+		if stamp <= 0 {
+			stamp = transaction.PostedTime
+		}
+		if stamp <= 0 {
+			return nil, nil, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+		}
+		occurrences = append(occurrences, recurringOccurrence{id: id, day: time.Unix(stamp, 0).UTC().Format("2006-01-02"), stamp: stamp, amount: amount})
+	}
+	first := byID[occurrenceIDs[0]]
+	for _, item := range occurrences {
+		transaction := byID[item.id]
+		if !sameRouting(transaction.SourceAccountID, transaction.Destinations, first.SourceAccountID, first.Destinations) {
+			return nil, nil, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
+		}
+	}
+	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].stamp < occurrences[j].stamp })
+	return occurrences, byID, nil
 }
 
 // PatternToNewScheduleInput carries everything creation needs: the confirmed
@@ -98,12 +173,6 @@ type PatternToNewScheduleInput struct {
 // Creatable=false instead of an error, so the interface can explain why.
 func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.PatternToNewSchedulePreview, error) {
 	anchor := input.Anchor
-	if !IsSchedulePatternKind(anchor.Kind) {
-		return types.PatternToNewSchedulePreview{}, ErrNotRecurring
-	}
-	if anchor.Status != "active" {
-		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
-	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
 		occurrenceIDs = append(occurrenceIDs, evidence.TransactionIDs...)
@@ -118,43 +187,11 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		ordered = append(ordered, id)
 	}
 	occurrenceIDs = ordered
-	if len(occurrenceIDs) == 0 {
-		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
-	}
-	byID := make(map[string]types.Transaction, len(input.Transactions))
-	for _, transaction := range input.Transactions {
-		byID[transaction.ID] = transaction
-	}
-	occurrences := make([]recurringOccurrence, 0, len(occurrenceIDs))
-	for _, id := range occurrenceIDs {
-		transaction, ok := byID[id]
-		if !ok || transaction.Pending || transaction.Void {
-			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
-		}
-		facts, ok := input.Facts[id]
-		if !ok {
-			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
-		}
-		amount, err := strconv.ParseFloat(facts.Amount, 64)
-		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 {
-			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
-		}
-		stamp := transaction.TransactionTime
-		if stamp <= 0 {
-			stamp = transaction.PostedTime
-		}
-		if stamp <= 0 {
-			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
-		}
-		occurrences = append(occurrences, recurringOccurrence{id: id, day: time.Unix(stamp, 0).UTC().Format("2006-01-02"), stamp: stamp, amount: amount})
+	occurrences, byID, err := resolvePatternOccurrences(anchor, occurrenceIDs, input.Transactions, input.Facts, patternOccurrencePolicy{requireAmount: true})
+	if err != nil {
+		return types.PatternToNewSchedulePreview{}, err
 	}
 	first := byID[occurrenceIDs[0]]
-	for _, item := range occurrences {
-		transaction := byID[item.id]
-		if !equalRouting(transaction, first) {
-			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
-		}
-	}
 	account := accountOf(first)
 	known := false
 	for _, id := range input.AccountIDs {
@@ -171,18 +208,21 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		magnitudes = append(magnitudes, math.Abs(item.amount))
 	}
 	typical := recurringMedian(magnitudes)
-	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].stamp < occurrences[j].stamp })
 	lastDay := occurrences[len(occurrences)-1].day
 	cadence := anchor.Product
 	preview := types.PatternToNewSchedulePreview{
-		FindingID:          anchor.ID,
-		PatternKey:         RecurringPatternKey(anchor.Kind, cadence, occurrenceIDs),
-		Merchant:           anchor.Provider,
-		Cadence:            cadence,
+		PatternPreviewHeader: types.PatternPreviewHeader{
+			FindingID:  anchor.ID,
+			PatternKey: RecurringPatternKey(anchor.Kind, cadence, occurrenceIDs),
+			Merchant:   anchor.Provider,
+			Cadence:    cadence,
+			AccountID:  account,
+		},
 		TypicalAmount:      formatCents(typical),
 		Currency:           input.Facts[occurrenceIDs[0]].Currency,
-		AccountID:          account,
 		ExistingScheduleID: input.ExistingScheduleID,
+		Occurrences:        []types.PatternOccurrence{},
+		Upcoming:           []types.PatternDatedAmount{},
 	}
 	if occurrences[0].amount > 0 {
 		preview.Direction = "inflow"
@@ -190,7 +230,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		preview.Direction = "outflow"
 	}
 	for _, item := range occurrences {
-		preview.Occurrences = append(preview.Occurrences, types.PatternOccurrence{TransactionID: item.id, Date: item.day, Amount: formatCents(math.Abs(item.amount))})
+		preview.Occurrences = append(preview.Occurrences, types.PatternOccurrence{PatternDatedAmount: types.PatternDatedAmount{Date: item.day, Amount: formatCents(math.Abs(item.amount))}, TransactionID: item.id})
 	}
 	frequency, ok := recurringCadenceFrequency(cadence)
 	if !ok {
@@ -198,22 +238,20 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		preview.Reason = fmt.Sprintf("Patterns that repeat %s cannot become forecast rules yet. The evidence stays saved for review.", cadenceLabel(cadence))
 		return preview, nil
 	}
-	rule := &types.Schedule{
+	proposal := types.ProposedNewSchedule{
 		Name:            ruleName(occurrences, byID, anchor.Provider),
 		SourceAccountID: first.SourceAccountID,
 		Destinations:    append([]string(nil), first.Destinations...),
-		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": formatCents(typical)}, Inputs: map[string]types.AmountInputBinding{}},
+		Amount:          formatCents(typical),
 		Frequency:       frequency,
 		StartDate:       domain.AdvanceRuleDate(lastDay, frequency, 1),
 		Enabled:         true,
 	}
 	preview.Creatable = true
-	preview.Schedule = &types.ProposedNewSchedule{
-		Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations,
-		Amount: formatCents(typical), Frequency: frequency, StartDate: rule.StartDate, Enabled: true,
-	}
-	for _, date := range domain.RuleScheduleDates(rule, domain.AdvanceRuleDate(rule.StartDate, frequency, 5)) {
-		preview.Upcoming = append(preview.Upcoming, types.UpcomingNewScheduleOccurrence{Date: date, Amount: formatCents(typical)})
+	preview.Schedule = &proposal
+	rule := types.ProposedNewScheduleToSchedule(proposal, "")
+	for _, date := range domain.RuleScheduleDates(&rule, domain.AdvanceRuleDate(rule.StartDate, frequency, 5)) {
+		preview.Upcoming = append(preview.Upcoming, types.PatternDatedAmount{Date: date, Amount: formatCents(typical)})
 	}
 	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
 		preview.Creatable = false
@@ -224,24 +262,6 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		preview.Reason = "This pattern already has an active forecast rule. Disable or delete that rule to create a replacement."
 	}
 	return preview, nil
-}
-
-func equalRouting(a, b types.Transaction) bool {
-	if (a.SourceAccountID == nil) != (b.SourceAccountID == nil) {
-		return false
-	}
-	if a.SourceAccountID != nil && *a.SourceAccountID != *b.SourceAccountID {
-		return false
-	}
-	if len(a.Destinations) != len(b.Destinations) {
-		return false
-	}
-	for i := range a.Destinations {
-		if a.Destinations[i] != b.Destinations[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func accountOf(transaction types.Transaction) string {

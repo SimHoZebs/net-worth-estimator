@@ -106,7 +106,10 @@ func observePaymentGroup(owner string, group paymentGroup, items []paymentOccurr
 	if repeating.medianGap <= 0 {
 		return stream
 	}
-	for _, option := range paymentCadences {
+	for _, option := range patternCadenceDefs {
+		if !option.detected {
+			continue
+		}
 		if len(kept) < option.minOcc || math.Abs(repeating.medianGap-option.days) > recurringTolerance*option.days {
 			continue
 		}
@@ -145,8 +148,8 @@ func summarizePayments(owner string, group paymentGroup, items []paymentOccurren
 	}
 	var gap float64
 	if len(gaps) > 0 {
-		gap = paymentMedian(gaps)
+		gap = recurringMedian(gaps)
 	}
 	return &paymentStream{streamID: paymentPatternID(owner, group.key, ""), patternID: paymentPatternID(owner, group.key, ""), merchant: group.merchant, currency: items[0].transaction.Facts.Currency, direction: group.direction,
-		typical: paymentMedian(amounts), amountCV: paymentCV(amounts), gapCV: paymentCV(gaps), medianGap: gap, recencyDays: float64(latest - items[len(items)-1].day), occurrences: items, signals: paymentSignals(items)}
+		typical: recurringMedian(amounts), amountCV: paymentCV(amounts), gapCV: paymentCV(gaps), medianGap: gap, recencyDays: float64(latest - items[len(items)-1].day), occurrences: items, signals: paymentSignals(items)}
 }

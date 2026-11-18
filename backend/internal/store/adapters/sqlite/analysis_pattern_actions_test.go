@@ -11,8 +11,7 @@ func TestPatternActionsRollBackAcceptance(t *testing.T) {
 	for _, action := range []string{"create", "link"} {
 		t.Run(action, func(t *testing.T) {
 			s := openSQLiteStore(t)
-			ids := seedRecurringEvidence(t, s)
-			finding := completePatternAnalysis(t, s, ids, "monthly")[0]
+			finding := seedPatternFindings(t, s, "recurring", "monthly", "GROCER 123", "-30.00", "grocer", "outflow")[0]
 			preview, err := s.PreviewPatternToNewSchedule(finding.ID)
 			if err != nil {
 				t.Fatal(err)
@@ -31,7 +30,7 @@ func TestPatternActionsRollBackAcceptance(t *testing.T) {
 				if _, err := s.db.Exec(`CREATE TRIGGER fail_pattern_claim BEFORE INSERT ON transaction_claims BEGIN SELECT RAISE(ABORT, 'test failure'); END`); err != nil {
 					t.Fatal(err)
 				}
-				_, err = s.SetPatternTransactionClaims(finding.ID, "verified-subject", []types.TransactionClaimUpdate{{TransactionID: ids[0], Claim: types.TransactionClaim{ScheduleID: rule.ID, OccurrenceDate: "2026-01-15"}}})
+				_, err = s.SetPatternTransactionClaims(finding.ID, "verified-subject", []types.TransactionClaimUpdate{{TransactionID: finding.TransactionID, Claim: types.TransactionClaim{ScheduleID: rule.ID, OccurrenceDate: "2026-01-15"}}})
 			}
 			if err == nil {
 				t.Fatal("expected persistence failure")

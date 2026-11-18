@@ -2,37 +2,19 @@ package analyses
 
 import (
 	"context"
-	"errors"
-	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/model"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// patternToExistingRuleMu serializes additions within one server instance.
-// Preview plus claim updates are separate store calls; without this, two
-// concurrent additions for one pattern could both pass preview and each
-// claim overlapping occurrences.
-var patternToExistingRuleMu sync.Mutex
-
 func patternToExistingRuleError(err error) error {
-	return patternToExistingRuleErrorAs(err, "The forecast preview is temporarily unavailable")
+	return patternRuleError(err, store.ErrPatternToExistingScheduleInvalid, store.ErrPatternToExistingScheduleConflict, "The forecast preview is temporarily unavailable")
 }
 
 func patternToExistingRuleErrorAs(err error, unavailable string) error {
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return huma.Error404NotFound("Finding not found")
-	case errors.Is(err, store.ErrPatternToExistingScheduleInvalid):
-		return huma.Error422UnprocessableEntity(err.Error())
-	case errors.Is(err, store.ErrPatternToExistingScheduleConflict):
-		return huma.Error409Conflict(err.Error())
-	default:
-		return huma.Error500InternalServerError(unavailable)
-	}
+	return patternRuleError(err, store.ErrPatternToExistingScheduleInvalid, store.ErrPatternToExistingScheduleConflict, unavailable)
 }
 
 func (s *handler) previewPatternToExistingSchedule(_ context.Context, input *struct {
@@ -56,7 +38,7 @@ func (s *handler) previewPatternToExistingSchedule(_ context.Context, input *str
 		Body         struct {
 			Preview types.PatternToExistingSchedulePreview `json:"preview"`
 		}
-	}{CacheControl: "private, no-store"}
+	}{CacheControl: patternPreviewCacheControl}
 	output.Body.Preview = preview
 	return output, nil
 }
@@ -76,14 +58,14 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 		ScheduleID string                       `json:"scheduleId"`
 	}
 }, error) {
-	if s.canWrite != nil && !s.canWrite(ctx) {
-		return nil, huma.Error403Forbidden("Write permission is required")
+	if err := s.requirePatternWrite(ctx); err != nil {
+		return nil, err
 	}
 	if input.Body.ScheduleID == "" {
 		return nil, huma.Error422UnprocessableEntity("scheduleId is required")
 	}
-	patternToExistingRuleMu.Lock()
-	defer patternToExistingRuleMu.Unlock()
+	patternRuleMu.Lock()
+	defer patternRuleMu.Unlock()
 	preview, err := s.store.PreviewPatternToExistingSchedule(input.ID, input.Body.ScheduleID)
 	if err != nil {
 		return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
@@ -103,68 +85,63 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	}
 	// Validate the candidate model with claims applied through the ordinary
 	// finance boundary before persisting.
-	model, err := s.store.LoadModel()
+	storedModel, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
 	}
-	// Re-check the rule is still enabled: rule writes do not take patternToExistingRuleMu, so
+	// Re-check the rule is still enabled: rule writes do not take patternRuleMu, so
 	// a disable landing between preview and persist must not mint claims the
 	// preview calls un-claimable. A deleted rule falls through to finance
 	// validation, which reports the missing rule as 422.
 	ruleFound, ruleEnabled := false, false
-	for i := range model.Schedules {
-		if model.Schedules[i].ID == preview.ScheduleID {
-			ruleFound, ruleEnabled = true, model.Schedules[i].Enabled
+	for i := range storedModel.Schedules {
+		if storedModel.Schedules[i].ID == preview.ScheduleID {
+			ruleFound, ruleEnabled = true, storedModel.Schedules[i].Enabled
 			break
 		}
 	}
 	if ruleFound && !ruleEnabled {
 		return nil, huma.Error422UnprocessableEntity("That forecast rule is disabled. Enable it before adding payments to it.")
 	}
-	baseline := domain.EvaluationReferenceIssues(model)
-	candidate := *model
-	byIndex := make(map[string]int, len(candidate.Transactions))
-	for i := range candidate.Transactions {
-		byIndex[candidate.Transactions[i].ID] = i
+	byID := make(map[string]bool, len(storedModel.Transactions))
+	for i := range storedModel.Transactions {
+		byID[storedModel.Transactions[i].ID] = true
 	}
 	claims := make([]types.TransactionClaimUpdate, 0, len(preview.Assignments))
 	for _, item := range preview.Assignments {
-		index, ok := byIndex[item.TransactionID]
-		if !ok {
+		if !byID[item.TransactionID] {
 			return nil, huma.Error409Conflict("A recorded movement changed. Review the pattern again.")
 		}
-		claim := types.TransactionClaim{ScheduleID: preview.ScheduleID, OccurrenceDate: item.Date}
-		candidate.Transactions[index].Claim = &claim
-		claims = append(claims, types.TransactionClaimUpdate{TransactionID: item.TransactionID, Claim: claim})
-	}
-	issues := domain.ValidateFinanceWriteChange(baseline, &candidate)
-	for _, issue := range issues {
-		if issue.Severity == types.SeverityError {
-			return nil, huma.Error422UnprocessableEntity(issue.Message)
-		}
+		claims = append(claims, types.TransactionClaimUpdate{TransactionID: item.TransactionID, Claim: types.TransactionClaim{ScheduleID: preview.ScheduleID, OccurrenceDate: item.Date}})
 	}
 	actor := ""
 	if s.actor != nil {
 		actor = s.actor(ctx)
 	}
-	rows, err := s.store.SetPatternTransactionClaims(input.ID, actor, claims)
-	if err != nil {
-		if errors.Is(err, store.ErrPatternToExistingScheduleInvalid) {
-			return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
+	rows, issues, saved, revision, err := model.PersistPatternTransactionClaims(s.store, func(candidate *types.FinancialModel) {
+		byIndex := make(map[string]int, len(candidate.Transactions))
+		for i := range candidate.Transactions {
+			byIndex[candidate.Transactions[i].ID] = i
 		}
-		return nil, modelstate.WriteError(err)
-	}
-	stored, err := s.store.LoadModel()
+		for _, item := range preview.Assignments {
+			if index, ok := byIndex[item.TransactionID]; ok {
+				claim := types.TransactionClaim{ScheduleID: preview.ScheduleID, OccurrenceDate: item.Date}
+				candidate.Transactions[index].Claim = &claim
+			}
+		}
+	}, func() ([]types.Transaction, error) {
+		return s.store.SetPatternTransactionClaims(input.ID, actor, claims)
+	})
 	if err != nil {
-		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
+		return nil, err
 	}
-	warnings := domain.ValidateFinanceModel(stored)
-	if warnings == nil {
-		warnings = []types.ModelValidationIssue{}
-	}
-	revision, err := store.ModelETag(stored)
-	if err != nil {
-		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
+	if !saved {
+		for _, issue := range issues {
+			if issue.Severity == types.SeverityError {
+				return nil, huma.Error422UnprocessableEntity(issue.Message)
+			}
+		}
+		return nil, huma.Error422UnprocessableEntity("This pattern cannot be added yet.")
 	}
 	output := &struct {
 		Body struct {
@@ -176,6 +153,6 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 			ScheduleID string                       `json:"scheduleId"`
 		}
 	}{}
-	output.Body.Matches, output.Body.Issues, output.Body.Saved, output.Body.Revision, output.Body.PatternKey, output.Body.ScheduleID = rows, warnings, true, revision, preview.PatternKey, preview.ScheduleID
+	output.Body.Matches, output.Body.Issues, output.Body.Saved, output.Body.Revision, output.Body.PatternKey, output.Body.ScheduleID = rows, issues, true, revision, preview.PatternKey, preview.ScheduleID
 	return output, nil
 }

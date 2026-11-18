@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
@@ -93,7 +95,41 @@ func runFinanceRowWriteWithStore[T any](st store.Store, mutate func(model *types
 	}, domain.ValidateFinanceModel)
 }
 
+// PersistPatternTransactionClaims validates and persists one pattern-to-
+// existing-rule claim set through the ordinary finance write boundary, so
+// linking shares the manual row-write contract: validation, revision, and
+// last-write-wins. The enabled-rule recheck and empty-assignment guard stay
+// in the handler; persistence itself goes through SetPatternTransactionClaims.
+func PersistPatternTransactionClaims(st store.Store, mutate func(model *types.FinancialModel), persist func() ([]types.Transaction, error)) ([]types.Transaction, []types.ModelValidationIssue, bool, string, error) {
+	var baseline []types.ModelValidationIssue
+	return runRowWriteWithValidatorAndPersistError(st, func(model *types.FinancialModel) {
+		baseline = domain.EvaluationReferenceIssues(model)
+		mutate(model)
+	}, persist, func(candidate *types.FinancialModel) []types.ModelValidationIssue {
+		return domain.ValidateFinanceWriteChange(baseline, candidate)
+	}, domain.ValidateFinanceModel, patternPersistError)
+}
+
+// patternPersistError maps pattern-claim persist failures before the generic
+// model-state mapping, so invalid claims stay 422 and conflicts stay 409.
+func patternPersistError(err error) error {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return huma.Error404NotFound("Finding not found")
+	case errors.Is(err, store.ErrPatternToExistingScheduleInvalid):
+		return huma.Error422UnprocessableEntity(err.Error())
+	case errors.Is(err, store.ErrPatternToExistingScheduleConflict):
+		return huma.Error409Conflict(err.Error())
+	default:
+		return modelstate.WriteError(err)
+	}
+}
+
 func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue, guards ...func(*types.FinancialModel) error) (T, []types.ModelValidationIssue, bool, string, error) {
+	return runRowWriteWithValidatorAndPersistError(st, mutate, persist, validateCandidate, validateStored, modelstate.WriteError, guards...)
+}
+
+func runRowWriteWithValidatorAndPersistError[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue, persistError func(error) error, guards ...func(*types.FinancialModel) error) (T, []types.ModelValidationIssue, bool, string, error) {
 	var zero T
 	model, err := st.LoadModel()
 	if err != nil {
@@ -124,7 +160,7 @@ func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.Fi
 	}
 	row, err := persist()
 	if err != nil {
-		return zero, nil, false, "", modelstate.WriteError(err)
+		return zero, nil, false, "", persistError(err)
 	}
 	// Re-read warnings against the saved model so the response
 	// reflects stored state, not the request echo.

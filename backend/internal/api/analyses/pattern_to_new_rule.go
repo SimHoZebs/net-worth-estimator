@@ -2,8 +2,6 @@ package analyses
 
 import (
 	"context"
-	"errors"
-	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -12,28 +10,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// patternToNewRuleMu serializes creations within one server instance. Preview,
-// record, and rule creation are separate store calls; without this, two
-// concurrent creations for one pattern could both pass preview and each
-// create their own rule. The store contract already assumes one server and
-// one instance, so a process-wide mutex matches the deployment.
-var patternToNewRuleMu sync.Mutex
-
 func patternToNewRuleError(err error) error {
-	return patternToNewRuleErrorAs(err, "The forecast preview is temporarily unavailable")
+	return patternRuleError(err, store.ErrPatternToNewScheduleInvalid, store.ErrPatternToNewScheduleConflict, "The forecast preview is temporarily unavailable")
 }
 
 func patternToNewRuleErrorAs(err error, unavailable string) error {
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return huma.Error404NotFound("Finding not found")
-	case errors.Is(err, store.ErrPatternToNewScheduleInvalid):
-		return huma.Error422UnprocessableEntity(err.Error())
-	case errors.Is(err, store.ErrPatternToNewScheduleConflict):
-		return huma.Error409Conflict(err.Error())
-	default:
-		return huma.Error500InternalServerError(unavailable)
-	}
+	return patternRuleError(err, store.ErrPatternToNewScheduleInvalid, store.ErrPatternToNewScheduleConflict, unavailable)
 }
 
 func (s *handler) previewPatternToNewSchedule(_ context.Context, input *struct {
@@ -53,7 +35,7 @@ func (s *handler) previewPatternToNewSchedule(_ context.Context, input *struct {
 		Body         struct {
 			Preview types.PatternToNewSchedulePreview `json:"preview"`
 		}
-	}{CacheControl: "private, no-store"}
+	}{CacheControl: patternPreviewCacheControl}
 	output.Body.Preview = preview
 	return output, nil
 }
@@ -69,11 +51,11 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 		PatternKey string                       `json:"patternKey"`
 	}
 }, error) {
-	if s.canWrite != nil && !s.canWrite(ctx) {
-		return nil, huma.Error403Forbidden("Write permission is required")
+	if err := s.requirePatternWrite(ctx); err != nil {
+		return nil, err
 	}
-	patternToNewRuleMu.Lock()
-	defer patternToNewRuleMu.Unlock()
+	patternRuleMu.Lock()
+	defer patternRuleMu.Unlock()
 	preview, err := s.store.PreviewPatternToNewSchedule(input.ID)
 	if err != nil {
 		return nil, patternToNewRuleErrorAs(err, "The forecast rule could not be saved.")
@@ -90,16 +72,7 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 	if err != nil {
 		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
 	}
-	rule := types.Schedule{
-		ID:              ruleID.String(),
-		Name:            preview.Schedule.Name,
-		SourceAccountID: preview.Schedule.SourceAccountID,
-		Destinations:    append([]string(nil), preview.Schedule.Destinations...),
-		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": preview.Schedule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency:       preview.Schedule.Frequency,
-		StartDate:       preview.Schedule.StartDate,
-		Enabled:         true,
-	}
+	rule := types.ProposedNewScheduleToSchedule(*preview.Schedule, ruleID.String())
 	actor := ""
 	if s.actor != nil {
 		actor = s.actor(ctx)

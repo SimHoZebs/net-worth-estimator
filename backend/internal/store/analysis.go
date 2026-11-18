@@ -2,10 +2,11 @@ package store
 
 import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 
-// AnalysisStore owns evidence and derived results, never financial-model writes.
+// AnalysisStore owns evidence and derived results plus the pattern-action
+// writes that atomically persist acceptance with the finance change.
 // Claim takes a consistent snapshot and a bounded durable lease atomically.
-// New-rule creation previews and pattern-to-rule records are analysis-side:
-// they never create, change, or remove financial rows.
+// Pattern previews read evidence, findings, and saved rows only; pattern
+// actions save acceptance and the finance change in one transaction.
 type AnalysisStore interface {
 	ClaimAnalysis(kind, version string) (types.AnalysisRun, types.AnalysisSnapshot, bool, error)
 	CompleteAnalysis(run types.AnalysisRun, findings []types.AnalysisDetection, problem string) error
@@ -21,12 +22,9 @@ type AnalysisStore interface {
 	// Pattern actions save acceptance and the finance change in one transaction.
 	CreatePatternSchedule(findingID, patternKey, merchantKey, actor string, schedule types.Schedule) (types.Schedule, error)
 	SetPatternTransactionClaims(findingID, actor string, claims []types.TransactionClaimUpdate) ([]types.Transaction, error)
-	FindPatternToNewSchedule(patternKey string) (types.PatternToNewSchedule, error)
 	// ListPatternToNewSchedules returns every promotion row for the user, used
 	// to recover the persisted merchant key for auto-claim matching.
 	ListPatternToNewSchedules() ([]types.PatternToNewSchedule, error)
-	RecordPatternToNewSchedule(record types.PatternToNewSchedule) error
-	RemovePatternToNewSchedule(patternKey, ruleID string) error
 	PreviewPatternToExistingSchedule(findingID, ruleID string) (types.PatternToExistingSchedulePreview, error)
 	// ConfirmTransferPair wires one detector-ranked opposite-leg pair as a
 	// single transfer: it validates both legs, replaces any active link

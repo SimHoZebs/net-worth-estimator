@@ -53,16 +53,27 @@ func (p PaymentPatterns) MatchesVersion(version string) bool {
 var payrollDescriptor = regexp.MustCompile(`(?i)\b(payroll|salary|paycheck|direct[ _-]*deposit|dir[ _-]*dep|ach[ _-]*credit|paystub|pension|ssa|va[ _-]*benefits|social[ _-]*security)\b`)
 var paymentRefundMarker = regexp.MustCompile(`(?i)\b(refund|reversal|chargeback|return)\b`)
 
-type paymentCadence struct {
-	id     string
-	days   float64
-	minOcc int
-	factor float64
+// patternCadenceDef is the single cadence registry: nominal interval days
+// per cadence plus detector annualization and the forecast rule schedule
+// each cadence maps onto. Biweekly has no rule schedule, so biweekly
+// patterns stay visible without creation until the product decides how they
+// should repeat. Daily is rule-only and never detected.
+type patternCadenceDef struct {
+	id        string
+	days      float64
+	minOcc    int
+	factor    float64
+	frequency types.Frequency
+	detected  bool
 }
 
-var paymentCadences = []paymentCadence{
-	{"weekly", 7, 3, 52}, {"biweekly", 14, 3, 26}, {"monthly", 30.4375, 3, 12},
-	{"quarterly", 91.3125, 3, 4}, {"annual", 365.25, 2, 1},
+var patternCadenceDefs = []patternCadenceDef{
+	{id: "daily", days: 1, frequency: types.FrequencyDaily},
+	{id: "weekly", days: 7, minOcc: 3, factor: 52, frequency: types.FrequencyWeekly, detected: true},
+	{id: "biweekly", days: 14, minOcc: 3, factor: 26, detected: true},
+	{id: "monthly", days: 30.4375, minOcc: 3, factor: 12, frequency: types.FrequencyMonthly, detected: true},
+	{id: "quarterly", days: 91.3125, minOcc: 3, factor: 4, frequency: types.FrequencyQuarterly, detected: true},
+	{id: "annual", days: 365.25, minOcc: 2, factor: 1, frequency: types.FrequencyAnnual, detected: true},
 }
 
 type paymentOccurrence struct {
@@ -91,34 +102,26 @@ type classifiedPayment struct {
 	isMain         bool
 }
 
-func paymentMedian(values []float64) float64 { return recurringMedian(values) }
-func paymentMean(values []float64) float64 {
+// paymentCV returns the coefficient of variation of one amount or gap
+// sample. It is the only stats helper: the median calls use recurringMedian
+// directly and the mean and standard deviation exist only inside this ratio.
+func paymentCV(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
 	var sum float64
 	for _, v := range values {
 		sum += v
 	}
-	if len(values) == 0 {
-		return 0
-	}
-	return sum / float64(len(values))
-}
-func paymentStd(values []float64) float64 {
-	mean := paymentMean(values)
-	var sum float64
-	for _, v := range values {
-		sum += (v - mean) * (v - mean)
-	}
-	if len(values) == 0 {
-		return 0
-	}
-	return math.Sqrt(sum / float64(len(values)))
-}
-func paymentCV(values []float64) float64 {
-	mean := paymentMean(values)
+	mean := sum / float64(len(values))
 	if mean == 0 {
 		return 0
 	}
-	return paymentStd(values) / mean
+	var squared float64
+	for _, v := range values {
+		squared += (v - mean) * (v - mean)
+	}
+	return math.Sqrt(squared/float64(len(values))) / mean
 }
 func paymentStamp(facts types.TransactionFacts) int64 {
 	if facts.OccurredAt > 0 {
