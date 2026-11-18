@@ -7,20 +7,18 @@ import type { AccountKind } from "@/api/contracts.ts";
 
 /**
  * Refusal reason when a synced kind change contradicts the bank balance,
- * or null when the kind may be saved. Kind is a user label, but it must
- * not contradict the owned facts: debt holds no positive balance and
- * assets hold no negative one. Both synced-kind writers share this so
- * the modal and the detail pane refuse identically.
+ * or null when the kind may be saved. Kind is a user label, but debt must
+ * not contradict the owned facts: debt holds no positive balance.
+ * Non-debt accounts may hold a negative bank balance (for example an
+ * overdrawn checking account), so only a positive debt balance refuses.
  */
 export function syncedKindError(
 	balance: number | null,
 	kind: AccountKind,
 ): string | null {
 	if (balance === null) return "Enter a balance in USD.";
-	if (kind === "debt" ? balance > 0 : balance < 0) {
-		return kind === "debt"
-			? "A debt account cannot hold a positive bank balance."
-			: "A non-debt account cannot hold a negative bank balance.";
+	if (kind === "debt" && balance > 0) {
+		return "A debt account cannot hold a positive bank balance.";
 	}
 	return null;
 }

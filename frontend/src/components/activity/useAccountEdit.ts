@@ -181,12 +181,8 @@ export function useAccountEdit(
 			setError("The ceiling must be at least the protected balance.");
 			return;
 		}
-		if (edit.value.kind === "debt" ? balance > 0 : balance < 0) {
-			setError(
-				edit.value.kind === "debt"
-					? "Enter debt as a negative balance."
-					: "Asset balances cannot be negative.",
-			);
+		if (edit.value.kind === "debt" && balance > 0) {
+			setError("Enter debt as a negative balance.");
 			return;
 		}
 		if (

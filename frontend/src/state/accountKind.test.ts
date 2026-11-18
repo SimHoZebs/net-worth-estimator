@@ -5,9 +5,9 @@ describe("syncedKindError", () => {
 	it("refuses debt on a positive bank balance", () => {
 		expect(syncedKindError(4200, "debt")).toMatch(/positive/);
 	});
-	it("refuses assets on a negative bank balance", () => {
+	it("accepts non-debt accounts on a negative bank balance", () => {
 		for (const kind of ["cash", "investment", "property"] as const) {
-			expect(syncedKindError(-50, kind)).toMatch(/negative/);
+			expect(syncedKindError(-50, kind)).toBeNull();
 		}
 	});
 	it("accepts debt on zero and negative balances", () => {
