@@ -92,8 +92,11 @@ func TestBuildPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	if preview.Direction != "inflow" || preview.Cadence != "monthly" || preview.TypicalAmount != "3000.00" {
 		t.Fatalf("preview=%+v", preview)
 	}
-	if preview.Schedule.StartDate != "2026-03-15" || preview.Schedule.Frequency != types.FrequencyMonthly {
+	if preview.Schedule.StartDate != "2026-01-15" || preview.Schedule.Frequency != types.FrequencyMonthly {
 		t.Fatalf("schedule=%+v", preview.Schedule)
+	}
+	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-15" || preview.Upcoming[5].Date != "2026-08-15" {
+		t.Fatalf("upcoming=%+v", preview.Upcoming)
 	}
 	if preview.PatternKey != RecurringPatternKey("income", "monthly", []string{"p2", "p1"}) {
 		t.Fatalf("key=%q", preview.PatternKey)
@@ -164,16 +167,17 @@ func TestBuildPatternToNewSchedulePreviewClampsMonthEnds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 2026-01-31 and 2026-02-28 evidence produce a clamped 2026-03-28 start.
-	if !preview.Creatable || preview.Schedule == nil || preview.Schedule.StartDate != "2026-03-28" {
+	// 2026-01-31 and 2026-02-28 evidence start the rule on 2026-01-31;
+	// Upcoming stays future-only from the clamped 2026-03-28.
+	if !preview.Creatable || preview.Schedule == nil || preview.Schedule.StartDate != "2026-01-31" {
 		t.Fatalf("preview=%+v", preview)
 	}
-	if len(preview.Upcoming) == 0 || preview.Upcoming[0].Date != "2026-03-28" {
+	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-28" {
 		t.Fatalf("upcoming=%+v", preview.Upcoming)
 	}
 }
 
-func TestBuildPatternToNewSchedulePreviewStartsAfterLatestEvidence(t *testing.T) {
+func TestBuildPatternToNewSchedulePreviewStartsOnFirstEvidence(t *testing.T) {
 	preview, err := BuildPatternToNewSchedulePreview(newRuleTestInput())
 	if err != nil {
 		t.Fatal(err)
@@ -181,11 +185,12 @@ func TestBuildPatternToNewSchedulePreviewStartsAfterLatestEvidence(t *testing.T)
 	if !preview.Creatable || preview.Schedule == nil {
 		t.Fatalf("preview=%+v", preview)
 	}
-	// 2026-01-15 and 2026-02-15 evidence produce a 2026-03-15 monthly start.
-	if preview.Schedule.StartDate != "2026-03-15" {
+	// 2026-01-15 and 2026-02-15 evidence start the rule on 2026-01-15;
+	// Upcoming stays future-only from 2026-03-15.
+	if preview.Schedule.StartDate != "2026-01-15" {
 		t.Fatalf("start=%s", preview.Schedule.StartDate)
 	}
-	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-15" {
+	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-15" || preview.Upcoming[5].Date != "2026-08-15" {
 		t.Fatalf("upcoming=%+v", preview.Upcoming)
 	}
 	if preview.PatternKey == "" || preview.PatternKey != RecurringPatternKey("recurring", "monthly", []string{"p2", "p1"}) {

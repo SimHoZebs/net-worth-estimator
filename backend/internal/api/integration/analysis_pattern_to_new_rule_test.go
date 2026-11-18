@@ -62,9 +62,21 @@ func TestPatternToNewScheduleHTTPContract(t *testing.T) {
 	if !created.Saved || !created.Result.Enabled || created.PatternKey == "" {
 		t.Fatalf("created=%+v", created)
 	}
+	if string(created.Result.StartDate) != "2026-01-15" {
+		t.Fatalf("start=%s", created.Result.StartDate)
+	}
 	model, err := scoped.LoadModel()
 	if err != nil || len(model.Schedules) != 1 {
 		t.Fatalf("model=%+v err=%v", model, err)
+	}
+	claimed := map[string]string{}
+	for _, transaction := range model.Transactions {
+		if transaction.Claim != nil && transaction.Claim.ScheduleID == created.Result.ID {
+			claimed[transaction.ID] = transaction.Claim.OccurrenceDate
+		}
+	}
+	if len(claimed) != 3 || claimed[preview.Preview.Occurrences[0].TransactionID] != "2026-01-15" || claimed[preview.Preview.Occurrences[1].TransactionID] != "2026-02-15" || claimed[preview.Preview.Occurrences[2].TransactionID] != "2026-03-15" {
+		t.Fatalf("claims=%+v", claimed)
 	}
 	res = callAPI(t, handler, "GET", previewPath, "")
 	preview = struct {

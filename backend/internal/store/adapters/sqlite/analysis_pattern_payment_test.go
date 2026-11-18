@@ -27,6 +27,9 @@ func TestPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	if err != nil || created.ID == "" {
 		t.Fatalf("create=%+v err=%v", created, err)
 	}
+	if string(created.StartDate) != "2026-01-15" {
+		t.Fatalf("start=%s", created.StartDate)
+	}
 	promotions, err := s.ListPatternToNewSchedules()
 	if err != nil || len(promotions) != 1 || promotions[0].MerchantKey != preview.Merchant || promotions[0].ScheduleID != created.ID {
 		t.Fatalf("promotions=%+v err=%v", promotions, err)
@@ -34,6 +37,20 @@ func TestPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	model, err := s.LoadModel()
 	if err != nil || len(model.Schedules) != 1 {
 		t.Fatalf("model=%+v err=%v", model, err)
+	}
+	claimed := map[string]string{}
+	for _, transaction := range model.Transactions {
+		if transaction.Claim != nil && transaction.Claim.ScheduleID == created.ID {
+			claimed[transaction.ID] = transaction.Claim.OccurrenceDate
+		}
+	}
+	if len(claimed) != 3 {
+		t.Fatalf("claims=%+v", claimed)
+	}
+	for _, occurrence := range preview.Occurrences {
+		if claimed[occurrence.TransactionID] != occurrence.Date {
+			t.Fatalf("claims=%+v occurrences=%+v", claimed, preview.Occurrences)
+		}
 	}
 	feedback, err := s.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})
 	if err != nil || len(feedback) != 1 || feedback[0].Review == nil || feedback[0].Review.Decision != "confirmed" {

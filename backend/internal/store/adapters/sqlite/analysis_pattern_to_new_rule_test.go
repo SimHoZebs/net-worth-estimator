@@ -22,6 +22,14 @@ func TestPatternToNewSchedulePreviewDerivesRuleAfterEvidence(t *testing.T) {
 	if len(preview.Occurrences) != 3 || len(preview.Upcoming) != 6 {
 		t.Fatalf("occurrences=%+v upcoming=%+v", preview.Occurrences, preview.Upcoming)
 	}
+	// The rule starts on the oldest recorded movement and
+	// Upcoming stays future-only after the latest recorded movement.
+	if preview.Schedule == nil || preview.Schedule.StartDate != "2026-01-15" {
+		t.Fatalf("schedule=%+v", preview.Schedule)
+	}
+	if preview.Upcoming[0].Date != "2026-04-15" || preview.Upcoming[5].Date != "2026-09-15" {
+		t.Fatalf("upcoming=%+v", preview.Upcoming)
+	}
 }
 
 func TestPatternToNewSchedulePreviewGuards(t *testing.T) {
@@ -76,10 +84,26 @@ func TestPatternToNewScheduleTracksOneActiveRule(t *testing.T) {
 	if promotions, err := s.ListPatternToNewSchedules(); err != nil || len(promotions) != 0 {
 		t.Fatalf("promotions=%+v err=%v", promotions, err)
 	}
-	checking := "checking"
-	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: "Grocer", SourceAccountID: &checking, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true})
+	rule := preview.Schedule
+	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations, Amount: types.ExpressionAmountResolution(rule.Amount), Frequency: rule.Frequency, StartDate: rule.StartDate, Enabled: true})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if string(created.StartDate) != "2026-01-15" {
+		t.Fatalf("start=%s", created.StartDate)
+	}
+	model, err := s.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimed := map[string]string{}
+	for _, transaction := range model.Transactions {
+		if transaction.Claim != nil && transaction.Claim.ScheduleID == created.ID {
+			claimed[transaction.ID] = transaction.Claim.OccurrenceDate
+		}
+	}
+	if len(claimed) != 3 || claimed[preview.Occurrences[0].TransactionID] != "2026-01-15" || claimed[preview.Occurrences[1].TransactionID] != "2026-02-15" || claimed[preview.Occurrences[2].TransactionID] != "2026-03-15" {
+		t.Fatalf("claims=%+v", claimed)
 	}
 	promotions, err := s.ListPatternToNewSchedules()
 	if err != nil || len(promotions) != 1 || promotions[0].MerchantKey != "grocer" || promotions[0].ScheduleID != created.ID {
@@ -110,8 +134,8 @@ func TestPatternToNewScheduleClearRemovesLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checking := "checking"
-	if _, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: "Grocer", SourceAccountID: &checking, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true}); err != nil {
+	rule := preview.Schedule
+	if _, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations, Amount: types.ExpressionAmountResolution(rule.Amount), Frequency: rule.Frequency, StartDate: rule.StartDate, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Clear(); err != nil {

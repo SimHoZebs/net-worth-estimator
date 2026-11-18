@@ -13,6 +13,10 @@ func WriteError(err error) error {
 	switch {
 	case errors.Is(err, store.ErrAnalysisFeedbackConflict):
 		return huma.Error409Conflict("The saved data changed. Review the pattern again.")
+	case errors.Is(err, store.ErrPatternToNewScheduleInvalid):
+		return huma.Error422UnprocessableEntity(err.Error())
+	case errors.Is(err, store.ErrPatternToNewScheduleConflict):
+		return huma.Error409Conflict(err.Error())
 	case store.IsNotFound(err):
 		return huma.Error404NotFound("row not found")
 	case store.IsIDConflict(err):

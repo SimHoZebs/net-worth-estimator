@@ -167,8 +167,11 @@ type PatternToNewScheduleInput struct {
 
 // BuildPatternToNewSchedulePreview derives the forecast rule one confirmed recurring
 // pattern would create, plus the forecast movements behind it. The proposed
-// rule always starts one full interval after the latest recorded movement,
-// so approving never duplicates bank facts as forecast movements.
+// rule starts on the oldest recorded movement: creation claims each recorded
+// movement onto its scheduled occurrence, so approving never duplicates bank
+// facts as forecast movements. Upcoming lists the six scheduled dates after
+// the latest recorded movement, so the interface shows future-only movements
+// alongside the recorded evidence.
 // Biweekly and unknown cadences return a visible preview with
 // Creatable=false instead of an error, so the interface can explain why.
 func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.PatternToNewSchedulePreview, error) {
@@ -208,6 +211,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		magnitudes = append(magnitudes, math.Abs(item.amount))
 	}
 	typical := recurringMedian(magnitudes)
+	firstDay := occurrences[0].day
 	lastDay := occurrences[len(occurrences)-1].day
 	cadence := anchor.Product
 	preview := types.PatternToNewSchedulePreview{
@@ -244,13 +248,16 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		Destinations:    append([]string(nil), first.Destinations...),
 		Amount:          formatCents(typical),
 		Frequency:       frequency,
-		StartDate:       domain.AdvanceRuleDate(lastDay, frequency, 1),
+		StartDate:       firstDay,
 		Enabled:         true,
 	}
 	preview.Creatable = true
 	preview.Schedule = &proposal
-	rule := types.ProposedNewScheduleToSchedule(proposal, "")
-	for _, date := range domain.RuleScheduleDates(&rule, domain.AdvanceRuleDate(rule.StartDate, frequency, 5)) {
+	for i := 1; i <= 6; i++ {
+		date := domain.AdvanceRuleDate(lastDay, frequency, i)
+		if domain.CompareIsoDates(date, lastDay) <= 0 {
+			continue
+		}
 		preview.Upcoming = append(preview.Upcoming, types.PatternDatedAmount{Date: date, Amount: formatCents(typical)})
 	}
 	if anchor.Dismissed || (anchor.Review != nil && anchor.Review.Decision == "rejected") {
