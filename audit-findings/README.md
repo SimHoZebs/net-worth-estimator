@@ -1,3 +1,53 @@
+# Pattern detection bloat audit
+
+Audited the pattern detection system on 2026-11-18: `backend/internal/analysis/payment_patterns.go`, `pattern_to_*.go`, `types/analysis_pattern_*.go`, `api/analyses/pattern_*.go`, `store/adapters/sqlite/analysis_pattern_*.go`, `frontend/src/domain/patternReview.ts` plus review UI, and `docs/payment-patterns.md`. Eight scoped read-only reviews ran in parallel, then deduped to one term per concept below.
+
+### Current finding index (033-058)
+
+| ID | Title | Scope | Status |
+| --- | --- | --- | --- |
+| [033](033-shared-occurrence-resolver.md) | Share one occurrence resolver for both preview builders | backend-domain | accepted |
+| [034](034-shared-routing-comparator.md) | Share one routing comparator | backend-domain | accepted |
+| [035](035-unified-cadence-table.md) | Unify the three cadence tables | backend-domain | accepted |
+| [036](036-shared-money-stats-helpers.md) | Collapse money formatting and stats helpers | backend-domain | accepted |
+| [037](037-shared-preview-loader.md) | Share one store preview loader | backend-api-persist | accepted |
+| [038](038-shared-handler-guard.md) | Share one forecast-schedule handler guard | backend-api-persist | accepted |
+| [039](039-shared-finance-persist.md) | Persist both forecast actions through one finance helper | backend-api-persist | accepted |
+| [040](040-preview-contract-types.md) | Tighten the preview contract to one header and one evidence shape | contracts-types | accepted |
+| [041](041-promotion-surface.md) | Remove test-only promotion surface | backend-api-persist | accepted |
+| [042](042-shared-test-seed.md) | Share one pattern test seed | deploy-build-test | accepted |
+| [043](043-one-layer-per-case.md) | Keep one layer per mirror case | deploy-build-test | accepted |
+| [044](044-review-row-fixture.md) | Share one review-row fixture in the frontend test | deploy-build-test | accepted |
+| [045](045-finding-state-wording.md) | Use one finding-state wording | frontend-domain | accepted |
+| [046](046-rename-residue.md) | Delete forecast rename residue | contracts-types | accepted |
+| [047](047-pattern-summary-owner.md) | Use one pattern summary owner | frontend-domain | accepted |
+| [048](048-memoized-grouping.md) | Memoize pattern grouping | frontend-state | accepted |
+| [049](049-single-findings-query.md) | Use one findings query for pattern review | frontend-state | accepted |
+| [050](050-insights-snapshot.md) | Drop the insights snapshot and render-phase sync | frontend-state | accepted |
+| [051](051-forecast-actions.md) | Share one forecast-schedule action pair | ui-ux | accepted |
+| [052](052-success-badge.md) | Own the success badge in one place | ui-ux | accepted |
+| [053](053-dialog-shell.md) | Share one dialog shell and error style | ui-ux | accepted |
+| [054](054-item-composition.md) | Fix row and forecast list composition | ui-ux | accepted |
+| [055](055-registry-docs.md) | Correct the payment registry docs | doc-audit-reference | accepted |
+| [056](056-stale-numbers.md) | Fix stale numbers in pattern docs | doc-audit-reference | accepted |
+| [057](057-doc-ownership.md) | Give review mechanics one doc owner | doc-audit-reference | accepted |
+| [058](058-privacy-sentence.md) | Correct the learner privacy sentence | doc-audit-reference | accepted |
+
+### Vocabulary consolidation for this pass
+
+| User term | Code names grouped under it |
+| --- | --- |
+| Pattern review | review queue, suggestion chips, PatternReview dialog, groupPatternReviews |
+| Forecast schedule | pattern-to-new-rule, pattern-to-existing-rule, promotion record, ProposedNewRule, preview/create/link schedule |
+| Finding state | reviewChipLabel, paymentLabel, paymentStatus, recurringPatternStatus, findingLabel |
+| Row summary | reviewTitle, patternTitle, reviewCadenceLabel, reviewRecordedCount, reviewAmount, ForecastRows |
+| Evidence rows | occurrences, assignments, upcoming, PatternOccurrence, UpcomingNewScheduleOccurrence |
+| Preview header | PatternToNewSchedulePreview, PatternToExistingSchedulePreview, creatable, claimable |
+
+Measurement limits: no benchmarks were run. Line counts cited are duplicated existing lines, not measured savings.
+
+---
+
 # shadcn Base UI migration audit
 
 ## Post-migration trimming audit

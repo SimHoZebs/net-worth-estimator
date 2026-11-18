@@ -156,20 +156,8 @@ human queue. The feature never selects an algorithm or interprets a probability.
 - Each occurrence carries its own finding. Its evidence lists every
   occurrence in the pattern plus the estimated cadence, typical source
   amount, and annualized estimate, so the basis is inspectable from one row.
-  The Pattern review list groups occurrences into one row per stream and
-  classification, with
-  source-currency amounts supplied as structured fields rather than parsed
-  from explanations or reconstructed from training features. Rows carry
-  Review, Saved, and Dismissed tabs by explicit answer, suggestion chips per
-  classification, and one dialog per stream with the answers, the forecast
-  actions (create a new schedule or link to an existing schedule, each behind
-  its preview, recording confirmation), and the visibility actions.
-  Repetition answers never imply income
-  or rent, and purpose answers never confirm repetition.
-  Review uses the latest answered eligible occurrence, or the first eligible
-  occurrence for an unanswered pattern. It saves one explicit label and never
-  rewrites the other recorded answers. Withdrawn findings remain separate
-  from current patterns.
+  Pattern review, including tabs, rows, chips, dialogs, and the answer
+  lifecycle, follows [payment-patterns.md](payment-patterns.md).
 - The highest candidate with established repetition is marked `income.main-inflow:annualized`
   and described as the main consistent inflow. Other candidates keep
   `income.inflow:annualized`. Ranking is by annualized estimate desc with
@@ -263,6 +251,8 @@ Setup installs `analysis_promotions` alongside the other Analysis tables;
 runtime rejects an incomplete schema. The deployment body provisions the
 record table for sources that predate it and verifies it on candidates. A
 user clear removes pattern-to-new-schedule records with the model rows they name.
+Existing income deployments also require the explicit offline
+[payment-patterns upgrade](../backend/scripts/one-time/payment-patterns/README.md).
 
 ## Pattern to existing schedule
 

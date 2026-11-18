@@ -94,10 +94,13 @@ operations individually.
 ## Privacy and replacement requirements
 
 The evidence includes sensitive original descriptions, amounts, and metadata,
-not anonymous feature vectors. Keep the supplied unauthenticated service on
-localhost or a private network. Configuring an external destination requires
-an explicit operator decision about data handling, authentication, and retention;
-this feature does not send data to any public model service by default.
+not anonymous feature vectors. Shared learning comes from explicit confirm and
+reject answers only; stored bank evidence, findings, and saved decisions stay
+owner-scoped. Request samples travel under the rule below: keep the supplied
+unauthenticated service on localhost or a private network. Configuring an
+external destination requires an explicit operator decision about data
+handling, authentication, and retention; this feature does not send data to any
+public model service by default.
 
 A replacement must preserve request correlation, the domain result schema,
 revision freshness, cancellation, and user isolation. Its own persistence,

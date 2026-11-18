@@ -60,6 +60,9 @@ the QA-03 test files' headers and in section 4 below.
   [deploy/MIGRATIONS.md](../deploy/MIGRATIONS.md) on every supported
   target, with conversion-correctness, data-safety, and rollback tests
   under `backend/scripts/one-time/`.
+- Payment-pattern scale-up to hundreds of active overlapping classifications
+  on arbitrary histories stays gated on broader CPU/memory/load measurements
+  before enabling such workloads.
 - Image publishing validates with `actionlint
   .github/workflows/images.yml` and `node --test
   deploy/images.test.mjs`. Container checks run under the deployment

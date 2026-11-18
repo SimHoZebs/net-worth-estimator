@@ -69,7 +69,7 @@ Use **Funding gaps** for the default transaction-funding evaluation and its outl
 **Analysis** is a versioned inference over saved evidence. It produces findings
 with reasons and uncertainty. Analysis runs independently of account sync and
 does not change the saved financial model. BNPL detection is an Analysis. Income
-evidence is the result of income-pattern Analysis.
+evidence is the result of `payments` Analysis.
 
 An inference from recorded recurring external inflows, such as an annualized estimate of net pay. The highest annualized candidate is the main consistent inflow when currencies are comparable, ranked without asking the user to state it. It never changes planned income and does not establish bank provenance. A replaceable judgment provider may refine the assessment; it may be automated or human-operated. Explicit feedback is audited independently of whether the provider learns from it. Hide and restore are never labels.
 
