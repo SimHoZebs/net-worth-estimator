@@ -57,33 +57,50 @@ function BillsList({ bills }: { bills: readonly TransactionResult[] }) {
 /**
  * All cash facts come from the server response. The visible Bills list is the
  * separate, locally owned bill definition: selected recurring transactions
- * for the selected cash accounts inside the current safe card cycle.
+ * for the selected cash accounts inside the selected statement cycle.
+ * Every offset uses the same cash-after-bills figure with the same testid.
  */
 export function SafeSpendingCashEvidence({
 	summary,
 	pending,
 	error,
-	closed,
-	upcoming = false,
 	bills,
 	onRetry,
+	unavailable = false,
 }: {
 	summary?: SafeSpendingSummary;
 	pending: boolean;
 	error: boolean;
-	closed: boolean;
-	/** A future cycle with no cash evidence; bills only, never cash figures. */
-	upcoming?: boolean;
 	bills: readonly TransactionResult[];
 	onRetry: () => void;
+	/**
+	 * The window has no cash evidence by contract (the summary endpoint
+	 * rejects its range, e.g. it ends in the future). Render the same
+	 * sections with an explicit unavailable figure instead of a loading or
+	 * error state. The caller disables the query for such windows.
+	 */
+	unavailable?: boolean;
 }) {
-	if (upcoming)
+	// Matches the missing-evidence rendering of a fetched summary: the same
+	// figure slot with an em dash, the same unavailable note, the same bills.
+	if (unavailable)
 		return (
 			<section className="grid content-start gap-3" aria-label="Cash evidence">
-				<BillsList bills={bills} />
-				<p className="m-0 text-xs text-muted-foreground">
-					No cash evidence exists for an upcoming cycle.
+				<div className="flex items-center justify-between gap-3">
+					<h3 className="m-0 text-sm text-muted-foreground">
+						{labels.cashAfterOutstandingBills}
+					</h3>
+					<strong
+						className="text-base tabular-nums"
+						data-testid="left-value"
+					>
+						{amountText(null)}
+					</strong>
+				</div>
+				<p className="m-0 text-sm text-muted-foreground">
+					Remainder unavailable
 				</p>
+				<BillsList bills={bills} />
 			</section>
 		);
 	if (!summary)
@@ -101,92 +118,74 @@ export function SafeSpendingCashEvidence({
 				)}
 			</div>
 		);
-	const cashValue = closed ? summary.checkingAvailable : summary.cashAfterBills;
-	const hasShortfall = !closed && cashValue !== null && cashValue < 0;
+	const cashValue = summary.cashAfterBills;
+	const hasShortfall = cashValue !== null && cashValue < 0;
 	return (
 		<section className="grid content-start gap-3" aria-label="Cash evidence">
-			{(!closed || cashValue !== null) && (
-				<>
-					<div className="flex items-center justify-between gap-3">
-						<h3 className="m-0 text-sm text-muted-foreground">
-							{closed
-								? "Available cash at close"
-								: labels.cashAfterOutstandingBills}
-						</h3>
-						<strong
-							className={cn(
-								"text-base tabular-nums",
-								hasShortfall && "text-danger-text",
-							)}
-							data-testid={closed ? "close-cash-value" : "left-value"}
-						>
-							{amountText(cashValue)}
-						</strong>
-					</div>
-					{closed && (
-						<p className="m-0 text-xs text-muted-foreground">
-							Available cash evidence · {monthDay(summary.start)} · Excludes
-							future income
-						</p>
+			<div className="flex items-center justify-between gap-3">
+				<h3 className="m-0 text-sm text-muted-foreground">
+					{labels.cashAfterOutstandingBills}
+				</h3>
+				<strong
+					className={cn(
+						"text-base tabular-nums",
+						hasShortfall && "text-danger-text",
 					)}
-				</>
-			)}
-			{closed && summary.checkingAvailable === null && (
-				<p className="m-0 text-sm text-muted-foreground">
-					No balance recorded at close
-				</p>
-			)}
-			{!closed && summary.status !== "available" && (
+					data-testid="left-value"
+				>
+					{amountText(cashValue)}
+				</strong>
+			</div>
+			{summary.status !== "available" && (
 				<p className="m-0 text-sm text-muted-foreground">
 					{summary.status === "uncertain"
 						? "Remainder uncertain"
 						: "Remainder unavailable"}
 				</p>
 			)}
-			{!closed &&
-				(summary.checkingAvailable === null ||
-					summary.checkingAvailable !== cashValue) && (
-					<dl className="m-0 grid gap-2 text-sm">
-						{summary.checkingAvailable !== null ? (
-							<div className="flex justify-between gap-3">
-								<dt>Available cash</dt>
-								<dd className="m-0 tabular-nums">
-									{amountText(summary.checkingAvailable)}
-								</dd>
-							</div>
-						) : (
-							(summary.baselines ?? [])
-								.filter(
-									(baseline) =>
-										baseline.availableBalance !== null ||
-										(baseline.basis === "posted" &&
-											baseline.postedBalance !== null),
-								)
-								.map((baseline) => {
-									const observed = baseline.availableBalance !== null;
-									return (
-										<div
-											key={baseline.accountId}
-											className="flex justify-between gap-3"
-										>
-											<dt>
-												{baseline.accountName} ·{" "}
-												{observed ? "observed available" : "posted balance"}
-											</dt>
-											<dd className="m-0 tabular-nums">
-												{amountText(
-													observed
-														? baseline.availableBalance
-														: baseline.postedBalance,
-												)}
-											</dd>
-										</div>
-									);
-								})
-						)}
-					</dl>
-				)}
-			{!closed && <BillsList bills={bills} />}
+			{(summary.checkingAvailable === null ||
+				summary.checkingAvailable !== cashValue) && (
+				<dl className="m-0 grid gap-2 text-sm">
+					{summary.checkingAvailable !== null ? (
+						<div className="flex justify-between gap-3">
+							<dt>Available cash</dt>
+							<dd className="m-0 tabular-nums">
+								{amountText(summary.checkingAvailable)}
+							</dd>
+						</div>
+					) : (
+						(summary.baselines ?? [])
+							.filter(
+								(baseline) =>
+									baseline.availableBalance !== null ||
+									(baseline.basis === "posted" &&
+										baseline.postedBalance !== null),
+							)
+							.map((baseline) => {
+								const observed = baseline.availableBalance !== null;
+								return (
+									<div
+										key={baseline.accountId}
+										className="flex justify-between gap-3"
+									>
+										<dt>
+											{baseline.accountName} ·{" "}
+											{observed ? "observed available" : "posted balance"}
+										</dt>
+										<dd className="m-0 tabular-nums">
+											{amountText(
+												observed
+													? baseline.availableBalance
+													: baseline.postedBalance,
+											)}
+										</dd>
+									</div>
+								);
+							})
+					)}
+				</dl>
+			)}
+			<BillsList bills={bills} />
 		</section>
 	);
 }

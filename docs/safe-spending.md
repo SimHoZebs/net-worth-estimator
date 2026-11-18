@@ -1,8 +1,8 @@
 # Safe card spending evidence
 
 Safe spending answers how much can safely be spent and which recorded spending
-exceeds that amount. Cash after outstanding bills is the current available cash
-less outstanding obligations through the end of the month. The chart, remaining
+exceeds that amount. Cash after outstanding bills is the available cash in the
+selected window less outstanding obligations in that window. The chart, remaining
 allowance, daily allowance, and transaction cutoff use that same cash-backed
 budget. Future paychecks do not increase money available to spend today.
 
@@ -13,10 +13,15 @@ frontend renders those facts rather than independently summing a second set of
 transactions. The summary and other model reads carry a revision so consumers
 can avoid combining different model versions.
 
-One current-cycle derivation owns the spending ledger, budget, chart, and
-transaction crossing identities. Its budget reconciles recorded cycle spending
-with the server's current cash remainder. This is today's spending capacity
-applied to the cycle, not a reconstructed historical bank balance. The protected
+One selected-cycle derivation owns the spending ledger, budget, chart, and
+transaction crossing identities. Its budget reconciles recorded selected-window
+spending with the server's selected-window cash remainder. The current range
+uses cash after bills as today; a past single-day close range uses its cash
+after bills (close cash minus close-day bills). Past cycles deliberately
+reconstruct the same budget rows as the current cycle from close cash evidence:
+spend by selected end, per day, and pace limits with thresholds whenever
+computable. Future windows with no evidence render the unavailable allowance
+state. The protected
 reserve reduces safe spending without changing the underlying cash remainder.
 One effective-selection resolver owns card, cash-account, and bill ids: stored
 `null` means all known ids, unknown ids drop out, and toggles normalize through
@@ -72,8 +77,9 @@ The summary accepts an explicit inclusive `start` and `end` calendar date.
 It always returns evidenced available cash at `start` and conditional
 outstanding bills within that range. It has no current-versus-historical mode
 and does not change its meaning based on the wall clock. The current view asks
-for today through month-end. The closed view asks for the closing date alone
-and uses only the cash evidence, not the conditional bill estimate.
+for today through month-end. A non-current selected window asks for its closing
+date alone and reconstructs the same budget rows from that close cash evidence;
+a future window with no evidence renders the unavailable allowance state.
 
 Each selected cash account has its own observation boundary. A newer retirement
 or investment observation cannot advance checking's boundary. Available cash,
@@ -90,7 +96,8 @@ merchant names alone do not establish that identity.
 
 The range does not invent an arrears ledger for dates before its start.
 Current schedule estimates returned for an old range are still conditional
-estimates; they are never evidence of historical payments or budgets.
+estimates; they are never evidence of historical payments. Selected-window
+budgets come from close cash evidence, not from those schedule estimates.
 
 Pending payments need particular care because available balance can already
 include their holds. The cash calculation must not deduct a covered payment a
@@ -103,9 +110,12 @@ apparently certain amount.
 Keep the panel concise, without an inline diagnostic Details section or
 explanatory allowance and paycheck captions. Bills remain visible in their
 existing section. Show known balances even when a dependent estimate is
-unavailable; omit unsupported historical metrics rather than filling the page
-with blank rows. Non-current cycles show recorded activity only, with
-transactions in the drawer.
+unavailable. Every offset shows the same main-card sections (spend by selected
+end, per day, cash evidence with the selected window's Bills list, pace chart
+with cash-limit labeling and the income threshold whenever computable) and the
+same side-panel shape (titled "Spending this cycle"); the cash-payments total
+lives only in that Transactions side panel, never inline on the main card, and
+there is no closed-balance row.
 The bills section has one heading and total, followed by a visibly separate list
 of bills with muted due dates and individual row dividers.
 
@@ -115,9 +125,11 @@ introducing a different calendar is outside this correction.
 
 ## Historical views
 
-The safe card shows a single selected statement cycle. Arrow buttons move the
-visible cycle to earlier or later statement cycles without bounds; non-current
-cycles show recorded activity only, with no invented budget. Recorded card
+The safe card is one definition parameterized by the selected statement cycle.
+Arrow buttons move the visible cycle to earlier or later statement cycles
+without bounds; every offset lists the same sections and rows on the main card
+and the same side-panel shape. Past cycles reconstruct the same budget rows as
+the current cycle from close cash evidence. Recorded card
 activity is evidence of charges, independent of statement debt.
 Purchases establish spending activity; they do not establish the closed
 statement balance. Card settlements affect cash, while purchases affect card
@@ -127,12 +139,9 @@ A historical cash balance requires observations at or before the historical
 cut and applicable subsequent recorded movements. A missing available figure
 alone leaves cash known at the reported posted balance. Missing coverage
 for a selected account makes the aggregate unavailable. Today's balance is never a
-substitute for a missing historical balance.
-
-Current schedules cannot recreate an old budget or the forecast that the user
-saw at that time. Without saved budget evidence, the historical spending curve
-has no budget or protected-reserve thresholds. Missing historical evidence is
-shown explicitly, while available recorded activity remains visible.
+substitute for a missing historical balance. Missing evidence is shown
+explicitly with the same unavailable allowance and cash-figure states used for
+the current window, while available recorded activity remains visible.
 
 ## Verification
 

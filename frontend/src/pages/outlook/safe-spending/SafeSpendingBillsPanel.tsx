@@ -4,7 +4,6 @@ import { exactMoney, monthDay } from "../../../domain/format.ts";
 import type {
 	CycleAllocation,
 	SafeSpendingHeroes,
-	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
 import { describeAllowance } from "./allowanceView.ts";
 import { amountText } from "./amountText.ts";
@@ -64,19 +63,11 @@ export function SafeSpendingBillsPanel({
 	cashEvidence,
 	allocation,
 	trend,
-	section,
-	closed = false,
-	upcoming = false,
 }: {
 	heroes: SafeSpendingHeroes;
 	cashEvidence: React.ReactNode;
 	allocation: CycleAllocation;
 	trend?: SafeSpendingTrend;
-	section?: SafeSpendingMandatorySection;
-	/** The statement already closed; the payday and pace are historical. */
-	closed?: boolean;
-	/** A future cycle with no evidence yet; recorded charges only. */
-	upcoming?: boolean;
 }) {
 	const allowanceView = describeAllowance({
 		allowance: allocation.allowance,
@@ -92,9 +83,7 @@ export function SafeSpendingBillsPanel({
 				? undefined
 				: allowanceView.phase === "into-reserve"
 					? `${exactMoney(allowanceView.intoReserve)} of ${exactMoney(allocation.reserve)} reserve in use`
-					: closed
-						? `Over budget by ${exactMoney(allowanceView.overLimit)}`
-						: `Over limit by ${exactMoney(allowanceView.overLimit)}`;
+					: `Over limit by ${exactMoney(allowanceView.overLimit)}`;
 	const dailyValue =
 		allowanceView.phase === "unavailable"
 			? null
@@ -117,65 +106,33 @@ export function SafeSpendingBillsPanel({
 							</div>
 						}
 					>
-						<SafeSpendingTrendChart trend={trend} closed={closed} />
+						<SafeSpendingTrendChart trend={trend} />
 					</Suspense>
 				</div>
 			)}
 			<div className="grid min-w-0 content-start gap-4">
 				{cashEvidence}
 				<div className="grid content-start gap-4">
-					{upcoming ? (
+					<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
 						<StatRow
-							label={labels.recordedCharges}
-							value={amountText(heroes.committedTotal)}
-							testId="recorded-charges-value"
+							label={spendLabel}
+							value={amountText(allowanceView.primary)}
+							tone={allowanceView.tone}
+							testId="spend-value"
+							qualifier={spendQualifier}
 						/>
-					) : closed ? (
-						<>
-							<StatRow
-								label={labels.recordedCharges}
-								value={amountText(heroes.committedTotal)}
-								testId="recorded-charges-value"
-							/>
-							{heroes.closedCycle.total !== null && (
-								<StatRow
-									label="Closed card balance"
-									value={amountText(heroes.closedCycle.total)}
-									testId="closed-card-value"
-								/>
-							)}
-						</>
-					) : (
-						<>
-							<div className="grid grid-cols-1 gap-3 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-								<StatRow
-									label={spendLabel}
-									value={amountText(allowanceView.primary)}
-									tone={allowanceView.tone}
-									testId="spend-value"
-									qualifier={spendQualifier}
-								/>
-								<StatRow
-									label={labels.perDay}
-									value={dailyValue === null ? "—" : exactMoney(dailyValue)}
-									testId="perday-value"
-								/>
-							</div>
-							{!allocation.available && (
-								<p className="m-0 text-xs text-muted-foreground">
-									Current cash evidence unavailable
-								</p>
-							)}
-						</>
+						<StatRow
+							label={labels.perDay}
+							value={dailyValue === null ? "—" : exactMoney(dailyValue)}
+							testId="perday-value"
+						/>
+					</div>
+					{!allocation.available && (
+						<p className="m-0 text-xs text-muted-foreground">
+							Cash evidence unavailable
+						</p>
 					)}
 				</div>
-				{closed && !upcoming && section && (
-					<StatRow
-						label={labels.cashPayments}
-						value={amountText(section.total)}
-						testId="cash-payments-value"
-					/>
-				)}
 			</div>
 		</div>
 	);

@@ -353,15 +353,27 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
 		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
-		await expect(card.getByTestId("recorded-charges-value")).toHaveText(
-			/\$125(?:\.00)?/,
-		);
-		await expect(card.getByTestId("closed-card-value")).toHaveCount(0);
+		// Every offset lists the same main-card sections: spend, per day,
+		// cash evidence with the selected window's Bills, and pace.
+		await expect(card.getByTestId("spend-value")).toHaveText("—");
+		await expect(card.getByTestId("perday-value")).toHaveText("—");
+		await expect(card.getByTestId("left-value")).toHaveText("—");
 		await expect(
-			card.getByText("No balance recorded at close", { exact: true }),
+			card.getByText("Remainder unavailable", { exact: true }),
 		).toBeVisible();
+		await expect(
+			card.getByRole("heading", { name: "Bills", exact: true }),
+		).toBeVisible();
+		await expect(card.getByText("No bills.", { exact: true })).toBeVisible();
+		await expect(
+			card.getByLabel("Spending pace", { exact: true }),
+		).toBeVisible();
+		await expect(card.getByTestId("closed-card-value")).toHaveCount(0);
 		await expect(card.getByTestId("close-cash-value")).toHaveCount(0);
-		await expect(card.getByTestId("cash-payments-value")).toHaveText("$80.00");
+		await expect(card.getByTestId("recorded-charges-value")).toHaveCount(0);
+		await expect(card.getByTestId("cash-payments-value")).toHaveCount(0);
+		await expect(card).not.toContainText("Closed card balance");
+		await expect(card).not.toContainText("No balance recorded at close");
 		const inlinePayment = card.getByText("Synthetic one-time card settlement", {
 			exact: true,
 		});
@@ -375,13 +387,20 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 			name: "Safe spending",
 			exact: true,
 		});
+		// One side-panel shape for every offset.
+		await expect(
+			drawer.getByRole("heading", { name: "Spending this cycle" }),
+		).toBeVisible();
+		await expect(drawer).toContainText("Sep 20 – Oct 19");
+		// The unified summary lists the spent total before the per-card rows.
+		await expect(drawer.getByText("$125.00", { exact: true }).first()).toBeVisible();
 		const paymentRow = drawer.getByText("Synthetic one-time card settlement", {
 			exact: true,
 		});
 		await expect(
 			drawer.getByText("Cash payments this cycle", { exact: true }),
 		).toBeVisible();
-		await expect(drawer).toContainText("Sep 20 – Oct 19");
+		await expect(drawer).toContainText("$80.00");
 		await expect(paymentRow).toBeVisible();
 		await drawer
 			.getByRole("button", { name: /Synthetic one-time card settlement on/ })
@@ -401,6 +420,28 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		await expect(
 			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
+		// Next offset lists the same main-card sections with unavailable future cash.
+		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
+		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
+		await expect(card.getByTestId("spend-value")).toHaveText("—");
+		await expect(card.getByTestId("perday-value")).toHaveText("—");
+		await expect(card.getByTestId("left-value")).toHaveText("—");
+		await expect(
+			card.getByRole("heading", { name: "Bills", exact: true }),
+		).toBeVisible();
+		await expect(
+			card.getByLabel("Spending pace", { exact: true }),
+		).toBeVisible();
+		await expect(card.getByTestId("closed-card-value")).toHaveCount(0);
+		await expect(card.getByTestId("cash-payments-value")).toHaveCount(0);
+		await expect(card.getByTestId("recorded-charges-value")).toHaveCount(0);
+		await card.getByRole("button", { name: "Transactions", exact: true }).click();
+		await expect(
+			drawer.getByRole("heading", { name: "Spending this cycle" }),
+		).toBeVisible();
+		await expect(drawer).toContainText("No spending this cycle yet.");
+		await page.keyboard.press("Escape");
+		await expect(drawer).toBeHidden();
 		const historical = await api.get(
 			`${FIXTURE_API}/v1/safe-spending-summary?start=2026-10-19&end=2026-10-19`,
 		);
@@ -531,17 +572,51 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		};
 		await checkCurrent();
 		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
-		await expect(card.getByTestId("recorded-charges-value")).toBeVisible();
-		await expect(card.getByText(/Income this month/)).toHaveCount(0);
-		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
-		await checkCurrent();
-		await card
-			.getByRole("button", { name: "Transactions", exact: true })
-			.click();
+		// Identical main-card sections for the past window, with close cash
+		// unavailable in this fixture.
+		await expect(card.getByTestId("spend-value")).toHaveText("—");
+		await expect(card.getByTestId("perday-value")).toHaveText("—");
+		await expect(card.getByTestId("left-value")).toHaveText("—");
+		await expect(
+			card.getByRole("heading", { name: "Bills", exact: true }),
+		).toBeVisible();
+		await expect(
+			card.getByLabel("Spending pace", { exact: true }),
+		).toBeVisible();
+		await expect(card.getByTestId("closed-card-value")).toHaveCount(0);
+		await expect(card.getByTestId("cash-payments-value")).toHaveCount(0);
+		await expect(card.getByTestId("recorded-charges-value")).toHaveCount(0);
 		const drawer = page.getByRole("dialog", {
 			name: "Safe spending",
 			exact: true,
 		});
+		await card
+			.getByRole("button", { name: "Transactions", exact: true })
+			.click();
+		await expect(
+			drawer.getByRole("heading", { name: "Spending this cycle" }),
+		).toBeVisible();
+		await expect(drawer).toContainText("Sep 20 – Oct 19");
+		await page.keyboard.press("Escape");
+		await expect(drawer).toBeHidden();
+		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
+		await checkCurrent();
+		// Identical main-card sections for the future window.
+		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
+		await expect(card.getByTestId("spend-value")).toHaveText("—");
+		await expect(card.getByTestId("perday-value")).toHaveText("—");
+		await expect(card.getByTestId("left-value")).toHaveText("—");
+		await expect(
+			card.getByRole("heading", { name: "Bills", exact: true }),
+		).toBeVisible();
+		await expect(
+			card.getByLabel("Spending pace", { exact: true }),
+		).toBeVisible();
+		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
+		await checkCurrent();
+		await card
+			.getByRole("button", { name: "Transactions", exact: true })
+			.click();
 		const checkCrossing = async () => {
 			const table = drawer.getByRole("table");
 			await expect(table.locator("tbody > tr")).toHaveCount(3);

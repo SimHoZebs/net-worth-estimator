@@ -84,12 +84,6 @@ const input: CycleViewInput = {
 	cashSummary: summary,
 	reserve: 700,
 	fullDaysLeft: 4,
-	closedCycle: {
-		start: "2026-09-20",
-		end: "2026-10-19",
-		total: null,
-		cards: [],
-	},
 	cardSpentByCard: [],
 	transactions: [
 		charge("third-charge", 200, "15:00:00"),
@@ -109,12 +103,6 @@ describe("one cash-backed current spending budget", () => {
 			createElement(SafeSpendingBillsPanel, {
 				...view,
 				cashEvidence: "Cash after bills 100",
-				section: {
-					title: "Cash payments",
-					subtitle: "",
-					total: 0,
-					transactions: [],
-				},
 			}),
 		);
 		expect(html).toContain("$100.00");
@@ -145,12 +133,6 @@ describe("one cash-backed current spending budget", () => {
 				...view,
 				trend: undefined,
 				cashEvidence: "Cash after bills -216.58",
-				section: {
-					title: "Cash payments",
-					subtitle: "",
-					total: 0,
-					transactions: [],
-				},
 			}),
 		);
 		expect(html).toContain("Over limit by $216.58");
@@ -959,7 +941,7 @@ describe("canonical recorded cash selection", () => {
 		expect(result.view.heroes.theoretical).toBe(40);
 		expect(result.trend.actual.at(-1)?.spent).toBe(10);
 		expect(result.trend.limitHit?.transactionId).toBe("recorded-purchase");
-		expect(paceLabel({ ...result.trend, projected: [] }, false)).toEqual({
+		expect(paceLabel({ ...result.trend, projected: [] })).toEqual({
 			text: null,
 			tone: "normal",
 		});

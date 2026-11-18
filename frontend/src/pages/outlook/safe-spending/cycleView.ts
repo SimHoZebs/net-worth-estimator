@@ -22,11 +22,16 @@ export interface CycleViewInput {
 	cashSummary?: SafeSpendingSummary;
 	cardSpentByCard: { id: string; name: string; amount: number | null }[];
 	reserve: number;
-	closedCycle: CycleView["heroes"]["closedCycle"];
 	fullDaysLeft: number;
 	/** Posted external cash inflows; null means evidence is unavailable. */
 	monthlyIncome?: number | null;
 	scheduledOutflows?: SafeSpendingScheduledIncrease[];
+	/**
+	 * Selected-window cash remainder for non-current cycles. When provided
+	 * (even as null) it replaces the current-range shape check; when absent
+	 * the exact current-range derivation applies.
+	 */
+	remainingOverride?: number | null;
 }
 
 export interface CycleViewResult {
@@ -51,10 +56,10 @@ export function cycleView({
 	cashSummary,
 	cardSpentByCard,
 	reserve,
-	closedCycle,
 	fullDaysLeft,
 	monthlyIncome,
 	scheduledOutflows,
+	remainingOverride,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
 	const monthStart = `${referenceDay.slice(0, 7)}-01`;
 	const recorded = spendingLedger({
@@ -70,20 +75,23 @@ export function cycleView({
 		todayIso: referenceDay,
 	});
 	const spent = sumCents(ledger, spendingAmount);
-	const remaining =
-		cashSummary?.status === "available" &&
-		cashSummary.start === referenceDay &&
-		cashSummary.end === monthEndIso(referenceDay) &&
-		cashSummary.cashAfterBills !== null &&
-		Number.isFinite(cashSummary.cashAfterBills)
+	const hasOverride = remainingOverride !== undefined;
+	const remaining = hasOverride
+		? remainingOverride
+		: cashSummary?.status === "available" &&
+			  cashSummary.start === referenceDay &&
+			  cashSummary.end === monthEndIso(referenceDay) &&
+			  cashSummary.cashAfterBills !== null &&
+			  Number.isFinite(cashSummary.cashAfterBills)
 			? cashSummary.cashAfterBills
 			: null;
 	const protectedReserve = Math.max(0, reserve);
 	const unknownSpending = hasUnknownSpending(ledger);
 	const cashInAccount =
 		cashSummary?.status === "available" &&
-		cashSummary.start === referenceDay &&
-		cashSummary.end === monthEndIso(referenceDay) &&
+		(hasOverride ||
+			(cashSummary.start === referenceDay &&
+				cashSummary.end === monthEndIso(referenceDay))) &&
 		cashSummary.checkingAvailable !== null &&
 		Number.isFinite(cashSummary.checkingAvailable)
 			? cashSummary.checkingAvailable
@@ -145,7 +153,6 @@ export function cycleView({
 		view: buildCycleView({
 			cycleStart: cycle.start,
 			cycleEnd: cycle.end,
-			closedCycle,
 			remaining,
 			cardSpent: unknownSpending ? null : spent,
 			cardSpentByCard,

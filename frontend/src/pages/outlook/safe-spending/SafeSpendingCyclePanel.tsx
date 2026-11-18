@@ -95,17 +95,7 @@ export function SafeSpendingCyclePanel({
 					))}
 				</div>
 			)}
-			<SafeSpendingSectionHeader
-				title={cycle.title}
-				total={
-					cycle.showTotal
-						? cycle.transactions.reduce(
-								(total, transaction) => total + transaction.amount,
-								0,
-							)
-						: undefined
-				}
-			/>
+			<SafeSpendingSectionHeader title={cycle.title} />
 			<div className="flex justify-end">
 				<TransactionSortButton
 					order={transactionOrder}

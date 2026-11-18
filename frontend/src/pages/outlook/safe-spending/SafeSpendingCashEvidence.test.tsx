@@ -65,13 +65,11 @@ const bill = (
 
 const render = (
 	data: SafeSpendingSummary,
-	closed = false,
 	bills: readonly TransactionResult[] = [],
 ) =>
 	renderToStaticMarkup(
 		<SafeSpendingCashEvidence
 			summary={data}
-			closed={closed}
 			bills={bills}
 			pending={false}
 			error={false}
@@ -81,7 +79,7 @@ const render = (
 
 describe("safe spending cash evidence", () => {
 	it("renders the exact server cash fact and bills from the selected-cycle bill rows", () => {
-		const html = render(summary(), false, [
+		const html = render(summary(), [
 			bill(),
 			bill({
 				transactionId: "bill-b",
@@ -104,6 +102,9 @@ describe("safe spending cash evidence", () => {
 		expect(html).not.toContain("Backend obligation not shown as bill");
 		expect(html).not.toContain("$1,461.01");
 		expect(html).toContain("$1,244.43");
+		expect(html).not.toContain("close-cash-value");
+		expect(html).not.toContain("Available cash at close");
+		expect(html).not.toContain("No balance recorded at close");
 	});
 	it("withholds the total and list when no bills are selected in the cycle", () => {
 		const html = render(summary());
@@ -136,7 +137,7 @@ describe("safe spending cash evidence", () => {
 		);
 		expect(html).toContain('data-testid="left-value">—');
 		expect(html).toMatch(
-			/Synthetic checking · observed available<\/dt><dd[^>]*>\$1,244.43/,
+			/Synthetic checking · observed available<\/dt><dd[^>]*>\$1,244\.43/,
 		);
 		expect(html).not.toContain("Posted");
 		expect(html).toContain("Remainder uncertain");
@@ -187,44 +188,26 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Remainder uncertain");
 		expect(html).toContain('data-testid="left-value">—');
 	});
-	it("renders upcoming bills without any cash figures", () => {
-		const html = renderToStaticMarkup(
-			<SafeSpendingCashEvidence
-				summary={summary()}
-				closed={false}
-				upcoming
-				bills={[bill()]}
-				pending={false}
-				error={false}
-				onRetry={() => {}}
-			/>,
-		);
-		expect(html).toContain("Bills</h3>");
-		expect(html).toContain("Selected bill A");
-		expect(html).toContain('aria-label="Bills in this cycle"');
-		expect(html).toContain("No cash evidence exists for an upcoming cycle.");
-		expect(html).not.toContain("close-cash-value");
-		expect(html).not.toContain("left-value");
-		expect(html).not.toContain("$1,244.43");
-		expect(html).not.toContain("-$216.58");
-	});
-	it("renders genuine close cash rather than the conditional result of a one-day range", () => {
+	it("renders a past single-day close range with the same cash figure and bills", () => {
 		const html = render(
 			summary({
 				start: "2026-10-19",
 				end: "2026-10-19",
-				cashAfterBills: 10000,
+				cashAfterBills: 450.25,
 				outstandingBillsTotal: 100,
 				checkingAvailable: 450.25,
 			}),
-			true,
+			[bill()],
 		);
 		expect(html).toContain("$450.25");
+		expect(html).toContain('data-testid="left-value"');
 		expect(html).not.toContain("Backend obligation not shown as bill");
-		expect(html).not.toContain("$10,000.00");
-		expect(html).toContain("Available cash at close");
+		expect(html).not.toContain("close-cash-value");
+		expect(html).not.toContain("Available cash at close");
+		expect(html).not.toContain("No balance recorded at close");
+		expect(html).toContain("Selected bill A");
 	});
-	it("does not replace missing close evidence with current cash", () => {
+	it("renders missing close evidence with the same unavailable figure", () => {
 		const html = render(
 			summary({
 				start: "2026-10-19",
@@ -235,25 +218,53 @@ describe("safe spending cash evidence", () => {
 				checkingAvailable: null,
 				baselines: [],
 			}),
-			true,
 		);
-		expect(html).toContain("No balance recorded at close");
+		expect(html).toContain('data-testid="left-value">—');
+		expect(html).toContain("Remainder unavailable");
+		expect(html).not.toContain("close-cash-value");
+		expect(html).not.toContain("No balance recorded at close");
 		expect(html).not.toContain("1,244.43");
 	});
-	it("shows no close value when the close has no recorded observation", () => {
+	it("renders a future single-day range with the same unavailable allowance state", () => {
 		const html = render(
 			summary({
-				start: "2026-10-19",
-				end: "2026-10-19",
-				checkingAvailable: null,
-				cashAfterBills: null,
+				start: "2026-12-19",
+				end: "2026-12-19",
 				status: "missing",
+				cashAfterBills: null,
+				outstandingBillsTotal: null,
+				checkingAvailable: null,
 				baselines: [],
 			}),
-			true,
+			[bill()],
 		);
-		expect(html).not.toContain('data-testid="close-cash-value"');
-		expect(html).toContain("No balance recorded at close");
+		expect(html).toContain('data-testid="left-value">—');
+		expect(html).toContain("Remainder unavailable");
+		expect(html).toContain("Bills</h3>");
+		expect(html).toContain("Selected bill A");
+		expect(html).not.toContain("close-cash-value");
+		expect(html).not.toContain("No cash evidence exists for an upcoming cycle.");
+	});
+	it("renders a contractually unfetchable window with the same unavailable figure", () => {
+		// Future ranges cannot be fetched (the endpoint rejects starts after
+		// today), so the caller disables the query and the component renders
+		// the explicit unavailable state instead of loading or erroring.
+		const html = renderToStaticMarkup(
+			<SafeSpendingCashEvidence
+				summary={undefined}
+				bills={[bill()]}
+				pending={false}
+				error={false}
+				unavailable
+				onRetry={() => {}}
+			/>,
+		);
+		expect(html).toContain('data-testid="left-value">—');
+		expect(html).toContain("Remainder unavailable");
+		expect(html).toContain("Bills</h3>");
+		expect(html).toContain("Selected bill A");
+		expect(html).not.toContain("Loading cash evidence");
+		expect(html).not.toContain("could not be loaded");
 	});
 	it("lists posted baselines alongside observed available", () => {
 		const html = render(

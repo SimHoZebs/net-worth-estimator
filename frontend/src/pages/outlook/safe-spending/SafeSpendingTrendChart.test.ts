@@ -54,8 +54,8 @@ describe("current spending pace after refunds", () => {
 		expect(low).toBe(0);
 		expect(high).toBeCloseTo(64.8);
 	});
-	it("keeps historical crossing identities without showing cleared cash or reserve warnings", () => {
-		expect(paceLabel(cleared, false)).toEqual({ text: null, tone: "normal" });
+	it("keeps crossing identities without showing cleared cash or reserve warnings", () => {
+		expect(paceLabel(cleared)).toEqual({ text: null, tone: "normal" });
 		expect(cleared.limitHit?.transactionId).toBe("purchase");
 	});
 	it("warns about a genuine future crossing after an earlier cleared crossing", () => {
@@ -66,7 +66,7 @@ describe("current spending pace after refunds", () => {
 				{ date: "2026-11-19", spent: 60, projected: true },
 			],
 		};
-		expect(paceLabel(trend, false)).toEqual({
+		expect(paceLabel(trend)).toEqual({
 			text: "Cash limit ~ Nov 19",
 			tone: "danger",
 		});
@@ -119,8 +119,7 @@ describe("income rule extent", () => {
 		]);
 	});
 
-	it("hides the income rule for historical views without a coordinate", () => {
-		expect(incomeRuleLine(base, true)).toEqual([]);
+	it("hides the income rule without a coordinate", () => {
 		expect(
 			incomeRuleLine({
 				...base,

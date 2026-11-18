@@ -1,5 +1,4 @@
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
-import type { ClosedCardBalances } from "../../../domain/closedCardBalances.ts";
 import { dateLabel } from "../../../domain/format.ts";
 import { roundCents } from "../../../domain/safeSpendingMath.ts";
 
@@ -39,18 +38,12 @@ export function cycleCaption({
 		return `${dateLabel(start, true)} – ${dateLabel(end, true)} · Upcoming`;
 	return `${dateLabel(end, true)} · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
 }
-export type SafeSpendingClosedCycle = ClosedCardBalances & {
-	start: string;
-	end: string;
-};
-
 export interface SafeSpendingChargeCycle {
 	start: string;
 	end: string;
 	title: string;
 	emptyMessage: string;
 	transactions: AccountTransaction[];
-	showTotal?: boolean;
 	/** Spent total plus per-card breakdown shown above the modal table. */
 	summary?: {
 		total: number | null;
@@ -87,7 +80,6 @@ export interface SafeSpendingHeroes {
 	fullDaysLeft: number;
 	cycleStart: string;
 	cycleEnd: string;
-	closedCycle: SafeSpendingClosedCycle;
 	committedTotal: number | null;
 	committedByCard: { id: string; name: string; amount: number | null }[];
 }
@@ -103,7 +95,6 @@ export interface CycleView {
 export function buildCycleView({
 	cycleStart,
 	cycleEnd,
-	closedCycle,
 	remaining,
 	cardSpent,
 	cardSpentByCard,
@@ -112,7 +103,6 @@ export function buildCycleView({
 }: {
 	cycleStart: string;
 	cycleEnd: string;
-	closedCycle: SafeSpendingClosedCycle;
 	remaining: number | null;
 	cardSpent: number | null;
 	cardSpentByCard: { id: string; name: string; amount: number | null }[];
@@ -134,7 +124,6 @@ export function buildCycleView({
 			fullDaysLeft: days,
 			cycleStart,
 			cycleEnd,
-			closedCycle,
 			committedTotal: cardSpent,
 			committedByCard: cardSpentByCard,
 		},
