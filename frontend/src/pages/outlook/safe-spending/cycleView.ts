@@ -26,21 +26,6 @@ export interface CycleViewInput {
 	fullDaysLeft: number;
 	/** Posted external cash inflows; null means evidence is unavailable. */
 	monthlyIncome?: number | null;
-	/**
-	 * Card debt incurred this cycle: card purchases minus card settlements
-	 * paid from cash. Card spending never leaves checking, so without this
-	 * deduction every card purchase would raise the reconstructed limit.
-	 * Undefined preserves the legacy spent-plus-remaining reconstruction;
-	 * null marks the debt unknown and clears the limit.
-	 */
-	cardDebtChange?: number | null;
-	/**
-	 * Income still expected inside the cycle after the reference day.
-	 * Received income already sits inside cashAfterBills, so only the
-	 * not-yet-arrived portion enters here and nothing is counted twice.
-	 * Undefined preserves the legacy calculation; null clears the limit.
-	 */
-	futureCycleIncome?: number | null;
 	scheduledOutflows?: SafeSpendingScheduledIncrease[];
 }
 
@@ -50,12 +35,14 @@ export interface CycleViewResult {
 }
 
 /**
- * One current cash-backed budget. The limit is cash left plus the income
- * still arriving to pay for the cycle, minus card debt incurred but not
- * yet paid: starting cash plus cycle income, independent of how much of
- * it is already spent. Cash already reflects recorded bank movements, so
- * purchases are not deducted from it again; received income already sits
- * inside it, so only not-yet-arrived income enters separately.
+ * One current cash-backed budget. The limit is net income plus the amount
+ * in the selected cash accounts: what is there plus what is paying for
+ * the cycle. It never depends on how much is already spent, and no bill,
+ * hold, debt, or reserve deduction enters it. Cash after bills stays the
+ * separate remaining figure; the reserve only offsets the safety net.
+ * Without selected income the limit falls back to the cash evidence
+ * reconstruction, spent plus cash after bills, so those budgets keep a
+ * limit instead of going blank.
  */
 export function cycleView({
 	cycle,
@@ -68,8 +55,6 @@ export function cycleView({
 	fullDaysLeft,
 	monthlyIncome,
 	scheduledOutflows,
-	cardDebtChange,
-	futureCycleIncome,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
 	const monthStart = `${referenceDay.slice(0, 7)}-01`;
 	const recorded = spendingLedger({
@@ -95,18 +80,26 @@ export function cycleView({
 			: null;
 	const protectedReserve = Math.max(0, reserve);
 	const unknownSpending = hasUnknownSpending(ledger);
-	const debt = cardDebtChange === undefined ? 0 : cardDebtChange;
-	const futureIncome =
-		futureCycleIncome === undefined ? 0 : futureCycleIncome;
+	const cashInAccount =
+		cashSummary?.status === "available" &&
+		cashSummary.start === referenceDay &&
+		cashSummary.end === monthEndIso(referenceDay) &&
+		cashSummary.checkingAvailable !== null &&
+		Number.isFinite(cashSummary.checkingAvailable)
+			? cashSummary.checkingAvailable
+			: null;
+	const incomeKnown =
+		monthlyIncome !== null &&
+		monthlyIncome !== undefined &&
+		Number.isFinite(monthlyIncome);
 	const capacity =
-		remaining === null ||
-		unknownSpending ||
-		debt === null ||
-		!Number.isFinite(debt) ||
-		futureIncome === null ||
-		!Number.isFinite(futureIncome)
+		remaining === null || unknownSpending
 			? null
-			: roundCents(spent + remaining - debt + futureIncome);
+			: incomeKnown
+				? cashInAccount === null
+					? null
+					: roundCents(monthlyIncome + cashInAccount)
+				: roundCents(spent + remaining);
 	const trend = safeSpendingTrend({
 		transactions: ledger,
 		cycleStart: cycle.start,

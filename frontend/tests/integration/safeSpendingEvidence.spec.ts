@@ -494,7 +494,7 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			name: "Safe spending",
 			exact: true,
 		});
-		const checkCurrent = async () => {
+		const checkCurrent = async (limit = "8,702.77") => {
 			await expect(card.getByTestId("left-value")).toHaveText(/[-−]\$216\.58/);
 			await expect(card.getByTestId("spend-value")).toHaveText("$0.00");
 			await expect(
@@ -503,7 +503,11 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			await expect(card.getByTestId("perday-value")).toHaveText("$0.00");
 			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
-			).toHaveText(/already exhausted at cycle entry/);
+			).toHaveText(
+				new RegExp(
+					`The \\$${limit} cash limit is not reached this cycle`,
+				),
+			);
 			await expect(
 				card.getByRole("list", { name: "Spending pace legend" }),
 			).toContainText("Income limit");
@@ -542,9 +546,8 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			const table = drawer.getByRole("table");
 			await expect(table.locator("tbody > tr")).toHaveCount(3);
 			await expect(table.getByRole("separator")).toHaveCount(0);
-			// The card debt deduction puts the cash limit below zero, so
-			// no crossing marker is assigned: the budget is over from
-			// the start instead of crossed mid-cycle.
+			// The income-backed limit sits far above spent, so no
+			// crossing marker is assigned.
 			await expect(
 				table.getByRole("row").filter({ hasText: "Cash limit" }),
 			).toHaveCount(0);
@@ -563,7 +566,7 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		);
 		expect(changed.ok(), await changed.text()).toBe(true);
 		await page.reload();
-		await checkCurrent();
+		await checkCurrent("101,244.42");
 		await card
 			.getByRole("button", { name: "Transactions", exact: true })
 			.click();

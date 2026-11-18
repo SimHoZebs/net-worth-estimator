@@ -440,7 +440,11 @@ describe("monthly income comparison", () => {
 		);
 		expect(savings.trend.limitHit).toBeNull();
 		expect(savings.view.heroes.theoretical).toBe(2000);
-		const lowCash = cycleView({ ...input, monthlyIncome: 1000 });
+		const lowCash = cycleView({
+			...input,
+			monthlyIncome: 1000,
+			cashSummary: { ...summary, checkingAvailable: -750 },
+		});
 		expect(lowCash.trend.monthlyIncome?.hit).toBeNull();
 		expect(lowCash.trend.limitHit?.transactionId).toBe("second-charge");
 	});
@@ -750,22 +754,27 @@ describe("canonical recorded cash selection", () => {
 			cycleView({ ...input, transactions: rows }).view.heroes.committedTotal,
 		).toBe(0);
 	});
-	it("holds the limit independent of spent by deducting incurred card debt", () => {
-		const base = cycleView(input);
-		expect(base.trend.limit).toBe(283.42);
-		const adjusted = cycleView({ ...input, cardDebtChange: 500 });
-		expect(adjusted.trend.limit).toBe(-216.58);
-		expect(adjusted.trend.safetyNet).toBe(-916.58);
-		const unknownDebt = cycleView({ ...input, cardDebtChange: null });
-		expect(unknownDebt.trend.limit).toBeNull();
+	it("sets the limit to income plus cash in account, ignoring spent", () => {
+		const result = cycleView({ ...input, monthlyIncome: 150 });
+		expect(result.trend.limit).toBe(1394.43);
+		expect(result.trend.safetyNet).toBe(694.43);
+		expect(result.trend.limitHit).toBeNull();
+		const crossing = cycleView({
+			...input,
+			monthlyIncome: 100,
+			cashSummary: { ...summary, checkingAvailable: 100 },
+		});
+		expect(crossing.trend.limit).toBe(200);
+		expect(crossing.trend.limitHit).toMatchObject({
+			transactionId: "second-charge",
+			amount: 300,
+		});
 	});
-	it("adds only not-yet-arrived cycle income to the limit", () => {
+	it("falls back to spent plus cash after bills without selected income", () => {
 		const base = cycleView(input);
 		expect(base.trend.limit).toBe(283.42);
-		const withFuture = cycleView({ ...input, futureCycleIncome: 100 });
-		expect(withFuture.trend.limit).toBe(383.42);
-		const unknownFuture = cycleView({ ...input, futureCycleIncome: null });
-		expect(unknownFuture.trend.limit).toBeNull();
+		const explicitNull = cycleView({ ...input, monthlyIncome: null });
+		expect(explicitNull.trend.limit).toBe(283.42);
 	});
 	it("sums selected November schedules into one expected pay figure", () => {
 		const schedules = [
@@ -833,7 +842,7 @@ describe("canonical recorded cash selection", () => {
 				hit: null,
 			});
 			expect(result.view.heroes.theoretical).toBe(183.42);
-			expect(result.trend.limit).toBe(183.42);
+			expect(result.trend.limit).toBe(1344.43);
 		},
 	);
 	it("suppresses incomplete current-cycle spending claims while preserving known income and cash", () => {
@@ -944,7 +953,7 @@ describe("canonical recorded cash selection", () => {
 			...input,
 			transactions: rows,
 			reserve: 0,
-			cashSummary: { ...summary, cashAfterBills: 40 },
+			cashSummary: { ...summary, cashAfterBills: 40, checkingAvailable: -50 },
 			monthlyIncome: 100,
 		});
 		expect(result.view.heroes.theoretical).toBe(40);
