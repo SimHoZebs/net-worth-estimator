@@ -104,7 +104,8 @@ Keep the panel concise, without an inline diagnostic Details section or
 explanatory allowance and paycheck captions. Bills remain visible in their
 existing section. Show known balances even when a dependent estimate is
 unavailable; omit unsupported historical metrics rather than filling the page
-with blank rows. Last cycle shows totals only, with transactions in the drawer.
+with blank rows. Non-current cycles show recorded activity only, with
+transactions in the drawer.
 The bills section has one heading and total, followed by a visibly separate list
 of bills with muted due dates and individual row dividers.
 
@@ -114,7 +115,10 @@ introducing a different calendar is outside this correction.
 
 ## Historical views
 
-Last cycle presents recorded card activity independently of statement debt.
+The safe card shows a single selected statement cycle. Arrow buttons move the
+visible cycle to earlier or later statement cycles without bounds; non-current
+cycles show recorded activity only, with no invented budget. Recorded card
+activity is evidence of charges, independent of statement debt.
 Purchases establish spending activity; they do not establish the closed
 statement balance. Card settlements affect cash, while purchases affect card
 spending. The same purchase must not be subtracted from cash again.

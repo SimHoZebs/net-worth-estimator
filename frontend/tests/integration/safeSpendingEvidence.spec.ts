@@ -352,7 +352,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		await expect(
 			card.getByLabel("Spending pace", { exact: true }),
 		).toBeVisible();
-		await card.getByRole("button", { name: "Last cycle", exact: true }).click();
+		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
 		await expect(card.getByTestId("recorded-charges-value")).toHaveText(
 			/\$125(?:\.00)?/,
 		);
@@ -368,7 +368,7 @@ test("cash uses per-account evidence and outstanding bills, not future income or
 		await expect(inlinePayment).toHaveCount(0);
 		await expect(card.locator("details")).toHaveCount(0);
 		await card
-			.getByRole("button", { name: "Last cycle transactions", exact: true })
+			.getByRole("button", { name: "Transactions", exact: true })
 			.focus();
 		await page.keyboard.press("Enter");
 		const drawer = page.getByRole("dialog", {
@@ -526,11 +526,13 @@ test("current cash budget and over-limit state survive inline history, sorting a
 			expect(axisDates).toEqual([...axisDates].sort((a, b) => a - b));
 		};
 		await checkCurrent();
-		await card.getByRole("button", { name: "Last cycle", exact: true }).click();
+		await card.getByRole("button", { name: "Previous cycle", exact: true }).click();
 		await expect(card.getByTestId("recorded-charges-value")).toBeVisible();
 		await expect(card.getByText(/Income this month/)).toHaveCount(0);
+		await card.getByRole("button", { name: "Next cycle", exact: true }).click();
+		await checkCurrent();
 		await card
-			.getByRole("button", { name: "This cycle transactions", exact: true })
+			.getByRole("button", { name: "Transactions", exact: true })
 			.click();
 		const drawer = page.getByRole("dialog", {
 			name: "Safe spending",
@@ -554,7 +556,6 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		await drawer.getByRole("button", { name: "Newest first" }).click();
 		await checkCrossing();
 		await page.keyboard.press("Escape");
-		await card.getByRole("button", { name: "This cycle", exact: true }).click();
 		await checkCurrent();
 		const changed = await api.post(
 			`${FIXTURE_API}/v1/schedules/evidence-salary/amend`,
@@ -564,7 +565,7 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		await page.reload();
 		await checkCurrent();
 		await card
-			.getByRole("button", { name: "This cycle transactions", exact: true })
+			.getByRole("button", { name: "Transactions", exact: true })
 			.click();
 		await checkCrossing();
 		await page.keyboard.press("Escape");
@@ -588,7 +589,7 @@ test("current cash budget and over-limit state survive inline history, sorting a
 		await expect(card.getByTestId("spend-value")).toHaveText("—");
 		await expect(card.getByTestId("perday-value")).toHaveText("—");
 		await card
-			.getByRole("button", { name: "This cycle transactions", exact: true })
+			.getByRole("button", { name: "Transactions", exact: true })
 			.click();
 		await expect(drawer.getByRole("table").locator("tbody > tr")).toHaveCount(
 			3,

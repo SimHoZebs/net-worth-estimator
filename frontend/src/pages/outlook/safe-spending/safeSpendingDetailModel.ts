@@ -4,17 +4,13 @@ import { dateLabel } from "../../../domain/format.ts";
 import { roundCents } from "../../../domain/safeSpendingMath.ts";
 
 export const SAFE_SPENDING_DETAIL_TABS = [
-	{ id: "cycle", label: "This cycle", view: "charges" },
-	{ id: "last-cycle", label: "Last cycle", view: "charges" },
+	{ id: "transactions", label: "Transactions", view: "charges" },
 	{ id: "configure", label: "Configure", view: "configure" },
 ] as const;
 
 export type SafeSpendingDetailTab =
 	(typeof SAFE_SPENDING_DETAIL_TABS)[number]["id"];
-export type SafeSpendingCycleTab = Extract<
-	(typeof SAFE_SPENDING_DETAIL_TABS)[number],
-	{ view: "charges" }
->["id"];
+export type SafeSpendingCycleTab = "transactions";
 
 export function isSafeSpendingCycleTab(
 	tab: SafeSpendingDetailTab,
@@ -28,16 +24,20 @@ export function cycleCaption({
 	start,
 	end,
 	closed,
+	upcoming,
 	daysLeft,
 }: {
 	start: string;
 	end: string;
 	closed: boolean;
+	upcoming: boolean;
 	daysLeft: number;
 }): string {
-	return closed
-		? `${dateLabel(start, true)} – ${dateLabel(end, true)} · Closed`
-		: `${dateLabel(end, true)} · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
+	if (closed)
+		return `${dateLabel(start, true)} – ${dateLabel(end, true)} · Closed`;
+	if (upcoming)
+		return `${dateLabel(start, true)} – ${dateLabel(end, true)} · Upcoming`;
+	return `${dateLabel(end, true)} · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
 }
 export type SafeSpendingClosedCycle = ClosedCardBalances & {
 	start: string;

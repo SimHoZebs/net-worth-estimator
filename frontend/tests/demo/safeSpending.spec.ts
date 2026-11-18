@@ -7,7 +7,7 @@ const anchor = process.env.DEMO_ANCHOR ?? new Date().toISOString().slice(0, 10);
 
 test("seeded account demo", async ({ page }) => {
 	await page.clock.setFixedTime(new Date(`${anchor}T12:00:00Z`));
-	await page.goto("/outlook?detail=safe-spending&tab=cycle");
+	await page.goto("/outlook?detail=safe-spending&tab=transactions");
 	await expect(
 		page.getByRole("heading", { name: "Safe spending" }),
 	).toBeVisible();
@@ -28,7 +28,7 @@ test("seeded account demo", async ({ page }) => {
 		).toBeVisible();
 	}
 	// The drawer keeps the per-cycle transaction list.
-	await page.getByRole("button", { name: "This cycle transactions" }).click();
+	await page.getByRole("button", { name: "Transactions" }).click();
 	await expect(
 		page
 			.getByRole("dialog", { name: "Safe spending" })

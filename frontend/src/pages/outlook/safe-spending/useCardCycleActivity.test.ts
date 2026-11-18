@@ -64,6 +64,7 @@ const input = {
 	statementDay: 20,
 	displayToday: "2026-10-21",
 	transactionOrder: "oldest" as const,
+	cycleOffset: 0,
 };
 
 describe("useCardCycleActivity", () => {
@@ -72,6 +73,7 @@ describe("useCardCycleActivity", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
+				cycleOffset: 0,
 				displayToday: "2026-11-15",
 				transactions: [
 					saved,
@@ -101,55 +103,78 @@ describe("useCardCycleActivity", () => {
 			}),
 		);
 		expect(
-			result.current.perAccount[0]!.inCycle.map((row) => [
+			result.current.perAccount[0]!.selected.map((row) => [
 				row.transactionId,
 				row.source,
 			]),
 		).toEqual([[saved.id, "historical"]]);
 	});
 	it("uses closing balances despite incomplete purchases and keeps the new-cycle ledger separate", () => {
-		const { result } = renderHook(() => useCardCycleActivity(input));
-		expect(result.current.closedCycle).toMatchObject({
-			start: "2026-09-20",
-			end: "2026-10-19",
-			total: 500,
+		const { result } = renderHook(() =>
+			useCardCycleActivity({ ...input, cycleOffset: 0 }),
+		);
+		expect(result.current.selected).toMatchObject({
+			cycleStart: "2026-10-20",
+			cycleEnd: "2026-11-19",
 		});
+		expect(result.current.previous).toMatchObject({
+			cycleStart: "2026-09-20",
+			cycleEnd: "2026-10-19",
+		});
+		expect(result.current.selectedBalances).toMatchObject({ total: 900 });
 		expect(
-			result.current.chargeCycles.cycle.transactions.map(
+			result.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["new-start", "today"]);
+		const { result: previous } = renderHook(() =>
+			useCardCycleActivity({ ...input, cycleOffset: -1 }),
+		);
+		expect(previous.current.selected).toMatchObject({
+			cycleStart: "2026-09-20",
+			cycleEnd: "2026-10-19",
+		});
+		expect(previous.current.selectedBalances).toMatchObject({ total: 500 });
 		expect(
-			result.current.chargeCycles["last-cycle"].transactions.map(
+			previous.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["closed-start", "closed-end"]);
-		expect(result.current.closedCycle.total).toBe(500);
 	});
 
 	it("includes every selected card and keeps sorting independent of totals", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
+				cycleOffset: 0,
 				trackedIds: [card.id, otherCard.id],
 				transactionOrder: "newest",
 			}),
 		);
-		expect(result.current.closedCycle.total).toBe(1200);
+		expect(result.current.selectedBalances.total).toBe(1600);
 		expect(
-			result.current.chargeCycles.cycle.transactions.map(
+			result.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["today", "new-start"]);
+		const { result: previous } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				cycleOffset: -1,
+				trackedIds: [card.id, otherCard.id],
+				transactionOrder: "newest",
+			}),
+		);
+		expect(previous.current.selectedBalances.total).toBe(1200);
 		expect(
-			result.current.chargeCycles["last-cycle"].transactions.map(
+			previous.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["closed-end", "other-card", "closed-start"]);
 	});
 
 	it("includes pending charges before and after the checkpoint without changing saved balances or projections", () => {
-		const pending = [
+		const pendingRows = [
 			purchase("pending-closed", "2026-10-19", 10, {
 				enabled: false,
 				pending: true,
@@ -180,14 +205,15 @@ describe("useCardCycleActivity", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
-				transactions: [...sourceTransactions, ...pending],
+				cycleOffset: 0,
+				transactions: [...sourceTransactions, ...pendingRows],
 				displayToday: "2026-10-22",
 			}),
 		);
 		// The saved Oct 22 purchase is now recorded too, independently of the
 		// Oct 21 balance checkpoint. Future Oct 23 holds remain outside today.
 		const currentPending =
-			result.current.chargeCycles.cycle.transactions.filter(
+			result.current.selectedChargeCycle.transactions.filter(
 				(row) => row.pending,
 			);
 		expect(currentPending.map((row) => row.transactionId)).toEqual([
@@ -196,13 +222,21 @@ describe("useCardCycleActivity", () => {
 			"pending-after",
 		]);
 		expect(currentPending.every((row) => row.excluded)).toBe(true);
+		const { result: previous } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				cycleOffset: -1,
+				transactions: [...sourceTransactions, ...pendingRows],
+				displayToday: "2026-10-22",
+			}),
+		);
 		expect(
-			result.current.chargeCycles["last-cycle"].transactions.map(
+			previous.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["closed-start", "closed-end", "pending-closed"]);
-		expect(result.current.closedCycle.total).toBe(500);
-		expect(pending.every((transaction) => !transaction.enabled)).toBe(true);
+		expect(previous.current.selectedBalances.total).toBe(500);
+		expect(pendingRows.every((transaction) => !transaction.enabled)).toBe(true);
 		expect(input.projection).toEqual(projectionBefore);
 	});
 
@@ -224,44 +258,76 @@ describe("useCardCycleActivity", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
+				cycleOffset: 0,
 				transactions: [...sourceTransactions, voidCurrent, voidClosed],
 			}),
 		);
 		expect(
-			result.current.chargeCycles.cycle.transactions.map(
+			result.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["new-start", "today"]);
+		const { result: previous } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				cycleOffset: -1,
+				transactions: [...sourceTransactions, voidCurrent, voidClosed],
+			}),
+		);
 		expect(
-			result.current.chargeCycles["last-cycle"].transactions.map(
+			previous.current.selectedChargeCycle.transactions.map(
 				(row) => row.transactionId,
 			),
 		).toEqual(["closed-start", "closed-end"]);
 	});
 
-	it("resolves a closed cycle across a year boundary and a custom statement day", () => {
+	it("resolves a selected cycle across a year boundary and a custom statement day", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
+				cycleOffset: -1,
 				displayToday: "2027-01-05",
 				statementDay: 5,
 			}),
 		);
-		expect(result.current.closedCycle).toMatchObject({
-			start: "2026-12-05",
-			end: "2027-01-04",
-			total: 900,
+		expect(result.current.selected).toMatchObject({
+			cycleStart: "2026-12-05",
+			cycleEnd: "2027-01-04",
 		});
-		expect(result.current.cycle.cycleStart).toBe("2027-01-05");
+		expect(result.current.selectedBalances).toMatchObject({ total: 900 });
+		expect(result.current.current.cycleStart).toBe("2027-01-05");
+		const { result: next } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				cycleOffset: 1,
+				displayToday: "2026-12-20",
+				statementDay: 20,
+			}),
+		);
+		expect(next.current.selected).toMatchObject({
+			cycleStart: "2027-01-20",
+			cycleEnd: "2027-02-19",
+		});
+	});
+
+	it("leaves a future selected cycle empty through today", () => {
+		const { result } = renderHook(() =>
+			useCardCycleActivity({ ...input, cycleOffset: 1 }),
+		);
+		expect(result.current.selected).toMatchObject({
+			cycleStart: "2026-11-20",
+			cycleEnd: "2026-12-19",
+		});
+		expect(result.current.selectedChargeCycle.transactions).toEqual([]);
 	});
 
 	it("keeps cycle dates available while the projection is pending", () => {
 		const { result } = renderHook(() =>
-			useCardCycleActivity({ ...input, projection: null }),
+			useCardCycleActivity({ ...input, cycleOffset: 0, projection: null }),
 		);
-		expect(result.current.closedCycle.total).toBe(500);
-		expect(result.current.cycle.cycleEnd).toBe("2026-11-19");
-		expect(result.current.chargeCycles.cycle.transactions).toEqual([]);
-		expect(result.current.chargeCycles["last-cycle"].transactions).toEqual([]);
+		expect(result.current.selectedBalances.total).toBe(900);
+		expect(result.current.selected.cycleEnd).toBe("2026-11-19");
+		expect(result.current.perAccount).toEqual([]);
+		expect(result.current.selectedChargeCycle.transactions).toEqual([]);
 	});
 });

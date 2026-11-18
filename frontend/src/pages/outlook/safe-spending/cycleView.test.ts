@@ -94,14 +94,25 @@ describe("historical cycle evidence", () => {
 				start: "2026-09-20",
 				end: "2026-10-19",
 				closed: true,
+				upcoming: false,
 				daysLeft: 4,
 			}),
 		).toBe("Sep 20, 2026 – Oct 19, 2026 · Closed");
 		expect(
 			cycleCaption({
+				start: "2026-11-20",
+				end: "2026-12-19",
+				closed: false,
+				upcoming: true,
+				daysLeft: 4,
+			}),
+		).toBe("Nov 20, 2026 – Dec 19, 2026 · Upcoming");
+		expect(
+			cycleCaption({
 				start: "2026-10-20",
 				end: "2026-11-19",
 				closed: false,
+				upcoming: false,
 				daysLeft: 4,
 			}),
 		).toBe("Nov 19, 2026 · 4 days left");
@@ -149,6 +160,34 @@ describe("historical cycle evidence", () => {
 		expect(html).not.toContain("Latest balance");
 		expect(html).not.toContain("lucide-shield-check");
 		expect(html).not.toContain("Cash balance 0");
+	});
+	it("renders the upcoming cycle without closed-card or budget rows", () => {
+		const { view, section } = historicalFixture();
+		const html = renderToStaticMarkup(
+			createElement(SafeSpendingBillsPanel, {
+				...view,
+				heroes: {
+					...view.heroes,
+					closedCycle: {
+						start: "2026-11-20",
+						end: "2026-12-19",
+						total: 999.99,
+						cards: [],
+					},
+				},
+				cashEvidence: "Upcoming cash evidence",
+				section,
+				closed: false,
+				upcoming: true,
+			}),
+		);
+		expect(html).toContain("Upcoming cash evidence");
+		expect(html).toContain('data-testid="recorded-charges-value"');
+		expect(html).not.toContain("closed-card-value");
+		expect(html).not.toContain("spend-value");
+		expect(html).not.toContain("perday-value");
+		expect(html).not.toContain("cash-payments-value");
+		expect(html).not.toContain("999.99");
 	});
 	it("keeps a populated cash payment list out of the card and available separately in the drawer", () => {
 		const { view, section } = historicalFixture();

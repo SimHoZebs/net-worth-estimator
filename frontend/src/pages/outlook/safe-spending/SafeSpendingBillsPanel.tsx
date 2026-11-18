@@ -66,6 +66,7 @@ export function SafeSpendingBillsPanel({
 	trend,
 	section,
 	closed = false,
+	upcoming = false,
 }: {
 	heroes: SafeSpendingHeroes;
 	cashEvidence: React.ReactNode;
@@ -74,6 +75,8 @@ export function SafeSpendingBillsPanel({
 	section?: SafeSpendingMandatorySection;
 	/** The statement already closed; the payday and pace are historical. */
 	closed?: boolean;
+	/** A future cycle with no evidence yet; recorded charges only. */
+	upcoming?: boolean;
 }) {
 	const allowanceView = describeAllowance({
 		allowance: allocation.allowance,
@@ -121,7 +124,13 @@ export function SafeSpendingBillsPanel({
 			<div className="grid min-w-0 content-start gap-4">
 				{cashEvidence}
 				<div className="grid content-start gap-4">
-					{closed ? (
+					{upcoming ? (
+						<StatRow
+							label={labels.recordedCharges}
+							value={amountText(heroes.committedTotal)}
+							testId="recorded-charges-value"
+						/>
+					) : closed ? (
 						<>
 							<StatRow
 								label={labels.recordedCharges}
@@ -160,7 +169,7 @@ export function SafeSpendingBillsPanel({
 						</>
 					)}
 				</div>
-				{closed && section && (
+				{closed && !upcoming && section && (
 					<StatRow
 						label={labels.cashPayments}
 						value={amountText(section.total)}

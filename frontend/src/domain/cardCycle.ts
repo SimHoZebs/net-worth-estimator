@@ -3,6 +3,7 @@ import {
 	clampMonth,
 	daysBetweenInclusive,
 	isoDate,
+	shiftDate,
 	utcDate,
 } from "./format.ts";
 import { DEFAULT_CYCLE_STATEMENT_DAY } from "./safeSpending.ts";
@@ -99,4 +100,38 @@ export function cycleOutflowTransactions({
 			transaction.date >= cycleStart &&
 			transaction.date <= today,
 	);
+}
+
+/**
+ * Resolve the statement cycle at an offset from the cycle containing
+ * `todayIso`. Offset 0 is the containing cycle; negative steps move to
+ * earlier cycles by resolving the day before the current start, positive
+ * steps move to later cycles by resolving the day after the current end.
+ */
+export function resolveStatementCycleAtOffset({
+	todayIso,
+	statementDay,
+	offset,
+}: {
+	todayIso: string;
+	statementDay: number;
+	offset: number;
+}): StatementCycle {
+	let cycle = resolveStatementCycle({ todayIso, statementDay });
+	if (offset < 0) {
+		for (let step = 0; step < -offset; step += 1) {
+			cycle = resolveStatementCycle({
+				todayIso: shiftDate({ date: cycle.cycleStart, days: -1 }),
+				statementDay,
+			});
+		}
+	} else if (offset > 0) {
+		for (let step = 0; step < offset; step += 1) {
+			cycle = resolveStatementCycle({
+				todayIso: shiftDate({ date: cycle.cycleEnd, days: 1 }),
+				statementDay,
+			});
+		}
+	}
+	return cycle;
 }

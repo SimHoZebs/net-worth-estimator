@@ -200,7 +200,7 @@ test("configure and transaction sheets share the canonical shell", async ({
 	await expect(configure).not.toBeVisible();
 	// A transaction from the same card opens the identical shell: same
 	// bounding width, same slot policy, same close placement.
-	await card.getByRole("button", { name: "This cycle transactions" }).click();
+	await card.getByRole("button", { name: "Transactions" }).click();
 	const drawer = page.locator('[data-slot="sheet-content"]').first();
 	await expect(drawer).toBeVisible();
 	const charge = drawer.getByRole("button", {

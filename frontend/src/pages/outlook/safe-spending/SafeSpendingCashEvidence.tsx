@@ -8,6 +8,53 @@ import { amountText } from "./amountText.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 /**
+ * The selected-cycle bill rows, owned locally from the selected recurring
+ * schedules. All cash facts come from the server response; this list never
+ * renders them.
+ */
+function BillsList({ bills }: { bills: readonly TransactionResult[] }) {
+	return (
+		<div className="mt-1 grid gap-3 border-t border-border pt-4">
+			<div className="flex items-center justify-between gap-3">
+				<h3 className="m-0 text-sm font-semibold">{labels.bills}</h3>
+				<strong className="text-base tabular-nums">
+					{amountText(
+						bills.length ? sumCents(bills, (row) => row.requested) : null,
+					)}
+				</strong>
+			</div>
+			{bills.length === 0 && (
+				<p className="m-0 text-xs text-muted-foreground">No bills.</p>
+			)}
+			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none. */}
+			<ul
+				className="m-0 list-none divide-y divide-border p-0"
+				role="list"
+				aria-label={labels.billsInCycle}
+			>
+				{bills.map((row, index) => (
+					<li
+						key={`${row.transactionId}-${row.date}-${index}`}
+						className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
+					>
+						<div className="grid min-w-0 gap-1">
+							<span>{row.name}</span>
+							<p className="m-0 text-xs text-muted-foreground">
+								{monthDay(row.date)}
+							</p>
+						</div>
+						<span className="shrink-0 tabular-nums">
+							{amountText(row.requested)}
+						</span>
+					</li>
+				))}
+			</ul>
+			{/* oxlint-enable jsx-a11y/no-redundant-roles */}
+		</div>
+	);
+}
+
+/**
  * All cash facts come from the server response. The visible Bills list is the
  * separate, locally owned bill definition: selected recurring transactions
  * for the selected cash accounts inside the current safe card cycle.
@@ -17,6 +64,7 @@ export function SafeSpendingCashEvidence({
 	pending,
 	error,
 	closed,
+	upcoming = false,
 	bills,
 	onRetry,
 }: {
@@ -24,9 +72,20 @@ export function SafeSpendingCashEvidence({
 	pending: boolean;
 	error: boolean;
 	closed: boolean;
+	/** A future cycle with no cash evidence; bills only, never cash figures. */
+	upcoming?: boolean;
 	bills: readonly TransactionResult[];
 	onRetry: () => void;
 }) {
+	if (upcoming)
+		return (
+			<section className="grid content-start gap-3" aria-label="Cash evidence">
+				<BillsList bills={bills} />
+				<p className="m-0 text-xs text-muted-foreground">
+					No cash evidence exists for an upcoming cycle.
+				</p>
+			</section>
+		);
 	if (!summary)
 		return (
 			<div aria-busy={pending} className="grid gap-2">
@@ -127,45 +186,7 @@ export function SafeSpendingCashEvidence({
 						)}
 					</dl>
 				)}
-			{!closed && (
-				<div className="mt-1 grid gap-3 border-t border-border pt-4">
-					<div className="flex items-center justify-between gap-3">
-						<h3 className="m-0 text-sm font-semibold">{labels.bills}</h3>
-						<strong className="text-base tabular-nums">
-							{amountText(
-								bills.length ? sumCents(bills, (row) => row.requested) : null,
-							)}
-						</strong>
-					</div>
-					{bills.length === 0 && (
-						<p className="m-0 text-xs text-muted-foreground">No bills.</p>
-					)}
-					{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none. */}
-					<ul
-						className="m-0 list-none divide-y divide-border p-0"
-						role="list"
-						aria-label={labels.billsInCycle}
-					>
-						{bills.map((row, index) => (
-							<li
-								key={`${row.transactionId}-${row.date}-${index}`}
-								className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 text-sm"
-							>
-								<div className="grid min-w-0 gap-1">
-									<span>{row.name}</span>
-									<p className="m-0 text-xs text-muted-foreground">
-										{monthDay(row.date)}
-									</p>
-								</div>
-								<span className="shrink-0 tabular-nums">
-									{amountText(row.requested)}
-								</span>
-							</li>
-						))}
-					</ul>
-					{/* oxlint-enable jsx-a11y/no-redundant-roles */}
-				</div>
-			)}
+			{!closed && <BillsList bills={bills} />}
 		</section>
 	);
 }

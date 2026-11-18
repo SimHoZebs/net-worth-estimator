@@ -187,6 +187,27 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Remainder uncertain");
 		expect(html).toContain('data-testid="left-value">—');
 	});
+	it("renders upcoming bills without any cash figures", () => {
+		const html = renderToStaticMarkup(
+			<SafeSpendingCashEvidence
+				summary={summary()}
+				closed={false}
+				upcoming
+				bills={[bill()]}
+				pending={false}
+				error={false}
+				onRetry={() => {}}
+			/>,
+		);
+		expect(html).toContain("Bills</h3>");
+		expect(html).toContain("Selected bill A");
+		expect(html).toContain('aria-label="Bills in this cycle"');
+		expect(html).toContain("No cash evidence exists for an upcoming cycle.");
+		expect(html).not.toContain("close-cash-value");
+		expect(html).not.toContain("left-value");
+		expect(html).not.toContain("$1,244.43");
+		expect(html).not.toContain("-$216.58");
+	});
 	it("renders genuine close cash rather than the conditional result of a one-day range", () => {
 		const html = render(
 			summary({
