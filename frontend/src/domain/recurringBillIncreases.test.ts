@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Transaction } from "./model.ts";
 import { transactionFixture } from "@/mocks/projection.ts";
-import { recurringBillIncreases } from "./recurringBillIncreases.ts";
+import {
+	recurringBillIncreases,
+	recurringBillMarkers,
+} from "./recurringBillIncreases.ts";
 
 const bill = (
 	date: string,
@@ -67,14 +70,20 @@ describe("recurringBillIncreases", () => {
 	});
 
 	it("leaves out occurrences a recorded transaction claims", () => {
+		const bills = [
+			bill("2026-11-20", 25, { transactionId: "rent" }),
+			bill("2026-11-21", 30, { transactionId: "utilities" }),
+		];
 		const increases = recurringBillIncreases({
 			transactions: [claim("paid-1", "rent", "2026-11-20")],
-			bills: [
-				bill("2026-11-20", 25, { transactionId: "rent" }),
-				bill("2026-11-21", 30, { transactionId: "utilities" }),
-			],
+			bills,
 		});
 		expect(increases).toEqual([
+			{ date: "2026-11-21", amount: 30, name: "bill" },
+		]);
+		// Markers keep the occurred bill so its dot survives on the chart.
+		expect(recurringBillMarkers(bills)).toEqual([
+			{ date: "2026-11-20", amount: 25, name: "bill" },
 			{ date: "2026-11-21", amount: 30, name: "bill" },
 		]);
 	});

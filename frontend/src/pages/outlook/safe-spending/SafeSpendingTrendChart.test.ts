@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { SafeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
 import {
 	incomeRuleLine,
+	lineAmountLabels,
 	paceLabel,
 	recurringIncreaseDots,
 	SafeSpendingTrendChart,
@@ -33,6 +34,7 @@ describe("current spending pace after refunds", () => {
 			transactionId: "purchase",
 		},
 		scheduledIncreases: [],
+		billMarkers: [],
 	};
 	it("pads negative net spending from a refund without clipping the recorded curve", () => {
 		const refundOnly = {
@@ -88,6 +90,7 @@ describe("income rule extent", () => {
 		limitHit: null,
 		safetyNetHit: null,
 		scheduledIncreases: [],
+		billMarkers: [],
 		monthlyIncome: {
 			amount: 90,
 			spent: 20,
@@ -136,7 +139,7 @@ describe("recurring increase dots on shared dates", () => {
 			{ date: "2026-11-10", spent: 210, projected: true },
 		];
 		expect(
-			recurringIncreaseDots(projected, [
+			recurringIncreaseDots([], projected, [
 				{ date: "2026-11-09", amount: 60, name: "Sub" },
 			]),
 		).toEqual([{ date: "2026-11-09", amount: 160 }]);
@@ -148,10 +151,41 @@ describe("recurring increase dots on shared dates", () => {
 			{ date: "2026-11-10", spent: 210, projected: true },
 		];
 		expect(
-			recurringIncreaseDots(projected, [
+			recurringIncreaseDots([], projected, [
 				{ date: "2026-11-10", amount: 60, name: "Sub" },
 			]),
 		).toEqual([{ date: "2026-11-10", amount: 210 }]);
+	});
+
+	it("falls back to the actual curve for a bill already in the cycle", () => {
+		const actual: SafeSpendingTrend["actual"] = [
+			{ date: "2026-11-08", spent: 40, projected: false },
+			{ date: "2026-11-09", spent: 100, projected: false },
+		];
+		const projected: SafeSpendingTrend["projected"] = [
+			{ date: "2026-11-09", spent: 100, projected: true },
+			{ date: "2026-11-10", spent: 210, projected: true },
+		];
+		expect(
+			recurringIncreaseDots(actual, projected, [
+				{ date: "2026-11-08", amount: 25, name: "Paid sub" },
+			]),
+		).toEqual([{ date: "2026-11-08", amount: 40 }]);
+	});
+
+	it("prefers the projected post-increase point when both curves have the date", () => {
+		const actual: SafeSpendingTrend["actual"] = [
+			{ date: "2026-11-09", spent: 100, projected: false },
+		];
+		const projected: SafeSpendingTrend["projected"] = [
+			{ date: "2026-11-09", spent: 100, projected: true },
+			{ date: "2026-11-09", spent: 160, projected: true },
+		];
+		expect(
+			recurringIncreaseDots(actual, projected, [
+				{ date: "2026-11-09", amount: 60, name: "Due today" },
+			]),
+		).toEqual([{ date: "2026-11-09", amount: 160 }]);
 	});
 });
 describe("scheduled recurring increases", () => {
@@ -168,12 +202,13 @@ describe("scheduled recurring increases", () => {
 			limitHit: { date: "2026-11-10", amount: 70, projected: true },
 			safetyNetHit: null,
 			scheduledIncreases: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
+			billMarkers: [],
 		};
 		const [, high] = spendingChartDomain(trend);
 		expect(high).toBeCloseTo(75.6);
 	});
 
-	it("renders recurring legend and increase description", () => {
+	it("renders recurring legend and increase description from bill markers", () => {
 		const trend: SafeSpendingTrend = {
 			actual: [{ date: "2026-11-09", spent: 10, projected: false }],
 			projected: [
@@ -185,7 +220,8 @@ describe("scheduled recurring increases", () => {
 			averageDaily: 5,
 			limitHit: null,
 			safetyNetHit: null,
-			scheduledIncreases: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
+			scheduledIncreases: [],
+			billMarkers: [{ date: "2026-11-10", amount: 55, name: "Sub" }],
 		};
 		const html = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, { trend }),
@@ -194,9 +230,114 @@ describe("scheduled recurring increases", () => {
 		expect(html).toContain("Includes $55.00 Sub bill on Nov 10, 2026.");
 		const without = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, {
-				trend: { ...trend, scheduledIncreases: [] },
+				trend: { ...trend, billMarkers: [] },
 			}),
 		);
 		expect(without).not.toContain("Recurring bills");
+	});
+});
+
+describe("horizontal rule amount labels", () => {
+	const base: SafeSpendingTrend = {
+		actual: [
+			{ date: "2026-11-09", spent: 10, projected: false },
+			{ date: "2026-11-10", spent: 20, projected: false },
+		],
+		projected: [
+			{ date: "2026-11-10", spent: 20, projected: true },
+			{ date: "2026-11-12", spent: 40, projected: true },
+		],
+		limit: 100,
+		safetyNet: 80,
+		averageDaily: 10,
+		limitHit: null,
+		safetyNetHit: null,
+		scheduledIncreases: [],
+		billMarkers: [],
+		monthlyIncome: {
+			amount: 90,
+			spent: 20,
+			coordinate: 90,
+			start: "2026-11-01",
+			end: "2026-11-30",
+			hit: null,
+		},
+	};
+
+	const domain = spendingChartDomain(base);
+	const renderedLabelY = (html: string, text: string) => {
+		const match = [
+			...html.matchAll(/<text[^>]*y="([\d.]+)"[^>]*>([^<]*)<\/text>/g),
+		].find((item) => item[2] === text);
+		if (!match) throw new Error(`Missing rendered label: ${text}`);
+		return Number(match[1]);
+	};
+	const labelYs = (html: string) =>
+		["Cash limit $100.00", "Income limit $90.00", "Reserve $80.00"]
+			.map((text) => renderedLabelY(html, text))
+			.sort((left, right) => left - right);
+
+	it("labels each drawn rule with its amount", () => {
+		const labels = lineAmountLabels(base, domain);
+		expect(labels.map((label) => [label.label, label.fill])).toEqual([
+			["Income limit $90.00", "var(--chart-2)"],
+			["Reserve $80.00", "var(--warning-text)"],
+			["Cash limit $100.00", "var(--danger-solid)"],
+		]);
+		expect(labels.map((label) => label.amount)).toEqual([90, 80, 100]);
+	});
+
+	it("omits labels for rules that are not drawn", () => {
+		expect(
+			lineAmountLabels(
+				{
+					...base,
+					monthlyIncome: { ...base.monthlyIncome!, coordinate: null },
+					limit: null,
+					safetyNet: null,
+				},
+				domain,
+			),
+		).toEqual([]);
+		expect(
+			lineAmountLabels({ ...base, limit: 0, safetyNet: 0 }, domain).map(
+				(label) => label.label,
+			),
+		).toEqual(["Income limit $90.00"]);
+	});
+
+	it("keeps close rule amounts readable in server-rendered markup", () => {
+		const html = renderToStaticMarkup(
+			createElement(SafeSpendingTrendChart, { trend: base }),
+		);
+		expect(html).toContain("Income limit $90.00");
+		expect(html).toContain("Reserve $80.00");
+		expect(html).toContain("Cash limit $100.00");
+		const ys = labelYs(html);
+		expect(ys[1]! - ys[0]!).toBeGreaterThanOrEqual(12);
+		expect(ys[2]! - ys[1]!).toBeGreaterThanOrEqual(12);
+	});
+
+	it("separates labels when the rules themselves nearly coincide", () => {
+		const close = {
+			...base,
+			limit: 100,
+			safetyNet: 99,
+			monthlyIncome: { ...base.monthlyIncome!, amount: 98, coordinate: 98 },
+		};
+		const html = renderToStaticMarkup(
+			createElement(SafeSpendingTrendChart, {
+				trend: close,
+			}),
+		);
+		const closeYs = [
+			"Cash limit $100.00",
+			"Income limit $98.00",
+			"Reserve $99.00",
+		]
+			.map((text) => renderedLabelY(html, text))
+			.sort((left, right) => left - right);
+		expect(closeYs[1]! - closeYs[0]!).toBeGreaterThanOrEqual(12);
+		expect(closeYs[2]! - closeYs[1]!).toBeGreaterThanOrEqual(12);
 	});
 });

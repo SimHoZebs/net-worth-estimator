@@ -317,4 +317,36 @@ describe("safeSpendingTrend", () => {
 			["2026-01-23", 260],
 		]);
 	});
+
+	it("carries bill markers without feeding them into the projection", () => {
+		const input = {
+			transactions: [charge("2026-01-21", 100)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-23",
+			todayIso: "2026-01-21",
+			limit: 10000,
+			safetyNet: 10000,
+			scheduledOutflows: [{ date: "2026-01-22", amount: 60, name: "Sub" }],
+		};
+		const without = safeSpendingTrend(input);
+		const occurred = [{ date: "2026-01-20", amount: 25, name: "Paid bill" }];
+		const withMarkers = safeSpendingTrend({ ...input, billMarkers: occurred });
+		expect(withMarkers.billMarkers).toBe(occurred);
+		expect(withMarkers.scheduledIncreases).toEqual(without.scheduledIncreases);
+		expect(withMarkers.projected).toEqual(without.projected);
+		expect(withMarkers.limitHit).toEqual(without.limitHit);
+		expect(withMarkers.safetyNetHit).toEqual(without.safetyNetHit);
+	});
+
+	it("defaults bill markers to an empty list", () => {
+		const trend = safeSpendingTrend({
+			transactions: [],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-01-19",
+			todayIso: "2026-01-21",
+			limit: 100,
+			safetyNet: 50,
+		});
+		expect(trend.billMarkers).toEqual([]);
+	});
 });

@@ -9,6 +9,20 @@ export interface RecurringBillIncrease {
 	name?: string;
 }
 
+/** Every selected bill occurrence grouped by date, claimed or not. */
+export function recurringBillMarkers(
+	bills: readonly TransactionResult[],
+): RecurringBillIncrease[] {
+	return groupByDate(
+		bills,
+		(row) =>
+			Number.isFinite(row.requested) && row.requested > 0
+				? row.requested
+				: undefined,
+		(row) => row.name,
+	);
+}
+
 /**
  * Projected increases come from the selected bills in the safe card cycle. A
  * bill whose occurrence a recorded transaction claims is already in actual
@@ -29,12 +43,7 @@ export function recurringBillIncreases({
 			`${row.claimScheduleId}|${row.claimOccurrenceDate.slice(0, 10)}`,
 		);
 	}
-	return groupByDate(
+	return recurringBillMarkers(
 		bills.filter((row) => !claimed.has(`${row.transactionId}|${row.date}`)),
-		(row) =>
-			Number.isFinite(row.requested) && row.requested > 0
-				? row.requested
-				: undefined,
-		(row) => row.name,
 	);
 }

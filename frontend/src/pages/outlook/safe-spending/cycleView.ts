@@ -26,6 +26,7 @@ export interface CycleViewInput {
 	/** Posted external cash inflows; null means evidence is unavailable. */
 	monthlyIncome?: number | null;
 	scheduledOutflows?: SafeSpendingScheduledIncrease[];
+	billMarkers?: SafeSpendingScheduledIncrease[];
 	/**
 	 * Selected-window cash remainder for non-current cycles. When provided
 	 * (even as null) it replaces the current-range shape check; when absent
@@ -59,6 +60,7 @@ export function cycleView({
 	fullDaysLeft,
 	monthlyIncome,
 	scheduledOutflows,
+	billMarkers,
 	remainingOverride,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
 	const monthStart = `${referenceDay.slice(0, 7)}-01`;
@@ -117,6 +119,7 @@ export function cycleView({
 		safetyNet:
 			capacity === null ? null : roundCents(capacity - protectedReserve),
 		scheduledOutflows,
+		billMarkers,
 	});
 	if (
 		monthlyIncome !== null &&

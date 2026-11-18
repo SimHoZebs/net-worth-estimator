@@ -52,7 +52,10 @@ import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/sa
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
 import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
 import { expectedMonthlyIncome } from "@/domain/safeSpendingIncome.ts";
-import { recurringBillIncreases } from "@/domain/recurringBillIncreases.ts";
+import {
+	recurringBillIncreases,
+	recurringBillMarkers,
+} from "@/domain/recurringBillIncreases.ts";
 import { cashPaymentSection } from "./cashPayments.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
 
@@ -307,6 +310,10 @@ export function SafeSpendingPreview({
 			}),
 		[selectedBills, transactions],
 	);
+	const billMarkers = useMemo(
+		() => recurringBillMarkers(selectedBills),
+		[selectedBills],
+	);
 	const selectedView = useMemo(
 		() =>
 			cycleView({
@@ -324,6 +331,7 @@ export function SafeSpendingPreview({
 				reserve: settings.reserve,
 				fullDaysLeft: Math.max(1, selected.daysLeft - 1),
 				scheduledOutflows: billIncreases,
+				billMarkers,
 				remainingOverride:
 					cycleOffset === 0
 						? undefined
@@ -345,6 +353,7 @@ export function SafeSpendingPreview({
 			selectedCardByCard,
 			settings.reserve,
 			billIncreases,
+			billMarkers,
 			cycleOffset,
 		],
 	);

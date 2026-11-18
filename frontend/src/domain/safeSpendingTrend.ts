@@ -45,6 +45,8 @@ export interface SafeSpendingTrend {
 	limitHit: SafeSpendingThresholdHit | null;
 	safetyNetHit: SafeSpendingThresholdHit | null;
 	scheduledIncreases: SafeSpendingScheduledIncrease[];
+	/** Every selected bill occurrence, including those already in actual spending. */
+	billMarkers: SafeSpendingScheduledIncrease[];
 }
 
 export const spendingAmount = (row: AccountTransaction): number =>
@@ -259,6 +261,7 @@ export function safeSpendingTrend({
 	limit,
 	safetyNet,
 	scheduledOutflows = [],
+	billMarkers = [],
 }: {
 	transactions: readonly AccountTransaction[];
 	cycleStart: string;
@@ -267,6 +270,7 @@ export function safeSpendingTrend({
 	limit: number | null;
 	safetyNet: number | null;
 	scheduledOutflows?: readonly SafeSpendingScheduledIncrease[];
+	billMarkers?: SafeSpendingScheduledIncrease[];
 }): SafeSpendingTrend {
 	const start = cycleStart.slice(0, 10);
 	const end = cycleEnd.slice(0, 10);
@@ -286,8 +290,9 @@ export function safeSpendingTrend({
 		limitHit: null,
 		safetyNetHit: null,
 		scheduledIncreases,
+		billMarkers,
 	};
-	if (end < start) return { ...empty, scheduledIncreases: [] };
+	if (end < start) return { ...empty, scheduledIncreases: [], billMarkers };
 
 	const ledger = spendingLedger({
 		transactions,
@@ -321,5 +326,6 @@ export function safeSpendingTrend({
 		safetyNetHit:
 			ledgerHit(ledger, safetyNet) ?? firstHit(projected, safetyNet),
 		scheduledIncreases,
+		billMarkers,
 	};
 }

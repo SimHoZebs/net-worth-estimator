@@ -1,5 +1,14 @@
-import { areaY, defineChart, dot, lineY, ruleY } from "@tanstack/charts";
+import {
+	type ChartPoint,
+	areaY,
+	defineChart,
+	dot,
+	lineY,
+	ruleY,
+	text,
+} from "@tanstack/charts";
 import { crosshair } from "@tanstack/charts/crosshair";
+import { decorative } from "@tanstack/charts/mark/decorative";
 import { Chart } from "@tanstack/charts/react";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { scalePoint } from "@tanstack/charts/scales/point";
@@ -43,18 +52,107 @@ export function incomeRuleLine(trend: SafeSpendingTrend): {
 	);
 }
 
-/** One dot per recurring bill, placed on the dated total after increases. */
+export interface SpendingLineAmountLabel {
+	amount: number;
+	label: string;
+	fill: string;
+	dy: number;
+}
+
+/** Axis margins leave about this much of the chart height for the vertical plot.
+ * Keep in sync with CHART_HEIGHT_PX: it drives both label spacing and mask y. */
+const CHART_HEIGHT_PX = 190;
+const LABEL_PLOT_HEIGHT_PX = 140;
+const LABEL_BASE_DY = 0;
+const LABEL_MIN_GAP_PX = 14;
+
+/**
+ * Amounts for the horizontal rules that are actually drawn. Each label sits on
+ * its own rule. When rules nearly coincide, the lower labels shift down enough
+ * to keep the amounts readable instead of colliding.
+ */
+export function lineAmountLabels(
+	trend: SafeSpendingTrend,
+	domain: readonly [number, number],
+): SpendingLineAmountLabel[] {
+	const result: SpendingLineAmountLabel[] = [];
+	const earned = trend.monthlyIncome;
+	if (
+		earned &&
+		earned.coordinate !== null &&
+		Number.isFinite(earned.coordinate)
+	) {
+		result.push({
+			amount: earned.coordinate,
+			label: `${labels.incomeLimit} ${exactMoney(earned.amount)}`,
+			fill: "var(--chart-2)",
+			dy: LABEL_BASE_DY,
+		});
+	}
+	const showThresholds = trend.limit !== null || trend.safetyNet !== null;
+	if (
+		showThresholds &&
+		trend.safetyNet !== null &&
+		Number.isFinite(trend.safetyNet) &&
+		trend.safetyNet > 0
+	) {
+		result.push({
+			amount: trend.safetyNet,
+			label: `${labels.reserveStarts} ${exactMoney(trend.safetyNet)}`,
+			fill: "var(--warning-text)",
+			dy: LABEL_BASE_DY,
+		});
+	}
+	if (
+		showThresholds &&
+		trend.limit !== null &&
+		Number.isFinite(trend.limit) &&
+		trend.limit > 0
+	) {
+		result.push({
+			amount: trend.limit,
+			label: `${labels.spendingLimit} ${exactMoney(trend.limit)}`,
+			fill: "var(--danger-solid)",
+			dy: LABEL_BASE_DY,
+		});
+	}
+	const span = domain[1] - domain[0];
+	if (span > 0) {
+		const pixelsPerUnit = LABEL_PLOT_HEIGHT_PX / span;
+		const minimumGapAmount = LABEL_MIN_GAP_PX / pixelsPerUnit;
+		let previousAmount = Number.POSITIVE_INFINITY;
+		for (const label of [...result].sort(
+			(left, right) => right.amount - left.amount,
+		)) {
+			const ceiling = previousAmount - minimumGapAmount;
+			if (label.amount > ceiling) {
+				label.dy += (label.amount - ceiling) * pixelsPerUnit;
+				previousAmount = ceiling;
+			} else {
+				previousAmount = label.amount;
+			}
+		}
+	}
+	return result;
+}
+
+/** One dot per bill marker, on the dated total after that day's increases. */
 export function recurringIncreaseDots(
+	actual: readonly SafeSpendingTrendPoint[],
 	projected: readonly SafeSpendingTrendPoint[],
-	scheduledIncreases: readonly SafeSpendingScheduledIncrease[],
+	billMarkers: readonly SafeSpendingScheduledIncrease[],
 ): { date: string; amount: number }[] {
-	return scheduledIncreases.flatMap((increase) => {
+	return billMarkers.flatMap((increase) => {
 		const day = increase.date.slice(0, 10);
-		for (let index = projected.length - 1; index >= 0; index--) {
-			const entry = projected[index];
-			if (!entry) continue;
-			if (entry.date.slice(0, 10) === day) {
-				return [{ date: day, amount: entry.spent }];
+		// Projected wins: a bill due today has two points and must land on the
+		// late, post-increase one. Only bills already in actual spending fall
+		// through to the recorded curve.
+		for (const series of [projected, actual]) {
+			for (let index = series.length - 1; index >= 0; index--) {
+				const entry = series[index];
+				if (entry && entry.date.slice(0, 10) === day) {
+					return [{ date: day, amount: entry.spent }];
+				}
 			}
 		}
 		return [];
@@ -118,7 +216,9 @@ function legendSwatch(dashed: boolean, tone: string) {
 }
 
 /** Include signed net spending and ceilings, with room around negative values. */
-export function spendingChartDomain(trend: SafeSpendingTrend): [number, number] {
+export function spendingChartDomain(
+	trend: SafeSpendingTrend,
+): [number, number] {
 	const income = trend.monthlyIncome;
 	const values = [
 		0,
@@ -152,23 +252,20 @@ export function SafeSpendingTrendChart({
 	const showThresholds = trend.limit !== null || trend.safetyNet !== null;
 	const actual = trend.actual;
 	const projected = trend.projected;
-	const scheduledIncreases = useMemo(
-		() => trend.scheduledIncreases ?? [],
-		[trend.scheduledIncreases],
+	const billMarkers = useMemo(
+		() => trend.billMarkers ?? [],
+		[trend.billMarkers],
 	);
 	const increaseByDate = useMemo(
 		() =>
 			new Map(
-				scheduledIncreases.map((increase) => [
-					increase.date.slice(0, 10),
-					increase,
-				]),
+				billMarkers.map((increase) => [increase.date.slice(0, 10), increase]),
 			),
-		[scheduledIncreases],
+		[billMarkers],
 	);
 	const increaseDots = useMemo(
-		() => recurringIncreaseDots(projected, scheduledIncreases),
-		[scheduledIncreases, projected],
+		() => recurringIncreaseDots(actual, projected, billMarkers),
+		[actual, projected, billMarkers],
 	);
 	const dates = useMemo(
 		() =>
@@ -181,180 +278,231 @@ export function SafeSpendingTrendChart({
 	);
 	const lastActual = actual.at(-1);
 	const domain = useMemo(() => spendingChartDomain(trend), [trend]);
+	const amountLabels = useMemo(
+		() => lineAmountLabels(trend, domain),
+		[domain, trend],
+	);
 	const definition = useMemo(
 		() =>
-			defineChart({
-				marks: [
-					...(earnedLine.length
-						? [
-								lineY(earnedLine, {
-									x: "date",
+			defineChart(({ width }) => {
+				const centerX = width / 2;
+				const pixelsPerUnit =
+					LABEL_PLOT_HEIGHT_PX / Math.max(0.01, domain[1] - domain[0]);
+				const gapPoints = amountLabels.flatMap((label) => {
+					const halfWidth = label.label.length * 3 + 4;
+					const amount = label.amount - label.dy / pixelsPerUnit;
+					return [
+						{ x: centerX - halfWidth, amount, group: label.label },
+						{ x: centerX + halfWidth, amount, group: label.label },
+					];
+				});
+				return {
+					marks: [
+						...(earnedLine.length
+							? [
+									lineY(earnedLine, {
+										x: "date",
+										y: "amount",
+										stroke: "var(--chart-2)",
+										strokeWidth: 2,
+										strokeDasharray: "10 3 2 3",
+									}),
+								]
+							: []),
+						...(earned?.hit
+							? [
+									dot([earned.hit], {
+										x: "date",
+										y: "amount",
+										r: 5,
+										fill: "var(--chart-2)",
+										stroke: "var(--card)",
+										strokeWidth: 2,
+									}),
+								]
+							: []),
+						areaY(actual, {
+							x: "date",
+							y1: 0,
+							y2: "spent",
+							fill: "var(--chart-band)",
+							fillOpacity: 0.35,
+						}),
+						lineY(actual, {
+							x: "date",
+							y: "spent",
+							stroke: "var(--primary)",
+							strokeWidth: 2.5,
+						}),
+						...(projected.length > 1
+							? [
+									lineY(projected, {
+										x: "date",
+										y: "spent",
+										key: (point) => `${point.date}|${point.spent}`,
+										stroke: "var(--primary)",
+										strokeWidth: 2,
+										strokeDasharray: "6 4",
+									}),
+								]
+							: []),
+						...(showThresholds &&
+						trend.safetyNet !== null &&
+						Number.isFinite(trend.safetyNet) &&
+						trend.safetyNet > 0
+							? [
+									ruleY([trend.safetyNet], {
+										stroke: "var(--warning-text)",
+										strokeWidth: 1.5,
+										strokeDasharray: "2 4",
+									}),
+								]
+							: []),
+						...(showThresholds &&
+						trend.limit !== null &&
+						Number.isFinite(trend.limit) &&
+						trend.limit > 0
+							? [
+									ruleY([trend.limit], {
+										stroke: "var(--danger-solid)",
+										strokeWidth: 1.5,
+										strokeDasharray: "6 4",
+									}),
+								]
+							: []),
+						...(lastActual
+							? [
+									dot([lastActual], {
+										x: "date",
+										y: "spent",
+										r: 4,
+										fill: "var(--primary)",
+										stroke: "var(--card)",
+										strokeWidth: 2,
+									}),
+								]
+							: []),
+						...(increaseDots.length
+							? [
+									dot(increaseDots, {
+										x: "date",
+										y: "amount",
+										r: 4,
+										fill: "var(--chart-5)",
+										stroke: "var(--card)",
+										strokeWidth: 2,
+									}),
+								]
+							: []),
+						...(showThresholds && trend.limitHit
+							? [
+									dot([trend.limitHit], {
+										x: "date",
+										y: "amount",
+										r: 5,
+										fill: "var(--danger-solid)",
+										stroke: "var(--card)",
+										strokeWidth: 2.5,
+									}),
+								]
+							: []),
+						...(gapPoints.length
+							? [
+									decorative(
+										lineY(gapPoints, {
+											x: "x",
+											xScale: "gapX",
+											y: "amount",
+											key: (point) => point.group,
+											stroke: "var(--card)",
+											strokeWidth: 16,
+										}),
+									),
+								]
+							: []),
+						...amountLabels.map((label) =>
+							decorative(
+								text([{ ...label, x: centerX }], {
+									x: "x",
+									xScale: "gapX",
 									y: "amount",
-									stroke: "var(--chart-2)",
-									strokeWidth: 2,
-									strokeDasharray: "10 3 2 3",
+									text: "label",
+									fill: label.fill,
+									fontSize: 11,
+									fontWeight: 600,
+									anchor: "middle",
+									dy: label.dy,
 								}),
-							]
-						: []),
-					...(earned?.hit
-						? [
-								dot([earned.hit], {
-									x: "date",
-									y: "amount",
-									r: 5,
-									fill: "var(--chart-2)",
-									stroke: "var(--card)",
-									strokeWidth: 2,
-								}),
-							]
-						: []),
-					areaY(actual, {
-						x: "date",
-						y1: 0,
-						y2: "spent",
-						fill: "var(--chart-band)",
-						fillOpacity: 0.35,
-					}),
-					lineY(actual, {
-						x: "date",
-						y: "spent",
-						stroke: "var(--primary)",
-						strokeWidth: 2.5,
-					}),
-					...(projected.length > 1
-						? [
-								lineY(projected, {
-									x: "date",
-									y: "spent",
-									key: (point) => `${point.date}|${point.spent}`,
-									stroke: "var(--primary)",
-									strokeWidth: 2,
-									strokeDasharray: "6 4",
-								}),
-							]
-						: []),
-					...(showThresholds &&
-					trend.safetyNet !== null &&
-					Number.isFinite(trend.safetyNet) &&
-					trend.safetyNet > 0
-						? [
-								ruleY([trend.safetyNet], {
-									stroke: "var(--warning-text)",
-									strokeWidth: 1.5,
-									strokeDasharray: "2 4",
-								}),
-							]
-						: []),
-					...(showThresholds &&
-					trend.limit !== null &&
-					Number.isFinite(trend.limit) &&
-					trend.limit > 0
-						? [
-								ruleY([trend.limit], {
-									stroke: "var(--danger-solid)",
-									strokeWidth: 1.5,
-									strokeDasharray: "6 4",
-								}),
-							]
-						: []),
-					...(lastActual
-						? [
-								dot([lastActual], {
-									x: "date",
-									y: "spent",
-									r: 4,
-									fill: "var(--primary)",
-									stroke: "var(--card)",
-									strokeWidth: 2,
-								}),
-							]
-						: []),
-					...(increaseDots.length
-						? [
-								dot(increaseDots, {
-									x: "date",
-									y: "amount",
-									r: 4,
-									fill: "var(--chart-5)",
-									stroke: "var(--card)",
-									strokeWidth: 2,
-								}),
-							]
-						: []),
-					...(showThresholds && trend.limitHit
-						? [
-								dot([trend.limitHit], {
-									x: "date",
-									y: "amount",
-									r: 5,
-									fill: "var(--danger-solid)",
-									stroke: "var(--card)",
-									strokeWidth: 2.5,
-								}),
-							]
-						: []),
-					crosshair({
-						x: {
-							label: {
-								format: (value) =>
-									typeof value === "string" ? monthDay(value) : "",
+							),
+						),
+						crosshair({
+							x: {
+								label: {
+									format: (value) =>
+										typeof value === "string" ? monthDay(value) : "",
+								},
 							},
+							y: {
+								label: {
+									format: (value) =>
+										typeof value === "number" ? exactMoney(value) : "",
+								},
+							},
+						}),
+					],
+					scales: {
+						x: {
+							scale: scalePoint<string>().domain(dates).padding(0.1),
+							axis: {
+								ticks: {
+									spacing: 80,
+									format: (value: string) => monthDay(value),
+								},
+								tickLabels: { thin: { minGap: 16 } },
+							},
+						},
+						gapX: {
+							scale: scaleLinear().domain([0, width]),
+							channel: "x",
+							axis: false,
 						},
 						y: {
-							label: {
-								format: (value) =>
-									typeof value === "number" ? exactMoney(value) : "",
+							scale: scaleLinear().domain(domain),
+							grid: true,
+							axis: {
+								ticks: { format: (value: number) => compactMoney(value) },
 							},
 						},
-					}),
-				],
-				scales: {
-					x: {
-						scale: scalePoint<string>().domain(dates).padding(0.1),
-						axis: {
-							ticks: {
-								spacing: 80,
-								format: (value: string) => monthDay(value),
-							},
-							tickLabels: { thin: { minGap: 16 } },
+					},
+					focus: "nearest-x",
+					maxFocusDistance: Number.POSITIVE_INFINITY,
+					tooltip: {
+						use: tooltip,
+						format: (point: ChartPoint) => {
+							const datum = point.datum as {
+								date?: unknown;
+								spent?: unknown;
+								amount?: unknown;
+								projected?: unknown;
+								income?: unknown;
+							};
+							if (datum.income && earned)
+								return `${labels.earnedThisMonth}: ${exactMoney(earned.amount)}`;
+							const date =
+								typeof datum.date === "string"
+									? datum.date.slice(0, 10)
+									: String(point.xValue).slice(0, 10);
+							const spent =
+								typeof datum.spent === "number"
+									? datum.spent
+									: typeof datum.amount === "number"
+										? datum.amount
+										: Number(point.yValue);
+							const increase = increaseByDate.get(date);
+							return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${increase ? ` incl. ${exactMoney(increase.amount)} bills` : ""}`;
 						},
 					},
-					y: {
-						scale: scaleLinear().domain(domain),
-						grid: true,
-						axis: {
-							ticks: { format: (value: number) => compactMoney(value) },
-						},
-					},
-				},
-				focus: "nearest-x",
-				maxFocusDistance: Number.POSITIVE_INFINITY,
-				tooltip: {
-					use: tooltip,
-					format: (point) => {
-						const datum = point.datum as {
-							date?: unknown;
-							spent?: unknown;
-							amount?: unknown;
-							projected?: unknown;
-							income?: unknown;
-						};
-						if (datum.income && earned)
-							return `${labels.earnedThisMonth}: ${exactMoney(earned.amount)}`;
-						const date =
-							typeof datum.date === "string"
-								? datum.date.slice(0, 10)
-								: String(point.xValue).slice(0, 10);
-						const spent =
-							typeof datum.spent === "number"
-								? datum.spent
-								: typeof datum.amount === "number"
-									? datum.amount
-									: Number(point.yValue);
-						const increase = increaseByDate.get(date);
-						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${increase ? ` incl. ${exactMoney(increase.amount)} bills` : ""}`;
-					},
-				},
+				};
 			}),
 		[
 			actual,
@@ -370,6 +518,7 @@ export function SafeSpendingTrendChart({
 			domain,
 			increaseByDate,
 			increaseDots,
+			amountLabels,
 		],
 	);
 	if (trend.spendingAvailable === false)
@@ -409,7 +558,7 @@ export function SafeSpendingTrendChart({
 		(showThresholds && trend.safetyNet !== null && trend.safetyNet > 0
 			? ` The protected reserve starts at ${exactMoney(trend.safetyNet)}.`
 			: "") +
-		scheduledIncreases
+		billMarkers
 			.map((increase) =>
 				increase.name
 					? ` Includes ${exactMoney(increase.amount)} ${increase.name} bill on ${dateLabel(increase.date, true)}.`
@@ -443,7 +592,7 @@ export function SafeSpendingTrendChart({
 				definition={definition}
 				ariaLabel={labels.spendingPace}
 				ariaDescription={description}
-				height={190}
+				height={CHART_HEIGHT_PX}
 			/>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
 			<ul
@@ -479,7 +628,7 @@ export function SafeSpendingTrendChart({
 						{labels.projectedSpending}
 					</li>
 				)}
-				{scheduledIncreases.length > 0 && (
+				{billMarkers.length > 0 && (
 					<li className="flex items-center gap-2">
 						<span
 							aria-hidden="true"
