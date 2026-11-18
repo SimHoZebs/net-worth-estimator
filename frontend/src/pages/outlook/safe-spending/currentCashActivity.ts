@@ -18,7 +18,17 @@ export function currentSpendingActivity(
 		if (row.flow === "expense" && row.amount === 0)
 			row = { ...row, direction: "out" };
 		const category = saved.get(row.transactionId)?.category;
-		const transfer = row.flow === "transfer";
+		// Card settlements move cash to the card but do not create new
+		// spending: the purchase already counted on the card. The bank
+		// sync leaves the checking leg as an external expense with no
+		// destination, so detect it by name and keep it inspectable as a
+		// transfer instead of consuming the purchase budget twice.
+		const cardSettlement =
+			row.flow === "expense" &&
+			row.direction === "out" &&
+			/payment\s+to.*card/i.test(row.name);
+		const transfer = row.flow === "transfer" || cardSettlement;
+		if (cardSettlement) row = { ...row, flow: "transfer" };
 		const expenseCredit = row.direction === "in" && isSpendCategory(category);
 		row = {
 			...row,

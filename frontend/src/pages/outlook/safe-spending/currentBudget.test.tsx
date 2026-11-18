@@ -729,6 +729,27 @@ describe("canonical recorded cash selection", () => {
 				.committedTotal,
 		).toBe(900);
 	});
+	it("excludes card settlements from the purchase budget while keeping them inspectable", () => {
+		const settlement = cash("Payment to Chase card ending in 4001 10/30", {
+			amount: 271.74,
+		});
+		const rows = currentSpendingActivity(
+			currentCashActivity({
+				accounts: [account],
+				transactions: [settlement],
+				spendingIds: ["cash"],
+				cycleStart: input.cycle.start,
+				cycleEnd: input.cycle.end,
+				today: input.referenceDay,
+			}),
+			[settlement],
+		);
+		expect(rows[0]?.flow).toBe("transfer");
+		expect(rows[0]?.spendingAmount).toBe(0);
+		expect(
+			cycleView({ ...input, transactions: rows }).view.heroes.committedTotal,
+		).toBe(0);
+	});
 	it("sums selected November schedules into one expected pay figure", () => {
 		const schedules = [
 			paycheck("payroll", 100, "2026-11-08"),
