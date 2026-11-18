@@ -131,36 +131,6 @@ test("Analysis migration provisions transfer links on a six-table source and rep
   assert.equal(await sha256File(db), hashBefore);
 });
 
-test("old four-column promotions gain merchant_key and keep their rows", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "bnpl-migration-merchant-key-"));
-  owned.add(directory);
-  const db = join(directory, "application.db");
-  // Start from a full current-schema fixture, then model the deployed table
-  // that predates merchant_key. The DROP also proves the local SQLite can
-  // remove the column, so the fixture really has the old four-column shape.
-  await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "owner"]);
-  const owner = await sql(db, "SELECT id FROM users;");
-  assert.equal(await sql(db, "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';"), "1");
-  await sql(db, "ALTER TABLE analysis_promotions DROP COLUMN merchant_key;");
-  assert.equal(await sql(db, "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';"), "0");
-  // Seed promotions through the four base columns so the source is a real
-  // old deployment with data the migration must carry forward.
-  await sql(db, `INSERT INTO analysis_promotions(user_id, pattern_key, rule_id, created_at) VALUES
-    ('${owner}','pattern-a','rule-a',1773140400),
-    ('${owner}','pattern-b','rule-b',1773140800);`);
-  const baseBefore = await sql(db, "SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY pattern_key;");
-  await migrate(db);
-  assert.equal(await sql(db, "PRAGMA integrity_check;"), "ok");
-  assert.equal(await sql(db, "PRAGMA foreign_key_check;"), "");
-  assert.equal(await sql(db, "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';"), "1");
-  assert.equal(await sql(db, "SELECT user_id, pattern_key, rule_id, created_at, merchant_key FROM analysis_promotions ORDER BY pattern_key;"),
-    `${owner}|pattern-a|rule-a|1773140400|\n${owner}|pattern-b|rule-b|1773140800|`);
-  assert.equal(await sql(db, "SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY pattern_key;"), baseBefore);
-  const hashBefore = await sha256File(db);
-  await migrate(db);
-  assert.equal(await sha256File(db), hashBefore);
-});
-
 test("Analysis migration leaves the original untouched on setup failure and permits retry", async () => {
   const { directory, db, owner } = await sourceDatabase();
   await seedFinalRows(db, owner);

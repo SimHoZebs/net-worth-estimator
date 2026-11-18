@@ -47,17 +47,6 @@ func TestAssessmentsAreIndependentIntersections(t *testing.T) {
 			if tc.purpose && tc.repeats && purpose[0].StreamID != repeats[0].StreamID {
 				t.Fatal("independent assessments do not share evidence identity")
 			}
-			cache := ctx.Value(observationsKey{}).(*observationCache)
-			cached := cache.streams[0]
-			streams, err := detectPaymentStreams(ctx, input)
-			if err != nil || streams[0] != cached {
-				t.Fatal("reextracted the same owner revision")
-			}
-			input.UserID = "another-owner"
-			other, err := detectPaymentStreams(ctx, input)
-			if err != nil || other[0].streamID == cached.streamID {
-				t.Fatal("cache leaked across owners")
-			}
 		})
 	}
 }

@@ -3,7 +3,6 @@ package sqlite
 import (
 	"errors"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -610,8 +609,5 @@ func TestSharingCopyDeniedWithoutGrant(t *testing.T) {
 	sharingTransaction(t, storeA, sharingTransactionA)
 	if _, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("ungranted copy = %v, want not-found", err)
-	}
-	if !strings.HasPrefix(alice, "user:") || !strings.HasPrefix(bob, "user:") {
-		t.Fatalf("unexpected user IDs %q %q", alice, bob)
 	}
 }

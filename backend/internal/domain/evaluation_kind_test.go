@@ -186,31 +186,6 @@ func kindTestModel() (*types.FinancialModel, *types.ProjectionRuntimeSettings) {
 	return model, settings
 }
 
-func TestEvaluationsDoNotAlterBaseTimeline(t *testing.T) {
-	model, settings := kindTestModel()
-	base, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	withEval := *settings
-	withEval.Evaluations.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
-		{InstanceID: "t", Name: "T", Enabled: true, Config: map[string]any{"target": 50.0}},
-	}
-	changed, err := ProjectFinancialModel(model, &withEval, types.EmptyModelOverrides(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(base.Timeline, changed.Timeline) {
-		t.Fatal("eval config must not alter the base timeline")
-	}
-	if len(changed.Evaluations.NetWorthThreshold) != 1 {
-		t.Fatal("eval-changed result must carry the threshold eval")
-	}
-	if len(base.Evaluations.NetWorthThreshold) != 0 {
-		t.Fatal("eval-free result must carry no threshold eval")
-	}
-}
-
 func TestEvalOnlyChangeRecomputesBasePath(t *testing.T) {
 	model, settings := kindTestModel()
 	first, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)

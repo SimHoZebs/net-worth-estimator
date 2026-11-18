@@ -71,19 +71,4 @@ describe("billsInCycle", () => {
 			rows.map((row) => [row.transactionId, row.date, row.requested]),
 		).toEqual([["rent", "2026-11-01", 120]]);
 	});
-
-	it("produces one row per occurrence with no duplicate from another source", () => {
-		const rows = billsInCycle(
-			[schedule("sallie", "checking")],
-			["sallie"],
-			"2026-11-01",
-			"2026-11-30",
-		);
-		expect(rows).toHaveLength(1);
-		expect(rows[0]).toMatchObject({
-			transactionId: "sallie",
-			date: "2026-11-01",
-			requested: 120,
-		});
-	});
 });

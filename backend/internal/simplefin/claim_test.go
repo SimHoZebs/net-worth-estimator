@@ -190,20 +190,6 @@ func TestFetchWithoutCredentialIsNotConfigured(t *testing.T) {
 	}
 }
 
-func TestEffectiveCardsComeFromProvider(t *testing.T) {
-	database := openRunnerStore(t)
-	runner := NewRunnerWithProvider(database, Config{}, func() (string, map[string]struct{}) {
-		return "https://user:pass@bridge.example/simplefin", map[string]struct{}{"db_card": {}}
-	}, nil)
-	merged := runner.effectiveCards()
-	if len(merged) != 1 {
-		t.Fatalf("merged = %+v, want only db_card", merged)
-	}
-	if _, ok := merged["db_card"]; !ok {
-		t.Fatalf("merged = %+v, want db_card", merged)
-	}
-}
-
 func TestNilRunnerIsUnconfigured(t *testing.T) {
 	var runner *Runner
 	if runner.IsConfigured() {

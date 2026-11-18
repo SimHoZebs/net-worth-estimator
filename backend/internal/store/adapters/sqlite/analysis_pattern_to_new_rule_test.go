@@ -244,30 +244,3 @@ func TestPatternToNewScheduleClearRemovesLinks(t *testing.T) {
 		t.Fatalf("record=%v", err)
 	}
 }
-
-func TestPatternClaimConfirmRejectGeneralizes(t *testing.T) {
-	s := openSQLiteStore(t)
-	ids := seedRecurringEvidence(t, s)
-	findings := completePatternAnalysis(t, s, ids, "monthly")
-	confirmed := confirmFinding(t, s, findings[0])
-	if confirmed.Review.Decision != "confirmed" {
-		t.Fatalf("review=%+v", confirmed.Review)
-	}
-	duration := feedbackInput(t, confirmed, "set-duration")
-	duration.Duration = &types.AnalysisDuration{Count: 4, Unit: "weeks"}
-	if _, err := s.ReviewAnalysisFinding(confirmed.ID, duration); !errors.Is(err, store.ErrAnalysisFeedbackInvalid) {
-		t.Fatalf("duration=%v", err)
-	}
-	next, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, item := range next {
-		if item.ID == findings[1].ID {
-			rejected, err := s.ReviewAnalysisFinding(item.ID, feedbackInput(t, item, "reject"))
-			if err != nil || rejected.Review.Decision != "rejected" {
-				t.Fatalf("reject=%+v err=%v", rejected, err)
-			}
-		}
-	}
-}

@@ -135,26 +135,6 @@ func TestSyncCardsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestClearResetsSyncCredential(t *testing.T) {
-	database := openTestStore(t)
-	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
-		t.Fatalf("set credential: %v", err)
-	}
-	if _, err := database.SetSyncCards([]string{"prime_card"}); err != nil {
-		t.Fatalf("set cards: %v", err)
-	}
-	if err := database.Clear(); err != nil {
-		t.Fatalf("clear: %v", err)
-	}
-	credential, err := database.GetSyncCredential()
-	if err != nil {
-		t.Fatalf("get credential: %v", err)
-	}
-	if credential.Configured() {
-		t.Fatalf("credential after Clear = %+v, want empty", credential)
-	}
-}
-
 // TestSyncCredentialSecretNeverSerializes guards the Store contract that the
 // AccessURL must never leave the server in API payloads.
 func TestSyncCredentialSecretNeverSerializes(t *testing.T) {

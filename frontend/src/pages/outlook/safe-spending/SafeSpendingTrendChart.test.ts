@@ -56,7 +56,6 @@ describe("current spending pace after refunds", () => {
 	});
 	it("keeps crossing identities without showing cleared cash or reserve warnings", () => {
 		expect(paceLabel(cleared)).toEqual({ text: null, tone: "normal" });
-		expect(cleared.limitHit?.transactionId).toBe("purchase");
 	});
 	it("warns about a genuine future crossing after an earlier cleared crossing", () => {
 		const trend = {

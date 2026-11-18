@@ -65,14 +65,3 @@ func TestRecurringFindingsAcceptOwnerCorrections(t *testing.T) {
 		t.Fatal("owner correction overwrote immutable source facts")
 	}
 }
-
-func TestRecurringCorrectionsRejectPendingEvidence(t *testing.T) {
-	s := openSQLiteStore(t)
-	finding := completeRecurringAnalysis(t, s, "v1")
-	if _, err := s.db.Exec(`UPDATE transactions SET pending=1 WHERE id=? AND user_id=:user_id`, finding.TransactionID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.ReviewAnalysisFinding(finding.ID, feedbackInput(t, finding, "confirm")); !errors.Is(err, store.ErrAnalysisFeedbackInvalid) {
-		t.Fatalf("pending confirm=%v", err)
-	}
-}

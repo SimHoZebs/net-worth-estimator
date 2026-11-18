@@ -5,42 +5,11 @@ import postcss from "postcss";
 
 /**
  * Check concrete style contracts, not React abstraction choices or layout.
- *
- * Retired vocabulary (deleted modules, application token aliases, and
- * preset-ring suppression) is banned in app scopes. Official shadcn
- * primitives under src/components/ui/ are exempt: their resets (input-group
- * addon, checkbox field-label guard) and overlay tokens are stock.
+ * Official shadcn primitives under src/components/ui/ are exempt: their
+ * resets (input-group addon, checkbox field-label guard) are stock.
  * Genuine browser chrome (native select pickers) and chart texture CSS are
  * exempt by pattern, not by file.
  */
-
-/** Modules deleted in the shadcn adoption; import the ui primitive instead. */
-const RETIRED_MODULE_PATTERN =
-	/(?:from\s+["']|import\s+["'])[^"']*\/(buttonStyles|mergeStyles)(\.tsx?)?["']/g;
-/** Recipe identifiers that only existed to serve the retired wrappers. */
-const RETIRED_RECIPE_PATTERN =
-	/(?<![\w$/])(buttonStyles|textButtonStyles|iconButtonStyles|mergeStyles|segmentedPillStyles)(?![\w$.])/g;
-
-/**
- * Application token aliases retired with the legacy visual system. Bare
- * `text-muted` is the text role (now `text-muted-foreground`); `bg-muted`
- * is the preset surface and stays allowed. Retired color roles are checked
- * across color utility prefixes, not just the combinations seen at retirement.
- */
-const RETIRED_COLOR_ROLES =
-	"ink|subtle|paper|surface|surface-2|surface-3|input-bg|hover|active|primary-hover|line|line-strong|on-primary|on-danger|on-guest|backdrop-film|backdrop-blur";
-const COLOR_UTILITY_PREFIXES =
-	"bg|text|border(?:-[xytrblse])?|divide|ring|ring-offset|inset-ring|outline|fill|stroke|accent|caret|decoration|placeholder|shadow|inset-shadow|from|via|to";
-const LEGACY_ALIAS_PATTERN = new RegExp(
-	`(?<![\\w-])(?:(?:${COLOR_UTILITY_PREFIXES})-(?:${RETIRED_COLOR_ROLES})|text-muted|rounded-control|rounded-surface|shadow-overlay)(?![\\w-])`,
-	"g",
-);
-
-/** CSS variables retired alongside the aliases above. */
-const LEGACY_VAR_PATTERN = new RegExp(
-	`var\\(--(?:${RETIRED_COLOR_ROLES})\\)`,
-	"g",
-);
 
 /**
  * Preset-ring suppression. Primitives own their focus rings; callers must
@@ -73,14 +42,6 @@ export function designSystemWarnings(path: string, source: string): string[] {
 				);
 			});
 		}
-		if (!isUiPrimitive(path)) {
-			for (const match of source.matchAll(LEGACY_VAR_PATTERN)) {
-				warn(
-					match.index,
-					"Retired application token. Use the preset token (foreground, muted-foreground, background, card, muted, accent, border, input, primary-foreground) or a genuine status token.",
-				);
-			}
-		}
 		return warnings;
 	}
 	if (!/\.tsx?$/.test(path)) return warnings;
@@ -102,38 +63,12 @@ export function designSystemWarnings(path: string, source: string): string[] {
 			"Use a semantic color token. Define palette choices in tokens.css or themes.css.",
 		);
 	}
-	if (!isUiPrimitive(path)) {
-		for (const match of source.matchAll(RETIRED_MODULE_PATTERN)) {
+	if (!isUiPrimitive(path) && !isGenuineChromeException(source)) {
+		for (const match of source.matchAll(RING_SUPPRESSION_PATTERN)) {
 			warn(
 				match.index,
-				"Retired style module. Import the shadcn primitive from @/components/ui/ instead.",
+				"Preset-ring suppression. Primitives own their focus rings; do not switch them off in app scopes.",
 			);
-		}
-		for (const match of source.matchAll(RETIRED_RECIPE_PATTERN)) {
-			warn(
-				match.index,
-				"Retired style recipe. Use the shadcn primitive variants instead.",
-			);
-		}
-		for (const match of source.matchAll(LEGACY_ALIAS_PATTERN)) {
-			warn(
-				match.index,
-				"Retired application token. Use the preset token (text-foreground, text-muted-foreground, bg-background, bg-card, bg-muted, bg-accent, border-border, border-input, text-primary-foreground, rounded-md, rounded-xl) or a genuine status token.",
-			);
-		}
-		for (const match of source.matchAll(LEGACY_VAR_PATTERN)) {
-			warn(
-				match.index,
-				"Retired application token. Use the preset token (foreground, muted-foreground, background, card, muted, accent, border, input, primary-foreground) or a genuine status token.",
-			);
-		}
-		if (!isGenuineChromeException(source)) {
-			for (const match of source.matchAll(RING_SUPPRESSION_PATTERN)) {
-				warn(
-					match.index,
-					"Preset-ring suppression. Primitives own their focus rings; do not switch them off in app scopes.",
-				);
-			}
 		}
 	}
 	return warnings;

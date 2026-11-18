@@ -164,19 +164,6 @@ describe("transaction patches", () => {
 		expect(patch).toEqual({});
 	});
 
-	it("carries no cadence, growth, or end date", () => {
-		const body = transactionBody(transactionValues());
-		expect(body).not.toHaveProperty("frequency");
-		expect(body).not.toHaveProperty("endDate");
-		expect(body.amount).toEqual({ value: 48000 });
-		expect(
-			transactionUpdate({
-				baseline: baselineTransaction,
-				values: transactionValues(),
-			}),
-		).not.toHaveProperty("annualIncrease");
-	});
-
 	it("validates the transaction fields without asking for recurrence", () => {
 		expect(validateTransactionValues(transactionValues())).toBeNull();
 		expect(validateTransactionValues(transactionValues({ name: "  " }))).toBe(

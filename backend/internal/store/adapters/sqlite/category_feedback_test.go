@@ -1,11 +1,9 @@
 package sqlite
 
 import (
-	"database/sql"
 	"fmt"
 	"testing"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -138,53 +136,20 @@ func TestCategoryJournalOrderingAndPagination(t *testing.T) {
 	}
 }
 
-func TestCategoryJournalSelfHeals(t *testing.T) {
-	s := openSQLiteStore(t)
-	seedAccount(t, s, "checking")
-	if _, err := s.db.Exec(`DROP TABLE IF EXISTS category_feedback`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.db.Exec(`DROP INDEX IF EXISTS category_feedback_user_txn`); err != nil {
-		t.Fatal(err)
-	}
-	// Reads recreate the journal on an old database without a migration.
-	if rows, err := s.ListCategoryFeedback("", 10); err != nil || len(rows) != 0 {
-		t.Fatalf("rows=%+v err=%v", rows, err)
-	}
-	id := mustJournalBankTransaction(t, s, "WHOLE FOODS", "food", "")
-	travel := types.CategoryTravel
-	if _, err := s.SetUserTransactionCategory(id, &travel); err != nil {
-		t.Fatal(err)
-	}
-	if rows := journalRows(t, s); len(rows) != 1 {
-		t.Fatalf("journal=%+v", rows)
-	}
-}
-
 func TestCategoryJournalAtomicWithSidecar(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	id := mustJournalBankTransaction(t, s, "WHOLE FOODS", "food", "")
+	// Create the journal table through the public read path, then make its
+	// insert fail while the category write would otherwise succeed. The owner
+	// sees an error and neither the assignment nor the journal entry persists.
+	journalRows(t, s)
+	if _, err := s.db.Exec(`CREATE TRIGGER fail_category_feedback BEFORE INSERT ON category_feedback BEGIN SELECT RAISE(ABORT, 'test failure'); END`); err != nil {
+		t.Fatal(err)
+	}
 	medical := types.CategoryMedical
-	// The sidecar write succeeds but the journal insert fails its CHECK
-	// constraint. Sharing one transaction must roll both back, which is
-	// exactly the atomicity the process-death case relies on: SQLite never
-	// commits half of withRowTx.
-	err := withRowTx(s.db, func(tx *userTx) error {
-		if err := ensureCategorySchema(tx); err != nil {
-			return err
-		}
-		if err := ensureCategoryFeedbackSchema(tx); err != nil {
-			return err
-		}
-		if err := writeTransactionCategory(tx, id, medical, types.CategorySourceUser, ""); err != nil {
-			return err
-		}
-		var factsRaw sql.NullString
-		return insertCategoryFeedback(tx, id, "bogus", &medical, "WHOLE FOODS", "out", factsRaw, 1)
-	})
-	if err == nil {
-		t.Fatal("invalid journal action was accepted")
+	if _, err := s.SetUserTransactionCategory(id, &medical); err == nil {
+		t.Fatal("journal failure was accepted")
 	}
 	if got := loadedCategory(t, s, id); got.Category != "" {
 		t.Fatalf("sidecar survived the journal failure=%+v", got)
@@ -257,8 +222,5 @@ func TestRecentUserCategoriesBoundsNewestFirst(t *testing.T) {
 	}
 	if labels[0].TransactionID != ids[4] || labels[2].TransactionID != ids[2] {
 		t.Fatalf("not newest first=%+v", labels)
-	}
-	if _, ok := interface{}(s).(store.CategoryStore); !ok {
-		t.Fatal("sqlite store lost the CategoryStore seam")
 	}
 }

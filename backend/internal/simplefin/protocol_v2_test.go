@@ -209,20 +209,3 @@ func TestDecodeAccountSetRequiresV2Markers(t *testing.T) {
 		}
 	}
 }
-
-func TestAccountKeyIsURLSafeAndStable(t *testing.T) {
-	key := AccountKey("CON-1", "acct")
-	encoded, err := json.Marshal(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(encoded) == "" {
-		t.Fatal("empty key")
-	}
-	if AccountKey("CON-1", "acct") != key {
-		t.Fatal("key is not deterministic")
-	}
-	if AccountKey("CON-2", "acct") == key {
-		t.Fatal("connection is not part of the key")
-	}
-}

@@ -33,16 +33,3 @@ func TestProvisionsCarryConnectionInstitution(t *testing.T) {
 		t.Errorf("name changed = %q, want bridge name verbatim", provisions[0].Name)
 	}
 }
-
-func TestFirstSyncStoresInstitutionOnLink(t *testing.T) {
-	// Covered end-to-end by TestFirstSyncImportsCheckpointAndSettledTogether
-	// once account_links carries institution; direct unit check of the
-	// provision path lives in TestProvisionsCarryConnectionInstitution.
-	provisions := bridgeAdapter{}.Provisions(&AccountSet{
-		Connections: []Connection{{ConnID: "C1", OrgName: "Chase"}},
-		Accounts:    []Account{{ID: "a1", ConnID: "C1", Name: "Checking"}},
-	})
-	if len(provisions) != 1 || provisions[0].Institution != "Chase" {
-		t.Fatalf("provisions = %+v, want one Chase account", provisions)
-	}
-}

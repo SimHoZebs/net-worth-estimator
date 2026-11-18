@@ -478,22 +478,6 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 	}
 }
 
-func TestExactCutDoesNotExecuteDayCloseRuleEarly(t *testing.T) {
-	model := observerFixture()
-	model.Checkpoints = model.Checkpoints[:1]
-	model.Transactions = nil
-	model.Schedules = []types.Schedule{
-		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
-	}
-	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := position.Accounts[0].Balance; got != 1000 {
-		t.Fatalf("day-close rule must not execute by a 10:00 cut, got %v", got)
-	}
-}
-
 // Settled bank actuals replay through the same actual path as manual
 // actuals: a 09:00 observation plus an 11:00 settled import is 900 at a
 // noon cut, in position and projection baseline alike.

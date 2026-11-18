@@ -253,41 +253,6 @@ func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	}
 }
 
-func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
-	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
-	applyDirectives(t, database, []BankDirective{{Upsert: &BankUpsert{
-		Transaction: bankSeedTransaction("Pending", "prime_card", "10", true),
-		Keys:        bankKeys(ProviderSimpleFIN, "bridge-prime", "pend1"),
-	}}})
-	loaded, err := database.LoadModel()
-	if err != nil || len(loaded.Transactions) != 1 {
-		t.Fatal("seed missing")
-	}
-	id := loaded.Transactions[0].ID
-	settled := bankSeedTransaction("Settled", "prime_card", "10", false)
-	summary := applyDirectives(t, database, []BankDirective{{Convert: &BankConvert{
-		ID:          id,
-		Transaction: settled,
-		AddKeys:     bankKeys(ProviderSimpleFIN, "bridge-prime", "post1"),
-	}}})
-	if summary.SettledConverted != 1 {
-		t.Fatalf("convert = %+v", summary)
-	}
-	after, err := database.LoadModel()
-	if err != nil || len(after.Transactions) != 1 {
-		t.Fatal("convert changed row count")
-	}
-	row := after.Transactions[0]
-	if row.ID != id || row.Name != "Settled" || row.Pending || row.Source != SourceBankSync || !row.Enabled {
-		t.Fatalf("converted row = %+v", row)
-	}
-	rows, err := database.LoadBankTransactions()
-	if err != nil || len(rows) != 1 || len(rows[0].Keys) != 1 || rows[0].Keys[0].TransactionID != "post1" {
-		t.Fatalf("keys after rotation = %+v, %v", rows, err)
-	}
-}
-
 func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
@@ -369,8 +334,18 @@ func TestDeleteOwnerTransactionSuppressesNothing(t *testing.T) {
 	if err := database.DeleteTransaction(created.ID); err != nil {
 		t.Fatalf("delete = %v", err)
 	}
-	if got := countRows(t, database, "suppressed_sync_keys", ""); got != 0 {
-		t.Fatalf("owner delete suppressed %d keys", got)
+	// Deleting an owner-authored row records no bank-key suppression: a
+	// fresh bank delivery with its own key must still import normally.
+	imported := applyDirectives(t, database, []BankDirective{bankUpsertDirective(
+		bankSeedTransaction("Bank after owner delete", "prime_card", "10", true),
+		ProviderSimpleFIN, "bridge-prime", "pend-owner-delete",
+	)})
+	if imported.PendingInserted != 1 {
+		t.Fatalf("bank import after owner delete = %+v", imported)
+	}
+	model, err := database.LoadModel()
+	if err != nil || len(model.Transactions) != 1 || model.Transactions[0].Name != "Bank after owner delete" {
+		t.Fatalf("model after owner delete = %+v, err %v", model, err)
 	}
 }
 

@@ -1,14 +1,15 @@
 package domain
 
 import (
+	"math"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// TestMathRoundRoundingContract pins the rounding contract: halves round toward
-// +Infinity.
-func TestMathRoundRoundingContract(t *testing.T) {
+// TestRoundSampleValueRoundingContract pins the rounding contract callers
+// observe on reported net-worth samples: halves round toward +Infinity.
+func TestRoundSampleValueRoundingContract(t *testing.T) {
 	cases := []struct {
 		input    float64
 		expected float64
@@ -22,30 +23,24 @@ func TestMathRoundRoundingContract(t *testing.T) {
 		{0, 0},
 	}
 	for _, c := range cases {
-		if got := mathRound(c.input); got != c.expected {
-			t.Errorf("mathRound(%v) = %v, want %v", c.input, got, c.expected)
+		if got := RoundSampleValue(c.input); got != c.expected {
+			t.Errorf("RoundSampleValue(%v) = %v, want %v", c.input, got, c.expected)
 		}
 	}
 }
 
-// TestLCGDeterministicSequence replays the fixed LCG sequence, including a
-// seed large enough to exceed exact-double products.
-func TestLCGDeterministicSequence(t *testing.T) {
-	lcg := newLCG(42)
-	expected := []float64{
-		0.5046903498026963,
-		0.17625009090465033,
-		0.15456239653498047,
-	}
-	for i, want := range expected {
-		if got := lcg.next(); got != want {
-			t.Errorf("lcg(42).next()[%d] = %v, want %v", i, got, want)
+// TestSeededSamplerDeterministicForLargeSeed pins the caller-visible contract
+// that a large seed yields finite, reproducible samples. The exact internal
+// recurrence is not observable and is left free to change.
+func TestSeededSamplerDeterministicForLargeSeed(t *testing.T) {
+	seed := int64(123456789012345)
+	first := NewStochasticSampler(&seed)
+	second := NewStochasticSampler(&seed)
+	for i := 0; i < 4; i++ {
+		a, b := first(0.05, 0.2), second(0.05, 0.2)
+		if math.IsNaN(a) || math.IsInf(a, 0) || a != b {
+			t.Fatalf("draw %d = %v / %v, want a finite reproducible value", i, a, b)
 		}
-	}
-
-	big := newLCG(123456789012345)
-	if got := big.next(); got != 0.789016724000227 {
-		t.Errorf("lcg(123456789012345).next() = %v, want 0.789016724000227", got)
 	}
 }
 

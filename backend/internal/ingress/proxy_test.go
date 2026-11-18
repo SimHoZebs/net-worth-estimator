@@ -90,11 +90,22 @@ func TestDirectDeploymentDoesNotTrustIngressHeaders(t *testing.T) {
 	r := httptest.NewRequest("GET", "http://internal.test/v1/auth/login", nil)
 	r.Header.Set(SecretHeader, testSecret)
 	r.Header.Set(OriginHeader, "https://app.test")
+	called := false
 	wrap(http.HandlerFunc(func(_ http.ResponseWriter, got *http.Request) {
-		if got != r || got.Host != "internal.test" {
-			t.Fatal("disabled ingress changed the request")
+		called = true
+		if got.Host != "internal.test" || got.URL.String() != r.URL.String() {
+			t.Fatal("disabled ingress changed the request target")
+		}
+		if got.Header.Get(SecretHeader) != testSecret || got.Header.Get(OriginHeader) != "https://app.test" {
+			t.Fatal("disabled ingress dropped or rewrote ingress headers")
 		}
 	})).ServeHTTP(httptest.NewRecorder(), r)
+	if !called {
+		t.Fatal("disabled ingress did not reach the application")
+	}
+	if r.Host != "internal.test" || r.Header.Get(SecretHeader) != testSecret {
+		t.Fatal("disabled ingress mutated the original request")
+	}
 }
 
 func TestProxyConfiguration(t *testing.T) {

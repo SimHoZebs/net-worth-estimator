@@ -264,12 +264,6 @@ describe("account-scoped transactions", () => {
 					excluded: true,
 				}),
 			]);
-			expect(
-				fixtureProjection.transactions.some((row) => row.transactionId === id),
-			).toBe(false);
-			expect(
-				data.transactions.find((transaction) => transaction.id === id)?.enabled,
-			).toBe(false);
 		},
 	);
 

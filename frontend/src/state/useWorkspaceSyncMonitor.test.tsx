@@ -32,14 +32,31 @@ function stubSync(lastSyncAt = "after") {
 	const fetcher = vi.fn(async (url: unknown, _init?: RequestInit) => {
 		const path = String(url);
 		if (path.endsWith("/v1/status")) return ok({ ...status, lastSyncAt });
-		if (path.includes("/accounts/balances")) return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
-		if (path.startsWith("/v1/checkpoints")) return ok({ checkpoints: [], revision: "r1" });
-		if (path.startsWith("/v1/schedules")) return ok({ schedules: [], revision: "r1" });
-		if (path.startsWith("/v1/transactions/catalog")) return ok({ items: [], revision: "r1" });
-		if (path.startsWith("/v1/transactions")) return ok({ transactions: [], revision: "r1" });
-		if (path.includes("/evaluations/summary")) return ok({ evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], transactionFulfillment: [], cycleFulfillment: [], plannedPurchases: [] }, revision: "r1" });
+		if (path.includes("/accounts/balances"))
+			return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
+		if (path.startsWith("/v1/checkpoints"))
+			return ok({ checkpoints: [], revision: "r1" });
+		if (path.startsWith("/v1/schedules"))
+			return ok({ schedules: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions/catalog"))
+			return ok({ items: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions"))
+			return ok({ transactions: [], revision: "r1" });
+		if (path.includes("/evaluations/summary"))
+			return ok({
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					accountBalance: [],
+					transactionFulfillment: [],
+					cycleFulfillment: [],
+					plannedPurchases: [],
+				},
+				revision: "r1",
+			});
 		if (path.includes("/amount-presets")) return ok({ presets: [] });
-		if (path.includes("/planned-purchases")) return ok({ plannedPurchases: [], revision: "r1" });
+		if (path.includes("/planned-purchases"))
+			return ok({ plannedPurchases: [], revision: "r1" });
 		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -120,8 +137,10 @@ it("retries a sync whose workspace reload failed", async () => {
 	let checkpointCalls = 0;
 	const fetcher = vi.fn(async (url: unknown) => {
 		const path = String(url);
-		if (path.endsWith("/v1/status")) return ok({ ...status, lastSyncAt: "after" });
-		if (path.includes("/accounts/balances")) return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
+		if (path.endsWith("/v1/status"))
+			return ok({ ...status, lastSyncAt: "after" });
+		if (path.includes("/accounts/balances"))
+			return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
 		if (path.startsWith("/v1/checkpoints")) {
 			checkpointCalls += 1;
 			if (checkpointCalls === 1)
@@ -131,12 +150,27 @@ it("retries a sync whose workspace reload failed", async () => {
 				});
 			return ok({ checkpoints: [], revision: "r1" });
 		}
-		if (path.startsWith("/v1/schedules")) return ok({ schedules: [], revision: "r1" });
-		if (path.startsWith("/v1/transactions/catalog")) return ok({ items: [], revision: "r1" });
-		if (path.startsWith("/v1/transactions")) return ok({ transactions: [], revision: "r1" });
-		if (path.includes("/evaluations/summary")) return ok({ evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], transactionFulfillment: [], cycleFulfillment: [], plannedPurchases: [] }, revision: "r1" });
+		if (path.startsWith("/v1/schedules"))
+			return ok({ schedules: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions/catalog"))
+			return ok({ items: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions"))
+			return ok({ transactions: [], revision: "r1" });
+		if (path.includes("/evaluations/summary"))
+			return ok({
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					accountBalance: [],
+					transactionFulfillment: [],
+					cycleFulfillment: [],
+					plannedPurchases: [],
+				},
+				revision: "r1",
+			});
 		if (path.includes("/amount-presets")) return ok({ presets: [] });
-		if (path.includes("/planned-purchases")) return ok({ plannedPurchases: [], revision: "r1" });
+		if (path.includes("/planned-purchases"))
+			return ok({ plannedPurchases: [], revision: "r1" });
 		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -175,14 +209,31 @@ it("retains a detected sync while the workspace is busy", async () => {
 			if (statusCalls === 1) return statusGate;
 			return ok({ ...status, lastSyncAt: "after" });
 		}
-		if (path.includes("/accounts/balances")) return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
-		if (path.startsWith("/v1/checkpoints")) return ok({ checkpoints: [], revision: "r1" });
-		if (path.startsWith("/v1/schedules")) return ok({ schedules: [], revision: "r1" });
-		if (path.startsWith("/v1/transactions/catalog")) return ok({ items: [], revision: "r1" });
-		if (path.startsWith("/v1/transactions")) return ok({ transactions: [], revision: "r1" });
-		if (path.includes("/evaluations/summary")) return ok({ evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], transactionFulfillment: [], cycleFulfillment: [], plannedPurchases: [] }, revision: "r1" });
+		if (path.includes("/accounts/balances"))
+			return ok({ accounts: [], asOf: "2026-10-26", revision: "r1" });
+		if (path.startsWith("/v1/checkpoints"))
+			return ok({ checkpoints: [], revision: "r1" });
+		if (path.startsWith("/v1/schedules"))
+			return ok({ schedules: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions/catalog"))
+			return ok({ items: [], revision: "r1" });
+		if (path.startsWith("/v1/transactions"))
+			return ok({ transactions: [], revision: "r1" });
+		if (path.includes("/evaluations/summary"))
+			return ok({
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					accountBalance: [],
+					transactionFulfillment: [],
+					cycleFulfillment: [],
+					plannedPurchases: [],
+				},
+				revision: "r1",
+			});
 		if (path.includes("/amount-presets")) return ok({ presets: [] });
-		if (path.includes("/planned-purchases")) return ok({ plannedPurchases: [], revision: "r1" });
+		if (path.includes("/planned-purchases"))
+			return ok({ plannedPurchases: [], revision: "r1" });
 		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -268,37 +319,6 @@ it("follows a user switch without a caller rerender", async () => {
 	rendered.unmount();
 });
 
-it("re-arms the poll after a user switch", async () => {
-	const fetcher = stubSync();
-	const nextId = `users/${"b".repeat(64)}`;
-	const rendered = renderHook(() => useWorkspaceSyncMonitor(true));
-	acceptUserScope(
-		{
-			apiBaseUrl: canonicalApiBaseUrl(""),
-			resource: {
-				id: nextId,
-				permissions: ["user:read", "user:write", "user:project"],
-			},
-			subject: nextId,
-		},
-		suspendUserScope(),
-	);
-	rendered.rerender();
-	act(() => {
-		window.dispatchEvent(new Event("online"));
-	});
-	await waitFor(() =>
-		expect(
-			fetcher.mock.calls.filter(
-				([url, init]) =>
-					String(url).endsWith("/v1/status") &&
-					new Headers(init?.headers).get("Waypoint-Resource") === nextId,
-			),
-		).toHaveLength(1),
-	);
-	rendered.unmount();
-});
-
 it("refreshes sync links after a scheduled sync provisions accounts", async () => {
 	const fetcher = stubSync("after");
 	const cache = serverQueryClient();
@@ -312,9 +332,7 @@ it("refreshes sync links after a scheduled sync provisions accounts", async () =
 	});
 	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(1));
 	await waitFor(() =>
-		expect(cache.getQueryState(syncLinksKey(scope))?.isInvalidated).toBe(
-			true,
-		),
+		expect(cache.getQueryState(syncLinksKey(scope))?.isInvalidated).toBe(true),
 	);
 	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
 });

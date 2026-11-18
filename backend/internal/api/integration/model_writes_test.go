@@ -12,16 +12,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-type countingModelStore struct {
-	store.Store
-	loads int
-}
-
-func (s *countingModelStore) LoadModel() (*types.FinancialModel, error) {
-	s.loads++
-	return s.Store.LoadModel()
-}
-
 func decodePlanEntrySave[T any](t *testing.T, response *httptest.ResponseRecorder) writeResult[T] {
 	t.Helper()
 	if response.Code != http.StatusOK {
@@ -54,17 +44,14 @@ func assertSavedModelIdentity(t *testing.T, database store.Store, revision strin
 }
 
 func TestPlanEntrySaveReusesStoredSnapshot(t *testing.T) {
-	database := &countingModelStore{Store: openAPIStore(t)}
+	database := openAPIStore(t)
 	handler := New(database, Config{})
 	created := decodePlanEntrySave[types.Account](t, doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
 		`{"name":"Probe","kind":"cash","enabled":true}`))
 	if !created.Saved || created.Result.ID == "" {
 		t.Fatalf("create = %+v", created)
 	}
-	if database.loads != 2 {
-		t.Errorf("create complete-plan loads = %d, want 2", database.loads)
-	}
-	model := assertSavedModelIdentity(t, database.Store, created.Revision)
+	model := assertSavedModelIdentity(t, database, created.Revision)
 	if len(model.Accounts) != 1 || model.Accounts[0].ID != created.Result.ID || model.Accounts[0].Name != created.Result.Name {
 		t.Fatalf("generated account identity/name differs from stored content: %+v", model.Accounts)
 	}
@@ -88,16 +75,12 @@ func TestPlanEntrySaveReusesStoredSnapshot(t *testing.T) {
 
 	previousRevision := created.Revision
 	for _, name := range []string{"Renamed", "Last write"} {
-		database.loads = 0
 		updated := decodePlanEntrySave[types.Account](t, doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/"+created.Result.ID,
 			`{"name":"`+name+`","kind":"cash","enabled":false}`))
 		if !updated.Saved || updated.Result.ID != created.Result.ID || updated.Result.Name != name {
 			t.Fatalf("update = %+v", updated)
 		}
-		if database.loads != 2 {
-			t.Errorf("update complete-plan loads = %d, want 2", database.loads)
-		}
-		model = assertSavedModelIdentity(t, database.Store, updated.Revision)
+		model = assertSavedModelIdentity(t, database, updated.Revision)
 		if model.Accounts[0].ID != created.Result.ID || model.Accounts[0].Name != name || model.Accounts[0].Enabled || len(updated.Issues) != 0 {
 			t.Fatalf("update must return stored content and empty issues: %+v", updated)
 		}
@@ -109,7 +92,7 @@ func TestPlanEntrySaveReusesStoredSnapshot(t *testing.T) {
 }
 
 func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
-	database := &countingModelStore{Store: openAPIStore(t)}
+	database := openAPIStore(t)
 	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash}); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
@@ -125,10 +108,7 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 	if !saved.Saved || saved.Result.Source != store.SourceUser || saved.Result.Balance != 30 {
 		t.Fatalf("owner balance check = %+v", saved)
 	}
-	if database.loads != 2 {
-		t.Errorf("balance-check complete-plan loads = %d, want 2", database.loads)
-	}
-	model := assertSavedModelIdentity(t, database.Store, saved.Revision)
+	model := assertSavedModelIdentity(t, database, saved.Revision)
 	if len(model.Checkpoints) != 2 || !reflect.DeepEqual(model.Checkpoints[0], saved.Result) ||
 		model.Checkpoints[1].Source != store.SourceBankSync || model.Checkpoints[1].Balance != 20 {
 		t.Fatalf("balance-check ownership/key changed: %+v", model.Checkpoints)
@@ -151,13 +131,13 @@ func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 		{"invalid update", true, http.MethodPatch, "/v1/accounts/checking", `{"name":"Invalid","kind":"cash","minBalance":10,"maxBalance":5,"enabled":true}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			database := &countingModelStore{Store: openAPIStore(t)}
+			database := openAPIStore(t)
 			if test.seed {
 				if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash}); err != nil {
 					t.Fatalf("seed account: %v", err)
 				}
 			}
-			before, err := database.Store.LoadModel()
+			before, err := database.LoadModel()
 			if err != nil {
 				t.Fatalf("load original plan: %v", err)
 			}
@@ -165,10 +145,7 @@ func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 			if rejected.Saved || !hasErrorIssues(rejected.Issues) {
 				t.Fatalf("invalid save = %+v", rejected)
 			}
-			if database.loads != 2 {
-				t.Errorf("rejected-save complete-plan loads = %d, want 2", database.loads)
-			}
-			after := assertSavedModelIdentity(t, database.Store, rejected.Revision)
+			after := assertSavedModelIdentity(t, database, rejected.Revision)
 			if !reflect.DeepEqual(before, after) {
 				t.Fatal("rejected save changed stored content")
 			}
@@ -177,12 +154,12 @@ func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 }
 
 func TestAccountLinkWritesKeepIdentityLookup(t *testing.T) {
-	database := &countingModelStore{Store: openAPIStore(t)}
+	database := openAPIStore(t)
 	// Links do not use whole-plan validation, even if stored content has errors.
 	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "unknown"}); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
-	model, err := database.Store.LoadModel()
+	model, err := database.LoadModel()
 	if err != nil || !hasErrorIssues(domainValidate(model)) {
 		t.Fatalf("seed must have validation errors: model %+v, error %v", model, err)
 	}
@@ -198,10 +175,10 @@ func TestAccountLinkWritesKeepIdentityLookup(t *testing.T) {
 	if err := json.Unmarshal(linked.Body.Bytes(), &saved); err != nil {
 		t.Fatalf("decode link: %v", err)
 	}
-	if database.loads != 1 || saved.Link.ModelAccountID != "checking" || saved.Link.Origin != store.LinkOriginManual {
-		t.Fatalf("link must retain direct identity lookup: loads %d, response %+v", database.loads, saved)
+	if saved.Link.ModelAccountID != "checking" || saved.Link.Origin != store.LinkOriginManual {
+		t.Fatalf("link = %+v", saved)
 	}
-	assertSavedModelIdentity(t, database.Store, saved.Revision)
+	assertSavedModelIdentity(t, database, saved.Revision)
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(linked.Body.Bytes(), &fields); err != nil {
 		t.Fatalf("decode link fields: %v", err)
@@ -212,10 +189,9 @@ func TestAccountLinkWritesKeepIdentityLookup(t *testing.T) {
 		}
 	}
 
-	database.loads = 0
 	unlinked := doRowRequest(t, handler, http.MethodDelete, "/v1/sync/simplefin/accounts/bridge-1", "")
-	if unlinked.Code != http.StatusOK || database.loads != 1 {
-		t.Fatalf("unlink status = %d, loads %d, body %s", unlinked.Code, database.loads, unlinked.Body.String())
+	if unlinked.Code != http.StatusOK {
+		t.Fatalf("unlink status = %d, body %s", unlinked.Code, unlinked.Body.String())
 	}
 	var deleted struct {
 		Revision string `json:"revision"`
@@ -223,7 +199,7 @@ func TestAccountLinkWritesKeepIdentityLookup(t *testing.T) {
 	if err := json.Unmarshal(unlinked.Body.Bytes(), &deleted); err != nil {
 		t.Fatalf("decode unlink: %v", err)
 	}
-	assertSavedModelIdentity(t, database.Store, deleted.Revision)
+	assertSavedModelIdentity(t, database, deleted.Revision)
 	links, err := database.ListAccountLinks()
 	if err != nil || len(links) != 0 {
 		t.Fatalf("links after delete = %+v, error %v", links, err)

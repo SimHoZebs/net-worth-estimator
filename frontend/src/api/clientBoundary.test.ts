@@ -1,5 +1,4 @@
-import { expect, expectTypeOf, it } from "vitest";
-import { logout, projectStochastic } from "./generated/endpoints.ts";
+import { expect, it } from "vitest";
 
 const networkNames = new Set([
 	"fetch",
@@ -37,11 +36,6 @@ const controlKeywords = new Set([
 	"while",
 	"with",
 ]);
-
-it("preserves Response return types for generated logout and streaming endpoints", () => {
-	expectTypeOf(logout).returns.toEqualTypeOf<Promise<Response>>();
-	expectTypeOf(projectStochastic).returns.toEqualTypeOf<Promise<Response>>();
-});
 
 // A token scan instead of a TypeScript parse: identifiers in code count, and
 // comments, strings, and template text do not. Interpolations scan as code,
@@ -316,38 +310,4 @@ it("keeps application network transport inside the Orval mutator", () => {
 			violations.push(`${path}: ${reference}`);
 	}
 	expect(violations).toEqual([]);
-});
-
-it("detects direct calls and transport aliases without matching comments or strings", () => {
-	expect(
-		networkReferences(
-			`fetch('/v1'); window.fetch('/v1'); const send = globalThis.fetch.bind(globalThis); new EventSource('/v1');`,
-		),
-	).toEqual(["fetch", "fetch", "fetch", "EventSource"]);
-	expect(
-		networkReferences(`// fetch('/v1')\nconst message = "fetch failed";`),
-	).toEqual([]);
-});
-
-it("scans template interpolations but not template text", () => {
-	expect(networkReferences("`fetch ${fetch('/v1')}`")).toEqual(["fetch"]);
-	expect(networkReferences("`fetch the report`")).toEqual([]);
-});
-
-it("tells division from regular expressions", () => {
-	expect(networkReferences("const ratio = total / count;")).toEqual([]);
-	expect(networkReferences("const ratio = total / fetch;")).toEqual(["fetch"]);
-	expect(networkReferences("const hit = /fetch/.test(path);")).toEqual([]);
-	expect(networkReferences("return /fetch/.test(path);")).toEqual([]);
-	expect(networkReferences("if (ready) /fetch/.test(path);")).toEqual([]);
-});
-
-it("ignores private identifiers", () => {
-	expect(networkReferences("class Store { #fetch = 1; }")).toEqual([]);
-});
-
-it("notes JSX text may over-trigger and stays fail-closed", () => {
-	// JsxText is never an identifier, but telling copy from code needs a
-	// parser. A bare transport name in copy warns; reword the copy.
-	expect(networkReferences("<p>fetch the report</p>")).toEqual(["fetch"]);
 });

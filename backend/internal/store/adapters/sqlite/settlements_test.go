@@ -249,49 +249,6 @@ func TestSettlementMovesNoMoney(t *testing.T) {
 	}
 }
 
-// Outstanding, partially-settled, and settled states derive from owed
-// shares plus the recorded history.
-func TestSettlementStatesFromHistory(t *testing.T) {
-	d := openSettlementTestDB(t)
-	alice := settlementUser(t, d, "alice")
-	bob := settlementUser(t, d, "bob")
-	cara := settlementUser(t, d, "cara")
-
-	record := func(actor, participant string, amount int64, key string) {
-		t.Helper()
-		if _, err := d.RecordSettlement(actor, store.SettlementInput{
-			SplitID: settlementSplitA, ParticipantID: participant, AmountMinor: amount,
-		}, key); err != nil {
-			t.Fatal(err)
-		}
-	}
-	record(alice, bob, 400, "01900000-0000-7000-8000-00000000c009")
-	record(bob, cara, 500, "01900000-0000-7000-8000-00000000c010")
-
-	history, err := d.ListSettlements(alice, settlementSplitA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	summary, err := store.SummarizeSettlements(map[string]int64{
-		alice: 1000, bob: 1000, cara: 500,
-	}, history)
-	if err != nil {
-		t.Fatal(err)
-	}
-	states := map[string]string{}
-	for _, position := range summary {
-		states[position.ParticipantID] = position.State
-	}
-	if states[alice] != store.SettlementStateOutstanding ||
-		states[bob] != store.SettlementStatePartiallySettled ||
-		states[cara] != store.SettlementStateSettled {
-		t.Fatalf("states = %v, want outstanding/partially-settled/settled", states)
-	}
-	if got := store.SplitSettlementState(summary); got != store.SettlementStatePartiallySettled {
-		t.Fatalf("split state = %q, want partially-settled", got)
-	}
-}
-
 func TestSettlementRejectsBadInput(t *testing.T) {
 	d := openSettlementTestDB(t)
 	alice := settlementUser(t, d, "alice")

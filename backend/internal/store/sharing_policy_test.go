@@ -30,12 +30,14 @@ func policyFixtureTransaction(source string, destinations []string, txnTime int6
 }
 
 func TestNormalizeSharingPolicyInputDefaults(t *testing.T) {
+	before := time.Now().UTC().Format("2006-01-02")
 	out, err := NormalizeSharingPolicyInput(SharingPolicyInput{Enabled: false})
+	after := time.Now().UTC().Format("2006-01-02")
 	if err != nil {
 		t.Fatalf("normalize disabled empty: %v", err)
 	}
-	if out.StartDate != DefaultSharingStartDate() {
-		t.Fatalf("start = %q, want setup-day default %q", out.StartDate, DefaultSharingStartDate())
+	if out.StartDate != before && out.StartDate != after {
+		t.Fatalf("start = %q, want setup day %q or %q", out.StartDate, before, after)
 	}
 	if out.EndDate != "" {
 		t.Fatalf("end = %q, want open", out.EndDate)

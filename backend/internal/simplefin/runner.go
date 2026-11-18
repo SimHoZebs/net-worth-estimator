@@ -205,17 +205,6 @@ func (r *Runner) BridgeHost() string {
 	return BridgeHost(accessURL)
 }
 
-// effectiveCards returns the credential-provided per-plan card set.
-func (r *Runner) effectiveCards() map[string]struct{} {
-	merged := map[string]struct{}{}
-	if _, cards := r.resolveCredential(); cards != nil {
-		for id := range cards {
-			merged[id] = struct{}{}
-		}
-	}
-	return merged
-}
-
 // Sync runs fetch, link resolution, provisioning, map, and apply.
 // Scheduler and first-live-run flows call it directly; manual triggers go
 // through Trigger for interval guarding. Sync shares the singleflight guard

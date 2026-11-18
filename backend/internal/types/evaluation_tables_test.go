@@ -5,23 +5,34 @@ import (
 	"testing"
 )
 
-func TestEvaluationTablesShareStableTypeOrder(t *testing.T) {
+func TestEvaluationTablesWireContract(t *testing.T) {
 	var configs EvaluationTables
 	var results EvaluationResultTables
-	configTables, resultTables := configs.Tables(), results.Tables()
+
+	// Tables() exposes pointers into the typed JSON fields so generic runtime
+	// code can append rows that are later serialized. Writing through those
+	// pointers must reach the typed fields, and the type order must agree with
+	// the order the API and persistence layers use.
 	var names []string
-	for index, table := range configTables {
+	for _, table := range configs.Tables() {
 		names = append(names, table.Type)
-		if table.Type != resultTables[index].Type || table.Rows != configs.ByType(table.Type) {
-			t.Fatalf("table mismatch for %s", table.Type)
-		}
 		*table.Rows = append(*table.Rows, EvaluationInstance[JsonValue]{InstanceID: table.Type})
-		*resultTables[index].Rows = append(*resultTables[index].Rows, EvaluationResultEnvelope{InstanceID: table.Type})
+		if rows := configs.ByType(table.Type); rows == nil || len(*rows) != 1 || (*rows)[0].InstanceID != table.Type {
+			t.Fatalf("configs.ByType(%q) = %v after write, want the appended row", table.Type, rows)
+		}
 	}
-	if !reflect.DeepEqual(names, EvaluationTypeOrder) || configs.ByType("unknown") != nil {
-		t.Fatalf("table order = %v", names)
+	for _, table := range results.Tables() {
+		*table.Rows = append(*table.Rows, EvaluationResultEnvelope{InstanceID: table.Type})
 	}
-	if configs.PlannedPurchases[0].InstanceID != EvaluationTypePlannedPurchases || results.PlannedPurchases[0].InstanceID != EvaluationTypePlannedPurchases {
+
+	if !reflect.DeepEqual(names, EvaluationTypeOrder) {
+		t.Fatalf("table order = %v, want %v", names, EvaluationTypeOrder)
+	}
+	if configs.ByType("unknown") != nil {
+		t.Fatal("configs.ByType(unknown) = non-nil, want nil")
+	}
+	if configs.PlannedPurchases[0].InstanceID != EvaluationTypePlannedPurchases ||
+		results.PlannedPurchases[0].InstanceID != EvaluationTypePlannedPurchases {
 		t.Fatal("table writes did not reach typed fields")
 	}
 }

@@ -136,11 +136,31 @@ func TestSettleProfiles(t *testing.T) {
 }
 
 func TestFloorProfileAcceptsAuthAsFloor(t *testing.T) {
-	profile := settleProfiles.Profiles["floor"]
-	if !profile.allowsAmount(100, 4500) {
-		t.Fatal("floor profile rejected a $1 auth transaction $45")
+	// A tiny fuel authorization posts at a much larger amount and still
+	// settles the hold in place. A posted amount below the auth's tolerance
+	// must not settle it.
+	tests := []struct {
+		name        string
+		authAmount  string
+		posted      string
+		wantConvert bool
+	}{
+		{"auth far below posted", "1.00", "45.00", true},
+		{"posted below auth tolerance", "50.00", "40.00", false},
 	}
-	if profile.allowsAmount(5000, 4000) {
-		t.Fatal("floor profile accepted a posted amount below the auth tolerance")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			bank := []store.BankRow{reconcileBankRow("uuid-pending", "SHELL OIL 1234", "prime_card", test.authAmount, true, false,
+				pendingKey("prime_card", "old-auth"))}
+			settled := []store.SyncTransaction{reconcileTransaction("SHELL OIL 1234", "prime_card", test.posted, false, 1785715200)}
+			directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+			_, converts, _ := directivesByAction(directives)
+			if test.wantConvert && converts != 1 {
+				t.Fatalf("directives = %+v, want one convert", directives)
+			}
+			if !test.wantConvert && converts != 0 {
+				t.Fatalf("directives = %+v, want no convert", directives)
+			}
+		})
 	}
 }

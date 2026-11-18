@@ -263,41 +263,12 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	}
 }
 
-// Invite codes are stored hashed only; no plaintext code column exists.
+// Invite codes are stored as hashes: the plaintext code returned to the
+// creator never persists, yet it still redeems through AcceptInvite.
 func TestGroupsInviteCodesAreHashed(t *testing.T) {
 	d := openGroupTestDB(t)
 	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
-	rows, err := d.SQL().Query(`PRAGMA table_info(group_invites)`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	var names []string
-	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notNull, pk int
-		var dflt any
-		if err := rows.Scan(&cid, &name, &ctype, &notNull, &dflt, &pk); err != nil {
-			t.Fatal(err)
-		}
-		names = append(names, name)
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, name := range names {
-		if name == "code" {
-			t.Fatal("group_invites stores a plaintext code column")
-		}
-		if name == "code_hash" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatal("group_invites lacks code_hash")
-	}
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
 	invite, code, err := d.CreateInvite(mustGroup(t, d, alice).ID, alice, 1, 24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
@@ -311,6 +282,10 @@ func TestGroupsInviteCodesAreHashed(t *testing.T) {
 	}
 	if stored == "" {
 		t.Fatal("empty code_hash")
+	}
+	// Hashing is a storage detail; the caller-visible code still redeems.
+	if _, err := d.AcceptInvite(code, bob, "Bob"); err != nil {
+		t.Fatalf("accept with plaintext code: %v", err)
 	}
 }
 

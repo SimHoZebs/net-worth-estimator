@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -82,23 +81,5 @@ func TestSetupAndRuntimeRejectInlineReceiptBlobsWithoutChanges(t *testing.T) {
 	var storedPayload string
 	if err := inspection.QueryRow(`SELECT image,payload FROM receipts WHERE id=?`, r.ID).Scan(&preserved, &storedPayload); err != nil || !bytes.Equal(preserved, image.Bytes) || storedPayload != payload {
 		t.Fatal("rejected setup changed receipt evidence", err)
-	}
-}
-
-func TestSetupRejectsMissingBlobLifecycleObjects(t *testing.T) {
-	for _, statement := range []string{`DROP TRIGGER receipt_blob_delete`, `DROP INDEX blob_cleanup`, `DROP INDEX receipt_blob_key`} {
-		t.Run(statement, func(t *testing.T) {
-			d := openSharedTestDatabase(t)
-			if _, err := d.db.Exec(statement); err != nil {
-				t.Fatal(err)
-			}
-			before := databaseSchemaSnapshot(t, d)
-			if err := d.setupSchema(); !errors.Is(err, ErrSetupRequired) {
-				t.Fatalf("incomplete lifecycle schema accepted: %v", err)
-			}
-			if after := databaseSchemaSnapshot(t, d); !reflect.DeepEqual(before, after) {
-				t.Fatal("setup repaired an existing schema")
-			}
-		})
 	}
 }

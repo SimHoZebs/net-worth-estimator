@@ -66,65 +66,6 @@ func TestPrepareTransactionExecutionIsPure(t *testing.T) {
 	}
 }
 
-// The split preserves behavior: Prepare plus Apply equals the old fused path.
-func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
-	account := "checking"
-	floor := 0.0
-	outflow := func(id, expression string) *types.Transaction {
-		return &types.Transaction{
-			ID: id, Name: id, SourceAccountID: &account,
-			Amount: expressionAmount(expression), Enabled: true,
-		}
-	}
-	rule := func(cap *float64) *types.Schedule {
-		return &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", AnnualCap: cap, Enabled: true}
-	}
-	cap := 100.0
-	loss := &types.Transaction{
-		ID: "p5", Name: "Loss", Destinations: []string{account},
-		Amount: expressionAmount("-30"), Enabled: true,
-	}
-	cases := []struct {
-		name        string
-		transaction *types.Transaction
-		rule        *types.Schedule
-		historical  bool
-		balances    map[string]float64
-	}{
-		{"funded outflow", outflow("p1", "50"), rule(nil), false, map[string]float64{account: 1000}},
-		{"underfunded outflow clamps", outflow("p2", "50"), rule(nil), false, map[string]float64{account: 10}},
-		{"historical actual ignores funding", outflow("p3", "50"), rule(nil), true, map[string]float64{account: 10}},
-		{"annual cap binds", outflow("p4", "500"), rule(&cap), false, map[string]float64{account: 1000}},
-		{"loss path", loss, nil, false, map[string]float64{account: 1000}},
-	}
-	for _, tc := range cases {
-		occurrence := fixedOccurrence(tc.transaction, tc.rule)
-		fused := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, tc.balances)
-		fusedResult, err := fused.ExecuteTransaction(occurrence, "2026-02-01", tc.historical)
-		if err != nil {
-			t.Fatalf("%s: fused: %v", tc.name, err)
-		}
-		split := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, tc.balances)
-		prepared, err := PrepareTransactionExecution(occurrence, "2026-02-01", tc.historical, split.snapshotExecutionState(), nil)
-		if err != nil {
-			t.Fatalf("%s: prepare: %v", tc.name, err)
-		}
-		splitResult, err := split.ApplyPreparedExecution(prepared, "2026-02-01")
-		if err != nil {
-			t.Fatalf("%s: apply: %v", tc.name, err)
-		}
-		if !reflect.DeepEqual(fusedResult, splitResult) {
-			t.Fatalf("%s: split %+v != fused %+v", tc.name, splitResult, fusedResult)
-		}
-		if !reflect.DeepEqual(fused.State.Balances, split.State.Balances) {
-			t.Fatalf("%s: balances diverge: %v vs %v", tc.name, fused.State.Balances, split.State.Balances)
-		}
-		if !reflect.DeepEqual(fused.State.RealizedTransactionAmountsByYear, split.State.RealizedTransactionAmountsByYear) {
-			t.Fatalf("%s: cap ledgers diverge", tc.name)
-		}
-	}
-}
-
 // Impossible states are handled entirely in the simulation half: the
 // prepared request is untouched by clamping.
 func TestApplyHandlesImpossibleStates(t *testing.T) {

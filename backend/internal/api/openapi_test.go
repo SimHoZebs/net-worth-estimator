@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,16 +10,7 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humachi"
-	"github.com/go-chi/chi/v5"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
-
-type evaluationInstanceOutput struct {
-	Body struct {
-		Items []types.EvaluationInstance[types.JsonValue] `json:"items"`
-	}
-}
 
 func TestServedOpenAPIMatchesSnapshot(t *testing.T) {
 	response := httptest.NewRecorder()
@@ -141,38 +131,6 @@ func TestStochasticStreamDocumentsHumaErrors(t *testing.T) {
 	if operation.OperationID != "project-stochastic" || operation.Responses["200"].Content["text/event-stream"] == nil || operation.Responses["default"].Content["application/problem+json"] == nil {
 		t.Fatalf("stream is not a documented Huma operation: %+v", operation)
 	}
-}
-
-func TestWaypointSchemaNamerKeepsRegistryGeneratorSafe(t *testing.T) {
-	router := chi.NewRouter()
-	config := huma.DefaultConfig("Test API", "1.0.0")
-	if config.Components == nil {
-		config.Components = &huma.Components{}
-	}
-	config.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", waypointSchemaNamer)
-	api := humachi.New(router, config)
-	huma.Register(api, huma.Operation{
-		OperationID: "test-evaluations",
-		Method:      http.MethodGet,
-		Path:        "/v1/test-evaluations",
-	}, func(context.Context, *struct{}) (*evaluationInstanceOutput, error) {
-		return nil, nil
-	})
-	spec := api.OpenAPI()
-	if _, ok := spec.Components.Schemas.Map()["EvaluationInstanceInterface"]; !ok {
-		t.Fatalf("expected sanitized EvaluationInstanceInterface schema, got %v", schemaKeys(spec))
-	}
-	if err := checkOpenAPIComponentKeys(spec); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func schemaKeys(spec *huma.OpenAPI) []string {
-	names := make([]string, 0, len(spec.Components.Schemas.Map()))
-	for key := range spec.Components.Schemas.Map() {
-		names = append(names, key)
-	}
-	return names
 }
 
 func TestServedSpecKeysAreGeneratorSafe(t *testing.T) {

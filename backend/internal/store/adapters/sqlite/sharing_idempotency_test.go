@@ -322,7 +322,7 @@ func TestSharingDoubleAcceptRaceConverges(t *testing.T) {
 	}
 }
 
-func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
+func TestSharingAcceptRecordsCurrentRevisionAfterOwnerEdit(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
@@ -339,14 +339,6 @@ func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
 	if _, err := storeA.UpdateTransaction(edited); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.verifySharingSourceCurrent(alice, sharingTransactionA, bob, snapshot); !errors.Is(err, store.ErrSharingConflict) {
-		t.Fatalf("stale verify = %v, want conflict", err)
-	}
-	current, err := store.SharingSourceRevision(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = current
 	live, err := d.ReadSharedTransaction(alice, sharingTransactionA, bob)
 	if err != nil {
 		t.Fatal(err)
@@ -356,10 +348,7 @@ func TestSharingAcceptFailsOnStaleRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	if liveRevision == snapshot {
-		t.Fatalf("owner edit did not move the source revision")
-	}
-	if _, err := d.verifySharingSourceCurrent(alice, sharingTransactionA, bob, liveRevision); err != nil {
-		t.Fatalf("current verify = %v, want nil", err)
+		t.Fatal("owner edit did not move the source revision")
 	}
 	copied, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, sharingKey(t))
 	if err != nil {

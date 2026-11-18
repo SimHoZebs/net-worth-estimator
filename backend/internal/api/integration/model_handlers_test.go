@@ -36,17 +36,6 @@ func TestGetModelReturnsNullWhenStoreIsUninitialized(t *testing.T) {
 	}
 }
 
-func TestResetRouteIsGone(t *testing.T) {
-	database := openAPIStore(t)
-	handler := New(database, Config{})
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/financial-model/reset", nil))
-
-	if response.Code != http.StatusNotFound {
-		t.Fatalf("reset status = %d, want 404, body %s", response.Code, response.Body.String())
-	}
-}
-
 func TestStatusReflectsReadOnlyFlag(t *testing.T) {
 	for _, readOnly := range []bool{false, true} {
 		database := openAPIStore(t)

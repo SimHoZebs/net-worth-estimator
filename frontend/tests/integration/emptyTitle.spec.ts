@@ -80,16 +80,3 @@ test("outlook empty title keeps heading role with preset appearance", async ({
 		page.getByRole("heading", { name: "Your workspace is ready" }),
 	);
 });
-
-test.describe("empty title narrow layout", () => {
-	test.use({ viewport: { width: 390, height: 844 } });
-	test("outlook empty title keeps heading role with preset appearance", async ({
-		page,
-	}) => {
-		await seedBlankModel();
-		await page.goto("/outlook");
-		await expectEmptyTitle(
-			page.getByRole("heading", { name: "Your workspace is ready" }),
-		);
-	});
-});

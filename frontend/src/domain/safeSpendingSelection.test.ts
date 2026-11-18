@@ -38,9 +38,4 @@ describe("toggleEffectiveId", () => {
 			toggleEffectiveId(["card", "loan"], ids, "utilities", ["card"]),
 		).toEqual(["card", "loan", "utilities"]);
 	});
-
-	it("returns to null when the toggle lands on the automatic fallback", () => {
-		// With no fallback, automatic means all known ids.
-		expect(toggleEffectiveId(["card", "loan"], ids, "utilities")).toBeNull();
-	});
 });

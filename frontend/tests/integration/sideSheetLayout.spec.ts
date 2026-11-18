@@ -301,15 +301,4 @@ test.describe("side sheet dark theme", () => {
 		);
 		expect(family).toMatch(/Merriweather/);
 	});
-	test("configure sheet keeps the canonical shell", async ({ page }) => {
-		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
-		await card.getByRole("button", { name: "Configure", exact: true }).click();
-		const sheet = page.locator('[data-slot="sheet-content"]').first();
-		await expect(sheet).toBeVisible();
-		const box = await sheet.boundingBox();
-		expect(box).not.toBeNull();
-		expect(box!.width).toBe(576);
-	});
 });

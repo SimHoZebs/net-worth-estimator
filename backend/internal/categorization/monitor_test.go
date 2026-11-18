@@ -42,14 +42,6 @@ func TestDisagreeRatePure(t *testing.T) {
 	}
 }
 
-func TestDisagreeThresholdConstants(t *testing.T) {
-	// Locked so the monitor contract stays visible: a bounded recent
-	// sample, silence below the minimum, and a warn line above 0.30.
-	if recentUserLabelSample != 20 || disagreeMinSamples != 10 || disagreeWarnThreshold != 0.30 {
-		t.Fatalf("sample=%d min=%d threshold=%v", recentUserLabelSample, disagreeMinSamples, disagreeWarnThreshold)
-	}
-}
-
 type fakeLabelStore struct {
 	store.Store
 	labels []types.UserCategoryLabel

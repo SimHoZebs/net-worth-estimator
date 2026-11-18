@@ -4,7 +4,6 @@ import {
 	groupPaymentPatterns,
 	paymentLabel,
 	paymentStatus,
-	paymentTitle,
 } from "./paymentFindings.ts";
 
 describe("payment classifications", () => {
@@ -60,7 +59,7 @@ describe("payment classifications", () => {
 			]),
 		).toHaveLength(2);
 	});
-	it("uses repeating-style card status and titles", () => {
+	it("keeps assessment status distinct from review decisions", () => {
 		expect(paymentStatus(rent)).toBe("Needs review");
 		expect(
 			paymentStatus({
@@ -68,19 +67,5 @@ describe("payment classifications", () => {
 				review: { decision: "confirmed", provider: "acme", answeredAt: 1 },
 			}),
 		).toBe("Confirmed");
-		const [pattern] = groupPaymentPatterns([
-			{ ...rent, id: "one", transactionId: "a" },
-			{ ...rent, id: "two", transactionId: "b" },
-		]);
-		expect(
-			paymentTitle(
-				pattern!,
-				new Map([
-					["a", "Landlord"],
-					["b", "Landlord"],
-				]),
-			),
-		).toBe("Landlord");
-		expect(paymentTitle(pattern!, new Map())).toBe("Rent");
 	});
 });

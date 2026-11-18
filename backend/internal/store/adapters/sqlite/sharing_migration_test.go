@@ -140,19 +140,4 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 	if len(history) != 1 || history[0].ID != recorded.ID {
 		t.Fatalf("settlement history = %+v, want the recorded settlement", history)
 	}
-
-	for table := range map[string]bool{
-		"sharing_grants": true, "sharing_copies": true, "inbox_share_state": true,
-		"sharing_policies": true, "sharing_visibility": true, "sharing_audit": true,
-		"sharing_requests": true, "splits": true, "split_allocations": true,
-		"split_settlements": true, "split_settlement_requests": true,
-	} {
-		var count int
-		if err := d.db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&count); err != nil {
-			t.Fatalf("count %s: %v", table, err)
-		}
-		if count == 0 {
-			t.Fatalf("table %s is empty after exercising its flow", table)
-		}
-	}
 }

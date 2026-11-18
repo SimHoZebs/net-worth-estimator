@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"math"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -78,13 +77,14 @@ func TestOccurrenceRateRejectsBadArgs(t *testing.T) {
 
 func TestGrowthFactorCompoundsFromStartDate(t *testing.T) {
 	args := map[string]types.JsonValue{"annualGrowthRate": 0.02}
-	// 2026-02-01 to 2026-03-01 is 28 days: (1.02)^(28/365).
+	// 2026-02-01 to 2026-03-01 is 28 days; the closed-form factor for 2%
+	// annual compounding over that span is (1.02)^(28/365). The literal is
+	// an independent oracle rather than the production expression.
+	const want = 1.0015202600810846
 	value, err := amountProviders["growth-factor"].resolve(args, rateTestContext(1, "2026-02-01", nil))
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	days := float64(DaysBetween("2026-02-01", "2026-03-01"))
-	want := math.Pow(1.02, days/365)
 	if diff := value - want; diff < -1e-12 || diff > 1e-12 {
 		t.Fatalf("factor = %v, want %v", value, want)
 	}

@@ -145,9 +145,6 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("future checkpoints = %s, want 0", empty["checkpoints"])
 	}
 
-	for _, key := range []string{"accounts", "transactions", "items", "evaluations", "checkpoints"} {
-		_ = key
-	}
 	revisions := map[string]string{}
 	for _, path := range []string{
 		"/v1/accounts/balances?asOf=2026-02-01",

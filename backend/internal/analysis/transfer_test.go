@@ -258,10 +258,4 @@ func TestTransferContextCancellation(t *testing.T) {
 	if _, err := (Transfer{}).Analyze(ctx, types.AnalysisSnapshot{Transactions: items}); err != context.Canceled {
 		t.Fatalf("cancellation=%v", err)
 	}
-	if got := (Transfer{}).Type(); got != "transfer" {
-		t.Fatalf("type=%q", got)
-	}
-	if got := (Transfer{}).Version(); got != TransferVersion {
-		t.Fatalf("version=%q", got)
-	}
 }

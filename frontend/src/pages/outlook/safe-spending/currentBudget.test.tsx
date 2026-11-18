@@ -93,7 +93,7 @@ const input: CycleViewInput = {
 };
 
 describe("one cash-backed current spending budget", () => {
-	it("keeps positive cash-backed allowance without restoring a spending bar", () => {
+	it("renders a positive cash-backed allowance as exact dollars", () => {
 		const { view } = cycleView({
 			...input,
 			reserve: 0,
@@ -106,8 +106,6 @@ describe("one cash-backed current spending budget", () => {
 			}),
 		);
 		expect(html).toContain("$100.00");
-		expect(html).not.toContain('aria-label="Spent');
-		expect(html).not.toContain('role="img"');
 	});
 	it("reconciles cash, reserve, daily allowance, trend, and the exact second row", () => {
 		const { view, trend, ledger } = cycleView(input);
@@ -165,7 +163,6 @@ describe("one cash-backed current spending budget", () => {
 				'<tr data-spending-row="second-charge"><td>second-charge<small>Spending limit</small></td></tr>',
 			);
 			expect(html.match(/data-spending-row=/g)).toHaveLength(3);
-			expect(html).not.toContain('role="separator"');
 		},
 	);
 	it("does not cross at exact zero and crosses on the next cent", () => {
@@ -388,7 +385,7 @@ describe("monthly income comparison", () => {
 		expect(cashOnly.trend.limit).not.toBeNull();
 		expect(cashOnly.trend.monthlyIncome).toBeUndefined();
 	});
-	it("plots the expected monthly pay directly without a cycle offset", () => {
+	it("shows the income threshold at the expected monthly pay", () => {
 		const result = cycleView({
 			...input,
 			cycle: { start: "2026-10-20", end: "2026-11-19" },
@@ -405,10 +402,6 @@ describe("monthly income comparison", () => {
 		const markup = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, { trend: result.trend }),
 		);
-		expect(markup).not.toContain("monthly-income-offset");
-		expect(markup).not.toContain("monthly-income-value");
-		expect(markup).not.toContain("No received payments");
-		expect(markup).not.toContain("net spent before");
 		expect(markup).toContain("Income limit");
 	});
 	it("warns about monthly overspending with savings left, or low cash with sufficient income", () => {
@@ -600,7 +593,9 @@ describe("canonical recorded cash selection", () => {
 		expect(
 			expectedMonthlyIncome({ ...args, incomeScheduleIds: ["payroll"] }),
 		).toBe(7458.34);
-		expect(expectedMonthlyIncome({ ...args, incomeScheduleIds: [] })).toBeNull();
+		expect(
+			expectedMonthlyIncome({ ...args, incomeScheduleIds: [] }),
+		).toBeNull();
 		expect(
 			expectedMonthlyIncome({ ...args, incomeScheduleIds: ["missing"] }),
 		).toBeNull();
@@ -771,7 +766,11 @@ describe("canonical recorded cash selection", () => {
 			monthEnd: "2026-11-30",
 		});
 		expect(income).toBe(180);
-		const result = cycleView({ ...input, monthlyIncome: income, transactions: [] });
+		const result = cycleView({
+			...input,
+			monthlyIncome: income,
+			transactions: [],
+		});
 		expect(result.trend.monthlyIncome).toMatchObject({
 			amount: 180,
 			spent: 0,

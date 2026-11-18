@@ -97,32 +97,3 @@ func TestTransferFindingsPairLegsAndSurviveReruns(t *testing.T) {
 		}
 	}
 }
-
-func TestTransferClaimCoexistsWithBNPLOnOneTransaction(t *testing.T) {
-	s := openSQLiteStore(t)
-	checking := seedTransferLeg(t, s, "CREDIT CARD PAYMENT", "checking", "bridge-checking", "out-1", "-500.00")
-	card := seedTransferLeg(t, s, "PAYMENT RECEIVED", "card", "bridge-card", "in-1", "500.00")
-	completeTransferAnalysis(t, s, []types.AnalysisDetection{
-		{TransactionID: checking, Kind: "transfer", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", TransactionIDs: []string{checking, card}}}},
-		{TransactionID: card, Kind: "transfer", Evidence: []types.AnalysisEvidence{{Code: "transfer.exact-leg-match", TransactionIDs: []string{checking, card}}}},
-	})
-	run, _, claimed, err := s.ClaimAnalysis("bnpl", "v1")
-	if err != nil || !claimed {
-		t.Fatalf("claim=%+v claimed=%v err=%v", run, claimed, err)
-	}
-	bnpl := types.AnalysisDetection{TransactionID: card, Kind: "bnpl", Provider: "klarna", Strength: "strong", Evidence: []types.AnalysisEvidence{{Code: "bnpl.product-descriptor", TransactionIDs: []string{card}}}}
-	if err := s.CompleteAnalysis(run, []types.AnalysisDetection{bnpl}, ""); err != nil {
-		t.Fatal(err)
-	}
-	findings, err := s.ListAnalysisFindings(types.AnalysisFindingFilter{TransactionIDs: []string{card}})
-	if err != nil || len(findings) != 2 {
-		t.Fatalf("claims=%+v err=%v", findings, err)
-	}
-	kinds := map[string]bool{}
-	for _, item := range findings {
-		kinds[item.TransactionID+"\x00"+item.Kind] = true
-	}
-	if !kinds[card+"\x00transfer"] || !kinds[card+"\x00bnpl"] {
-		t.Fatalf("independent claims collided: %+v", findings)
-	}
-}

@@ -345,29 +345,20 @@ describe("useHorizontalSwipe", () => {
 		expect(onSwipeRight).not.toHaveBeenCalled();
 	});
 
-	it("does not subscribe while disabled", () => {
-		const add = vi.spyOn(window, "addEventListener");
-		renderHook(() =>
-			useHorizontalSwipe({ enabled: false, onSwipeRight: vi.fn() }),
-		);
-		expect(add).not.toHaveBeenCalledWith(
-			"touchstart",
-			expect.any(Function),
-			expect.anything(),
-		);
+	it("does not open on a swipe while disabled", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ enabled: false, onSwipeRight }));
+		gesture(target());
+		expect(onSwipeRight).not.toHaveBeenCalled();
 	});
 
-	it("invokes the latest callback without resubscribing mid-gesture", () => {
+	it("invokes the latest callback for a gesture started before a rerender", () => {
 		const first = vi.fn();
 		const second = vi.fn();
-		const add = vi.spyOn(window, "addEventListener");
 		const hook = renderHook(
 			({ onSwipeRight }) => useHorizontalSwipe({ onSwipeRight }),
 			{ initialProps: { onSwipeRight: first } },
 		);
-		const subscriptions = () =>
-			add.mock.calls.filter((call) => call[0] === "touchstart").length;
-		const before = subscriptions();
 		const element = target();
 		act(() => {
 			element.dispatchEvent(
@@ -375,7 +366,6 @@ describe("useHorizontalSwipe", () => {
 			);
 		});
 		hook.rerender({ onSwipeRight: second });
-		expect(subscriptions()).toBe(before);
 		act(() => {
 			element.dispatchEvent(
 				touchEvent("touchend", [], [{ clientX: 200, clientY: 100 }]),

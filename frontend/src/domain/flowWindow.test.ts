@@ -106,8 +106,9 @@ describe("matchFlowPreset", () => {
 
 describe("defaultFlowWindow", () => {
 	it("defaults to this-month", () => {
-		expect(defaultFlowWindow("2026-03-15")).toEqual(
-			flowPresetRange("this-month", "2026-03-15"),
-		);
+		expect(defaultFlowWindow("2026-03-15")).toEqual({
+			startDate: "2026-03-01",
+			endDate: "2026-03-31",
+		});
 	});
 });

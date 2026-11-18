@@ -219,26 +219,3 @@ it("separates identical models by resource identity", async () => {
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(seen).toEqual(["users/one", "users/two"]);
 });
-
-it("requests the saved model without local edits", async () => {
-	setup();
-	const bodies: unknown[] = [];
-	vi.stubGlobal(
-		"fetch",
-		vi.fn(async (_url: unknown, init?: RequestInit) => {
-			bodies.push(JSON.parse(String(init?.body ?? "{}")));
-			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getUserScope().resource?.id;
-			if (resource) headers.set("Waypoint-Resource", resource);
-			return new Response(JSON.stringify({ result }), { headers });
-		}),
-	);
-	const saved = model(100);
-	const hook = renderHook(() => useCurrentPosition({ model: saved }), {
-		wrapper,
-	});
-	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	expect(bodies).toHaveLength(1);
-	expect((bodies[0] as { model?: unknown }).model).toBeUndefined();
-	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
-});

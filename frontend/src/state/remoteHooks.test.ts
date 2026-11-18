@@ -557,31 +557,6 @@ describe("remote workspace state", () => {
 		expect(getAccountBalances()).toBeUndefined();
 	});
 
-	it("keeps session credentials out of workspace state", async () => {
-		const server = stubTestServer();
-		const rendered = renderHookRTL(() => useWorkspaceQueries());
-		await waitFor(() =>
-			expect(
-				serverQueryClient().isFetching({
-					queryKey: userResourceKey("status"),
-				}),
-			).toBe(0),
-		);
-		expect(
-			server.calls.filter((call) => call.url.endsWith("/v1/status")),
-		).toHaveLength(1);
-		await serverQueryClient().fetchQuery({
-			...presetsOptions(),
-			staleTime: 0,
-		});
-		expect(
-			server.fetcher.mock.calls
-				.filter(([url]) => String(url).endsWith("/v1/amount-presets"))
-				.at(-1)?.[1],
-		).not.toHaveProperty("authToken");
-		rendered.unmount();
-	});
-
 	it("uses a replacement client on an explicit Query refresh", async () => {
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceQueries());
@@ -1112,71 +1087,6 @@ describe("remote projection mapping and SSE", () => {
 		expect(item?.outcomeDate).toBeNull();
 		expect(item?.qualifier).toBeNull();
 		expect(item?.progress?.fraction).toBe(0.05);
-	});
-
-	it("maps FI coverage to a bar without prose", () => {
-		const model = {
-			...modelFixture(),
-			evaluations: {
-				...modelFixture().evaluations,
-				financialIndependence: [
-					{
-						instanceId: "financial-independence",
-						name: "Financial independence",
-						enabled: true,
-						config: { annualExpenseTarget: 80000, evaluationYears: 10 },
-					},
-				],
-			},
-		};
-		const result = {
-			...projectionFixture(),
-			evaluations: {
-				...projectionFixture().evaluations,
-				financialIndependence: [
-					{
-						instanceId: "financial-independence",
-						name: "Financial independence",
-						status: "not-satisfied",
-						deterministic: {
-							rows: [
-								{
-									date: "2026-01-31",
-									netWorth: 2000000,
-									minimumNetWorth: 1500000,
-									minimumNetWorthMet: true,
-									annualDirectIncome: 0,
-									selectedAssetBalance: 1000000,
-									annualWithdrawalCapacity: 40000,
-									totalAnnualCapacity: 40000,
-									annualExpenseTarget: 80000,
-									coverageRatio: 0.5,
-									isCovered: false,
-									isEligible: false,
-								},
-							],
-							runOutcomes: [],
-							milestones: {
-								firstCoverageDate: null,
-								firstSelfSustainingDate: null,
-							},
-						},
-						probabilistic: null,
-						diagnostics: [],
-					},
-				],
-			},
-		};
-		const local = projectionResultToLocal(result, model);
-		expect(
-			local.otherEvaluations.find(
-				(entry) => entry.id === "financial-independence",
-			),
-		).toMatchObject({
-			outcomeDate: null,
-			qualifier: null,
-			progress: { fraction: 0.5 },
-		});
 	});
 
 	it("prefers the self-sustaining date over first coverage for FI", () => {

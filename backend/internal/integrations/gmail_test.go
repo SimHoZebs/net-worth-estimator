@@ -26,27 +26,6 @@ func unconfiguredGmailService() *gmail.Service {
 	return gmail.New(gmail.Config{})
 }
 
-func TestGmailRegistryListsBothProviders(t *testing.T) {
-	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "registry.db"))
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
-	defer database.Close()
-	userStore := openGmailUserStore(t, database, "alice")
-
-	registry := NewRegistry(NewSimpleFIN(userStore, nil), NewGmail(userStore, nil))
-	if ids := registry.IDs(); len(ids) != 2 || ids[0] != SimpleFINID || ids[1] != GmailID {
-		t.Fatalf("IDs = %v, want [simplefin gmail]", ids)
-	}
-	entries, err := registry.Snapshot(context.Background())
-	if err != nil {
-		t.Fatalf("snapshot: %v", err)
-	}
-	if len(entries) != 2 || entries[1].ID != GmailID || entries[1].Connected {
-		t.Fatalf("entries = %+v, want disconnected gmail second", entries)
-	}
-}
-
 func TestGmailStatusConnectedReportsDisplayOnly(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "connected.db"))
 	if err != nil {

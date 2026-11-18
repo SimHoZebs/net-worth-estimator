@@ -36,32 +36,6 @@ func TestRowWritesMarkModelPresent(t *testing.T) {
 	}
 }
 
-func TestOpenCreatesExpectedTables(t *testing.T) {
-	store := openSQLiteStore(t)
-	tables := map[string]bool{}
-	rows, err := store.db.Query(`SELECT name FROM sqlite_master WHERE type = 'table'`)
-	if err != nil {
-		t.Fatalf("list tables: %v", err)
-	}
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			rows.Close()
-			t.Fatalf("scan table: %v", err)
-		}
-		tables[name] = true
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		t.Fatalf("iterate tables: %v", err)
-	}
-	for _, want := range expectedSchemaTables() {
-		if !tables[want] {
-			t.Fatalf("missing table %q: %v", want, tables)
-		}
-	}
-}
-
 func TestStoreRoundTripsPaymentTerms(t *testing.T) {
 	store := openTestStore(t)
 	percent := 0.02

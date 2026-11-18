@@ -43,20 +43,6 @@ func sanitizeOpenAPIComponentKey(name string) string {
 	return clean.String()
 }
 
-// checkOpenAPIComponentKeys reports component keys and dangling schema
-// references. Tests fail on either; the served spec must stay generator-safe.
-func checkOpenAPIComponentKeys(spec *huma.OpenAPI) error {
-	names := make([]string, 0, len(spec.Components.Schemas.Map()))
-	for key := range spec.Components.Schemas.Map() {
-		names = append(names, key)
-	}
-	raw, err := json.Marshal(spec)
-	if err != nil {
-		return fmt.Errorf("marshal spec: %w", err)
-	}
-	return checkOpenAPIKeys(names, raw)
-}
-
 func checkOpenAPIKeys(names []string, raw []byte) error {
 	for _, key := range names {
 		if !openAPIComponentKeyPattern.MatchString(key) {

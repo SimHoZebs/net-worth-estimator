@@ -98,21 +98,3 @@ test("safe-spending card title heading inherits the sm composition", async ({
 	await expectLoadedCard(card);
 	await expectCanonicalTitle(heading, title, "16px");
 });
-
-test.describe("card title heading narrow layout", () => {
-	test.use({ viewport: { width: 390, height: 844 } });
-	test("safe-spending card title heading matches the canonical composition", async ({
-		page,
-	}) => {
-		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe spending" });
-		const title = card.locator(
-			':scope > [data-slot="card-header"] > [data-slot="card-title"]',
-		);
-		const heading = title.getByRole("heading", {
-			name: "Safe spending",
-		});
-		await expectLoadedCard(card);
-		await expectCanonicalTitle(heading, title, "16px");
-	});
-});

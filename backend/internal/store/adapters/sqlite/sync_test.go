@@ -189,16 +189,8 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 		 VALUES ('` + otherSyncedTransactionID + `', 11, 0, 0, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + otherSyncedTransactionID + `', 'transaction', :user_id)`,
 	})
-	tx, err := store.db.Begin()
-	if err != nil {
-		t.Fatalf("begin replace: %v", err)
-	}
-	defer tx.Rollback()
-	if err := replaceModel(tx, ownerModel()); err != nil {
+	if _, err := store.ImportModel(ownerModel()); err != nil {
 		t.Fatalf("replace: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit replace: %v", err)
 	}
 	loaded, err := store.LoadModel()
 	if err != nil {
@@ -296,7 +288,7 @@ func syncPendingDirective(item SyncTransaction) BankDirective {
 	}}
 }
 
-func TestApplySyncPendingDeleteSparesUserRows(t *testing.T) {
+func TestApplySyncSparesOwnerRows(t *testing.T) {
 	// Ownership, not lifecycle state or ID formatting, protects owner rows.
 	store := openSQLiteStore(t)
 	seedAccount(t, store, "prime_card")
@@ -312,8 +304,18 @@ func TestApplySyncPendingDeleteSparesUserRows(t *testing.T) {
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
-	if got := countRows(t, store, "transactions", "id = '"+ownerTransactionID+"'"); got != 1 {
-		t.Fatal("owner row was deleted")
+	model, err := store.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerRowPresent := false
+	for _, transaction := range model.Transactions {
+		if transaction.ID == ownerTransactionID && transaction.Name == "Manual" && transaction.Source == SourceUser {
+			ownerRowPresent = true
+		}
+	}
+	if !ownerRowPresent {
+		t.Fatalf("owner row was deleted or altered by ApplySync: %+v", model.Transactions)
 	}
 }
 
@@ -344,8 +346,8 @@ func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 		t.Fatal("convert changed row count")
 	}
 	row := converted.Transactions[0]
-	if row.ID != id || row.Source != SourceBankSync || row.Pending || row.Void || !row.Enabled {
-		t.Fatalf("converted row = %+v, want enabled settled participant", row)
+	if row.ID != id || row.Name != "Pending a" || row.Source != SourceBankSync || row.Pending || row.Void || !row.Enabled {
+		t.Fatalf("converted row = %+v, want the settled name, enabled settled participant", row)
 	}
 	rows, err := store.LoadBankTransactions()
 	if err != nil || len(rows) != 1 || len(rows[0].Keys) != 1 || rows[0].Keys[0].TransactionID != "posted-a" {

@@ -113,21 +113,9 @@ func grantBodyKey(transactionID, audienceType, audienceID, key string) string {
 	return string(out)
 }
 
-// grantKeyBody aliases grantBodyKey under the name the QA-02 security
-// track uses, so its keyed grant bodies compile unchanged.
-func grantKeyBody(transactionID, audienceType, audienceID, key string) string {
-	return grantBodyKey(transactionID, audienceType, audienceID, key)
-}
-
 func copyBodyKey(owner, transactionID, key string) string {
 	out, _ := json.Marshal(map[string]string{"owner": owner, "transactionId": transactionID, "requestId": key})
 	return string(out)
-}
-
-// copyKeyBody aliases copyBodyKey under the name the QA-02 security
-// track uses, so its keyed accept bodies compile unchanged.
-func copyKeyBody(owner, transactionID, key string) string {
-	return copyBodyKey(owner, transactionID, key)
 }
 
 // A key reused for a different action reports 409 with no session

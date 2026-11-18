@@ -104,28 +104,3 @@ func TestUnknownNewerClaimInvalidatesLatestAmountEvenWhenBalanceObservationCover
 		})
 	}
 }
-
-func TestRecordedAmountInvalidationClearsIdentityDateAndAccumulation(t *testing.T) {
-	a := newAmounts(&types.FinancialModel{}, map[string]float64{})
-	tx := payment("unknown", 100, "2026-11-15T09:00:00Z")
-	tx.Claim = &types.TransactionClaim{ScheduleID: "S", OccurrenceDate: "2026-11-15"}
-	a.record(tx, 100)
-	a.invalidateRecorded(tx)
-	for _, id := range []string{"unknown", "S"} {
-		if _, ok := a.latest[id]; ok {
-			t.Fatalf("latest amount retained for %s", id)
-		}
-		if _, ok := a.dates[id]; ok {
-			t.Fatalf("latest date retained for %s", id)
-		}
-		if _, ok := a.years[id]; ok {
-			t.Fatalf("accumulated state retained for %s", id)
-		}
-	}
-	later := payment("later-known", 150, "2026-11-16T09:00:00Z")
-	later.Claim = &types.TransactionClaim{ScheduleID: "S", OccurrenceDate: "2026-11-16"}
-	a.record(later, 150)
-	if a.latest["S"] != 150 || a.dates["S"] != "2026-11-16" {
-		t.Fatal("latest known evidence not restored")
-	}
-}

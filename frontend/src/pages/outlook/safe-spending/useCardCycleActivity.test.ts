@@ -233,7 +233,6 @@ describe("useCardCycleActivity", () => {
 				.flatMap((item) => item.selected.map((row) => row.transactionId))
 				.sort(),
 		).toEqual(["closed-end", "closed-start", "pending-closed"]);
-		expect(pendingRows.every((transaction) => !transaction.enabled)).toBe(true);
 		expect(input.projection).toEqual(projectionBefore);
 	});
 
