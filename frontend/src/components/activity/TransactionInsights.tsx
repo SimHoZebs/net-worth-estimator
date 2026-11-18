@@ -6,8 +6,8 @@ import { dateLabel, money } from "@/domain/format.ts";
 import type { Transaction } from "@/domain/model.ts";
 import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import {
-	cadenceLabel,
 	directionLabel,
+	frequencyLabel,
 	groupRecurringPatterns,
 	patternTitle,
 	type RecurringPattern,
@@ -38,6 +38,9 @@ import {
 } from "@/components/ui/select.tsx";
 import {
 	ExistingScheduleDialog,
+	FORECAST_SCHEDULE_EYEBROW,
+	FORECAST_SCHEDULE_LINK_HEADING,
+	ForecastScheduleButtons,
 	NewScheduleDialog,
 } from "../analysis/RecurringPatterns.tsx";
 
@@ -179,7 +182,7 @@ function suggestionEvidence(suggestion: InsightSuggestion): string {
 	}
 	const pattern = suggestion.pattern;
 	const evidenceCount = pattern.findings.length;
-	return `${cadenceLabel(pattern.cadence)} · ${directionLabel(pattern.anchor.role)} · ${evidenceCount} recorded ${evidenceCount === 1 ? "payment" : "payments"}.`;
+	return `${frequencyLabel(pattern.cadence)} · ${directionLabel(pattern.anchor.role)} · ${evidenceCount} recorded ${evidenceCount === 1 ? "payment" : "payments"}.`;
 }
 
 export function TransactionInsightsPanel({
@@ -209,9 +212,16 @@ export function TransactionInsightsPanel({
 	const [voidSaving, setVoidSaving] = useState(false);
 	const [voidError, setVoidError] = useState<string | null>(null);
 	const [ruleDialog, setRuleDialog] = useState<"new" | "existing" | null>(null);
-	// Keep the pattern visible while a schedule action refreshes the queue.
-	const [recurringSnapshot, setRecurringSnapshot] =
-		useState<RecurringPattern | null>(null);
+	// The forecast dialog is keyed by finding id so acceptance can refresh the
+	// queue without unmounting it. Preview data follows the id, never a stale
+	// anchor object.
+	const [dialogFinding, setDialogFinding] = useState<{
+		id: string;
+		title: string;
+	} | null>(null);
+	const createButtonRef = useRef<HTMLButtonElement>(null);
+	const linkButtonRef = useRef<HTMLButtonElement>(null);
+	const doneButtonRef = useRef<HTMLButtonElement>(null);
 	const durationRef = useRef<HTMLInputElement>(null);
 
 	const open = suggestions.filter(
@@ -220,10 +230,9 @@ export function TransactionInsightsPanel({
 	const active = open[0] ?? null;
 	const activeKey = active ? suggestionKey(active) : null;
 
-	// A render-phase sync resets the step when the queue changes.
-	const [syncedKey, setSyncedKey] = useState<string | null>(null);
-	if (activeKey !== syncedKey && !recurringSnapshot) {
-		setSyncedKey(activeKey);
+	// Reset the step when the queue head changes. The dialog stays mounted
+	// across the refetch boundary via dialogFinding.
+	useEffect(() => {
 		setPhase(
 			active?.kind === "bnpl" && active.finding.review?.decision
 				? "details"
@@ -232,14 +241,15 @@ export function TransactionInsightsPanel({
 		setError(null);
 		setDurationCount("");
 		setDurationUnit("months");
-		setRuleDialog(null);
 		setVoidCandidateId(
 			active?.kind === "void"
 				? (active.candidates[0]?.transactionId ?? "")
 				: "",
 		);
 		setVoidError(null);
-	}
+		// Keyed reset: re-run only when the queue head changes.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [activeKey]);
 
 	useEffect(() => {
 		if (phase === "details" && active?.kind === "bnpl")
@@ -248,37 +258,75 @@ export function TransactionInsightsPanel({
 
 	const markHandled = (suggestion: InsightSuggestion) => {
 		setHandled((previous) => [...previous, suggestionKey(suggestion)]);
-		setRecurringSnapshot(null);
 		setPhase("question");
 		setError(null);
 		setDurationCount("");
 		setDurationUnit("months");
 		setRuleDialog(null);
+		setDialogFinding(null);
 		setVoidCandidateId("");
 		setVoidError(null);
 	};
 
-	// An open schedule dialog survives acceptance removing the pattern from the queue.
-	const shown: InsightSuggestion | null =
-		recurringSnapshot != null
-			? { kind: "recurring", pattern: recurringSnapshot, priority: 2 }
-			: active;
+	// Derived from the live queue only; the dialog below stays mounted by id.
+	const shown: InsightSuggestion | null = active;
+	const closeRuleDialog = (kind: "new" | "existing") => {
+		setRuleDialog(null);
+		setDialogFinding(null);
+		const target = kind === "new" ? createButtonRef : linkButtonRef;
+		requestAnimationFrame(
+			() => target.current?.focus() ?? doneButtonRef.current?.focus(),
+		);
+	};
+	const scheduleDialog = (
+		<>
+			{ruleDialog === "new" && dialogFinding && (
+				<NewScheduleDialog
+					key={dialogFinding.id}
+					findingId={dialogFinding.id}
+					title={dialogFinding.title}
+					readOnly={readOnly}
+					eyebrow={FORECAST_SCHEDULE_EYEBROW}
+					onClose={() => closeRuleDialog("new")}
+				/>
+			)}
+			{ruleDialog === "existing" && dialogFinding && (
+				<ExistingScheduleDialog
+					key={dialogFinding.id}
+					findingId={dialogFinding.id}
+					title={dialogFinding.title}
+					names={names}
+					readOnly={readOnly}
+					heading={FORECAST_SCHEDULE_LINK_HEADING}
+					onClose={() => closeRuleDialog("existing")}
+				/>
+			)}
+		</>
+	);
 
 	if (!shown) {
 		return (
-			<Empty aria-live="polite">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<Check aria-hidden="true" />
-					</EmptyMedia>
-					<EmptyTitle>All caught up</EmptyTitle>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button type="button" variant="default" onClick={onDone}>
-						Done
-					</Button>
-				</EmptyContent>
-			</Empty>
+			<>
+				<Empty aria-live="polite">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<Check aria-hidden="true" />
+						</EmptyMedia>
+						<EmptyTitle>All caught up</EmptyTitle>
+					</EmptyHeader>
+					<EmptyContent>
+						<Button
+							ref={doneButtonRef}
+							type="button"
+							variant="default"
+							onClick={onDone}
+						>
+							Done
+						</Button>
+					</EmptyContent>
+				</Empty>
+				{scheduleDialog}
+			</>
 		);
 	}
 
@@ -322,11 +370,10 @@ export function TransactionInsightsPanel({
 			: shown.kind === "recurring"
 				? shown.pattern.anchor.feedbackRevision
 				: 0;
-	const detailsPattern =
-		recurringSnapshot ?? (shown.kind === "recurring" ? shown.pattern : null);
+	const detailsPattern = shown.kind === "recurring" ? shown.pattern : null;
 	const patternTitleText = detailsPattern
 		? patternTitle(detailsPattern, names)
-		: "";
+		: (dialogFinding?.title ?? "");
 	const selectedVoid =
 		shown.kind === "void"
 			? (shown.candidates.find(
@@ -516,7 +563,7 @@ export function TransactionInsightsPanel({
 						vanished hold record.
 					</p>
 				</div>
-			) : phase === "question" && !recurringSnapshot && isBnpl ? (
+			) : phase === "question" && isBnpl ? (
 				<div className="grid grid-cols-2 gap-2">
 					<Button
 						type="button"
@@ -535,7 +582,7 @@ export function TransactionInsightsPanel({
 						<Check size={16} aria-hidden="true" /> Yes
 					</Button>
 				</div>
-			) : isBnpl && !recurringSnapshot ? (
+			) : isBnpl ? (
 				<form onSubmit={(event) => saveDuration(event)} className="grid gap-4">
 					<div className="grid grid-cols-2 gap-3">
 						<Field className="min-w-0">
@@ -592,41 +639,39 @@ export function TransactionInsightsPanel({
 						Saving records your acceptance of the pattern. Recorded payments
 						stay unchanged.
 					</p>
-					<div className="flex flex-wrap gap-2">
-						<Button
-							type="button"
-							variant="default"
-							size="sm"
-							aria-label={`Create forecast schedule for ${patternTitleText}`}
-							onClick={() => {
-								setRecurringSnapshot(detailsPattern);
-								setRuleDialog("new");
-							}}
-						>
-							Create forecast schedule
-						</Button>
-						<Button
-							type="button"
-							variant="secondary"
-							size="sm"
-							aria-label={`Link repeating pattern for ${patternTitleText} to an existing schedule`}
-							onClick={() => {
-								setRecurringSnapshot(detailsPattern);
-								setRuleDialog("existing");
-							}}
-						>
-							Link to existing schedule
-						</Button>
-						<Button
-							type="button"
-							variant="secondary"
-							size="sm"
-							disabled={busy || readOnly}
-							onClick={() => answer("reject")}
-						>
-							Not repeating
-						</Button>
-					</div>
+					<ForecastScheduleButtons
+						title={patternTitleText}
+						readOnly={readOnly}
+						createRef={createButtonRef}
+						linkRef={linkButtonRef}
+						onCreate={() => {
+							if (!detailsPattern) return;
+							setDialogFinding({
+								id: detailsPattern.anchor.id,
+								title: patternTitle(detailsPattern, names),
+							});
+							setRuleDialog("new");
+						}}
+						onLink={() => {
+							if (!detailsPattern) return;
+							setDialogFinding({
+								id: detailsPattern.anchor.id,
+								title: patternTitle(detailsPattern, names),
+							});
+							setRuleDialog("existing");
+						}}
+						after={
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								disabled={busy || readOnly}
+								onClick={() => answer("reject")}
+							>
+								Not repeating
+							</Button>
+						}
+					/>
 				</div>
 			)}
 
@@ -703,13 +748,15 @@ export function TransactionInsightsPanel({
 							variant="ghost"
 							size="sm"
 							onClick={() => {
-								if (detailsPattern)
+								const advanceId =
+									dialogFinding?.id ?? detailsPattern?.anchor.id ?? null;
+								if (advanceId)
 									setHandled((previous) =>
-										previous.includes(detailsPattern.anchor.id)
+										previous.includes(advanceId)
 											? previous
-											: [...previous, detailsPattern.anchor.id],
+											: [...previous, advanceId],
 									);
-								setRecurringSnapshot(null);
+								setDialogFinding(null);
 								setPhase("question");
 								setError(null);
 								setRuleDialog(null);
@@ -724,29 +771,7 @@ export function TransactionInsightsPanel({
 				)}
 			</div>
 
-			{ruleDialog === "new" && detailsPattern && (
-				<NewScheduleDialog
-					findingId={detailsPattern.anchor.id}
-					title={patternTitleText}
-					readOnly={readOnly}
-					onClose={() => {
-						setRuleDialog(null);
-						setRecurringSnapshot(null);
-					}}
-				/>
-			)}
-			{ruleDialog === "existing" && detailsPattern && (
-				<ExistingScheduleDialog
-					findingId={detailsPattern.anchor.id}
-					title={patternTitleText}
-					names={names}
-					readOnly={readOnly}
-					onClose={() => {
-						setRuleDialog(null);
-						setRecurringSnapshot(null);
-					}}
-				/>
-			)}
+			{scheduleDialog}
 		</div>
 	);
 }

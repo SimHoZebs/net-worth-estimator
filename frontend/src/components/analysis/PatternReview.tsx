@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
 	groupPatternReviews,
-	reviewAmount,
-	reviewCadenceLabel,
 	reviewChips,
-	reviewRecordedCount,
+	reviewSummary,
 	reviewTitle,
 	type PatternReviewRow,
 	type PatternReviewTab,
@@ -25,18 +23,9 @@ import {
 } from "@/state/analyses.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog.tsx";
-import {
-	Item,
-	ItemContent,
-	ItemDescription,
-	ItemTitle,
-} from "@/components/ui/item.tsx";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
+import { cn } from "@/lib/utils.ts";
+import { itemVariants } from "@/components/ui/item.tsx";
 import {
 	Tabs,
 	TabsContent,
@@ -44,12 +33,18 @@ import {
 	TabsTrigger,
 } from "@/components/ui/tabs.tsx";
 
-const errorClassName =
-	"m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text";
 import {
-	ExistingScheduleDialog,
-	NewScheduleDialog,
+	AnalysisDialogContent,
+	analysisErrorClassName,
+	FORECAST_SCHEDULE_EYEBROW,
+	FORECAST_SCHEDULE_LINK_HEADING,
+	ForecastScheduleActions,
 } from "./RecurringPatterns.tsx";
+
+const forecastScheduleTitles = {
+	eyebrow: FORECAST_SCHEDULE_EYEBROW,
+	heading: FORECAST_SCHEDULE_LINK_HEADING,
+};
 
 function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	return {
@@ -90,15 +85,12 @@ function ClassificationAnswers({
 		<div className="space-y-2">
 			<p className="m-0 text-xs font-semibold">{kindLabel}</p>
 			<div className="flex flex-wrap items-center gap-2">
-				<Badge
-					variant={confirmed ? "default" : "secondary"}
-					className={confirmed ? "bg-success-bg text-success-text" : undefined}
-				>
+				<Badge variant={confirmed ? "success" : "secondary"}>
 					{paymentStatus(finding)}
 				</Badge>
 			</div>
 			{review.isError && (
-				<p role="alert" className={errorClassName}>
+				<p role="alert" className={analysisErrorClassName}>
 					The answer could not be saved.
 				</p>
 			)}
@@ -145,8 +137,6 @@ function RepetitionActions({
 }) {
 	const feedback = useReviewAnalysisFinding();
 	const dismiss = useDismissAnalysisFinding();
-	const [planOpen, setPlanOpen] = useState(false);
-	const [linkOpen, setLinkOpen] = useState(false);
 	const confirmed = pattern.confirmed;
 	const rejected = pattern.anchor.review?.decision === "rejected";
 	const actionable = confirmed ?? pattern.anchor;
@@ -154,143 +144,54 @@ function RepetitionActions({
 		<div className="space-y-2">
 			<p className="m-0 text-xs font-semibold">Repeating</p>
 			<div className="flex flex-wrap items-center gap-2">
-				<Badge
-					variant={confirmed ? "default" : "secondary"}
-					className={confirmed ? "bg-success-bg text-success-text" : undefined}
-				>
+				<Badge variant={confirmed ? "success" : "secondary"}>
 					{recurringPatternStatus(pattern)}
 				</Badge>
 			</div>
 			{(feedback.isError || dismiss.isError) && (
-				<p role="alert" className={errorClassName}>
+				<p role="alert" className={analysisErrorClassName}>
 					The answer could not be saved.
 				</p>
 			)}
-			<div className="flex flex-wrap gap-2">
-				{!readOnly && rejected && (
-					<Button
-						type="button"
-						size="sm"
-						variant="secondary"
-						disabled={dismiss.isPending}
-						aria-label={`Review repeating pattern for ${title} again`}
-						onClick={() =>
-							dismiss.mutate({ id: pattern.anchor.id, dismissed: false })
-						}
-					>
-						Review again
-					</Button>
-				)}
-				<Button
-					type="button"
-					size="sm"
-					variant={readOnly ? "secondary" : "default"}
-					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
-					onClick={() => setPlanOpen(true)}
-				>
-					{readOnly ? "Review forecast plan" : "Create forecast schedule"}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant="secondary"
-					aria-label={`Link repeating pattern for ${title} to an existing schedule`}
-					onClick={() => setLinkOpen(true)}
-				>
-					Link to existing schedule
-				</Button>
-				{!readOnly && !confirmed && !rejected && (
-					<Button
-						type="button"
-						size="sm"
-						variant="secondary"
-						disabled={feedback.isPending}
-						aria-label={`Reject repeating pattern for ${title}`}
-						onClick={() =>
-							feedback.mutate(answerInput(pattern.anchor, "reject"))
-						}
-					>
-						Not repeating
-					</Button>
-				)}
-			</div>
-			{planOpen && (
-				<NewScheduleDialog
-					findingId={actionable.id}
-					title={title}
-					readOnly={readOnly}
-					onClose={() => setPlanOpen(false)}
-				/>
-			)}
-			{linkOpen && (
-				<ExistingScheduleDialog
-					findingId={actionable.id}
-					title={title}
-					names={names}
-					readOnly={readOnly}
-					onClose={() => setLinkOpen(false)}
-				/>
-			)}
-		</div>
-	);
-}
-
-function PaymentForecastActions({
-	finding,
-	title,
-	names,
-	readOnly,
-}: {
-	finding: AnalysisFinding;
-	title: string;
-	names: Map<string, string>;
-	readOnly: boolean;
-}) {
-	const [planOpen, setPlanOpen] = useState(false);
-	const [linkOpen, setLinkOpen] = useState(false);
-	const kindLabel =
-		finding.kind.charAt(0).toUpperCase() + finding.kind.slice(1);
-	return (
-		<div className="space-y-2">
-			<div className="flex flex-wrap gap-2">
-				<Button
-					type="button"
-					size="sm"
-					variant={readOnly ? "secondary" : "default"}
-					aria-label={`${readOnly ? "Review forecast plan" : "Create forecast schedule"} for ${title}`}
-					onClick={() => setPlanOpen(true)}
-				>
-					{readOnly ? "Review forecast plan" : "Create forecast schedule"}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant="secondary"
-					aria-label={`Link to existing schedule for ${title}`}
-					onClick={() => setLinkOpen(true)}
-				>
-					Link to existing schedule
-				</Button>
-			</div>
-			{planOpen && (
-				<NewScheduleDialog
-					findingId={finding.id}
-					title={title}
-					readOnly={readOnly}
-					eyebrow={kindLabel}
-					onClose={() => setPlanOpen(false)}
-				/>
-			)}
-			{linkOpen && (
-				<ExistingScheduleDialog
-					findingId={finding.id}
-					title={title}
-					names={names}
-					readOnly={readOnly}
-					heading="Link recorded payments to a schedule"
-					onClose={() => setLinkOpen(false)}
-				/>
-			)}
+			<ForecastScheduleActions
+				findingId={actionable.id}
+				title={title}
+				names={names}
+				readOnly={readOnly}
+				titles={forecastScheduleTitles}
+				before={
+					!readOnly && rejected ? (
+						<Button
+							type="button"
+							size="sm"
+							variant="secondary"
+							disabled={dismiss.isPending}
+							aria-label={`Review repeating pattern for ${title} again`}
+							onClick={() =>
+								dismiss.mutate({ id: pattern.anchor.id, dismissed: false })
+							}
+						>
+							Review again
+						</Button>
+					) : undefined
+				}
+				after={
+					!readOnly && !confirmed && !rejected ? (
+						<Button
+							type="button"
+							size="sm"
+							variant="secondary"
+							disabled={feedback.isPending}
+							aria-label={`Reject repeating pattern for ${title}`}
+							onClick={() =>
+								feedback.mutate(answerInput(pattern.anchor, "reject"))
+							}
+						>
+							Not repeating
+						</Button>
+					) : undefined
+				}
+			/>
 		</div>
 	);
 }
@@ -307,10 +208,13 @@ function PatternReviewDialog({
 	onClose: () => void;
 }) {
 	const visibility = useDismissAnalysisFinding();
-	const title = reviewTitle(row, names);
-	const amount = reviewAmount(row);
-	const findings = row.findings.filter((finding) => !finding.dismissed);
-	const dismissed = row.findings.filter((finding) => finding.dismissed);
+	const title = useMemo(() => reviewTitle(row, names), [row, names]);
+	const summary = useMemo(() => reviewSummary(row), [row]);
+	const { visible, dismissed } = useMemo(() => {
+		const visible = row.findings.filter((finding) => !finding.dismissed);
+		const dismissed = row.findings.filter((finding) => finding.dismissed);
+		return { visible, dismissed };
+	}, [row]);
 	return (
 		<Dialog
 			open
@@ -318,7 +222,7 @@ function PatternReviewDialog({
 				if (!open) onClose();
 			}}
 		>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
+			<AnalysisDialogContent>
 				<DialogHeader>
 					<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
 						Pattern review
@@ -328,17 +232,17 @@ function PatternReviewDialog({
 				<div className="space-y-4">
 					<div className="space-y-1">
 						<p className="m-0 text-xs text-muted-foreground">
-							{reviewCadenceLabel(row)} · {reviewRecordedCount(row)} recorded
+							{summary.cadence} · {summary.recorded} recorded
 						</p>
-						{amount && (
+						{summary.amount && (
 							<p
 								className={
-									amount.inflow
+									summary.amount.inflow
 										? "m-0 text-xs font-semibold text-success-text"
 										: "m-0 text-xs font-semibold"
 								}
 							>
-								{amount.text} · {amount.direction}
+								{summary.amount.text} · {summary.amount.direction}
 							</p>
 						)}
 					</div>
@@ -361,22 +265,23 @@ function PatternReviewDialog({
 					))}
 					{row.repetition.length === 0 &&
 						row.payments.map((pattern) => (
-							<PaymentForecastActions
+							<ForecastScheduleActions
 								key={`forecast:${pattern.key}`}
-								finding={pattern.anchor}
+								findingId={pattern.anchor.id}
 								title={title}
 								names={names}
 								readOnly={readOnly}
+								titles={forecastScheduleTitles}
 							/>
 						))}
 					{visibility.isError && (
-						<p role="alert" className={errorClassName}>
+						<p role="alert" className={analysisErrorClassName}>
 							The answer could not be saved.
 						</p>
 					)}
 					{!readOnly && (
 						<div className="flex flex-wrap gap-2">
-							{findings.length > 0 && (
+							{visible.length > 0 && (
 								<Button
 									type="button"
 									size="sm"
@@ -384,7 +289,7 @@ function PatternReviewDialog({
 									disabled={visibility.isPending}
 									aria-label={`Dismiss pattern for ${title}`}
 									onClick={() => {
-										for (const finding of findings)
+										for (const finding of visible)
 											visibility.mutate({ id: finding.id, dismissed: true });
 									}}
 								>
@@ -409,7 +314,7 @@ function PatternReviewDialog({
 						</div>
 					)}
 				</div>
-			</DialogContent>
+			</AnalysisDialogContent>
 		</Dialog>
 	);
 }
@@ -425,13 +330,30 @@ export function PatternReview({
 }) {
 	const [rows, setRows] = useState(5);
 	const [openKey, setOpenKey] = useState<string | null>(null);
-	const groups = groupPatternReviews(findings);
+	const groups = useMemo(() => groupPatternReviews(findings), [findings]);
+	const counts = useMemo(() => {
+		const next = new Map<PatternReviewTab, number>();
+		for (const row of groups) next.set(row.tab, (next.get(row.tab) ?? 0) + 1);
+		return next;
+	}, [groups]);
+	const rowViews = useMemo(
+		() =>
+			groups.map((row) => ({
+				row,
+				title: reviewTitle(row, names),
+				summary: reviewSummary(row),
+				chips: reviewChips(row),
+			})),
+		[groups, names],
+	);
+	const openRow = useMemo(
+		() =>
+			openKey
+				? (rowViews.find((view) => view.row.key === openKey)?.row ?? null)
+				: null,
+		[rowViews, openKey],
+	);
 	if (!groups.length) return null;
-	const counts = new Map<PatternReviewTab, number>();
-	for (const row of groups) counts.set(row.tab, (counts.get(row.tab) ?? 0) + 1);
-	const openRow = openKey
-		? (groups.find((row) => row.key === openKey) ?? null)
-		: null;
 	return (
 		<section className="space-y-4" aria-label="Pattern review">
 			<header className="space-y-2">
@@ -455,7 +377,9 @@ export function PatternReview({
 					))}
 				</TabsList>
 				{TABS.map((entry) => {
-					const entryRows = groups.filter((row) => row.tab === entry.id);
+					const entryRows = rowViews.filter(
+						(view) => view.row.tab === entry.id,
+					);
 					return (
 						<TabsContent key={entry.id} value={entry.id}>
 							{entryRows.length === 0 ? (
@@ -464,65 +388,52 @@ export function PatternReview({
 								</p>
 							) : (
 								<ul className="m-0 list-none space-y-2 p-0">
-									{entryRows.slice(0, rows).map((row) => {
-										const title = reviewTitle(row, names);
-										const amount = reviewAmount(row);
+									{entryRows.slice(0, rows).map((view) => {
+										const { row, title, summary } = view;
 										return (
 											<li key={row.key}>
-												<Item
-													variant="outline"
-													render={
-														<button
-															type="button"
-															aria-label={`Review ${title}`}
-															onClick={() => setOpenKey(row.key)}
-														/>
-													}
-													className="text-left"
+												<button
+													type="button"
+													aria-label={`Review ${title}`}
+													onClick={() => setOpenKey(row.key)}
+													className={cn(
+														itemVariants({ variant: "outline" }),
+														"text-left",
+													)}
 												>
-													<ItemContent>
-														<ItemTitle>{title}</ItemTitle>
-														<ItemDescription>
-															{reviewCadenceLabel(row)} ·{" "}
-															{reviewRecordedCount(row)} recorded
-														</ItemDescription>
-														{amount && (
+													<span className="flex flex-1 flex-col gap-1">
+														<span className="line-clamp-1 text-sm leading-snug font-medium">
+															{title}
+														</span>
+														<span className="text-sm text-muted-foreground">
+															{summary.cadence} · {summary.recorded} recorded
+														</span>
+														{summary.amount && (
 															<span
 																className={
-																	amount.inflow
+																	summary.amount.inflow
 																		? "text-xs font-semibold text-success-text"
 																		: "text-xs font-semibold"
 																}
 															>
-																{amount.text} · {amount.direction}
+																{summary.amount.text} ·{" "}
+																{summary.amount.direction}
 															</span>
 														)}
 														<span className="flex flex-wrap gap-1 pt-1">
-															{reviewChips(row).map((chip) => (
-																<Badge
-																	key={chip.key}
-																	variant={
-																		chip.tone === "success"
-																			? "default"
-																			: "secondary"
-																	}
-																	className={
-																		chip.tone === "success"
-																			? "bg-success-bg text-success-text"
-																			: undefined
-																	}
-																>
+															{view.chips.map((chip) => (
+																<Badge key={chip.key} variant={chip.tone}>
 																	{chip.label}
 																</Badge>
 															))}
 														</span>
-													</ItemContent>
+													</span>
 													<ChevronRight
 														size={16}
 														aria-hidden="true"
 														className="flex-none text-muted-foreground"
 													/>
-												</Item>
+												</button>
 											</li>
 										);
 									})}

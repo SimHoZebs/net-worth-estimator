@@ -1,4 +1,5 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import { findingStateLabel } from "./paymentFindings.ts";
 
 export interface RecurringPattern {
 	key: string;
@@ -65,15 +66,17 @@ export function groupRecurringPatterns(
 	});
 }
 
-/** The most common saved transaction name behind a pattern, oldest first on ties. */
-export function patternTitle(
-	pattern: RecurringPattern,
+/** The most common saved transaction name behind findings, first-wins on
+ * ties. Pattern titles and review titles share this counter and differ only
+ * in scan scope and fallback. */
+export function mostCommonTransactionName(
+	findings: AnalysisFinding[],
 	names: Map<string, string>,
 ): string {
 	const counts = new Map<string, number>();
 	let best = "";
 	let bestCount = 0;
-	for (const finding of pattern.findings) {
+	for (const finding of findings) {
 		const name = names.get(finding.transactionId) ?? "";
 		if (!name) continue;
 		const count = (counts.get(name) ?? 0) + 1;
@@ -83,39 +86,20 @@ export function patternTitle(
 			bestCount = count;
 		}
 	}
+	return best;
+}
+
+/** The most common saved transaction name behind a pattern, oldest first on ties. */
+export function patternTitle(
+	pattern: RecurringPattern,
+	names: Map<string, string>,
+): string {
+	const best = mostCommonTransactionName(pattern.findings, names);
 	if (best) return best;
 	const merchant = pattern.merchant.trim();
 	return merchant
 		? merchant.charAt(0).toUpperCase() + merchant.slice(1)
 		: "Repeating payment";
-}
-
-export function cadenceLabel(cadence: string): string {
-	switch (cadence) {
-		case "weekly":
-			return "Weekly";
-		case "biweekly":
-			return "Every 2 weeks";
-		case "monthly":
-			return "Monthly";
-		case "quarterly":
-			return "Every 3 months";
-		case "annual":
-			return "Yearly";
-		default:
-			return "Repeating";
-	}
-}
-
-export function directionLabel(direction: string): string {
-	switch (direction) {
-		case "inflow":
-			return "Deposit";
-		case "outflow":
-			return "Payment";
-		default:
-			return "Movement";
-	}
 }
 
 export function frequencyLabel(frequency: string): string {
@@ -124,6 +108,8 @@ export function frequencyLabel(frequency: string): string {
 			return "Daily";
 		case "weekly":
 			return "Weekly";
+		case "biweekly":
+			return "Every 2 weeks";
 		case "monthly":
 			return "Monthly";
 		case "quarterly":
@@ -138,11 +124,18 @@ export function frequencyLabel(frequency: string): string {
 	}
 }
 
+export function directionLabel(direction: string): string {
+	switch (direction) {
+		case "inflow":
+			return "Deposit";
+		case "outflow":
+			return "Payment";
+		default:
+			return "Movement";
+	}
+}
+
 export function recurringPatternStatus(pattern: RecurringPattern): string {
 	if (pattern.confirmed) return "Confirmed";
-	const anchor = pattern.anchor;
-	if (anchor.review?.decision === "rejected") return "Not repeating";
-	if (anchor.dismissed) return "Dismissed";
-	if (anchor.stale) return "Awaiting analysis";
-	return anchor.status === "withdrawn" ? "Withdrawn" : "Needs review";
+	return findingStateLabel({ ...pattern.anchor, kind: "repeating" }, "status");
 }

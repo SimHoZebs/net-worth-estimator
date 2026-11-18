@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
-	cadenceLabel,
 	directionLabel,
 	frequencyLabel,
 	groupRecurringPatterns,
@@ -93,8 +92,8 @@ describe("repeating-payment patterns", () => {
 		expect(recurringPatternStatus(notRepeating!)).toBe("Not repeating");
 	});
 	it("words cadences without schedule jargon", () => {
-		expect(cadenceLabel("monthly")).toBe("Monthly");
-		expect(cadenceLabel("biweekly")).toBe("Every 2 weeks");
+		expect(frequencyLabel("monthly")).toBe("Monthly");
+		expect(frequencyLabel("biweekly")).toBe("Every 2 weeks");
 		expect(directionLabel("outflow")).toBe("Payment");
 		expect(directionLabel("inflow")).toBe("Deposit");
 		expect(frequencyLabel("quarterly")).toBe("Every 3 months");

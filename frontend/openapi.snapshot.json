@@ -3258,6 +3258,19 @@
 				"required": ["code", "message", "scope"],
 				"type": "object"
 			},
+			"PatternDatedAmount": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"type": "string"
+					},
+					"date": {
+						"type": "string"
+					}
+				},
+				"required": ["date", "amount"],
+				"type": "object"
+			},
 			"PatternOccurrence": {
 				"additionalProperties": false,
 				"properties": {
@@ -3312,14 +3325,15 @@
 					}
 				},
 				"required": [
-					"findingId",
-					"patternKey",
 					"scheduleId",
 					"scheduleName",
+					"claimable",
+					"assignments",
+					"findingId",
+					"patternKey",
 					"merchant",
 					"cadence",
-					"accountId",
-					"claimable"
+					"accountId"
 				],
 				"type": "object"
 			},
@@ -3370,23 +3384,23 @@
 					},
 					"upcoming": {
 						"items": {
-							"$ref": "#/components/schemas/UpcomingNewScheduleOccurrence"
+							"$ref": "#/components/schemas/PatternDatedAmount"
 						},
 						"type": ["array", "null"]
 					}
 				},
 				"required": [
+					"typicalAmount",
+					"currency",
+					"direction",
+					"creatable",
+					"occurrences",
+					"upcoming",
 					"findingId",
 					"patternKey",
 					"merchant",
 					"cadence",
-					"occurrences",
-					"typicalAmount",
-					"currency",
-					"direction",
-					"accountId",
-					"creatable",
-					"reason"
+					"accountId"
 				],
 				"type": "object"
 			},
@@ -6353,19 +6367,6 @@
 					}
 				},
 				"required": ["legA", "legB", "findingId", "actor", "createdAt"],
-				"type": "object"
-			},
-			"UpcomingNewScheduleOccurrence": {
-				"additionalProperties": false,
-				"properties": {
-					"amount": {
-						"type": "string"
-					},
-					"date": {
-						"type": "string"
-					}
-				},
-				"required": ["date", "amount"],
 				"type": "object"
 			},
 			"WriteResultAccount": {

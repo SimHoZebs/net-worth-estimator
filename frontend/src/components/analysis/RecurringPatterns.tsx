@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
 import { frequencyLabel } from "@/domain/recurringPatterns.ts";
 import {
@@ -11,6 +12,7 @@ import { notifySuccess } from "@/state/notifications.ts";
 import { useSavedAccounts } from "@/state/savedState.ts";
 import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Field } from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -27,23 +29,172 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import {
-	Item,
-	ItemContent,
-	ItemGroup,
-	ItemSeparator,
-} from "@/components/ui/item.tsx";
-import { Fragment } from "react";
 import { useId } from "react";
 
-const errorClassName =
+export const analysisErrorClassName =
 	"m-0 shrink-0 overflow-auto text-sm leading-relaxed text-danger-text";
+
+export function AnalysisDialogContent({
+	className,
+	...props
+}: ComponentProps<typeof DialogContent>) {
+	return (
+		<DialogContent
+			className={cn(
+				"max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl",
+				className,
+			)}
+			{...props}
+		/>
+	);
+}
+
+/**
+ * Single vocabulary for the forecast-schedule pair so repeating rows,
+ * payment rows, and transaction insights share order, labels, and
+ * dialog titles instead of drifting through kind-specific overrides.
+ */
+export const FORECAST_SCHEDULE_EYEBROW = "Repeating payment";
+export const FORECAST_SCHEDULE_LINK_HEADING =
+	"Link repeating payments to a schedule";
+
+export interface ForecastScheduleTitles {
+	eyebrow: string;
+	heading: string;
+}
+
+export type ForecastScheduleDialog = "new" | "existing";
+
+/**
+ * The shared create-plus-link button pair with one order, one set of
+ * labels, and one aria vocabulary. Extra answers (Not repeating, Review
+ * again) slot in via before/after. Dialog ownership stays with the
+ * caller: ForecastScheduleActions mounts them inline, while surfaces
+ * that must survive queue refreshes (transaction insights) mount the
+ * dialogs at panel level and wire this pair to them.
+ */
+export function ForecastScheduleButtons({
+	title,
+	readOnly,
+	before,
+	after,
+	onCreate,
+	onLink,
+	createRef,
+	linkRef,
+}: {
+	title: string;
+	readOnly: boolean;
+	before?: ReactNode;
+	after?: ReactNode;
+	onCreate: () => void;
+	onLink: () => void;
+	createRef?: Ref<HTMLButtonElement>;
+	linkRef?: Ref<HTMLButtonElement>;
+}) {
+	const planLabel = readOnly
+		? "Review forecast plan"
+		: "Create forecast schedule";
+	return (
+		<div className="flex flex-wrap gap-2">
+			{before}
+			<Button
+				type="button"
+				size="sm"
+				variant={readOnly ? "secondary" : "default"}
+				ref={createRef}
+				aria-label={`${planLabel} for ${title}`}
+				onClick={onCreate}
+			>
+				{planLabel}
+			</Button>
+			<Button
+				type="button"
+				size="sm"
+				variant="secondary"
+				ref={linkRef}
+				aria-label={`Link to existing schedule for ${title}`}
+				onClick={onLink}
+			>
+				Link to existing schedule
+			</Button>
+			{after}
+		</div>
+	);
+}
+
+/**
+ * The shared create-plus-link pair for one finding. Callers render only
+ * their extra answers (Not repeating, Review again) around it via
+ * before/after. Owns both dialog open states and returns focus to the
+ * invoking button on close.
+ */
+export function ForecastScheduleActions({
+	findingId,
+	title,
+	names,
+	readOnly,
+	titles,
+	before,
+	after,
+}: {
+	findingId: string;
+	title: string;
+	names: Map<string, string>;
+	readOnly: boolean;
+	titles: ForecastScheduleTitles;
+	before?: ReactNode;
+	after?: ReactNode;
+}) {
+	const [dialog, setDialog] = useState<ForecastScheduleDialog | null>(null);
+	const planButtonRef = useRef<HTMLButtonElement>(null);
+	const linkButtonRef = useRef<HTMLButtonElement>(null);
+	const closeDialog = () => {
+		const current = dialog;
+		setDialog(null);
+		const target = current === "existing" ? linkButtonRef : planButtonRef;
+		requestAnimationFrame(() => target.current?.focus());
+	};
+	return (
+		<>
+			<ForecastScheduleButtons
+				title={title}
+				readOnly={readOnly}
+				before={before}
+				after={after}
+				createRef={planButtonRef}
+				linkRef={linkButtonRef}
+				onCreate={() => setDialog("new")}
+				onLink={() => setDialog("existing")}
+			/>
+			{dialog === "new" && (
+				<NewScheduleDialog
+					findingId={findingId}
+					title={title}
+					readOnly={readOnly}
+					eyebrow={titles.eyebrow}
+					onClose={closeDialog}
+				/>
+			)}
+			{dialog === "existing" && (
+				<ExistingScheduleDialog
+					findingId={findingId}
+					title={title}
+					names={names}
+					readOnly={readOnly}
+					heading={titles.heading}
+					onClose={closeDialog}
+				/>
+			)}
+		</>
+	);
+}
 
 export function NewScheduleDialog({
 	findingId,
 	title,
 	readOnly,
-	eyebrow = "Repeating payment",
+	eyebrow = FORECAST_SCHEDULE_EYEBROW,
 	onClose,
 }: {
 	findingId: string;
@@ -68,7 +219,7 @@ export function NewScheduleDialog({
 				if (!open) onClose();
 			}}
 		>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
+			<AnalysisDialogContent>
 				<DialogHeader>
 					<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
 						{eyebrow}
@@ -88,11 +239,11 @@ export function NewScheduleDialog({
 				) : (
 					<div className="space-y-4">
 						<ForecastRows plan={plan} title={title} accountName={accountName} />
-						{plan.schedule && plan.upcoming && plan.upcoming.length > 0 && (
+						{(plan.upcoming ?? []).length > 0 && plan.schedule && (
 							<div>
 								<h3 className="text-sm font-semibold">Upcoming</h3>
 								<ul className="mb-0 mt-1 space-y-1 pl-4 text-sm text-muted-foreground">
-									{plan.upcoming.map((item) => (
+									{(plan.upcoming ?? []).map((item) => (
 										<li key={item.date}>
 											{item.date} · {item.amount} {plan.currency}
 										</li>
@@ -106,11 +257,11 @@ export function NewScheduleDialog({
 								{evidenceSummary(plan)}
 							</p>
 						</div>
-						{!plan.creatable && (
+						{!plan.creatable && plan.reason && (
 							<p className="m-0 text-sm text-muted-foreground">{plan.reason}</p>
 						)}
 						{failed && (
-							<p role="alert" className={errorClassName}>
+							<p role="alert" className={analysisErrorClassName}>
 								The schedule could not be created.
 							</p>
 						)}
@@ -144,7 +295,7 @@ export function NewScheduleDialog({
 						</div>
 					</div>
 				)}
-			</DialogContent>
+			</AnalysisDialogContent>
 		</Dialog>
 	);
 }
@@ -168,7 +319,7 @@ function ForecastRows({
 	title: string;
 	accountName: string;
 }) {
-	const rows: { label: string; value: React.ReactNode }[] = [
+	const rows: { label: string; value: ReactNode }[] = [
 		{ label: "Suggested schedule", value: plan.schedule?.name ?? title },
 		{
 			label: "Amount",
@@ -188,19 +339,17 @@ function ForecastRows({
 			: []),
 	];
 	return (
-		<ItemGroup className="gap-0">
-			{rows.map((row, index) => (
-				<Fragment key={row.label}>
-					{index > 0 && <ItemSeparator />}
-					<Item className="justify-between gap-5">
-						<span className="text-muted-foreground">{row.label}</span>
-						<ItemContent className="flex-none flex-row items-center justify-end gap-2 text-right">
-							{row.value}
-						</ItemContent>
-					</Item>
-				</Fragment>
+		<dl className="m-0 divide-y divide-border">
+			{rows.map((row) => (
+				<div
+					key={row.label}
+					className="flex items-baseline justify-between gap-5 py-2 first:pt-0 last:pb-0"
+				>
+					<dt className="text-sm text-muted-foreground">{row.label}</dt>
+					<dd className="m-0 text-right text-sm">{row.value}</dd>
+				</div>
 			))}
-		</ItemGroup>
+		</dl>
 	);
 }
 
@@ -209,7 +358,7 @@ export function ExistingScheduleDialog({
 	title,
 	names,
 	readOnly,
-	heading = "Link repeating payments to a schedule",
+	heading = FORECAST_SCHEDULE_LINK_HEADING,
 	onClose,
 }: {
 	findingId: string;
@@ -245,7 +394,7 @@ export function ExistingScheduleDialog({
 				if (!open) onClose();
 			}}
 		>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
+			<AnalysisDialogContent>
 				<DialogHeader>
 					<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
 						{title}
@@ -306,11 +455,11 @@ export function ExistingScheduleDialog({
 						</div>
 					) : (
 						<>
-							{plan.assignments && plan.assignments.length > 0 && (
+							{(plan.assignments ?? []).length > 0 && (
 								<div>
 									<h3 className="text-sm font-semibold">Matched occurrences</h3>
 									<ul className="mb-0 mt-1 space-y-1 pl-4 text-sm text-muted-foreground">
-										{plan.assignments.map((item) => (
+										{(plan.assignments ?? []).map((item) => (
 											<li key={item.transactionId}>
 												{names.get(item.transactionId) ?? item.transactionId} ·{" "}
 												{item.date}
@@ -320,13 +469,13 @@ export function ExistingScheduleDialog({
 									</ul>
 								</div>
 							)}
-							{!plan.claimable && (
+							{!plan.claimable && plan.reason && (
 								<p className="m-0 text-sm text-muted-foreground">
 									{plan.reason}
 								</p>
 							)}
 							{failed && (
-								<p role="alert" className={errorClassName}>
+								<p role="alert" className={analysisErrorClassName}>
 									The payments could not be added.
 								</p>
 							)}
@@ -360,7 +509,7 @@ export function ExistingScheduleDialog({
 						</>
 					)}
 				</div>
-			</DialogContent>
+			</AnalysisDialogContent>
 		</Dialog>
 	);
 }

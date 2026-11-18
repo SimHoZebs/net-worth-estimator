@@ -1,15 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import {
 	findingLabel,
 	findingStatus,
 	providerLabel,
 } from "@/domain/analysisFindings.ts";
-import {
-	useAnalyses,
-	useAnalysisFindings,
-	useDismissAnalysisFinding,
-} from "@/state/analyses.ts";
+import { useAnalyses, useDismissAnalysisFinding } from "@/state/analyses.ts";
 import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { useAllAnalysisFindings } from "@/state/allAnalysisFindings.ts";
@@ -30,30 +26,54 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 
 export function AnalysisFindings() {
-	const [cursors, setCursors] = useState([""]);
-	const query = useAnalysisFindings(undefined, cursors.at(-1) ?? "");
+	const [page, setPage] = useState(0);
 	const complete = useAllAnalysisFindings();
 	const analyses = useAnalyses();
 	const review = useDismissAnalysisFinding();
 	const catalog = useTransactionCatalog().data;
 	const readOnly = useUserReadOnly();
-	const transactions = (catalog?.items ?? []).map((item) => ({
-		id: item.id,
-		name: item.name,
-	}));
-	const allFindings = query.data?.findings ?? [];
-	const findings = allFindings.filter((finding) => finding.kind === "bnpl");
-	const patterns = (complete.data ?? []).filter(
-		(finding) => finding.pattern || finding.kind === "recurring",
+	const transactions = useMemo(
+		() =>
+			(catalog?.items ?? []).map((item) => ({
+				id: item.id,
+				name: item.name,
+			})),
+		[catalog?.items],
 	);
-	const names = new Map(
-		transactions.map((transaction) => [transaction.id, transaction.name]),
+	// One findings fetch family per poll: the BNPL table slices the complete
+	// list locally while pattern review keeps complete membership. Both views
+	// share `analysisFindingsKey` as the single invalidation root.
+	const allFindings = useMemo(() => complete.data ?? [], [complete.data]);
+	const findings = useMemo(
+		() => allFindings.filter((finding) => finding.kind === "bnpl"),
+		[allFindings],
+	);
+	const patterns = useMemo(
+		() =>
+			allFindings.filter(
+				(finding) => finding.pattern || finding.kind === "recurring",
+			),
+		[allFindings],
+	);
+	const names = useMemo(
+		() =>
+			new Map(
+				transactions.map((transaction) => [transaction.id, transaction.name]),
+			),
+		[transactions],
+	);
+	const pageSize = 100;
+	const pageCount = Math.max(1, Math.ceil(findings.length / pageSize));
+	const safePage = Math.min(page, pageCount - 1);
+	const pagedFindings = useMemo(
+		() => findings.slice(safePage * pageSize, (safePage + 1) * pageSize),
+		[findings, safePage],
 	);
 	const state = analyses.data?.analyses?.find(
 		(item) => item.type === "bnpl",
 	)?.state;
 	const findingsError =
-		query.isError || analyses.isError
+		complete.isError || analyses.isError
 			? "Analysis results could not be loaded."
 			: state === "failed"
 				? "Analysis failed. Automatic retry pending. Account sync is unaffected."
@@ -75,7 +95,7 @@ export function AnalysisFindings() {
 						<AlertDescription>{findingsError}</AlertDescription>
 					</Alert>
 				) : null}
-				{query.isPending ? (
+				{complete.isPending ? (
 					<p className="text-sm text-muted-foreground">Loading findings…</p>
 				) : findings.length ? (
 					<Table
@@ -98,7 +118,7 @@ export function AnalysisFindings() {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{findings.map((finding) => (
+							{pagedFindings.map((finding) => (
 								<TableRow key={finding.id}>
 									<TableHead scope="row">
 										<span className="text-sm font-semibold">
@@ -159,14 +179,14 @@ export function AnalysisFindings() {
 				) : allFindings.length === 0 ? (
 					<p className="text-sm text-muted-foreground">No findings yet.</p>
 				) : null}
-				{(cursors.length > 1 || query.data?.nextCursor) && (
+				{pageCount > 1 && (
 					<div className="flex gap-2">
 						<Button
 							type="button"
 							variant="secondary"
 							size="sm"
-							disabled={cursors.length === 1}
-							onClick={() => setCursors((previous) => previous.slice(0, -1))}
+							disabled={safePage === 0}
+							onClick={() => setPage((previous) => Math.max(0, previous - 1))}
 						>
 							Previous findings
 						</Button>
@@ -174,11 +194,10 @@ export function AnalysisFindings() {
 							type="button"
 							variant="secondary"
 							size="sm"
-							disabled={!query.data?.nextCursor}
-							onClick={() => {
-								const next = query.data?.nextCursor;
-								if (next) setCursors((previous) => [...previous, next]);
-							}}
+							disabled={safePage >= pageCount - 1}
+							onClick={() =>
+								setPage((previous) => Math.min(pageCount - 1, previous + 1))
+							}
 						>
 							Next findings
 						</Button>

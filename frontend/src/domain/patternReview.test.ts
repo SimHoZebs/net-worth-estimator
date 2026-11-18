@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
 	groupPatternReviews,
-	reviewAmount,
-	reviewCadenceLabel,
 	reviewChipLabel,
 	reviewChips,
-	reviewRecordedCount,
+	reviewSummary,
 	reviewTabFor,
 	reviewTitle,
 } from "./patternReview.ts";
@@ -65,18 +63,21 @@ function recurring(id: string, transactionId: string): AnalysisFinding {
 	} as AnalysisFinding;
 }
 
+function makeReviewRow() {
+	return groupPatternReviews([
+		payment("one"),
+		payment("two"),
+		recurring("rep-one", "one"),
+		recurring("rep-two", "two"),
+	])[0]!;
+}
+
 describe("pattern review grouping", () => {
 	it("groups purpose and repetition of one stream into one row", () => {
-		const rows = groupPatternReviews([
-			payment("one"),
-			payment("two"),
-			recurring("rep-one", "one"),
-			recurring("rep-two", "two"),
-		]);
-		expect(rows).toHaveLength(1);
-		expect(rows[0]!.payments).toHaveLength(1);
-		expect(rows[0]!.repetition).toHaveLength(1);
-		expect(rows[0]!.tab).toBe("review");
+		const row = makeReviewRow();
+		expect(row.payments).toHaveLength(1);
+		expect(row.repetition).toHaveLength(1);
+		expect(row.tab).toBe("review");
 	});
 	it("keeps withdrawn evidence in a separate row", () => {
 		const rows = groupPatternReviews([
@@ -124,38 +125,35 @@ describe("pattern review rows", () => {
 		["one", "ACME payroll"],
 		["two", "ACME payroll"],
 	]);
-	function row() {
-		return groupPatternReviews([
-			payment("one"),
-			payment("two"),
-			recurring("rep-one", "one"),
-			recurring("rep-two", "two"),
-		])[0]!;
-	}
 	it("titles the row after the most common saved name", () => {
-		expect(reviewTitle(row(), names)).toBe("ACME payroll");
-		expect(reviewTitle(row(), new Map())).toBe("Acme");
+		expect(reviewTitle(makeReviewRow(), names)).toBe("ACME payroll");
+		expect(reviewTitle(makeReviewRow(), new Map())).toBe("Acme");
 	});
 	it("summarizes cadence, occurrences, and the typical amount", () => {
-		expect(reviewCadenceLabel(row())).toBe("Monthly");
-		expect(reviewRecordedCount(row())).toBe(2);
-		expect(reviewAmount(row())).toEqual({
-			text: "2,000 USD typical",
-			direction: "Deposit",
-			inflow: true,
+		expect(reviewSummary(makeReviewRow())).toEqual({
+			cadence: "Monthly",
+			recorded: 2,
+			amount: {
+				text: "2,000 USD typical",
+				direction: "Deposit",
+				inflow: true,
+			},
 		});
 	});
 	it("reports missing repetition and skips amounts without a purpose", () => {
 		const [single] = groupPatternReviews([payment("one", { product: "" })]);
-		expect(reviewCadenceLabel(single!)).toBe("Repetition not established");
+		expect(reviewSummary(single!).cadence).toBe("Repetition not established");
 		const [repeating] = groupPatternReviews([recurring("rep-one", "one")]);
-		expect(reviewCadenceLabel(repeating!)).toBe("Monthly");
-		expect(reviewAmount(repeating!)).toBeNull();
+		expect(reviewSummary(repeating!)).toEqual({
+			cadence: "Monthly",
+			recorded: 1,
+			amount: null,
+		});
 	});
 	it("chips each classification plus a repetition marker", () => {
-		const chips = reviewChips(row());
+		const chips = reviewChips(makeReviewRow());
 		expect(chips.map((chip) => chip.label)).toEqual(["income?", "Repeating"]);
-		expect(chips.map((chip) => chip.tone)).toEqual(["neutral", "neutral"]);
+		expect(chips.map((chip) => chip.tone)).toEqual(["secondary", "secondary"]);
 		const [saved] = groupPatternReviews([
 			payment("one", {
 				review: { decision: "confirmed", provider: "acme", answeredAt: 1 },

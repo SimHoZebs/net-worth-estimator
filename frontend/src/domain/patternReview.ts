@@ -1,14 +1,16 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
+	findingStateLabel,
 	groupPaymentPatterns,
 	isMainIncome,
 	paymentAmount,
 	type PaymentPattern,
 } from "./paymentFindings.ts";
 import {
-	cadenceLabel,
 	directionLabel,
+	frequencyLabel,
 	groupRecurringPatterns,
+	mostCommonTransactionName,
 	type RecurringPattern,
 } from "./recurringPatterns.ts";
 
@@ -25,7 +27,7 @@ export interface PatternReviewRow {
 export interface PatternReviewChip {
 	key: string;
 	label: string;
-	tone: "success" | "neutral";
+	tone: "success" | "secondary";
 }
 
 export interface PatternReviewAmount {
@@ -99,19 +101,7 @@ export function reviewTitle(
 	row: PatternReviewRow,
 	names: Map<string, string>,
 ): string {
-	const counts = new Map<string, number>();
-	let best = "";
-	let bestCount = 0;
-	for (const finding of row.findings) {
-		const name = names.get(finding.transactionId) ?? "";
-		if (!name) continue;
-		const count = (counts.get(name) ?? 0) + 1;
-		counts.set(name, count);
-		if (count > bestCount) {
-			best = name;
-			bestCount = count;
-		}
-	}
+	const best = mostCommonTransactionName(row.findings, names);
 	if (best) return best;
 	const anchors = [
 		...row.payments.map((pattern) => pattern.anchor),
@@ -125,7 +115,17 @@ export function reviewTitle(
 	return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Payment pattern";
 }
 
-export function reviewCadenceLabel(row: PatternReviewRow): string {
+export interface PatternReviewSummary {
+	cadence: string;
+	recorded: number;
+	amount: PatternReviewAmount | null;
+}
+
+/**
+ * One row-summary owner for the pattern list and dialog: cadence, recorded
+ * movement count, and the typical purpose amount.
+ */
+export function reviewSummary(row: PatternReviewRow): PatternReviewSummary {
 	const cadence =
 		[
 			...row.payments.map((pattern) => pattern.anchor.product),
@@ -133,44 +133,30 @@ export function reviewCadenceLabel(row: PatternReviewRow): string {
 		]
 			.map((value) => (value ?? "").trim())
 			.find(Boolean) ?? "";
-	return cadence ? cadenceLabel(cadence) : "Repetition not established";
-}
-
-export function reviewRecordedCount(row: PatternReviewRow): number {
-	return new Set(row.findings.map((finding) => finding.transactionId)).size;
-}
-
-export function reviewAmount(
-	row: PatternReviewRow,
-): PatternReviewAmount | null {
 	const anchor = row.payments
 		.map((pattern) => pattern.anchor)
 		.find((finding) => finding.pattern);
-	if (!anchor?.pattern) return null;
 	return {
-		text: `${paymentAmount(anchor.pattern.typicalAmount, anchor.pattern.currency)} typical`,
-		direction: directionLabel(anchor.role),
-		inflow: anchor.role === "inflow",
+		cadence: cadence ? frequencyLabel(cadence) : "Repetition not established",
+		recorded: new Set(row.findings.map((finding) => finding.transactionId))
+			.size,
+		amount: anchor?.pattern
+			? {
+					text: `${paymentAmount(anchor.pattern.typicalAmount, anchor.pattern.currency)} typical`,
+					direction: directionLabel(anchor.role),
+					inflow: anchor.role === "inflow",
+				}
+			: null,
 	};
 }
 
 /**
  * One chip per payment classification plus a repetition marker. Unanswered
  * suggestions read as kind questions, confirmed ones as the kind itself;
- * every other state reuses the existing finding words.
+ * every other state reuses the shared finding-state wording.
  */
 export function reviewChipLabel(finding: AnalysisFinding): string {
-	const kind = finding.kind;
-	if (finding.status === "withdrawn") return "Withdrawn";
-	if (finding.review?.decision === "rejected") return `Not ${kind}`;
-	if (finding.review?.decision === "confirmed") return kind;
-	if (finding.dismissed) return "Dismissed";
-	if (finding.stale) return "Awaiting analysis";
-	if (finding.judgment?.status === "pending") return "Review pending";
-	if (finding.judgment?.decision === "unsupported") return `Not ${kind}`;
-	if (finding.judgment?.decision === "uncertain") return `Possible ${kind}`;
-	if (isMainIncome(finding)) return "Main income";
-	return `${kind}?`;
+	return findingStateLabel(finding, "chip");
 }
 
 export function reviewChips(row: PatternReviewRow): PatternReviewChip[] {
@@ -179,13 +165,13 @@ export function reviewChips(row: PatternReviewRow): PatternReviewChip[] {
 		label: reviewChipLabel(pattern.anchor),
 		tone: (pattern.anchor.review?.decision === "confirmed"
 			? "success"
-			: "neutral") as "success" | "neutral",
+			: "secondary") as "success" | "secondary",
 	}));
 	row.repetition.forEach((pattern, index) => {
 		chips.push({
 			key: `repetition:${pattern.key}:${index}`,
 			label: "Repeating",
-			tone: pattern.confirmed ? "success" : "neutral",
+			tone: pattern.confirmed ? "success" : "secondary",
 		});
 	});
 	return chips;

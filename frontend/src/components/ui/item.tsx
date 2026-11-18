@@ -200,4 +200,5 @@ export {
 	ItemDescription,
 	ItemHeader,
 	ItemFooter,
+	itemVariants,
 };
