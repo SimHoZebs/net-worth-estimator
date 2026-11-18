@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { Transaction } from "./model.ts";
 import { transactionFixture } from "@/mocks/projection.ts";
 import {
+	claimedBillKeys,
 	recurringBillIncreases,
 	recurringBillMarkers,
+	unclaimedBills,
 } from "./recurringBillIncreases.ts";
 
 const bill = (
@@ -88,6 +90,24 @@ describe("recurringBillIncreases", () => {
 		]);
 	});
 
+	it("hides a claimed occurrence from the Bills list while markers keep it", () => {
+		const bills = [
+			bill("2026-11-20", 25, { transactionId: "rent" }),
+			bill("2026-11-21", 30, { transactionId: "utilities" }),
+		];
+		const transactions = [claim("paid-1", "rent", "2026-11-20")];
+		expect(claimedBillKeys(transactions)).toEqual(new Set(["rent|2026-11-20"]));
+		expect(
+			unclaimedBills(bills, transactions).map((row) => row.transactionId),
+		).toEqual(["utilities"]);
+		// Markers keep the occurred bill so its dot survives on the chart.
+		expect(recurringBillMarkers(bills)).toHaveLength(2);
+		// Projected increases reuse the same unclaimed list, so they cannot drift.
+		expect(recurringBillIncreases({ bills, transactions })).toEqual(
+			recurringBillMarkers(unclaimedBills(bills, transactions)),
+		);
+	});
+
 	it("keeps a bill claimed by a void or pending transaction", () => {
 		const voidClaim = {
 			...claim("void-claim", "rent", "2026-11-20"),
@@ -105,6 +125,15 @@ describe("recurringBillIncreases", () => {
 			],
 		});
 		expect(increases).toHaveLength(2);
+		expect(
+			unclaimedBills(
+				[
+					bill("2026-11-20", 25, { transactionId: "rent" }),
+					bill("2026-11-21", 30, { transactionId: "utilities" }),
+				],
+				[voidClaim, pendingClaim],
+			),
+		).toHaveLength(2);
 	});
 
 	it("ignores rows with no spendable amount", () => {

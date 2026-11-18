@@ -37,9 +37,14 @@ Pending charges and pending refunds both count in recorded spending, counted
 once on their transaction date. Pending status never excludes a row from the
 ledger; only voided, disabled, or future-dated rows are left out. Bills are the
 selected recurring transactions whose source is a selected cash account and
-whose occurrence falls inside the visible cycle. One bill definition supplies
-both the Bills list and the chart's discrete projected increases, so a limit
-crossing reflects exactly the bills the user selected. Backend outstanding
+whose occurrence falls inside the visible cycle. The Bills list shows
+unclaimed occurrences only: a scheduled occurrence with a claim from a
+recorded movement is hidden because actual spending already carries it. The
+chart's discrete markers still show every scheduled occurrence in the
+selected cycle, claimed or not, while the projected increases leave out
+claimed occurrences to avoid counting them twice. One bill definition
+supplies both the Bills list and the chart's discrete projected increases,
+so a limit crossing reflects exactly the bills the user selected. Backend outstanding
 obligations remain a separate cash fact: they reduce cash after bills through
 month end and are not the Bills list.
 

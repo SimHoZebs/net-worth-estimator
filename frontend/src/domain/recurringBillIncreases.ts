@@ -24,6 +24,36 @@ export function recurringBillMarkers(
 }
 
 /**
+ * Posted claim identities for bill occurrences. A recorded movement claims a
+ * scheduled occurrence through its schedule id and occurrence date, so the
+ * projected line can leave it out without counting actual spending twice.
+ */
+export function claimedBillKeys(
+	transactions: readonly Transaction[],
+): Set<string> {
+	const claimed = new Set<string>();
+	for (const row of transactions) {
+		if (!isPostedTransaction(row)) continue;
+		if (!row.claimScheduleId || !row.claimOccurrenceDate) continue;
+		claimed.add(
+			`${row.claimScheduleId}|${row.claimOccurrenceDate.slice(0, 10)}`,
+		);
+	}
+	return claimed;
+}
+
+/** Selected bills without occurrences a recorded movement already claims. */
+export function unclaimedBills(
+	bills: readonly TransactionResult[],
+	transactions: readonly Transaction[],
+): TransactionResult[] {
+	const claimed = claimedBillKeys(transactions);
+	return bills.filter(
+		(row) => !claimed.has(`${row.transactionId}|${row.date}`),
+	);
+}
+
+/**
  * Projected increases come from the selected bills in the safe card cycle. A
  * bill whose occurrence a recorded transaction claims is already in actual
  * spending, so it is left out of the projected line to avoid counting it twice.
@@ -35,15 +65,5 @@ export function recurringBillIncreases({
 	bills: readonly TransactionResult[];
 	transactions: readonly Transaction[];
 }): RecurringBillIncrease[] {
-	const claimed = new Set<string>();
-	for (const row of transactions) {
-		if (!isPostedTransaction(row)) continue;
-		if (!row.claimScheduleId || !row.claimOccurrenceDate) continue;
-		claimed.add(
-			`${row.claimScheduleId}|${row.claimOccurrenceDate.slice(0, 10)}`,
-		);
-	}
-	return recurringBillMarkers(
-		bills.filter((row) => !claimed.has(`${row.transactionId}|${row.date}`)),
-	);
+	return recurringBillMarkers(unclaimedBills(bills, transactions));
 }

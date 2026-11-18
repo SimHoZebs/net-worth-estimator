@@ -2,6 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
 import type { TransactionResult } from "@/domain/result.ts";
+import type { Transaction } from "@/domain/model.ts";
+import {
+	recurringBillMarkers,
+	unclaimedBills,
+} from "@/domain/recurringBillIncreases.ts";
 import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
 
 function summary(
@@ -243,7 +248,9 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Bills</h3>");
 		expect(html).toContain("Selected bill A");
 		expect(html).not.toContain("close-cash-value");
-		expect(html).not.toContain("No cash evidence exists for an upcoming cycle.");
+		expect(html).not.toContain(
+			"No cash evidence exists for an upcoming cycle.",
+		);
 	});
 	it("renders a contractually unfetchable window with the same unavailable figure", () => {
 		// Future ranges cannot be fetched (the endpoint rejects starts after
@@ -330,5 +337,52 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Remainder uncertain");
 		expect(html).not.toContain("Posted");
 		expect(html).not.toContain("Diagnostic movement");
+	});
+	it("hides a claimed occurrence from the Bills list while markers keep its dot", () => {
+		const full = [
+			bill(),
+			bill({
+				transactionId: "bill-b",
+				name: "Selected bill B",
+				date: "2026-11-20",
+				requested: 98.92,
+			}),
+		];
+		const paid: Transaction = {
+			id: "paid-1",
+			name: "Recorded payment for bill A",
+			amount: 711.12,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			kind: "transaction",
+			startDate: "2026-11-15",
+			endDate: null,
+			annualIncrease: 0,
+			enabled: true,
+			readOnly: false,
+			claimScheduleId: "bill-a",
+			claimOccurrenceDate: "2026-11-15",
+			postedDate: null,
+			pending: false,
+			void: false,
+			syncOwned: true,
+			category: null,
+			categorySource: null,
+			transactionTime: null,
+		};
+		// The preview passes the unclaimed list to the Bills section while
+		// the chart keeps markers from the full selected-cycle set.
+		const display = unclaimedBills(full, [paid]);
+		expect(display.map((row) => row.transactionId)).toEqual(["bill-b"]);
+		expect(recurringBillMarkers(full)).toEqual([
+			{ date: "2026-11-15", amount: 711.12, name: "Selected bill A" },
+			{ date: "2026-11-20", amount: 98.92, name: "Selected bill B" },
+		]);
+		const html = render(summary(), display);
+		expect(html).toContain("Selected bill B");
+		expect(html).toContain("$98.92");
+		expect(html).not.toContain("Selected bill A");
+		expect(html).not.toContain("$810.04");
 	});
 });

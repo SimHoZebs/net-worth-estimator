@@ -55,6 +55,7 @@ import { expectedMonthlyIncome } from "@/domain/safeSpendingIncome.ts";
 import {
 	recurringBillIncreases,
 	recurringBillMarkers,
+	unclaimedBills,
 } from "@/domain/recurringBillIncreases.ts";
 import { cashPaymentSection } from "./cashPayments.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
@@ -314,6 +315,12 @@ export function SafeSpendingPreview({
 		() => recurringBillMarkers(selectedBills),
 		[selectedBills],
 	);
+	// The Bills list hides scheduled occurrences a recorded movement already
+	// claims; the chart dots keep every scheduled occurrence, claimed or not.
+	const displayBills = useMemo(
+		() => unclaimedBills(selectedBills, transactions ?? []),
+		[selectedBills, transactions],
+	);
 	const selectedView = useMemo(
 		() =>
 			cycleView({
@@ -478,7 +485,7 @@ export function SafeSpendingPreview({
 										summary={cashSummary.data}
 										pending={cashSummary.isPending}
 										error={cashSummary.isError}
-										bills={selectedBills}
+										bills={displayBills}
 										unavailable={cycleOffset > 0}
 										onRetry={() => {
 											void cashSummary.refetch();
