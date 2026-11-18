@@ -482,7 +482,7 @@ test("included bill changes refresh cash evidence without reloading", async ({
 	}
 });
 
-test("current cash budget and exact crossing survive inline history, sorting and future salary changes", async ({
+test("current cash budget and over-limit state survive inline history, sorting and future salary changes", async ({
 	page,
 }) => {
 	const api = await request.newContext();
@@ -503,7 +503,7 @@ test("current cash budget and exact crossing survive inline history, sorting and
 			await expect(card.getByTestId("perday-value")).toHaveText("$0.00");
 			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
-			).toHaveText(/\$283\.42 cash limit was crossed on Nov 9, 2026/);
+			).toHaveText(/already exhausted at cycle entry/);
 			await expect(
 				card.getByRole("list", { name: "Spending pace legend" }),
 			).toContainText("Income limit");
@@ -540,43 +540,15 @@ test("current cash budget and exact crossing survive inline history, sorting and
 			const table = drawer.getByRole("table");
 			await expect(table.locator("tbody > tr")).toHaveCount(3);
 			await expect(table.getByRole("separator")).toHaveCount(0);
-			const row = table.getByRole("row").filter({
-				has: page.getByRole("button", {
-					name: /View Synthetic crossing purchase on/,
-				}),
-			});
-			await expect(row).toContainText("Reserve · Cash limit");
-			await expect(row).toHaveClass(/border-b-0/);
-			await expect(
-				row.locator('[data-spending-divider="danger"]'),
-			).toContainText("Cash limit");
-			await expect(
-				row.locator("td").last().locator(":scope > span").first(),
-			).not.toContainText("Cash limit");
-			const geometry = await row.evaluate((element) => {
-				const marker = element.querySelector(
-					'[data-spending-divider="danger"]',
-				)!;
-				const label = marker.children[1]!;
-				const rowBounds = element.getBoundingClientRect();
-				const labelBounds = label.getBoundingClientRect();
-				return {
-					offset: Math.abs(
-						(labelBounds.left + labelBounds.right) / 2 -
-							(rowBounds.left + rowBounds.right) / 2,
-					),
-					border: getComputedStyle(element).borderBottomWidth,
-					left: getComputedStyle(marker.children[0]!).borderTopWidth,
-					right: getComputedStyle(marker.children[2]!).borderTopWidth,
-				};
-			});
-			expect(geometry.offset).toBeLessThan(1);
-			expect(geometry.border).toBe("0px");
-			expect(geometry.left).toBe("2px");
-			expect(geometry.right).toBe("2px");
+			// The card debt deduction puts the cash limit below zero, so
+			// no crossing marker is assigned: the budget is over from
+			// the start instead of crossed mid-cycle.
 			await expect(
 				table.getByRole("row").filter({ hasText: "Cash limit" }),
-			).toHaveCount(1);
+			).toHaveCount(0);
+			await expect(drawer.locator("[data-spending-divider]")).toHaveCount(
+				0,
+			);
 		};
 		await checkCrossing();
 		await drawer.getByRole("button", { name: "Newest first" }).click();
