@@ -5,6 +5,16 @@ import {
 import type { Account, Transaction } from "@/domain/model.ts";
 import { isSpendCategory } from "@/domain/safeSpendingMath.ts";
 
+/**
+ * Card settlement legs move cash to the card without creating new spending.
+ * The bank sync leaves the checking leg as an external expense with no
+ * destination, so it is detected by name. Genuine transfers keep their
+ * explicit routing and never reach this test.
+ */
+export function isCardSettlement(name: string): boolean {
+	return /payment\s+to.*card/i.test(name);
+}
+
 /** Preserve exact chronology through display projection, including posted-time
  * fallback already resolved by transactionToDisplay for untimed transactions. */
 export function currentSpendingActivity(
@@ -26,7 +36,7 @@ export function currentSpendingActivity(
 		const cardSettlement =
 			row.flow === "expense" &&
 			row.direction === "out" &&
-			/payment\s+to.*card/i.test(row.name);
+			isCardSettlement(row.name);
 		const transfer = row.flow === "transfer" || cardSettlement;
 		if (cardSettlement) row = { ...row, flow: "transfer" };
 		const expenseCredit = row.direction === "in" && isSpendCategory(category);
@@ -60,8 +70,10 @@ export function currentSpendingActivity(
 }
 
 /** Recorded enabled cash only. Bank holds already reflected by available cash
- * cannot be charged again. Explicit routing, never names or amounts, identifies
- * transfers; the spending owner excludes those while the drawer keeps them. */
+ * cannot be charged again. Explicit routing identifies transfers; card
+ * settlement legs are the documented exception because the sync leaves
+ * them routeless, so they are detected by name in currentSpendingActivity.
+ * The spending owner excludes transfers while the drawer keeps them. */
 export function currentCashActivity({
 	accounts,
 	transactions,

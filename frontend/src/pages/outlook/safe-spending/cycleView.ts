@@ -26,6 +26,21 @@ export interface CycleViewInput {
 	fullDaysLeft: number;
 	/** Posted external cash inflows; null means evidence is unavailable. */
 	monthlyIncome?: number | null;
+	/**
+	 * Card debt incurred this cycle: card purchases minus card settlements
+	 * paid from cash. Card spending never leaves checking, so without this
+	 * deduction every card purchase would raise the reconstructed limit.
+	 * Undefined preserves the legacy spent-plus-remaining reconstruction;
+	 * null marks the debt unknown and clears the limit.
+	 */
+	cardDebtChange?: number | null;
+	/**
+	 * Income still expected inside the cycle after the reference day.
+	 * Received income already sits inside cashAfterBills, so only the
+	 * not-yet-arrived portion enters here and nothing is counted twice.
+	 * Undefined preserves the legacy calculation; null clears the limit.
+	 */
+	futureCycleIncome?: number | null;
 	scheduledOutflows?: SafeSpendingScheduledIncrease[];
 }
 
@@ -35,10 +50,12 @@ export interface CycleViewResult {
 }
 
 /**
- * One current cash-backed budget. Capacity reconstructs the current budget over
- * recorded cycle spending; it is neither historical bank cash nor an old budget.
- * Known cash already includes recorded bank movements: purchases are not deducted
- * from it again. Future income never enters this calculation.
+ * One current cash-backed budget. The limit is cash left plus the income
+ * still arriving to pay for the cycle, minus card debt incurred but not
+ * yet paid: starting cash plus cycle income, independent of how much of
+ * it is already spent. Cash already reflects recorded bank movements, so
+ * purchases are not deducted from it again; received income already sits
+ * inside it, so only not-yet-arrived income enters separately.
  */
 export function cycleView({
 	cycle,
@@ -51,6 +68,8 @@ export function cycleView({
 	fullDaysLeft,
 	monthlyIncome,
 	scheduledOutflows,
+	cardDebtChange,
+	futureCycleIncome,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
 	const monthStart = `${referenceDay.slice(0, 7)}-01`;
 	const recorded = spendingLedger({
@@ -76,10 +95,18 @@ export function cycleView({
 			: null;
 	const protectedReserve = Math.max(0, reserve);
 	const unknownSpending = hasUnknownSpending(ledger);
+	const debt = cardDebtChange === undefined ? 0 : cardDebtChange;
+	const futureIncome =
+		futureCycleIncome === undefined ? 0 : futureCycleIncome;
 	const capacity =
-		remaining === null || unknownSpending
+		remaining === null ||
+		unknownSpending ||
+		debt === null ||
+		!Number.isFinite(debt) ||
+		futureIncome === null ||
+		!Number.isFinite(futureIncome)
 			? null
-			: roundCents(spent + remaining);
+			: roundCents(spent + remaining - debt + futureIncome);
 	const trend = safeSpendingTrend({
 		transactions: ledger,
 		cycleStart: cycle.start,

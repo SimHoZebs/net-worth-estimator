@@ -9,7 +9,7 @@ import {
 	sortTransactionsByDate,
 	type TransactionOrder,
 } from "@/domain/transactionSort.ts";
-import { monthDay, sum, todayIso } from "@/domain/format.ts";
+import { monthDay, shiftDate, sum, todayIso } from "@/domain/format.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
 	Card,
@@ -28,6 +28,7 @@ import { spendingLedger, spendingAmount } from "@/domain/safeSpendingTrend.ts";
 import {
 	currentCashActivity,
 	currentSpendingActivity,
+	isCardSettlement,
 } from "./currentCashActivity.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
 import {
@@ -350,6 +351,49 @@ export function SafeSpendingPreview({
 			}),
 		[currentBills, transactions],
 	);
+	// Card debt incurred this cycle: card purchases minus settlements paid
+	// from cash. Settlements already left checking, so without this
+	// deduction every card purchase would raise the limit it should
+	// constrain. Null when either side is not finite, clearing the limit
+	// instead of publishing a false precise one.
+	const cardDebtChange = useMemo(() => {
+		const cardTotal = currentCardByCard.reduce(
+			(total, item) =>
+				total === null || item.amount === null || !Number.isFinite(item.amount)
+					? null
+					: (total as number) + (item.amount as number),
+			0 as number | null,
+		);
+		let settlements: number | null = 0;
+		for (const row of directTransactions) {
+			if (row.flow !== "transfer" || !isCardSettlement(row.name)) continue;
+			if (!Number.isFinite(row.amount)) {
+				settlements = null;
+				break;
+			}
+			settlements = (settlements as number) + row.amount;
+		}
+		if (cardTotal === null || settlements === null) return null;
+		return (cardTotal as number) - (settlements as number);
+	}, [currentCardByCard, directTransactions]);
+	// Income still arriving before the cycle ends. Received income already
+	// sits inside cashAfterBills, so only the not-yet-arrived portion
+	// enters here. Undefined when no income source is selected, preserving
+	// the legacy cash-only reconstruction for those budgets.
+	const futureCycleIncome = useMemo(() => {
+		if (!settings.incomeScheduleIds.length) return undefined;
+		return expectedMonthlyIncome({
+			schedules: savedRules ?? [],
+			incomeScheduleIds: settings.incomeScheduleIds,
+			monthStart: shiftDate({ date: displayToday, days: 1 }),
+			monthEnd: cycle.cycleEnd,
+		});
+	}, [
+		settings.incomeScheduleIds,
+		savedRules,
+		displayToday,
+		cycle.cycleEnd,
+	]);
 	const currentView = useMemo(
 		() =>
 			cycleView({
@@ -368,6 +412,8 @@ export function SafeSpendingPreview({
 				closedCycle,
 				fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
 				scheduledOutflows: billIncreases,
+				cardDebtChange,
+				futureCycleIncome,
 			}),
 		[
 			cycle.cycleStart,
@@ -382,6 +428,8 @@ export function SafeSpendingPreview({
 			settings.reserve,
 			closedCycle,
 			billIncreases,
+			cardDebtChange,
+			futureCycleIncome,
 		],
 	);
 	// The closed cycle's cash-payment section lists every posted cash row in

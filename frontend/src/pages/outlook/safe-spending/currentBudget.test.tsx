@@ -750,6 +750,23 @@ describe("canonical recorded cash selection", () => {
 			cycleView({ ...input, transactions: rows }).view.heroes.committedTotal,
 		).toBe(0);
 	});
+	it("holds the limit independent of spent by deducting incurred card debt", () => {
+		const base = cycleView(input);
+		expect(base.trend.limit).toBe(283.42);
+		const adjusted = cycleView({ ...input, cardDebtChange: 500 });
+		expect(adjusted.trend.limit).toBe(-216.58);
+		expect(adjusted.trend.safetyNet).toBe(-916.58);
+		const unknownDebt = cycleView({ ...input, cardDebtChange: null });
+		expect(unknownDebt.trend.limit).toBeNull();
+	});
+	it("adds only not-yet-arrived cycle income to the limit", () => {
+		const base = cycleView(input);
+		expect(base.trend.limit).toBe(283.42);
+		const withFuture = cycleView({ ...input, futureCycleIncome: 100 });
+		expect(withFuture.trend.limit).toBe(383.42);
+		const unknownFuture = cycleView({ ...input, futureCycleIncome: null });
+		expect(unknownFuture.trend.limit).toBeNull();
+	});
 	it("sums selected November schedules into one expected pay figure", () => {
 		const schedules = [
 			paycheck("payroll", 100, "2026-11-08"),
