@@ -59,9 +59,10 @@
 		"jsdom": "^31.0.0",
 		"orval": "^8.46.0",
 		"oxfmt": "^0.76.0",
-		"oxlint": "^1.91.0",
+		"oxlint": "1.94.0",
 		"postcss": "^8.5.32",
 		"tailwindcss": "^4.3.4",
+		"tsrs": "^0.25.0-ts7.1.0-beta",
 		"typescript": "^7.0.2",
 		"vite": "^8.3.6",
 		"vitest": "^5.1.0"
