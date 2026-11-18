@@ -53,6 +53,7 @@ export function useResourceSession() {
 		error: string;
 	}>({ phase: "checking", error: "" });
 	const [logoutPending, setLogoutPending] = useState(false);
+	const [retryPending, setRetryPending] = useState(false);
 	const owner = useRef<SessionOwner | null>(null);
 	const verification = useRef<Verification | null>(null);
 	const signingOut = useRef<LogoutAttempt | null>(null);
@@ -181,9 +182,8 @@ export function useResourceSession() {
 				if (previous)
 					notifyError("session", check.error, {
 						label: "Retry access check",
-						onAction: () => {
-							void verifySession();
-						},
+						onAction: () => verifySession(),
+						pendingLabel: "Checking…",
 					});
 			}
 		})().finally(() => {
@@ -198,6 +198,18 @@ export function useResourceSession() {
 		// or an outage that keeps stale data visible.
 		if (!owner.current) setStatus({ phase: "checking", error: "" });
 		return verify();
+	}, [verify]);
+	// The full-page retry owns its own pending flag: focus/visibility checks
+	// call refresh directly and must never flicker the button.
+	const retry = useCallback(async () => {
+		setRetryPending(true);
+		try {
+			// Direct verification keeps the outage body mounted while it runs.
+			// refresh() would set the checking phase and unmount the button.
+			await verify();
+		} finally {
+			if (mounted.current) setRetryPending(false);
+		}
 	}, [verify]);
 
 	const logout = useCallback(async () => {
@@ -305,5 +317,13 @@ export function useResourceSession() {
 			void clearResourceQueryCache();
 		};
 	}, [refresh, verify]);
-	return { ...status, session, logoutPending, refresh, logout };
+	return {
+		...status,
+		session,
+		logoutPending,
+		retryPending,
+		refresh,
+		retry,
+		logout,
+	};
 }

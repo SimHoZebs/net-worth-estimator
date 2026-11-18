@@ -98,9 +98,8 @@ export function stochasticProjectionOptions({
 				if (!(error instanceof UserScopeError))
 					notifyError("projection-range", error.message, {
 						label: "Retry scenario calculation",
-						onAction: () => {
-							void client.refetchQueries({ queryKey, exact: true });
-						},
+						onAction: () => client.refetchQueries({ queryKey, exact: true }),
+						pendingLabel: "Retrying…",
 					});
 				throw error;
 			}

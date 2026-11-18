@@ -32,7 +32,8 @@ function integrationsOptions(scope = getUserScope()) {
 							: "The integrations could not be loaded.",
 						{
 							label: "Reload integrations",
-							onAction: () => void refreshIntegrations(true),
+							onAction: () => refreshIntegrations(true),
+							pendingLabel: "Reloading…",
 						},
 					);
 				throw error;

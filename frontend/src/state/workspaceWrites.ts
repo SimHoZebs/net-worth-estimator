@@ -191,7 +191,8 @@ async function write<T>(
 					error instanceof Error ? error.message : "The server write failed.",
 					{
 						label: "Retry server request",
-						onAction: () => void reloadWorkspace(),
+						onAction: () => reloadWorkspace(),
+						pendingLabel: "Retrying…",
 					},
 				);
 		},

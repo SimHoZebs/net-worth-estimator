@@ -33,7 +33,8 @@ function pinsOptions() {
 							: "Pins could not be loaded.",
 						{
 							label: "Reload pins",
-							onAction: () => void refreshPins(true),
+							onAction: () => refreshPins(true),
+							pendingLabel: "Reloading…",
 						},
 					);
 				throw error;
@@ -103,7 +104,8 @@ export async function togglePin(id: string): Promise<boolean> {
 				error instanceof Error ? error.message : "Pins could not be saved.",
 				{
 					label: "Reload pins",
-					onAction: () => void refreshPins(true),
+					onAction: () => refreshPins(true),
+					pendingLabel: "Reloading…",
 				},
 			);
 		}

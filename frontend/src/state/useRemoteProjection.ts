@@ -737,9 +737,9 @@ export function useRemoteProjection({
 	queryClientRef.current = queryClient;
 	const reportDeterministicError = (queryKey: readonly unknown[]) => ({
 		label: "Retry calculation",
-		onAction: () => {
-			void queryClientRef.current.refetchQueries({ queryKey, exact: true });
-		},
+		onAction: () =>
+			queryClientRef.current.refetchQueries({ queryKey, exact: true }),
+		pendingLabel: "Retrying…",
 	});
 	const notifyDeterministicError = (
 		queryKey: readonly unknown[],

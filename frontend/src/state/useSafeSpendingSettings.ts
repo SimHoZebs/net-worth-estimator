@@ -193,11 +193,14 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 					{
 						label: "Retry save",
 						onAction: () => updateSettingsForScope(scope)({}),
+						pendingLabel: "Retrying…",
 					},
 				);
 			},
 		});
-		void mutation.execute(undefined).catch(() => {});
+		const pending = mutation.execute(undefined);
+		void pending.catch(() => {});
+		return pending;
 	};
 }
 

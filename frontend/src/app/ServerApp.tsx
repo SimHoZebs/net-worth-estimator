@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useMatches } from "@tanstack/react-router";
+import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { FieldError } from "@/components/ui/field.tsx";
 import { useSession, type Session } from "../auth/sessionContext.ts";
@@ -62,9 +63,10 @@ export function ServerApp({ invalidLink = false }: { invalidLink?: boolean }) {
 	const session = sessionState?.session ?? null;
 	const phase = sessionState?.phase ?? "checking";
 	const sessionError = sessionState?.error ?? "";
-	const refresh = sessionState?.refresh ?? (async () => {});
 	const logout = sessionState?.logout ?? (async () => {});
 	const logoutPending = sessionState?.logoutPending ?? false;
+	const retry = sessionState?.retry ?? (async () => {});
+	const retryPending = sessionState?.retryPending ?? false;
 
 	// The layout stays mounted once. Only the body switches: session
 	// denial or outage, recovery when the server holds no model, otherwise
@@ -94,8 +96,9 @@ export function ServerApp({ invalidLink = false }: { invalidLink?: boolean }) {
 						session={session}
 						error={sessionError}
 						logoutPending={logoutPending}
+						retryPending={retryPending}
 						onRetry={() => {
-							void refresh();
+							void retry();
 						}}
 						onLogout={() => {
 							void logout();
@@ -125,12 +128,14 @@ function SessionErrorBody({
 	session,
 	error,
 	logoutPending,
+	retryPending,
 	onRetry,
 	onLogout,
 }: {
 	session: Session | null;
 	error: string;
 	logoutPending: boolean;
+	retryPending: boolean;
 	onRetry: () => void;
 	onLogout: () => void;
 }) {
@@ -161,8 +166,20 @@ function SessionErrorBody({
 						{logoutPending ? "Signing out…" : "Sign out"}
 					</Button>
 				)}
-				<Button variant="secondary" onClick={onRetry}>
-					Retry access check
+				<Button
+					variant="secondary"
+					disabled={retryPending}
+					aria-busy={retryPending}
+					onClick={onRetry}
+				>
+					{retryPending && (
+						<LoaderCircle
+							size={16}
+							aria-hidden="true"
+							className="shrink-0 animate-spin"
+						/>
+					)}
+					{retryPending ? "Checking…" : "Retry access check"}
 				</Button>
 			</div>
 		</div>

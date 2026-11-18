@@ -22,8 +22,10 @@ interface SessionContextValue {
 	phase: SessionPhase;
 	error: string;
 	refresh: () => Promise<void>;
+	retry: () => Promise<void>;
 	logout: () => Promise<void>;
 	logoutPending: boolean;
+	retryPending: boolean;
 }
 
 // AuthBoundary exposes the session hook's state and actions. Sidebar

@@ -211,12 +211,12 @@ describe("authentication resource isolation", () => {
 			</AuthBoundary>,
 		);
 		await screen.findByTestId("financial-preferences");
-		act(() =>
+		act(() => {
 			safeSpendingSettingsObserver.getState().updateSettings({
 				reserve: 123456,
 				incomeScheduleIds: ["private-a-income"],
-			}),
-		);
+			});
+		});
 		let finish: (value: Response) => void = () => {};
 		let gated = false;
 		fetcher.mockImplementation(

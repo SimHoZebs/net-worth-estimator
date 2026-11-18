@@ -247,3 +247,36 @@ it("rejects an old logout redirect after the boundary unmounts and mounts again"
 	expect(current.result.current.phase).toBe("ready");
 	expect(getUserScope()).toBe(verified);
 });
+
+it("marks only explicit retries pending, not background revalidation", async () => {
+	let discovery = true;
+	let finish: ((value: Response) => void) | null = null;
+	const fetcher = vi.fn(async (_input: RequestInfo | URL) => {
+		if (discovery) return response(session);
+		return new Promise<Response>((resolve) => {
+			finish = resolve;
+		});
+	});
+	vi.stubGlobal("fetch", fetcher);
+	const { result } = renderHook(useResourceSession);
+	await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+	await act(async () => {
+		await result.current.refresh();
+	});
+	expect(result.current.retryPending).toBe(false);
+
+	discovery = false;
+	let retry: Promise<void>;
+	act(() => {
+		retry = result.current.retry();
+	});
+	await waitFor(() => expect(result.current.retryPending).toBe(true));
+	expect(finish).not.toBeNull();
+	await act(async () => {
+		finish!(response(session));
+		await retry;
+	});
+	expect(result.current.retryPending).toBe(false);
+	expect(result.current.phase).toBe("ready");
+});
