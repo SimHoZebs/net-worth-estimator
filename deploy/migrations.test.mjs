@@ -1378,6 +1378,7 @@ test("API image migrates the full base with checkpoints and Analysis as its user
 set -eu
 test "$(id -u)" = 10001
 test -x /app/migrate.sh
+test -x /app/upgrade-statement-closing-day
 if /app/migrate.sh 2>/dev/null; then exit 1; fi
 test ! -e "$NET_WORTH_ESTIMATOR_DB"
 export NET_WORTH_ESTIMATOR_DB='/tmp/analysis fixture.db'

@@ -27,6 +27,9 @@ await run("go", ["build", "-o", join(tools, "simplefin-v2-keys"), "./scripts/one
 await run("go", ["build", "-o", join(tools, "prune-noop-checkpoints"), "./scripts/one-time/noop-checkpoints"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-statement-closing-day"), "./scripts/one-time/statement-closing-day"], {
+  cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
+});
 const sql = async (db, query) => (await run("sqlite3", [db, query])).stdout.trim();
 const sha256File = async (path) => (await run("sha256sum", [path])).stdout.trim().split(/\s+/)[0];
 const migrate = async (db, env = {}) => {
