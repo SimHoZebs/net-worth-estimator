@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Account } from "./model.ts";
 import {
+	accountBalanceDisplayData,
+	accountBalanceHeaderData,
+	accountBalanceSelectedData,
+	canChooseDisplayBasis,
 	componentIds,
 	displayBalance,
-	displayCurrentBalance,
+	effectiveDisplayBasis,
 	isGroupedDisplay,
 	toDisplayAccounts,
 	toDisplayTransaction,
@@ -128,40 +132,235 @@ describe("visible accounts", () => {
 	it("does not derive current available evidence from modeled balances", () => {
 		expect(toDisplayAccounts(fixture())[0]?.availableBalance).toBeNull();
 	});
-	it("derives the grouped current figure from the visible account basis", () => {
-		const raw = fixture();
-		raw[0]!.availableBalance = 1000;
-		raw[1]!.availableBalance = 44.43;
-		const grouped = toDisplayAccounts(raw)[0]!;
-		expect(displayCurrentBalance(grouped)).toBe(1044.43);
-		grouped.displayBasis = "posted";
-		expect(displayCurrentBalance(grouped)).toBe(-1020);
-	});
-	describe("displayCurrentBalance", () => {
-		it("shows available evidence by default", () => {
-			expect(displayCurrentBalance(account("cash", 100, 44.43))).toBe(44.43);
+	describe("effectiveDisplayBasis", () => {
+		it("defaults to available when the account reports an available figure", () => {
+			expect(effectiveDisplayBasis(account("cash", 100, 44.43))).toBe(
+				"available",
+			);
 		});
-		it("shows a reported zero as a current balance", () => {
-			expect(displayCurrentBalance(account("cash", 100, 0))).toBe(0);
-		});
-		it("shows the posted total when the basis is posted", () => {
+		it("keeps a persisted posted basis when both figures exist", () => {
 			const row = account("cash", 100, 44.43);
 			row.displayBasis = "posted";
-			expect(displayCurrentBalance(row)).toBe(100);
+			expect(effectiveDisplayBasis(row)).toBe("posted");
 		});
-		it("falls back to the saved balance for posted basis without observation", () => {
+		it("treats a reported zero as an available figure", () => {
+			expect(effectiveDisplayBasis(account("cash", 100, 0))).toBe("available");
+		});
+		it("falls back to posted when available is missing without rewriting the draft", () => {
 			const row = account("cash", 100, null);
+			expect(effectiveDisplayBasis(row)).toBe("posted");
+			expect(row.displayBasis).toBe("available");
 			row.displayBasis = "posted";
+			expect(effectiveDisplayBasis(row)).toBe("posted");
+		});
+	});
+	describe("canChooseDisplayBasis", () => {
+		it("allows the choice when both figures exist", () => {
+			expect(canChooseDisplayBasis(account("cash", 100, 44.43))).toBe(true);
+		});
+		it("allows the choice with a reported zero available figure", () => {
+			expect(canChooseDisplayBasis(account("cash", 100, 0))).toBe(true);
+		});
+		it("uses the saved balance as posted when observation is missing", () => {
+			const row = account("cash", 100, 44.43);
 			row.observedBalance = null;
-			expect(displayCurrentBalance(row)).toBe(100);
+			expect(canChooseDisplayBasis(row)).toBe(true);
 		});
-		it("shows the saved balance for manual accounts without bank evidence", () => {
-			expect(displayCurrentBalance(account("cash", 100, null))).toBe(100);
+		it("disallows the choice when the available figure is missing", () => {
+			expect(canChooseDisplayBasis(account("cash", 100, null))).toBe(false);
+			const synced = account("cash", 100, null);
+			synced.readOnly = true;
+			expect(canChooseDisplayBasis(synced)).toBe(false);
 		});
-		it("shows unavailable for synced accounts without bank evidence", () => {
-			const row = account("cash", 100, null);
+	});
+	describe("accountBalanceDisplayData", () => {
+		it("prepares both labeled entries with emphasis on the effective available figure", () => {
+			const row = account("cash", 100, 44.43);
+			row.source = "Synced balance check";
 			row.readOnly = true;
-			expect(displayCurrentBalance(row)).toBeNull();
+			expect(accountBalanceDisplayData(row)).toEqual({
+				entries: [
+					{ label: "Posted balance", value: 100, emphasized: false },
+					{ label: "Available balance", value: 44.43, emphasized: true },
+				],
+				synced: "2026-01-31",
+			});
+		});
+		it("uses the saved balance as the posted entry when no observation exists", () => {
+			const row = account("cash", 100, 44.43);
+			row.observedBalance = null;
+			expect(accountBalanceDisplayData(row).entries[0]).toEqual({
+				label: "Posted balance",
+				value: 100,
+				emphasized: false,
+			});
+		});
+		it("only prepares the posted entry, emphasized, when available is missing", () => {
+			const data = accountBalanceDisplayData(account("cash", 100, null));
+			expect(data.entries).toEqual([
+				{ label: "Posted balance", value: 100, emphasized: true },
+			]);
+		});
+		it("keeps a reported zero available entry with emphasis", () => {
+			const data = accountBalanceDisplayData(account("cash", 100, 0));
+			expect(data.entries[1]).toEqual({
+				label: "Available balance",
+				value: 0,
+				emphasized: true,
+			});
+		});
+		it("moves emphasis to the posted entry when the persisted choice is posted", () => {
+			const row = account("cash", 100, 44.43);
+			row.displayBasis = "posted";
+			expect(accountBalanceDisplayData(row).entries).toEqual([
+				{ label: "Posted balance", value: 100, emphasized: true },
+				{ label: "Available balance", value: 44.43, emphasized: false },
+			]);
+		});
+		it("emphasizes the posted entry when available is missing without rewriting the draft", () => {
+			const row = account("cash", 100, null);
+			row.displayBasis = "available";
+			const data = accountBalanceDisplayData(row);
+			expect(data.entries[0]?.emphasized).toBe(true);
+			expect(row.displayBasis).toBe("available");
+		});
+		it("reports a bank-owned account's recorded date even when read-only", () => {
+			const synced = account("cash", 100);
+			synced.source = "Synced balance check";
+			synced.readOnly = true;
+			expect(accountBalanceDisplayData(synced).synced).toBe("2026-01-31");
+			const unobserved = account("cash", 100);
+			unobserved.source = "Synced balance check";
+			unobserved.readOnly = true;
+			unobserved.observedOn = "";
+			expect(accountBalanceDisplayData(unobserved).synced).toBeNull();
+		});
+		it("does not report a sync date for a manual account with no ownership signal, even when read-only", () => {
+			const manual = account("cash", 100);
+			manual.source = "Manual entry";
+			manual.readOnly = true;
+			expect(accountBalanceDisplayData(manual).synced).toBeNull();
+		});
+		it("does not report a sync date for a manual account with an observation date", () => {
+			const manual = account("cash", 100);
+			manual.readOnly = false;
+			expect(manual.observedOn).toBe("2026-01-31");
+			expect(accountBalanceDisplayData(manual).synced).toBeNull();
+		});
+	});
+	describe("accountBalanceHeaderData", () => {
+		it("shows available first then posted with emphasis on the effective available figure", () => {
+			const row = account("cash", 100, 44.43);
+			row.source = "Synced balance check";
+			row.readOnly = true;
+			expect(accountBalanceHeaderData(row)).toEqual({
+				entries: [
+					{ label: "Available balance", value: 44.43, emphasized: true },
+					{ label: "Posted balance", value: 100, emphasized: false },
+				],
+				synced: "2026-01-31",
+			});
+		});
+		it("keeps available first while emphasizing posted when the persisted choice is posted", () => {
+			const row = account("cash", 100, 44.43);
+			row.displayBasis = "posted";
+			expect(accountBalanceHeaderData(row).entries).toEqual([
+				{ label: "Available balance", value: 44.43, emphasized: false },
+				{ label: "Posted balance", value: 100, emphasized: true },
+			]);
+		});
+		it("shows only the posted entry when available is missing", () => {
+			const row = account("cash", 100, null);
+			row.source = "Synced balance check";
+			row.readOnly = true;
+			expect(accountBalanceHeaderData(row)).toEqual({
+				entries: [{ label: "Posted balance", value: 100, emphasized: true }],
+				synced: "2026-01-31",
+			});
+		});
+		it("keeps a reported zero available entry first", () => {
+			expect(accountBalanceHeaderData(account("cash", 100, 0)).entries).toEqual(
+				[
+					{ label: "Available balance", value: 0, emphasized: true },
+					{ label: "Posted balance", value: 100, emphasized: false },
+				],
+			);
+		});
+		it("passes through a bank-owned account's recorded date even when read-only", () => {
+			const synced = account("cash", 100, 44.43);
+			synced.source = "Synced balance check";
+			synced.readOnly = true;
+			expect(accountBalanceHeaderData(synced).synced).toBe("2026-01-31");
+			const unobserved = account("cash", 100, 44.43);
+			unobserved.source = "Synced balance check";
+			unobserved.readOnly = true;
+			unobserved.observedOn = "";
+			expect(accountBalanceHeaderData(unobserved).synced).toBeNull();
+		});
+		it("does not pass through a sync date for a manual account with no ownership signal, even when read-only", () => {
+			const manual = account("cash", 100, 44.43);
+			manual.source = "Manual entry";
+			manual.readOnly = true;
+			expect(accountBalanceHeaderData(manual).synced).toBeNull();
+		});
+		it("does not pass through a sync date for a manual account with an observation date", () => {
+			const manual = account("cash", 100, 44.43);
+			manual.readOnly = false;
+			expect(manual.observedOn).toBe("2026-01-31");
+			expect(accountBalanceHeaderData(manual).synced).toBeNull();
+		});
+	});
+	describe("accountBalanceSelectedData", () => {
+		it("selects only the available entry when the effective basis is available", () => {
+			expect(accountBalanceSelectedData(account("cash", 100, 44.43))).toEqual({
+				entries: [
+					{ label: "Available balance", value: 44.43, emphasized: true },
+				],
+				synced: null,
+			});
+		});
+		it("selects only the posted entry when the persisted basis is posted", () => {
+			const row = account("cash", 100, 44.43);
+			row.displayBasis = "posted";
+			expect(accountBalanceSelectedData(row)).toEqual({
+				entries: [{ label: "Posted balance", value: 100, emphasized: true }],
+				synced: null,
+			});
+		});
+		it("selects the emphasized posted entry when available is missing", () => {
+			const data = accountBalanceSelectedData(account("cash", 100, null));
+			expect(data.entries).toEqual([
+				{ label: "Posted balance", value: 100, emphasized: true },
+			]);
+		});
+		it("keeps a reported zero as the selected available entry", () => {
+			expect(
+				accountBalanceSelectedData(account("cash", 100, 0)).entries,
+			).toEqual([{ label: "Available balance", value: 0, emphasized: true }]);
+		});
+		it("never carries a sync date, even for an observed account", () => {
+			expect(
+				accountBalanceSelectedData(account("cash", 100)).synced,
+			).toBeNull();
+			const unobserved = account("cash", 100, 44.43);
+			unobserved.observedOn = "";
+			expect(accountBalanceSelectedData(unobserved).synced).toBeNull();
+		});
+		it("selects the group available figure, then the group posted figure on a posted basis", () => {
+			const raw = fixture();
+			raw[0]!.availableBalance = 1000;
+			raw[1]!.availableBalance = 44.43;
+			const grouped = toDisplayAccounts(raw)[0]!;
+			expect(accountBalanceSelectedData(grouped)).toEqual({
+				entries: [
+					{ label: "Available balance", value: 1044.43, emphasized: true },
+				],
+				synced: null,
+			});
+			grouped.displayBasis = "posted";
+			expect(accountBalanceSelectedData(grouped).entries).toEqual([
+				{ label: "Posted balance", value: -1020, emphasized: true },
+			]);
 		});
 	});
 	it("includes interest-only balances in projection lines", () => {

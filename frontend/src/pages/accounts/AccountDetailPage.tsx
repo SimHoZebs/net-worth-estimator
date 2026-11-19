@@ -31,18 +31,17 @@ import {
 import { useSchedules } from "../../state/workspaceResources.ts";
 import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import { AccountIcon } from "../../components/AccountIcon.tsx";
-import { money } from "../../domain/format.ts";
-import { Field, FieldTitle } from "@/components/ui/field.tsx";
 import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
 import { LoanDetails } from "../../components/activity/LoanDetails.tsx";
 import {
+	accountBalanceHeaderData,
 	componentIds,
-	displayCurrentBalance,
 	isGroupedDisplay,
 	toDisplayTransaction,
 } from "../../domain/accountDisplay.ts";
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
 import { Transactions } from "../../components/activity/Transactions.tsx";
+import { AccountBalances } from "./AccountBalances.tsx";
 import { BalanceHistory } from "./BalanceHistory.tsx";
 import {
 	Tabs,
@@ -231,32 +230,20 @@ export function AccountDetailView({
 					onSubmit={(event) => void edit.submit(event)}
 				>
 					{(() => {
-						// The header shows the owner-facing current balance. Manual
-						// accounts keep the balance editor; synced or grouped
-						// accounts show the display-basis value: posted shows the
-						// posted total, available shows the bank-reported figure
-						// or unavailable when the bank reported none. The form
-						// stays mounted so the name field and the sticky save
-						// button keep working in every branch.
+						// The header shows both recorded bases. Manual accounts keep
+						// the balance editor; synced or grouped accounts get the
+						// read-only figures. The form stays mounted so the name
+						// field and the sticky save button keep working in every
+						// branch.
 						if (!account.readOnly && !isGroupedDisplay(account)) {
 							return <AccountBalanceValue edit={edit} readOnly={locked} />;
 						}
-						const posted = (account.displayBasis ?? "available") === "posted";
-						const current = displayCurrentBalance(account);
 						return (
-							<div className="flex min-w-0 flex-col items-start gap-2 pt-1 pb-2 md:items-end">
-								<Field orientation="vertical" className="w-full md:items-end">
-									<FieldTitle>
-										{posted ? "Posted balance" : "Available balance"}
-									</FieldTitle>
-									<div className="w-auto tabular-nums text-lg font-semibold md:text-right">
-										{current === null ? (
-											<span className="text-muted-foreground">Unavailable</span>
-										) : (
-											money(current)
-										)}
-									</div>
-								</Field>
+							<div className="min-w-0 pt-1 pb-2 text-left md:text-right">
+								<AccountBalances
+									data={accountBalanceHeaderData(account)}
+									columns={2}
+								/>
 							</div>
 						);
 					})()}

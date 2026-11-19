@@ -1,6 +1,5 @@
 import { LockKeyhole, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
-import { displayCurrentBalance } from "../../domain/accountDisplay.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Empty,
@@ -17,8 +16,9 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table.tsx";
-import { money } from "../../domain/format.ts";
+import { accountBalanceSelectedData } from "../../domain/accountDisplay.ts";
 import type { Account } from "../../domain/model.ts";
+import { AccountBalances } from "./AccountBalances.tsx";
 
 export function AccountsPanel({
 	accounts,
@@ -54,7 +54,7 @@ export function AccountsPanel({
 			</TableCaption>
 			<colgroup>
 				<col />
-				<col className="max-sm:w-24" />
+				<col className="max-sm:w-32" />
 			</colgroup>
 			{showHeaders && (
 				<TableHeader>
@@ -67,63 +67,51 @@ export function AccountsPanel({
 				</TableHeader>
 			)}
 			<TableBody>
-				{accounts.map((account) => {
-					// Current balance follows the account's display basis:
-					// posted shows the posted total, available (the default)
-					// shows the bank-reported figure. Manual accounts without
-					// bank evidence keep their saved balance; synced or
-					// grouped accounts without evidence show unavailable
-					// rather than borrowing the modeled balance.
-					const current = displayCurrentBalance(account);
-					return (
-						<TableRow
-							key={account.id}
-							className="group cursor-pointer hover:bg-muted"
-							onClick={(event) => {
-								if ((event.target as HTMLElement).closest("button")) return;
-								onAccount(account.id);
-							}}
+				{accounts.map((account) => (
+					<TableRow
+						key={account.id}
+						className="group cursor-pointer hover:bg-muted"
+						onClick={(event) => {
+							if ((event.target as HTMLElement).closest("button")) return;
+							onAccount(account.id);
+						}}
+					>
+						<TableHead
+							scope="row"
+							className="py-5 max-sm:min-w-0 max-sm:whitespace-normal max-sm:px-2 max-sm:py-4"
 						>
-							<TableHead
-								scope="row"
-								className="py-5 max-sm:min-w-0 max-sm:whitespace-normal max-sm:px-2 max-sm:py-4"
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="group h-auto max-w-full justify-start gap-3 px-1 py-0.5 text-left font-normal max-sm:min-w-0 max-sm:gap-1.5 max-sm:px-0"
+								aria-label={`Open ${account.name} transactions`}
+								onClick={() => onAccount(account.id)}
 							>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									className="group h-auto max-w-full justify-start gap-3 px-1 py-0.5 text-left font-normal max-sm:min-w-0 max-sm:gap-1.5 max-sm:px-0"
-									aria-label={`Open ${account.name} transactions`}
-									onClick={() => onAccount(account.id)}
-								>
-									<AccountLabel
-										account={account}
-										title={account.name}
-										className="max-sm:gap-2"
-										nameClassName="truncate group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
-										suffix={!account.enabled ? " · excluded" : undefined}
+								<AccountLabel
+									account={account}
+									title={account.name}
+									className="max-sm:gap-2"
+									nameClassName="truncate group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
+									suffix={!account.enabled ? " · excluded" : undefined}
+								/>
+								{account.readOnly && (
+									<LockKeyhole
+										size={14}
+										aria-label="Read-only record"
+										className="shrink-0"
 									/>
-									{account.readOnly && (
-										<LockKeyhole
-											size={14}
-											aria-label="Read-only record"
-											className="shrink-0"
-										/>
-									)}
-								</Button>
-							</TableHead>
-							<TableCell className="text-right tabular-nums max-sm:whitespace-nowrap max-sm:px-1 max-sm:py-4">
-								<div>
-									{current === null ? (
-										<span className="text-muted-foreground">Unavailable</span>
-									) : (
-										money(current)
-									)}
-								</div>
-							</TableCell>
-						</TableRow>
-					);
-				})}
+								)}
+							</Button>
+						</TableHead>
+						<TableCell className="text-right max-sm:whitespace-normal max-sm:px-1 max-sm:py-4">
+							<AccountBalances
+								data={accountBalanceSelectedData(account)}
+								emphasis="plain"
+							/>
+						</TableCell>
+					</TableRow>
+				))}
 			</TableBody>
 		</Table>
 	);
