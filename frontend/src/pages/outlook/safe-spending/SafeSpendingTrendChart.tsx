@@ -1,11 +1,11 @@
 import {
-	type ChartPoint,
 	type ChartValue,
 	areaY,
 	defineChart,
 	dot,
 	lineY,
 	ruleY,
+	text,
 } from "@tanstack/charts";
 import { crosshair } from "@tanstack/charts/crosshair";
 import { controlledSignal } from "@tanstack/charts/interaction/signal";
@@ -13,7 +13,6 @@ import { Chart } from "@tanstack/charts/react";
 import { keyedSelection, whenSelected } from "@tanstack/charts/selection";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { scalePoint } from "@tanstack/charts/scales/point";
-import { tooltip } from "@tanstack/charts/tooltip";
 import { useMemo, useState } from "react";
 import {
 	compactMoney,
@@ -190,13 +189,6 @@ export function SafeSpendingTrendChart({
 		() => trend.billMarkers ?? [],
 		[trend.billMarkers],
 	);
-	const increaseByDate = useMemo(
-		() =>
-			new Map(
-				billMarkers.map((increase) => [increase.date.slice(0, 10), increase]),
-			),
-		[billMarkers],
-	);
 	const billDots = useMemo(
 		() => recurringIncreaseDots(actual, projected, billMarkers),
 		[actual, projected, billMarkers],
@@ -337,15 +329,34 @@ export function SafeSpendingTrendChart({
 					...(billDots.length
 						? [
 								whenSelected(
-									dot(billDots, {
+									text(billDots, {
 										x: "date",
 										y: "amount",
-										key: "key",
-										id: "bill-increase-dots-selected",
-										r: 6,
-										fill: "var(--chart-5)",
-										stroke: "var(--card)",
-										strokeWidth: 2,
+										text: (datum) => billSelectionLabel(datum).nameLine,
+										fontSize: 11,
+										fontWeight: 600,
+										anchor: "middle",
+										fill: "var(--foreground)",
+										dy: (datum) =>
+											datum.amount >= domain[0] + (domain[1] - domain[0]) * 0.75
+												? 18
+												: -24,
+									}),
+									selection,
+								),
+								whenSelected(
+									text(billDots, {
+										x: "date",
+										y: "amount",
+										text: (datum) => billSelectionLabel(datum).totalLine,
+										fontSize: 11,
+										fontWeight: 600,
+										anchor: "middle",
+										fill: "var(--muted-foreground)",
+										dy: (datum) =>
+											datum.amount >= domain[0] + (domain[1] - domain[0]) * 0.75
+												? 32
+												: -10,
 									}),
 									selection,
 								),
@@ -370,12 +381,7 @@ export function SafeSpendingTrendChart({
 									typeof value === "string" ? monthDay(value) : "",
 							},
 						},
-						y: {
-							label: {
-								format: (value) =>
-									typeof value === "number" ? exactMoney(value) : "",
-							},
-						},
+						y: false,
 					}),
 				],
 				scales: {
@@ -400,40 +406,7 @@ export function SafeSpendingTrendChart({
 				focus: "nearest-x",
 				maxFocusDistance: Number.POSITIVE_INFINITY,
 				selection,
-				tooltip: {
-					use: tooltip,
-					format: (point: ChartPoint) => {
-						const datum = point.datum as {
-							date?: unknown;
-							spent?: unknown;
-							amount?: unknown;
-							projected?: unknown;
-							income?: unknown;
-							billName?: unknown;
-							billAmount?: unknown;
-						};
-						if (datum.income && earned)
-							return `${labels.earnedThisMonth}: ${exactMoney(earned.amount)}`;
-						const date =
-							typeof datum.date === "string"
-								? datum.date.slice(0, 10)
-								: String(point.xValue).slice(0, 10);
-						const spent =
-							typeof datum.spent === "number"
-								? datum.spent
-								: typeof datum.amount === "number"
-									? datum.amount
-									: Number(point.yValue);
-						if (
-							typeof datum.billName === "string" &&
-							typeof datum.billAmount === "number"
-						) {
-							return `${dateLabel(date, true)}: ${datum.billName} ${exactMoney(datum.billAmount)} · total ${exactMoney(spent)}`;
-						}
-						const increase = increaseByDate.get(date);
-						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${increase ? ` incl. ${exactMoney(increase.amount)} bills` : ""}`;
-					},
-				},
+				tooltip: false,
 			}),
 		[
 			actual,
@@ -447,7 +420,6 @@ export function SafeSpendingTrendChart({
 			trend.limitHit,
 			lastActual,
 			domain,
-			increaseByDate,
 			billDots,
 			selection,
 		],
@@ -531,22 +503,9 @@ export function SafeSpendingTrendChart({
 			/>
 			<span className="sr-only" role="status">
 				{selectedBill && selectedBillLabel
-					? `${selectedBillLabel.nameLine} ${selectedBillLabel.totalLine} on ${dateLabel(selectedBill.date, true)}`
+					? `${selectedBillLabel.nameLine} ${selectedBillLabel.totalLine}`
 					: ""}
 			</span>
-			{selectedBill && selectedBillLabel && (
-				<section
-					aria-label="Selected bill"
-					className="border-t border-border pt-2"
-				>
-					<h4 className="m-0 text-sm font-semibold text-foreground">
-						{selectedBillLabel.nameLine}
-					</h4>
-					<p className="m-0 mt-1 text-xs text-muted-foreground">
-						{dateLabel(selectedBill.date, true)} · {selectedBillLabel.totalLine}
-					</p>
-				</section>
-			)}
 		</div>
 	);
 }

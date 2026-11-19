@@ -301,5 +301,6 @@ describe("scheduled recurring increases", () => {
 			createElement(SafeSpendingTrendChart, { trend }),
 		);
 		expect(html).toContain("Includes $55.00 Sub bill on Nov 10, 2026.");
+		expect(html).not.toContain("Selected bill");
 	});
 });
