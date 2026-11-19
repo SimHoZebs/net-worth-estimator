@@ -22,7 +22,11 @@ import {
 import { dateLabel } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { AccountIconFallback } from "./AccountIconFallback.tsx";
-import { parseUnion } from "../../domain/guards.ts";
+import {
+	recurrenceFromScheduleLike,
+	recurrenceSentence,
+	type Recurrence,
+} from "../../domain/recurrence.ts";
 import {
 	visibleAccounts,
 	type Account,
@@ -107,7 +111,6 @@ import {
 	transactionRemovalNeedsProjectionRefresh,
 } from "../../state/transactionCache.ts";
 import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
-import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import {
 	refreshTransactions,
 	schedulesOptions,
@@ -120,7 +123,6 @@ import {
 	transactionUpdate,
 	scheduleUpdate,
 } from "../editors/transactionBodies.ts";
-import type { Frequency } from "@/api/contracts.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
 import { TransferLinkSection } from "./TransferLinkSection.tsx";
@@ -213,14 +215,14 @@ function useTransactionEdit({
 	savedTransaction,
 	readOnly: readOnlyProp,
 	onClose,
-	scheduleFrequency,
-	storedFrequency: storedScheduleFrequency,
+	scheduleRecurrence,
+	storedRecurrence: storedScheduleRecurrence,
 }: {
 	savedTransaction: Transaction;
 	readOnly?: boolean;
 	onClose: () => void;
-	scheduleFrequency: Frequency;
-	storedFrequency?: Frequency;
+	scheduleRecurrence: Recurrence | null;
+	storedRecurrence?: Recurrence;
 }) {
 	// Standard form state: every permitted field stays editable and the
 	// footer Save commits. activeField only feeds the locked-row
@@ -231,7 +233,7 @@ function useTransactionEdit({
 	const [saving, setSaving] = useState(false);
 	const edit = useEditDraft(
 		savedTransaction.id,
-		draftFromTransaction(savedTransaction, scheduleFrequency),
+		draftFromTransaction(savedTransaction, scheduleRecurrence),
 	);
 	const draft = edit.value;
 	const formId = useId();
@@ -311,7 +313,7 @@ function useTransactionEdit({
 		setSaving(true);
 		setError(null);
 		if (savedTransaction.kind === "schedule") {
-			if (draft.frequency === null) {
+			if (draft.recurrence === null) {
 				setSaving(false);
 				setError(
 					"The saved schedule could not be loaded. Close and try again.",
@@ -319,18 +321,18 @@ function useTransactionEdit({
 				return;
 			}
 			const values = detailScheduleValues({
-				draft: { ...draft, frequency: draft.frequency },
+				draft: { ...draft, recurrence: draft.recurrence },
 			});
 			if (values instanceof Error) {
 				setSaving(false);
 				setError(values.message);
 				return;
 			}
-			const storedFrequency = storedScheduleFrequency;
-			if (storedFrequency === undefined) {
-				// A cadence edit needs the stored value to tell an untouched
-				// choice from a changed one; refuse instead of saving a blind
-				// update the server would ignore.
+			const storedRecurrence = storedScheduleRecurrence;
+			if (storedRecurrence === undefined) {
+				// A recurrence edit needs the stored value to tell an
+				// untouched choice from a changed one; refuse instead of
+				// saving a blind update the server would ignore.
 				setSaving(false);
 				setError(
 					"The saved schedule could not be loaded. Close and try again.",
@@ -340,7 +342,7 @@ function useTransactionEdit({
 			const schedule = scheduleUpdate({
 				baseline: savedTransaction,
 				values,
-				storedFrequency,
+				storedRecurrence,
 			});
 			const ok = await performSave({
 				call: async () => {
@@ -401,7 +403,7 @@ function useTransactionEdit({
 	const saveBlocked =
 		saving ||
 		(savedTransaction.kind === "schedule" &&
-			storedScheduleFrequency === undefined) ||
+			storedScheduleRecurrence === undefined) ||
 		(Boolean(readOnlyReason) && !(claimEditable && activeField === "schedule"));
 	return {
 		draft,
@@ -482,8 +484,12 @@ function useMarkAsSubscription({
 			call: () =>
 				scheduleFromTransaction(savedTransaction.id, {
 					id: scheduleId,
-					frequency: "monthly",
 					startDate: savedTransaction.startDate,
+					recurrence: {
+						unit: "month",
+						interval: 1,
+						monthlyMode: "byDate",
+					},
 				}),
 			refresh: refreshTransactions,
 			failureMessage: "The subscription schedule could not be created.",
@@ -551,23 +557,19 @@ export function TransactionDetail({
 		savedTransaction.kind === "schedule"
 			? rawSchedules?.find((rule) => rule.id === savedTransaction.id)
 			: undefined;
-	const scheduleCadence = rawSchedule
-		? frequencyLabel(rawSchedule.frequency)
-		: null;
-	const scheduleFrequency: Frequency =
-		parseUnion(rawSchedule?.frequency, [
-			"daily",
-			"weekly",
-			"monthly",
-			"quarterly",
-			"annual",
-		] as const) ?? "monthly";
+	const storedRecurrence = rawSchedule
+		? (recurrenceFromScheduleLike(rawSchedule) ?? undefined)
+		: undefined;
+	const scheduleCadence =
+		rawSchedule && storedRecurrence
+			? recurrenceSentence(storedRecurrence, rawSchedule.startDate)
+			: null;
 	const edit = useTransactionEdit({
 		savedTransaction,
 		readOnly,
 		onClose,
-		scheduleFrequency,
-		storedFrequency: rawSchedule?.frequency as Frequency | undefined,
+		scheduleRecurrence: storedRecurrence ?? null,
+		storedRecurrence,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [confirmingEndSchedule, setConfirmingEndSchedule] = useState(false);

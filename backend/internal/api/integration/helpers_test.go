@@ -43,8 +43,8 @@ func stochasticTestModel() *types.FinancialModel {
 		Transactions: []types.Transaction{},
 		Schedules: []types.Schedule{{
 			ID: "salary", Name: "Salary", Destinations: []string{"checking"},
-			Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
-			Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", EndDate: &end, Priority: 1, Enabled: true,
+			Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
+			Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-01-01", EndDate: &end, Priority: 1, Enabled: true,
 		}},
 		Evaluations: types.EmptyEvaluationTables(),
 	}

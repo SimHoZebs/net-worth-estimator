@@ -84,7 +84,7 @@ func TestPurchasesProtectFuturePayments(t *testing.T) {
 			if recurring {
 				end := "2026-02-02"
 				request.Model.Schedules = []types.Schedule{{ID: rent.ID, Name: rent.Name,
-					SourceAccountID: rent.SourceAccountID, Amount: rent.Amount, Frequency: types.FrequencyMonthly,
+					SourceAccountID: rent.SourceAccountID, Amount: rent.Amount, Recurrence: monthlyTestRecurrence(),
 					StartDate: "2026-02-02", EndDate: &end, Enabled: true}}
 			} else {
 				request.Model.Transactions = append(request.Model.Transactions, rent)
@@ -143,8 +143,8 @@ func TestPurchasesExecuteAfterEstablishedSameDayPayments(t *testing.T) {
 	source := "cash"
 	end := request.StartDate
 	request.Model.Schedules = []types.Schedule{{ID: "rent", SourceAccountID: &source,
-		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "600"}},
-		Frequency: types.FrequencyMonthly, StartDate: request.StartDate, EndDate: &end, Enabled: true}}
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "600"}},
+		Recurrence: monthlyTestRecurrence(), StartDate: request.StartDate, EndDate: &end, Enabled: true}}
 	run, err := simulatePurchases(request)
 	if err != nil {
 		t.Fatal(err)
@@ -315,8 +315,8 @@ func TestPurchaseProtectsDownstreamTransferAndLaterRecurringBill(t *testing.T) {
 	account := "bills"
 	end := "2026-02-03"
 	request.Model.Schedules = []types.Schedule{{ID: "bill", SourceAccountID: &account,
-		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "900"}},
-		Frequency: types.FrequencyMonthly, StartDate: end, EndDate: &end, Enabled: true}}
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "900"}},
+		Recurrence: monthlyTestRecurrence(), StartDate: end, EndDate: &end, Enabled: true}}
 	run, err := simulatePurchases(request)
 	if err != nil {
 		t.Fatal(err)
@@ -349,7 +349,7 @@ func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "50", 0))
 	end := "2026-03-01"
 	request.Model.Schedules = []types.Schedule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
-		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
+		Recurrence: monthlyTestRecurrence(), StartDate: "2026-02-02", EndDate: &end,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
 	}}

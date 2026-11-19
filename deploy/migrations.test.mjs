@@ -339,6 +339,69 @@ test("old four-column promotions gain merchant_key and keep their rows", async (
   assert.equal(await sha256File(db), hashAfter);
 });
 
+test("legacy schedule frequencies convert to recurrences", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-recurrence-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  // Model the deployed table that predates recurrence columns. Assert the
+  // DROP so the fixture really starts with the retired frequency shape on
+  // this SQLite build.
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('recurrence_rules') WHERE name='frequency';"), "0");
+  await sqlite(db, `ALTER TABLE recurrence_rules DROP COLUMN recurrence_unit;
+    ALTER TABLE recurrence_rules DROP COLUMN recurrence_interval;
+    ALTER TABLE recurrence_rules DROP COLUMN recurrence_weekdays;
+    ALTER TABLE recurrence_rules DROP COLUMN recurrence_month_mode;
+    ALTER TABLE recurrence_rules ADD COLUMN frequency TEXT NOT NULL DEFAULT 'monthly';`);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('recurrence_rules') WHERE name='frequency';"), "1");
+  await sqlite(db, `INSERT INTO recurrence_rules(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled) VALUES
+    ('${owner}','r-annual','0','Annual',NULL,'null','{}','annual','2026-06-30',NULL,NULL,0,1),
+    ('${owner}','r-daily','1','Daily',NULL,'null','{}','daily','2026-01-01',NULL,NULL,1,1),
+    ('${owner}','r-monthly','2','Monthly',NULL,'null','{}','monthly','2026-01-15',NULL,NULL,2,1),
+    ('${owner}','r-quarterly','3','Quarterly',NULL,'null','{}','quarterly','2026-01-15',NULL,NULL,3,1),
+    ('${owner}','r-weekly','4','Weekly',NULL,'null','{}','weekly','2026-01-06',NULL,NULL,4,1);`);
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /Converted schedule frequencies to recurrences/);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('recurrence_rules') WHERE name='frequency';"), "0");
+  assert.equal(await rows(db, "SELECT id, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode FROM recurrence_rules ORDER BY id;"),
+    `r-annual|year|1|[]|\nr-daily|day|1|[]|\nr-monthly|month|1|[]|byDate\nr-quarterly|month|3|[]|byDate\nr-weekly|week|1|["2"]|`);
+  assert.equal(await rows(db, "SELECT id, position, name, amount_resolution_json, start_date, priority, enabled FROM recurrence_rules ORDER BY id;"),
+    `r-annual|0|Annual|{}|2026-06-30|0|1\nr-daily|1|Daily|{}|2026-01-01|1|1\nr-monthly|2|Monthly|{}|2026-01-15|2|1\nr-quarterly|3|Quarterly|{}|2026-01-15|3|1\nr-weekly|4|Weekly|{}|2026-01-06|4|1`);
+  assert.equal((await backups(directory)).length, 1);
+
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("unknown frequencies and undated weekly schedules fail closed with the original unchanged", async (t) => {
+  for (const [name, frequency, startDate, pattern] of [
+    ["unknown-frequency", "fortnightly", "2026-01-01", /Unknown schedule frequency/],
+    ["undated-weekly", "weekly", "not-a-date", /invent weekdays/],
+  ]) {
+    const directory = await mkdtemp(join(tmpdir(), `waypoint-migration-recurrence-${name}-`));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const { db, owner } = await fullBase(directory);
+    await sqlite(db, `ALTER TABLE recurrence_rules DROP COLUMN recurrence_unit;
+      ALTER TABLE recurrence_rules DROP COLUMN recurrence_interval;
+      ALTER TABLE recurrence_rules DROP COLUMN recurrence_weekdays;
+      ALTER TABLE recurrence_rules DROP COLUMN recurrence_month_mode;
+      ALTER TABLE recurrence_rules ADD COLUMN frequency TEXT NOT NULL DEFAULT 'monthly';`);
+    await sqlite(db, `INSERT INTO recurrence_rules(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled) VALUES
+      ('${owner}','r-bad','0','Bad',NULL,'null','{}','${frequency}','${startDate}',NULL,NULL,0,1);`);
+    const expected = (await sqlite(db, ".dump")).stdout;
+
+    const error = await migrateFails(db);
+    assert.match(error.stderr ?? error.stdout ?? "", pattern);
+    assert.equal((await sqlite(db, ".dump")).stdout, expected);
+    assert.deepEqual(await backups(directory), []);
+  }
+});
+
 test("complete target repeats read-only and preserves owner disables byte-identical", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-repeat-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

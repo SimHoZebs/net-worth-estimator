@@ -1,4 +1,5 @@
 import { literalAmountOf } from "./transactionRows.ts";
+import { recurrenceFromScheduleLike } from "./recurrence.ts";
 import { scheduleOccurrenceDates } from "./scheduleExpansion.ts";
 import type { Account, Transaction } from "./model.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
@@ -23,9 +24,7 @@ export function incomeSourceCandidates({
 			.filter((account) => account.enabled && !account.archived)
 			.map((account) => account.id),
 	);
-	const destinations = new Set(
-		spendingIds.filter((id) => available.has(id)),
-	);
+	const destinations = new Set(spendingIds.filter((id) => available.has(id)));
 	const selected = new Set(incomeScheduleIds);
 	return rules.filter(
 		(rule) =>
@@ -62,10 +61,12 @@ export function expectedMonthlyIncome({
 	for (const id of new Set(incomeScheduleIds)) {
 		const schedule = byId.get(id);
 		if (!schedule) return null;
+		const recurrence = recurrenceFromScheduleLike(schedule);
+		if (!recurrence) continue;
 		const occurrences = scheduleOccurrenceDates({
 			startDate: schedule.startDate,
 			endDate: schedule.endDate,
-			frequency: schedule.frequency,
+			recurrence,
 			through: monthEnd,
 		}).filter((date) => date >= monthStart);
 		if (!occurrences.length) continue;

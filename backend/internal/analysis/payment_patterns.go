@@ -54,26 +54,25 @@ var payrollDescriptor = regexp.MustCompile(`(?i)\b(payroll|salary|paycheck|direc
 var paymentRefundMarker = regexp.MustCompile(`(?i)\b(refund|reversal|chargeback|return)\b`)
 
 // patternCadenceDef is the single cadence registry: nominal interval days
-// per cadence plus detector annualization and the forecast rule schedule
-// each cadence maps onto. Biweekly has no rule schedule, so biweekly
-// patterns stay visible without creation until the product decides how they
-// should repeat. Daily is rule-only and never detected.
+// per cadence plus detector annualization. Forecast rule schedules are
+// built by recurringCadenceRecurrence, so every detected cadence
+// (including biweekly) maps onto a recurrence. Daily is rule-only and
+// never detected.
 type patternCadenceDef struct {
-	id        string
-	days      float64
-	minOcc    int
-	factor    float64
-	frequency types.Frequency
-	detected  bool
+	id       string
+	days     float64
+	minOcc   int
+	factor   float64
+	detected bool
 }
 
 var patternCadenceDefs = []patternCadenceDef{
-	{id: "daily", days: 1, frequency: types.FrequencyDaily},
-	{id: "weekly", days: 7, minOcc: 3, factor: 52, frequency: types.FrequencyWeekly, detected: true},
+	{id: "daily", days: 1},
+	{id: "weekly", days: 7, minOcc: 3, factor: 52, detected: true},
 	{id: "biweekly", days: 14, minOcc: 3, factor: 26, detected: true},
-	{id: "monthly", days: 30.4375, minOcc: 3, factor: 12, frequency: types.FrequencyMonthly, detected: true},
-	{id: "quarterly", days: 91.3125, minOcc: 3, factor: 4, frequency: types.FrequencyQuarterly, detected: true},
-	{id: "annual", days: 365.25, minOcc: 2, factor: 1, frequency: types.FrequencyAnnual, detected: true},
+	{id: "monthly", days: 30.4375, minOcc: 3, factor: 12, detected: true},
+	{id: "quarterly", days: 91.3125, minOcc: 3, factor: 4, detected: true},
+	{id: "annual", days: 365.25, minOcc: 2, factor: 1, detected: true},
 }
 
 type paymentOccurrence struct {

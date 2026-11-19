@@ -110,7 +110,7 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 	// only by the rule's own occurrences.
 	preRule, _ := json.Marshal(qa03StoredProjection(t, handler))
 	ruleID := qa03CreateRow(t, handler, "/v1/schedules",
-		`{"name":"Dues","sourceAccountId":"`+model.Accounts[0].ID+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"5"},"inputs":{}},"frequency":"monthly","startDate":"2026-07-15","enabled":true,"priority":1}`)
+		`{"name":"Dues","sourceAccountId":"`+model.Accounts[0].ID+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"5"},"inputs":{}},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-07-15","enabled":true,"priority":1}`)
 	changed, _ := json.Marshal(qa03StoredProjection(t, handler))
 	if string(changed) == string(preRule) {
 		t.Fatal("new rule left the forecast unchanged")

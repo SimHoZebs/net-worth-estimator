@@ -67,7 +67,7 @@ func snapshotFinancials(t *testing.T, d *Database) string {
 		"accounts":         "user_id, id, position, name, kind, min_balance, max_balance, color, display_basis, enabled",
 		"transactions":     "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
 		"checkpoints":      "user_id, id, position, model_account_id, balance, source, observed_at",
-		"recurrence_rules": "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
+		"recurrence_rules": "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled",
 	}
 	var out strings.Builder
 	for _, table := range []string{"accounts", "transactions", "checkpoints", "recurrence_rules"} {

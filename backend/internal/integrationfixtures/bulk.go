@@ -193,7 +193,7 @@ func BuildBulkModel(spec BulkSpec) *types.FinancialModel {
 				ID:              bulkScheduleID(spec.Seed, i),
 				Name:            fmt.Sprintf("Seed rule %02d", i),
 				SourceAccountID: ptr(accountID),
-				Frequency:       types.FrequencyMonthly,
+				Recurrence:      types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
 				Amount: types.TransactionAmountResolution{
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "250.00"},

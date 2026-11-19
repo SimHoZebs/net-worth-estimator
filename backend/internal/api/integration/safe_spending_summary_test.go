@@ -31,7 +31,7 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 			}
 			cash := 1000.0 + float64(i)*100
 			account := "same-account"
-			model := &types.FinancialModel{Accounts: []types.Account{{ID: account, Name: subject, Kind: "cash", Enabled: true}}, Checkpoints: []types.Checkpoint{{AccountID: account, Balance: cash + 50, AvailableBalance: &cash, ObservedAt: midnight.Unix() - 1}}, Schedules: []types.Schedule{{ID: "same-bill", Name: subject + " bill", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "20"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: "monthly", StartDate: day, Enabled: true}}}
+			model := &types.FinancialModel{Accounts: []types.Account{{ID: account, Name: subject, Kind: "cash", Enabled: true}}, Checkpoints: []types.Checkpoint{{AccountID: account, Balance: cash + 50, AvailableBalance: &cash, ObservedAt: midnight.Unix() - 1}}, Schedules: []types.Schedule{{ID: "same-bill", Name: subject + " bill", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "20"}, Inputs: map[string]types.AmountInputBinding{}}, Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: day, Enabled: true}}}
 			model.Checkpoints = nil // Available balances are bank evidence, not owner import rows.
 			if _, err := st.ImportModel(model); err != nil {
 				t.Fatal(err)

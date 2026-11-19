@@ -76,7 +76,6 @@ func TestPatternToNewSchedulePaymentKeepsUnsupportedCadenceVisible(t *testing.T)
 	cases := []struct {
 		name, kind, cadence, description, amount, provider, role string
 	}{
-		{"biweekly income", "income", "biweekly", "ACME PAYROLL", "3000.00", "ACME PAYROLL", "inflow"},
 		{"rent without cadence", "rent", "", "RENT PAYMENT", "-1200.00", "Rent", "outflow"},
 	}
 	for _, testCase := range cases {
@@ -115,8 +114,8 @@ func TestPatternToExistingSchedulePaymentHTTPContract(t *testing.T) {
 	handler := New(scoped, Config{Actor: func(context.Context) string { return "verified-subject" }})
 	ruleBody, _ := json.Marshal(map[string]any{
 		"name": "Rent", "sourceAccountId": "checking",
-		"amount":    map[string]any{"resolver": "expression", "config": map[string]any{"expression": "1200.00"}, "inputs": map[string]any{}},
-		"frequency": "monthly", "startDate": "2026-01-15", "enabled": true,
+		"amount":     map[string]any{"resolver": "expression", "config": map[string]any{"expression": "1200.00"}, "inputs": map[string]any{}},
+		"recurrence": map[string]any{"unit": "month", "interval": 1, "monthlyMode": "byDate"}, "startDate": "2026-01-15", "enabled": true,
 	})
 	res := callAPI(t, handler, "POST", "/v1/schedules", string(ruleBody))
 	if res.Code != 200 {

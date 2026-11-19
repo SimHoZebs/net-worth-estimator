@@ -43,7 +43,7 @@ func TestPrepareTransactionExecutionIsPure(t *testing.T) {
 	}
 	rt := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, map[string]float64{account: 1000})
 	before := CloneSimulationState(rt.State)
-	occurrence := fixedOccurrence(transaction, &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", Enabled: true})
+	occurrence := fixedOccurrence(transaction, &types.Schedule{ID: "r", Recurrence: monthlyTestRecurrence(), StartDate: "2026-01-01", Enabled: true})
 	first, err := PrepareTransactionExecution(occurrence, "2026-02-01", false, rt.snapshotExecutionState(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestApplyHandlesImpossibleStates(t *testing.T) {
 // clamping happen at resolution time.
 func TestResolveOccurrences(t *testing.T) {
 	rule := func(id, start, end string, enabled bool) types.Schedule {
-		r := types.Schedule{ID: id, Name: id, Frequency: types.FrequencyMonthly, StartDate: types.IsoDate(start), Priority: 1, Enabled: enabled}
+		r := types.Schedule{ID: id, Name: id, Recurrence: monthlyTestRecurrence(), StartDate: types.IsoDate(start), Priority: 1, Enabled: enabled}
 		if end != "" {
 			r.EndDate = (*types.IsoDate)(&end)
 		}

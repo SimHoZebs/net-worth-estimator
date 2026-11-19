@@ -471,12 +471,36 @@ func validateSchedules(issues *[]types.ModelValidationIssue, model *types.Financ
 				"Schedule sourceAccountId must not appear in destinations.",
 				base...)
 		}
-		switch rule.Frequency {
-		case types.FrequencyDaily, types.FrequencyWeekly, types.FrequencyMonthly, types.FrequencyQuarterly, types.FrequencyAnnual:
+		switch rule.Recurrence.Unit {
+		case types.RecurrenceDay, types.RecurrenceWeek, types.RecurrenceMonth, types.RecurrenceYear:
 		default:
-			addIssue(issues, types.SeverityError, "schedule.frequency.invalid",
-				fmt.Sprintf("Schedule '%s' has frequency '%s'. Expected daily, weekly, monthly, quarterly, or annual.", rule.ID, rule.Frequency),
-				pathWithField(base, "frequency")...)
+			addIssue(issues, types.SeverityError, "schedule.recurrence.unit.invalid",
+				fmt.Sprintf("Schedule '%s' has recurrence unit '%s'. Expected day, week, month, or year.", rule.ID, rule.Recurrence.Unit),
+				pathWithField(base, "recurrence")...)
+		}
+		if rule.Recurrence.Interval < 1 || rule.Recurrence.Interval > 99 {
+			addIssue(issues, types.SeverityError, "schedule.recurrence.interval.invalid",
+				fmt.Sprintf("Schedule '%s' has recurrence interval %d. Expected between 1 and 99.", rule.ID, rule.Recurrence.Interval),
+				pathWithField(base, "recurrence")...)
+		}
+		if rule.Recurrence.Unit == types.RecurrenceWeek {
+			validateRecurrenceWeekdays(issues, rule, base)
+		} else if len(rule.Recurrence.Weekdays) > 0 {
+			addIssue(issues, types.SeverityError, "schedule.recurrence.weekdays.invalid",
+				fmt.Sprintf("Schedule '%s' sets recurrence weekdays, which only weekly schedules allow.", rule.ID),
+				pathWithField(base, "recurrence")...)
+		}
+		if rule.Recurrence.Unit == types.RecurrenceMonth {
+			if rule.Recurrence.MonthlyMode != types.RecurrenceMonthlyByDate &&
+				rule.Recurrence.MonthlyMode != types.RecurrenceMonthlyByNthWeekday {
+				addIssue(issues, types.SeverityError, "schedule.recurrence.monthly-mode.invalid",
+					fmt.Sprintf("Schedule '%s' has monthly mode '%s'. Expected byDate or byNthWeekday.", rule.ID, rule.Recurrence.MonthlyMode),
+					pathWithField(base, "recurrence")...)
+			}
+		} else if rule.Recurrence.MonthlyMode != "" {
+			addIssue(issues, types.SeverityError, "schedule.recurrence.monthly-mode.invalid",
+				fmt.Sprintf("Schedule '%s' sets a monthly mode, which only monthly schedules allow.", rule.ID),
+				pathWithField(base, "recurrence")...)
 		}
 		if !IsValidIsoDate(rule.StartDate) {
 			addIssue(issues, types.SeverityError, "schedule.start-date.format",
@@ -496,6 +520,33 @@ func validateSchedules(issues *[]types.ModelValidationIssue, model *types.Financ
 				"Schedule endDate must be the same as or later than startDate.",
 				pathWithField(base, "endDate")...)
 		}
+	}
+}
+
+// validateRecurrenceWeekdays checks the weekly weekday set: required, one to
+// seven unique Sunday-first days, and always including the start date's
+// weekday so ruleOccursOn stays true on the start date itself.
+func validateRecurrenceWeekdays(issues *[]types.ModelValidationIssue, rule *types.Schedule, base []any) {
+	weekdays := rule.Recurrence.Weekdays
+	invalid := func(message string) {
+		addIssue(issues, types.SeverityError, "schedule.recurrence.weekdays.invalid",
+			fmt.Sprintf("Schedule '%s' %s", rule.ID, message),
+			pathWithField(base, "recurrence")...)
+	}
+	if len(weekdays) == 0 {
+		invalid("needs recurrence weekdays: weekly schedules require at least one weekday.")
+		return
+	}
+	seen := map[int]bool{}
+	for _, day := range weekdays {
+		if day < 0 || day > 6 || seen[day] {
+			invalid("has invalid recurrence weekdays: expected 1 to 7 unique days from 0 (Sunday) to 6 (Saturday).")
+			return
+		}
+		seen[day] = true
+	}
+	if IsValidIsoDate(rule.StartDate) && !weekdayIn(weekdays, weekdayOf(rule.StartDate)) {
+		invalid(fmt.Sprintf("must include its start date's weekday %d so the start date stays a scheduled occurrence.", weekdayOf(rule.StartDate)))
 	}
 }
 

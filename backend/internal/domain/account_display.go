@@ -30,7 +30,7 @@ func BuildLoan(id, interestID, interestRuleID, paymentRuleID string, terms types
 	display := &types.AccountDisplay{Name: name, Components: []types.AccountComponent{{AccountID: id, Role: "principal"}, {AccountID: interestID, Role: "interest"}}, InterestScheduleID: interestRuleID, PaymentScheduleID: paymentRuleID}
 	principal := types.Account{ID: id, Name: name + " (Principal)", Kind: "debt", MaxBalance: &zero, Enabled: terms.Enabled, Display: display, DisplayBasis: types.DisplayBasisAvailable}
 	interest := types.Account{ID: interestID, Name: name + " (Interest)", Kind: "debt", MaxBalance: &zero, Enabled: terms.Enabled, DisplayBasis: types.DisplayBasisAvailable}
-	charge := types.Schedule{ID: interestRuleID, Name: name + " Interest", SourceAccountID: &interestID, Frequency: terms.InterestFrequency, StartDate: terms.InterestStartDate, Enabled: terms.Enabled, Priority: 6,
+	charge := types.Schedule{ID: interestRuleID, Name: name + " Interest", SourceAccountID: &interestID, Recurrence: recurrenceFromFrequency(terms.InterestFrequency, terms.InterestStartDate), StartDate: terms.InterestStartDate, Enabled: terms.Enabled, Priority: 6,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "abs(principal) * rate"}, Inputs: map[string]types.AmountInputBinding{
 			"principal": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": id}},
 			"rate":      {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": terms.AnnualRate, "volatility": 0.0}},
@@ -39,7 +39,7 @@ func BuildLoan(id, interestID, interestRuleID, paymentRuleID string, terms types
 	if terms.FundingAccountID != "" {
 		paymentSource = &terms.FundingAccountID
 	}
-	payment := types.Schedule{ID: paymentRuleID, Name: name + " Payment", SourceAccountID: paymentSource, Destinations: []string{interestID, id}, Frequency: terms.PaymentFrequency, StartDate: terms.PaymentStartDate, Enabled: terms.Enabled, Priority: 7,
+	payment := types.Schedule{ID: paymentRuleID, Name: name + " Payment", SourceAccountID: paymentSource, Destinations: []string{interestID, id}, Recurrence: recurrenceFromFrequency(terms.PaymentFrequency, terms.PaymentStartDate), StartDate: terms.PaymentStartDate, Enabled: terms.Enabled, Priority: 7,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": fmt.Sprintf("%g", terms.Payment)}, Inputs: map[string]types.AmountInputBinding{}}}
 	return types.LoanBundle{Accounts: []types.Account{principal, interest}, Checkpoints: []types.Checkpoint{{AccountID: id, Balance: -terms.Principal, ObservedAt: terms.ObservedAt, Source: "user"}, {AccountID: interestID, Balance: -terms.AccruedInterest, ObservedAt: terms.ObservedAt, Source: "user"}}, Schedules: []types.Schedule{charge, payment}}, nil
 }

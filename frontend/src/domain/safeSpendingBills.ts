@@ -3,6 +3,7 @@ import type { TransactionResult } from "./result.ts";
 import { literalAmountOf } from "./transactionRows.ts";
 import { inWindow } from "./safeSpendingMath.ts";
 import { resolveEffectiveIds } from "./safeSpendingSelection.ts";
+import { recurrenceFromScheduleLike } from "./recurrence.ts";
 import { scheduleOccurrenceDates } from "./scheduleExpansion.ts";
 
 export interface BillCandidate {
@@ -68,11 +69,12 @@ export function billsInCycle(
 		.filter((schedule) => selected.has(schedule.id))
 		.flatMap((schedule) => {
 			const amount = billAmount(schedule);
-			if (amount === null) return [];
+			const recurrence = recurrenceFromScheduleLike(schedule);
+			if (amount === null || recurrence === null) return [];
 			return scheduleOccurrenceDates({
 				startDate: schedule.startDate,
 				endDate: schedule.endDate,
-				frequency: schedule.frequency,
+				recurrence,
 				through: end,
 			})
 				.filter((date) => inWindow(date, start, end))

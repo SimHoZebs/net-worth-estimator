@@ -104,7 +104,7 @@ func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 	model.Checkpoints = model.Checkpoints[:1]
 	model.Transactions = nil
 	model.Schedules = []types.Schedule{
-		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
+		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Recurrence: monthlyTestRecurrence(), StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
 	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
@@ -455,7 +455,7 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
 		},
 		Schedules: []types.Schedule{
-			{ID: "payout", Name: "Payout", SourceAccountID: &account, Amount: expenseAmount("100"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true, AnnualCap: &cap},
+			{ID: "payout", Name: "Payout", SourceAccountID: &account, Amount: expenseAmount("100"), Recurrence: monthlyTestRecurrence(), StartDate: "2026-03-10", Priority: 1, Enabled: true, AnnualCap: &cap},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}

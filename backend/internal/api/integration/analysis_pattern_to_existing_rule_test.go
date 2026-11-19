@@ -15,8 +15,8 @@ func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	// Create an existing monthly rule that matches the pattern routing.
 	ruleBody, _ := json.Marshal(map[string]any{
 		"name": "Grocer", "sourceAccountId": "checking",
-		"amount":    map[string]any{"resolver": "expression", "config": map[string]any{"expression": "30.00"}, "inputs": map[string]any{}},
-		"frequency": "monthly", "startDate": "2026-01-15", "enabled": true,
+		"amount":     map[string]any{"resolver": "expression", "config": map[string]any{"expression": "30.00"}, "inputs": map[string]any{}},
+		"recurrence": map[string]any{"unit": "month", "interval": 1, "monthlyMode": "byDate"}, "startDate": "2026-01-15", "enabled": true,
 	})
 	res := callAPI(t, handler, "POST", "/v1/schedules", string(ruleBody))
 	if res.Code != 200 {

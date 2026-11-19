@@ -89,7 +89,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 			Name:         "Broken dates",
 			StartDate:    "not-a-date",
 			EndDate:      ptrIsoDate("2026-01-01"),
-			Frequency:    types.FrequencyMonthly,
+			Recurrence:   monthlyTestRecurrence(),
 			Priority:     1,
 			Enabled:      true,
 			Destinations: []string{"checking"},

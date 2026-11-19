@@ -116,7 +116,7 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 		id = rowID
 	}
 	if _, err := database.CreateSchedule(types.Schedule{
-		ID: "corner", Name: "Corner Store", Frequency: types.FrequencyMonthly,
+		ID: "corner", Name: "Corner Store", Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
 		StartDate: "2026-08-01", Enabled: true,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
 	}); err != nil {

@@ -17,7 +17,7 @@ func TestPatternActionsRollBackAcceptance(t *testing.T) {
 				t.Fatal(err)
 			}
 			account := "checking"
-			rule := types.Schedule{ID: uuid.NewString(), Name: "Grocer", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-01-15", Enabled: true}
+			rule := types.Schedule{ID: uuid.NewString(), Name: "Grocer", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30"}, Inputs: map[string]types.AmountInputBinding{}}, Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-01-15", Enabled: true}
 			if action == "create" {
 				if _, err := s.db.Exec(`CREATE TRIGGER fail_pattern_schedule BEFORE INSERT ON recurrence_rules BEGIN SELECT RAISE(ABORT, 'test failure'); END`); err != nil {
 					t.Fatal(err)

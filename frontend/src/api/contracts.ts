@@ -149,6 +149,18 @@ export interface AmountCatalogResponse extends HumaMetadata {
 
 export type Frequency = "daily" | "weekly" | "monthly" | "quarterly" | "annual";
 
+export type RecurrenceUnit = "day" | "week" | "month" | "year";
+
+export type RecurrenceMonthlyMode = "byDate" | "byNthWeekday";
+
+export interface BackendRecurrence extends HumaMetadata {
+	unit: RecurrenceUnit;
+	interval: number;
+	weekdays?: number[] | null;
+	monthlyMode?: RecurrenceMonthlyMode | null;
+}
+export type Recurrence = BackendRecurrence;
+
 export interface BackendPlannedPurchase extends HumaMetadata {
 	id: string;
 	name: string;
@@ -187,7 +199,7 @@ export interface BackendSchedule extends HumaMetadata {
 	sourceAccountId: string | null;
 	destinations: string[] | null;
 	amount: TransactionAmountResolution;
-	frequency: Frequency;
+	recurrence: BackendRecurrence;
 	startDate: IsoDate;
 	endDate: IsoDate | null;
 	annualCap: number | null;

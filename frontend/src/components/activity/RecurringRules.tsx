@@ -23,7 +23,8 @@ import {
 	useServerStatus,
 } from "../../state/workspaceResources.ts";
 import { scheduleTransaction } from "../../domain/accountActivity.ts";
-import { frequencyLabel } from "../../domain/recurringPatterns.ts";
+import { recurrenceLabel } from "../../domain/recurringPatterns.ts";
+import { recurrenceFromScheduleLike } from "../../domain/recurrence.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import {
 	Empty,
@@ -129,7 +130,17 @@ export function RecurringRules({
 	const status = useServerStatus().data;
 	const cadenceById = useMemo(
 		() =>
-			new Map(rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)])),
+			new Map(
+				rules.map((rule) => {
+					const recurrence = recurrenceFromScheduleLike(rule);
+					return [
+						rule.id,
+						recurrence
+							? recurrenceLabel(recurrence, rule.startDate)
+							: "Recurring",
+					];
+				}),
+			),
 		[rules],
 	);
 	const cadenceOf = (id: string) => cadenceById.get(id) ?? "Recurring";

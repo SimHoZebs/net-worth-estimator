@@ -39,7 +39,7 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 	model.Transactions = []types.Transaction{}
 	model.Schedules = []types.Schedule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
-		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
+		Destinations: []string{"prime_card"}, Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-09-10", Enabled: true,
 		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",
@@ -129,7 +129,7 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 	model.Transactions = []types.Transaction{}
 	model.Schedules = []types.Schedule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
-		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
+		Destinations: []string{"prime_card"}, Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-09-10", Enabled: true,
 		Amount: types.TransactionAmountResolution{
 			Resolver: "expression",

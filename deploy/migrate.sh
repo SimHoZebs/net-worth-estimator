@@ -8,9 +8,13 @@
 #      observation instants (23:59:59 UTC of their own Gregorian day), and
 #      legacy default-disabled settled bank rows recover their posted-time
 #      event times, all inside a single candidate transaction.
-#   2. Frozen SQL provisions Analysis on that candidate when needed, and the
+#   2. Retired schedule frequencies convert to recurrences (daily to every
+#      day, weekly to the start weekday, monthly to the clamped start day,
+#      quarterly to every third month, annual to the yearly date) inside a
+#      single candidate transaction with mapping postconditions.
+#   3. Frozen SQL provisions Analysis on that candidate when needed, and the
 #      promotion merchant-key column is added additively when absent.
-#   3. The standalone purchase tool converts retired purchase policies.
+#   4. The standalone purchase tool converts retired purchase policies.
 #   4. The additive unified projection tables and columns are provisioned
 #      when absent; a partial group fails closed.
 #   5. The completed transaction-ID migration audit table is removed.
@@ -31,15 +35,17 @@
 # lives in the backend.
 #
 # Supported sources are the full `shared-accounts-v1` base with either
-# checkpoint shape (deployed date-only, or final observation instants) and
-# with zero, six, or all eight Analysis tables. Partial Analysis schemas, unknown
-# checkpoint shapes (including a date+observed_at mix, which was never
-# deployed), pre-user-scope tables, malformed or NULL or normalized-invalid
-# dates, and missing or non-integer or non-positive posted instants all fail
-# closed before any backup or mutation. A complete target (final checkpoints
-# plus the full Analysis schema) repeats read-only checks only and never
-# reactivates a post-upgrade owner disable. An absent database file fails:
-# provisioning fresh storage is `setupdb` and `api-boot.sh`, not
+# checkpoint shape (deployed date-only, or final observation instants), either
+# schedule shape (retired frequency, or current recurrence columns), and
+# with zero, six, or all eight Analysis tables. Partial Analysis schemas,
+# partial recurrence shapes, unknown schedule frequencies, undated weekly
+# schedules, unknown checkpoint shapes (including a date+observed_at mix,
+# which was never deployed), pre-user-scope tables, malformed or NULL or
+# normalized-invalid dates, and missing or non-integer or non-positive posted
+# instants all fail closed before any backup or mutation. A complete target
+# (final checkpoints plus the full Analysis schema) repeats read-only checks
+# only and never reactivates a post-upgrade owner disable. An absent database
+# file fails: provisioning fresh storage is `setupdb` and `api-boot.sh`, not
 # this hook.
 #
 # The published `<database>.analysis-migration-pending` interlock from an
@@ -106,6 +112,38 @@ check_base_columns() {
   SELECT user_id, id, position, name, kind, min_balance, max_balance, color, enabled FROM accounts LIMIT 0;
   SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void FROM transactions LIMIT 0;
   SELECT user_id, provider, bridge_account_id, bank_transaction_id, transaction_id FROM transaction_sync_keys LIMIT 0;
+  SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
+  SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
+  SELECT user_id, id, source_path, document_present FROM model_metadata LIMIT 0;
+  SELECT user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms LIMIT 0;
+  SELECT user_id, id, kind FROM entity_ids LIMIT 0;
+  SELECT user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at FROM account_links LIMIT 0;
+  SELECT user_id, instance_id, position FROM pinned_evaluations LIMIT 0;
+  SELECT user_id, id, settings_json FROM safe_spending_settings LIMIT 0;
+  SELECT user_id, id, last_sync_at FROM sync_state LIMIT 0;
+  SELECT user_id, id, access_url, bridge_host, updated_at, cards_json FROM sync_credentials LIMIT 0;
+  SELECT user_id, id, position, name, label, summary, when_use, amount_json, enabled FROM amount_presets LIMIT 0;'
+}
+
+# check_base_columns_legacy accepts the pre-recurrence base: every other table
+# matches the current shape while recurrence_rules still carries the retired
+# frequency column. Only the recurrence step below may consume this shape.
+check_base_columns_legacy() {
+  sqlite3 -readonly "$1" '
+  SELECT user_id, id, transaction_id, digest, size, blob_key, revision, payload FROM receipts LIMIT 0;
+  SELECT key, state, expires_at FROM blob_objects LIMIT 0;
+  SELECT key, data FROM blob_data LIMIT 0;
+  SELECT token, data, expiry FROM sessions LIMIT 0;
+  SELECT id, issuer, subject, sid, expiry, data FROM identity_grants LIMIT 0;
+  SELECT issuer, kind, identifier, seen_at, expiry FROM identity_logout_marks LIMIT 0;
+  SELECT issuer, jti, expiry FROM identity_logout_tokens LIMIT 0;
+  SELECT id, issuer, subject FROM users LIMIT 0;
+  SELECT id, name, created_by_user_id, created_at FROM user_groups LIMIT 0;
+  SELECT group_id, user_id, role, joined_at, display_name FROM group_members LIMIT 0;
+  SELECT id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at FROM group_invites LIMIT 0;
+  SELECT user_id, id, position, name, kind, min_balance, max_balance, color, enabled FROM accounts LIMIT 0;
+  SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void FROM transactions LIMIT 0;
+  SELECT user_id, provider, bridge_account_id, bank_transaction_id, transaction_id FROM transaction_sync_keys LIMIT 0;
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
   SELECT user_id, id, source_path, document_present FROM model_metadata LIMIT 0;
@@ -117,6 +155,22 @@ check_base_columns() {
   SELECT user_id, id, last_sync_at FROM sync_state LIMIT 0;
   SELECT user_id, id, access_url, bridge_host, updated_at, cards_json FROM sync_credentials LIMIT 0;
   SELECT user_id, id, position, name, label, summary, when_use, amount_json, enabled FROM amount_presets LIMIT 0;'
+}
+
+# check_recurrence verifies the migrated recurrence columns: the retired
+# frequency column is gone, every rule carries a known unit with an in-range
+# interval, weekly rules carry exactly the start date's Sunday-first weekday,
+# and monthly rules repeat on the clamped start day-of-month.
+check_recurrence() {
+  sqlite3 -readonly "$1" '
+    SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;' || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('recurrence_rules') WHERE name='frequency';")" = 0 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM recurrence_rules WHERE recurrence_unit NOT IN ('day','week','month','year') OR recurrence_interval IS NULL OR recurrence_interval < 1 OR recurrence_interval > 99;")" = 0 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM recurrence_rules WHERE recurrence_unit = 'week' AND recurrence_weekdays != '[\"' || strftime('%w', start_date) || '\"]';")" = 0 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM recurrence_rules WHERE recurrence_unit = 'week' AND (date(start_date) IS NULL OR date(start_date) != start_date);")" = 0 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM recurrence_rules WHERE recurrence_unit = 'month' AND recurrence_month_mode != 'byDate';")" = 0 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM recurrence_rules WHERE recurrence_unit != 'month' AND recurrence_month_mode IS NOT NULL;")" = 0 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM recurrence_rules WHERE recurrence_unit != 'week' AND recurrence_weekdays != '[]';")" = 0
 }
 
 check_target() {
@@ -368,7 +422,25 @@ esac
 marker=$(sqlite3 -readonly "$db" "SELECT count(*) FROM schema_migrations WHERE name='shared-accounts-v1';") \
   || fail "Cannot inspect schema marker; refusing to guess."
 test "$marker" = 1 || fail "Unsupported application schema."
-check_base_columns "$db" || fail "Incomplete application schema. Refusing automatic repair."
+# Schedule recurrences are the current shape; the retired frequency column is
+# a supported legacy source converted below. A partial recurrence shape (new
+# columns without the retired column, or vice versa) fails closed here.
+recurrence="current"
+if ! check_base_columns "$db" 2>/dev/null; then
+  if check_base_columns_legacy "$db" 2>/dev/null; then
+    recurrence="legacy"
+  else
+    fail "Incomplete application schema. Refusing automatic repair."
+  fi
+fi
+if [ "$recurrence" = legacy ]; then
+  unknown_frequency=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM recurrence_rules WHERE frequency NOT IN ('daily','weekly','monthly','quarterly','annual');") \
+    || fail "Cannot inspect schedule frequencies; refusing to guess."
+  test "$unknown_frequency" = 0 || fail "Unknown schedule frequency; refusing automatic repair."
+  undated_weekly=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM recurrence_rules WHERE frequency = 'weekly' AND (date(start_date) IS NULL OR date(start_date) != start_date);") \
+    || fail "Cannot inspect weekly schedule dates; refusing to guess."
+  test "$undated_weekly" = 0 || fail "Refusing to invent weekdays: a weekly schedule lacks a calendar start date."
+fi
 transactions_destination=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name IN ('destinations','destination_account_ids');") \
   || fail "Cannot inspect transactions columns; refusing to guess."
 test "$transactions_destination" -ge 1 || fail "Transactions lack a destination column; refusing automatic repair."
@@ -474,7 +546,7 @@ fi
 # one and a failed dry run falls through to the full path instead of stranding
 # the window. The full path provisions the candidate and keeps a verified
 # backup either way.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -943,6 +1015,84 @@ DDL
   fi
 fi
 
+# Convert retired schedule frequencies to recurrences on the candidate. The
+# mapping is daily to every day, weekly to the start date's Sunday-first
+# weekday (strftime %w already yields 0 for Sunday), monthly to the clamped
+# start day-of-month, quarterly to every third month, and annual to the yearly
+# date. A table rebuild carries the exact current DDL including its CHECK
+# constraints, so the retired frequency column cannot survive and no SQLite
+# DROP COLUMN support is required. Foreign keys stay off across the
+# drop-and-rename only; the candidate integrity and foreign-key checks below
+# plus verify_recurrence prove the result. A conversion failure leaves the
+# original byte-identical.
+if [ "$recurrence" = legacy ]; then
+  recurrence_sql="$backup/recurrence.sql"
+  cat > "$recurrence_sql" <<'DDL'
+.bail on
+PRAGMA foreign_keys=OFF;
+BEGIN IMMEDIATE;
+CREATE TEMP TABLE assert_ok(ok INTEGER CHECK(ok = 1));
+CREATE TABLE recurrence_rules_new (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  source_account_id TEXT,
+  destinations TEXT,
+  amount_resolution_json TEXT NOT NULL,
+  recurrence_unit TEXT NOT NULL CHECK(recurrence_unit IN ('day', 'week', 'month', 'year')),
+  recurrence_interval INTEGER NOT NULL CHECK(recurrence_interval >= 1 AND recurrence_interval <= 99),
+  recurrence_weekdays TEXT NOT NULL DEFAULT '[]',
+  recurrence_month_mode TEXT CHECK(recurrence_month_mode IN ('byDate', 'byNthWeekday')),
+  start_date TEXT NOT NULL,
+  end_date TEXT,
+  annual_cap REAL,
+  priority INTEGER NOT NULL,
+  enabled INTEGER NOT NULL,
+  PRIMARY KEY (user_id, id),
+  FOREIGN KEY(user_id, source_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
+);
+INSERT INTO recurrence_rules_new(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled)
+  SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json,
+    CASE frequency WHEN 'daily' THEN 'day' WHEN 'weekly' THEN 'week' WHEN 'monthly' THEN 'month' WHEN 'quarterly' THEN 'month' WHEN 'annual' THEN 'year' END,
+    CASE frequency WHEN 'quarterly' THEN 3 ELSE 1 END,
+    CASE frequency WHEN 'weekly' THEN '["' || strftime('%w', start_date) || '"]' ELSE '[]' END,
+    CASE frequency WHEN 'monthly' THEN 'byDate' WHEN 'quarterly' THEN 'byDate' ELSE NULL END,
+    start_date, end_date, annual_cap, priority, enabled
+  FROM recurrence_rules;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN (SELECT COUNT(*) FROM recurrence_rules) != (SELECT COUNT(*) FROM recurrence_rules_new) THEN 0 ELSE 1 END;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM recurrence_rules o WHERE NOT EXISTS (
+    SELECT 1 FROM recurrence_rules_new n
+    WHERE n.user_id = o.user_id AND n.id = o.id AND n.recurrence_unit = CASE o.frequency WHEN 'daily' THEN 'day' WHEN 'weekly' THEN 'week' WHEN 'monthly' THEN 'month' WHEN 'quarterly' THEN 'month' WHEN 'annual' THEN 'year' END)
+) THEN 0 ELSE 1 END;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM recurrence_rules_new WHERE recurrence_unit NOT IN ('day', 'week', 'month', 'year') OR recurrence_interval < 1 OR recurrence_interval > 99
+) THEN 0 ELSE 1 END;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM recurrence_rules_new WHERE recurrence_unit = 'week' AND recurrence_weekdays != '["' || strftime('%w', start_date) || '"]'
+) THEN 0 ELSE 1 END;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM recurrence_rules_new WHERE recurrence_unit = 'month' AND recurrence_month_mode != 'byDate'
+) THEN 0 ELSE 1 END;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM recurrence_rules_new WHERE recurrence_unit != 'month' AND recurrence_month_mode IS NOT NULL
+) THEN 0 ELSE 1 END;
+INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM recurrence_rules_new WHERE recurrence_unit != 'week' AND recurrence_weekdays != '[]'
+) THEN 0 ELSE 1 END;
+DROP TABLE recurrence_rules;
+ALTER TABLE recurrence_rules_new RENAME TO recurrence_rules;
+COMMIT;
+PRAGMA foreign_keys=ON;
+DDL
+  if ! sqlite3 "$candidate" < "$recurrence_sql" > "$backup/recurrence.log" 2>&1; then
+    printf 'migrate: recurrence conversion failed: %s\n' "$(cat "$backup/recurrence.log")" >&2
+    fail "Candidate recurrence conversion failed without committing. Original unchanged; verified backup retained at $backup. Keep the API stopped."
+  fi
+  check_recurrence "$candidate" || fail "Candidate schedule recurrence schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+
 # Verify the full candidate before publication: target schema, integrity,
 # foreign keys, and every preserved table against the backup. Only the
 # checkpoint date-to-instant conversion, the settled-bank repair, and the
@@ -1001,12 +1151,45 @@ verify_simplefin_keys() {
   fi
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays') ORDER BY name;") \
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays','recurrence_rules') ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
   verify_same "$table" || fail "Candidate changed preserved table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
 done
+
+# Schedule frequencies convert to recurrences, so the generic byte-identical
+# check cannot apply to that table on a legacy source. Every preexisting rule
+# must survive with its identity and terms intact, and every converted
+# recurrence must match the retired frequency: daily to every day, weekly to
+# its start weekday, monthly to the clamped start day-of-month, quarterly to
+# every third month, and annual to the yearly date. Unknown stored frequencies
+# never reach this point: the source preflight fails closed before any backup.
+# A source that already carries recurrences verifies byte-identical instead.
+verify_recurrence() {
+  same_count=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT (SELECT COUNT(*) FROM main.recurrence_rules) != (SELECT COUNT(*) FROM before.recurrence_rules);") \
+    || return 1
+  test "$same_count" = 0 || return 1
+  if [ "$recurrence" != legacy ]; then
+    verify_same recurrence_rules || return 1
+  else
+  mapped=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (
+    SELECT 1 FROM before.recurrence_rules o WHERE NOT EXISTS (
+      SELECT 1 FROM main.recurrence_rules n
+      WHERE n.user_id = o.user_id AND n.id = o.id AND n.position = o.position AND n.name = o.name
+        AND n.source_account_id IS o.source_account_id AND n.destinations IS o.destinations
+        AND n.amount_resolution_json = o.amount_resolution_json AND n.start_date = o.start_date
+        AND n.end_date IS o.end_date AND n.annual_cap IS o.annual_cap AND n.priority = o.priority AND n.enabled = o.enabled
+        AND n.recurrence_unit = CASE o.frequency WHEN 'daily' THEN 'day' WHEN 'weekly' THEN 'week' WHEN 'monthly' THEN 'month' WHEN 'quarterly' THEN 'month' WHEN 'annual' THEN 'year' END
+        AND n.recurrence_interval = CASE o.frequency WHEN 'quarterly' THEN 3 ELSE 1 END
+        AND n.recurrence_weekdays = CASE o.frequency WHEN 'weekly' THEN '[\"' || strftime('%w', o.start_date) || '\"]' ELSE '[]' END
+        AND n.recurrence_month_mode IS CASE o.frequency WHEN 'monthly' THEN 'byDate' WHEN 'quarterly' THEN 'byDate' ELSE NULL END));") \
+    || return 1
+  test "$mapped" = 0 || return 1
+  fi
+  check_recurrence "$candidate" || return 1
+}
+verify_recurrence || fail "Candidate schedule recurrence conversion is incomplete or overreached. Original unchanged; backup retained at $backup. Keep the API stopped."
 
 # Account displays gain stored 1:1 passthrough rows for uncovered accounts,
 # so the generic byte-identical check cannot apply. Every preexisting row
@@ -1530,8 +1713,12 @@ test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM accounts WHERE display_bas
   || fail "Published database carries an unknown display basis. Recover from the verified backup at $backup. Keep the API stopped."
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';")" = 1 \
   || fail "Published database is missing the analysis_promotions merchant_key column. Recover from the verified backup at $backup. Keep the API stopped."
+check_recurrence "$db" || fail "Published database failed schedule recurrence verification. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
+if [ "$recurrence" = legacy ]; then
+  info "Converted schedule frequencies to recurrences from $backup."
+fi
 if [ "$mode" = convert ]; then
   info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, pruned no-op checkpoints, and provisioned Analysis, unified projection, account institution, account display-basis, and promotion merchant-key schema from $backup."
 else

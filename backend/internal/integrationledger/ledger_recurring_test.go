@@ -99,7 +99,7 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	if err := json.Unmarshal(previewResp.Body.Bytes(), &preview); err != nil || !preview.Preview.Creatable || preview.Preview.Schedule == nil {
 		t.Fatalf("preview = %d %+v, want a creatable rule", previewResp.Code, preview)
 	}
-	if math.Abs(ledgerParseAmount(preview.Preview.Schedule.Amount)-want.DetectAmount) > 0.001 || preview.Preview.Schedule.Frequency != types.FrequencyMonthly {
+	if math.Abs(ledgerParseAmount(preview.Preview.Schedule.Amount)-want.DetectAmount) > 0.001 || preview.Preview.Schedule.Recurrence.Unit != types.RecurrenceMonth || preview.Preview.Schedule.Recurrence.Interval != 1 || preview.Preview.Schedule.Recurrence.MonthlyMode != types.RecurrenceMonthlyByDate {
 		t.Fatalf("preview rule = %+v, want monthly %v from the seed charge", preview.Preview.Schedule, want.DetectAmount)
 	}
 	createReq := httptest.NewRequest(http.MethodPost, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-schedule", nil)

@@ -161,6 +161,36 @@ const (
 	FrequencyAnnual    Frequency = "annual"
 )
 
+// RecurrenceUnit names the calendar rhythm a schedule repeats on. It is the
+// Google-lite recurrence shape: day, week, month, and year only.
+type RecurrenceUnit string
+
+const (
+	RecurrenceDay   RecurrenceUnit = "day"
+	RecurrenceWeek  RecurrenceUnit = "week"
+	RecurrenceMonth RecurrenceUnit = "month"
+	RecurrenceYear  RecurrenceUnit = "year"
+)
+
+// Monthly recurrence modes: byDate repeats on the clamped start day-of-month;
+// byNthWeekday repeats on the start date's weekday ordinal (or the last such
+// weekday when the start date falls in the final week of its month).
+const (
+	RecurrenceMonthlyByDate       = "byDate"
+	RecurrenceMonthlyByNthWeekday = "byNthWeekday"
+)
+
+// Recurrence describes when a schedule repeats. Interval is the number of
+// units between occurrences (1..99). Weekdays holds Sunday-first weekdays
+// (0=Sunday..6=Saturday) for weekly schedules only. MonthlyMode selects the
+// monthly interpretation for monthly schedules only.
+type Recurrence struct {
+	Unit        RecurrenceUnit `json:"unit"`
+	Interval    int            `json:"interval"`
+	Weekdays    []int          `json:"weekdays,omitempty"`
+	MonthlyMode string         `json:"monthlyMode,omitempty"`
+}
+
 // AmountInputBinding is a literal value or provider binding for one input.
 type AmountInputBinding struct {
 	Source    string         `json:"source"` // "literal" | "provider"
@@ -274,7 +304,7 @@ type Schedule struct {
 	SourceAccountID *string                     `json:"sourceAccountId"`
 	Destinations    []string                    `json:"destinations"`
 	Amount          TransactionAmountResolution `json:"amount"`
-	Frequency       Frequency                   `json:"frequency"`
+	Recurrence      Recurrence                  `json:"recurrence"`
 	StartDate       IsoDate                     `json:"startDate"`
 	EndDate         *IsoDate                    `json:"endDate"`
 	AnnualCap       *float64                    `json:"annualCap"`

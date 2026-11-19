@@ -21,12 +21,12 @@ func testTransactionFixture(id string) types.Transaction {
 
 func testRuleFixture(id string) types.Schedule {
 	return types.Schedule{
-		ID:        id,
-		Name:      "Rule " + id,
-		Frequency: types.FrequencyMonthly,
-		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-		StartDate: "2026-01-01",
-		Enabled:   true,
+		ID:         id,
+		Name:       "Rule " + id,
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+		StartDate:  "2026-01-01",
+		Enabled:    true,
 	}
 }
 

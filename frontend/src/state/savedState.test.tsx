@@ -72,7 +72,10 @@ describe("saved rows", () => {
 		expect(transactions.result.current).toEqual([]);
 		await waitFor(() => expect(rules.result.current).not.toBeNull());
 		expect(rules.result.current?.map((rule) => rule.id)).toEqual(["salary"]);
-		expect(rules.result.current?.[0]?.frequency).toBe("monthly");
+		expect(rules.result.current?.[0]?.recurrence).toMatchObject({
+			unit: "month",
+			interval: 1,
+		});
 		await waitFor(() => expect(evaluations.result.current).not.toBeNull());
 		expect(evaluations.result.current).toMatchObject([
 			{ id: "target", kind: "net-worth", target: 500 },

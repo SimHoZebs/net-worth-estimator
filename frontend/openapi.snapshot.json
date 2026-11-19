@@ -4004,11 +4004,11 @@
 					"enabled": {
 						"type": "boolean"
 					},
-					"frequency": {
-						"type": "string"
-					},
 					"name": {
 						"type": "string"
+					},
+					"recurrence": {
+						"$ref": "#/components/schemas/Recurrence"
 					},
 					"sourceAccountId": {
 						"type": "string"
@@ -4017,7 +4017,7 @@
 						"type": "string"
 					}
 				},
-				"required": ["name", "amount", "frequency", "startDate", "enabled"],
+				"required": ["name", "amount", "recurrence", "startDate", "enabled"],
 				"type": "object"
 			},
 			"ProviderEntry": {
@@ -4290,6 +4290,30 @@
 					}
 				},
 				"required": ["producer", "version", "simulated"],
+				"type": "object"
+			},
+			"Recurrence": {
+				"additionalProperties": false,
+				"properties": {
+					"interval": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"monthlyMode": {
+						"type": "string"
+					},
+					"unit": {
+						"type": "string"
+					},
+					"weekdays": {
+						"items": {
+							"format": "int64",
+							"type": "integer"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["unit", "interval"],
 				"type": "object"
 			},
 			"Remove-transfer-linkResponse": {
@@ -4760,9 +4784,6 @@
 					"endDate": {
 						"type": ["string", "null"]
 					},
-					"frequency": {
-						"type": "string"
-					},
 					"id": {
 						"type": "string"
 					},
@@ -4772,6 +4793,9 @@
 					"priority": {
 						"format": "int64",
 						"type": "integer"
+					},
+					"recurrence": {
+						"$ref": "#/components/schemas/Recurrence"
 					},
 					"sourceAccountId": {
 						"type": ["string", "null"]
@@ -4786,7 +4810,7 @@
 					"sourceAccountId",
 					"destinations",
 					"amount",
-					"frequency",
+					"recurrence",
 					"startDate",
 					"endDate",
 					"annualCap",
@@ -4943,9 +4967,6 @@
 					"endDate": {
 						"type": "string"
 					},
-					"frequency": {
-						"type": "string"
-					},
 					"id": {
 						"type": "string"
 					},
@@ -4956,6 +4977,9 @@
 						"format": "int64",
 						"type": "integer"
 					},
+					"recurrence": {
+						"$ref": "#/components/schemas/ScheduleRecurrence"
+					},
 					"sourceAccountId": {
 						"type": "string"
 					},
@@ -4963,7 +4987,7 @@
 						"type": "string"
 					}
 				},
-				"required": ["name", "amount", "frequency", "startDate", "enabled"],
+				"required": ["name", "amount", "recurrence", "startDate", "enabled"],
 				"type": "object"
 			},
 			"ScheduleEndBody": {
@@ -5152,15 +5176,15 @@
 					"endDate": {
 						"type": "string"
 					},
-					"frequency": {
-						"type": "string"
-					},
 					"id": {
 						"format": "uuid",
 						"type": "string"
 					},
 					"name": {
 						"type": "string"
+					},
+					"recurrence": {
+						"$ref": "#/components/schemas/ScheduleRecurrence"
 					},
 					"sourceAccountId": {
 						"type": ["string", "null"]
@@ -5169,7 +5193,7 @@
 						"type": "string"
 					}
 				},
-				"required": ["frequency", "startDate"],
+				"required": ["recurrence", "startDate"],
 				"type": "object"
 			},
 			"ScheduleListOutputBody": {
@@ -5225,6 +5249,37 @@
 				"required": ["scheduleId", "occurrences", "revision"],
 				"type": "object"
 			},
+			"ScheduleRecurrence": {
+				"additionalProperties": false,
+				"properties": {
+					"interval": {
+						"description": "Units between occurrences, 1 to 99.",
+						"format": "int64",
+						"maximum": 99,
+						"minimum": 1,
+						"type": "integer"
+					},
+					"monthlyMode": {
+						"description": "Monthly interpretation: byDate or byNthWeekday. Defaults to byDate when omitted.",
+						"type": "string"
+					},
+					"unit": {
+						"description": "Calendar step: day, week, month, or year.",
+						"enum": ["day", "week", "month", "year"],
+						"type": "string"
+					},
+					"weekdays": {
+						"description": "Sunday-first weekdays for weekly schedules only, 0=Sunday through 6=Saturday.",
+						"items": {
+							"format": "int64",
+							"type": "integer"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["unit", "interval"],
+				"type": "object"
+			},
 			"ScheduleRescheduleBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -5240,8 +5295,36 @@
 					"endDate": {
 						"type": ["string", "null"]
 					},
-					"frequency": {
-						"type": "string"
+					"recurrence": {
+						"additionalProperties": false,
+						"properties": {
+							"interval": {
+								"description": "Units between occurrences, 1 to 99.",
+								"format": "int64",
+								"maximum": 99,
+								"minimum": 1,
+								"type": "integer"
+							},
+							"monthlyMode": {
+								"description": "Monthly interpretation: byDate or byNthWeekday. Defaults to byDate when omitted.",
+								"type": "string"
+							},
+							"unit": {
+								"description": "Calendar step: day, week, month, or year.",
+								"enum": ["day", "week", "month", "year"],
+								"type": "string"
+							},
+							"weekdays": {
+								"description": "Sunday-first weekdays for weekly schedules only, 0=Sunday through 6=Saturday.",
+								"items": {
+									"format": "int64",
+									"type": "integer"
+								},
+								"type": ["array", "null"]
+							}
+						},
+						"required": ["unit", "interval"],
+						"type": "object"
 					},
 					"startDate": {
 						"type": "string"

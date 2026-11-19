@@ -65,7 +65,7 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	transactionID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+checkingID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","enabled":true}`).Body.Bytes())
 	ruleID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
-		`{"name":"Salary","sourceAccountId":null,"destinations":["`+checkingID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true,"priority":1}`).Body.Bytes())
+		`{"name":"Salary","sourceAccountId":null,"destinations":["`+checkingID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-02-01","enabled":true,"priority":1}`).Body.Bytes())
 
 	// A configured evaluation referencing savings stays valid through the
 	// public endpoint while the model is otherwise clean.

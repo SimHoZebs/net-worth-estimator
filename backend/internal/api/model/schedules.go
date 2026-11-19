@@ -2,7 +2,9 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"sort"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -16,22 +18,94 @@ import (
 // Schedules are standing instructions: plans with a cadence. They are
 // independent of the transactions that fulfil their occurrences.
 
+// ScheduleRecurrence is the wire recurrence for schedule creates, reschedules,
+// and schedule-from-transaction starts. It mirrors types.Recurrence: the unit
+// names the calendar step, the interval counts units between occurrences
+// (1..99), weekdays lists Sunday-first weekdays for weekly schedules only
+// (0=Sunday..6=Saturday, and it must include the start date's weekday), and
+// monthlyMode selects the monthly interpretation for monthly schedules only.
+type ScheduleRecurrence struct {
+	Unit        string `json:"unit" enum:"day,week,month,year" doc:"Calendar step: day, week, month, or year."`
+	Interval    int    `json:"interval" minimum:"1" maximum:"99" doc:"Units between occurrences, 1 to 99."`
+	Weekdays    []int  `json:"weekdays,omitempty" doc:"Sunday-first weekdays for weekly schedules only, 0=Sunday through 6=Saturday."`
+	MonthlyMode string `json:"monthlyMode,omitempty" doc:"Monthly interpretation: byDate or byNthWeekday. Defaults to byDate when omitted."`
+}
+
+// resolve normalizes a wire recurrence against its start date. A monthly
+// schedule without a mode repeats on the clamped start day-of-month; every
+// other combination must state exactly what the contract allows.
+func (r ScheduleRecurrence) resolve(startDate types.IsoDate) (types.Recurrence, error) {
+	unit := types.RecurrenceUnit(r.Unit)
+	switch unit {
+	case types.RecurrenceDay, types.RecurrenceWeek, types.RecurrenceMonth, types.RecurrenceYear:
+	default:
+		return types.Recurrence{}, fmt.Errorf("recurrence unit must be one of day, week, month, or year")
+	}
+	if r.Interval < 1 || r.Interval > 99 {
+		return types.Recurrence{}, fmt.Errorf("recurrence interval must be between 1 and 99")
+	}
+	out := types.Recurrence{Unit: unit, Interval: r.Interval}
+	if unit == types.RecurrenceWeek {
+		if len(r.Weekdays) == 0 {
+			return types.Recurrence{}, fmt.Errorf("weekly recurrence must list at least one weekday")
+		}
+		deduped := make([]int, 0, len(r.Weekdays))
+		seen := make(map[int]bool, len(r.Weekdays))
+		for _, weekday := range r.Weekdays {
+			if weekday < 0 || weekday > 6 {
+				return types.Recurrence{}, fmt.Errorf("weekly recurrence weekdays must be between 0 (Sunday) and 6 (Saturday)")
+			}
+			if !seen[weekday] {
+				seen[weekday] = true
+				deduped = append(deduped, weekday)
+			}
+		}
+		sort.Ints(deduped)
+		out.Weekdays = deduped
+		if domain.IsValidIsoDate(string(startDate)) {
+			start, err := time.Parse("2006-01-02", string(startDate))
+			if err == nil && !seen[int(start.Weekday())] {
+				return types.Recurrence{}, fmt.Errorf("weekly recurrence must include the start date's weekday")
+			}
+		}
+	} else if len(r.Weekdays) > 0 {
+		return types.Recurrence{}, fmt.Errorf("weekdays apply to weekly recurrences only")
+	}
+	if unit == types.RecurrenceMonth {
+		mode := r.MonthlyMode
+		if mode == "" {
+			mode = types.RecurrenceMonthlyByDate
+		}
+		if mode != types.RecurrenceMonthlyByDate && mode != types.RecurrenceMonthlyByNthWeekday {
+			return types.Recurrence{}, fmt.Errorf("monthly recurrence mode must be byDate or byNthWeekday")
+		}
+		out.MonthlyMode = mode
+	} else if r.MonthlyMode != "" {
+		return types.Recurrence{}, fmt.Errorf("monthlyMode applies to monthly recurrences only")
+	}
+	return out, nil
+}
+
 type scheduleCreateBody struct {
-	ID              *string         `json:"id,omitempty"`
-	Name            string          `json:"name"`
-	SourceAccountID *string         `json:"sourceAccountId,omitempty"`
-	Destinations    []string        `json:"destinations,omitempty"`
-	Amount          amountInput     `json:"amount"`
-	Frequency       types.Frequency `json:"frequency"`
-	StartDate       types.IsoDate   `json:"startDate"`
-	EndDate         *types.IsoDate  `json:"endDate,omitempty"`
-	AnnualCap       *float64        `json:"annualCap,omitempty"`
-	Priority        *int            `json:"priority,omitempty"`
-	Enabled         bool            `json:"enabled"`
+	ID              *string            `json:"id,omitempty"`
+	Name            string             `json:"name"`
+	SourceAccountID *string            `json:"sourceAccountId,omitempty"`
+	Destinations    []string           `json:"destinations,omitempty"`
+	Amount          amountInput        `json:"amount"`
+	Recurrence      ScheduleRecurrence `json:"recurrence"`
+	StartDate       types.IsoDate      `json:"startDate"`
+	EndDate         *types.IsoDate     `json:"endDate,omitempty"`
+	AnnualCap       *float64           `json:"annualCap,omitempty"`
+	Priority        *int               `json:"priority,omitempty"`
+	Enabled         bool               `json:"enabled"`
 }
 
 func (b scheduleCreateBody) toSchedule(id string) (types.Schedule, error) {
 	amount, err := b.Amount.resolution()
+	if err != nil {
+		return types.Schedule{}, err
+	}
+	recurrence, err := b.Recurrence.resolve(b.StartDate)
 	if err != nil {
 		return types.Schedule{}, err
 	}
@@ -41,7 +115,7 @@ func (b scheduleCreateBody) toSchedule(id string) (types.Schedule, error) {
 	}
 	out := types.Schedule{
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
-		Destinations: b.Destinations, Amount: amount, Frequency: b.Frequency,
+		Destinations: b.Destinations, Amount: amount, Recurrence: recurrence,
 		StartDate: b.StartDate, EndDate: b.EndDate, AnnualCap: b.AnnualCap,
 		Priority: priority, Enabled: b.Enabled,
 	}
@@ -111,18 +185,25 @@ func (b scheduleAmendBody) apply(stored types.Schedule) (types.Schedule, error) 
 }
 
 type scheduleRescheduleBody struct {
-	Frequency optional[types.Frequency]       `json:"frequency,omitempty"`
-	StartDate optional[types.IsoDate]         `json:"startDate,omitempty"`
-	EndDate   nullableOptional[types.IsoDate] `json:"endDate,omitempty"`
+	Recurrence optional[ScheduleRecurrence]    `json:"recurrence,omitempty"`
+	StartDate  optional[types.IsoDate]         `json:"startDate,omitempty"`
+	EndDate    nullableOptional[types.IsoDate] `json:"endDate,omitempty"`
 }
 
-func (b scheduleRescheduleBody) apply(stored types.Schedule) types.Schedule {
+// apply carries a reschedule onto the stored row. Recurrence and the start
+// date resolve together so a weekly change validates against the new start;
+// absent members keep their stored value and a null end date clears it.
+func (b scheduleRescheduleBody) apply(stored types.Schedule) (types.Schedule, error) {
 	out := stored
-	if b.Frequency.Set {
-		out.Frequency = b.Frequency.Value
-	}
 	if b.StartDate.Set {
 		out.StartDate = b.StartDate.Value
+	}
+	if b.Recurrence.Set {
+		recurrence, err := b.Recurrence.Value.resolve(out.StartDate)
+		if err != nil {
+			return types.Schedule{}, err
+		}
+		out.Recurrence = recurrence
 	}
 	if b.EndDate.Set {
 		if b.EndDate.Null {
@@ -132,7 +213,7 @@ func (b scheduleRescheduleBody) apply(stored types.Schedule) types.Schedule {
 			out.EndDate = &value
 		}
 	}
-	return out
+	return out, nil
 }
 
 type scheduleInput struct {
@@ -234,7 +315,10 @@ func (s *handler) rescheduleSchedule(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	next := input.Body.apply(existing)
+	next, err := input.Body.apply(existing)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
 	if !domain.IsValidIsoDate(string(next.StartDate)) {
 		return nil, huma.Error422UnprocessableEntity("startDate must be a YYYY-MM-DD calendar date")
 	}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Transaction } from "../../domain/model.ts";
+import type { Recurrence } from "../../domain/recurrence.ts";
 import {
 	claimUpdate,
 	combineDayTime,
@@ -72,6 +73,10 @@ function transactionValues(
 	};
 }
 
+function monthlyRecurrence(): Recurrence {
+	return { unit: "month", interval: 1, monthlyMode: "byDate" };
+}
+
 function scheduleValues(
 	overrides: Partial<Parameters<typeof scheduleUpdate>[0]["values"]> = {},
 ): Parameters<typeof scheduleUpdate>[0]["values"] {
@@ -81,7 +86,7 @@ function scheduleValues(
 		annualIncrease: baselineSchedule.annualIncrease,
 		fromId: baselineSchedule.fromId,
 		toId: baselineSchedule.toId,
-		frequency: "monthly",
+		recurrence: monthlyRecurrence(),
 		startDate: baselineSchedule.startDate,
 		endDate: baselineSchedule.endDate,
 		enabled: baselineSchedule.enabled,
@@ -185,7 +190,7 @@ describe("schedule patches", () => {
 		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
 			values: scheduleValues({ name: "Monthly investing revised" }),
-			storedFrequency: "monthly",
+			storedRecurrence: monthlyRecurrence(),
 		});
 		expect(patch).toEqual({
 			amend: { name: "Monthly investing revised" },
@@ -193,20 +198,23 @@ describe("schedule patches", () => {
 		});
 	});
 
-	it("sends only the cadence when the choice changes", () => {
+	it("sends only the recurrence when the choice changes", () => {
 		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
-			values: scheduleValues({ frequency: "annual" }),
-			storedFrequency: "monthly",
+			values: scheduleValues({ recurrence: { unit: "year", interval: 1 } }),
+			storedRecurrence: monthlyRecurrence(),
 		});
-		expect(patch).toEqual({ amend: {}, reschedule: { frequency: "annual" } });
+		expect(patch).toEqual({
+			amend: {},
+			reschedule: { recurrence: { unit: "year", interval: 1 } },
+		});
 	});
 
 	it("sends a semantic amount when the value or growth changes", () => {
 		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
 			values: scheduleValues({ amount: 2000, annualIncrease: 3 }),
-			storedFrequency: "monthly",
+			storedRecurrence: monthlyRecurrence(),
 		});
 		expect(patch).toEqual({
 			amend: { amount: { value: 2000, annualIncrease: 3 } },
@@ -218,15 +226,18 @@ describe("schedule patches", () => {
 		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
 			values: scheduleValues({ endDate: null }),
-			storedFrequency: "monthly",
+			storedRecurrence: monthlyRecurrence(),
 		});
 		expect(patch).toEqual({ amend: {}, reschedule: { endDate: null } });
 	});
 
-	it("omits frequency when the stored cadence is unknown", () => {
+	it("omits recurrence when the stored cadence is unknown", () => {
 		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
-			values: scheduleValues({ name: "Renamed", frequency: "annual" }),
+			values: scheduleValues({
+				name: "Renamed",
+				recurrence: { unit: "year", interval: 1 },
+			}),
 		});
 		expect(patch).toEqual({ amend: { name: "Renamed" }, reschedule: {} });
 	});
@@ -238,7 +249,7 @@ describe("schedule patches", () => {
 				amount: "1800",
 				fromId: "checking",
 				toId: "brokerage",
-				frequency: "annual",
+				recurrence: { unit: "year", interval: 1 },
 				startDate: "2026-10-03",
 				endDate: "",
 				noEndDate: true,
@@ -247,7 +258,7 @@ describe("schedule patches", () => {
 			},
 		});
 		if (values instanceof Error) throw values;
-		expect(values.frequency).toBe("annual");
+		expect(values.recurrence).toEqual({ unit: "year", interval: 1 });
 		expect(values.annualIncrease).toBe(2.5);
 		expect(values.endDate).toBeNull();
 	});
@@ -262,6 +273,27 @@ describe("schedule patches", () => {
 				scheduleValues({ startDate: "2026-10-03", endDate: "2026-09-01" }),
 			),
 		).toBe("The last occurrence cannot come before the first one.");
+		expect(
+			validateScheduleValues(
+				scheduleValues({ recurrence: { unit: "day", interval: 0 } }),
+			),
+		).toBe("Enter a repeat interval from 1 to 99.");
+		expect(
+			validateScheduleValues(
+				scheduleValues({
+					recurrence: { unit: "week", interval: 1, weekdays: [3] },
+					startDate: "2026-10-06",
+				}),
+			),
+		).toBe("The repeat days must include the first occurrence weekday.");
+		expect(
+			validateScheduleValues(
+				scheduleValues({
+					recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
+					startDate: "2026-10-03",
+				}),
+			),
+		).toBeNull();
 	});
 
 	it("rejects a matching account pair on create but keeps it editable in place", () => {
@@ -281,7 +313,7 @@ describe("schedule patches", () => {
 				amount: "1800",
 				fromId: "checking",
 				toId: "checking",
-				frequency: "monthly",
+				recurrence: monthlyRecurrence(),
 				startDate: "2026-10-03",
 				endDate: "",
 				noEndDate: true,
@@ -309,13 +341,13 @@ describe("create bodies", () => {
 			annualIncrease: 2.5,
 			fromId: "checking",
 			toId: "brokerage",
-			frequency: "annual",
+			recurrence: { unit: "year", interval: 1 },
 			startDate: "2026-01-01",
 			endDate: null,
 			enabled: true,
 		});
 		expect(body.amount).toEqual({ value: 900, annualIncrease: 2.5 });
-		expect(body.frequency).toBe("annual");
+		expect(body.recurrence).toEqual({ unit: "year", interval: 1 });
 	});
 
 	it("states a claim as its own action body", () => {

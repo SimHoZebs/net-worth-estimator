@@ -37,18 +37,31 @@ func IsSchedulePatternKind(kind string) bool {
 	return false
 }
 
-// recurringCadenceFrequencies maps detected cadences onto forecast rule
-// schedules via the single cadence registry. Biweekly has no rule schedule:
-// rules expand weekly, monthly, quarterly, or longer, so biweekly patterns
-// stay visible without creation until the product decides how they should
-// repeat.
-func recurringCadenceFrequency(cadence string) (types.Frequency, bool) {
-	for _, def := range patternCadenceDefs {
-		if def.id == cadence && def.detected {
-			return def.frequency, def.frequency != ""
-		}
+// recurringCadenceRecurrence maps detected cadences onto forecast schedule
+// recurrences: daily, weekly, biweekly, monthly, quarterly, and annual
+// patterns all become creatable, with weekly shapes pinned to the start
+// date's weekday so the start date stays a scheduled occurrence.
+func recurringCadenceRecurrence(cadence, firstDay string) (types.Recurrence, bool) {
+	weekday := 0
+	if domain.IsValidIsoDate(firstDay) {
+		weekday = int(domain.MustParseIsoDate(firstDay).Weekday())
 	}
-	return "", false
+	switch cadence {
+	case "daily":
+		return types.Recurrence{Unit: types.RecurrenceDay, Interval: 1}, true
+	case "weekly":
+		return types.Recurrence{Unit: types.RecurrenceWeek, Interval: 1, Weekdays: []int{weekday}}, true
+	case "biweekly":
+		return types.Recurrence{Unit: types.RecurrenceWeek, Interval: 2, Weekdays: []int{weekday}}, true
+	case "monthly":
+		return types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, true
+	case "quarterly":
+		return types.Recurrence{Unit: types.RecurrenceMonth, Interval: 3, MonthlyMode: types.RecurrenceMonthlyByDate}, true
+	case "annual":
+		return types.Recurrence{Unit: types.RecurrenceYear, Interval: 1}, true
+	default:
+		return types.Recurrence{}, false
+	}
 }
 
 // RecurringPatternKey identifies one confirmed source pattern: the claim
@@ -172,8 +185,8 @@ type PatternToNewScheduleInput struct {
 // facts as forecast movements. Upcoming lists the six scheduled dates after
 // the latest recorded movement, so the interface shows future-only movements
 // alongside the recorded evidence.
-// Biweekly and unknown cadences return a visible preview with
-// Creatable=false instead of an error, so the interface can explain why.
+// Unknown cadences return a visible preview with Creatable=false instead of
+// an error, so the interface can explain why.
 func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.PatternToNewSchedulePreview, error) {
 	anchor := input.Anchor
 	occurrenceIDs := []string{}
@@ -236,7 +249,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 	for _, item := range occurrences {
 		preview.Occurrences = append(preview.Occurrences, types.PatternOccurrence{PatternDatedAmount: types.PatternDatedAmount{Date: item.day, Amount: formatCents(math.Abs(item.amount))}, TransactionID: item.id})
 	}
-	frequency, ok := recurringCadenceFrequency(cadence)
+	frequency, ok := recurringCadenceRecurrence(cadence, firstDay)
 	if !ok {
 		preview.Creatable = false
 		preview.Reason = fmt.Sprintf("Patterns that repeat %s cannot become forecast rules yet. The evidence stays saved for review.", cadenceLabel(cadence))
@@ -247,7 +260,7 @@ func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.Pa
 		SourceAccountID: first.SourceAccountID,
 		Destinations:    append([]string(nil), first.Destinations...),
 		Amount:          formatCents(typical),
-		Frequency:       frequency,
+		Recurrence:      frequency,
 		StartDate:       firstDay,
 		Enabled:         true,
 	}

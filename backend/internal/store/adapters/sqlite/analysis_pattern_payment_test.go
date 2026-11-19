@@ -21,8 +21,8 @@ func TestPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	rule := preview.Schedule
 	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, preview.Merchant, "verified-subject", types.Schedule{
 		ID: uuid.NewString(), Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations,
-		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": rule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency: rule.Frequency, StartDate: rule.StartDate, Enabled: true,
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": rule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+		Recurrence: rule.Recurrence, StartDate: rule.StartDate, Enabled: true,
 	})
 	if err != nil || created.ID == "" {
 		t.Fatalf("create=%+v err=%v", created, err)
@@ -63,7 +63,7 @@ func TestPatternToExistingScheduleAcceptsRentKind(t *testing.T) {
 	findings := seedPatternFindings(t, s, "rent", "monthly", "RENT PAYMENT", "-1200.00", "Rent", "outflow")
 	anchor := confirmFinding(t, s, findings[0])
 	account := "checking"
-	rule, err := s.CreateSchedule(types.Schedule{Name: "Rent", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1200.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-01-15", Enabled: true})
+	rule, err := s.CreateSchedule(types.Schedule{Name: "Rent", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1200.00"}, Inputs: map[string]types.AmountInputBinding{}}, Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-01-15", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}

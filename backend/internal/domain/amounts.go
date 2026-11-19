@@ -28,9 +28,9 @@ type AmountProviderContext struct {
 	RealizedTransactionAmountsByYear map[string]map[string]float64
 	PaymentTerms                     map[string]types.PaymentTerms
 	Date                             string
-	// FrequencyDivisor converts an annual rate to a per-occurrence rate.
-	// Rules carry their frequency divisor; manual transactions use 1.
-	FrequencyDivisor int
+	// RecurrenceDivisor converts an annual rate to a per-occurrence rate.
+	// Rules carry their recurrence divisor; manual transactions use 1.
+	RecurrenceDivisor float64
 	// RuleStartDate is the owning rule's start date, or "" for manual
 	// transactions. It anchors the growth-factor provider.
 	RuleStartDate string
@@ -222,11 +222,11 @@ var amountProviders = map[string]providerDefinition{
 			if volatility > 0 && ctx.SampledAnnualRate != nil {
 				effective = *ctx.SampledAnnualRate
 			}
-			divisor := ctx.FrequencyDivisor
+			divisor := ctx.RecurrenceDivisor
 			if divisor <= 0 {
 				divisor = 1
 			}
-			return effective / float64(divisor), nil
+			return effective / divisor, nil
 		},
 		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
 			_, _, err := validateRateArgs(args)

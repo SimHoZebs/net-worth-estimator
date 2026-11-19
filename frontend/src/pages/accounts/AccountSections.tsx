@@ -33,7 +33,8 @@ import {
 	scheduleToDisplay,
 	transactionToDisplay,
 } from "../../domain/transactionRows.ts";
-import { frequencyLabel } from "../../domain/recurringPatterns.ts";
+import { recurrenceLabel } from "../../domain/recurringPatterns.ts";
+import { recurrenceFromScheduleLike } from "../../domain/recurrence.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
 import { useRouter } from "@tanstack/react-router";
@@ -183,7 +184,17 @@ function TransactionsView({
 	);
 	const ruleCadence = useMemo(
 		() =>
-			new Map(rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)])),
+			new Map(
+				rules.map((rule) => {
+					const recurrence = recurrenceFromScheduleLike(rule);
+					return [
+						rule.id,
+						recurrence
+							? recurrenceLabel(recurrence, rule.startDate)
+							: "Recurring",
+					];
+				}),
+			),
 		[rules],
 	);
 	const visible = useMemo(

@@ -1,9 +1,12 @@
 import { Link2, Repeat } from "lucide-react";
 import { useId, type RefObject } from "react";
 import { dateLabel } from "../../domain/format.ts";
-import { parseUnion } from "../../domain/guards.ts";
+import {
+	ensureStartWeekday,
+	recurrenceSentence,
+	type Recurrence,
+} from "../../domain/recurrence.ts";
 import type { Transaction } from "../../domain/model.ts";
-import type { Frequency } from "@/api/contracts.ts";
 import { timeOfDay } from "../editors/transactionBodies.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -25,6 +28,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select.tsx";
+import { RecurrenceFields } from "../editors/RecurrenceFields.tsx";
 import { TransactionCategory } from "./TransactionCategory.tsx";
 
 export type EditField =
@@ -40,8 +44,8 @@ export type TransactionDraft = {
 	amount: string;
 	fromId: string;
 	toId: string;
-	/** Schedule cadence. Null on a one-time transaction. */
-	frequency: Frequency | null;
+	/** Schedule recurrence. Null on a one-time transaction. */
+	recurrence: Recurrence | null;
 	startDate: string;
 	endDate: string;
 	noEndDate: boolean;
@@ -57,14 +61,15 @@ export type TransactionDraft = {
 
 export function draftFromTransaction(
 	savedTransaction: Transaction,
-	scheduleFrequency: Frequency,
+	scheduleRecurrence: Recurrence | null,
 ): TransactionDraft {
 	return {
 		name: savedTransaction.name,
 		amount: String(savedTransaction.amount),
 		fromId: savedTransaction.fromId ?? "",
 		toId: savedTransaction.toId ?? "",
-		frequency: savedTransaction.kind === "schedule" ? scheduleFrequency : null,
+		recurrence:
+			savedTransaction.kind === "schedule" ? scheduleRecurrence : null,
 		startDate: savedTransaction.startDate,
 		endDate: savedTransaction.endDate ?? "",
 		noEndDate: savedTransaction.endDate == null,
@@ -209,14 +214,6 @@ export function ClaimFields({
 	);
 }
 
-const frequencyLabels: Record<string, string> = {
-	daily: "Daily",
-	weekly: "Weekly",
-	monthly: "Monthly",
-	quarterly: "Every 3 months",
-	annual: "Yearly",
-};
-
 export function MoreOptions({
 	savedTransaction,
 	transactions,
@@ -257,42 +254,21 @@ export function MoreOptions({
 				)}
 				{schedule && (
 					<>
-						<Field>
-							<FieldLabel htmlFor={`${id}-frequency`}>Frequency</FieldLabel>
-							<Select
-								disabled={locked}
-								value={draft.frequency ?? "monthly"}
-								onValueChange={(value) => {
-									const next = parseUnion(value, [
-										"daily",
-										"weekly",
-										"monthly",
-										"quarterly",
-										"annual",
-									] as const);
-									if (next) updateDraft({ frequency: next }, "schedule");
-								}}
-							>
-								<SelectTrigger
-									id={`${id}-frequency`}
-									aria-label="Frequency"
-									className="w-full"
-								>
-									<SelectValue>
-										{(value: string | null) =>
-											(value !== null && frequencyLabels[value]) || "Frequency"
-										}
-									</SelectValue>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="daily">Daily</SelectItem>
-									<SelectItem value="weekly">Weekly</SelectItem>
-									<SelectItem value="monthly">Monthly</SelectItem>
-									<SelectItem value="quarterly">Every 3 months</SelectItem>
-									<SelectItem value="annual">Yearly</SelectItem>
-								</SelectContent>
-							</Select>
-						</Field>
+						<RecurrenceFields
+							recurrence={
+								draft.recurrence ?? {
+									unit: "month",
+									interval: 1,
+									monthlyMode: "byDate",
+								}
+							}
+							startDate={draft.startDate}
+							endDate={!draft.noEndDate && draft.endDate ? draft.endDate : null}
+							onChange={(recurrence) => updateDraft({ recurrence }, "schedule")}
+							disabled={locked}
+							compact
+							idPrefix={`${id}-recurrence`}
+						/>
 						<Field>
 							<FieldLabel htmlFor={`${id}-annual`}>
 								Annual amount increase (%)
@@ -334,8 +310,8 @@ export function MoreOptions({
 
 /**
  * Schedule cadence stated only for recurring rules: one-time transactions
- * need no label. The sentence is always the same elements: frequency text,
- * date controls, and the growth note.
+ * need no label. The sentence is always the same elements: recurrence
+ * sentence, date controls, and the growth note.
  */
 export function ScheduleCapsule({
 	savedTransaction,
@@ -402,6 +378,9 @@ export function ScheduleCapsule({
 		annualIncrease === 0
 			? null
 			: ` · ${annualIncrease > 0 ? "+" : ""}${annualIncrease}% yearly`;
+	const sentence = draft.recurrence
+		? recurrenceSentence(draft.recurrence, draft.startDate)
+		: null;
 	return (
 		<Card size="sm" className="mt-5">
 			<CardHeader>
@@ -410,7 +389,7 @@ export function ScheduleCapsule({
 					Recurring schedule
 				</CardTitle>
 				<CardDescription>
-					{scheduleCadence ?? "Recurring schedule"}
+					{sentence ?? scheduleCadence ?? "Recurring schedule"}
 					{growth}
 				</CardDescription>
 				{savedTransaction.enabled === false && (
@@ -433,9 +412,18 @@ export function ScheduleCapsule({
 							required
 							readOnly={locked}
 							value={draft.startDate}
-							onChange={(event) =>
-								updateDraft({ startDate: event.target.value }, "schedule")
-							}
+							onChange={(event) => {
+								const startDate = event.target.value;
+								const recurrence = draft.recurrence
+									? ensureStartWeekday(draft.recurrence, startDate)
+									: null;
+								updateDraft(
+									recurrence && recurrence !== draft.recurrence
+										? { startDate, recurrence }
+										: { startDate },
+									"schedule",
+								);
+							}}
 						/>
 					</Field>
 					<Field className="min-w-32 flex-1">

@@ -52,7 +52,7 @@ func flowTestModel() *types.FinancialModel {
 				Name:            "Rent",
 				SourceAccountID: &checking,
 				Amount:          flowTestAmount("800"),
-				Frequency:       types.FrequencyMonthly,
+				Recurrence:      monthlyTestRecurrence(),
 				StartDate:       "2025-12-01",
 				Priority:        1,
 				Enabled:         true,

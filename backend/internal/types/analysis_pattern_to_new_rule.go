@@ -5,13 +5,13 @@ package types
 // single expression amount, so approval saves exactly what the preview
 // showed. Use ProposedNewScheduleToSchedule for the one conversion.
 type ProposedNewSchedule struct {
-	Name            string    `json:"name"`
-	SourceAccountID *string   `json:"sourceAccountId,omitempty"`
-	Destinations    []string  `json:"destinations,omitempty"`
-	Amount          string    `json:"amount"`
-	Frequency       Frequency `json:"frequency"`
-	StartDate       IsoDate   `json:"startDate"`
-	Enabled         bool      `json:"enabled"`
+	Name            string     `json:"name"`
+	SourceAccountID *string    `json:"sourceAccountId,omitempty"`
+	Destinations    []string   `json:"destinations,omitempty"`
+	Amount          string     `json:"amount"`
+	Recurrence      Recurrence `json:"recurrence"`
+	StartDate       IsoDate    `json:"startDate"`
+	Enabled         bool       `json:"enabled"`
 }
 
 // ProposedNewScheduleToSchedule converts a preview proposal into the
@@ -24,7 +24,7 @@ func ProposedNewScheduleToSchedule(proposal ProposedNewSchedule, id string) Sche
 		SourceAccountID: proposal.SourceAccountID,
 		Destinations:    append([]string(nil), proposal.Destinations...),
 		Amount:          ExpressionAmountResolution(proposal.Amount),
-		Frequency:       proposal.Frequency,
+		Recurrence:      proposal.Recurrence,
 		StartDate:       proposal.StartDate,
 		Enabled:         true,
 	}

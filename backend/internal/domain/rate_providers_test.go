@@ -10,7 +10,7 @@ import (
 // transactions. These tests pin the provider math the simulation kernel
 // relies on.
 
-func rateTestContext(divisor int, startDate string, sampled *float64) *AmountProviderContext {
+func rateTestContext(divisor float64, startDate string, sampled *float64) *AmountProviderContext {
 	return &AmountProviderContext{
 		Balances:                         map[string]float64{},
 		LatestRealizedTransactionAmounts: map[string]float64{},
@@ -18,13 +18,13 @@ func rateTestContext(divisor int, startDate string, sampled *float64) *AmountPro
 		RealizedTransactionAmountsByYear: map[string]map[string]float64{},
 		PaymentTerms:                     map[string]types.PaymentTerms{},
 		Date:                             "2026-03-01",
-		FrequencyDivisor:                 divisor,
+		RecurrenceDivisor:                divisor,
 		RuleStartDate:                    startDate,
 		SampledAnnualRate:                sampled,
 	}
 }
 
-func TestOccurrenceRateDividesByFrequency(t *testing.T) {
+func TestOccurrenceRateDividesByRecurrence(t *testing.T) {
 	args := map[string]types.JsonValue{"annualRate": 0.12}
 	value, err := amountProviders["occurrence-rate"].resolve(args, rateTestContext(12, "", nil))
 	if err != nil {
@@ -116,7 +116,7 @@ func TestMultipleVolatileInputsRejected(t *testing.T) {
 	model := &types.FinancialModel{
 		Schedules: []types.Schedule{{
 			ID: "growth", Name: "Growth", Amount: amount,
-			Frequency: types.FrequencyMonthly, StartDate: "2026-02-01", Enabled: true,
+			Recurrence: monthlyTestRecurrence(), StartDate: "2026-02-01", Enabled: true,
 		}},
 	}
 	issues := ValidateFinancialModel(model)

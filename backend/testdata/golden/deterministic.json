@@ -137,7 +137,7 @@
           },
           "inputs": {}
         },
-        "frequency": "monthly",
+        "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
         "startDate": "2026-02-05",
         "endDate": "2026-02-05",
         "annualCap": null,
@@ -156,7 +156,7 @@
           },
           "inputs": {}
         },
-        "frequency": "monthly",
+        "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
         "startDate": "2026-02-06",
         "endDate": "2026-02-06",
         "annualCap": null,
@@ -177,7 +177,7 @@
           },
           "inputs": {}
         },
-        "frequency": "monthly",
+        "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
         "startDate": "2026-02-10",
         "endDate": "2026-02-10",
         "annualCap": null,
@@ -206,7 +206,7 @@
             }
           }
         },
-        "frequency": "monthly",
+        "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
         "startDate": "2026-02-20",
         "endDate": "2026-02-20",
         "annualCap": null,
@@ -646,7 +646,7 @@
             },
             "inputs": {}
           },
-          "frequency": "monthly",
+          "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
           "startDate": "2026-02-05",
           "endDate": "2026-02-05",
           "annualCap": null,
@@ -665,7 +665,7 @@
             },
             "inputs": {}
           },
-          "frequency": "monthly",
+          "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
           "startDate": "2026-02-06",
           "endDate": "2026-02-06",
           "annualCap": null,
@@ -686,7 +686,7 @@
             },
             "inputs": {}
           },
-          "frequency": "monthly",
+          "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
           "startDate": "2026-02-10",
           "endDate": "2026-02-10",
           "annualCap": null,
@@ -715,7 +715,7 @@
               }
             }
           },
-          "frequency": "monthly",
+          "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
           "startDate": "2026-02-20",
           "endDate": "2026-02-20",
           "annualCap": null,

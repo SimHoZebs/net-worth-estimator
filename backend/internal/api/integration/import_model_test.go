@@ -33,13 +33,13 @@ func importTestModel() types.FinancialModel {
 		Schedules: []types.Schedule{
 			{
 				ID: "01900000-0000-7000-8000-000000000003", Name: "Salary", Destinations: []string{"checking"},
-				Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
-				Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", Priority: 1, Enabled: true,
+				Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
+				Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-01-01", Priority: 1, Enabled: true,
 			},
 			{
 				ID: "01900000-0000-7000-8000-000000000004", Name: "Gym", Destinations: []string{"checking"},
-				Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "40"}, Inputs: map[string]types.AmountInputBinding{}},
-				Frequency: types.FrequencyMonthly, StartDate: "2026-02-01", Priority: 2, Enabled: true,
+				Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "40"}, Inputs: map[string]types.AmountInputBinding{}},
+				Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-02-01", Priority: 2, Enabled: true,
 			},
 		},
 		Evaluations: types.EmptyEvaluationTables(),

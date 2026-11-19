@@ -146,7 +146,7 @@ func TestCreateScheduleDefaultsPriority(t *testing.T) {
 	if seeded.Code != http.StatusOK {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
-	base := `{"name":"%s","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true%s}`
+	base := `{"name":"%s","sourceAccountId":"checking","recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true%s}`
 	first := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules", fmt.Sprintf(base, "First", ""))
 	if !first.Saved || first.Result.Priority != 0 {
 		t.Fatalf("first rule = %+v", first)
@@ -170,7 +170,7 @@ func TestUpdateScheduleKeepsUnmodeledFields(t *testing.T) {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
 	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules",
-		`{"id":"rule-1","name":"Rule","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true,"priority":7,"annualCap":500}`)
+		`{"id":"rule-1","name":"Rule","sourceAccountId":"checking","recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true,"priority":7,"annualCap":500}`)
 	if created.Result.Priority != 7 || created.Result.AnnualCap == nil || *created.Result.AnnualCap != 500 {
 		t.Fatalf("created rule = %+v", created.Result)
 	}
@@ -261,12 +261,12 @@ func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
 		t.Fatalf("record issues = %+v", recorded.Issues)
 	}
 	started := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+recorded.Result.ID+"/schedule",
-		`{"frequency":"monthly","startDate":"2026-07-02"}`)
+		`{"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-07-02"}`)
 	if started.Code != http.StatusOK {
 		t.Fatalf("schedule-from-transaction status = %d, body %s", started.Code, started.Body.String())
 	}
 	schedule := decodeWriteResult[types.Schedule](t, started.Code, started.Body.Bytes())
-	if !schedule.Saved || schedule.Result.Frequency != "monthly" || schedule.Result.StartDate != "2026-07-02" {
+	if !schedule.Saved || schedule.Result.Recurrence.Unit != "month" || schedule.Result.Recurrence.Interval != 1 || schedule.Result.Recurrence.MonthlyMode != "byDate" || schedule.Result.StartDate != "2026-07-02" {
 		t.Fatalf("schedule = %+v", schedule)
 	}
 	model, err := database.LoadModel()
@@ -285,7 +285,7 @@ func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
 	}
 	again := doRowRequest(t, handler, http.MethodPost,
 		"/v1/transactions/"+recorded.Result.ID+"/schedule",
-		`{"frequency":"monthly","startDate":"2026-07-02"}`)
+		`{"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-07-02"}`)
 	if again.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("second start status = %d, want 422, body %s", again.Code, again.Body.String())
 	}
@@ -309,7 +309,7 @@ func TestEndScheduleWithTransactionRecordsFact(t *testing.T) {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
 	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules",
-		`{"name":"Gym","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-05","amount":{"value":45},"enabled":true}`)
+		`{"name":"Gym","sourceAccountId":"checking","recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-01-05","amount":{"value":45},"enabled":true}`)
 	ended := doRowRequest(t, handler, http.MethodPost, "/v1/schedules/"+created.Result.ID+"/end-with-transaction",
 		`{"date":"2026-07-05"}`)
 	if ended.Code != http.StatusOK {
@@ -347,7 +347,7 @@ func TestDeleteScheduleReleasesClaims(t *testing.T) {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
 	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules",
-		`{"name":"Gym","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-05","amount":{"value":45},"enabled":true}`)
+		`{"name":"Gym","sourceAccountId":"checking","recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-01-05","amount":{"value":45},"enabled":true}`)
 	transaction := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Gym visit","sourceAccountId":"checking","amount":{"value":45},"date":"2026-01-05","enabled":true,"claim":{"scheduleId":"`+created.Result.ID+`","occurrenceDate":"2026-01-05"}}`)
 	if transaction.Code != http.StatusOK {
@@ -440,7 +440,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 
 	ruleBody := func(destinations string) string {
 		return `{"name":"SplitRule","destinations":` + destinations +
-			`,"frequency":"monthly","startDate":"2026-01-01","amount":` + amount + `,"enabled":true}`
+			`,"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-01-01","amount":` + amount + `,"enabled":true}`
 	}
 	ruleCreate := doRowRequest(t, handler, http.MethodPost, "/v1/schedules", ruleBody(`["checking","savings"]`))
 	createdRule := decodeWriteResult[types.Schedule](t, ruleCreate.Code, ruleCreate.Body.Bytes())
@@ -458,7 +458,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	splitCreate := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", transactionBody(`["checking","savings"]`))
 	split := decodeWriteResult[types.Transaction](t, splitCreate.Code, splitCreate.Body.Bytes())
 	toSchedule := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/schedule",
-		`{"frequency":"monthly","startDate":"2026-04-01"}`)
+		`{"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-04-01"}`)
 	if toSchedule.Code != http.StatusOK {
 		t.Fatalf("start schedule status = %d, body %s", toSchedule.Code, toSchedule.Body.String())
 	}

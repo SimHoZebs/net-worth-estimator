@@ -4,7 +4,11 @@ import type { ScheduleRescheduleBody } from "@/api/generated/model/scheduleResch
 import type { TransactionAmendBody } from "@/api/generated/model/transactionAmendBody.ts";
 import type { TransactionClaimBody } from "@/api/generated/model/transactionClaimBody.ts";
 import type { TransactionRecordBody } from "@/api/generated/model/transactionRecordBody.ts";
-import type { Frequency } from "../../api/contracts.ts";
+import {
+	recurrenceEqual,
+	validateRecurrence,
+	type Recurrence,
+} from "../../domain/recurrence.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import { calendarDayMs } from "../../domain/calendarDay.ts";
@@ -35,7 +39,7 @@ export interface ScheduleFormValues {
 	annualIncrease: number;
 	fromId: string | null;
 	toId: string | null;
-	frequency: Frequency;
+	recurrence: Recurrence;
 	startDate: string;
 	endDate: string | null;
 	enabled: boolean;
@@ -61,7 +65,7 @@ export interface ScheduleDraftValues {
 	amount: string;
 	fromId: string;
 	toId: string;
-	frequency: Frequency;
+	recurrence: Recurrence;
 	startDate: string;
 	endDate: string;
 	noEndDate: boolean;
@@ -123,8 +127,8 @@ export function transactionBody(
 }
 
 /**
- * Explicit new schedule body for creates. Frequency is stated here because a
- * schedule owns recurrence. Priority and caps stay omitted so the server
+ * Explicit new schedule body for creates. Recurrence is stated here because
+ * a schedule owns it. Priority and caps stay omitted so the server
  * appends and defaults them.
  */
 export function scheduleBody(values: ScheduleFormValues): ScheduleCreateBody {
@@ -139,13 +143,17 @@ export type ScheduleTerms = Omit<
 	"amount" | "annualIncrease"
 >;
 
+/**
+ * Schedule create payload without the amount: recurrence, dates, and routes.
+ * The generated create body already carries recurrence instead of frequency.
+ */
 export function scheduleTermsBody(
 	values: ScheduleTerms,
 ): Omit<ScheduleCreateBody, "amount"> {
 	return {
 		name: values.name,
 		enabled: values.enabled,
-		frequency: values.frequency,
+		recurrence: values.recurrence,
 		startDate: values.startDate,
 		...(values.endDate ? { endDate: values.endDate } : {}),
 		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
@@ -198,18 +206,18 @@ export function transactionUpdate({
 }
 
 /**
- * Schedule terms an edit changes. The stored cadence is passed in because the
- * display row never carries it; without it the reschedule leg is omitted and
- * the server keeps the stored cadence.
+ * Schedule terms an edit changes. The stored recurrence is passed in
+ * because the display row never carries it; without it the reschedule leg
+ * is omitted and the server keeps the stored cadence.
  */
 export function scheduleUpdate({
 	baseline,
 	values,
-	storedFrequency,
+	storedRecurrence,
 }: {
 	baseline: Transaction;
 	values: ScheduleFormValues;
-	storedFrequency?: Frequency;
+	storedRecurrence?: Recurrence;
 }): { amend: ScheduleAmendBody; reschedule: ScheduleRescheduleBody } {
 	const amend: ScheduleAmendBody = {};
 	const reschedule: ScheduleRescheduleBody = {};
@@ -224,8 +232,11 @@ export function scheduleUpdate({
 	if (values.toId !== baseline.toId)
 		amend.destinations = values.toId ? [values.toId] : null;
 	if (values.enabled !== baseline.enabled) amend.enabled = values.enabled;
-	if (storedFrequency !== undefined && values.frequency !== storedFrequency)
-		reschedule.frequency = values.frequency;
+	if (
+		storedRecurrence !== undefined &&
+		!recurrenceEqual(values.recurrence, storedRecurrence)
+	)
+		reschedule.recurrence = values.recurrence;
 	if (values.startDate !== baseline.startDate)
 		reschedule.startDate = values.startDate;
 	if ((values.endDate ?? null) !== baseline.endDate)
@@ -282,6 +293,11 @@ export function validateScheduleValues(
 ): string | null {
 	const baseError = scheduleBaseError(values);
 	if (baseError) return baseError;
+	const recurrenceError = validateRecurrence(
+		values.recurrence,
+		values.startDate,
+	);
+	if (recurrenceError) return recurrenceError;
 	if (
 		!Number.isFinite(values.amount) ||
 		values.amount < 0 ||
@@ -300,6 +316,11 @@ export function validateScheduleValues(
 export function validateScheduleTerms(values: ScheduleTerms): string | null {
 	const baseError = scheduleBaseError(values);
 	if (baseError) return baseError;
+	const recurrenceError = validateRecurrence(
+		values.recurrence,
+		values.startDate,
+	);
+	if (recurrenceError) return recurrenceError;
 	if (values.fromId && values.fromId === values.toId)
 		return "Choose different source and destination accounts.";
 	return null;
@@ -356,7 +377,7 @@ export function detailScheduleValues({
 				: 0,
 		fromId: draft.fromId || null,
 		toId: draft.toId || null,
-		frequency: draft.frequency,
+		recurrence: draft.recurrence,
 		startDate: draft.startDate,
 		endDate: !draft.noEndDate && draft.endDate ? draft.endDate : null,
 		enabled: draft.enabled,

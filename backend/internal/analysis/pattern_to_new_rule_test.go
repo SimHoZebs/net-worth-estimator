@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -92,7 +93,7 @@ func TestBuildPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	if preview.Direction != "inflow" || preview.Cadence != "monthly" || preview.TypicalAmount != "3000.00" {
 		t.Fatalf("preview=%+v", preview)
 	}
-	if preview.Schedule.StartDate != "2026-01-15" || preview.Schedule.Frequency != types.FrequencyMonthly {
+	if preview.Schedule.StartDate != "2026-01-15" || !reflect.DeepEqual(preview.Schedule.Recurrence, types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}) {
 		t.Fatalf("schedule=%+v", preview.Schedule)
 	}
 	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-15" || preview.Upcoming[5].Date != "2026-08-15" {
@@ -103,13 +104,27 @@ func TestBuildPatternToNewSchedulePreviewAcceptsIncomeKind(t *testing.T) {
 	}
 }
 
-func TestBuildPatternToNewSchedulePreviewLeavesBiweeklyIncomeVisible(t *testing.T) {
+func TestBuildPatternToNewSchedulePreviewCreatesBiweekly(t *testing.T) {
 	preview, err := BuildPatternToNewSchedulePreview(paymentRuleTestInput("income", "biweekly", "3000.00", "3000.00"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preview.Creatable || preview.Schedule != nil || preview.Reason == "" {
+	if !preview.Creatable || preview.Schedule == nil {
 		t.Fatalf("preview=%+v", preview)
+	}
+	// 2026-01-15 is a Thursday, so the biweekly rule repeats every two
+	// Thursdays from the first evidence day.
+	want := types.Recurrence{Unit: types.RecurrenceWeek, Interval: 2, Weekdays: []int{4}}
+	if preview.Schedule.Recurrence.Unit != want.Unit || preview.Schedule.Recurrence.Interval != want.Interval ||
+		len(preview.Schedule.Recurrence.Weekdays) != 1 || preview.Schedule.Recurrence.Weekdays[0] != 4 {
+		t.Fatalf("recurrence=%+v, want %+v", preview.Schedule.Recurrence, want)
+	}
+	if preview.Schedule.StartDate != "2026-01-15" {
+		t.Fatalf("start=%s", preview.Schedule.StartDate)
+	}
+	// Upcoming advances every two weeks from the latest recorded movement.
+	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-01" || preview.Upcoming[5].Date != "2026-05-10" {
+		t.Fatalf("upcoming=%+v", preview.Upcoming)
 	}
 	if len(preview.Occurrences) != 2 {
 		t.Fatalf("occurrences=%+v", preview.Occurrences)

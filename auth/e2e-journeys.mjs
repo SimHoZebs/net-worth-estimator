@@ -693,6 +693,25 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
     addedTransactions += 1;
   }
 
+  // Legacy seed frequencies map onto the recurrence wire shape the same
+  // way deploy/migrate.sh backfills stored rows.
+  function recurrenceFromSeed(row) {
+    const startDate = row.startDate ?? "2026-01-01";
+    switch (row.frequency ?? "monthly") {
+      case "daily":
+        return { unit: "day", interval: 1 };
+      case "weekly":
+        return { unit: "week", interval: 1, weekdays: [new Date(`${startDate}T00:00:00Z`).getUTCDay()] };
+      case "quarterly":
+        return { unit: "month", interval: 3, monthlyMode: "byDate" };
+      case "annual":
+        return { unit: "year", interval: 1 };
+      case "monthly":
+      default:
+        return { unit: "month", interval: 1, monthlyMode: "byDate" };
+    }
+  }
+
   async function createRule(row) {
     const response = await api(owner, origin, own, "POST", "/v1/schedules", {
       id: row.id,
@@ -700,7 +719,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       sourceAccountId: row.sourceAccountId ?? null,
       destinations: row.destinations ?? [],
       amount: expressionAmount(row.amount),
-      frequency: row.frequency ?? "monthly",
+      recurrence: recurrenceFromSeed(row),
       startDate: row.startDate ?? "2026-01-01",
       enabled: row.enabled ?? true,
     });
@@ -792,7 +811,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
           sourceAccountId: accountId,
           destinations: [],
           amount: { config: { expression: "250.00" } },
-          frequency: "monthly",
+          recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
           startDate: "2026-01-01",
           enabled: true,
         });

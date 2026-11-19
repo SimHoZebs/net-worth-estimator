@@ -125,7 +125,7 @@
             "destinations": [],
             "enabled": true,
             "endDate": "2026-12-01",
-            "frequency": "monthly",
+            "recurrence": {"unit": "month", "interval": 1, "monthlyMode": "byDate"},
             "id": "edge-rule-rent",
             "name": "Rent template",
             "priority": 1,

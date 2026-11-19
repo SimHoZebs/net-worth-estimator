@@ -18,7 +18,7 @@ const schedule = (id: string, sourceAccountId: string | null, enabled = true) =>
 			config: { expression: "120" },
 			inputs: {},
 		},
-		frequency: "monthly",
+		recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
 		startDate: "2026-01-01",
 		endDate: null,
 		annualCap: null,

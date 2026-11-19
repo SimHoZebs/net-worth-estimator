@@ -39,7 +39,7 @@ func TestMatchAutoClaimPicksClosestUnclaimed(t *testing.T) {
 		Name:            "Rent",
 		SourceAccountID: &account,
 		Amount:          autoClaimTestAmount("1000"),
-		Frequency:       types.FrequencyMonthly,
+		Recurrence:      monthlyTestRecurrence(),
 		StartDate:       "2026-01-01",
 		Enabled:         true,
 	}}
@@ -57,7 +57,7 @@ func TestMatchAutoClaimSkipsClaimedDate(t *testing.T) {
 		Name:            "Rent",
 		SourceAccountID: &account,
 		Amount:          autoClaimTestAmount("1000"),
-		Frequency:       types.FrequencyMonthly,
+		Recurrence:      monthlyTestRecurrence(),
 		StartDate:       "2026-01-01",
 		Enabled:         true,
 	}}
@@ -71,8 +71,8 @@ func TestMatchAutoClaimSkipsClaimedDate(t *testing.T) {
 func TestMatchAutoClaimRejectsAmbiguous(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{
-		{ID: "a", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", Enabled: true},
-		{ID: "b", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", Enabled: true},
+		{ID: "a", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Recurrence: monthlyTestRecurrence(), StartDate: "2026-01-01", Enabled: true},
+		{ID: "b", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Recurrence: monthlyTestRecurrence(), StartDate: "2026-01-01", Enabled: true},
 	}
 	transaction := autoClaimTestTransaction("tx-1", "Gym", "2026-02-01", "50", &account)
 	if match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil); match != nil {
@@ -84,7 +84,7 @@ func TestMatchAutoClaimRejectsAmountOutsideTolerance(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1200", &account)
@@ -97,7 +97,7 @@ func TestFindAutoClaimsClaimsSequentially(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	first := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
@@ -112,7 +112,7 @@ func TestMatchAutoClaimRejectsDisabled(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
@@ -126,7 +126,7 @@ func TestMatchAutoClaimRejectsVoid(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
@@ -140,7 +140,7 @@ func TestMatchAutoClaimAllowsPendingBankRow(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
@@ -156,7 +156,7 @@ func TestMatchAutoClaimRejectsDisabledSchedule(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: false,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Rent", "2026-02-01", "1000", &account)
@@ -169,7 +169,7 @@ func TestFindAutoClaimsSkipsDisabledAndVoid(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rent", Name: "Rent", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	disabled := autoClaimTestTransaction("tx-disabled", "Rent", "2026-02-01", "1000", &account)
@@ -186,7 +186,7 @@ func TestMatchAutoClaimFindsOldDailySchedule(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "daily", Name: "Coffee", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("5"), Frequency: types.FrequencyDaily,
+		Amount: autoClaimTestAmount("5"), Recurrence: dailyTestRecurrence(),
 		StartDate: "2016-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Coffee", "2026-02-01", "5", &account)
@@ -196,11 +196,42 @@ func TestMatchAutoClaimFindsOldDailySchedule(t *testing.T) {
 	}
 }
 
+func TestMatchAutoClaimFindsIntervalDailySchedule(t *testing.T) {
+	account := "checking"
+	// Every-2-days from 2020: 2026-02-04 is 2226 days after start, an
+	// occurrence, exercising the interval-aware fast-forward offset.
+	schedules := []types.Schedule{{
+		ID: "every2", Name: "Coffee", SourceAccountID: &account,
+		Amount: autoClaimTestAmount("5"), Recurrence: types.Recurrence{Unit: types.RecurrenceDay, Interval: 2},
+		StartDate: "2020-01-01", Enabled: true,
+	}}
+	transaction := autoClaimTestTransaction("tx-1", "Coffee", "2026-02-04", "5", &account)
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
+	if match == nil || match.ScheduleID != "every2" || match.OccurrenceDate != "2026-02-04" {
+		t.Fatalf("match = %+v, want every2 on 2026-02-04", match)
+	}
+}
+
+func TestMatchAutoClaimFindsMultiWeekdayWeekly(t *testing.T) {
+	account := "checking"
+	// 2026-01-06 is a Tuesday; the rule fires Tue and Thu weekly.
+	schedules := []types.Schedule{{
+		ID: "gym", Name: "Gym", SourceAccountID: &account,
+		Amount: autoClaimTestAmount("50"), Recurrence: weeklyTestRecurrence(2, 4),
+		StartDate: "2026-01-06", Enabled: true,
+	}}
+	transaction := autoClaimTestTransaction("tx-1", "Gym", "2026-01-09", "50", &account)
+	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
+	if match == nil || match.ScheduleID != "gym" || match.OccurrenceDate != "2026-01-08" {
+		t.Fatalf("match = %+v, want gym on 2026-01-08", match)
+	}
+}
+
 func TestMatchAutoClaimPrefersCloserAmountOnSameDayDistance(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{
-		{ID: "a", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Frequency: types.FrequencyMonthly, StartDate: "2026-01-15", Enabled: true},
-		{ID: "b", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("55"), Frequency: types.FrequencyMonthly, StartDate: "2026-01-15", Enabled: true},
+		{ID: "a", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("50"), Recurrence: monthlyTestRecurrence(), StartDate: "2026-01-15", Enabled: true},
+		{ID: "b", Name: "Gym", SourceAccountID: &account, Amount: autoClaimTestAmount("55"), Recurrence: monthlyTestRecurrence(), StartDate: "2026-01-15", Enabled: true},
 	}
 	transaction := autoClaimTestTransaction("tx-1", "Gym", "2026-02-15", "50", &account)
 	match := MatchAutoClaim(transaction, schedules, map[string]map[string]bool{}, nil)
@@ -213,7 +244,7 @@ func TestMatchAutoClaimRejectsSubstringName(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "rule", Name: "SplitRule", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("10"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("10"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "Split", "2026-07-02", "10", &account)
@@ -230,7 +261,7 @@ func TestMatchAutoClaimAcceptsTokenSubsetDescriptor(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "lyft", Name: "Lyft", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("25"), Frequency: types.FrequencyWeekly,
+		Amount: autoClaimTestAmount("25"), Recurrence: weeklyTestRecurrence(4),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	transaction := autoClaimTestTransaction("tx-1", "LYFT *STANDARD 10-30", "2026-01-08", "25", &account)
@@ -263,7 +294,7 @@ func TestMatchAutoClaimPromotionKeySurvivesRename(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "sub", Name: "Monthly Subscription", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("15"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("15"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	merchantKeys := map[string]string{"sub": "netflix"}
@@ -278,7 +309,7 @@ func TestMatchAutoClaimPromotionKeyMismatchRefusesNameMatch(t *testing.T) {
 	account := "checking"
 	schedules := []types.Schedule{{
 		ID: "sub", Name: "Netflix", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("15"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("15"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}}
 	merchantKeys := map[string]string{"sub": "uber"}
@@ -293,7 +324,7 @@ func TestMatchAutoClaimPromotionKeyRespectsOtherGates(t *testing.T) {
 	other := "savings"
 	baseSchedule := types.Schedule{
 		ID: "sub", Name: "Renamed", SourceAccountID: &account,
-		Amount: autoClaimTestAmount("1000"), Frequency: types.FrequencyMonthly,
+		Amount: autoClaimTestAmount("1000"), Recurrence: monthlyTestRecurrence(),
 		StartDate: "2026-01-01", Enabled: true,
 	}
 	merchantKeys := map[string]string{"sub": "rent"}

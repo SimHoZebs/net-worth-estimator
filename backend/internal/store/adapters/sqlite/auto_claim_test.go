@@ -30,7 +30,7 @@ func autoClaimSchedule(id, account string) types.Schedule {
 		Name:            "Rent",
 		SourceAccountID: &source,
 		Amount:          autoClaimAmount("1000"),
-		Frequency:       types.FrequencyMonthly,
+		Recurrence:      types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
 		StartDate:       "2026-01-01",
 		Enabled:         true,
 	}

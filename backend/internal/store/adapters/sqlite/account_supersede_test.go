@@ -55,7 +55,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 				"manual": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "manual"}},
 			},
 		},
-		Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", Enabled: true,
+		Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-01-01", Enabled: true,
 	}); err != nil {
 		t.Fatalf("seed rule: %v", err)
 	}

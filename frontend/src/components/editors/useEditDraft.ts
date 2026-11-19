@@ -1,10 +1,14 @@
 import { useState } from "react";
+import type { Recurrence } from "../../domain/recurrence.ts";
 
-/** Local edits override current values. Only edited fields retain a conflict baseline. */
-export function useEditDraft<T extends Record<string, string | boolean | null>>(
-	key: string,
-	source: T,
-) {
+/**
+ * Local edits override current values. Only edited fields retain a
+ * conflict baseline. Object members such as recurrence compare by
+ * reference: editors keep the stored reference when nothing changed.
+ */
+export function useEditDraft<
+	T extends Record<string, string | boolean | Recurrence | null>,
+>(key: string, source: T) {
 	const [edit, setEdit] = useState<{
 		key: string;
 		base: T;

@@ -28,7 +28,7 @@ func TestTransactionUpdateLeavesAbsentMembersUntouched(t *testing.T) {
 	seedPatchAccounts(t, handler)
 
 	rule := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
-		`{"id":"salary","name":"Salary","sourceAccountId":null,"destinations":["checking"],"amount":{"value":1200},"frequency":"monthly","startDate":"2026-01-01","enabled":true}`)
+		`{"id":"salary","name":"Salary","sourceAccountId":null,"destinations":["checking"],"amount":{"value":1200},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-01-01","enabled":true}`)
 	if rule.Code != http.StatusOK {
 		t.Fatalf("seed rule status = %d, body %s", rule.Code, rule.Body.String())
 	}
@@ -94,7 +94,7 @@ func TestRuleUpdateClearsNullableMembersAndKeepsOthers(t *testing.T) {
 
 	create := doRowRequest(t, handler, http.MethodPost, "/v1/schedules", `{
 		"name":"Invest","sourceAccountId":"checking","destinations":["savings"],
-		"amount":{"value":900,"annualIncrease":2},"frequency":"monthly",
+		"amount":{"value":900,"annualIncrease":2},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},
 		"startDate":"2026-01-05","endDate":"2027-01-05","annualCap":12000,"priority":4,"enabled":true}`)
 	created := decodeWriteResult[types.Schedule](t, create.Code, create.Body.Bytes())
 
@@ -106,15 +106,15 @@ func TestRuleUpdateClearsNullableMembersAndKeepsOthers(t *testing.T) {
 	if clearedRow.Result.EndDate != nil || capRow.Result.AnnualCap != nil {
 		t.Fatalf("row = %+v / %+v, want end date and cap cleared", clearedRow.Result, capRow.Result)
 	}
-	if clearedRow.Result.Frequency != "monthly" || clearedRow.Result.StartDate != "2026-01-05" || clearedRow.Result.Priority != 4 {
-		t.Fatalf("row = %+v, want untouched schedule and priority", clearedRow.Result)
+	if clearedRow.Result.Recurrence.Unit != "month" || clearedRow.Result.Recurrence.Interval != 1 || clearedRow.Result.Recurrence.MonthlyMode != "byDate" || clearedRow.Result.StartDate != "2026-01-05" || clearedRow.Result.Priority != 4 {
+		t.Fatalf("row = %+v, want untouched recurrence and priority", clearedRow.Result)
 	}
 
 	// A cadence-only patch leaves the amount descriptor untouched.
-	cadence := doRowRequest(t, handler, http.MethodPost, "/v1/schedules/"+created.Result.ID+"/reschedule", `{"frequency":"annual"}`)
+	cadence := doRowRequest(t, handler, http.MethodPost, "/v1/schedules/"+created.Result.ID+"/reschedule", `{"recurrence":{"unit":"year","interval":1}}`)
 	cadenceRow := decodeWriteResult[types.Schedule](t, cadence.Code, cadence.Body.Bytes())
-	if cadenceRow.Result.Frequency != "annual" {
-		t.Fatalf("frequency = %q, want annual", cadenceRow.Result.Frequency)
+	if cadenceRow.Result.Recurrence.Unit != "year" {
+		t.Fatalf("recurrence unit = %q, want year", cadenceRow.Result.Recurrence.Unit)
 	}
 	expression, _ := cadenceRow.Result.Amount.Config["expression"].(string)
 	if expression != "(900) * growth" {
@@ -152,7 +152,7 @@ func TestCreateBodiesAcceptSemanticAmounts(t *testing.T) {
 	}
 
 	rule := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
-		`{"name":"Salary","sourceAccountId":null,"destinations":["checking"],"amount":{"value":1200,"annualIncrease":2.5},"frequency":"monthly","startDate":"2026-02-01","enabled":true}`)
+		`{"name":"Salary","sourceAccountId":null,"destinations":["checking"],"amount":{"value":1200,"annualIncrease":2.5},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-02-01","enabled":true}`)
 	createdRule := decodeWriteResult[types.Schedule](t, rule.Code, rule.Body.Bytes())
 	expression, _ = createdRule.Result.Amount.Config["expression"].(string)
 	if expression != "(1200) * growth" {
@@ -165,7 +165,7 @@ func TestCreateBodiesAcceptSemanticAmounts(t *testing.T) {
 
 	// A stored descriptor replays verbatim during model import.
 	replayed := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
-		`{"name":"Imported","sourceAccountId":null,"destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"1+1"},"inputs":{}},"frequency":"monthly","startDate":"2026-03-01","enabled":true}`)
+		`{"name":"Imported","sourceAccountId":null,"destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"1+1"},"inputs":{}},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-03-01","enabled":true}`)
 	replayedRow := decodeWriteResult[types.Schedule](t, replayed.Code, replayed.Body.Bytes())
 	expression, _ = replayedRow.Result.Amount.Config["expression"].(string)
 	if expression != "1+1" {

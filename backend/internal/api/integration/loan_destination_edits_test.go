@@ -26,7 +26,7 @@ func TestLoanLinkPreservesExistingDestinationsOnUnrelatedEdits(t *testing.T) {
 	funding := "checking"
 	amount := types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}}
 	model.Transactions = append(model.Transactions, types.Transaction{ID: "principal-payment", Name: "Principal payment", SourceAccountID: &funding, Destinations: []string{id}, Amount: amount, PostedTime: 1786665600, TransactionTime: 1786665600, Enabled: true})
-	model.Schedules = append(model.Schedules, types.Schedule{ID: "principal-schedule", Name: "Principal schedule", SourceAccountID: &funding, Destinations: []string{id}, Amount: amount, Frequency: "monthly", StartDate: "2026-08-14", Enabled: true})
+	model.Schedules = append(model.Schedules, types.Schedule{ID: "principal-schedule", Name: "Principal schedule", SourceAccountID: &funding, Destinations: []string{id}, Amount: amount, Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-08-14", Enabled: true})
 	if _, err := st.ImportModel(model); err != nil {
 		t.Fatal(err)
 	}

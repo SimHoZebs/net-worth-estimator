@@ -15,7 +15,7 @@ func TestNewLoanAppendsSchedulesAndEditsPreservePriorities(t *testing.T) {
 		t.Fatal(err)
 	}
 	funding := "checking"
-	if _, err := st.CreateSchedule(types.Schedule{ID: "existing-payment", Name: "Existing payment", SourceAccountID: &funding, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}}, Priority: 20, Frequency: "monthly", StartDate: "2026-08-13", Enabled: true}); err != nil {
+	if _, err := st.CreateSchedule(types.Schedule{ID: "existing-payment", Name: "Existing payment", SourceAccountID: &funding, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}}, Priority: 20, Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-08-13", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	h := New(st, Config{})

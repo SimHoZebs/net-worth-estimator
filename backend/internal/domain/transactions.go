@@ -27,15 +27,15 @@ type AccountTransactionResult struct {
 // One-time and rule-generated transactions resolve through the same amount
 // descriptor path: rate, growth, and volatility live in the amount inputs
 // (occurrence-rate and growth-factor providers), never in side columns.
-// Rule schedule context (frequency divisor, start date, pre-sampled rate)
+// Rule schedule context (recurrence divisor, start date, pre-sampled rate)
 // arrives through AmountProviderContext; manual transactions use divisor 1,
 // no start date, and no sample.
 func ComputeRequestedAmount(occurrence DatedTransactionOccurrence, currentDate string, latestRealized map[string]float64, realizedDates map[string]string, realizedByYear map[string]map[string]float64, balances map[string]float64, paymentTerms map[string]types.PaymentTerms, stochasticRate *float64) (float64, error) {
 	transaction := occurrence.Transaction
-	divisor := 1
+	divisor := 1.0
 	startDate := ""
 	if occurrence.Rule != nil {
-		divisor = FrequencyDivisor(occurrence.Rule.Frequency)
+		divisor = RecurrenceDivisor(occurrence.Rule.Recurrence)
 		startDate = occurrence.Rule.StartDate
 	}
 	// Manual transactions carry no schedule: stochastic sampling only produces
@@ -47,7 +47,7 @@ func ComputeRequestedAmount(occurrence DatedTransactionOccurrence, currentDate s
 		RealizedTransactionAmountsByYear: realizedByYear,
 		PaymentTerms:                     paymentTerms,
 		Date:                             currentDate,
-		FrequencyDivisor:                 divisor,
+		RecurrenceDivisor:                divisor,
 		RuleStartDate:                    startDate,
 		SampledAnnualRate:                stochasticRate,
 	})

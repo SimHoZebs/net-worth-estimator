@@ -15,7 +15,7 @@ func existingRuleTestRule() types.Schedule {
 		SourceAccountID: &account,
 		Destinations:    []string{},
 		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1200.00"}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency:       types.FrequencyMonthly,
+		Recurrence:      types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
 		StartDate:       "2026-01-01",
 		Enabled:         true,
 	}

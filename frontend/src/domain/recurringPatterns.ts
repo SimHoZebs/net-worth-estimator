@@ -1,5 +1,6 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { findingStateLabel } from "./paymentFindings.ts";
+import { recurrenceSentence, type Recurrence } from "./recurrence.ts";
 
 export interface RecurringPattern {
 	key: string;
@@ -122,6 +123,18 @@ export function frequencyLabel(frequency: string): string {
 		default:
 			return frequency || "Repeating";
 	}
+}
+
+/**
+ * Display label for a stored schedule recurrence anchored on its start
+ * date. Raw finding cadence strings stay on frequencyLabel above; only
+ * schedule rules use this.
+ */
+export function recurrenceLabel(
+	recurrence: Recurrence,
+	startDate: string,
+): string {
+	return recurrenceSentence(recurrence, startDate);
 }
 
 export function directionLabel(direction: string): string {

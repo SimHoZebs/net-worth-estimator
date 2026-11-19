@@ -10,6 +10,11 @@ import (
 
 func createScheduleOccurrenceFixture(t *testing.T, handler http.Handler, startDate, endDate string) string {
 	t.Helper()
+	return createScheduleRecurrenceFixture(t, handler, `{"unit":"month","interval":1,"monthlyMode":"byDate"}`, startDate, endDate)
+}
+
+func createScheduleRecurrenceFixture(t *testing.T, handler http.Handler, recurrence, startDate, endDate string) string {
+	t.Helper()
 	account := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"Checking","kind":"cash","enabled":true}`)
 	if account.Code != http.StatusOK {
 		t.Fatalf("create account status = %d, body %s", account.Code, account.Body.String())
@@ -24,7 +29,7 @@ func createScheduleOccurrenceFixture(t *testing.T, handler http.Handler, startDa
 	}
 	body := `{"name":"Rent","destinations":["` + accountPayload.Result.ID + `"],` +
 		`"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},` +
-		`"frequency":"monthly","startDate":"` + startDate + `","enabled":true,"priority":1`
+		`"recurrence":` + recurrence + `,"startDate":"` + startDate + `","enabled":true,"priority":1`
 	if endDate != "" {
 		body += `,"endDate":"` + endDate + `"`
 	}
@@ -105,6 +110,58 @@ func TestListScheduleOccurrences(t *testing.T) {
 		// more. A one-month default would return two; a yearly one dozens.
 		if len(dates) != 4 || dates[0] != today {
 			t.Fatalf("default occurrences = %v, want 4 monthly dates from %s", dates, today)
+		}
+	})
+
+	t.Run("every two months lists clamped dates", func(t *testing.T) {
+		id := createScheduleRecurrenceFixture(t, handler, `{"unit":"month","interval":2,"monthlyMode":"byDate"}`, "2026-01-15", "")
+		response := doRowRequest(t, handler, http.MethodGet, "/v1/schedules/"+id+"/occurrences?through=2026-05-15", "")
+		if response.Code != http.StatusOK {
+			t.Fatalf("occurrences status = %d, body %s", response.Code, response.Body.String())
+		}
+		_, dates, _ := decodeOccurrences(t, response.Body.Bytes())
+		want := []string{"2026-01-15", "2026-03-15", "2026-05-15"}
+		if strings.Join(dates, ",") != strings.Join(want, ",") {
+			t.Fatalf("occurrences = %v, want %v", dates, want)
+		}
+	})
+
+	t.Run("weekly tuesday and thursday lists both weekdays", func(t *testing.T) {
+		id := createScheduleRecurrenceFixture(t, handler, `{"unit":"week","interval":1,"weekdays":[2,4]}`, "2026-01-06", "")
+		response := doRowRequest(t, handler, http.MethodGet, "/v1/schedules/"+id+"/occurrences?through=2026-01-15", "")
+		if response.Code != http.StatusOK {
+			t.Fatalf("occurrences status = %d, body %s", response.Code, response.Body.String())
+		}
+		_, dates, _ := decodeOccurrences(t, response.Body.Bytes())
+		want := []string{"2026-01-06", "2026-01-08", "2026-01-13", "2026-01-15"}
+		if strings.Join(dates, ",") != strings.Join(want, ",") {
+			t.Fatalf("occurrences = %v, want %v", dates, want)
+		}
+	})
+
+	t.Run("monthly third sunday lists the ordinal weekday", func(t *testing.T) {
+		id := createScheduleRecurrenceFixture(t, handler, `{"unit":"month","interval":1,"monthlyMode":"byNthWeekday"}`, "2026-01-18", "")
+		response := doRowRequest(t, handler, http.MethodGet, "/v1/schedules/"+id+"/occurrences?through=2026-03-31", "")
+		if response.Code != http.StatusOK {
+			t.Fatalf("occurrences status = %d, body %s", response.Code, response.Body.String())
+		}
+		_, dates, _ := decodeOccurrences(t, response.Body.Bytes())
+		want := []string{"2026-01-18", "2026-02-15", "2026-03-15"}
+		if strings.Join(dates, ",") != strings.Join(want, ",") {
+			t.Fatalf("occurrences = %v, want %v", dates, want)
+		}
+	})
+
+	t.Run("weekly without the start weekday is rejected", func(t *testing.T) {
+		account := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"Checking","kind":"cash","enabled":true}`)
+		if account.Code != http.StatusOK {
+			t.Fatalf("create account status = %d, body %s", account.Code, account.Body.String())
+		}
+		rejected := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
+			`{"name":"Rent","amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},`+
+				`"recurrence":{"unit":"week","interval":1,"weekdays":[4]},"startDate":"2026-01-06","enabled":true}`)
+		if rejected.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("missing weekday status = %d, want 422, body %s", rejected.Code, rejected.Body.String())
 		}
 	})
 

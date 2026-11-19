@@ -517,7 +517,7 @@ describe("canonical recorded cash selection", () => {
 			config: { expression: String(value) },
 			inputs: {},
 		},
-		frequency: "monthly",
+		recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
 		startDate: day,
 		endDate: null,
 		annualCap: null,

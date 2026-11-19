@@ -18,7 +18,7 @@ func TestLoanAtomicFailureAndImportRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Fail after account and observation inserts: rule identity collision.
-	if _, err := s.CreateSchedule(types.Schedule{ID: "payment", Name: "Collision", Frequency: "monthly", StartDate: "2026-08-13", Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1"}}}); err != nil {
+	if _, err := s.CreateSchedule(types.Schedule{ID: "payment", Name: "Collision", Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-08-13", Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "1"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.SaveLoan(b, true); err == nil {

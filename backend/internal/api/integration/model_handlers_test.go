@@ -351,7 +351,7 @@ func TestTransactionClaimOnPendingSeedPersists(t *testing.T) {
 
 	rule := httptest.NewRecorder()
 	ruleRequest := httptest.NewRequest(http.MethodPost, "/v1/schedules", bytes.NewReader([]byte(
-		`{"id":"housing","name":"Housing","sourceAccountId":"checking","amount":{"resolver":"expression","config":{"expression":"2970"},"inputs":{}},"frequency":"monthly","startDate":"2026-05-01","enabled":true}`,
+		`{"id":"housing","name":"Housing","sourceAccountId":"checking","amount":{"resolver":"expression","config":{"expression":"2970"},"inputs":{}},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-05-01","enabled":true}`,
 	)))
 	ruleRequest.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(rule, ruleRequest)

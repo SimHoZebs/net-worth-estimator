@@ -361,14 +361,26 @@ func insertRule(tx *userTx, position int, rule *types.Schedule) error {
 	if err != nil {
 		return fmt.Errorf("marshal rule amount %s: %w", rule.ID, err)
 	}
+	weekdays := rule.Recurrence.Weekdays
+	if weekdays == nil {
+		weekdays = []int{}
+	}
+	weekdaysJSON, err := json.Marshal(weekdays)
+	if err != nil {
+		return fmt.Errorf("marshal rule weekdays %s: %w", rule.ID, err)
+	}
+	var monthMode any
+	if rule.Recurrence.MonthlyMode != "" {
+		monthMode = rule.Recurrence.MonthlyMode
+	}
 	sourceAccountID := nullable(rule.SourceAccountID)
 	endDate := nullable(rule.EndDate)
 	annualCap := nullable(rule.AnnualCap)
 	if _, err := tx.Exec(
-		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled, user_id)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?, :user_id)`,
+		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled, user_id)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, :user_id)`,
 		rule.ID, position, rule.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		string(rule.Frequency),
+		string(rule.Recurrence.Unit), rule.Recurrence.Interval, string(weekdaysJSON), monthMode,
 		rule.StartDate, endDate, annualCap, rule.Priority, boolToInt(rule.Enabled),
 	); err != nil {
 		return fmt.Errorf("insert recurrence rule %s: %w", rule.ID, err)
@@ -447,10 +459,13 @@ func scanRuleRow(rows *sql.Rows) (types.Schedule, error) {
 	var rule types.Schedule
 	var sourceAccountID, endDate sql.NullString
 	var destinationsJSON, amountJSON string
-	var frequency string
+	var unit string
+	var interval int
+	var weekdaysJSON string
+	var monthMode sql.NullString
 	var enabled int64
 	var capNull sql.NullFloat64
-	if err := rows.Scan(&rule.ID, &rule.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &rule.StartDate, &endDate, &capNull, &rule.Priority, &enabled); err != nil {
+	if err := rows.Scan(&rule.ID, &rule.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &unit, &interval, &weekdaysJSON, &monthMode, &rule.StartDate, &endDate, &capNull, &rule.Priority, &enabled); err != nil {
 		return types.Schedule{}, err
 	}
 	if sourceAccountID.Valid {
@@ -467,7 +482,18 @@ func scanRuleRow(rows *sql.Rows) (types.Schedule, error) {
 	if err := json.Unmarshal([]byte(amountJSON), &rule.Amount); err != nil {
 		return types.Schedule{}, fmt.Errorf("parse rule amount %s: %w", rule.ID, err)
 	}
-	rule.Frequency = types.Frequency(frequency)
+	rule.Recurrence.Unit = types.RecurrenceUnit(unit)
+	rule.Recurrence.Interval = interval
+	if weekdaysJSON != "" {
+		var weekdays []int
+		if err := json.Unmarshal([]byte(weekdaysJSON), &weekdays); err != nil {
+			return types.Schedule{}, fmt.Errorf("parse rule weekdays %s: %w", rule.ID, err)
+		}
+		rule.Recurrence.Weekdays = weekdays
+	}
+	if monthMode.Valid {
+		rule.Recurrence.MonthlyMode = monthMode.String
+	}
 	if endDate.Valid {
 		value := endDate.String
 		rule.EndDate = &value
@@ -642,7 +668,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, err
 	}
 
-	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules WHERE user_id = :user_id ORDER BY position`)
+	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules WHERE user_id = :user_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}

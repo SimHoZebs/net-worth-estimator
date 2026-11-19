@@ -42,7 +42,7 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("create transaction status = %d, body %s", transaction.Code, transaction.Body.String())
 	}
 	rule := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
-		`{"name":"Salary","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true,"priority":1}`)
+		`{"name":"Salary","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-02-01","enabled":true,"priority":1}`)
 	if rule.Code != http.StatusOK {
 		t.Fatalf("create rule status = %d, body %s", rule.Code, rule.Body.String())
 	}
@@ -102,14 +102,14 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("recurrence rules for account = %s, want 1 row", rules["schedules"])
 	}
 	var ruleRow struct {
-		ID        string `json:"id"`
-		Frequency string `json:"frequency"`
+		ID         string           `json:"id"`
+		Recurrence types.Recurrence `json:"recurrence"`
 	}
 	if err := json.Unmarshal(ruleRows[0], &ruleRow); err != nil {
 		t.Fatalf("decode rule row: %v", err)
 	}
-	if ruleRow.Frequency != "monthly" {
-		t.Fatalf("rule cadence = %q, want monthly", ruleRow.Frequency)
+	if ruleRow.Recurrence.Unit != "month" || ruleRow.Recurrence.Interval != 1 || ruleRow.Recurrence.MonthlyMode != "byDate" {
+		t.Fatalf("rule cadence = %+v, want monthly byDate", ruleRow.Recurrence)
 	}
 	if len(decodeQueryBody(t, get("/v1/transactions"), "transactions")) != 1 {
 		t.Fatal("/v1/transactions returned no rows")

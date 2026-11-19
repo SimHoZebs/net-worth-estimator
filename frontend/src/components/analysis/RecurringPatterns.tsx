@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import type { ComponentProps, ReactNode, Ref } from "react";
 import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
-import { frequencyLabel } from "@/domain/recurringPatterns.ts";
+import { recurrenceLabel } from "@/domain/recurringPatterns.ts";
+import { recurrenceFromScheduleLike } from "@/domain/recurrence.ts";
 import {
 	useAddPatternToExistingSchedule,
 	useCreatePatternToNewSchedule,
@@ -331,7 +332,12 @@ function ForecastRows({
 			? [
 					{
 						label: "Repeats",
-						value: frequencyLabel(plan.schedule.frequency),
+						value: (() => {
+							const recurrence = recurrenceFromScheduleLike(plan.schedule);
+							return recurrence && plan.schedule
+								? recurrenceLabel(recurrence, plan.schedule.startDate)
+								: "Repeating";
+						})(),
 					},
 					{ label: "Starts", value: plan.schedule.startDate },
 					{ label: "Account", value: accountName },

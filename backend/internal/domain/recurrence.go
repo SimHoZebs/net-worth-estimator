@@ -2,6 +2,7 @@ package domain
 
 import (
 	"cmp"
+	"fmt"
 	"sort"
 	"time"
 
@@ -99,84 +100,279 @@ func midnightUnix(date string) int64 {
 	return MustParseIsoDate(date).Unix()
 }
 
-// FrequencyDivisor converts annual rates to per-occurrence rates.
-func FrequencyDivisor(frequency types.Frequency) int {
-	switch frequency {
-	case types.FrequencyDaily:
-		return 365
-	case types.FrequencyWeekly:
-		return 52
-	case types.FrequencyMonthly:
-		return 12
-	case types.FrequencyQuarterly:
-		return 4
-	case types.FrequencyAnnual:
-		return 1
+// RecurrenceDivisor converts annual rates to per-occurrence rates: daily
+// schedules divide the year into 365 slices, weekly schedules into 52 weeks
+// times the active weekday count, monthly schedules into 12 slices, and
+// annual schedules keep the whole rate.
+func RecurrenceDivisor(recurrence types.Recurrence) float64 {
+	interval := recurrence.Interval
+	if interval <= 0 {
+		interval = 1
+	}
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
+		return 365.0 / float64(interval)
+	case types.RecurrenceWeek:
+		count := len(recurrence.Weekdays)
+		if count <= 0 {
+			count = 1
+		}
+		return 52.0 * float64(count) / float64(interval)
+	case types.RecurrenceMonth:
+		return 12.0 / float64(interval)
+	case types.RecurrenceYear:
+		return 1.0 / float64(interval)
 	default:
 		return 1
 	}
 }
 
-// AdvanceRuleDate moves a calendar day forward by whole schedule periods.
-// Pattern-to-new-rule creation uses it to list future-only Upcoming dates after the
-// latest recorded movement.
-func AdvanceRuleDate(date string, frequency types.Frequency, periodCount int) string {
-	return advanceDate(date, frequency, periodCount)
+// weekdayOf returns the Sunday-first weekday of a validated calendar date
+// (0=Sunday..6=Saturday), matching the Recurrence.Weekdays encoding.
+func weekdayOf(date string) int {
+	return int(MustParseIsoDate(date).Weekday())
 }
 
-func advanceDate(date string, frequency types.Frequency, periodCount int) string {
-	switch frequency {
-	case types.FrequencyDaily, types.FrequencyWeekly:
-		days := 7
-		if frequency == types.FrequencyDaily {
-			days = 1
+func weekdayIn(weekdays []int, weekday int) bool {
+	for _, day := range weekdays {
+		if day == weekday {
+			return true
 		}
-		t := MustParseIsoDate(date).AddDate(0, 0, days*periodCount)
-		return FormatIsoDate(t)
-	case types.FrequencyMonthly:
-		return AddMonthsClamped(date, periodCount)
-	case types.FrequencyQuarterly:
-		return AddMonthsClamped(date, periodCount*3)
-	case types.FrequencyAnnual:
-		return AddMonthsClamped(date, periodCount*12)
+	}
+	return false
+}
+
+// addDays moves a validated calendar day by whole days.
+func addDays(date string, days int) string {
+	return FormatIsoDate(MustParseIsoDate(date).AddDate(0, 0, days))
+}
+
+// monthsBetween counts whole calendar months from start to date by year and
+// month fields only. Callers must validate both dates first.
+func monthsBetween(start, date string) int {
+	startYear, startMonth, _ := splitIsoDate(start)
+	dateYear, dateMonth, _ := splitIsoDate(date)
+	return (dateYear-startYear)*12 + (dateMonth - startMonth)
+}
+
+// recurrenceNthWeekday derives the monthly byNthWeekday shape from the start
+// date: its weekday, its ordinal within its month (nth=ceil(day/7), 1..5),
+// and whether a week later crosses into the next month (isLast).
+func recurrenceNthWeekday(startDate string) (weekday time.Weekday, nth int, isLast bool) {
+	start := MustParseIsoDate(startDate)
+	weekday = start.Weekday()
+	nth = (start.Day()-1)/7 + 1
+	isLast = start.AddDate(0, 0, 7).Month() != start.Month()
+	return weekday, nth, isLast
+}
+
+// nthWeekdayDate resolves one monthly byNthWeekday occurrence within the
+// given year and month: the nth weekday when isLast is false, otherwise the
+// last such weekday. It reports false when the month lacks an nth weekday
+// (only possible for nth=5), in which case the month has no occurrence.
+func nthWeekdayDate(year int, month time.Month, weekday time.Weekday, nth int, isLast bool) (string, bool) {
+	first := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	offset := (int(weekday) - int(first.Weekday()) + 7) % 7
+	lastDay := daysInMonth(year, month)
+	if isLast {
+		day := 1 + offset
+		for day+7 <= lastDay {
+			day += 7
+		}
+		return FormatIsoDate(time.Date(year, month, day, 0, 0, 0, 0, time.UTC)), true
+	}
+	day := 1 + offset + 7*(nth-1)
+	if day > lastDay {
+		return "", false
+	}
+	return FormatIsoDate(time.Date(year, month, day, 0, 0, 0, 0, time.UTC)), true
+}
+
+// nthWeekdayMonthsAfter resolves the byNthWeekday occurrence monthsAfter
+// calendar months after the start date's month, deriving the weekday shape
+// from the start date. It reports false for months that lack the weekday
+// ordinal; callers skip those months.
+func nthWeekdayMonthsAfter(startDate string, monthsAfter int) (string, bool) {
+	weekday, nth, isLast := recurrenceNthWeekday(startDate)
+	year, month, _ := splitIsoDate(startDate)
+	nextMonthIndex := (month - 1) + monthsAfter
+	targetYear := year + floorDiv(nextMonthIndex, 12)
+	targetMonth := time.Month(((nextMonthIndex%12)+12)%12 + 1)
+	return nthWeekdayDate(targetYear, targetMonth, weekday, nth, isLast)
+}
+
+// AdvanceRuleDate moves a calendar day forward by whole schedule periods,
+// treating the base date as an occurrence. Pattern-to-new-rule creation uses
+// it to list future-only Upcoming dates after the latest recorded movement.
+// Weekly multi-day schedules have no single per-period date, so this returns
+// the week anchor (start plus whole weeks); occurrence enumeration lives in
+// recurrenceDatesFrom, not here.
+func AdvanceRuleDate(date string, recurrence types.Recurrence, periodCount int) string {
+	interval := recurrence.Interval
+	if interval <= 0 {
+		interval = 1
+	}
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
+		return addDays(date, interval*periodCount)
+	case types.RecurrenceWeek:
+		return addDays(date, 7*interval*periodCount)
+	case types.RecurrenceMonth:
+		if recurrence.MonthlyMode == types.RecurrenceMonthlyByNthWeekday {
+			return advanceNthWeekday(date, interval, periodCount)
+		}
+		return AddMonthsClamped(date, interval*periodCount)
+	case types.RecurrenceYear:
+		return AddMonthsClamped(date, interval*12*periodCount)
 	default:
 		return date
 	}
 }
 
-// validScheduleFrequency reports whether a frequency expands. Unknown
-// frequencies never reach expansion past validation, but expansion must
-// still terminate on them: advanceDate returns unknown frequencies
-// unchanged, which would otherwise loop forever.
-func validScheduleFrequency(frequency types.Frequency) bool {
+// advanceNthWeekday steps a byNthWeekday schedule forward, deriving the
+// weekday shape from the base occurrence and skipping months that lack the
+// ordinal. Bases are occurrences by construction (the latest recorded
+// movement), so the derived shape matches the schedule's own.
+func advanceNthWeekday(date string, interval, periodCount int) string {
+	monthsAfter := interval * periodCount
+	for guard := 0; guard < 2400; guard++ {
+		if occurrence, ok := nthWeekdayMonthsAfter(date, monthsAfter); ok {
+			return occurrence
+		}
+		monthsAfter += interval
+	}
+	return AddMonthsClamped(date, interval*periodCount)
+}
+
+// recurrenceFromFrequency maps a legacy loan-term frequency onto a schedule
+// recurrence for the monthly-clamped monthly, quarterly-as-every-3-months,
+// and weekly-on-start-weekday equivalences. Unknown frequencies fall back to
+// monthly byDate; loan terms only ever carry the five known values.
+func recurrenceFromFrequency(frequency types.Frequency, startDate string) types.Recurrence {
 	switch frequency {
-	case types.FrequencyDaily, types.FrequencyWeekly, types.FrequencyMonthly, types.FrequencyQuarterly, types.FrequencyAnnual:
+	case types.FrequencyDaily:
+		return types.Recurrence{Unit: types.RecurrenceDay, Interval: 1}
+	case types.FrequencyWeekly:
+		weekdays := []int(nil)
+		if IsValidIsoDate(startDate) {
+			weekdays = []int{weekdayOf(startDate)}
+		}
+		return types.Recurrence{Unit: types.RecurrenceWeek, Interval: 1, Weekdays: weekdays}
+	case types.FrequencyMonthly:
+		return types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}
+	case types.FrequencyQuarterly:
+		return types.Recurrence{Unit: types.RecurrenceMonth, Interval: 3, MonthlyMode: types.RecurrenceMonthlyByDate}
+	case types.FrequencyAnnual:
+		return types.Recurrence{Unit: types.RecurrenceYear, Interval: 1}
+	default:
+		return types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}
+	}
+}
+
+// validRecurrence reports whether a recurrence expands. Unknown units,
+// out-of-range intervals, and monthly schedules without a known mode never
+// reach expansion past validation, but expansion must still terminate on
+// them: every generator below consults this first.
+func validRecurrence(recurrence types.Recurrence) bool {
+	if recurrence.Interval < 1 || recurrence.Interval > 99 {
+		return false
+	}
+	switch recurrence.Unit {
+	case types.RecurrenceDay, types.RecurrenceWeek, types.RecurrenceYear:
 		return true
+	case types.RecurrenceMonth:
+		return recurrence.MonthlyMode == types.RecurrenceMonthlyByDate ||
+			recurrence.MonthlyMode == types.RecurrenceMonthlyByNthWeekday
 	default:
 		return false
 	}
+}
+
+// recurrenceDatesFrom lists occurrence dates of a recurrence anchored at
+// startDate up to endDate (inclusive), skipping periods before startPeriod.
+// The fast-forward offset lets callers resume enumeration near a window
+// without expanding the whole prefix; every loop advances its cursor past
+// endDate, so unknown or degenerate inputs terminate through the
+// validRecurrence gate above.
+func recurrenceDatesFrom(recurrence types.Recurrence, startDate, endDate string, startPeriod int) []string {
+	dates := []string{}
+	interval := recurrence.Interval
+	if interval <= 0 {
+		interval = 1
+	}
+	if startPeriod < 0 {
+		startPeriod = 0
+	}
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
+		for period := startPeriod; ; period++ {
+			occurrenceDate := addDays(startDate, period*interval)
+			if CompareIsoDates(occurrenceDate, endDate) > 0 {
+				break
+			}
+			dates = append(dates, occurrenceDate)
+		}
+	case types.RecurrenceWeek:
+		anchor := addDays(startDate, startPeriod*7*interval)
+		for date := anchor; CompareIsoDates(date, endDate) <= 0; date = addDays(date, 1) {
+			if !weekdayIn(recurrence.Weekdays, weekdayOf(date)) {
+				continue
+			}
+			if DaysBetween(startDate, date)/7%interval != 0 {
+				continue
+			}
+			dates = append(dates, date)
+		}
+	case types.RecurrenceMonth:
+		if recurrence.MonthlyMode == types.RecurrenceMonthlyByNthWeekday {
+			for period := startPeriod; ; period++ {
+				monthsAfter := period * interval
+				year, month, _ := splitIsoDate(startDate)
+				nextMonthIndex := (month - 1) + monthsAfter
+				targetYear := year + floorDiv(nextMonthIndex, 12)
+				targetMonth := ((nextMonthIndex % 12) + 12) % 12
+				if CompareIsoDates(fmt.Sprintf("%04d-%02d-01", targetYear, targetMonth+1), endDate) > 0 {
+					break
+				}
+				if occurrenceDate, ok := nthWeekdayMonthsAfter(startDate, monthsAfter); ok {
+					if CompareIsoDates(occurrenceDate, endDate) <= 0 {
+						dates = append(dates, occurrenceDate)
+					}
+				}
+			}
+			break
+		}
+		for period := startPeriod; ; period++ {
+			occurrenceDate := AddMonthsClamped(startDate, period*interval)
+			if CompareIsoDates(occurrenceDate, endDate) > 0 {
+				break
+			}
+			dates = append(dates, occurrenceDate)
+		}
+	case types.RecurrenceYear:
+		for period := startPeriod; ; period++ {
+			occurrenceDate := AddMonthsClamped(startDate, period*interval*12)
+			if CompareIsoDates(occurrenceDate, endDate) > 0 {
+				break
+			}
+			dates = append(dates, occurrenceDate)
+		}
+	}
+	return dates
 }
 
 // RuleScheduleDates lists every scheduled date of a rule up to endDate
 // (inclusive), unfiltered by projection windows. Validation uses it to check
 // that a claim names a real scheduled occurrence.
 func RuleScheduleDates(rule *types.Schedule, endDate string) []string {
-	dates := []string{}
-	if !validScheduleFrequency(rule.Frequency) {
-		return dates
+	if !validRecurrence(rule.Recurrence) {
+		return []string{}
 	}
 	effectiveEnd := endDate
 	if rule.EndDate != nil && CompareIsoDates(*rule.EndDate, endDate) < 0 {
 		effectiveEnd = *rule.EndDate
 	}
-	for periodCount := 0; ; periodCount++ {
-		occurrenceDate := advanceDate(rule.StartDate, rule.Frequency, periodCount)
-		if CompareIsoDates(occurrenceDate, effectiveEnd) > 0 {
-			break
-		}
-		dates = append(dates, occurrenceDate)
-	}
-	return dates
+	return recurrenceDatesFrom(rule.Recurrence, rule.StartDate, effectiveEnd, 0)
 }
 
 // ScheduleOccurrencesHorizonMonths is the named default forward window for
@@ -186,16 +382,20 @@ const ScheduleOccurrencesHorizonMonths = 3
 
 // DefaultScheduleOccurrencesThrough returns the default `through` date for
 // schedule occurrence reads: today plus the named horizon, month-clamped
-// exactly like advanceDate (Jan 31 + 3mo clamps to Apr 30).
+// exactly like monthly byDate expansion (Jan 31 + 3mo clamps to Apr 30).
 func DefaultScheduleOccurrencesThrough(today string) string {
 	return AddMonthsClamped(today, ScheduleOccurrencesHorizonMonths)
 }
 
-// ruleOccursOn tests one date without expanding the whole prefix: advance
-// until reaching or passing the date. Daily rules with hundreds of claims
-// no longer re-expand the shared prefix per claim.
+// ruleOccursOn tests one date without expanding the whole prefix: the date
+// is an occurrence exactly when its calendar distance from the start date
+// fits the recurrence arithmetic. Daily rules with hundreds of claims no
+// longer re-expand the shared prefix per claim.
 func ruleOccursOn(rule *types.Schedule, date string) bool {
-	if !validScheduleFrequency(rule.Frequency) {
+	if !validRecurrence(rule.Recurrence) {
+		return false
+	}
+	if !IsValidIsoDate(rule.StartDate) || !IsValidIsoDate(date) {
 		return false
 	}
 	if CompareIsoDates(date, rule.StartDate) < 0 {
@@ -204,15 +404,40 @@ func ruleOccursOn(rule *types.Schedule, date string) bool {
 	if rule.EndDate != nil && CompareIsoDates(date, *rule.EndDate) > 0 {
 		return false
 	}
-	for periodCount := 0; ; periodCount++ {
-		occurrenceDate := advanceDate(rule.StartDate, rule.Frequency, periodCount)
-		comparison := CompareIsoDates(occurrenceDate, date)
-		if comparison == 0 {
-			return true
-		}
-		if comparison > 0 {
+	return recurrenceIncludes(rule.Recurrence, rule.StartDate, date)
+}
+
+// recurrenceIncludes reports whether date is an occurrence of a recurrence
+// anchored at startDate. The date must already be within [startDate, end].
+func recurrenceIncludes(recurrence types.Recurrence, startDate, date string) bool {
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
+		return DaysBetween(startDate, date)%recurrence.Interval == 0
+	case types.RecurrenceWeek:
+		if !weekdayIn(recurrence.Weekdays, weekdayOf(date)) {
 			return false
 		}
+		// Week 0 is the 7-day window starting startDate, not the ISO week:
+		// only whole elapsed weeks count toward the interval.
+		return DaysBetween(startDate, date)/7%recurrence.Interval == 0
+	case types.RecurrenceMonth:
+		months := monthsBetween(startDate, date)
+		if months%recurrence.Interval != 0 {
+			return false
+		}
+		if recurrence.MonthlyMode == types.RecurrenceMonthlyByNthWeekday {
+			occurrence, ok := nthWeekdayMonthsAfter(startDate, months)
+			return ok && occurrence == date
+		}
+		return AddMonthsClamped(startDate, months) == date
+	case types.RecurrenceYear:
+		months := monthsBetween(startDate, date)
+		if months%(recurrence.Interval*12) != 0 {
+			return false
+		}
+		return AddMonthsClamped(startDate, months) == date
+	default:
+		return false
 	}
 }
 
@@ -264,18 +489,14 @@ func ResolveOccurrences(rules []types.Schedule, transactions []types.Transaction
 	specs := []instanceSpec{}
 	for ruleIndex := range rules {
 		rule := &rules[ruleIndex]
-		if !rule.Enabled || !validScheduleFrequency(rule.Frequency) {
+		if !rule.Enabled || !validRecurrence(rule.Recurrence) {
 			continue
 		}
 		effectiveEnd := windowEnd
 		if rule.EndDate != nil && CompareIsoDates(*rule.EndDate, windowEnd) < 0 {
 			effectiveEnd = *rule.EndDate
 		}
-		for periodCount := 0; ; periodCount++ {
-			occurrenceDate := advanceDate(rule.StartDate, rule.Frequency, periodCount)
-			if CompareIsoDates(occurrenceDate, effectiveEnd) > 0 {
-				break
-			}
+		for _, occurrenceDate := range recurrenceDatesFrom(rule.Recurrence, rule.StartDate, effectiveEnd, 0) {
 			if !inWindow(occurrenceDate) {
 				continue
 			}

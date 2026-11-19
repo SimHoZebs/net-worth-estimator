@@ -15,17 +15,19 @@ import (
 // transaction_claims row a manual claim would write. Validation stays
 // authoritative. False positives are fixed by tightening this matcher,
 // never by removing automatic assignment.
-func AutoClaimWindowDays(frequency types.Frequency) int {
-	switch frequency {
-	case types.FrequencyDaily:
+// AutoClaimWindowDays returns the match window in days around a transaction
+// day per recurrence unit: daily schedules repeat every day, weekly ones
+// within a few days, monthly ones within a week, and annual ones within a
+// month. Unknown units return zero and never match.
+func AutoClaimWindowDays(recurrence types.Recurrence) int {
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
 		return 1
-	case types.FrequencyWeekly:
+	case types.RecurrenceWeek:
 		return 3
-	case types.FrequencyMonthly:
+	case types.RecurrenceMonth:
 		return 7
-	case types.FrequencyQuarterly:
-		return 15
-	case types.FrequencyAnnual:
+	case types.RecurrenceYear:
 		return 31
 	default:
 		return 0
@@ -134,32 +136,35 @@ func autoClaimRoutesMatch(transaction types.Transaction, schedule types.Schedule
 	return true
 }
 
-func autoClaimStartOffset(start, lower string, frequency types.Frequency) int {
+func autoClaimStartOffset(start, lower string, recurrence types.Recurrence) int {
 	if CompareIsoDates(start, lower) >= 0 {
 		return 0
 	}
-	startTime := MustParseIsoDate(start)
-	lowerTime := MustParseIsoDate(lower)
-	switch frequency {
-	case types.FrequencyDaily:
-		if days := DaysBetween(start, lower); days > 2 {
-			return days - 2
+	interval := recurrence.Interval
+	if interval <= 0 {
+		interval = 1
+	}
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
+		if days := DaysBetween(start, lower); days/interval > 2 {
+			return days/interval - 2
 		}
-	case types.FrequencyWeekly:
-		if days := DaysBetween(start, lower); days/7 > 2 {
-			return days/7 - 2
+	case types.RecurrenceWeek:
+		if weeks := DaysBetween(start, lower) / 7; weeks/interval > 2 {
+			return weeks/interval - 2
 		}
-	case types.FrequencyMonthly, types.FrequencyQuarterly:
+	case types.RecurrenceMonth:
+		startTime := MustParseIsoDate(start)
+		lowerTime := MustParseIsoDate(lower)
 		months := (lowerTime.Year()-startTime.Year())*12 + int(lowerTime.Month()-startTime.Month())
-		if frequency == types.FrequencyQuarterly {
-			months /= 3
+		if months/interval > 2 {
+			return months/interval - 2
 		}
-		if months > 2 {
-			return months - 2
-		}
-	case types.FrequencyAnnual:
-		if years := lowerTime.Year() - startTime.Year(); years > 2 {
-			return years - 2
+	case types.RecurrenceYear:
+		startTime := MustParseIsoDate(start)
+		lowerTime := MustParseIsoDate(lower)
+		if years := lowerTime.Year() - startTime.Year(); years/interval > 2 {
+			return years/interval - 2
 		}
 	}
 	return 0
@@ -227,8 +232,11 @@ func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, c
 		if amountDiff > 0.15 {
 			continue
 		}
-		window := AutoClaimWindowDays(schedule.Frequency)
+		window := AutoClaimWindowDays(schedule.Recurrence)
 		if window <= 0 {
+			continue
+		}
+		if !validRecurrence(schedule.Recurrence) {
 			continue
 		}
 		base := MustParseIsoDate(day)
@@ -237,11 +245,9 @@ func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, c
 		bestDate := ""
 		bestDiff := 0
 		first := true
-		for periodCount := autoClaimStartOffset(schedule.StartDate, lower, schedule.Frequency); ; periodCount++ {
-			occurrence := AdvanceRuleDate(schedule.StartDate, schedule.Frequency, periodCount)
-			if CompareIsoDates(occurrence, upper) > 0 {
-				break
-			}
+		// Weekly multi-day schedules enumerate every active weekday, so the
+		// fast-forward offset counts whole weeks rather than occurrences.
+		for _, occurrence := range recurrenceDatesFrom(schedule.Recurrence, schedule.StartDate, upper, autoClaimStartOffset(schedule.StartDate, lower, schedule.Recurrence)) {
 			if CompareIsoDates(occurrence, lower) < 0 {
 				continue
 			}
@@ -260,12 +266,6 @@ func MatchAutoClaim(transaction types.Transaction, schedules []types.Schedule, c
 			}
 			if first || diff < bestDiff {
 				bestDate, bestDiff, first = occurrence, diff, false
-			}
-			// Unknown frequencies advance to the same date; the upper
-			// window break above terminates every reachable loop.
-			// A large guard remains only against a defective advance.
-			if periodCount > 1000000 {
-				break
 			}
 		}
 		if bestDate == "" {

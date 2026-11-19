@@ -88,7 +88,7 @@ export function fixtureModel(
 				sourceAccountId: row.fromId,
 				destinations: row.toId ? [row.toId] : null,
 				amount: fixtureAmount(row),
-				frequency: "monthly",
+				recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
 				startDate: row.startDate,
 				endDate: row.endDate,
 				annualCap: null,

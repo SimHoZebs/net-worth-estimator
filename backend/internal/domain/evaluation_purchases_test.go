@@ -111,7 +111,7 @@ func TestPlannedPurchasesSampleUsesTheBaselineSample(t *testing.T) {
 	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "50", 0))
 	end := "2026-03-01"
 	request.Model.Schedules = []types.Schedule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
-		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
+		Recurrence: monthlyTestRecurrence(), StartDate: "2026-02-02", EndDate: &end,
 		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
 	}}

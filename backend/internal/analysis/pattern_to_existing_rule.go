@@ -21,20 +21,30 @@ var (
 	ErrNoScheduleMatch = errors.New("no scheduled occurrence matches a recorded movement")
 )
 
-// existingRuleIntervalDays converts a rule frequency to nominal days for drift
-// tolerance via the single cadence registry: the reverse direction of
-// recurringCadenceFrequency, so detector intervals and rule schedules cannot
-// drift apart.
-func existingRuleIntervalDays(frequency types.Frequency) (float64, bool) {
-	if frequency == "" {
+// existingRuleIntervalDays converts a rule recurrence to nominal days for drift
+// tolerance: daily and annual cadences use detector intervals, weekly ones
+// divide the week span by the active weekday count, and monthly ones use the
+// mean month length times the interval.
+func existingRuleIntervalDays(recurrence types.Recurrence) (float64, bool) {
+	interval := recurrence.Interval
+	if interval <= 0 {
 		return 0, false
 	}
-	for _, def := range patternCadenceDefs {
-		if def.frequency == frequency {
-			return def.days, true
+	switch recurrence.Unit {
+	case types.RecurrenceDay:
+		return float64(interval), true
+	case types.RecurrenceWeek:
+		if len(recurrence.Weekdays) == 0 {
+			return 0, false
 		}
+		return 7.0 * float64(interval) / float64(len(recurrence.Weekdays)), true
+	case types.RecurrenceMonth:
+		return 30.4375 * float64(interval), true
+	case types.RecurrenceYear:
+		return 365.25 * float64(interval), true
+	default:
+		return 0, false
 	}
-	return 0, false
 }
 
 // PatternToExistingScheduleInput carries everything adding needs: the confirmed anchor
@@ -103,7 +113,7 @@ func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]typ
 	if !rule.Enabled {
 		return nil, ErrRuleDisabled
 	}
-	interval, ok := existingRuleIntervalDays(rule.Frequency)
+	interval, ok := existingRuleIntervalDays(rule.Recurrence)
 	if !ok {
 		return nil, fmt.Errorf("%w: rule schedule is unknown", ErrNoScheduleMatch)
 	}

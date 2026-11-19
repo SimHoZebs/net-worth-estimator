@@ -73,7 +73,7 @@ async function seedEvidence(
 		sourceAccountId: checkingId,
 		destinations: [],
 		amount: amount(value),
-		frequency: "monthly",
+		recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
 		startDate: `2026-11-${String(day).padStart(2, "0")}`,
 		endDate: null,
 		annualCap: null,

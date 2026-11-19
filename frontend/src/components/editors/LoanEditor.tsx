@@ -29,6 +29,21 @@ const frequencies = [
 ] as const;
 type Frequency = (typeof frequencies)[number];
 
+/** Loan-term frequency implied by a linked schedule's recurrence. Loan
+ * charges and payments are monthly in practice; anything else falls back
+ * to monthly rather than blocking the editor. */
+function loanFrequencyOf(schedule?: {
+	recurrence?: { unit?: string; interval?: number } | null;
+}): Frequency {
+	const unit = schedule?.recurrence?.unit;
+	const interval = schedule?.recurrence?.interval;
+	if (unit === "day" && interval === 1) return "daily";
+	if (unit === "week" && interval === 1) return "weekly";
+	if (unit === "month" && interval === 3) return "quarterly";
+	if (unit === "year" && interval === 1) return "annual";
+	return "monthly";
+}
+
 const frequencyOptions = frequencies.map((frequency) => ({
 	value: frequency,
 	label: frequency,
@@ -127,8 +142,8 @@ function LoanForm({
 				(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
 			)?.id ??
 			"",
-		interestFrequency: (charge?.frequency ?? "monthly") as Frequency,
-		paymentFrequency: (paymentRule?.frequency ?? "monthly") as Frequency,
+		interestFrequency: loanFrequencyOf(charge),
+		paymentFrequency: loanFrequencyOf(paymentRule),
 		interestStart: charge?.startDate ?? today,
 		paymentStart: paymentRule?.startDate ?? today,
 	};

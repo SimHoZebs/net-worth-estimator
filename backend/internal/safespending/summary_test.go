@@ -20,7 +20,7 @@ func baseModel() *types.FinancialModel {
 	return &types.FinancialModel{Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}}, Checkpoints: []types.Checkpoint{{AccountID: "checking", Balance: 1608.05, AvailableBalance: ptr(1244.43), ObservedAt: stamp("2026-11-14T20:00:00Z")}}}
 }
 func bill(id, day string, amount float64) types.Schedule {
-	return types.Schedule{ID: id, Name: id, SourceAccountID: ptr("checking"), Amount: fixed(amount), Frequency: "monthly", StartDate: day, Enabled: true}
+	return types.Schedule{ID: id, Name: id, SourceAccountID: ptr("checking"), Amount: fixed(amount), Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: day, Enabled: true}
 }
 func payment(id string, amount float64, at string) types.Transaction {
 	return types.Transaction{ID: id, Name: id, SourceAccountID: ptr("checking"), Amount: fixed(amount), PostedTime: stamp(at), TransactionTime: stamp(at), Enabled: true, Source: "banksync"}
@@ -37,7 +37,7 @@ func TestProductionArithmeticUsesCashObservationAndRequestedBills(t *testing.T) 
 	m.Accounts = append(m.Accounts, types.Account{ID: "investment", Kind: "investment", Enabled: true})
 	m.Checkpoints = append(m.Checkpoints, types.Checkpoint{AccountID: "investment", Balance: 100000, ObservedAt: stamp("2026-11-15T10:00:00Z")})
 	m.Schedules = []types.Schedule{bill("sofi", "2026-11-15", 711.12), bill("utilities", "2026-11-15", 98.92), bill("car", "2026-11-16", 400), bill("insurance", "2026-11-16", 159.89), bill("sallie", "2026-11-19", 91.08)}
-	m.Schedules = append(m.Schedules, types.Schedule{ID: "salary", Name: "salary", Destinations: []string{"checking"}, Amount: fixed(7458.34), Frequency: "monthly", StartDate: "2026-11-30", Enabled: true})
+	m.Schedules = append(m.Schedules, types.Schedule{ID: "salary", Name: "salary", Destinations: []string{"checking"}, Amount: fixed(7458.34), Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-11-30", Enabled: true})
 	s := Build(m, nil, "2026-11-15", testEnd)
 	if s.Status != "available" || len(s.OutstandingObligations) != 5 || len(s.Baselines) != 1 {
 		t.Fatalf("summary %+v", s)

@@ -85,7 +85,7 @@ func TestPatternToNewScheduleTracksOneActiveRule(t *testing.T) {
 		t.Fatalf("promotions=%+v err=%v", promotions, err)
 	}
 	rule := preview.Schedule
-	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations, Amount: types.ExpressionAmountResolution(rule.Amount), Frequency: rule.Frequency, StartDate: rule.StartDate, Enabled: true})
+	created, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations, Amount: types.ExpressionAmountResolution(rule.Amount), Recurrence: rule.Recurrence, StartDate: rule.StartDate, Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestPatternToNewScheduleClearRemovesLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := preview.Schedule
-	if _, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations, Amount: types.ExpressionAmountResolution(rule.Amount), Frequency: rule.Frequency, StartDate: rule.StartDate, Enabled: true}); err != nil {
+	if _, err := s.CreatePatternSchedule(anchor.ID, preview.PatternKey, "grocer", "test-actor", types.Schedule{ID: "rule-1", Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations, Amount: types.ExpressionAmountResolution(rule.Amount), Recurrence: rule.Recurrence, StartDate: rule.StartDate, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Clear(); err != nil {

@@ -345,7 +345,7 @@ type scheduleFromTransactionBody struct {
 	Amount          *amountInput               `json:"amount,omitempty"`
 	SourceAccountID nullableOptional[string]   `json:"sourceAccountId,omitempty"`
 	Destinations    nullableOptional[[]string] `json:"destinations,omitempty"`
-	Frequency       types.Frequency            `json:"frequency"`
+	Recurrence      ScheduleRecurrence         `json:"recurrence"`
 	StartDate       types.IsoDate              `json:"startDate"`
 	EndDate         *types.IsoDate             `json:"endDate,omitempty"`
 	AnnualIncrease  *float64                   `json:"annualIncrease,omitempty"`
@@ -375,12 +375,16 @@ func (s *handler) startScheduleFromTransaction(_ context.Context, input *struct 
 	if !domain.IsValidIsoDate(string(input.Body.StartDate)) {
 		return nil, huma.Error422UnprocessableEntity("startDate must be a YYYY-MM-DD calendar date")
 	}
+	recurrence, err := input.Body.Recurrence.resolve(input.Body.StartDate)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
 	schedule := types.Schedule{
 		Name:            transaction.Name,
 		SourceAccountID: transaction.SourceAccountID,
 		Destinations:    transaction.Destinations,
 		Amount:          transaction.Amount,
-		Frequency:       input.Body.Frequency,
+		Recurrence:      recurrence,
 		StartDate:       input.Body.StartDate,
 		EndDate:         input.Body.EndDate,
 		Enabled:         transaction.Enabled,

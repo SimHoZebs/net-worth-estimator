@@ -192,8 +192,8 @@ func TestRowWritesMarkDirty(t *testing.T) {
 
 	rule, err := s.CreateSchedule(types.Schedule{
 		Name: "Pay", SourceAccountID: &account.ID,
-		Amount:    types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency: "monthly", StartDate: "2026-09-01", Priority: 1, Enabled: true,
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-09-01", Priority: 1, Enabled: true,
 	})
 	if err != nil {
 		t.Fatalf("create rule: %v", err)

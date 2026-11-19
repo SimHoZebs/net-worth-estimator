@@ -2,7 +2,13 @@ import { useId, useMemo, useState } from "react";
 import { createSchedule } from "@/api/generated/endpoints.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
-import { parseUnion } from "../../domain/guards.ts";
+import {
+	ensureStartWeekday,
+	recurrenceEqual,
+	recurrenceFromScheduleLike,
+	recurrenceSentence,
+	type Recurrence,
+} from "../../domain/recurrence.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
@@ -24,21 +30,19 @@ import {
 	EditorSelect,
 	MoneyField,
 } from "./editorFields.tsx";
-import type { Frequency } from "../../api/contracts.ts";
 import {
 	SCHEDULE_AMOUNT_RECIPES,
 	validateRecipe,
 	type AmountFields,
 } from "../../domain/scheduleAmounts.ts";
 import { ScheduleAmountFields } from "./ScheduleAmountFields.tsx";
+import { RecurrenceFields } from "./RecurrenceFields.tsx";
 
-const frequencyOptions = [
-	{ value: "daily", label: "Daily" },
-	{ value: "weekly", label: "Weekly" },
-	{ value: "monthly", label: "Monthly" },
-	{ value: "quarterly", label: "Every 3 months" },
-	{ value: "annual", label: "Yearly" },
-] as const;
+const DEFAULT_RECURRENCE: Recurrence = {
+	unit: "month",
+	interval: 1,
+	monthlyMode: "byDate",
+};
 
 /** Create-only schedule form. Recurrence, growth, and the end date live here. */
 export function AddScheduleDialog({
@@ -78,10 +82,14 @@ export function AddScheduleDialog({
 		: undefined;
 	const effectivePriority =
 		priority === "" ? automaticPriority : Number(priority);
-	const [frequency, setFrequency] = useState<Frequency>("monthly");
+	const [recurrence, setRecurrence] = useState<Recurrence>(DEFAULT_RECURRENCE);
 	const [fromId, setFromId] = useState("");
 	const [toId, setToId] = useState("");
 	const [startDate, setStartDate] = useState(fallbackStart);
+	const changeStartDate = (next: string) => {
+		setStartDate(next);
+		setRecurrence((current) => ensureStartWeekday(current, next));
+	};
 	const [noEndDate, setNoEndDate] = useState(true);
 	const [endDate, setEndDate] = useState("");
 	const [enabled, setEnabled] = useState(true);
@@ -90,11 +98,11 @@ export function AddScheduleDialog({
 	const enabledId = useId();
 	const noEndDateId = useId();
 	const nameId = useId();
-	const frequencyId = useId();
 	const fromIdInput = useId();
 	const toIdInput = useId();
 	const firstId = useId();
 	const lastId = useId();
+	const recurrenceId = useId();
 	const annualCapId = useId();
 	const annualCapHintId = `${annualCapId}-hint`;
 	const priorityId = useId();
@@ -106,7 +114,7 @@ export function AddScheduleDialog({
 		amountKind !== "fixed" ||
 		annualCap !== "" ||
 		priority !== "" ||
-		frequency !== "monthly" ||
+		!recurrenceEqual(recurrence, DEFAULT_RECURRENCE) ||
 		fromId !== "" ||
 		toId !== "" ||
 		startDate !== fallbackStart ||
@@ -125,7 +133,7 @@ export function AddScheduleDialog({
 			name: name.trim(),
 			fromId: fromId || null,
 			toId: toId || null,
-			frequency,
+			recurrence,
 			startDate,
 			endDate: !noEndDate && endDate ? endDate : null,
 			enabled,
@@ -224,22 +232,25 @@ export function AddScheduleDialog({
 							<div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
 								<span className="text-muted-foreground">
 									Source starts {sourceSchedule.startDate} ·{" "}
-									{sourceSchedule.frequency}
+									{(() => {
+										const sourceRecurrence =
+											recurrenceFromScheduleLike(sourceSchedule);
+										return sourceRecurrence
+											? recurrenceSentence(
+													sourceRecurrence,
+													sourceSchedule.startDate,
+												)
+											: "Recurring schedule";
+									})()}
 								</span>
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
 									onClick={() => {
-										const next = parseUnion(sourceSchedule.frequency, [
-											"daily",
-											"weekly",
-											"monthly",
-											"quarterly",
-											"annual",
-										] as const);
-										if (next) setFrequency(next);
-										setStartDate(sourceSchedule.startDate);
+										const next = recurrenceFromScheduleLike(sourceSchedule);
+										if (next) setRecurrence(next);
+										changeStartDate(sourceSchedule.startDate);
 										setEndDate(sourceSchedule.endDate ?? "");
 										setNoEndDate(!sourceSchedule.endDate);
 									}}
@@ -267,24 +278,16 @@ export function AddScheduleDialog({
 							</Alert>
 						)}
 					</div>
-					<EditorField label="Frequency" htmlFor={frequencyId}>
-						<EditorSelect
-							id={frequencyId}
-							value={frequency}
-							onValueChange={(next) => {
-								const parsed = parseUnion(next, [
-									"daily",
-									"weekly",
-									"monthly",
-									"quarterly",
-									"annual",
-								] as const);
-								if (parsed) setFrequency(parsed);
-							}}
-							options={[...frequencyOptions]}
+					<div className="col-span-full">
+						<RecurrenceFields
+							recurrence={recurrence}
+							startDate={startDate}
+							endDate={!noEndDate && endDate ? endDate : null}
+							onChange={setRecurrence}
 							disabled={saving}
+							idPrefix={recurrenceId}
 						/>
-					</EditorField>
+					</div>
 					<EditorField label="From" htmlFor={fromIdInput}>
 						<EditorSelect
 							id={fromIdInput}
@@ -319,7 +322,7 @@ export function AddScheduleDialog({
 							type="date"
 							required
 							value={startDate}
-							onChange={(event) => setStartDate(event.target.value)}
+							onChange={(event) => changeStartDate(event.target.value)}
 							disabled={saving}
 						/>
 					</EditorField>
