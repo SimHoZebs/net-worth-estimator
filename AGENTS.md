@@ -44,7 +44,7 @@
 - When given a task, delegate the implemenation work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
 - Split independent workstreams across parallel backgrounded subagents under a single orchestrator that owns the branch.
 - Retain final ownership of audit verification and shipment and remain the final entity that ships the change.
-- Prefer subagent models in this order with the listed effort as provider slash model hash variant.
+- On every subagent spawn, explicitly set `model` to the first available model in this order, including its listed effort variant.
   1. `opencode-go/hy4-flash-free#high` at max effort where supported
   2. `opencode/longcat-2.5-free` at max effort where supported
   3. `opencode/deepseek-v4.1-flash-free#max`
