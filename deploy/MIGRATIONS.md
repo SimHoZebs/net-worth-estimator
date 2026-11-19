@@ -47,8 +47,8 @@ target before its operator window is complete.
 | Bank source normalization | [bank-source README](../backend/scripts/one-time/bank-source/README.md) | Run on every supported target before deploying the strict settlement matcher. Both legacy counts must read zero before the API starts. |
 | No-op checkpoint prune | [noop-checkpoints README](../backend/scripts/one-time/noop-checkpoints/README.md) | Unverified on Compose, dev, and Northflank. Runs inside the body after provisioning; deletes only forward sync-owned zero-delta checkpoints. |
 | SimpleFIN v2 keys | Tool usage: `simplefin-v2-keys --db PATH (--mapping PATH \| --write-mapping PATH)` | Runs inside the body. When bare keys exist, supply `SIMPLEFIN_V2_MAPPING` as a mode-0600 JSON map produced by `--write-mapping` before the window; the map tool performs the only provider read. A missing, ambiguous, or colliding mapping fails before publication. No-op when no SimpleFIN rows exist. |
-| Promotion merchant key | Body in `deploy/migrate.sh` (additive `analysis_promotions.merchant_key`) | Pending one-time column addition; unverified on Compose, dev, and Northflank until operators run the body. Adds `merchant_key TEXT NOT NULL DEFAULT ''` to existing promotions with no row rewrites; the frozen offline DDL carries it for fresh sources. |
-| Schedule recurrences | Body in `deploy/migrate.sh` (recurrence columns plus frequency backfill) | Pending one-time conversion; unverified on Compose, dev, and Northflank until operators run the body. Rebuilds `recurrence_rules` from the retired `frequency` column (daily to every day, weekly to the start weekday, monthly to the clamped start day, quarterly to every third month, annual to the yearly date) with row-count and mapping postconditions; unknown frequencies and undated weekly rows fail the source preflight. Fresh databases carry the recurrence columns from `setupdb` with no legacy path. |
+| Promotion merchant key | Body in `deploy/migrate.sh` (additive `analysis_promotions.merchant_key`) | The Northflank database carries the column with no NULL keys across its promotions, so the add path ran there; the release that applied it is not recorded. Unverified on Compose and dev. Adds `merchant_key TEXT NOT NULL DEFAULT ''` to existing promotions with no row rewrites; the frozen offline DDL carries it for fresh sources. |
+| Schedule recurrences | Body in `deploy/migrate.sh` (recurrence columns plus frequency backfill) | Verified on Northflank: the first attempt of release `main-ece20d55ae00` (run `a2f1eb8b-1c08-4448-835c-c68c31a8e811`) converted all nine monthly rules to unit `month` with interval 1 and `byDate`, passed the candidate postconditions, and published them; the green retry `691f6dab-9cc0-4822-8e46-0cf484e0b483` then took the no-op path. Unverified on Compose and dev. Rebuilds `recurrence_rules` from the retired `frequency` column (daily to every day, weekly to the start weekday, monthly to the clamped start day, quarterly to every third month, annual to the yearly date) with row-count and mapping postconditions; unknown frequencies and undated weekly rows fail the source preflight. Fresh databases carry the recurrence columns from `setupdb` with no legacy path. |
 
 ## Supported execution paths
 
@@ -71,7 +71,9 @@ Do not infer coverage from a successful build.
 4. Define retry behavior from actual data. Never reset existing users on retry.
 5. Define rollback and the point after which new writes require reconciliation.
 6. Replace `deploy/migrate.sh`. Keep platform orchestration outside the body.
-7. Rehearse with disposable state, including failure, retry, and repeat success.
+7. Rehearse with disposable state, including failure, retry, and repeat success,
+   and record the full-conversion wall time against the target's execute-action
+   budget.
 8. Verify migration and API use the same immutable target image.
 9. Run affected tests, image checks, shell syntax, and adapter contract checks.
 10. Review the exact staged diff before the semantic commit and push.
@@ -170,7 +172,17 @@ terminates the old pod before starting another pod with that volume. The
 maintenance process serves only `/tmp/waypoint-maintenance`, never `/data`.
 The API and scheduler are absent. Its `/readyz` body says `maintenance`, not
 `ok`. The workflow deploys the target image and runs `/app/migrate.sh` as
-UID/GID `10001`, with `dispatchOnly: false` to wait for its exit status.
+UID/GID `10001`, with `dispatchOnly: false` so the node awaits that command.
+Northflank caps an execute action at 15 seconds and has no timeout field for
+it, so the await ends at that wall, and a wall failure is a step failure, not a
+migration verdict. Budget a new conversion against it on the target compute
+plan. The no-op verify path on the live database takes 2 seconds, while the
+first schedule-recurrence conversion took 13 seconds at `nf-compute-10`; with
+the exec attach that step hit the wall. The body publishes only at its end and
+keeps its verified backup. Recover an overrun by running the same body through
+`northflank exec service`, which has no wall, requiring exit 0, and then
+requesting the release again; read its failure line before acting on the
+retained backup.
 Only success restores `python /app/northflank-runtime.py`, which then runs
 `/app/api-boot.sh` to validate the migrated schema before the server starts. The
 workflow waits for the API container to be running; confirm `/readyz` answers

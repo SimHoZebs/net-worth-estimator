@@ -74,6 +74,12 @@ migration runs inside that container. The identity image deploy runs after the
 API image deploy, so the API container is already settled when the migration
 attaches to it.
 
+The workflow runs that migration as an execute action, which Northflank caps
+at 15 seconds with no configurable timeout. A conversion near that wall fails
+the step even when the body would finish, so measure a new conversion before
+its window and recover an overrun with the CLI command below, which has no such
+wall, then request a green release.
+
 Northflank can still refuse that command with `No running container found`
 when the container was replaced moments earlier. The migration never mutates
 the database before it publishes, so a refused command leaves the API in
