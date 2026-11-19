@@ -3,8 +3,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SafeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
 import {
+	billSelectionLabel,
 	incomeRuleLine,
-	lineAmountLabels,
 	paceLabel,
 	recurringIncreaseDots,
 	SafeSpendingTrendChart,
@@ -132,29 +132,42 @@ describe("income rule extent", () => {
 });
 
 describe("recurring increase dots on shared dates", () => {
+	const projected: SafeSpendingTrend["projected"] = [
+		{ date: "2026-11-09", spent: 100, projected: true },
+		{ date: "2026-11-09", spent: 160, projected: true },
+		{ date: "2026-11-10", spent: 210, projected: true },
+	];
+
 	it("places the dot on the dated total after same-day increases", () => {
-		const projected: SafeSpendingTrend["projected"] = [
-			{ date: "2026-11-09", spent: 100, projected: true },
-			{ date: "2026-11-09", spent: 160, projected: true },
-			{ date: "2026-11-10", spent: 210, projected: true },
-		];
 		expect(
 			recurringIncreaseDots([], projected, [
 				{ date: "2026-11-09", amount: 60, name: "Sub" },
 			]),
-		).toEqual([{ date: "2026-11-09", amount: 160 }]);
+		).toEqual([
+			{
+				date: "2026-11-09",
+				amount: 160,
+				billName: "Sub",
+				billAmount: 60,
+				key: "2026-11-09|0",
+			},
+		]);
 	});
 
 	it("keeps future dated totals for later recurring bills", () => {
-		const projected: SafeSpendingTrend["projected"] = [
-			{ date: "2026-11-09", spent: 100, projected: true },
-			{ date: "2026-11-10", spent: 210, projected: true },
-		];
 		expect(
 			recurringIncreaseDots([], projected, [
 				{ date: "2026-11-10", amount: 60, name: "Sub" },
 			]),
-		).toEqual([{ date: "2026-11-10", amount: 210 }]);
+		).toEqual([
+			{
+				date: "2026-11-10",
+				amount: 210,
+				billName: "Sub",
+				billAmount: 60,
+				key: "2026-11-10|0",
+			},
+		]);
 	});
 
 	it("falls back to the actual curve for a bill already in the cycle", () => {
@@ -162,30 +175,91 @@ describe("recurring increase dots on shared dates", () => {
 			{ date: "2026-11-08", spent: 40, projected: false },
 			{ date: "2026-11-09", spent: 100, projected: false },
 		];
-		const projected: SafeSpendingTrend["projected"] = [
-			{ date: "2026-11-09", spent: 100, projected: true },
-			{ date: "2026-11-10", spent: 210, projected: true },
-		];
 		expect(
 			recurringIncreaseDots(actual, projected, [
 				{ date: "2026-11-08", amount: 25, name: "Paid sub" },
 			]),
-		).toEqual([{ date: "2026-11-08", amount: 40 }]);
+		).toEqual([
+			{
+				date: "2026-11-08",
+				amount: 40,
+				billName: "Paid sub",
+				billAmount: 25,
+				key: "2026-11-08|0",
+			},
+		]);
 	});
 
 	it("prefers the projected post-increase point when both curves have the date", () => {
 		const actual: SafeSpendingTrend["actual"] = [
 			{ date: "2026-11-09", spent: 100, projected: false },
 		];
-		const projected: SafeSpendingTrend["projected"] = [
-			{ date: "2026-11-09", spent: 100, projected: true },
-			{ date: "2026-11-09", spent: 160, projected: true },
-		];
 		expect(
 			recurringIncreaseDots(actual, projected, [
 				{ date: "2026-11-09", amount: 60, name: "Due today" },
 			]),
-		).toEqual([{ date: "2026-11-09", amount: 160 }]);
+		).toEqual([
+			{
+				date: "2026-11-09",
+				amount: 160,
+				billName: "Due today",
+				billAmount: 60,
+				key: "2026-11-09|0",
+			},
+		]);
+	});
+
+	it("gives same-day bills distinct keys and a fallback name", () => {
+		expect(
+			recurringIncreaseDots([], projected, [
+				{ date: "2026-11-10", amount: 30, name: "  Sub  " },
+				{ date: "2026-11-10", amount: 45 },
+			]),
+		).toEqual([
+			{
+				date: "2026-11-10",
+				amount: 210,
+				billName: "Sub",
+				billAmount: 30,
+				key: "2026-11-10|0",
+			},
+			{
+				date: "2026-11-10",
+				amount: 210,
+				billName: "Recurring bills",
+				billAmount: 45,
+				key: "2026-11-10|1",
+			},
+		]);
+	});
+});
+
+describe("bill selection label", () => {
+	it("shows the bill name and amount plus the total spent at the dot", () => {
+		expect(
+			billSelectionLabel({
+				date: "2026-11-10",
+				amount: 210,
+				billName: "Sub",
+				billAmount: 55,
+				key: "2026-11-10|0",
+			}),
+		).toEqual({
+			nameLine: "Sub · $55.00",
+			totalLine: "Total spent $210.00",
+		});
+	});
+
+	it("uses the fallback bill name when the marker has none", () => {
+		expect(
+			billSelectionLabel({
+				date: "2026-11-10",
+				amount: 210,
+				billName: "Recurring bills",
+				billAmount: 45,
+				key: "2026-11-10|1",
+			}).nameLine,
+		).toBe("Recurring bills · $45.00");
 	});
 });
 describe("scheduled recurring increases", () => {
@@ -208,7 +282,7 @@ describe("scheduled recurring increases", () => {
 		expect(high).toBeCloseTo(75.6);
 	});
 
-	it("renders recurring legend and increase description from bill markers", () => {
+	it("renders the increase description from bill markers", () => {
 		const trend: SafeSpendingTrend = {
 			actual: [{ date: "2026-11-09", spent: 10, projected: false }],
 			projected: [
@@ -226,118 +300,6 @@ describe("scheduled recurring increases", () => {
 		const html = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, { trend }),
 		);
-		expect(html).toContain("Recurring bills");
 		expect(html).toContain("Includes $55.00 Sub bill on Nov 10, 2026.");
-		const without = renderToStaticMarkup(
-			createElement(SafeSpendingTrendChart, {
-				trend: { ...trend, billMarkers: [] },
-			}),
-		);
-		expect(without).not.toContain("Recurring bills");
-	});
-});
-
-describe("horizontal rule amount labels", () => {
-	const base: SafeSpendingTrend = {
-		actual: [
-			{ date: "2026-11-09", spent: 10, projected: false },
-			{ date: "2026-11-10", spent: 20, projected: false },
-		],
-		projected: [
-			{ date: "2026-11-10", spent: 20, projected: true },
-			{ date: "2026-11-12", spent: 40, projected: true },
-		],
-		limit: 100,
-		safetyNet: 80,
-		averageDaily: 10,
-		limitHit: null,
-		safetyNetHit: null,
-		scheduledIncreases: [],
-		billMarkers: [],
-		monthlyIncome: {
-			amount: 90,
-			spent: 20,
-			coordinate: 90,
-			start: "2026-11-01",
-			end: "2026-11-30",
-			hit: null,
-		},
-	};
-
-	const domain = spendingChartDomain(base);
-	const renderedLabelY = (html: string, text: string) => {
-		const match = [
-			...html.matchAll(/<text[^>]*y="([\d.]+)"[^>]*>([^<]*)<\/text>/g),
-		].find((item) => item[2] === text);
-		if (!match) throw new Error(`Missing rendered label: ${text}`);
-		return Number(match[1]);
-	};
-	const labelYs = (html: string) =>
-		["Cash limit $100.00", "Income limit $90.00", "Reserve $80.00"]
-			.map((text) => renderedLabelY(html, text))
-			.sort((left, right) => left - right);
-
-	it("labels each drawn rule with its amount", () => {
-		const labels = lineAmountLabels(base, domain);
-		expect(labels.map((label) => [label.label, label.fill])).toEqual([
-			["Income limit $90.00", "var(--chart-2)"],
-			["Reserve $80.00", "var(--warning-text)"],
-			["Cash limit $100.00", "var(--danger-solid)"],
-		]);
-		expect(labels.map((label) => label.amount)).toEqual([90, 80, 100]);
-	});
-
-	it("omits labels for rules that are not drawn", () => {
-		expect(
-			lineAmountLabels(
-				{
-					...base,
-					monthlyIncome: { ...base.monthlyIncome!, coordinate: null },
-					limit: null,
-					safetyNet: null,
-				},
-				domain,
-			),
-		).toEqual([]);
-		expect(
-			lineAmountLabels({ ...base, limit: 0, safetyNet: 0 }, domain).map(
-				(label) => label.label,
-			),
-		).toEqual(["Income limit $90.00"]);
-	});
-
-	it("keeps close rule amounts readable in server-rendered markup", () => {
-		const html = renderToStaticMarkup(
-			createElement(SafeSpendingTrendChart, { trend: base }),
-		);
-		expect(html).toContain("Income limit $90.00");
-		expect(html).toContain("Reserve $80.00");
-		expect(html).toContain("Cash limit $100.00");
-		const ys = labelYs(html);
-		expect(ys[1]! - ys[0]!).toBeGreaterThanOrEqual(12);
-		expect(ys[2]! - ys[1]!).toBeGreaterThanOrEqual(12);
-	});
-
-	it("separates labels when the rules themselves nearly coincide", () => {
-		const close = {
-			...base,
-			limit: 100,
-			safetyNet: 99,
-			monthlyIncome: { ...base.monthlyIncome!, amount: 98, coordinate: 98 },
-		};
-		const html = renderToStaticMarkup(
-			createElement(SafeSpendingTrendChart, {
-				trend: close,
-			}),
-		);
-		const closeYs = [
-			"Cash limit $100.00",
-			"Income limit $98.00",
-			"Reserve $99.00",
-		]
-			.map((text) => renderedLabelY(html, text))
-			.sort((left, right) => left - right);
-		expect(closeYs[1]! - closeYs[0]!).toBeGreaterThanOrEqual(12);
-		expect(closeYs[2]! - closeYs[1]!).toBeGreaterThanOrEqual(12);
 	});
 });

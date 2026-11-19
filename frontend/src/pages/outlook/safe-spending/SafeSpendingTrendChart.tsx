@@ -1,19 +1,20 @@
 import {
 	type ChartPoint,
+	type ChartValue,
 	areaY,
 	defineChart,
 	dot,
 	lineY,
 	ruleY,
-	text,
 } from "@tanstack/charts";
 import { crosshair } from "@tanstack/charts/crosshair";
-import { decorative } from "@tanstack/charts/mark/decorative";
+import { controlledSignal } from "@tanstack/charts/interaction/signal";
 import { Chart } from "@tanstack/charts/react";
+import { keyedSelection, whenSelected } from "@tanstack/charts/selection";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { scalePoint } from "@tanstack/charts/scales/point";
 import { tooltip } from "@tanstack/charts/tooltip";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
 	compactMoney,
 	dateLabel,
@@ -52,88 +53,13 @@ export function incomeRuleLine(trend: SafeSpendingTrend): {
 	);
 }
 
-export interface SpendingLineAmountLabel {
+/** A bill marker resolved onto its plotted dated total. */
+export interface BillIncreaseDot {
+	date: string;
 	amount: number;
-	label: string;
-	fill: string;
-	dy: number;
-}
-
-/** Axis margins leave about this much of the chart height for the vertical plot.
- * Keep in sync with CHART_HEIGHT_PX: it drives both label spacing and mask y. */
-const CHART_HEIGHT_PX = 190;
-const LABEL_PLOT_HEIGHT_PX = 140;
-const LABEL_BASE_DY = 0;
-const LABEL_MIN_GAP_PX = 14;
-
-/**
- * Amounts for the horizontal rules that are actually drawn. Each label sits on
- * its own rule. When rules nearly coincide, the lower labels shift down enough
- * to keep the amounts readable instead of colliding.
- */
-export function lineAmountLabels(
-	trend: SafeSpendingTrend,
-	domain: readonly [number, number],
-): SpendingLineAmountLabel[] {
-	const result: SpendingLineAmountLabel[] = [];
-	const earned = trend.monthlyIncome;
-	if (
-		earned &&
-		earned.coordinate !== null &&
-		Number.isFinite(earned.coordinate)
-	) {
-		result.push({
-			amount: earned.coordinate,
-			label: `${labels.incomeLimit} ${exactMoney(earned.amount)}`,
-			fill: "var(--chart-2)",
-			dy: LABEL_BASE_DY,
-		});
-	}
-	const showThresholds = trend.limit !== null || trend.safetyNet !== null;
-	if (
-		showThresholds &&
-		trend.safetyNet !== null &&
-		Number.isFinite(trend.safetyNet) &&
-		trend.safetyNet > 0
-	) {
-		result.push({
-			amount: trend.safetyNet,
-			label: `${labels.reserveStarts} ${exactMoney(trend.safetyNet)}`,
-			fill: "var(--warning-text)",
-			dy: LABEL_BASE_DY,
-		});
-	}
-	if (
-		showThresholds &&
-		trend.limit !== null &&
-		Number.isFinite(trend.limit) &&
-		trend.limit > 0
-	) {
-		result.push({
-			amount: trend.limit,
-			label: `${labels.spendingLimit} ${exactMoney(trend.limit)}`,
-			fill: "var(--danger-solid)",
-			dy: LABEL_BASE_DY,
-		});
-	}
-	const span = domain[1] - domain[0];
-	if (span > 0) {
-		const pixelsPerUnit = LABEL_PLOT_HEIGHT_PX / span;
-		const minimumGapAmount = LABEL_MIN_GAP_PX / pixelsPerUnit;
-		let previousAmount = Number.POSITIVE_INFINITY;
-		for (const label of [...result].sort(
-			(left, right) => right.amount - left.amount,
-		)) {
-			const ceiling = previousAmount - minimumGapAmount;
-			if (label.amount > ceiling) {
-				label.dy += (label.amount - ceiling) * pixelsPerUnit;
-				previousAmount = ceiling;
-			} else {
-				previousAmount = label.amount;
-			}
-		}
-	}
-	return result;
+	billName: string;
+	billAmount: number;
+	key: string;
 }
 
 /** One dot per bill marker, on the dated total after that day's increases. */
@@ -141,22 +67,41 @@ export function recurringIncreaseDots(
 	actual: readonly SafeSpendingTrendPoint[],
 	projected: readonly SafeSpendingTrendPoint[],
 	billMarkers: readonly SafeSpendingScheduledIncrease[],
-): { date: string; amount: number }[] {
-	return billMarkers.flatMap((increase) => {
+): BillIncreaseDot[] {
+	return billMarkers.flatMap((increase, index) => {
 		const day = increase.date.slice(0, 10);
 		// Projected wins: a bill due today has two points and must land on the
 		// late, post-increase one. Only bills already in actual spending fall
 		// through to the recorded curve.
 		for (const series of [projected, actual]) {
-			for (let index = series.length - 1; index >= 0; index--) {
-				const entry = series[index];
+			for (let position = series.length - 1; position >= 0; position--) {
+				const entry = series[position];
 				if (entry && entry.date.slice(0, 10) === day) {
-					return [{ date: day, amount: entry.spent }];
+					return [
+						{
+							date: day,
+							amount: entry.spent,
+							billName: increase.name?.trim() || labels.recurringBills,
+							billAmount: increase.amount,
+							key: `${day}|${index}`,
+						},
+					];
 				}
 			}
 		}
 		return [];
 	});
+}
+
+/** The two lines shown when a bill dot is selected. */
+export function billSelectionLabel(dot: BillIncreaseDot): {
+	nameLine: string;
+	totalLine: string;
+} {
+	return {
+		nameLine: `${dot.billName} · ${exactMoney(dot.billAmount)}`,
+		totalLine: `Total spent ${exactMoney(dot.amount)}`,
+	};
 }
 
 export function paceLabel(trend: SafeSpendingTrend): {
@@ -201,20 +146,6 @@ export function paceLabel(trend: SafeSpendingTrend): {
 	return { text: null, tone: "normal" };
 }
 
-function legendSwatch(dashed: boolean, tone: string) {
-	return (
-		<span
-			aria-hidden="true"
-			className={cn(
-				"inline-block w-4 shrink-0",
-				dashed
-					? `border-t-2 [border-top-style:dashed] ${tone}`
-					: `h-0.5 rounded-md ${tone}`,
-			)}
-		/>
-	);
-}
-
 /** Include signed net spending and ceilings, with room around negative values. */
 export function spendingChartDomain(
 	trend: SafeSpendingTrend,
@@ -235,6 +166,9 @@ export function spendingChartDomain(
 	);
 	return [Math.min(0, ...values) * 1.08, Math.max(1, ...values) * 1.08];
 }
+
+/** Axis margins and a fixed chart height keep the plot geometry predictable. */
+const CHART_HEIGHT_PX = 190;
 
 /**
  * Spending pace. The solid line is recorded spending through the selected
@@ -263,9 +197,29 @@ export function SafeSpendingTrendChart({
 			),
 		[billMarkers],
 	);
-	const increaseDots = useMemo(
+	const billDots = useMemo(
 		() => recurringIncreaseDots(actual, projected, billMarkers),
 		[actual, projected, billMarkers],
+	);
+	const [selectedBillKey, setSelectedBillKey] = useState<string | null>(null);
+	const selection = useMemo(
+		() =>
+			keyedSelection<unknown, string, ChartValue, ChartValue>({
+				selected: controlledSignal(selectedBillKey, (next) =>
+					setSelectedBillKey(next),
+				),
+				key: (datum) =>
+					(datum as BillIncreaseDot | null | undefined)?.key ?? null,
+			}),
+		[selectedBillKey],
+	);
+	const selectedBill = useMemo(
+		() => billDots.find((dot) => dot.key === selectedBillKey) ?? null,
+		[billDots, selectedBillKey],
+	);
+	const selectedBillLabel = useMemo(
+		() => (selectedBill ? billSelectionLabel(selectedBill) : null),
+		[selectedBill],
 	);
 	const dates = useMemo(
 		() =>
@@ -278,231 +232,208 @@ export function SafeSpendingTrendChart({
 	);
 	const lastActual = actual.at(-1);
 	const domain = useMemo(() => spendingChartDomain(trend), [trend]);
-	const amountLabels = useMemo(
-		() => lineAmountLabels(trend, domain),
-		[domain, trend],
-	);
 	const definition = useMemo(
 		() =>
-			defineChart(({ width }) => {
-				const centerX = width / 2;
-				const pixelsPerUnit =
-					LABEL_PLOT_HEIGHT_PX / Math.max(0.01, domain[1] - domain[0]);
-				const gapPoints = amountLabels.flatMap((label) => {
-					const halfWidth = label.label.length * 3 + 4;
-					const amount = label.amount - label.dy / pixelsPerUnit;
-					return [
-						{ x: centerX - halfWidth, amount, group: label.label },
-						{ x: centerX + halfWidth, amount, group: label.label },
-					];
-				});
-				return {
-					marks: [
-						...(earnedLine.length
-							? [
-									lineY(earnedLine, {
+			defineChart({
+				marks: [
+					...(earnedLine.length
+						? [
+								lineY(earnedLine, {
+									x: "date",
+									y: "amount",
+									stroke: "var(--chart-2)",
+									strokeWidth: 2,
+									strokeDasharray: "10 3 2 3",
+								}),
+							]
+						: []),
+					...(earned?.hit
+						? [
+								dot([earned.hit], {
+									x: "date",
+									y: "amount",
+									r: 5,
+									fill: "var(--chart-2)",
+									stroke: "var(--card)",
+									strokeWidth: 2,
+								}),
+							]
+						: []),
+					areaY(actual, {
+						x: "date",
+						y1: 0,
+						y2: "spent",
+						fill: "var(--chart-band)",
+						fillOpacity: 0.35,
+					}),
+					lineY(actual, {
+						x: "date",
+						y: "spent",
+						stroke: "var(--primary)",
+						strokeWidth: 2.5,
+					}),
+					...(projected.length > 1
+						? [
+								lineY(projected, {
+									x: "date",
+									y: "spent",
+									key: (point) => `${point.date}|${point.spent}`,
+									stroke: "var(--primary)",
+									strokeWidth: 2,
+									strokeDasharray: "6 4",
+								}),
+							]
+						: []),
+					...(showThresholds &&
+					trend.safetyNet !== null &&
+					Number.isFinite(trend.safetyNet) &&
+					trend.safetyNet > 0
+						? [
+								ruleY([trend.safetyNet], {
+									stroke: "var(--warning-text)",
+									strokeWidth: 1.5,
+									strokeDasharray: "2 4",
+								}),
+							]
+						: []),
+					...(showThresholds &&
+					trend.limit !== null &&
+					Number.isFinite(trend.limit) &&
+					trend.limit > 0
+						? [
+								ruleY([trend.limit], {
+									stroke: "var(--danger-solid)",
+									strokeWidth: 1.5,
+									strokeDasharray: "6 4",
+								}),
+							]
+						: []),
+					...(lastActual
+						? [
+								dot([lastActual], {
+									x: "date",
+									y: "spent",
+									r: 4,
+									fill: "var(--primary)",
+									stroke: "var(--card)",
+									strokeWidth: 2,
+								}),
+							]
+						: []),
+					...(billDots.length
+						? [
+								dot(billDots, {
+									x: "date",
+									y: "amount",
+									key: "key",
+									id: "bill-increase-dots",
+									r: 4,
+									fill: "var(--chart-5)",
+									stroke: "var(--card)",
+									strokeWidth: 2,
+								}),
+							]
+						: []),
+					...(billDots.length
+						? [
+								whenSelected(
+									dot(billDots, {
 										x: "date",
 										y: "amount",
-										stroke: "var(--chart-2)",
-										strokeWidth: 2,
-										strokeDasharray: "10 3 2 3",
-									}),
-								]
-							: []),
-						...(earned?.hit
-							? [
-									dot([earned.hit], {
-										x: "date",
-										y: "amount",
-										r: 5,
-										fill: "var(--chart-2)",
-										stroke: "var(--card)",
-										strokeWidth: 2,
-									}),
-								]
-							: []),
-						areaY(actual, {
-							x: "date",
-							y1: 0,
-							y2: "spent",
-							fill: "var(--chart-band)",
-							fillOpacity: 0.35,
-						}),
-						lineY(actual, {
-							x: "date",
-							y: "spent",
-							stroke: "var(--primary)",
-							strokeWidth: 2.5,
-						}),
-						...(projected.length > 1
-							? [
-									lineY(projected, {
-										x: "date",
-										y: "spent",
-										key: (point) => `${point.date}|${point.spent}`,
-										stroke: "var(--primary)",
-										strokeWidth: 2,
-										strokeDasharray: "6 4",
-									}),
-								]
-							: []),
-						...(showThresholds &&
-						trend.safetyNet !== null &&
-						Number.isFinite(trend.safetyNet) &&
-						trend.safetyNet > 0
-							? [
-									ruleY([trend.safetyNet], {
-										stroke: "var(--warning-text)",
-										strokeWidth: 1.5,
-										strokeDasharray: "2 4",
-									}),
-								]
-							: []),
-						...(showThresholds &&
-						trend.limit !== null &&
-						Number.isFinite(trend.limit) &&
-						trend.limit > 0
-							? [
-									ruleY([trend.limit], {
-										stroke: "var(--danger-solid)",
-										strokeWidth: 1.5,
-										strokeDasharray: "6 4",
-									}),
-								]
-							: []),
-						...(lastActual
-							? [
-									dot([lastActual], {
-										x: "date",
-										y: "spent",
-										r: 4,
-										fill: "var(--primary)",
-										stroke: "var(--card)",
-										strokeWidth: 2,
-									}),
-								]
-							: []),
-						...(increaseDots.length
-							? [
-									dot(increaseDots, {
-										x: "date",
-										y: "amount",
-										r: 4,
+										key: "key",
+										id: "bill-increase-dots-selected",
+										r: 6,
 										fill: "var(--chart-5)",
 										stroke: "var(--card)",
 										strokeWidth: 2,
 									}),
-								]
-							: []),
-						...(showThresholds && trend.limitHit
-							? [
-									dot([trend.limitHit], {
-										x: "date",
-										y: "amount",
-										r: 5,
-										fill: "var(--danger-solid)",
-										stroke: "var(--card)",
-										strokeWidth: 2.5,
-									}),
-								]
-							: []),
-						...(gapPoints.length
-							? [
-									decorative(
-										lineY(gapPoints, {
-											x: "x",
-											xScale: "gapX",
-											y: "amount",
-											key: (point) => point.group,
-											stroke: "var(--card)",
-											strokeWidth: 16,
-										}),
-									),
-								]
-							: []),
-						...amountLabels.map((label) =>
-							decorative(
-								text([{ ...label, x: centerX }], {
-									x: "x",
-									xScale: "gapX",
+									selection,
+								),
+							]
+						: []),
+					...(showThresholds && trend.limitHit
+						? [
+								dot([trend.limitHit], {
+									x: "date",
 									y: "amount",
-									text: "label",
-									fill: label.fill,
-									fontSize: 11,
-									fontWeight: 600,
-									anchor: "middle",
-									dy: label.dy,
+									r: 5,
+									fill: "var(--danger-solid)",
+									stroke: "var(--card)",
+									strokeWidth: 2.5,
 								}),
-							),
-						),
-						crosshair({
-							x: {
-								label: {
-									format: (value) =>
-										typeof value === "string" ? monthDay(value) : "",
-								},
-							},
-							y: {
-								label: {
-									format: (value) =>
-										typeof value === "number" ? exactMoney(value) : "",
-								},
-							},
-						}),
-					],
-					scales: {
+							]
+						: []),
+					crosshair({
 						x: {
-							scale: scalePoint<string>().domain(dates).padding(0.1),
-							axis: {
-								ticks: {
-									spacing: 80,
-									format: (value: string) => monthDay(value),
-								},
-								tickLabels: { thin: { minGap: 16 } },
+							label: {
+								format: (value) =>
+									typeof value === "string" ? monthDay(value) : "",
 							},
-						},
-						gapX: {
-							scale: scaleLinear().domain([0, width]),
-							channel: "x",
-							axis: false,
 						},
 						y: {
-							scale: scaleLinear().domain(domain),
-							grid: true,
-							axis: {
-								ticks: { format: (value: number) => compactMoney(value) },
+							label: {
+								format: (value) =>
+									typeof value === "number" ? exactMoney(value) : "",
 							},
 						},
-					},
-					focus: "nearest-x",
-					maxFocusDistance: Number.POSITIVE_INFINITY,
-					tooltip: {
-						use: tooltip,
-						format: (point: ChartPoint) => {
-							const datum = point.datum as {
-								date?: unknown;
-								spent?: unknown;
-								amount?: unknown;
-								projected?: unknown;
-								income?: unknown;
-							};
-							if (datum.income && earned)
-								return `${labels.earnedThisMonth}: ${exactMoney(earned.amount)}`;
-							const date =
-								typeof datum.date === "string"
-									? datum.date.slice(0, 10)
-									: String(point.xValue).slice(0, 10);
-							const spent =
-								typeof datum.spent === "number"
-									? datum.spent
-									: typeof datum.amount === "number"
-										? datum.amount
-										: Number(point.yValue);
-							const increase = increaseByDate.get(date);
-							return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${increase ? ` incl. ${exactMoney(increase.amount)} bills` : ""}`;
+					}),
+				],
+				scales: {
+					x: {
+						scale: scalePoint<string>().domain(dates).padding(0.1),
+						axis: {
+							ticks: {
+								spacing: 80,
+								format: (value: string) => monthDay(value),
+							},
+							tickLabels: { thin: { minGap: 16 } },
 						},
 					},
-				};
+					y: {
+						scale: scaleLinear().domain(domain),
+						grid: true,
+						axis: {
+							ticks: { format: (value: number) => compactMoney(value) },
+						},
+					},
+				},
+				focus: "nearest-x",
+				maxFocusDistance: Number.POSITIVE_INFINITY,
+				selection,
+				tooltip: {
+					use: tooltip,
+					format: (point: ChartPoint) => {
+						const datum = point.datum as {
+							date?: unknown;
+							spent?: unknown;
+							amount?: unknown;
+							projected?: unknown;
+							income?: unknown;
+							billName?: unknown;
+							billAmount?: unknown;
+						};
+						if (datum.income && earned)
+							return `${labels.earnedThisMonth}: ${exactMoney(earned.amount)}`;
+						const date =
+							typeof datum.date === "string"
+								? datum.date.slice(0, 10)
+								: String(point.xValue).slice(0, 10);
+						const spent =
+							typeof datum.spent === "number"
+								? datum.spent
+								: typeof datum.amount === "number"
+									? datum.amount
+									: Number(point.yValue);
+						if (
+							typeof datum.billName === "string" &&
+							typeof datum.billAmount === "number"
+						) {
+							return `${dateLabel(date, true)}: ${datum.billName} ${exactMoney(datum.billAmount)} · total ${exactMoney(spent)}`;
+						}
+						const increase = increaseByDate.get(date);
+						return `${dateLabel(date, true)}: ${exactMoney(spent)}${datum.projected ? " projected" : ""}${increase ? ` incl. ${exactMoney(increase.amount)} bills` : ""}`;
+					},
+				},
 			}),
 		[
 			actual,
@@ -517,8 +448,8 @@ export function SafeSpendingTrendChart({
 			lastActual,
 			domain,
 			increaseByDate,
-			increaseDots,
-			amountLabels,
+			billDots,
+			selection,
 		],
 	);
 	if (trend.spendingAvailable === false)
@@ -593,64 +524,29 @@ export function SafeSpendingTrendChart({
 				ariaLabel={labels.spendingPace}
 				ariaDescription={description}
 				height={CHART_HEIGHT_PX}
+				onSelect={(point) => {
+					const datum = point?.datum as BillIncreaseDot | null | undefined;
+					if (!datum?.key) setSelectedBillKey(null);
+				}}
 			/>
-			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
-			<ul
-				className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted-foreground"
-				role="list"
-				aria-label={`${labels.spendingPace} legend`}
-			>
-				{earned && earned.coordinate !== null && (
-					<li className="flex items-center gap-2">
-						<svg
-							aria-hidden="true"
-							width="24"
-							height="4"
-							className="shrink-0 text-chart-2"
-						>
-							<path
-								d="M0 2H24"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeDasharray="10 3 2 3"
-							/>
-						</svg>
-						{labels.incomeLimit}
-					</li>
-				)}
-				<li className="flex items-center gap-2">
-					{legendSwatch(false, "bg-primary")}
-					{labels.cardSpendingSoFar}
-				</li>
-				{projected.length > 1 && (
-					<li className="flex items-center gap-2">
-						{legendSwatch(true, "border-primary")}
-						{labels.projectedSpending}
-					</li>
-				)}
-				{billMarkers.length > 0 && (
-					<li className="flex items-center gap-2">
-						<span
-							aria-hidden="true"
-							className="inline-block h-2 w-2 shrink-0 rounded-full bg-chart-5"
-						/>
-						{labels.recurringBills}
-					</li>
-				)}
-				{showThresholds && trend.safetyNet !== null && trend.safetyNet > 0 && (
-					<li className="flex items-center gap-2">
-						{legendSwatch(true, "border-warning-text")}
-						{labels.reserveStarts}
-					</li>
-				)}
-				{showThresholds && trend.limit !== null && trend.limit > 0 && (
-					<li className="flex items-center gap-2">
-						{legendSwatch(true, "border-danger-solid")}
-						{labels.spendingLimit}
-					</li>
-				)}
-			</ul>
-			{/* oxlint-enable jsx-a11y/no-redundant-roles */}
+			<span className="sr-only" role="status">
+				{selectedBill && selectedBillLabel
+					? `${selectedBillLabel.nameLine} ${selectedBillLabel.totalLine} on ${dateLabel(selectedBill.date, true)}`
+					: ""}
+			</span>
+			{selectedBill && selectedBillLabel && (
+				<section
+					aria-label="Selected bill"
+					className="border-t border-border pt-2"
+				>
+					<h4 className="m-0 text-sm font-semibold text-foreground">
+						{selectedBillLabel.nameLine}
+					</h4>
+					<p className="m-0 mt-1 text-xs text-muted-foreground">
+						{dateLabel(selectedBill.date, true)} · {selectedBillLabel.totalLine}
+					</p>
+				</section>
+			)}
 		</div>
 	);
 }

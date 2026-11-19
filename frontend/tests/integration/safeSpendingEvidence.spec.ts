@@ -594,9 +594,6 @@ test("current cash budget and over-limit state survive inline history, sorting a
 				new RegExp(`The \\$${limit} cash limit is not reached this cycle`),
 			);
 			await expect(
-				card.getByRole("list", { name: "Spending pace legend" }),
-			).toContainText("Income limit");
-			await expect(
 				card.getByLabel("Spending pace", { exact: true }).locator("desc"),
 			).toHaveText(/Income this month: \$/);
 			const chart = card.getByLabel("Spending pace", { exact: true });
@@ -734,8 +731,10 @@ test("Configure preserves explicit recurring sources and prices their November o
 			name: "Safe spending",
 			exact: true,
 		});
-		const legend = card.getByRole("list", { name: "Spending pace legend" });
-		await expect(legend).toContainText("Income limit");
+		const paceDesc = card
+			.getByLabel("Spending pace", { exact: true })
+			.locator("desc");
+		await expect(paceDesc).toHaveText(/Income this month:/);
 		const cashBefore = await card.getByTestId("left-value").textContent();
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const payroll = drawer.getByRole("button", {
@@ -757,13 +756,13 @@ test("Configure preserves explicit recurring sources and prices their November o
 		};
 		await toggle(payroll);
 		await page.keyboard.press("Escape");
-		await expect(legend).not.toContainText("Income limit");
+		await expect(paceDesc).not.toHaveText(/Income this month:/);
 		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		await toggle(other);
 		await page.keyboard.press("Escape");
 		await page.reload();
-		await expect(legend).toContainText("Income limit");
+		await expect(paceDesc).toHaveText(/Income this month:/);
 		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		await expect(payroll).toHaveAttribute("aria-pressed", "false");
@@ -771,7 +770,7 @@ test("Configure preserves explicit recurring sources and prices their November o
 		await toggle(payroll);
 		await page.keyboard.press("Escape");
 		await page.reload();
-		await expect(legend).toContainText("Income limit");
+		await expect(paceDesc).toHaveText(/Income this month:/);
 		await expect(card.getByTestId("left-value")).toHaveText(cashBefore!);
 		const settings = await api.get(`${FIXTURE_API}/v1/safe-spending-settings`);
 		expect(await settings.json()).toMatchObject({
