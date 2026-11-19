@@ -282,7 +282,6 @@ export function AddScheduleDialog({
 						<RecurrenceFields
 							recurrence={recurrence}
 							startDate={startDate}
-							endDate={!noEndDate && endDate ? endDate : null}
 							onChange={setRecurrence}
 							disabled={saving}
 							idPrefix={recurrenceId}

@@ -473,34 +473,3 @@ export function recurrenceOccurrenceDates({
 		}
 	}
 }
-
-/**
- * First `count` occurrence dates for live previews. Extends the horizon
- * until enough dates land or a sixty-year cap stops the search.
- */
-export function previewNextOccurrences({
-	startDate,
-	recurrence,
-	endDate,
-	count,
-}: {
-	startDate: string;
-	recurrence: Recurrence;
-	endDate: string | null;
-	count: number;
-}): string[] {
-	if (!isIsoDate(startDate) || count <= 0) return [];
-	let horizonDays = 730;
-	for (let attempt = 0; attempt < 6; attempt += 1) {
-		const dates = recurrenceOccurrenceDates({
-			startDate,
-			recurrence,
-			endDate,
-			through: shiftDate({ date: startDate, days: horizonDays }),
-		});
-		if (dates.length >= count || horizonDays >= 21_900)
-			return dates.slice(0, count);
-		horizonDays *= 2;
-	}
-	return [];
-}

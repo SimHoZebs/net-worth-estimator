@@ -3,7 +3,6 @@ import { useId, type RefObject } from "react";
 import { dateLabel } from "../../domain/format.ts";
 import {
 	ensureStartWeekday,
-	recurrenceSentence,
 	type Recurrence,
 } from "../../domain/recurrence.ts";
 import type { Transaction } from "../../domain/model.ts";
@@ -14,7 +13,6 @@ import {
 	Card,
 	CardAction,
 	CardContent,
-	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card.tsx";
@@ -263,7 +261,6 @@ export function MoreOptions({
 								}
 							}
 							startDate={draft.startDate}
-							endDate={!draft.noEndDate && draft.endDate ? draft.endDate : null}
 							onChange={(recurrence) => updateDraft({ recurrence }, "schedule")}
 							disabled={locked}
 							compact
@@ -309,16 +306,15 @@ export function MoreOptions({
 }
 
 /**
- * Schedule cadence stated only for recurring rules: one-time transactions
- * need no label. The sentence is always the same elements: recurrence
- * sentence, date controls, and the growth note.
+ * Schedule dates for recurring rules: one-time transactions need no card.
+ * The card holds the date controls only; the cadence lives in the options
+ * below and is never restated here.
  */
 export function ScheduleCapsule({
 	savedTransaction,
 	draft,
 	updateDraft,
 	claimScheduleName,
-	scheduleCadence,
 	locked,
 	scheduleControlId,
 	controlRef,
@@ -329,8 +325,6 @@ export function ScheduleCapsule({
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	claimScheduleName?: string | null;
-	/** Stored cadence from the raw rule, shown while it loads. */
-	scheduleCadence?: string | null;
 	locked: boolean;
 	/** DOM id for the first schedule control. */
 	scheduleControlId?: string;
@@ -373,14 +367,6 @@ export function ScheduleCapsule({
 			</div>
 		);
 	}
-	const annualIncrease = Number(draft.annualIncrease) || 0;
-	const growth =
-		annualIncrease === 0
-			? null
-			: ` · ${annualIncrease > 0 ? "+" : ""}${annualIncrease}% yearly`;
-	const sentence = draft.recurrence
-		? recurrenceSentence(draft.recurrence, draft.startDate)
-		: null;
 	return (
 		<Card size="sm" className="mt-5">
 			<CardHeader>
@@ -388,10 +374,6 @@ export function ScheduleCapsule({
 					<Repeat size={16} aria-hidden="true" />
 					Recurring schedule
 				</CardTitle>
-				<CardDescription>
-					{sentence ?? scheduleCadence ?? "Recurring schedule"}
-					{growth}
-				</CardDescription>
 				{savedTransaction.enabled === false && (
 					<CardAction>
 						<Badge variant="secondary">Excluded</Badge>

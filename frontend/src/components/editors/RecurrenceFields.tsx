@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { dateLabel, isIsoDate } from "../../domain/format.ts";
+import { isIsoDate } from "../../domain/format.ts";
 import {
 	dayOfMonthOfIsoDate,
 	monthAnchorOfStartDate,
-	previewNextOccurrences,
-	recurrenceSentence,
 	validateRecurrence,
 	weekdayOfIsoDate,
 	WEEKDAY_TOGGLE_LABELS,
@@ -50,7 +48,6 @@ const NTH_WORDS = ["first", "second", "third", "fourth", "fifth"] as const;
 export function RecurrenceFields({
 	recurrence,
 	startDate,
-	endDate,
 	onChange,
 	disabled,
 	compact,
@@ -58,7 +55,6 @@ export function RecurrenceFields({
 }: {
 	recurrence: Recurrence;
 	startDate: string;
-	endDate?: string | null;
 	onChange: (next: Recurrence) => void;
 	disabled?: boolean;
 	/** Tighter spacing for the in-place editor. */
@@ -88,7 +84,6 @@ export function RecurrenceFields({
 	const unitId = `${idPrefix}-unit`;
 	const repeatOnHintId = `${idPrefix}-repeat-on-hint`;
 	const monthlyHintId = `${idPrefix}-monthly-hint`;
-	const previewId = `${idPrefix}-preview`;
 
 	const changeUnit = (unit: RecurrenceUnit) => {
 		if (unit === recurrence.unit) return;
@@ -136,14 +131,9 @@ export function RecurrenceFields({
 	};
 
 	const invalid = validateRecurrence(recurrence, startDate);
-	const summary =
-		intervalError ?? invalid ?? recurrenceSentence(recurrence, startDate);
-	const preview = previewNextOccurrences({
-		startDate,
-		recurrence,
-		endDate: endDate ?? null,
-		count: 5,
-	});
+	// The controls state the cadence outright, so only validation errors
+	// get a live summary line; the sentence and date preview are gone.
+	const error = intervalError ?? invalid;
 	const dayOfMonth = isIsoDate(startDate)
 		? dayOfMonthOfIsoDate(startDate)
 		: null;
@@ -245,7 +235,9 @@ export function RecurrenceFields({
 					<RadioGroup
 						value={recurrence.monthlyMode ?? "byDate"}
 						disabled={disabled}
-						aria-describedby={monthlyHintId}
+						aria-describedby={
+							dayOfMonth !== null && dayOfMonth > 28 ? monthlyHintId : undefined
+						}
 						onValueChange={(value) => {
 							const parsed = parseUnion(value, [
 								"byDate",
@@ -275,28 +267,18 @@ export function RecurrenceFields({
 							</FieldLabel>
 						</Field>
 					</RadioGroup>
-					<FieldDescription id={monthlyHintId}>
-						{dayOfMonth !== null && dayOfMonth > 28
-							? "Months without that day use the last day."
-							: "Anchored on the first occurrence."}
-					</FieldDescription>
+					{dayOfMonth !== null && dayOfMonth > 28 && (
+						<FieldDescription id={monthlyHintId}>
+							Months without that day use the last day.
+						</FieldDescription>
+					)}
 				</FieldSet>
 			)}
-			<div aria-live="polite">
-				<p id={previewId} className="m-0 text-sm">
-					{summary}
-				</p>
-				{!intervalError && !invalid && preview.length > 0 && (
-					<p className="m-0 mt-1 text-xs text-muted-foreground">
-						Next: {preview.map((date) => dateLabel(date, true)).join(" · ")}
-					</p>
-				)}
-				{!intervalError && !invalid && preview.length === 0 && (
-					<p className="m-0 mt-1 text-xs text-muted-foreground">
-						No upcoming dates.
-					</p>
-				)}
-			</div>
+			{error !== null && (
+				<div aria-live="polite">
+					<p className="m-0 text-sm text-destructive">{error}</p>
+				</div>
+			)}
 		</div>
 	);
 }

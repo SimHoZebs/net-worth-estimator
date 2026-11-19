@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
 	ensureStartWeekday,
 	monthlyNthWeekdayDate,
-	previewNextOccurrences,
 	recurrenceEqual,
 	recurrenceFromFrequency,
 	recurrenceFromScheduleLike,
@@ -219,16 +218,6 @@ describe("recurrence expansion", () => {
 				last: true,
 			}),
 		).toBe("2026-02-23");
-	});
-	it("previews the next dates for the dialog", () => {
-		expect(
-			previewNextOccurrences({
-				startDate: "2026-01-15",
-				recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
-				endDate: null,
-				count: 3,
-			}),
-		).toEqual(["2026-01-15", "2026-02-15", "2026-03-15"]);
 	});
 });
 

@@ -24,7 +24,6 @@ import { getUserScope } from "@/auth/resourceScope.ts";
 import { AccountIconFallback } from "./AccountIconFallback.tsx";
 import {
 	recurrenceFromScheduleLike,
-	recurrenceSentence,
 	type Recurrence,
 } from "../../domain/recurrence.ts";
 import {
@@ -560,10 +559,6 @@ export function TransactionDetail({
 	const storedRecurrence = rawSchedule
 		? (recurrenceFromScheduleLike(rawSchedule) ?? undefined)
 		: undefined;
-	const scheduleCadence =
-		rawSchedule && storedRecurrence
-			? recurrenceSentence(storedRecurrence, rawSchedule.startDate)
-			: null;
 	const edit = useTransactionEdit({
 		savedTransaction,
 		readOnly,
@@ -1259,7 +1254,6 @@ export function TransactionDetail({
 											)?.name ?? claimScheduleName)
 										: null
 								}
-								scheduleCadence={scheduleCadence}
 								occurrenceOptions={occurrenceOptions}
 								locked={!canEdit}
 								scheduleControlId={`${edit.formId}-schedule`}
@@ -1338,14 +1332,10 @@ export function TransactionDetail({
 								type="button"
 								variant="link"
 								onClick={scrollToSchedule}
-								aria-label={
-									scheduleCadence
-										? `Recurring schedule: ${scheduleCadence}. Go to schedule`
-										: "Recurring schedule. Go to schedule"
-								}
+								aria-label="Recurring schedule. Go to schedule"
 							>
 								<Repeat size={14} aria-hidden="true" />
-								<span>{scheduleCadence ?? "Recurring schedule"}</span>
+								<span>Recurring schedule</span>
 							</Button>
 						)}
 						{once && (
