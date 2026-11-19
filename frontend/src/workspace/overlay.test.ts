@@ -224,18 +224,18 @@ describe("resolveOverlay", () => {
 			resolveOverlay(validate({ detail: "safe-spending" }), model),
 		).toEqual({
 			state: "ready",
-			overlay: { kind: "safeSpendingDetail", tab: "transactions", edit: null },
+			overlay: { kind: "safeSpendingDetail", tab: "ledger", edit: null },
 		});
 		expect(
 			resolveOverlay(
-				validate({ detail: "safe-spending", tab: "transactions" }),
+				validate({ detail: "safe-spending", tab: "ledger" }),
 				model,
 			),
 		).toEqual({
 			state: "ready",
 			overlay: {
 				kind: "safeSpendingDetail",
-				tab: "transactions",
+				tab: "ledger",
 				edit: null,
 			},
 		});
@@ -255,7 +255,7 @@ describe("resolveOverlay", () => {
 			resolveOverlay(
 				validate({
 					detail: "safe-spending",
-					tab: "transactions",
+					tab: "ledger",
 					editTransaction: "invest",
 				}),
 				model,
@@ -264,7 +264,7 @@ describe("resolveOverlay", () => {
 			state: "ready",
 			overlay: {
 				kind: "safeSpendingDetail",
-				tab: "transactions",
+				tab: "ledger",
 				edit: { kind: "transaction", item: investTransaction },
 			},
 		});
@@ -272,7 +272,7 @@ describe("resolveOverlay", () => {
 			resolveOverlay(
 				validate({
 					detail: "safe-spending",
-					tab: "transactions",
+					tab: "ledger",
 					editTransaction: "missing",
 				}),
 				model,
@@ -347,22 +347,22 @@ describe("search builders", () => {
 	});
 
 	test("safe spending detail round-trips through resolve", () => {
-		expect(safeSpendingDetailSearch("transactions")).toEqual({
+		expect(safeSpendingDetailSearch("ledger")).toEqual({
 			detail: "safe-spending",
-			tab: "transactions",
+			tab: "ledger",
 		});
-		expect(safeSpendingDetailSearch("transactions", "invest")).toEqual({
+		expect(safeSpendingDetailSearch("ledger", "invest")).toEqual({
 			detail: "safe-spending",
-			tab: "transactions",
+			tab: "ledger",
 			editTransaction: "invest",
 		});
 		expect(
-			resolveOverlay(safeSpendingDetailSearch("transactions", "invest"), model),
+			resolveOverlay(safeSpendingDetailSearch("ledger", "invest"), model),
 		).toEqual({
 			state: "ready",
 			overlay: {
 				kind: "safeSpendingDetail",
-				tab: "transactions",
+				tab: "ledger",
 				edit: { kind: "transaction", item: investTransaction },
 			},
 		});

@@ -12,7 +12,7 @@ import {
 	toggleEffectiveId,
 } from "@/domain/safeSpendingSelection.ts";
 import { incomeSourceCandidates } from "@/domain/safeSpendingIncome.ts";
-import type { TotalCycleSettings } from "@/state/useSafeSpendingSettings.ts";
+import type { SafeSpendingSettings } from "@/api/contracts.ts";
 
 /**
  * The one place that resolves and toggles the four user selections behind
@@ -31,9 +31,9 @@ export function useSafeSpendingSelections({
 	accounts: Account[];
 	rules: Transaction[];
 	savedRules: Schedule[];
-	settings: TotalCycleSettings;
+	settings: SafeSpendingSettings;
 	displayToday: string;
-	updateSettings: (next: Partial<TotalCycleSettings>) => void;
+	updateSettings: (next: Partial<SafeSpendingSettings>) => void;
 }) {
 	const { accountIds, spendingAccountIds, transactionIds, incomeScheduleIds } =
 		settings;

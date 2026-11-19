@@ -623,6 +623,14 @@ func validateAccountBounds(issues *[]types.ModelValidationIssue, accounts []type
 				fmt.Sprintf("minBalance (%v) must not exceed maxBalance (%v).", formatBound(account.MinBalanceValue()), formatBound(account.MaxBalanceValue())),
 				[]any{"accounts", index}...)
 		}
+		// Zero is the Go zero value for callers that build an Account outside
+		// the API or a store read; it means the default 19. Other out-of-range
+		// values are real errors.
+		if day := account.StatementClosingDay; day < 0 || day > 31 {
+			addIssue(issues, types.SeverityError, "account.statementClosingDay.invalid",
+				fmt.Sprintf("Account '%s' needs a statement closing day between 1 and 31.", account.ID),
+				[]any{"accounts", index, "statementClosingDay"}...)
+		}
 	}
 }
 

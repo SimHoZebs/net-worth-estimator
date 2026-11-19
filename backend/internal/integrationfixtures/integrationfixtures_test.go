@@ -53,11 +53,27 @@ func TestSafeSpendingPackSeedsSettings(t *testing.T) {
 	if settings == nil {
 		t.Fatal("safe-spending settings were not seeded")
 	}
-	if settings.StatementDay != 20 || settings.Reserve != 725 {
-		t.Fatalf("settings = %+v, want statement day 20 and reserve 725", settings)
+	if settings.Reserve != 725 {
+		t.Fatalf("settings = %+v, want reserve 725", settings)
 	}
 	if len(settings.IncomeScheduleIDs) != 2 {
 		t.Fatalf("income schedule ids = %v, want salary and partner schedule", settings.IncomeScheduleIDs)
+	}
+	model, err := scoped.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, account := range model.Accounts {
+		if account.ID == "loan" {
+			found = true
+			if account.StatementClosingDay != 19 {
+				t.Fatalf("statement closing day = %d, want 19", account.StatementClosingDay)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("seeded model has no debt account")
 	}
 	if pack.AnchorDate() != "2026-01-31" {
 		t.Fatalf("anchor date = %q, want 2026-01-31", pack.AnchorDate())

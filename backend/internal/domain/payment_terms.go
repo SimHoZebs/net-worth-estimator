@@ -59,11 +59,6 @@ func validatePaymentTerms(issues *[]types.ModelValidationIssue, model *types.Fin
 				fmt.Sprintf("Payment terms for '%s' need a due day between 1 and 28.", terms.AccountID),
 				append(path, "dueDay")...)
 		}
-		if terms.StatementDay != nil && (*terms.StatementDay < 1 || *terms.StatementDay > 28) {
-			addIssue(issues, types.SeverityError, "terms.statementDay.invalid",
-				fmt.Sprintf("Payment terms for '%s' need a statement day between 1 and 28.", terms.AccountID),
-				append(path, "statementDay")...)
-		}
 	}
 }
 

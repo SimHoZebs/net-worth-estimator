@@ -176,6 +176,61 @@ func TestLinkedLoanNameEditPreservesExactRuleAmounts(t *testing.T) {
 	}
 }
 
+func TestLoanEditsPreserveStatementClosingDay(t *testing.T) {
+	st := openAPIStore(t)
+	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	h := New(st, Config{})
+	created := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPost, "/v1/loans", loanBody))
+	model, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.Accounts) != 3 {
+		t.Fatalf("accounts = %d, want checking and two loan components", len(model.Accounts))
+	}
+	for i, day := range []int{27, 31} {
+		model.Accounts[i+1].StatementClosingDay = day
+	}
+	if _, err := st.ImportModel(model); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := st.LoadModel()
+	var body map[string]any
+	if err := json.Unmarshal([]byte(loanBody), &body); err != nil {
+		t.Fatal(err)
+	}
+	body["name"], body["recordBalances"] = "Renamed loan", false
+	data, _ := json.Marshal(body)
+	updated := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPut, "/v1/loans/"+created.Result.ID, string(data)))
+	if !updated.Saved {
+		t.Fatalf("name edit failed: %+v", updated)
+	}
+	after, _ := st.LoadModel()
+	for i := 1; i < 3; i++ {
+		if after.Accounts[i].StatementClosingDay != before.Accounts[i].StatementClosingDay {
+			t.Fatalf("component %d closing day = %d, want %d", i, after.Accounts[i].StatementClosingDay, before.Accounts[i].StatementClosingDay)
+		}
+	}
+
+	legacy, err := st.CreateAccount(types.Account{Name: "Legacy card", Kind: types.AccountKindDebt, Enabled: true, StatementClosingDay: 28})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adoptBody := `{"name":"Adopted","principal":5000,"accruedInterest":0,"observedAt":1784073599,"recordBalances":false,"annualRate":0,"interestFrequency":"monthly","interestStartDate":"2026-08-13","payment":0,"paymentFrequency":"monthly","paymentStartDate":"2026-08-13","fundingAccountId":"checking","enabled":true}`
+	adopted := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPut, "/v1/loans/"+legacy.ID, adoptBody))
+	if !adopted.Saved {
+		t.Fatalf("adoption failed: %+v", adopted)
+	}
+	after, _ = st.LoadModel()
+	for _, account := range after.Accounts {
+		if account.ID == legacy.ID && account.StatementClosingDay != 28 {
+			t.Fatalf("adoption reset closing day to %d, want 28", account.StatementClosingDay)
+		}
+	}
+}
+
 func TestSingleDebtViaAccountsIsRejected(t *testing.T) {
 	st := openAPIStore(t)
 	h := New(st, Config{})

@@ -82,6 +82,9 @@ export const accountSchema = z.object({
 	// figure above; posted is the posted (observed) balance. The modeled
 	// balance stays the net-worth and projection authority either way.
 	displayBasis: z.enum(["available", "posted"]).default("available"),
+	// Authoritative statement closing day for this account, independent of
+	// optional payment terms. Day 31 means the last day of a shorter month.
+	statementClosingDay: z.number().int().min(1).max(31).optional(),
 });
 
 export const plannedPurchaseSchema = z.object({

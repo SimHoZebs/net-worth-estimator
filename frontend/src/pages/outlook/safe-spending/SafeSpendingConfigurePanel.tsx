@@ -4,8 +4,7 @@ import { Field, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import type { Account, Transaction } from "../../../domain/model.ts";
-import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
-import { clampStatementDay } from "../../../state/useSafeSpendingSettings.ts";
+import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import type {
 	BillCandidate,
 	SafeSpendingConfigHints,
@@ -36,32 +35,15 @@ export function SafeSpendingConfigurePanel({
 	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
-	onUpdateConfig: (next: Partial<TotalCycleSettings>) => void;
+	onUpdateConfig: (next: Partial<SafeSpendingSettings>) => void;
 }) {
 	const accountsById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
-	const cycleStartId = useId();
 	const reserveId = useId();
 	return (
 		<div className="grid content-start gap-3">
-			<Field>
-				<Label htmlFor={cycleStartId}>{`${labels.cycleStart} (1–28)`}</Label>
-				<Input
-					id={cycleStartId}
-					type="number"
-					min={1}
-					max={28}
-					value={config.statementDay}
-					onChange={(event) =>
-						onUpdateConfig({
-							statementDay: clampStatementDay(event.target.value),
-							statementDaySet: true,
-						})
-					}
-				/>
-			</Field>
 			<Field>
 				<Label htmlFor={reserveId}>{`${labels.reserve} ($)`}</Label>
 				<Input

@@ -1,21 +1,34 @@
 package types
 
-// SafeSpendingSummary is a factual cash cut plus conditional outstanding bills.
-// It is not a projection: future income and simulated fulfillment never enter it.
+// SafeSpendingSummary combines observed cash with obligations through the next selected payday.
 type SafeSpendingSummary struct {
-	Revision              string                 `json:"revision"`
-	Start                 string                 `json:"start"`
-	End                   string                 `json:"end"`
-	CashAsOf              string                 `json:"cashAsOf" doc:"UTC calendar date of the cash evidence cut"`
-	Status                string                 `json:"status"`
-	Reasons               []string               `json:"reasons"`
-	SelectedAccountIDs    []string               `json:"selectedAccountIds"`
-	Baselines             []SafeSpendingBaseline `json:"baselines"`
-	CheckingAvailable     *float64               `json:"checkingAvailable"`
-	ConfirmedMovements    []SafeSpendingMovement `json:"confirmedMovements"`
-	Bills                 []SafeSpendingBill     `json:"bills"`
-	OutstandingBillsTotal *float64               `json:"outstandingBillsTotal"`
-	CashAfterBills        *float64               `json:"cashAfterBills"`
+	Revision           string                  `json:"revision"`
+	CashAsOf           string                  `json:"cashAsOf" doc:"UTC calendar date of the cash evidence cut"`
+	Status             string                  `json:"status"`
+	Reasons            []string                `json:"reasons"`
+	SelectedAccountIDs []string                `json:"selectedAccountIds"`
+	Baselines          []SafeSpendingBaseline  `json:"baselines"`
+	CheckingAvailable  *float64                `json:"checkingAvailable"`
+	ConfirmedMovements []SafeSpendingMovement  `json:"confirmedMovements"`
+	Bills              []SafeSpendingBill      `json:"bills"`
+	Payday             *string                 `json:"payday"`
+	ExpectedPay        *float64                `json:"expectedPay"`
+	PrePaydayBills     *float64                `json:"prePaydayBills"`
+	PaydayBills        *float64                `json:"paydayBills"`
+	StatementReserve   *float64                `json:"statementReserve"`
+	Reserve            float64                 `json:"reserve"`
+	PrePaydayRoom      *float64                `json:"prePaydayRoom"`
+	PostIncomeRoom     *float64                `json:"postIncomeRoom"`
+	SafeToSpend        *float64                `json:"safeToSpend"`
+	Statements         []SafeSpendingStatement `json:"statements"`
+}
+
+type SafeSpendingStatement struct {
+	AccountID   string   `json:"accountId"`
+	Name        string   `json:"name"`
+	ClosingDate string   `json:"closingDate"`
+	Kind        string   `json:"kind" enum:"closed,estimated"`
+	Amount      *float64 `json:"amount"`
 }
 
 type SafeSpendingBaseline struct {

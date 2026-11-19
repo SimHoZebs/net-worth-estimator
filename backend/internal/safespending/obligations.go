@@ -111,7 +111,7 @@ func (a *amounts) record(tx types.Transaction, value float64) {
 
 // Expand selected schedules first so claims enrich the same occurrence identity,
 // even when a payment posts outside the cycle or for a different amount.
-func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts, cut int64) {
+func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts, cut int64, start, end string) *float64 {
 	claims := map[types.TransactionClaim]*types.Transaction{}
 	for i := range model.Transactions {
 		tx := &model.Transactions[i]
@@ -122,7 +122,7 @@ func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel,
 	schedules := effectiveBills(model.Schedules, selected, settings.TransactionIDs)
 	total := 0.0
 	exact := true
-	for date, occurrences := range domain.ResolveOccurrences(schedules, nil, s.Start, s.End, true).ByDate {
+	for date, occurrences := range domain.ResolveOccurrences(schedules, nil, start, end, true).ByDate {
 		for _, o := range occurrences {
 			row, cause := billEvidence(o, date, claims[types.TransactionClaim{ScheduleID: o.Rule.ID, OccurrenceDate: date}], selected, observations, ctx)
 			if cause != "" {
@@ -144,8 +144,9 @@ func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel,
 	})
 	sort.Strings(s.Reasons)
 	if exact {
-		s.OutstandingBillsTotal = money(total)
+		return money(total)
 	}
+	return nil
 }
 
 func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types.Transaction, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts) (*types.SafeSpendingBill, string) {

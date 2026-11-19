@@ -28,12 +28,11 @@ func termsCodes(issues []types.ModelValidationIssue) map[string]bool {
 }
 
 func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
-	statementDay := 15
 	percent := 0.02
 	model := termsModel()
 	model.PaymentTerms = []types.PaymentTerms{{
 		AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent,
-		DueDay: 10, StatementDay: &statementDay,
+		DueDay: 10,
 	}}
 	checking := "checking"
 	model.Transactions = []types.Transaction{}
@@ -54,7 +53,6 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 }
 
 func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
-	statementDay := 99
 	percent := 2.0
 	cases := []struct {
 		name  string
@@ -71,7 +69,6 @@ func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
 		{"percent over one", []types.PaymentTerms{{AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent, DueDay: 10}}, "terms.minimum.invalid"},
 		{"due day zero", []types.PaymentTerms{{AccountID: "prime_card", MinimumFixed: 25, DueDay: 0}}, "terms.dueDay.invalid"},
 		{"due day 29", []types.PaymentTerms{{AccountID: "prime_card", MinimumFixed: 25, DueDay: 29}}, "terms.dueDay.invalid"},
-		{"statement day 99", []types.PaymentTerms{{AccountID: "prime_card", MinimumFixed: 25, DueDay: 10, StatementDay: &statementDay}}, "terms.statementDay.invalid"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -90,6 +87,26 @@ func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
 				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(model))
 			}
 		})
+	}
+}
+
+func TestValidateAccountAcceptsMonthEndClosingDay(t *testing.T) {
+	model := termsModel()
+	model.Accounts[0].StatementClosingDay = 31
+	for _, issue := range ValidateFinancialModel(model) {
+		if issue.Code == "account.statementClosingDay.invalid" {
+			t.Fatalf("day 31 must be a valid month-end closing day: %+v", issue)
+		}
+	}
+}
+
+func TestValidateAccountRejectsBadClosingDay(t *testing.T) {
+	for _, day := range []int{-1, 32, 99} {
+		model := termsModel()
+		model.Accounts[0].StatementClosingDay = day
+		if !termsCodes(ValidateFinancialModel(model))["account.statementClosingDay.invalid"] {
+			t.Fatalf("closing day %d must be rejected", day)
+		}
 	}
 }
 

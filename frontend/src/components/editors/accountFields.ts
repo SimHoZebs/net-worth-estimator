@@ -31,6 +31,7 @@ export interface AccountEditValues {
 	minBalance: number;
 	maxBalance: number | null;
 	noCeiling: boolean;
+	statementClosingDay: number;
 }
 
 /**
@@ -63,6 +64,7 @@ export function accountUpdateBody({
 		kind: values.kind,
 		enabled: values.enabled,
 		displayBasis: values.displayBasis,
+		statementClosingDay: values.statementClosingDay,
 		...(minEdited
 			? { minBalance: values.minBalance }
 			: rawMin != null

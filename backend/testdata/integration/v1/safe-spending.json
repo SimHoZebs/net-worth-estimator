@@ -74,6 +74,7 @@
             "id": "loan",
             "name": "Student loan",
             "kind": "debt",
+            "statementClosingDay": 19,
             "minBalance": null,
             "maxBalance": 0,
             "color": "#8a4b2b",
@@ -335,7 +336,6 @@
     {
       "kind": "settings",
       "settings": {
-        "statementDay": 20,
         "reserve": 725,
         "accountIds": null,
         "spendingAccountIds": null,
@@ -343,8 +343,7 @@
           "salary",
           "partner-income"
         ],
-        "transactionIds": null,
-        "statementDaySet": false
+        "transactionIds": null
       }
     }
   ]

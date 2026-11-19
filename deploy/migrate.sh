@@ -115,7 +115,7 @@ check_base_columns() {
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
   SELECT user_id, id, source_path, document_present FROM model_metadata LIMIT 0;
-  SELECT user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms LIMIT 0;
+  SELECT user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day FROM payment_terms LIMIT 0;
   SELECT user_id, id, kind FROM entity_ids LIMIT 0;
   SELECT user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at FROM account_links LIMIT 0;
   SELECT user_id, instance_id, position FROM pinned_evaluations LIMIT 0;
@@ -147,7 +147,7 @@ check_base_columns_legacy() {
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
   SELECT user_id, id, source_path, document_present FROM model_metadata LIMIT 0;
-  SELECT user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms LIMIT 0;
+  SELECT user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day FROM payment_terms LIMIT 0;
   SELECT user_id, id, kind FROM entity_ids LIMIT 0;
   SELECT user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at FROM account_links LIMIT 0;
   SELECT user_id, instance_id, position FROM pinned_evaluations LIMIT 0;
@@ -381,6 +381,24 @@ available_state() {
   echo 1
 }
 
+# Statement closing day is one authoritative account property. Legacy sources
+# carry payment_terms.statement_day with no marker; converted sources carry
+# accounts.statement_closing_day and the marker. Exactly one source column must
+# exist and the marker must agree with it.
+statement_closing_state() {
+  legacy=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('payment_terms') WHERE name = 'statement_day';") \
+    || fail "Cannot inspect payment terms statement-day column; refusing to guess."
+  current=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name = 'statement_closing_day';") \
+    || fail "Cannot inspect accounts closing-day column; refusing to guess."
+  marked=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM schema_migrations WHERE name = 'statement-closing-day-v1';") \
+    || fail "Cannot inspect statement closing day marker; refusing to guess."
+  case "$legacy:$current:$marked" in
+    1:0:0) echo legacy ;;
+    0:1:1) echo current ;;
+    *) fail "Inconsistent statement closing day shape ($legacy,$current,$marked); refusing automatic repair." ;;
+  esac
+}
+
 cp_cols() {
   sqlite3 -readonly "$1" "SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('checkpoints') ORDER BY cid LIMIT -1);"
 }
@@ -492,6 +510,7 @@ institution_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_i
   || fail "Cannot inspect account_links institution column."
 basis_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';") \
   || fail "Cannot inspect accounts display_basis column."
+statement_closing=$(statement_closing_state "$db") || fail "Cannot inspect statement closing day shape."
 transactions_split=0
 if [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_sim';")" = 1 ] && \
    [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'destination_account_ids';")" = 1 ]; then
@@ -546,7 +565,7 @@ fi
 # one and a failed dry run falls through to the full path instead of stranding
 # the window. The full path provisions the candidate and keeps a verified
 # backup either way.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -588,6 +607,13 @@ cp "$before" "$candidate" || fail "Cannot stage the migration candidate."
 if ! upgrade-transaction-sim-split --db "$candidate" > "$backup/transaction-sim.log" 2>&1; then
   printf 'migrate: transaction split failed: %s\n' "$(cat "$backup/transaction-sim.log")" >&2
   fail "Candidate transaction split failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+# Reconcile the retired household cycle start into one per-card statement
+# closing day. The tool no-ops on an already-converted candidate and fails
+# closed on unknown shapes before setupdb validates the candidate.
+if ! upgrade-statement-closing-day --db "$candidate" > "$backup/statement-closing-day.log" 2>&1; then
+  printf 'migrate: statement closing day upgrade failed: %s\n' "$(cat "$backup/statement-closing-day.log")" >&2
+  fail "Candidate statement closing day upgrade failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 # Convert legacy checkpoints and repair settled bank rows inside the
 # candidate only. Every postcondition is an assertion row: a violated
@@ -1121,6 +1147,62 @@ verify_same() {
   test "$changed" = 0
 }
 
+# Accounts, payment terms and safe-spending settings are the tables this body
+# edits for the closing-day reconciliation, so the generic byte-identical check
+# does not apply to them. Every account keeps its identity and profile; an
+# authored card statement day carries straight over, and every other account
+# (including cards with no terms) gets the household-derived day or 19.
+verify_statement_closing_day() {
+  if [ "$statement_closing" = current ]; then
+    verify_same accounts || return 1
+    verify_same payment_terms || return 1
+    verify_same safe_spending_settings || return 1
+    return 0
+  fi
+  sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT (SELECT COUNT(*) FROM main.accounts) != (SELECT COUNT(*) FROM before.accounts)
+      OR EXISTS(
+        SELECT 1 FROM before.accounts o
+        LEFT JOIN before.safe_spending_settings s ON s.user_id = o.user_id AND s.id = 1
+        WHERE NOT EXISTS (
+          SELECT 1 FROM main.accounts n
+          WHERE n.user_id = o.user_id AND n.id = o.id
+            AND n.position IS o.position AND n.name IS o.name AND n.kind IS o.kind
+            AND n.min_balance IS o.min_balance AND n.max_balance IS o.max_balance
+            AND n.color IS o.color AND n.display_basis IS o.display_basis AND n.enabled IS o.enabled
+            AND n.statement_closing_day = CASE
+              WHEN EXISTS(SELECT 1 FROM before.payment_terms t
+                WHERE t.user_id = o.user_id AND t.model_account_id = o.id AND t.statement_day IS NOT NULL)
+                THEN (SELECT t.statement_day FROM before.payment_terms t
+                  WHERE t.user_id = o.user_id AND t.model_account_id = o.id AND t.statement_day IS NOT NULL LIMIT 1)
+              WHEN COALESCE(json_extract(s.settings_json, '\$.statementDaySet'), 0) = 1
+                THEN CASE COALESCE(json_extract(s.settings_json, '\$.statementDay'), 20)
+                  WHEN 1 THEN 31 ELSE COALESCE(json_extract(s.settings_json, '\$.statementDay'), 20) - 1 END
+              ELSE 19 END
+        )
+      );" || return 1
+  sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT (SELECT COUNT(*) FROM main.payment_terms) != (SELECT COUNT(*) FROM before.payment_terms)
+      OR (SELECT COUNT(*) FROM pragma_table_info('payment_terms') WHERE name = 'statement_day') != 0
+      OR EXISTS(
+        SELECT 1 FROM before.payment_terms o
+        WHERE NOT EXISTS (SELECT 1 FROM main.payment_terms n
+          WHERE n.user_id = o.user_id AND n.model_account_id = o.model_account_id
+            AND n.position IS o.position AND n.minimum_fixed IS o.minimum_fixed
+            AND n.minimum_percent IS o.minimum_percent AND n.due_day IS o.due_day)
+      );" || return 1
+  sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT (SELECT COUNT(*) FROM main.safe_spending_settings) != (SELECT COUNT(*) FROM before.safe_spending_settings)
+      OR EXISTS(SELECT 1 FROM main.safe_spending_settings
+        WHERE settings_json LIKE '%\"statementDay\"%' OR settings_json LIKE '%\"statementDaySet\"%')
+      OR EXISTS(
+        SELECT 1 FROM before.safe_spending_settings o
+        WHERE NOT EXISTS (SELECT 1 FROM main.safe_spending_settings n
+          WHERE n.user_id = o.user_id AND n.id = o.id
+            AND json_extract(n.settings_json, '\$.reserve') IS json_extract(o.settings_json, '\$.reserve'))
+      );" || return 1
+}
+
 verify_simplefin_keys() {
   sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
     SELECT (SELECT COUNT(*) FROM main.account_links) != (SELECT COUNT(*) FROM before.account_links)
@@ -1151,12 +1233,13 @@ verify_simplefin_keys() {
   fi
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays','recurrence_rules') ORDER BY name;") \
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays','recurrence_rules','accounts','payment_terms','safe_spending_settings') ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
   verify_same "$table" || fail "Candidate changed preserved table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
 done
+verify_statement_closing_day || fail "Candidate statement closing day verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 
 # Schedule frequencies convert to recurrences, so the generic byte-identical
 # check cannot apply to that table on a legacy source. Every preexisting rule

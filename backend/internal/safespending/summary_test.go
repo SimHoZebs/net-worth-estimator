@@ -13,10 +13,32 @@ import (
 const testEnd = "2026-11-30"
 
 // These fixtures observe cash on the first day unless a test specifies an instant.
-func Build(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string) types.SafeSpendingSummary {
-	return BuildAtCut(model, settings, start, end, domain.DayCloseUnix(start))
+func Build(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string) testEvidence {
+	return buildEvidence(model, settings, start, end, domain.DayCloseUnix(start))
 }
 
+type testEvidence struct {
+	types.SafeSpendingSummary
+	Start, End                            string
+	OutstandingBillsTotal, CashAfterBills *float64
+}
+
+func buildEvidence(m *types.FinancialModel, c *types.SafeSpendingSettings, start, end string, cut int64) testEvidence {
+	if c == nil {
+		c = &types.SafeSpendingSettings{}
+	}
+	if m == nil {
+		m = &types.FinancialModel{}
+	}
+	st := cashEvidence(m, c, cut)
+	total := buildObligations(st.s, m, c, st.selected, st.latest, st.ctx, cut, start, end)
+	st.gateStatus()
+	out := testEvidence{SafeSpendingSummary: *st.s, Start: start, End: end, OutstandingBillsTotal: total}
+	if total != nil && st.s.CheckingAvailable != nil {
+		out.CashAfterBills = money(*st.s.CheckingAvailable - *total)
+	}
+	return out
+}
 func stamp(day string) int64 { v, _ := time.Parse(time.RFC3339, day); return v.Unix() }
 func ptr[T any](v T) *T      { return &v }
 func fixed(v float64) types.TransactionAmountResolution {

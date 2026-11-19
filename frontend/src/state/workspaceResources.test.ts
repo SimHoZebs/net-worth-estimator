@@ -159,7 +159,6 @@ describe("direct Query ownership", () => {
 					minimumFixed: 25,
 					minimumPercent: 0.02,
 					dueDay: 15,
-					statementDay: 20,
 				},
 			],
 		});
@@ -172,7 +171,6 @@ describe("direct Query ownership", () => {
 			minimumFixed: 25,
 			minimumPercent: 0.02,
 			dueDay: 15,
-			statementDay: 20,
 		});
 		expect(getPaymentTermsForAccount("checking")).toBeNull();
 	});

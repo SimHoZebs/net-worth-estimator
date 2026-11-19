@@ -75,7 +75,7 @@ export async function run(values, positionals) {
     DEMO_PACK: pack,
   };
   console.log(
-    `demo: pack=${pack} anchor=${anchor} ui=http://127.0.0.1:${frontendPort}/#outlook/safe-spending-detail/cycle`,
+    `demo: pack=${pack} anchor=${anchor} ui=http://127.0.0.1:${frontendPort}/outlook`,
   );
   const child = spawn(
     "bunx",

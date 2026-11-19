@@ -16,79 +16,64 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("safe spending summary query", () => {
-	it("uses the generated scoped no-store transport with explicit inclusive ranges", async () => {
+	it("uses the scoped no-store transport with no cycle query", async () => {
 		const server = stubTestServer();
-		const body = { revision: "synthetic", cashAfterBills: -216.58 };
+		const body = { revision: "synthetic", safeToSpend: 200 };
 		const fetcher = vi.fn(async () => server.ok(body));
 		vi.stubGlobal("fetch", fetcher);
 		const cache = serverQueryClient();
 		expect(
-			await cache.fetchQuery(
-				safeSpendingSummaryOptions("2026-11-15", "2026-11-30", ["synthetic"]),
-			),
+			await cache.fetchQuery(safeSpendingSummaryOptions(["synthetic"])),
 		).toEqual(body);
-		await cache.fetchQuery(
-			safeSpendingSummaryOptions("2026-10-19", "2026-10-19", ["synthetic"]),
-		);
 		expect(fetcher).toHaveBeenCalledWith(
-			"/v1/safe-spending-summary?start=2026-11-15&end=2026-11-30",
+			"/v1/safe-spending-summary",
 			expect.objectContaining({
 				cache: "no-store",
 				signal: expect.any(AbortSignal),
 			}),
 		);
-		expect(fetcher).toHaveBeenCalledWith(
-			"/v1/safe-spending-summary?start=2026-10-19&end=2026-10-19",
-			expect.objectContaining({ cache: "no-store" }),
-		);
 	});
-	it("separates summaries by model revision, range, and selected settings", () => {
-		const current = safeSpendingSummaryOptions("2026-11-15", "2026-11-30", [
-			"revision-a",
-		]);
+
+	it("separates summaries by model revision and selected settings", () => {
+		const current = safeSpendingSummaryOptions(["revision-a"]);
 		expect(current.queryKey).not.toEqual(
-			safeSpendingSummaryOptions("2026-11-15", "2026-11-30", ["revision-b"])
-				.queryKey,
-		);
-		expect(current.queryKey).not.toEqual(
-			safeSpendingSummaryOptions("2026-11-15", "2026-11-15", ["revision-a"])
-				.queryKey,
-		);
-		expect(current.queryKey).not.toEqual(
-			safeSpendingSummaryOptions("2026-11-16", "2026-11-30", ["revision-a"])
-				.queryKey,
+			safeSpendingSummaryOptions(["revision-b"]).queryKey,
 		);
 		serverQueryClient().setQueryData(safeSpendingSettingsKey(), {
 			...defaultSafeSpendingSettings(),
 			spendingAccountIds: ["other-cash"],
 		});
 		expect(current.queryKey).not.toEqual(
-			safeSpendingSummaryOptions("2026-11-15", "2026-11-30", ["revision-a"])
-				.queryKey,
+			safeSpendingSummaryOptions(["revision-a"]).queryKey,
 		);
 	});
+
 	it.each([refreshAccounts, refreshTransactions])(
-		"invalidates cash evidence when workspace rows refresh",
+		"invalidates the summary when workspace rows refresh",
 		async (refresh) => {
 			stubTestServer();
 			const cache = serverQueryClient();
-			const options = safeSpendingSummaryOptions("2026-11-15", "2026-11-30", [
-				"synthetic",
-			]);
+			const options = safeSpendingSummaryOptions(["synthetic"]);
 			cache.setQueryData(options.queryKey, {
 				revision: "synthetic",
-				start: "2026-11-15",
-				end: "2026-11-30",
+				cashAsOf: "2026-11-15",
 				status: "missing",
 				reasons: [],
+				selectedAccountIds: [],
 				baselines: [],
 				checkingAvailable: null,
-				outstandingBillsTotal: null,
-				cashAfterBills: null,
 				confirmedMovements: [],
 				bills: [],
-				cashAsOf: "2026-11-15",
-				selectedAccountIds: [],
+				payday: null,
+				expectedPay: null,
+				prePaydayBills: null,
+				paydayBills: null,
+				statementReserve: null,
+				reserve: 200,
+				prePaydayRoom: null,
+				postIncomeRoom: null,
+				safeToSpend: null,
+				statements: [],
 			});
 			await refresh();
 			expect(cache.getQueryState(options.queryKey)?.isInvalidated).toBe(true);

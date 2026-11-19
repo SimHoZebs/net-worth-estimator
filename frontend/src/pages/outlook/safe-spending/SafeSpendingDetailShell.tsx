@@ -14,31 +14,28 @@ import {
 	TabsTrigger,
 } from "@/components/ui/tabs.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { dateLabel } from "../../../domain/format.ts";
 import {
 	SAFE_SPENDING_DETAIL_TABS,
 	type SafeSpendingDetailTab,
-	type SafeSpendingCycleTab,
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingDetailShell({
 	tab,
 	onTabChange,
-	cycleCounts,
-	range,
+	counts,
+	caption,
 	onClose,
 	children,
 }: {
 	tab: SafeSpendingDetailTab;
 	onTabChange: (tab: SafeSpendingDetailTab) => void;
-	cycleCounts: Partial<Record<SafeSpendingCycleTab, number>>;
-	range?: { start: string; end: string };
+	counts: Partial<Record<SafeSpendingDetailTab, number>>;
+	caption?: string;
 	onClose: () => void;
 	children: React.ReactNode;
 }) {
 	const title = labels.title;
-	const counts: Partial<Record<SafeSpendingDetailTab, number>> = cycleCounts;
 	const id = useId();
 	return (
 		<Sheet
@@ -49,9 +46,9 @@ export function SafeSpendingDetailShell({
 		>
 			<SheetContent side="right" aria-label={title}>
 				<SheetHeader>
-					{range && (
+					{caption && (
 						<p className="mb-2 text-xs font-bold tracking-widest text-muted-foreground">
-							{`${dateLabel(range.start, true)} – ${dateLabel(range.end, true)}`}
+							{caption}
 						</p>
 					)}
 					<SheetTitle>{title}</SheetTitle>

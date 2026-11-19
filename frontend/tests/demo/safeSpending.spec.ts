@@ -1,38 +1,31 @@
 import { expect, test } from "@playwright/test";
 
-// The demo command sets the clock to the pack's anchor date. Without it the
-// safe-spending cycle follows the real calendar and the seeded rows drift out
-// of the current statement window.
+// The demo command sets the clock to the pack's anchor date so the dated
+// allowance and its protected obligations read against the seeded evidence.
 const anchor = process.env.DEMO_ANCHOR ?? new Date().toISOString().slice(0, 10);
 
 test("seeded account demo", async ({ page }) => {
 	await page.clock.setFixedTime(new Date(`${anchor}T12:00:00Z`));
-	await page.goto("/outlook?detail=safe-spending&tab=transactions");
+	await page.goto("/outlook");
 	await expect(
 		page.getByRole("heading", { name: "Safe spending" }),
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
+		await expect(page.getByTestId("safe-to-spend")).toBeVisible();
 		await expect(
-			page.getByText("Cash after bills", { exact: true }),
-		).toBeVisible();
-		await expect(page.getByText("Spending pace")).toBeVisible();
-		await expect(
-			page.getByRole("separator", { name: "Cash limit" }),
-		).toHaveCount(0);
-		await expect(page.getByText("Reserve", { exact: true })).toBeVisible();
-	}
-	if (process.env.DEMO_PACK === "safe-spending-shortfall") {
-		await expect(page.getByText("Retirement contribution")).toBeVisible();
-		await expect(
-			page.getByText("Outstanding bills", { exact: true }),
+			page.getByRole("region", { name: "Cash check comparison" }),
 		).toBeVisible();
 	}
-	// The drawer keeps the per-cycle transaction list.
-	await page.getByRole("button", { name: "Transactions" }).click();
+	await page.getByRole("button", { name: /Protected obligations ·/ }).click();
+	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(
-		page
-			.getByRole("dialog", { name: "Safe spending" })
-			.getByRole("heading", { name: "Spending this cycle" }),
+		drawer.getByRole("region", { name: "Cash checks" }),
+	).toBeVisible();
+	await expect(
+		drawer.getByRole("region", { name: "Cash evidence" }),
+	).toBeVisible();
+	await expect(
+		drawer.getByRole("region", { name: "Protected obligations" }),
 	).toBeVisible();
 	// Keep the headed browser open until the developer stops the command.
 	const exitAfter = Number(process.env.DEMO_EXIT_AFTER_MS ?? 0);

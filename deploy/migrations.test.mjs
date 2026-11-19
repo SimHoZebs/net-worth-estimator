@@ -33,6 +33,10 @@ await run("go", ["build", "-o", join(tools, "prune-noop-checkpoints"), "./script
   cwd: new URL("../backend/", import.meta.url).pathname,
   env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-statement-closing-day"), "./scripts/one-time/statement-closing-day"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
 
 const sqlite = (db, sql) => run("sqlite3", [db, sql]);
 const rows = async (db, sql) => (await sqlite(db, sql)).stdout.trim();
@@ -370,6 +374,37 @@ test("legacy schedule frequencies convert to recurrences", async (t) => {
     `r-annual|year|1|[]|\nr-daily|day|1|[]|\nr-monthly|month|1|[]|byDate\nr-quarterly|month|3|[]|byDate\nr-weekly|week|1|["2"]|`);
   assert.equal(await rows(db, "SELECT id, position, name, amount_resolution_json, start_date, priority, enabled FROM recurrence_rules ORDER BY id;"),
     `r-annual|0|Annual|{}|2026-06-30|0|1\nr-daily|1|Daily|{}|2026-01-01|1|1\nr-monthly|2|Monthly|{}|2026-01-15|2|1\nr-quarterly|3|Quarterly|{}|2026-01-15|3|1\nr-weekly|4|Weekly|{}|2026-01-06|4|1`);
+  assert.equal((await backups(directory)).length, 1);
+
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("retired cycle start becomes each account's closing day", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-closing-day-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='statement_closing_day';"), "1");
+  await sqlite(db, `ALTER TABLE accounts DROP COLUMN statement_closing_day;
+    ALTER TABLE payment_terms ADD COLUMN statement_day INTEGER;
+    DELETE FROM schema_migrations WHERE name = 'statement-closing-day-v1';
+    INSERT INTO accounts(user_id, id, position, name, kind, enabled) VALUES ('${owner}','card-a',0,'A','debt',1),('${owner}','card-b',1,'B','debt',1),('${owner}','card-c',2,'C','debt',1),('${owner}','card-no-terms',3,'D','debt',1);
+    INSERT INTO safe_spending_settings(user_id, id, settings_json) VALUES ('${owner}',1,'{"statementDay":22,"statementDaySet":true,"reserve":100}');
+    INSERT INTO payment_terms(user_id, model_account_id, position, minimum_fixed, due_day, statement_day) VALUES
+      ('${owner}','card-a',0,25,10,NULL),('${owner}','card-b',1,25,10,15),('${owner}','card-c',2,25,10,1);`);
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('payment_terms') WHERE name='statement_day';"), "0");
+  assert.equal(await rows(db, "SELECT id || ':' || statement_closing_day FROM accounts ORDER BY id;"),
+    "card-a:21\ncard-b:15\ncard-c:1\ncard-no-terms:21");
+  const settings = await rows(db, `SELECT settings_json FROM safe_spending_settings WHERE user_id = '${owner}' AND id = 1;`);
+  assert.doesNotMatch(settings, /statementDay/);
+  assert.match(settings, /"reserve":100/);
   assert.equal((await backups(directory)).length, 1);
 
   const hashAfter = await sha256File(db);

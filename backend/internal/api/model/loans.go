@@ -57,6 +57,7 @@ func (s *handler) updateLoan(_ context.Context, input *struct {
 					bundle.Accounts[i].MinBalance = existing.MinBalance
 					bundle.Accounts[i].Color = existing.Color
 					bundle.Accounts[i].DisplayBasis = existing.DisplayBasis
+					bundle.Accounts[i].StatementClosingDay = existing.StatementClosingDay
 				}
 			}
 		}
@@ -124,6 +125,7 @@ func (s *handler) updateLoan(_ context.Context, input *struct {
 				bundle.Accounts[0].MinBalance = prior.MinBalance
 				bundle.Accounts[0].Color = prior.Color
 				bundle.Accounts[0].DisplayBasis = prior.DisplayBasis
+				bundle.Accounts[0].StatementClosingDay = prior.StatementClosingDay
 			}
 		}
 		// Adoption always records the principal and interest pair at

@@ -49,6 +49,7 @@ export function fixtureModel(
 				minBalance,
 				maxBalance,
 				color,
+				statementClosingDay: 19,
 			}),
 		),
 		checkpoints: data.accounts.map((account) => ({

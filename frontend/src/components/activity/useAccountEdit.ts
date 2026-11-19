@@ -1,7 +1,9 @@
 import { useId, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+	deletePaymentTerms,
 	listAccountBalances,
+	savePaymentTerms,
 	updateAccount,
 } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
@@ -10,7 +12,12 @@ import { getUserScope } from "@/auth/resourceScope.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
 import { accountUpdateBody } from "../editors/accountFields.ts";
-import { getAccountBalances } from "../../state/workspaceResources.ts";
+import {
+	getAccountBalances,
+	getPaymentTermsForAccount,
+	refreshPaymentTerms,
+	usePaymentTerms,
+} from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshAccountAdjustments } from "../../state/accountAdjustments.ts";
 import {
@@ -27,13 +34,30 @@ export type AccountEditField =
 	| "protected"
 	| "ceiling"
 	| "display"
+	| "minimum"
+	| "minimumPercent"
+	| "dueDay"
+	| "closingDay"
 	| "time";
+
+// Optional minimum/due terms are separate from the authoritative closing day.
+// Their empty inputs only prefill the form; terms are written only when a terms
+// field is edited, and can be removed without touching the closing day.
+const DEFAULT_STATEMENT_CLOSING_DAY = 19;
+
+function parseDay(raw: string): number | null {
+	const value = parseDisplayNumber(raw);
+	return value !== null && Number.isInteger(value) ? value : null;
+}
 
 export function useAccountEdit(
 	account: Account,
 	readOnly: boolean,
 	adjustments: BalanceAdjustment[],
 ) {
+	// Own the terms read so the card rows prefill from the authoritative row.
+	usePaymentTerms();
+	const terms = getPaymentTermsForAccount(account.id);
 	const source = {
 		name: account.name,
 		balance: String(account.balance),
@@ -44,6 +68,15 @@ export function useAccountEdit(
 		minBalance: String(account.minBalance),
 		maxBalance: account.maxBalance === null ? "" : String(account.maxBalance),
 		noCeiling: account.maxBalance === null,
+		minimumFixed: terms ? String(terms.minimumFixed) : "",
+		minimumPercent:
+			terms?.minimumPercent === undefined || terms.minimumPercent === null
+				? ""
+				: String(terms.minimumPercent * 100),
+		dueDay: terms ? String(terms.dueDay) : "",
+		statementClosingDay: String(
+			account.statementClosingDay || DEFAULT_STATEMENT_CLOSING_DAY,
+		),
 	};
 	const edit = useEditDraft(account.id, source);
 	const [activeField, setActiveField] = useState<AccountEditField | null>(null);
@@ -93,6 +126,21 @@ export function useAccountEdit(
 		setObservedAt(null);
 		setError(null);
 		setConfirmCancel(false);
+	};
+	const clearTerms = async () => {
+		if (saving || readOnly || getPaymentTermsForAccount(account.id) === null)
+			return;
+		setSaving(true);
+		setError(null);
+		const ok = await performSave({
+			call: () => deletePaymentTerms(account.id),
+			refresh: refreshPaymentTerms,
+			failureMessage: "The payment terms could not be removed.",
+			onRejected: setError,
+		});
+		setSaving(false);
+		if (ok)
+			edit.update({ minimumFixed: "", minimumPercent: "", dueDay: "" });
 	};
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -185,6 +233,53 @@ export function useAccountEdit(
 			setError("Enter debt as a negative balance.");
 			return;
 		}
+		const statementClosingDay = parseDay(edit.value.statementClosingDay);
+		if (
+			statementClosingDay === null ||
+			statementClosingDay < 1 ||
+			statementClosingDay > 31
+		) {
+			setError("Enter a statement closing day between 1 and 31.");
+			return;
+		}
+		const termFields = ["minimumFixed", "minimumPercent", "dueDay"] as const;
+		const termsDirty =
+			edit.value.kind === "debt" &&
+			termFields.some((field) => edit.value[field] !== source[field]);
+		let cardTerms: {
+			accountId: string;
+			minimumFixed: number;
+			minimumPercent?: number;
+			dueDay: number;
+		} | null = null;
+		if (termsDirty) {
+			const minimumFixed = parseDisplayNumber(edit.value.minimumFixed);
+			const percent = edit.value.minimumPercent.trim()
+				? parseDisplayNumber(edit.value.minimumPercent)
+				: null;
+			const dueDay = parseDay(edit.value.dueDay);
+			if (minimumFixed === null || minimumFixed < 0) {
+				setError("Enter a minimum payment in USD.");
+				return;
+			}
+			if (
+				edit.value.minimumPercent.trim() &&
+				(percent === null || percent < 0 || percent > 100)
+			) {
+				setError("Enter the minimum percent as a number between 0 and 100.");
+				return;
+			}
+			if (dueDay === null || dueDay < 1 || dueDay > 28) {
+				setError("Enter a due day between 1 and 28.");
+				return;
+			}
+			cardTerms = {
+				accountId: account.id,
+				minimumFixed,
+				...(percent === null ? {} : { minimumPercent: percent / 100 }),
+				dueDay,
+			};
+		}
 		if (
 			observedAt !== null &&
 			(!Number.isFinite(instant) ||
@@ -204,7 +299,8 @@ export function useAccountEdit(
 		setSaving(true);
 		setError(null);
 		const ok = await performSave({
-			call: () => {
+			call: async () => {
+				if (cardTerms) await savePaymentTerms(cardTerms);
 				const row = getAccountBalances()?.accounts.find(
 					(row) => row.id === account.id,
 				);
@@ -231,12 +327,16 @@ export function useAccountEdit(
 							minBalance,
 							maxBalance,
 							noCeiling: edit.value.noCeiling,
+							statementClosingDay,
 						},
 					}),
 					...(moved ? { balance, observedAt: Math.floor(instant / 1000) } : {}),
 				});
 			},
-			refresh: refreshAccountAdjustments,
+			refresh: async () => {
+				await refreshAccountAdjustments();
+				if (cardTerms) await refreshPaymentTerms();
+			},
 			failureMessage: "The account could not be saved.",
 			onRejected: setError,
 		});
@@ -250,6 +350,7 @@ export function useAccountEdit(
 		update,
 		submit,
 		reset,
+		clearTerms,
 		error,
 		saving,
 		dirty: edit.dirty,

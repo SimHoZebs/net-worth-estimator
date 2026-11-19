@@ -1,138 +1,89 @@
-import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { dateLabel } from "../../../domain/format.ts";
-import { roundCents } from "../../../domain/safeSpendingMath.ts";
 
 export const SAFE_SPENDING_DETAIL_TABS = [
-	{ id: "transactions", label: "Transactions", view: "charges" },
+	{ id: "ledger", label: "Obligations", view: "ledger" },
 	{ id: "configure", label: "Configure", view: "configure" },
 ] as const;
 
 export type SafeSpendingDetailTab =
 	(typeof SAFE_SPENDING_DETAIL_TABS)[number]["id"];
-export type SafeSpendingCycleTab = "transactions";
+export type SafeSpendingLedgerTab = "ledger";
 
-export function isSafeSpendingCycleTab(
+export function isSafeSpendingLedgerTab(
 	tab: SafeSpendingDetailTab,
-): tab is SafeSpendingCycleTab {
+): tab is SafeSpendingLedgerTab {
 	return SAFE_SPENDING_DETAIL_TABS.some(
-		(item) => item.id === tab && item.view === "charges",
+		(item) => item.id === tab && item.view === "ledger",
 	);
 }
 
-export function cycleCaption({
-	start,
-	end,
-	closed,
-	upcoming,
-	daysLeft,
+/** The allowance is dated by the income date the server selected. */
+export function allowanceCaption({
+	payday,
+	cashAsOf,
 }: {
-	start: string;
-	end: string;
-	closed: boolean;
-	upcoming: boolean;
-	daysLeft: number;
+	payday: string | null;
+	cashAsOf: string;
 }): string {
-	if (closed)
-		return `${dateLabel(start, true)} – ${dateLabel(end, true)} · Closed`;
-	if (upcoming)
-		return `${dateLabel(start, true)} – ${dateLabel(end, true)} · Upcoming`;
-	return `${dateLabel(end, true)} · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
+	return payday
+		? `Through payday · ${dateLabel(payday, true)}`
+		: `As of ${dateLabel(cashAsOf, true)}`;
 }
-export interface SafeSpendingChargeCycle {
-	start: string;
-	end: string;
+
+export type EvidenceStatus = "available" | "uncertain" | "missing";
+
+export interface ObligationRow {
+	id: string;
+	name: string;
+	date: string;
+	amount: number | null;
+	/** Status wording for pending, unknown and estimated rows. */
+	detail: string | null;
+}
+
+export interface ObligationSection {
 	title: string;
-	emptyMessage: string;
-	transactions: AccountTransaction[];
-	/** Spent total plus per-card breakdown shown above the modal table. */
-	summary?: {
-		total: number | null;
-		byCard: { id: string; name: string; amount: number | null }[];
-	};
-	/** Exact recorded spending rows that first crossed the current budget. */
-	thresholds?: {
-		incomeTransactionId?: string | null;
-		safetyNetTransactionId: string | null;
-		limitTransactionId: string | null;
-	};
+	/** Server-owned total for this part of the protected ledger. */
+	total: number | null;
+	rows: ObligationRow[];
 }
 
-export interface SafeSpendingMandatorySection {
-	title: string;
-	subtitle: string;
-	total: number;
-	transactions: AccountTransaction[];
-}
-
-/** The current cash-backed allowance after the protected reserve. */
-export interface CycleAllocation {
+export interface DatedAllowance {
+	cashAsOf: string;
+	payday: string | null;
+	status: EvidenceStatus;
+	/** Clamped at zero; null when evidence cannot determine the allowance. */
+	amount: number | null;
+	prePaydayRoom: number | null;
+	postIncomeRoom: number | null;
+	expectedPay: number | null;
 	reserve: number;
-	allowance: number;
-	/** False when current cash evidence cannot support an allowance. */
-	available: boolean;
 }
 
-export interface SafeSpendingHeroes {
-	safe: number;
-	theoretical: number;
-	dailySafe: number;
-	dailyTheoretical: number;
-	fullDaysLeft: number;
-	cycleStart: string;
-	cycleEnd: string;
-	committedTotal: number | null;
-	committedByCard: { id: string; name: string; amount: number | null }[];
+export interface AllowanceEvidence {
+	status: EvidenceStatus;
+	message: string | null;
+	checkingAvailable: number | null;
+	cashAsOf: string;
+	baselines: {
+		accountId: string;
+		accountName: string;
+		basis: string;
+		status: string;
+		amount: number | null;
+	}[];
 }
 
-export interface CycleView {
-	heroes: SafeSpendingHeroes;
-	allocation: CycleAllocation;
-}
-
-/**
- * Project the shared remaining headroom into the current decision rows.
- */
-export function buildCycleView({
-	cycleStart,
-	cycleEnd,
-	remaining,
-	cardSpent,
-	cardSpentByCard,
-	reserve,
-	fullDaysLeft,
-}: {
-	cycleStart: string;
-	cycleEnd: string;
-	remaining: number | null;
-	cardSpent: number | null;
-	cardSpentByCard: { id: string; name: string; amount: number | null }[];
-	reserve: number;
-	fullDaysLeft: number;
-}): CycleView {
-	const available = remaining !== null;
-	const theoretical = remaining ?? 0;
-	const allowance = available ? roundCents(theoretical - reserve) : 0;
-	const days = Math.max(1, fullDaysLeft);
-	const dailySafe = allowance / days;
-	const dailyTheoretical = theoretical / days;
-	return {
-		heroes: {
-			safe: allowance,
-			theoretical,
-			dailySafe,
-			dailyTheoretical,
-			fullDaysLeft: days,
-			cycleStart,
-			cycleEnd,
-			committedTotal: cardSpent,
-			committedByCard: cardSpentByCard,
-		},
-		allocation: { reserve, allowance, available },
-	};
+export interface AllowanceLedger {
+	allowance: DatedAllowance;
+	sections: ObligationSection[];
+	evidence: AllowanceEvidence;
+	/** Server-owned obligation totals combined for the one-line preview summary. */
+	protectedTotal: number | null;
+	obligationCount: number;
 }
 
 export interface SafeSpendingConfigHints {
-	statementDay: number;
 	reserve: number;
 	cards: { id: string; name: string }[];
 	trackedIds: string[];
