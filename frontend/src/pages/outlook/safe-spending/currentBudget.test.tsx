@@ -387,7 +387,7 @@ describe("monthly income comparison", () => {
 		const markup = renderToStaticMarkup(
 			createElement(SafeSpendingTrendChart, { trend: result.trend }),
 		);
-		expect(markup).toContain("Income limit");
+		expect(markup).toContain("Income this month: $7,458.34");
 	});
 	it("warns about monthly overspending with savings left, or low cash with sufficient income", () => {
 		const savings = cycleView({
