@@ -13,18 +13,19 @@ type statementClose struct {
 	closed bool
 }
 
-// effectiveCards mirrors useSafeSpendingSelections: enabled debt accounts are
-// the candidates, independent of optional minimum payment terms. A null
-// selection falls back to IDs ending in _card when any exist, otherwise to
-// every debt account; an explicit, even empty, selection keeps only those IDs.
+// effectiveCards mirrors useSafeSpendingSelections. A null selection falls
+// back to detected debt accounts, preferring IDs ending in _card. An explicit
+// selection is authoritative even when a synced card still carries the neutral
+// cash label, so the owner's tracked cards are not silently dropped. Only IDs
+// the owner selected enter the explicit path; unrelated loans stay out.
 func effectiveCards(model *types.FinancialModel, settings *types.SafeSpendingSettings) []types.Account {
-	candidates := []types.Account{}
-	for _, account := range model.Accounts {
-		if account.Enabled && account.Kind == types.AccountKindDebt {
-			candidates = append(candidates, account)
-		}
-	}
 	if settings.AccountIDs == nil {
+		candidates := []types.Account{}
+		for _, account := range model.Accounts {
+			if account.Enabled && account.Kind == types.AccountKindDebt {
+				candidates = append(candidates, account)
+			}
+		}
 		cardLike := []types.Account{}
 		for _, account := range candidates {
 			if strings.HasSuffix(account.ID, "_card") {
@@ -37,7 +38,10 @@ func effectiveCards(model *types.FinancialModel, settings *types.SafeSpendingSet
 		return candidates
 	}
 	chosen := []types.Account{}
-	for _, account := range candidates {
+	for _, account := range model.Accounts {
+		if !account.Enabled {
+			continue
+		}
 		for _, id := range settings.AccountIDs {
 			if account.ID == id {
 				chosen = append(chosen, account)
@@ -79,9 +83,14 @@ func statementCloses(day int, today, payday string) []statementClose {
 func buildStatements(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, today, payday string, cut int64) *float64 {
 	exact := true
 	total := 0.0
-	for _, card := range effectiveCards(model, settings) {
+	cards := effectiveCards(model, settings)
+	tracked := map[string]bool{}
+	for _, card := range cards {
+		tracked[card.ID] = true
+	}
+	for _, card := range cards {
 		closes := statementCloses(accountClosingDay(card), today, payday)
-		amounts, known := cardStatementRows(st, model, card.ID, closes, cut)
+		amounts, known := cardStatementRows(st, model, card.ID, closes, cut, tracked)
 		if amounts == nil {
 			amounts = make([]*float64, len(closes))
 		}
@@ -132,11 +141,67 @@ type cardActivity struct {
 	payment float64
 }
 
+// transferLeg tells how one single-destination movement touches a card. It
+// follows cashDelta in the balance replay: the source balance falls by the
+// amount and the destination balance rises by it, so with debt = max(0,
+// -balance) the source owes more (a charge) and the destination owes less (a
+// payment). Each leg is dated on the card's own statement ledger.
+type transferLeg int
+
+const (
+	legNone transferLeg = iota
+	legCharge
+	legPayment
+)
+
+// recordedLeg classifies a posted movement. Both ends must be tracked cards so
+// that an internal transfer is never mistaken for cash settling a purchase.
+// Multi-destination rows are rejected by the caller because no share is known.
+func recordedLeg(tx types.Transaction, cardID string, tracked map[string]bool) transferLeg {
+	if tx.SourceAccountID == nil || len(tx.Destinations) != 1 {
+		return legNone
+	}
+	src := *tx.SourceAccountID
+	dst := tx.Destinations[0]
+	if !tracked[src] || !tracked[dst] || src == dst {
+		return legNone
+	}
+	switch cardID {
+	case src:
+		return legCharge
+	case dst:
+		return legPayment
+	}
+	return legNone
+}
+
+// scheduledLeg classifies a rule occurrence on the same cashDelta basis. A
+// rule authored on the card charges it, whether or not it hands the debt to a
+// tracked destination; a rule landing on this card from a tracked card pays it
+// down. A split routing has no per-card share, so the caller keeps the payoff
+// unavailable.
+func scheduledLeg(rule types.Schedule, cardID string, tracked map[string]bool) (transferLeg, bool) {
+	if rule.SourceAccountID == nil {
+		return legNone, true
+	}
+	if len(rule.Destinations) > 1 {
+		return legNone, false
+	}
+	src := *rule.SourceAccountID
+	if src == cardID {
+		return legCharge, true
+	}
+	if len(rule.Destinations) == 1 && tracked[src] && rule.Destinations[0] == cardID {
+		return legPayment, true
+	}
+	return legNone, true
+}
+
 // cardStatementRows computes one payoff per close in date order. Each newer
 // statement is funded only by its own period's charges, so summing the rows
 // never counts a carried balance twice. Payments are allocated oldest first
 // across all rows with the remainder carried forward.
-func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string, closes []statementClose, cut int64) ([]*float64, bool) {
+func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string, closes []statementClose, cut int64, tracked map[string]bool) ([]*float64, bool) {
 	first := closes[0].date
 	closeCut := min(domain.DayCloseUnix(first), cut)
 	evidence := cashEvidence(model, st.settings, closeCut)
@@ -158,6 +223,7 @@ func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string,
 		if len(tx.Destinations) > 1 {
 			return nil, false // no allocation evidence for a split movement
 		}
+		leg := recordedLeg(tx, cardID, tracked)
 		date := transactionDay(tx)
 		if date <= first {
 			continue
@@ -169,16 +235,32 @@ func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string,
 		if tx.Pending || domain.TransactionInstant(&tx) > cut {
 			return nil, false
 		}
-		if cashPaymentToCard(model, tx, cardID) {
+		switch leg {
+		case legCharge:
+			// The source balance falls, so this card owes more as of the date.
+			activities = append(activities, cardActivity{date: date, charge: amount})
+		case legPayment:
+			// The destination balance rises, so this card owes less. No cash
+			// movement is added: the replay already applied cashDelta once.
 			activities = append(activities, cardActivity{date: date, payment: amount})
-			continue
+		default:
+			if cashPaymentToCard(model, tx, cardID) {
+				activities = append(activities, cardActivity{date: date, payment: amount})
+			} else {
+				activities = append(activities, cardActivity{date: date, charge: -cashDelta(tx, cardID, amount)})
+			}
 		}
-		activities = append(activities, cardActivity{date: date, charge: -cashDelta(tx, cardID, amount)})
 	}
 
 	cardRules := []types.Schedule{}
 	for _, rule := range model.Schedules {
-		if rule.Enabled && rule.SourceAccountID != nil && *rule.SourceAccountID == cardID {
+		if !rule.Enabled || rule.SourceAccountID == nil {
+			continue
+		}
+		// A rule on the card is a charge unless it hands the debt to another
+		// tracked card. A rule from a tracked card into this one adds debt too.
+		if *rule.SourceAccountID == cardID ||
+			(tracked[*rule.SourceAccountID] && contains(rule.Destinations, cardID)) {
 			cardRules = append(cardRules, rule)
 		}
 	}
@@ -197,7 +279,16 @@ func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string,
 				if err != nil || amount < 0 {
 					return nil, false
 				}
-				activities = append(activities, cardActivity{date: date, charge: amount})
+				leg, ok := scheduledLeg(*row.Rule, cardID, tracked)
+				if !ok {
+					return nil, false
+				}
+				switch leg {
+				case legCharge:
+					activities = append(activities, cardActivity{date: date, charge: amount})
+				case legPayment:
+					activities = append(activities, cardActivity{date: date, payment: amount})
+				}
 			}
 		}
 	}

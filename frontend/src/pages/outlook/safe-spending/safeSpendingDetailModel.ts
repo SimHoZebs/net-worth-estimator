@@ -37,7 +37,7 @@ export interface ObligationRow {
 	name: string;
 	date: string;
 	amount: number | null;
-	/** Status wording for pending, unknown and estimated rows. */
+	/** Status wording for estimated statement rows. */
 	detail: string | null;
 }
 
@@ -62,7 +62,6 @@ export interface DatedAllowance {
 
 export interface AllowanceEvidence {
 	status: EvidenceStatus;
-	message: string | null;
 	checkingAvailable: number | null;
 	cashAsOf: string;
 	baselines: {
@@ -75,6 +74,7 @@ export interface AllowanceEvidence {
 }
 
 export interface AllowanceLedger {
+	amountLabel: string;
 	allowance: DatedAllowance;
 	sections: ObligationSection[];
 	evidence: AllowanceEvidence;

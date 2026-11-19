@@ -33,12 +33,10 @@ func claimState(model *types.FinancialModel, cut int64) claimStateResult {
 	return claimStateResult{settled: settled, pending: pending}
 }
 
-// selectPayday resolves the next selected income occurrence. Only recurring
-// inflows into a selected cash account are candidates, so a scheduled outflow
-// or a transfer cannot masquerade as pay. An occurrence dated today counts
-// unless a posted payment explicitly claims it; counting it a second time is
-// then impossible because the claim already advanced the observed cash.
-func selectPayday(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, today string, cut int64) (string, float64, bool) {
+// incomeRules is the single selection of recurring inflows into a selected
+// cash account. Both the next payday and the previous cycle boundary use it,
+// so the obligation window cannot disagree with the income window.
+func incomeRules(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings) []types.Schedule {
 	cash := map[string]bool{}
 	for _, id := range st.s.SelectedAccountIDs {
 		cash[id] = true
@@ -57,6 +55,39 @@ func selectPayday(st *cutState, model *types.FinancialModel, settings *types.Saf
 		}
 		rules = append(rules, rule)
 	}
+	return rules
+}
+
+// previousPayday is the latest selected income occurrence strictly before the
+// next payday. It bounds the current income cycle: obligations after it and
+// through payday belong here, while the boundary occurrence itself belongs to
+// the previous cycle. Claims are ignored because a settled payday is still a
+// cycle boundary. Returning empty means no earlier boundary is known.
+func previousPayday(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, payday string) string {
+	rules := incomeRules(st, model, settings)
+	if len(rules) == 0 {
+		return ""
+	}
+	// The lookback boundary is inclusive: an annual income occurrence lands
+	// exactly 12 months back and is still the previous cycle boundary. Payday
+	// itself is filtered out below.
+	occurrences := domain.ResolveOccurrences(rules, nil, domain.AddMonthsClamped(payday, -12), payday, true)
+	previous := ""
+	for date := range occurrences.ByDate {
+		if date < payday && (previous == "" || date > previous) {
+			previous = date
+		}
+	}
+	return previous
+}
+
+// selectPayday resolves the next selected income occurrence. Only recurring
+// inflows into a selected cash account are candidates, so a scheduled outflow
+// or a transfer cannot masquerade as pay. An occurrence dated today counts
+// unless a posted payment explicitly claims it; counting it a second time is
+// then impossible because the claim already advanced the observed cash.
+func selectPayday(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, today string, cut int64) (string, float64, bool) {
+	rules := incomeRules(st, model, settings)
 	if len(rules) == 0 {
 		reason(&st.s.Reasons, ReasonPaydayUnavailable)
 		return "", 0, false

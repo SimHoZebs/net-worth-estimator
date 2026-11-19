@@ -8,7 +8,6 @@ function evidence(
 ): AllowanceEvidence {
 	return {
 		status: "available",
-		message: null,
 		checkingAvailable: 1244.43,
 		cashAsOf: "2026-11-15",
 		baselines: [
@@ -42,24 +41,21 @@ describe("safe spending cash evidence", () => {
 		expect(html).toContain("Synthetic checking · observed available");
 	});
 
-	it("shows the uncertainty state without exposing internal reason codes", () => {
+	it("shows unknown cash without exposing internal reason codes", () => {
 		const html = render(
 			evidence({
 				status: "uncertain",
-				message: "Allowance uncertain",
 				checkingAvailable: null,
 			}),
 		);
 		expect(html).toContain('data-testid="cash-on-hand">—');
-		expect(html).toContain("Allowance uncertain");
 		expect(html).not.toContain("posted-hold-coverage-unknown");
 	});
 
-	it("shows the missing state with a known baseline still visible", () => {
+	it("keeps a known baseline visible in the missing state", () => {
 		const html = render(
 			evidence({
 				status: "missing",
-				message: "Allowance unavailable",
 				checkingAvailable: null,
 				baselines: [
 					{
@@ -72,7 +68,6 @@ describe("safe spending cash evidence", () => {
 				],
 			}),
 		);
-		expect(html).toContain("Allowance unavailable");
 		expect(html).toContain("Synthetic checking · posted balance");
 		expect(html).toContain("$500.00");
 	});

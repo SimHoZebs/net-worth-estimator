@@ -31,7 +31,7 @@ func buildEvidence(m *types.FinancialModel, c *types.SafeSpendingSettings, start
 		m = &types.FinancialModel{}
 	}
 	st := cashEvidence(m, c, cut)
-	total := buildObligations(st.s, m, c, st.selected, st.latest, st.ctx, cut, start, end)
+	total := buildObligations(st.s, m, c, st.selected, st.ctx, cut, start, end)
 	st.gateStatus()
 	out := testEvidence{SafeSpendingSummary: *st.s, Start: start, End: end, OutstandingBillsTotal: total}
 	if total != nil && st.s.CheckingAvailable != nil {
@@ -78,7 +78,7 @@ func TestProductionArithmeticUsesCashObservationAndRequestedBills(t *testing.T) 
 	}
 }
 
-func TestClaimsReplaceOccurrencesAndPendingCoverageNeverGuessed(t *testing.T) {
+func TestExactClaimReplacesOccurrenceForPostedAndRealPending(t *testing.T) {
 	for _, pending := range []bool{true, false} {
 		t.Run(fmt.Sprint(pending), func(t *testing.T) {
 			m := baseModel()
@@ -88,16 +88,14 @@ func TestClaimsReplaceOccurrencesAndPendingCoverageNeverGuessed(t *testing.T) {
 			tx.Claim = &types.TransactionClaim{ScheduleID: "bill", OccurrenceDate: "2026-11-15"}
 			m.Transactions = []types.Transaction{tx, payment("distinct", 10, "2026-11-16T12:00:00Z")}
 			s := Build(m, nil, "2026-11-15", testEnd)
-			if pending {
-				if len(s.Bills) != 1 || s.Bills[0].Status != "pending" || s.Bills[0].ID != "schedule:bill:2026-11-15" || s.CashAfterBills != nil || s.OutstandingBillsTotal != nil || !slices.Contains(s.Reasons, ReasonPendingObligationCoverageUnknown) {
-					t.Fatalf("pending %+v", s)
-				}
-				assertMoney(t, s.Bills[0].Amount, 600)
-			} else {
-				if len(s.Bills) != 1 || s.Bills[0].Status != "paid" {
-					t.Fatalf("posted %+v", s)
-				}
-				assertMoney(t, s.CashAfterBills, 1244.43)
+			if len(s.Bills) != 1 || s.Bills[0].Status != "paid" || s.Bills[0].ID != "schedule:bill:2026-11-15" {
+				t.Fatalf("claimed occurrence %+v", s.Bills)
+			}
+			assertMoney(t, s.Bills[0].Amount, 600)
+			assertMoney(t, s.OutstandingBillsTotal, 0)
+			assertMoney(t, s.CashAfterBills, 1244.43)
+			if s.Status != "available" {
+				t.Fatalf("real pending hold changed the gate %+v", s)
 			}
 		})
 	}

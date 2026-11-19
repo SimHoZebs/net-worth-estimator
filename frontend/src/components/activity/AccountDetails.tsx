@@ -68,10 +68,13 @@ export function AccountDetails({
 	account,
 	edit,
 	readOnly,
+	cardAccountIds = [],
 }: {
 	account: Account;
 	edit: AccountEdit;
 	readOnly: boolean;
+	/** Explicitly tracked cards, including ones sync labelled as cash. */
+	cardAccountIds?: string[];
 }) {
 	const locked = readOnly || edit.saving;
 	// The display basis is owner config, not bank evidence, so it stays
@@ -79,6 +82,12 @@ export function AccountDetails({
 	// locks it: readOnly without account.readOnly means the session, not
 	// the bank, forbids writes.
 	const basisLocked = edit.saving || (readOnly && !account.readOnly);
+	// A tracked card keeps an editable closing day even when sync owns the
+	// account, but a session-level read-only view still locks it.
+	const trackedCard = cardAccountIds.includes(account.id);
+	const closingLocked = trackedCard
+		? edit.saving || (readOnly && !account.readOnly)
+		: locked;
 	const { draft, formId } = edit;
 	const data = accountBalanceDisplayData(account);
 	// With both figures present the selector follows the owner's in-progress
@@ -430,6 +439,11 @@ export function AccountDetails({
 				</SettingRow>
 			),
 		});
+	}
+
+	// Sync leaves real cards with the neutral cash kind, so a deliberately
+	// tracked card must keep an editable closing day independent of its kind.
+	if (draft.kind === "debt" || trackedCard) {
 		rows.push({
 			key: "closing-day",
 			node: (
@@ -444,7 +458,7 @@ export function AccountDetails({
 						step="1"
 						className="w-48"
 						value={draft.statementClosingDay}
-						readOnly={locked}
+						readOnly={closingLocked}
 						onChange={(event) =>
 							edit.update(
 								{ statementClosingDay: event.target.value },

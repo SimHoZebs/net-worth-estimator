@@ -33,13 +33,19 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 		st.s.ExpectedPay = money(expectedPay)
 	}
 
-	// The ledger runs from today through payday. Without a selected income date
-	// it still shows the known scheduled obligations over the default horizon.
-	horizon := domain.DefaultScheduleOccurrencesThrough(today)
+	// The ledger covers the current income cycle: after the previous payday
+	// through the selected payday. That keeps an unclaimed bill that came due
+	// earlier in the cycle visible and payable once, without reaching back
+	// into older arrears. Without a selected income date there is no cycle
+	// boundary, so the ledger starts today over the default horizon.
+	start, horizon := today, domain.DefaultScheduleOccurrencesThrough(today)
 	if payday != "" {
 		horizon = payday
+		if previous := previousPayday(st, model, settings, payday); previous != "" {
+			start = nextIsoDay(previous)
+		}
 	}
-	buildObligations(st.s, model, settings, st.selected, st.latest, st.ctx, st.cut, today, horizon)
+	buildObligations(st.s, model, settings, st.selected, st.ctx, st.cut, start, horizon)
 	preBills, paydayBills := splitObligations(st.s, payday)
 	if preBills != nil {
 		st.s.PrePaydayBills = preBills
@@ -58,8 +64,11 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 }
 
 // splitObligations partitions the single dated bill ledger into obligations
-// due before payday and those due on payday. A group stays unknown when any of
-// its rows has uncertain coverage, so ambiguous evidence never becomes zero.
+// due before payday and those due on payday. A paid row happened by the
+// evidence cut: its movement or hold is already in the cash ledger, so it is
+// neither a deduction here nor a reason to withhold the subtotal. A remaining
+// group stays unknown when any of its rows has uncertain coverage, so
+// ambiguous evidence never becomes zero.
 func splitObligations(s *types.SafeSpendingSummary, payday string) (*float64, *float64) {
 	// Without a selected income date there is no window to total. The dated
 	// bills remain visible as evidence, but neither subtotal is invented.
@@ -69,11 +78,14 @@ func splitObligations(s *types.SafeSpendingSummary, payday string) (*float64, *f
 	pre, onPayday := 0.0, 0.0
 	preExact, paydayExact := true, true
 	for _, bill := range s.Bills {
-		if payday != "" && bill.Date > payday {
+		if bill.Date > payday {
+			continue
+		}
+		if bill.Status == "paid" {
 			continue
 		}
 		uncertain := bill.Status != "unpaid" || bill.Amount == nil
-		if payday != "" && bill.Date == payday {
+		if bill.Date == payday {
 			if uncertain {
 				paydayExact = false
 			} else {

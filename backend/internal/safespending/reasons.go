@@ -12,8 +12,6 @@ const (
 	ReasonPendingHoldWithoutAvailableBalance  = "pending-hold-without-available-balance"
 	ReasonPostedHoldCoverageUnknown           = "posted-hold-coverage-unknown"
 	ReasonCashAccountsMissing                 = "cash-accounts-missing"
-	ReasonScheduledPaymentStatusUnknown       = "scheduled-payment-status-unknown"
-	ReasonPendingObligationCoverageUnknown    = "pending-obligation-coverage-unknown"
 	ReasonObligationRoutingUnknown            = "obligation-routing-unknown"
 	ReasonObligationAmountUnavailable         = "obligation-amount-unavailable"
 	ReasonNegativeObligationAmount            = "negative-obligation-amount"

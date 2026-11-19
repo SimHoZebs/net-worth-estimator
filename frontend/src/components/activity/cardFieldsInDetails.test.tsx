@@ -119,4 +119,37 @@ describe("card fields in account details", () => {
 			screen.queryByLabelText(/Statement closing day of the month/i),
 		).toBeNull();
 	});
+
+	it("keeps closing day editable for a tracked card sync labelled cash", () => {
+		render(
+			<AccountDetails
+				account={account({ kind: "cash", id: "synced-card" })}
+				edit={editStub("cash")}
+				readOnly={false}
+				cardAccountIds={["synced-card"]}
+			/>,
+		);
+		const closing = screen.getByLabelText(
+			/Statement closing day of the month/i,
+		) as HTMLInputElement;
+		expect(closing.value).toBe("19");
+		expect(closing.readOnly).toBe(false);
+		expect(screen.queryByLabelText("Due day of the month")).toBeNull();
+		expect(screen.queryByLabelText("Minimum payment in USD")).toBeNull();
+	});
+
+	it("keeps a tracked card's closing day editable on a synced account", () => {
+		render(
+			<AccountDetails
+				account={account({ kind: "cash", id: "synced-card", readOnly: true })}
+				edit={editStub("cash")}
+				readOnly
+				cardAccountIds={["synced-card"]}
+			/>,
+		);
+		const closing = screen.getByLabelText(
+			/Statement closing day of the month/i,
+		) as HTMLInputElement;
+		expect(closing.readOnly).toBe(false);
+	});
 });

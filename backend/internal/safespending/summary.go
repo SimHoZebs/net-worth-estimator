@@ -31,6 +31,18 @@ func posted(t types.Transaction, cut int64) bool {
 	return fact(t) && !t.Pending && t.PostedTime > 0 && t.PostedTime <= cut && domain.TransactionInstant(&t) <= cut
 }
 
+// happenedByCut reports whether an actual is evidence at the cut. A posted
+// settlement and a real pending authorization both count. Void rows, projected
+// rows, and facts dated after the cut never do. A claim is only a link to one
+// exact schedule occurrence; matching amounts, names, or nearby dates do not
+// make a row happen.
+func happenedByCut(t types.Transaction, cut int64) bool {
+	if t.Claim == nil {
+		return false
+	}
+	return posted(t, cut) || (fact(t) && t.Pending && domain.TransactionInstant(&t) <= cut)
+}
+
 // cutState carries the evidence assembled during one BuildAtCut pass. The
 // helpers below advance it through checkpoint selection, confirmed replay,
 // baseline derivation and the final availability gate.

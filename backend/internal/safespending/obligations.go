@@ -110,12 +110,15 @@ func (a *amounts) record(tx types.Transaction, value float64) {
 }
 
 // Expand selected schedules first so claims enrich the same occurrence identity,
-// even when a payment posts outside the cycle or for a different amount.
-func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts, cut int64, start, end string) *float64 {
+// even when a payment posts outside the cycle or for a different amount. Only
+// occurrences in [start, end] are expanded, so a claim naming another cycle
+// cannot pull all-history arrears into this ledger or duplicate an occurrence
+// outside the window.
+func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, ctx *amounts, cut int64, start, end string) *float64 {
 	claims := map[types.TransactionClaim]*types.Transaction{}
 	for i := range model.Transactions {
 		tx := &model.Transactions[i]
-		if tx.Claim != nil && (posted(*tx, cut) || (fact(*tx) && tx.Pending && domain.TransactionInstant(tx) <= cut)) {
+		if happenedByCut(*tx, cut) {
 			claims[*tx.Claim] = tx
 		}
 	}
@@ -124,7 +127,7 @@ func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel,
 	exact := true
 	for date, occurrences := range domain.ResolveOccurrences(schedules, nil, start, end, true).ByDate {
 		for _, o := range occurrences {
-			row, cause := billEvidence(o, date, claims[types.TransactionClaim{ScheduleID: o.Rule.ID, OccurrenceDate: date}], selected, observations, ctx)
+			row, cause := billEvidence(o, date, claims[types.TransactionClaim{ScheduleID: o.Rule.ID, OccurrenceDate: date}], selected, ctx)
 			if cause != "" {
 				reason(&s.Reasons, cause)
 				exact = false
@@ -149,7 +152,7 @@ func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel,
 	return nil
 }
 
-func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types.Transaction, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts) (*types.SafeSpendingBill, string) {
+func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types.Transaction, selected map[string]bool, ctx *amounts) (*types.SafeSpendingBill, string) {
 	rule := o.Rule
 	internal := 0
 	for _, id := range rule.Destinations {
@@ -159,27 +162,31 @@ func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types
 	}
 	row := &types.SafeSpendingBill{ID: "schedule:" + rule.ID + ":" + date, ScheduleID: &rule.ID, Date: date, Name: rule.Name, AccountID: *rule.SourceAccountID, Status: "unpaid"}
 	if claim != nil {
+		// An exact claim that happened by the evidence cut settles the
+		// occurrence. A real pending authorization is such evidence too, even
+		// before it posts. The cash ledger already carries its movement or
+		// hold under the cash rules, so the scheduled bill is neither a second
+		// deduction nor a reason to withhold the subtotal.
 		row.TransactionID = &claim.ID
+		row.Status = "paid"
 		if !claim.Pending {
-			row.Status = "paid"
 			if amount, ok := ctx.latest[claim.ID]; ok {
 				row.Amount = money(amount)
 			}
 			return row, ""
 		}
-		row.Status = "pending"
-		// Pending records have no replayed settlement amount. Only their
-		// literal inputs are evidence at authorization time; the end-of-cut
-		// provider context could contain a fact posted after the hold.
+		// A hold has no replayed settlement amount. Only literal inputs are
+		// evidence at authorization time; the end-of-cut provider context
+		// could contain a fact posted after the hold.
 		for _, input := range claim.Amount.Inputs {
 			if input.Source != "literal" {
-				return row, ReasonPendingObligationCoverageUnknown
+				return row, ""
 			}
 		}
 		if amount, err := ctx.resolveFact(*claim); err == nil {
 			row.Amount = money(amount)
 		}
-		return row, ReasonPendingObligationCoverageUnknown
+		return row, ""
 	}
 	if internal > 0 {
 		row.Status = "unknown"
@@ -195,9 +202,8 @@ func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types
 		return row, ReasonNegativeObligationAmount
 	}
 	row.Amount = money(amount)
-	if cp, ok := observations[row.AccountID]; ok && date <= domain.FormatIsoDate(time.Unix(cp.ObservedAt, 0)) {
-		row.Status = "unknown"
-		return row, ReasonScheduledPaymentStatusUnknown
-	}
+	// Without an exact happening claim the occurrence stays expected, priced and
+	// deducted once. A balance observation on its date is not settlement
+	// evidence in either direction, so it never turns the bill unknown.
 	return row, ""
 }

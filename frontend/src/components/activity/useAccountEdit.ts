@@ -110,9 +110,16 @@ export function useAccountEdit(
 	const update = (patch: Partial<typeof source>, field: AccountEditField) => {
 		// The kind selector stays available on synced accounts: kind is a
 		// user-configured label, and changing it is the supported way to
-		// update the type there. The display basis is owner config too,
-		// so it stays editable wherever kind does.
-		if (saving || (readOnly && field !== "kind" && field !== "display")) return;
+		// update the type there. Display basis and a tracked card's closing
+		// day are owner config too, so they stay editable wherever kind does.
+		if (
+			saving ||
+			(readOnly &&
+				field !== "kind" &&
+				field !== "display" &&
+				field !== "closingDay")
+		)
+			return;
 		edit.update(patch);
 		setActiveField(field);
 		if (field === "balance" && observedAt === null)
@@ -145,16 +152,26 @@ export function useAccountEdit(
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving) return;
-		// Synced accounts lock every field except kind and display basis. A
-		// kind change writes only the kind plus the current bounds verbatim;
-		// a basis change rides along as owner config.
+		// Synced accounts lock bank-owned facts. Kind, display basis and a
+		// tracked card's closing day are owner config and ride along on save;
+		// the current bounds stay verbatim.
 		if (readOnly) {
 			const kindChanged = edit.value.kind !== account.kind;
 			const basisChanged =
 				(edit.value.displayBasis ?? "available") !==
 				(account.displayBasis ?? "available");
-			if (!kindChanged && !basisChanged) {
+			const closingChanged =
+				(edit.value.statementClosingDay ?? "") !==
+				String(account.statementClosingDay || DEFAULT_STATEMENT_CLOSING_DAY);
+			if (!kindChanged && !basisChanged && !closingChanged) {
 				reset();
+				return;
+			}
+			const closingDay = closingChanged
+				? parseDay(edit.value.statementClosingDay)
+				: null;
+			if (closingChanged && (closingDay === null || closingDay < 1 || closingDay > 31)) {
+				setError("Enter a statement closing day between 1 and 31.");
 				return;
 			}
 			if (edit.conflict) {
@@ -185,6 +202,7 @@ export function useAccountEdit(
 				},
 				edit.value.kind,
 				basisChanged ? edit.value.displayBasis : undefined,
+				closingDay ?? undefined,
 			);
 			setSaving(false);
 			if (ok) {

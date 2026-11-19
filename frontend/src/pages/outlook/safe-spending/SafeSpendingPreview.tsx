@@ -127,7 +127,7 @@ export function SafeSpendingPreview({
 						<>
 							<div className="grid gap-1">
 								<p className="m-0 text-sm text-muted-foreground">
-									{labels.safeBeforePayday}
+									{ledger.amountLabel}
 								</p>
 								<strong
 									className="text-3xl font-bold tabular-nums"
@@ -137,11 +137,6 @@ export function SafeSpendingPreview({
 								</strong>
 								<p className="m-0 text-xs text-muted-foreground">{caption}</p>
 							</div>
-							{ledger.evidence.message && (
-								<p className="m-0 text-sm text-muted-foreground" role="status">
-									{ledger.evidence.message}
-								</p>
-							)}
 							<SafeSpendingConstraintCompare
 								prePaydayRoom={ledger.allowance.prePaydayRoom}
 								postIncomeRoom={ledger.allowance.postIncomeRoom}

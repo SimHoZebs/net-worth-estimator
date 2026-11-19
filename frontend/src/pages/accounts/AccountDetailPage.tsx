@@ -29,6 +29,7 @@ import {
 	useRemoteProjection,
 } from "../../state/useRemoteProjection.ts";
 import { useSchedules } from "../../state/workspaceResources.ts";
+import { useSafeSpendingSettings } from "../../state/useSafeSpendingSettings.ts";
 import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import { AccountIcon } from "../../components/AccountIcon.tsx";
 import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
@@ -88,6 +89,7 @@ export function AccountDetailView({
 		!isGroupedDisplay(account),
 	);
 	const edit = useAccountEdit(account, locked, adjustments.data ?? []);
+	const trackedCardIds = useSafeSpendingSettings().accountIds ?? [];
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
 		if (edit.saving) return;
@@ -338,6 +340,7 @@ export function AccountDetailView({
 							account={account}
 							edit={edit}
 							readOnly={locked}
+							cardAccountIds={trackedCardIds}
 						/>
 					)}
 				</TabsContent>

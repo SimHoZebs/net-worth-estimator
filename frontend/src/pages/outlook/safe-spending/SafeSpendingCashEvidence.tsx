@@ -51,11 +51,6 @@ export function SafeSpendingCashEvidence({
 			<p className="m-0 text-xs text-muted-foreground">
 				{labels.cashAsOf} {evidence.cashAsOf}
 			</p>
-			{evidence.message && (
-				<p className="m-0 text-sm text-muted-foreground" role="status">
-					{evidence.message}
-				</p>
-			)}
 			{evidence.baselines.length > 0 && (
 				<dl className="m-0 grid gap-2 text-sm">
 					{evidence.baselines.map((baseline) => (

@@ -21,36 +21,35 @@ func TestDisabledPendingRemainsEvidenceAndClaimsWithoutMutatingSnapshot(t *testi
 				}
 				m.Transactions = []types.Transaction{tx}
 				s := Build(m, nil, "2026-11-15", testEnd)
-				uncertain := claimed || at > "2026-11-14T20:00:00Z"
+				// A real pending authorization counts as a happened occurrence.
+				// Only a hold after the observation leaves cash unknown; the
+				// claimed bill itself is never a second, uncertain deduction.
+				uncertain := at > "2026-11-14T20:00:00Z"
 				if len(s.Bills) != 1 || (s.Status == "uncertain") != uncertain {
 					t.Fatalf("summary %+v", s)
 				}
-				if at > "2026-11-14T20:00:00Z" {
-					if s.CheckingAvailable != nil {
+				if uncertain {
+					if s.CheckingAvailable != nil || s.CashAfterBills != nil {
 						t.Fatal("post-observation pending coverage presented as exact cash")
 					}
 				} else {
 					assertMoney(t, s.CheckingAvailable, 1244.43)
-				}
-				if uncertain {
-					if s.CashAfterBills != nil {
-						t.Fatal("uncertain coverage presented as exact cash after bills")
+					if claimed {
+						assertMoney(t, s.CashAfterBills, 1244.43)
+					} else {
+						assertMoney(t, s.CashAfterBills, 544.43)
 					}
-				} else {
-					assertMoney(t, s.CashAfterBills, 544.43)
 				}
 				if claimed {
-					if s.OutstandingBillsTotal != nil {
-						t.Fatal("hold deduction presented as exact")
-					}
+					assertMoney(t, s.OutstandingBillsTotal, 0)
 				} else {
 					assertMoney(t, s.OutstandingBillsTotal, 700)
 				}
 				if m.Transactions[0].Enabled {
 					t.Fatal("mutated simulation eligibility")
 				}
-				if (s.Bills[0].Status == "pending") != claimed {
-					t.Fatalf("pending evidence %+v", s.Bills)
+				if (s.Bills[0].Status == "paid") != claimed {
+					t.Fatalf("claimed occurrence evidence %+v", s.Bills)
 				}
 				// The bank settles the same identity and its claim remains exact.
 				m.Transactions[0].Pending = false
@@ -164,7 +163,7 @@ func TestRequestedBillSurvivesSimulatedPartialRealizationAndExactClaimReplacesWh
 	}
 }
 
-func TestBillWindowOmitsEarlierSchedulesAndSameDayObservationMakesPaymentUnknown(t *testing.T) {
+func TestBillWindowOmitsEarlierSchedulesAndSameDayObservationStaysExpected(t *testing.T) {
 	for _, due := range []string{"2026-11-01", "2026-11-14", "2026-11-15"} {
 		t.Run(due, func(t *testing.T) {
 			m := baseModel()
@@ -186,12 +185,17 @@ func TestBillWindowOmitsEarlierSchedulesAndSameDayObservationMakesPaymentUnknown
 				if s.Bills[0].Status != "unpaid" {
 					t.Fatalf("future bill %+v", s)
 				}
+				// An observation on the bill's own date neither confirms nor
+				// denies payment. The bill stays expected, priced and deducted
+				// once, so the subtotal and remainder stay available.
 				m.Checkpoints[0].ObservedAt = stamp("2026-11-15T08:00:00Z")
 				s = Build(m, nil, "2026-11-15", testEnd)
 				assertMoney(t, s.CheckingAvailable, 1244.43)
-				if s.Status != "uncertain" || s.CashAfterBills != nil || !slices.Contains(s.Reasons, ReasonScheduledPaymentStatusUnknown) || s.Bills[0].Status != "unknown" {
-					t.Fatalf("same-day payment status guessed %+v", s)
+				if s.Status != "available" || len(s.Reasons) != 0 || s.Bills[0].Status != "unpaid" {
+					t.Fatalf("same-day observation changed an expected bill %+v", s)
 				}
+				assertMoney(t, s.OutstandingBillsTotal, 100)
+				assertMoney(t, s.CashAfterBills, 1144.43)
 			}
 			m.Transactions[0].Claim = &types.TransactionClaim{ScheduleID: "unclaimed", OccurrenceDate: due}
 			s = Build(m, nil, "2026-11-15", testEnd)
@@ -269,9 +273,14 @@ func TestPendingClaimCannotBorrowLaterRecordedAmount(t *testing.T) {
 	hold.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "previous"}, Inputs: map[string]types.AmountInputBinding{"previous": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "later"}}}}
 	m.Transactions = []types.Transaction{hold, payment("later", 80, "2026-11-14T11:00:00Z")}
 	s := Build(m, nil, "2026-11-15", testEnd)
-	if len(s.Bills) != 1 || s.Bills[0].Status != "pending" || s.Bills[0].Amount != nil || s.OutstandingBillsTotal != nil || s.CashAfterBills != nil {
-		t.Fatalf("pending evidence %+v", s)
+	// The real pending hold settles its exact occurrence even though the
+	// provider amount cannot be borrowed from a later recorded row. An
+	// unresolved amount is not a second deduction or an uncertain total.
+	if len(s.Bills) != 1 || s.Bills[0].Status != "paid" || s.Bills[0].Amount != nil {
+		t.Fatalf("claimed hold evidence %+v", s)
 	}
+	assertMoney(t, s.OutstandingBillsTotal, 0)
+	assertMoney(t, s.CashAfterBills, 1244.43)
 }
 
 func TestPendingOutsideBillWindowRespectsObservationCut(t *testing.T) {

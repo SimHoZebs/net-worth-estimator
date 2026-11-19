@@ -17,19 +17,13 @@ function evidenceStatus(summary: SafeSpendingSummary): EvidenceStatus {
 	return "missing";
 }
 
-function billDetail(status: SafeSpendingBill["status"]): string | null {
-	if (status === "pending") return "Pending";
-	if (status === "unknown") return "Payment unknown";
-	return null;
-}
-
 function billRow(bill: SafeSpendingBill): ObligationRow {
 	return {
 		id: bill.id,
 		name: bill.name,
 		date: bill.date,
 		amount: bill.amount,
-		detail: billDetail(bill.status),
+		detail: null,
 	};
 }
 
@@ -48,12 +42,6 @@ function buildEvidence(summary: SafeSpendingSummary): AllowanceEvidence {
 	const status = evidenceStatus(summary);
 	return {
 		status,
-		message:
-			status === "uncertain"
-				? "Allowance uncertain"
-				: status === "missing"
-					? "Allowance unavailable"
-					: null,
 		checkingAvailable: summary.checkingAvailable,
 		cashAsOf: summary.cashAsOf,
 		baselines: (summary.baselines ?? []).map((baseline) => ({
@@ -85,10 +73,23 @@ export function buildAllowanceLedger(
 		? unpaidBills.filter((bill) => bill.date >= payday)
 		: [];
 	const status = evidenceStatus(summary);
-	const amount =
-		status === "available" && summary.safeToSpend !== null
-			? Math.max(0, cents(summary.safeToSpend))
+	const statementAmountUnknown =
+		summary.statementReserve === null ||
+		(summary.statements ?? []).some(
+			(statement) => statement.amount === null,
+		);
+	const safe = summary.safeToSpend;
+	const beforePayoffs =
+		safe === null &&
+		statementAmountUnknown &&
+		summary.prePaydayRoom !== null
+			? Math.max(0, cents(summary.prePaydayRoom))
 			: null;
+	const amount = safe !== null ? Math.max(0, cents(safe)) : beforePayoffs;
+	const amountLabel =
+		beforePayoffs !== null
+			? "Before card payoffs"
+			: "Safe to spend before payday";
 	const sections: ObligationSection[] = [
 		{
 			title: "Bills before payday",
@@ -108,6 +109,7 @@ export function buildAllowanceLedger(
 	];
 	const totalsKnown = sections.every((section) => section.total !== null);
 	return {
+		amountLabel,
 		allowance: {
 			cashAsOf: summary.cashAsOf,
 			payday,

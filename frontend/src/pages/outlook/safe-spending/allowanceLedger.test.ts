@@ -75,7 +75,7 @@ describe("dated allowance", () => {
 });
 
 describe("protected obligation ledger", () => {
-	it("groups bills by the selected payday and keeps the server totals", () => {
+	it("groups expected bills by payday and omits a paid occurrence", () => {
 		const { sections } = buildAllowanceLedger(
 			summary({
 				bills: [
@@ -101,13 +101,13 @@ describe("protected obligation ledger", () => {
 					},
 					{
 						id: "power",
-						transactionId: "power-payment",
+						transactionId: null,
 						scheduleId: null,
 						accountId: "checking",
 						name: "Power",
 						date: "2026-11-30",
 						amount: null,
-						status: "unknown",
+						status: "unpaid",
 					},
 				],
 				statements: [
@@ -127,13 +127,14 @@ describe("protected obligation ledger", () => {
 			["Card payoff on payday", 650],
 		]);
 		expect(sections[0]!.rows.map((row) => row.name)).toEqual(["Phone"]);
+		expect(sections.flatMap((section) => section.rows.map((row) => row.name))).not.toContain("Rent");
 		expect(sections[1]!.rows.map((row) => row)).toEqual([
 			{
 				id: "power",
 				name: "Power",
 				date: "2026-11-30",
 				amount: null,
-				detail: "Payment unknown",
+				detail: null,
 			},
 		]);
 		expect(sections[2]!.rows).toEqual([
@@ -187,7 +188,7 @@ describe("protected obligation ledger", () => {
 		);
 		expect(sections[0]!.rows[0]).toMatchObject({
 			name: "Bill",
-			detail: "Pending",
+			detail: null,
 		});
 	});
 });
@@ -214,7 +215,6 @@ describe("evidence state", () => {
 			}),
 		);
 		expect(evidence.status).toBe("uncertain");
-		expect(evidence.message).toBe("Allowance uncertain");
 		expect(evidence.baselines).toEqual([
 			{
 				accountId: "checking",
@@ -226,12 +226,46 @@ describe("evidence state", () => {
 		]);
 	});
 
-	it("does not expose internal reason codes", () => {
-		const { evidence } = buildAllowanceLedger(
-			summary({ status: "missing", reasons: ["__proto__"] }),
+	it("presents a known server allowance even when the summary is uncertain", () => {
+		const ledger = buildAllowanceLedger(
+			summary({ status: "uncertain", safeToSpend: 275 }),
 		);
-		expect(evidence.message).toBe("Allowance unavailable");
-		expect(JSON.stringify(evidence)).not.toContain("__proto__");
+		expect(ledger.allowance.amount).toBe(275);
+		expect(ledger.amountLabel).toBe("Safe to spend before payday");
+	});
+
+	it("leads with before-payoff room when statement amounts are unknown", () => {
+		const ledger = buildAllowanceLedger(
+			summary({
+				status: "uncertain",
+				safeToSpend: null,
+				statementReserve: null,
+				statements: [
+					{
+						accountId: "card",
+						name: "Card",
+						closingDate: "2026-11-28",
+						kind: "closed",
+						amount: null,
+					},
+				],
+				prePaydayRoom: 325.5,
+			}),
+		);
+		expect(ledger.allowance.amount).toBe(325.5);
+		expect(ledger.amountLabel).toBe("Before card payoffs");
+	});
+
+	it("withholds a number when neither the allowance nor before-payoff room is known", () => {
+		const ledger = buildAllowanceLedger(
+			summary({
+				status: "uncertain",
+				safeToSpend: null,
+				statementReserve: null,
+				prePaydayRoom: null,
+			}),
+		);
+		expect(ledger.allowance.amount).toBeNull();
 	});
 });
 

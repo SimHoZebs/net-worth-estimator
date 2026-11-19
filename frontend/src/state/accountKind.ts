@@ -28,7 +28,8 @@ export function syncedKindError(
  * user-configured label the backend stores but never interprets, so the
  * write carries only the kind plus the account's current bounds verbatim:
  * open bounds ride as omitted, never invented. A display-basis change rides
- * along when given: the basis is owner config, not bank evidence. Fails
+ * along when given: the basis is owner config, not bank evidence. A tracked
+ * card's closing day is owner config too and rides along when supplied. Fails
  * closed when the current bounds cannot be read instead of clearing them.
  */
 export async function persistSyncedAccountKind(
@@ -40,6 +41,7 @@ export async function persistSyncedAccountKind(
 	},
 	kind: AccountKind,
 	displayBasis?: "available" | "posted",
+	statementClosingDay?: number,
 ): Promise<boolean> {
 	const row = getAccountBalances()?.accounts.find(
 		(row) => row.id === account.id,
@@ -61,6 +63,7 @@ export async function persistSyncedAccountKind(
 				kind,
 				enabled: account.enabled,
 				...(displayBasis === undefined ? {} : { displayBasis }),
+				...(statementClosingDay === undefined ? {} : { statementClosingDay }),
 				...(minBalance === undefined ? {} : { minBalance }),
 				...(maxBalance === undefined ? {} : { maxBalance }),
 				...(color === undefined ? {} : { color }),
