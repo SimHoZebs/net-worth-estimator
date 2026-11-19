@@ -40,9 +40,9 @@ func oldShapeDatabase(t *testing.T) string {
 			('alice', 'checking', 0, 'Checking', 'cash', 1),
 			('alice', 'savings', 1, 'Savings', 'cash', 1),
 			('bob', 'checking', 0, 'Checking', 'cash', 1)`,
-		`INSERT INTO recurrence_rules(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, priority, enabled) VALUES
-			('alice', 'rule-a', 0, ' Subscription', 'checking', 'null', '` + oldTransactionsAmount + `', 'monthly', '2026-01-01', 0, 1),
-			('bob', 'rule-b', 0, 'Subscription', 'checking', 'null', '` + oldTransactionsAmount + `', 'monthly', '2026-01-01', 0, 1)`,
+		`INSERT INTO recurrence_rules(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, priority, enabled) VALUES
+			('alice', 'rule-a', 0, ' Subscription', 'checking', 'null', '` + oldTransactionsAmount + `', 'month', 1, '[]', 'byDate', '2026-01-01', 0, 1),
+			('bob', 'rule-b', 0, 'Subscription', 'checking', 'null', '` + oldTransactionsAmount + `', 'month', 1, '[]', 'byDate', '2026-01-01', 0, 1)`,
 		`INSERT INTO transactions(user_id, id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, source, pending, void, position, enabled, execution_order, fulfills_rule_id, fulfills_occurrence_date, receipt_ids) VALUES
 			('alice', '01900000-0000-7000-8000-000000000001', 'Groceries', 'checking', '["savings"]', '` + oldTransactionsAmount + `', 1769904000, 1769904000, 'user', 0, 0, 2, 1, 3, 'rule-a', '2026-02-01', '["rcpt-b", "rcpt-a"]'),
 			('alice', '01900000-0000-7000-8000-000000000002', 'Rent', 'checking', 'null', '` + oldTransactionsAmount + `', 1769904000, 1769904000, 'user', 0, 0, 0, 0, 0, NULL, NULL, '[]'),
