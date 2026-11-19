@@ -86,6 +86,24 @@
         },
         {
           "kind": "Action",
+          "ref": "verify-maintenance",
+          "spec": {
+            "kind": "Service",
+            "spec": {
+              "type": "execute",
+              "condition": "running",
+              "data": {
+                "serviceId": "nwe-api",
+                "command": "/bin/sh -c 'body=\"\"; for i in 1 2 3 4; do body=$(busybox wget -qO- -T 2 \"http://127.0.0.1:$PORT/readyz\" 2>/dev/null) && [ \"$body\" = maintenance ] && exit 0; sleep 1; done; echo \"expected maintenance readiness, got: $body\" >&2; exit 1'",
+                "options": { "dispatchOnly": false },
+                "user": "10001",
+                "group": "10001"
+              }
+            }
+          }
+        },
+        {
+          "kind": "Action",
           "ref": "migrate",
           "spec": {
             "kind": "Service",

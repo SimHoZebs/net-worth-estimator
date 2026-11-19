@@ -1113,12 +1113,13 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   const steps = workflow.spec.spec.steps;
   assert.deepEqual(steps.map((step) => step.ref), [
     "identity-backup", "await-api-writers", "stop-api-writers", "deploy-maintenance-image",
-    "deploy-identity-image", "await-api-container", "migrate", "clear-maintenance", "start-api",
+    "deploy-identity-image", "await-api-container", "verify-maintenance", "migrate",
+    "clear-maintenance", "start-api",
   ]);
-  // Project workflows reject team templates at runtime, so the definition
-  // stays inside the project-allowed node kinds.
-  assert.ok(steps.every((step) => step.kind !== "RunTemplate"));
-  const [backup, awaitWriters, stopApi, deployApi, deployIdentity, awaitContainer, migrate, clearMaintenance, startApi] = steps;
+  // Project workflows reject team templates at runtime. Project workflow
+  // templates remain allowed, so only the team kind is forbidden.
+  assert.ok(steps.every((step) => step.kind !== "RunTemplate" || step.spec.templateType !== "template"));
+  const [backup, awaitWriters, stopApi, deployApi, deployIdentity, awaitContainer, verifyMaintenance, migrate, clearMaintenance, startApi] = steps;
   assert.equal(backup.condition, "success");
   assert.equal(backup.spec.backupType, "dump");
   assert.equal(awaitWriters.kind, "Condition");
@@ -1149,6 +1150,10 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   );
   assert.ok(
     steps.findIndex((step) => step.ref === "deploy-identity-image") <
+      steps.findIndex((step) => step.ref === "verify-maintenance"),
+  );
+  assert.ok(
+    steps.findIndex((step) => step.ref === "verify-maintenance") <
       steps.findIndex((step) => step.ref === "migrate"),
   );
   assert.ok(
@@ -1161,6 +1166,22 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.equal(awaitContainer.spec.spec.type, "running");
   assert.equal(awaitContainer.spec.spec.data.serviceId, "nwe-api");
   assert.equal(awaitContainer.spec.spec.data.timeoutDuration, 600);
+  // A target that is not in maintenance answers ok, so the release must
+  // fail before the migration instead of migrating under live writers.
+  const verify = verifyMaintenance.spec;
+  assert.equal(verifyMaintenance.kind, "Action");
+  assert.equal(verifyMaintenance.condition, undefined);
+  assert.equal(verify.kind, "Service");
+  assert.equal(verify.spec.type, "execute");
+  assert.equal(verify.spec.condition, "running");
+  assert.equal(verify.spec.data.serviceId, "nwe-api");
+  assert.equal(verify.spec.data.options.dispatchOnly, false);
+  assert.equal(verify.spec.data.user, "10001");
+  assert.equal(verify.spec.data.group, "10001");
+  assert.match(verify.spec.data.command, /busybox wget/);
+  assert.match(verify.spec.data.command, /127\.0\.0\.1:\$PORT\/readyz/);
+  assert.match(verify.spec.data.command, /\[ "\$body" = maintenance \]/);
+  assert.match(verify.spec.data.command, /exit 1/);
   for (const [step, image, target] of [
     [deployIdentity, "IDENTITY_IMAGE", "${args.IDENTITY_SERVICE_ID}"],
     [deployApi, "API_IMAGE", "nwe-api"],

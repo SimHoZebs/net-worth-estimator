@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import test from "node:test";
 
 const exec = promisify(execFile);
 const image = process.env.NORTHFLANK_TEST_IMAGE;
 const docker = async (...args) => (await exec("docker", args, { timeout: 120000 })).stdout.trim();
+const release = JSON.parse(await readFile(new URL("./release.json", import.meta.url), "utf8"));
+const verifyCommand = release.spec.spec.steps
+  .find((step) => step.ref === "verify-maintenance").spec.spec.data.command;
 
 async function waitForReady(name, expected, deadlineMs = 90000) {
   const deadline = Date.now() + deadlineMs;
@@ -57,6 +61,8 @@ exec python /app/northflank-runtime.py
     image, "/bin/sh", "-c", boot);
 
   await waitForReady(name, "ok");
+  // The gate must fail closed when the container is not in maintenance.
+  await assert.rejects(docker("exec", name, "/bin/sh", "-c", verifyCommand));
   const feedback = `
 import copy,json,urllib.request
 def post(path,payload):
@@ -139,8 +145,9 @@ exec python /app/northflank-runtime.py
     image, "/bin/sh", "-c", boot);
 
   await waitForReady(name, "maintenance", 60000);
+  await docker("exec", name, "/bin/sh", "-c", verifyCommand);
   await assert.rejects(docker("exec", name, "busybox", "wget", "-qO-", "http://127.0.0.1:8766/health"));
   await docker("exec", name, "rm", "-f", "/data/waypoint-maintenance");
   await docker("restart", name);
-  await waitForReady(name, "ok", 60000);
+  await waitForReady(name, "ok");
 });

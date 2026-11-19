@@ -55,7 +55,7 @@ target before its operator window is complete.
 | Target | Adapter | Storage access and gate |
 | --- | --- | --- |
 | Home-server Komodo | Infrastructure `net-worth-estimator/migrate.sh` | Build target images, stop frontend/API, run `/app/migrate.sh` with `net-worth-data`; continue Compose only on exit 0. |
-| Northflank | `northflank/release.json` | Deploy pinned GHCR images, back up identity, set the durable maintenance marker on the existing volume, run `/app/migrate.sh`, clear the marker and restart only on success. |
+| Northflank | `northflank/release.json` | Deploy pinned GHCR images, back up identity, set the durable maintenance marker on the existing volume, verify `/readyz` answers `maintenance`, run `/app/migrate.sh`, clear the marker and restart only on success. |
 | Other container hosts | Explicit stopped-API maintenance operation | Run the same image command with the real disk attached. A job without that disk does not migrate production. |
 
 Vercel contains no financial database and needs no database migration hook.
@@ -121,7 +121,9 @@ Require exactly `ok` from `PRAGMA integrity_check` and no rows from
 `PRAGMA foreign_key_check`. A candidate database permits checks before
 publication. Keep backup paths private and preserve numeric ownership.
 
-On failure, the adapter leaves the API stopped or in maintenance. Inspect the
+On failure, the adapter leaves a marker-aware API stopped or in maintenance; a
+target that is not in maintenance can keep running, so stop it
+before any manual migration. Inspect the
 failed stage. Repair and retry the same reviewed target or perform paired
 restore. Never automatically resume old code against partial changes.
 After new writes, restore an older backup only after an explicit reconciliation
@@ -150,15 +152,18 @@ needs that image's migration. Retain its exact image and recovery set.
 
 The files in `northflank/` define only the `waypoint-release` project workflow.
 Project workflows cannot invoke team templates, so the definition is
-self-contained and uses no `RunTemplate` node.
+self-contained and references no team template.
 
 The release waits for the running API container, creates the durable marker
 `/data/waypoint-maintenance` with an execute action, and deploys the target
 image. On boot, `/app/northflank-runtime.py` sees the marker and answers
 `/readyz` as `maintenance` from `/tmp/waypoint-maintenance`. It starts neither
 the ML sidecar nor `/app/server`, and its docroot never includes `/data`.
-Clearing the marker and restarting the service is the only switch back to the
-API.
+Before it runs the migration, the workflow reads the container's local
+`/readyz` and requires the body to be exactly `maintenance`. A target that is
+not in maintenance answers `ok` and fails that step, so the release never
+migrates under live writers. Clearing the marker and restarting the service is
+the only switch back to the API.
 
 Use workflow concurrency `queue` so releases never overlap or drop newer commits.
 Disable per-service CI/CD bypasses: disable direct Git CI and pin both services
@@ -178,7 +183,8 @@ The ReadWriteOnce volume stays attached to its one API service. Northflank
 terminates the old pod before starting another pod with that volume. The
 maintenance process serves only `/tmp/waypoint-maintenance`, never `/data`.
 The API and scheduler are absent. Its `/readyz` body says `maintenance`, not
-`ok`. The workflow deploys the target image and runs `/app/migrate.sh` as
+`ok`. The workflow deploys the target image, requires that same `maintenance`
+body from inside the container, and runs `/app/migrate.sh` as
 UID/GID `10001`, with `dispatchOnly: false` so the node awaits that command.
 Northflank caps an execute action at 15 seconds and has no timeout field for
 it, so the await ends at that wall, and a wall failure is a step failure, not a
@@ -198,6 +204,9 @@ as complete. If the service is not running before a release, restart it first
 so the marker action has a container to reach. If the API image cannot boot at
 all, the manual service-command patch remains the last-resort path: patch the
 command to clear the marker, then restore `python /app/northflank-runtime.py`.
+If the verification step failed because the container answered `ok`, that
+target is not in maintenance and may still serve writers. Stop it and ensure a
+marker-aware image boots with the marker before running any migration by hand.
 
 Postgres dumps precede identity-image replacement. They do not back up SQLite.
 A pending migration must take and verify the financial backup in its shared

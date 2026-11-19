@@ -17,8 +17,8 @@ leave it unchanged across releases. Project workflows cannot invoke team
 templates, so `release.json` is self-contained: it creates the durable marker
 `/data/waypoint-maintenance` on the volume before deploying the target image,
 and the supervisor answers `/readyz` as `maintenance` from
-`/tmp/waypoint-maintenance` while that marker exists, starting neither the ML
-sidecar nor `/app/server`. After a successful migration the workflow removes
+`/tmp/waypoint-maintenance` when the marker was present at boot, starting
+neither the ML sidecar nor `/app/server`. After a successful migration the workflow removes
 the marker and restarts the service; the supervisor then runs
 `/app/api-boot.sh` after the ML provider is healthy, and that wrapper provisions
 or validates the shared application database before `/app/server`. Do not
@@ -73,10 +73,16 @@ the image references drive the deployment.
 The release waits for the running API container, writes the marker into its
 volume, and deploys the target image. The restarted supervisor sees the marker,
 answers `/readyz` with `maintenance`, and starts no ML or API writer, so the
-migration owns the only write path. The migration runs inside that single
+migration owns the only write path. Before the migration, the workflow reads
+that local `/readyz` and fails unless the body is exactly `maintenance`. A
+target that is not in maintenance answers `ok`, so the release fails instead of
+migrating under live writers. That target keeps serving writers after the
+failure; stop it and ensure a marker-aware image boots with the marker before
+any manual migration. The migration runs inside that single
 container on the real volume. Only a zero exit removes the marker and restarts
-the API; a failed step leaves the marker in place, so the maintenance answer
-survives retries. The identity image deploy runs after the API image deploy, so
+the API. For a marker-aware image, a failed step leaves the marker in place, so
+the maintenance answer survives retries; any other target keeps answering
+`ok`. The identity image deploy runs after the API image deploy, so
 the API container is already settled when the migration attaches to it.
 
 If the service is not running before a release, restart it before requesting
@@ -103,9 +109,12 @@ older code. A second release queues behind the first and never overlaps it.
 
 The policy for a failed release lives in [the migration SOP](../MIGRATIONS.md):
 inspect the failed stage, repair and retry the same reviewed target, and never
-promote old code over partial changes. A failed step leaves the API stopped or
-in maintenance. When the API is in maintenance, recovering the window takes
-these steps.
+promote old code over partial changes. A failed step leaves a marker-aware API
+stopped or in maintenance. When the API is in maintenance, recovering the
+window takes these steps. If verification failed because `/readyz` answered
+`ok`, the target is not in maintenance and may still be serving writers: stop
+it and ensure a marker-aware image boots with the marker before any manual
+migration.
 
 1. Wait until `/readyz` answers `maintenance`. That answer shows the
    maintenance container is serving. If the migration command is refused again
