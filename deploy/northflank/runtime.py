@@ -8,6 +8,13 @@ installed as ML_MODEL_PATH only if the live database is missing or shows
 zero learning (empty events table, no drift review pending). A database
 that already recorded feedback is never overwritten. ML_SEED_DISABLE=1
 skips seeding. A corrupt live database fails loud so an operator decides.
+
+Maintenance marker: /data/waypoint-maintenance is the release contract.
+While it exists at boot, the runtime answers /readyz with "maintenance"
+from a generated docroot and starts neither the ML sidecar nor the API,
+so the migration owns the only write path. The release workflow creates
+and removes the marker and restarts the service; the service command
+never changes.
 """
 import os
 import shutil
@@ -18,6 +25,24 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+MAINTENANCE_MARKER = "/data/waypoint-maintenance"
+MAINTENANCE_ROOT = "/tmp/waypoint-maintenance"
+
+
+def serve_maintenance():
+    """Serve /readyz as maintenance without touching application writers.
+
+    The docroot is generated outside /data, so the process exposes no
+    database file and no application state.
+    """
+    os.makedirs(MAINTENANCE_ROOT, exist_ok=True)
+    with open(os.path.join(MAINTENANCE_ROOT, "readyz"), "w", encoding="utf-8") as ready:
+        ready.write("maintenance\n")
+    os.execv(sys.executable, [
+        sys.executable, "-m", "http.server", os.environ.get("PORT", "8787"),
+        "--bind", "0.0.0.0", "--directory", MAINTENANCE_ROOT,
+    ])
 
 
 def maybe_install_seed():
@@ -78,6 +103,10 @@ def maybe_install_seed():
 
 
 def run():
+    if os.path.isfile(MAINTENANCE_MARKER):
+        print("northflank runtime: maintenance marker present; serving maintenance", flush=True)
+        serve_maintenance()
+        return 0
     children = []
     stopping = False
 

@@ -12,13 +12,17 @@ public port, and the supervisor waits for River storage readiness before booting
 the API. A child exit stops both processes, and SIGTERM is forwarded with a
 bounded shutdown grace period.
 
-Use `python /app/northflank-runtime.py` as the API service's custom command.
-The supervisor runs `/app/api-boot.sh` after the ML provider is healthy, and
-that wrapper provisions or validates the shared application database before
-`/app/server`. The release maintenance command must bypass the supervisor so all
-API writers stop before the offline migration, and the Northflank command is
-restored only after a successful migration. Do not change the identity provider
-or issuer as part of adopting this packaging.
+Use `python /app/northflank-runtime.py` as the API service's custom command and
+leave it unchanged across releases. Project workflows cannot invoke team
+templates, so `release.json` is self-contained: it creates the durable marker
+`/data/waypoint-maintenance` on the volume before deploying the target image,
+and the supervisor answers `/readyz` as `maintenance` from
+`/tmp/waypoint-maintenance` while that marker exists, starting neither the ML
+sidecar nor `/app/server`. After a successful migration the workflow removes
+the marker and restarts the service; the supervisor then runs
+`/app/api-boot.sh` after the ML provider is healthy, and that wrapper provisions
+or validates the shared application database before `/app/server`. Do not
+change the identity provider or issuer as part of adopting this packaging.
 
 The existing API volume holds three current application databases whose paths
 come from the service environment:
@@ -66,13 +70,17 @@ the image references drive the deployment.
 
 ## Release window and recovery
 
-The release stops every API writer, swaps the API container for a maintenance
-process that answers `/readyz` with `maintenance`, migrates the real database,
-and restores the API command only after the migration exits zero. The release
-waits for the API container to be running before it migrates, because the
-migration runs inside that container. The identity image deploy runs after the
-API image deploy, so the API container is already settled when the migration
-attaches to it.
+The release waits for the running API container, writes the marker into its
+volume, and deploys the target image. The restarted supervisor sees the marker,
+answers `/readyz` with `maintenance`, and starts no ML or API writer, so the
+migration owns the only write path. The migration runs inside that single
+container on the real volume. Only a zero exit removes the marker and restarts
+the API; a failed step leaves the marker in place, so the maintenance answer
+survives retries. The identity image deploy runs after the API image deploy, so
+the API container is already settled when the migration attaches to it.
+
+If the service is not running before a release, restart it before requesting
+the release so the marker execute action has a container to reach.
 
 The workflow runs that migration as an execute action, which Northflank caps
 at 15 seconds with no configurable timeout. A conversion near that wall fails
@@ -102,17 +110,18 @@ these steps.
 1. Wait until `/readyz` answers `maintenance`. That answer shows the
    maintenance container is serving. If the migration command is refused again
    with `No running container found`, wait for that answer and run it again.
-   When nothing serves `/readyz`, the container is not up; request the release
-   again instead of running the migration.
+   When nothing serves `/readyz`, the container is not up; restart the service
+   before requesting the release again instead of running the migration.
 2. Run the migration as the API user and require exit zero.
-3. Restore the API process command. The patch changes only the command and
-   leaves credentials, ports, volumes, and identity settings untouched.
+3. Remove the marker and restart the API. Clearing the marker is the whole
+   switch; the service command stays `python /app/northflank-runtime.py`.
 
 ```bash
 northflank exec service --project net-worth --service nwe-api --user 10001 --group 10001 \
   --shell-cmd 'sh -c' --cmd 'test -f "$NET_WORTH_ESTIMATOR_DB" && exec /app/migrate.sh'
-northflank patch service combined --project net-worth --service nwe-api \
-  -i '{"deployment":{"instances":1,"docker":{"configType":"customCommand","customCommand":"python /app/northflank-runtime.py"}}}'
+northflank exec service --project net-worth --service nwe-api --user 10001 --group 10001 \
+  --shell-cmd 'sh -c' --cmd 'rm -f /data/waypoint-maintenance'
+northflank restart service --project net-worth --service nwe-api
 ```
 
 `--shell-cmd 'sh -c'` runs the command through the container shell, so
@@ -120,3 +129,10 @@ northflank patch service combined --project net-worth --service nwe-api \
 Confirm `/readyz` answers `ok` and never `maintenance` afterwards. A release
 that fails after the API was stopped still requires a full green release of the
 reviewed target before it is complete.
+
+If the API image cannot boot at all, so no container accepts `exec`, the manual
+service-command patch remains the last-resort path: patch the command to
+`rm -f /data/waypoint-maintenance`, restart, then restore
+`python /app/northflank-runtime.py` and restart again. The patch changes only
+the command and leaves credentials, ports, volumes, and identity settings
+untouched.

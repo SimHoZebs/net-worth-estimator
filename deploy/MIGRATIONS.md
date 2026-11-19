@@ -55,7 +55,7 @@ target before its operator window is complete.
 | Target | Adapter | Storage access and gate |
 | --- | --- | --- |
 | Home-server Komodo | Infrastructure `net-worth-estimator/migrate.sh` | Build target images, stop frontend/API, run `/app/migrate.sh` with `net-worth-data`; continue Compose only on exit 0. |
-| Northflank | `northflank/release.json` and `northflank/api-command.json` | Deploy pinned GHCR images, back up identity, replace API with a maintenance process on its existing volume, run `/app/migrate.sh`, restore API command only on success. |
+| Northflank | `northflank/release.json` | Deploy pinned GHCR images, back up identity, set the durable maintenance marker on the existing volume, run `/app/migrate.sh`, clear the marker and restart only on success. |
 | Other container hosts | Explicit stopped-API maintenance operation | Run the same image command with the real disk attached. A job without that disk does not migrate production. |
 
 Vercel contains no financial database and needs no database migration hook.
@@ -148,10 +148,17 @@ needs that image's migration. Retain its exact image and recovery set.
 
 ## Northflank adapter
 
-The files in `northflank/` define the `waypoint-release` workflow and small
-`waypoint-api-command` template. The template changes only the API process
-command and waits for its service. It does not change credentials, ports, volume
-attachments, or identity settings.
+The files in `northflank/` define only the `waypoint-release` project workflow.
+Project workflows cannot invoke team templates, so the definition is
+self-contained and uses no `RunTemplate` node.
+
+The release waits for the running API container, creates the durable marker
+`/data/waypoint-maintenance` with an execute action, and deploys the target
+image. On boot, `/app/northflank-runtime.py` sees the marker and answers
+`/readyz` as `maintenance` from `/tmp/waypoint-maintenance`. It starts neither
+the ML sidecar nor `/app/server`, and its docroot never includes `/data`.
+Clearing the marker and restarting the service is the only switch back to the
+API.
 
 Use workflow concurrency `queue` so releases never overlap or drop newer commits.
 Disable per-service CI/CD bypasses: disable direct Git CI and pin both services
@@ -183,10 +190,14 @@ keeps its verified backup. Recover an overrun by running the same body through
 `northflank exec service`, which has no wall, requiring exit 0, and then
 requesting the release again; read its failure line before acting on the
 retained backup.
-Only success restores `python /app/northflank-runtime.py`, which then runs
-`/app/api-boot.sh` to validate the migrated schema before the server starts. The
-workflow waits for the API container to be running; confirm `/readyz` answers
-`ok` separately before treating the release as complete.
+Only a zero exit removes `/data/waypoint-maintenance` and restarts the service;
+the supervisor then runs `/app/api-boot.sh` to validate the migrated schema
+before the server starts. The workflow waits for the API container to be
+running; confirm `/readyz` answers `ok` separately before treating the release
+as complete. If the service is not running before a release, restart it first
+so the marker action has a container to reach. If the API image cannot boot at
+all, the manual service-command patch remains the last-resort path: patch the
+command to clear the marker, then restore `python /app/northflank-runtime.py`.
 
 Postgres dumps precede identity-image replacement. They do not back up SQLite.
 A pending migration must take and verify the financial backup in its shared
@@ -194,8 +205,8 @@ body before data edits. Volume snapshots are a separate account capability,
 not a prerequisite for SQLite's backup operation.
 
 Reapply reviewed JSON through the Northflank API when definitions change.
-Read back the workflow, template, image pins, single-instance setting, mount,
-and command. Pause the release trigger during a migration window.
+Read back the workflow, image pins, single-instance setting, mount, and service
+command. Pause the release trigger during a migration window.
 
 ## References
 

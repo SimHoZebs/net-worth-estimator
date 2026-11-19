@@ -1,6 +1,6 @@
 {
   "name": "waypoint-release",
-  "description": "Deploy pinned images, stop API writers, run the shared migration on the real volume, then start the API.",
+  "description": "Deploy pinned images, hold API writers behind a durable maintenance marker, run the shared migration on the real volume, then restart the API.",
   "apiVersion": "v1.2",
   "arguments": { "RELEASE_SHA": "", "API_IMAGE": "", "IDENTITY_IMAGE": "", "IDENTITY_SERVICE_ID": "", "IDENTITY_DATABASE_ADDON_ID": "" },
   "options": { "autorun": false, "concurrencyPolicy": "queue" },
@@ -23,19 +23,31 @@
           "spec": { "addonId": "${args.IDENTITY_DATABASE_ADDON_ID}", "backupType": "dump" }
         },
         {
-          "kind": "RunTemplate",
-          "ref": "stop-api-writers",
-          "condition": "success",
+          "kind": "Condition",
+          "ref": "await-api-writers",
           "spec": {
-            "templateType": "template",
-            "templateId": "waypoint-api-command",
-            "arguments": {
-              "variables": [
-                {
-                  "key": "COMMAND",
-                  "value": "/bin/sh -c 'mkdir -p /tmp/waypoint-maintenance; printf \"maintenance\\n\" > /tmp/waypoint-maintenance/readyz; exec busybox-extras httpd -f -p \"$PORT\" -h /tmp/waypoint-maintenance'"
-                }
-              ]
+            "kind": "Service",
+            "spec": {
+              "type": "running",
+              "data": { "serviceId": "nwe-api", "timeoutDuration": 600 }
+            }
+          }
+        },
+        {
+          "kind": "Action",
+          "ref": "stop-api-writers",
+          "spec": {
+            "kind": "Service",
+            "spec": {
+              "type": "execute",
+              "condition": "running",
+              "data": {
+                "serviceId": "nwe-api",
+                "command": "/bin/sh -c 'touch /data/waypoint-maintenance'",
+                "options": { "dispatchOnly": false },
+                "user": "10001",
+                "group": "10001"
+              }
             }
           }
         },
@@ -91,13 +103,33 @@
           }
         },
         {
-          "kind": "RunTemplate",
-          "ref": "start-api",
-          "condition": "success",
+          "kind": "Action",
+          "ref": "clear-maintenance",
           "spec": {
-            "templateType": "template",
-            "templateId": "waypoint-api-command",
-            "arguments": { "variables": [{ "key": "COMMAND", "value": "python /app/northflank-runtime.py" }] }
+            "kind": "Service",
+            "spec": {
+              "type": "execute",
+              "condition": "running",
+              "data": {
+                "serviceId": "nwe-api",
+                "command": "/bin/sh -c 'rm -f /data/waypoint-maintenance'",
+                "options": { "dispatchOnly": false },
+                "user": "10001",
+                "group": "10001"
+              }
+            }
+          }
+        },
+        {
+          "kind": "Action",
+          "ref": "start-api",
+          "spec": {
+            "kind": "Service",
+            "spec": {
+              "type": "restart",
+              "condition": "running",
+              "data": { "serviceId": "nwe-api", "timeoutDuration": 600 }
+            }
           }
         }
       ]

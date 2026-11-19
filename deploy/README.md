@@ -18,7 +18,7 @@ Application and data migrations run through the shared migration SOP in `MIGRATI
 | Storage | Existing compatible SQLite file on durable, writable local storage at `/data` |
 | Database | `NET_WORTH_ESTIMATOR_DB` on `/data`; the image default is `/data/net-worth-estimator.db` |
 | Schema | Explicit `setupdb` with the API stopped for the default image; hosts using `/app/api-boot.sh` run `setupdb` before `/app/server` |
-| Boot | Default `/app/server`; Northflank `python /app/northflank-runtime.py`, which supervises the ML sidecar and then runs `/app/api-boot.sh` |
+| Boot | Default `/app/server`; Northflank `python /app/northflank-runtime.py`, which serves `/readyz` as `maintenance` while `/data/waypoint-maintenance` exists, otherwise supervises the ML sidecar and then runs `/app/api-boot.sh` |
 | Policy database | `NET_WORTH_ESTIMATOR_AUTHZ_DB` on durable storage, provisioned once with `authzctl --setup` |
 | Liveness | `GET /healthz` reports process availability |
 | Readiness | `GET /readyz` checks the database connection with a two-second deadline |

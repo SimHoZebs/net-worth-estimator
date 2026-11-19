@@ -1,4 +1,5 @@
 import importlib.util
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
@@ -58,6 +59,27 @@ class RuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "child exited"):
                 runtime.run()
         self.provider.terminate.assert_called_once()
+
+    def test_maintenance_marker_serves_readiness_without_starting_writers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "waypoint-maintenance"
+            marker.write_text("")
+            docroot = Path(directory) / "maintenance"
+            with patch.object(runtime, "MAINTENANCE_MARKER", str(marker)), \
+                 patch.object(runtime, "MAINTENANCE_ROOT", str(docroot)), \
+                 patch.object(runtime.signal, "signal") as install_signal, \
+                 patch.object(runtime.subprocess, "Popen") as popen, \
+                 patch.object(runtime.os, "execv") as execv:
+                self.assertEqual(runtime.run(), 0)
+            self.assertEqual((docroot / "readyz").read_text(), "maintenance\n")
+
+        execv.assert_called_once()
+        executable, argv = execv.call_args.args
+        self.assertEqual(executable, runtime.sys.executable)
+        self.assertEqual(argv[:3], [runtime.sys.executable, "-m", "http.server"])
+        self.assertEqual(argv[argv.index("--directory") + 1], str(docroot))
+        popen.assert_not_called()
+        install_signal.assert_not_called()
 
 
 if __name__ == "__main__":

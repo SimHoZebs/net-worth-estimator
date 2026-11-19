@@ -8,6 +8,22 @@ const exec = promisify(execFile);
 const image = process.env.NORTHFLANK_TEST_IMAGE;
 const docker = async (...args) => (await exec("docker", args, { timeout: 120000 })).stdout.trim();
 
+async function waitForReady(name, expected, deadlineMs = 90000) {
+  const deadline = Date.now() + deadlineMs;
+  while (Date.now() < deadline) {
+    try {
+      assert.equal(await docker("exec", name, "busybox", "wget", "-qO-", "http://127.0.0.1:10000/readyz"), expected);
+      return;
+    } catch {
+      const state = JSON.parse(await docker("inspect", name))[0].State;
+      const logs = state.Running ? "" : await exec("docker", ["logs", name]);
+      assert.ok(state.Running, `Container stopped: ${logs.stdout}\n${logs.stderr}`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  assert.fail(`Container did not report ${expected}: ${await docker("logs", name)}`);
+}
+
 test("Northflank target persists learning and supervises both processes within Sandbox limits", { skip: !image, timeout: 240000 }, async (t) => {
   const name = `nwe-northflank-${randomUUID()}`;
   const volume = `${name}-data`;
@@ -40,22 +56,7 @@ exec python /app/northflank-runtime.py
     "--env", "NET_WORTH_ESTIMATOR_PROXY_SECRET=0123456789abcdef0123456789abcdef",
     image, "/bin/sh", "-c", boot);
 
-  async function ready() {
-    const deadline = Date.now() + 90000;
-    while (Date.now() < deadline) {
-      try {
-        assert.equal(await docker("exec", name, "busybox", "wget", "-qO-", "http://127.0.0.1:10000/readyz"), "ok");
-        return;
-      } catch {
-        const state = JSON.parse(await docker("inspect", name))[0].State;
-        const logs = state.Running ? "" : await exec("docker", ["logs", name]);
-        assert.ok(state.Running, `Container stopped: ${logs.stdout}\n${logs.stderr}`);
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-    }
-    assert.fail(`Container not ready: ${await docker("logs", name)}`);
-  }
-  await ready();
+  await waitForReady(name, "ok");
   const feedback = `
 import copy,json,urllib.request
 def post(path,payload):
@@ -97,9 +98,49 @@ print(after['revision'])
   assert.notEqual(await docker("wait", name), "0");
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.OOMKilled, false);
   await docker("start", name);
-  await ready();
+  await waitForReady(name, "ok");
   assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT 'payments-v2:b32768:h0.75:l0.25:' || generation || ':' || revision FROM model;"), revision);
   assert.equal(await docker("exec", name, "sqlite3", "/data/ml.sqlite3", "SELECT cursor FROM checkpoints WHERE owner='fixture';"), "001");
   await docker("stop", "--time", "12", name);
   assert.equal(JSON.parse(await docker("inspect", name))[0].State.ExitCode, 0);
+});
+
+test("Northflank maintenance marker answers readiness without starting ML or API writers", { skip: !image, timeout: 120000 }, async (t) => {
+  const name = `nwe-northflank-maintenance-${randomUUID()}`;
+  const volume = `${name}-data`;
+  t.after(async () => {
+    await docker("rm", "--force", name).catch(() => {});
+    await docker("volume", "rm", volume).catch(() => {});
+  });
+  await docker("volume", "create", volume);
+  await docker("run", "--rm", "--user", "10001:10001",
+    "--mount", `type=volume,source=${volume},target=/data`,
+    image, "/bin/sh", "-c", "touch /data/waypoint-maintenance");
+  const boot = `
+set -eu
+mkdir -p /tmp/provider/.well-known
+printf '%s' '{"issuer":"http://127.0.0.1:18000","authorization_endpoint":"http://127.0.0.1:18000/authorize","token_endpoint":"http://127.0.0.1:18000/token","jwks_uri":"http://127.0.0.1:18000/jwks","introspection_endpoint":"http://127.0.0.1:18000/introspect","backchannel_logout_supported":true}' > /tmp/provider/.well-known/openid-configuration
+busybox-extras httpd -p 18000 -h /tmp/provider
+if [ ! -f "$NET_WORTH_ESTIMATOR_AUTHZ_DB" ]; then
+  /app/authzctl --setup --db "$NET_WORTH_ESTIMATOR_AUTHZ_DB" --issuer "$NET_WORTH_ESTIMATOR_AUTH_ISSUER" --guest "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
+fi
+exec python /app/northflank-runtime.py
+`;
+  await docker("run", "--detach", "--network", "none",
+    "--name", name, "--mount", `type=volume,source=${volume},target=/data`,
+    "--env", "PORT=10000",
+    "--env", "NET_WORTH_ESTIMATOR_AUTH_ISSUER=http://127.0.0.1:18000",
+    "--env", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID=fixture",
+    "--env", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET=fixture-secret",
+    "--env", "NET_WORTH_ESTIMATOR_PUBLIC_URL=http://localhost:8080",
+    "--env", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT=disposable-guest",
+    "--env", "NET_WORTH_ESTIMATOR_AUTHZ_DB=/data/authorization.db",
+    "--env", "NET_WORTH_ESTIMATOR_PROXY_SECRET=0123456789abcdef0123456789abcdef",
+    image, "/bin/sh", "-c", boot);
+
+  await waitForReady(name, "maintenance", 60000);
+  await assert.rejects(docker("exec", name, "busybox", "wget", "-qO-", "http://127.0.0.1:8766/health"));
+  await docker("exec", name, "rm", "-f", "/data/waypoint-maintenance");
+  await docker("restart", name);
+  await waitForReady(name, "ok", 60000);
 });

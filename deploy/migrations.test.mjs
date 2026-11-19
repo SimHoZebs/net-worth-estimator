@@ -1112,18 +1112,35 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.equal(workflow.triggers[0].spec.token, "INJECT_PRIVATE_WEBHOOK_TOKEN");
   const steps = workflow.spec.spec.steps;
   assert.deepEqual(steps.map((step) => step.ref), [
-    "identity-backup", "stop-api-writers", "deploy-maintenance-image",
-    "deploy-identity-image", "await-api-container", "migrate", "start-api",
+    "identity-backup", "await-api-writers", "stop-api-writers", "deploy-maintenance-image",
+    "deploy-identity-image", "await-api-container", "migrate", "clear-maintenance", "start-api",
   ]);
-  const [backup, stopApi, deployApi, deployIdentity, awaitContainer, migrate, startApi] = steps;
+  // Project workflows reject team templates at runtime, so the definition
+  // stays inside the project-allowed node kinds.
+  assert.ok(steps.every((step) => step.kind !== "RunTemplate"));
+  const [backup, awaitWriters, stopApi, deployApi, deployIdentity, awaitContainer, migrate, clearMaintenance, startApi] = steps;
   assert.equal(backup.condition, "success");
   assert.equal(backup.spec.backupType, "dump");
-  assert.equal(stopApi.condition, "success");
-  assert.equal(stopApi.spec.templateId, "waypoint-api-command");
-  const maintenance = stopApi.spec.arguments.variables[0].value;
-  assert.match(maintenance, /httpd -f/);
-  assert.match(maintenance, /-h \/tmp\/waypoint-maintenance/);
-  assert.doesNotMatch(maintenance, /\/app\/server|\/data/);
+  assert.equal(awaitWriters.kind, "Condition");
+  assert.equal(awaitWriters.condition, undefined);
+  assert.equal(awaitWriters.spec.kind, "Service");
+  assert.equal(awaitWriters.spec.spec.type, "running");
+  assert.equal(awaitWriters.spec.spec.data.serviceId, "nwe-api");
+  assert.equal(awaitWriters.spec.spec.data.timeoutDuration, 600);
+  for (const [step, command] of [
+    [stopApi, "/bin/sh -c 'touch /data/waypoint-maintenance'"],
+    [clearMaintenance, "/bin/sh -c 'rm -f /data/waypoint-maintenance'"],
+  ]) {
+    assert.equal(step.kind, "Action");
+    assert.equal(step.spec.kind, "Service");
+    assert.equal(step.spec.spec.type, "execute");
+    assert.equal(step.spec.spec.condition, "running");
+    assert.equal(step.spec.spec.data.serviceId, "nwe-api");
+    assert.equal(step.spec.spec.data.command, command);
+    assert.equal(step.spec.spec.data.options.dispatchOnly, false);
+    assert.equal(step.spec.spec.data.user, "10001");
+    assert.equal(step.spec.spec.data.group, "10001");
+  }
   // The API image lands before the identity image so the API container is
   // already settled when the migration attaches to it.
   assert.ok(
@@ -1133,6 +1150,10 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.ok(
     steps.findIndex((step) => step.ref === "deploy-identity-image") <
       steps.findIndex((step) => step.ref === "migrate"),
+  );
+  assert.ok(
+    steps.findIndex((step) => step.ref === "migrate") <
+      steps.findIndex((step) => step.ref === "start-api"),
   );
   assert.equal(awaitContainer.kind, "Condition");
   assert.equal(awaitContainer.condition, undefined);
@@ -1161,8 +1182,12 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.equal(migration.user, "10001");
   assert.equal(migration.group, "10001");
   assert.match(migration.command, /test -f.*NET_WORTH_ESTIMATOR_DB.*exec \/app\/migrate\.sh/);
-  assert.equal(startApi.condition, "success");
-  assert.equal(startApi.spec.arguments.variables[0].value, "python /app/northflank-runtime.py");
+  assert.equal(startApi.kind, "Action");
+  assert.equal(startApi.spec.kind, "Service");
+  assert.equal(startApi.spec.spec.type, "restart");
+  assert.equal(startApi.spec.spec.condition, "running");
+  assert.equal(startApi.spec.spec.data.serviceId, "nwe-api");
+  assert.equal(startApi.spec.spec.data.timeoutDuration, 600);
 });
 
 test("Northflank release waits for a green main Tests run and rejects unsafe calls", async () => {
@@ -1287,23 +1312,6 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   }
   await assert.rejects(executeRelease({ env: { RELEASE_SHA: sha, GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, async () => ({ ok: false, status: 409 }), { log() {} }), /HTTP 409/);
   await assert.rejects(executeRelease({ env: { RELEASE_SHA: "latest", GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, fetch, { log() {} }), /full release SHA/);
-});
-
-test("Northflank command adapter patches only the single API process", async () => {
-  const template = await readJSON("./northflank/api-command.json");
-  assert.equal(template.options.concurrencyPolicy, "forbid");
-  assert.equal(template.options.autorun, false);
-  const [patch, wait] = template.spec.spec.steps;
-  assert.equal(patch.updateMode, "patch");
-  assert.deepEqual(patch.spec, {
-    name: "nwe-api",
-    deployment: {
-      instances: 1,
-      docker: { configType: "customCommand", customCommand: "${args.COMMAND}" },
-    },
-  });
-  assert.equal(wait.spec.kind, "Service");
-  assert.equal(wait.spec.spec.type, "running");
 });
 
 test("API image migrates the full base with checkpoints and Analysis as its user", {
