@@ -15,33 +15,29 @@ import {
 	userResourceKey,
 } from "./workspaceResources.ts";
 
+/**
+ * One coherent read of the server-owned before-payday summary. The endpoint
+ * owns the date, obligations and calculation, so the key carries only the
+ * model revisions and the effective settings that can change its answer.
+ */
 export function safeSpendingSummaryOptions(
-	start: string,
-	end: string,
 	revisions: readonly (string | null | undefined)[],
 	scope = getUserScope(),
 ) {
 	return queryOptions({
 		queryKey: [
 			...userResourceKey("safe-spending-summary", scope),
-			start,
-			end,
 			...revisions,
 			getSafeSpendingSettings(scope),
 		],
 		queryFn: async ({ signal }) =>
-			(
-				await getSafeSpendingSummary(
-					{ start, end },
-					{ signal, cache: "no-store" },
-				)
-			).data,
+			(await getSafeSpendingSummary({ signal, cache: "no-store" })).data,
 		staleTime: Infinity,
 		retry: false,
 	});
 }
 
-export function useSafeSpendingSummary(start: string, end: string) {
+export function useSafeSpendingSummary() {
 	const scope = useUserScope();
 	const savingSettings =
 		useIsMutating(
@@ -64,7 +60,7 @@ export function useSafeSpendingSummary(start: string, end: string) {
 	const loaded = revisions.every((revision) => revision != null);
 	const query = useQuery(
 		{
-			...safeSpendingSummaryOptions(start, end, revisions, scope),
+			...safeSpendingSummaryOptions(revisions, scope),
 			enabled: scope.status === "ready" && coherent && !savingSettings,
 			refetchOnMount: "always",
 		},

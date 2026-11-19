@@ -110,6 +110,10 @@ type Account struct {
 	// DisplayBasis chooses the owner-facing current balance: available
 	// (default) or posted. It is owner config, never bank evidence.
 	DisplayBasis DisplayBasis `json:"displayBasis,omitempty"`
+	// StatementClosingDay is the authoritative day this card's statement
+	// closes, 1..31, independent of optional payment terms. Day 31 means the
+	// last day of a shorter month. It defaults to 19.
+	StatementClosingDay int `json:"statementClosingDay"`
 }
 
 func (a *Account) MinBalanceValue() float64 {
@@ -336,7 +340,6 @@ type PaymentTerms struct {
 	MinimumFixed   float64  `json:"minimumFixed"`
 	MinimumPercent *float64 `json:"minimumPercent,omitempty"`
 	DueDay         int      `json:"dueDay"`
-	StatementDay   *int     `json:"statementDay,omitempty"`
 }
 
 type ModelOverrides struct {

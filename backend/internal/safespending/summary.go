@@ -47,38 +47,13 @@ type cutState struct {
 	knownAvailable bool
 }
 
-// BuildAtCut explicitly bounds observed facts without a domain wall clock.
-// The API supplies its captured request instant so authored future-today facts
-// remain conditional instead of masquerading as cash already observed.
-func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string, factualCut int64) types.SafeSpendingSummary {
-	cut := min(domain.DayCloseUnix(end), factualCut)
-	s := types.SafeSpendingSummary{Start: start, End: end, CashAsOf: domain.FormatIsoDate(time.Unix(cut, 0)), Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}}
-	if settings == nil {
-		settings = &types.SafeSpendingSettings{}
-	}
-	if model == nil {
-		model = &types.FinancialModel{}
-	}
-	st := &cutState{
-		s:        &s,
-		model:    model,
-		settings: settings,
-		latest:   pickCheckpoints(model, cut),
-		selected: map[string]bool{},
-		balances: map[string]float64{},
-		cut:      cut,
-	}
+func cashEvidence(model *types.FinancialModel, settings *types.SafeSpendingSettings, cut int64) *cutState {
+	day := domain.FormatIsoDate(time.Unix(cut, 0))
+	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}, Reserve: settings.Reserve}
+	st := &cutState{s: &s, model: model, settings: settings, latest: pickCheckpoints(model, cut), selected: map[string]bool{}, balances: map[string]float64{}, cut: cut}
 	st.replayConfirmed()
-	if s.Start > s.CashAsOf {
-		// Observations can inform bill amounts and claims, not the future
-		// cycle's cash baseline or cash movements.
-		s.ConfirmedMovements = []types.SafeSpendingMovement{}
-		s.Reasons = []string{ReasonFutureCycle}
-	} else {
-		st.deriveBaselines()
-	}
-	st.gateStatus()
-	return s
+	st.deriveBaselines()
+	return st
 }
 
 // pickCheckpoints keeps the newest observation at or before the cut for each
@@ -253,19 +228,14 @@ func (st *cutState) deriveBaselines() {
 	}
 }
 
-// gateStatus adds conditional obligations and resolves the final status and
-// cash-after-bills figure. The financial window stays unchanged.
 func (st *cutState) gateStatus() {
-	buildObligations(st.s, st.model, st.settings, st.selected, st.latest, st.ctx, st.cut)
 	if len(st.s.Reasons) > 0 {
 		st.s.Status = "uncertain"
 	}
 	if !st.knownAvailable {
 		st.s.Status = "missing"
 	}
-	if st.s.Status == "available" && st.s.CheckingAvailable != nil && st.s.OutstandingBillsTotal != nil {
-		st.s.CashAfterBills = money(*st.s.CheckingAvailable - *st.s.OutstandingBillsTotal)
-	}
+	sort.Strings(st.s.Reasons)
 }
 
 func touches(tx types.Transaction, id string) bool {

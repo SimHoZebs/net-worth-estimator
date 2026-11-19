@@ -31,8 +31,9 @@ import {
 	ItemSeparator,
 	ItemTitle,
 } from "@/components/ui/item.tsx";
-import { PaymentTermsSection } from "./PaymentTermsSection.tsx";
 import type { AccountEdit } from "./useAccountEdit.ts";
+import { getPaymentTermsForAccount } from "../../state/workspaceResources.ts";
+import { Button } from "@/components/ui/button.tsx";
 
 /** One settings row: a label in the item slot and its control in the actions slot. */
 function SettingRow({
@@ -342,14 +343,116 @@ export function AccountDetails({
 		),
 	});
 	if (draft.kind === "debt") {
+		const hasTerms = getPaymentTermsForAccount(account.id) !== null;
 		rows.push({
-			key: "payment-terms",
+			key: "minimum",
 			node: (
-				<Item>
-					<ItemContent className="min-w-0">
-						<PaymentTermsSection accountId={account.id} readOnly={locked} />
-					</ItemContent>
-				</Item>
+				<SettingRow label="Minimum" htmlFor={`${formId}-minimum`}>
+					<span className="inline-flex items-center gap-2">
+						<InputGroup className="w-48">
+							<InputGroupAddon aria-hidden="true">$</InputGroupAddon>
+							<InputGroupInput
+								id={`${formId}-minimum`}
+								aria-label="Minimum payment in USD"
+								name="minimumFixed"
+								type="number"
+								min="0"
+								max="10000000000"
+								step="0.01"
+								value={draft.minimumFixed}
+								readOnly={locked}
+								onChange={(event) =>
+									edit.update({ minimumFixed: event.target.value }, "minimum")
+								}
+							/>
+						</InputGroup>
+						{hasTerms && !locked && (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => void edit.clearTerms()}
+							>
+								Clear terms
+							</Button>
+						)}
+					</span>
+				</SettingRow>
+			),
+		});
+		rows.push({
+			key: "minimum-percent",
+			node: (
+				<SettingRow label="Minimum percent" htmlFor={`${formId}-percent`}>
+					<InputGroup className="w-48">
+						<InputGroupInput
+							id={`${formId}-percent`}
+							aria-label="Minimum percent of the balance"
+							name="minimumPercent"
+							type="number"
+							min="0"
+							max="100"
+							step="0.01"
+							value={draft.minimumPercent}
+							placeholder="None"
+							readOnly={locked}
+							onChange={(event) =>
+								edit.update(
+									{ minimumPercent: event.target.value },
+									"minimumPercent",
+								)
+							}
+						/>
+						<InputGroupAddon aria-hidden="true">%</InputGroupAddon>
+					</InputGroup>
+				</SettingRow>
+			),
+		});
+		rows.push({
+			key: "due-day",
+			node: (
+				<SettingRow label="Due day" htmlFor={`${formId}-due`}>
+					<InputGroupInput
+						id={`${formId}-due`}
+						aria-label="Due day of the month"
+						name="dueDay"
+						type="number"
+						min="1"
+						max="28"
+						step="1"
+						className="w-48"
+						value={draft.dueDay}
+						readOnly={locked}
+						onChange={(event) =>
+							edit.update({ dueDay: event.target.value }, "dueDay")
+						}
+					/>
+				</SettingRow>
+			),
+		});
+		rows.push({
+			key: "closing-day",
+			node: (
+				<SettingRow label="Closing day" htmlFor={`${formId}-closing`}>
+					<InputGroupInput
+						id={`${formId}-closing`}
+						aria-label="Statement closing day of the month; day 31 is the last day of a shorter month"
+						name="statementClosingDay"
+						type="number"
+						min="1"
+						max="31"
+						step="1"
+						className="w-48"
+						value={draft.statementClosingDay}
+						readOnly={locked}
+						onChange={(event) =>
+							edit.update(
+								{ statementClosingDay: event.target.value },
+								"closingDay",
+							)
+						}
+					/>
+				</SettingRow>
 			),
 		});
 	}

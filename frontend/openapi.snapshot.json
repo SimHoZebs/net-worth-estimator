@@ -32,6 +32,10 @@
 					},
 					"name": {
 						"type": "string"
+					},
+					"statementClosingDay": {
+						"format": "int64",
+						"type": "integer"
 					}
 				},
 				"required": [
@@ -41,7 +45,8 @@
 					"minBalance",
 					"maxBalance",
 					"color",
-					"enabled"
+					"enabled",
+					"statementClosingDay"
 				],
 				"type": "object"
 			},
@@ -116,6 +121,10 @@
 					"readOnly": {
 						"type": "boolean"
 					},
+					"statementClosingDay": {
+						"format": "int64",
+						"type": "integer"
+					},
 					"syncOwned": {
 						"type": "boolean"
 					},
@@ -135,7 +144,8 @@
 					"observedOn",
 					"hasCheckpoint",
 					"syncOwned",
-					"readOnly"
+					"readOnly",
+					"statementClosingDay"
 				],
 				"type": "object"
 			},
@@ -213,6 +223,12 @@
 					},
 					"source": {
 						"type": "string"
+					},
+					"statementClosingDay": {
+						"format": "int64",
+						"maximum": 31,
+						"minimum": 1,
+						"type": "integer"
 					}
 				},
 				"required": ["name", "kind", "enabled"],
@@ -3421,10 +3437,6 @@
 					"minimumPercent": {
 						"format": "double",
 						"type": "number"
-					},
-					"statementDay": {
-						"format": "int64",
-						"type": "integer"
 					}
 				},
 				"required": ["accountId", "minimumFixed", "dueDay"],
@@ -4595,15 +4607,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"statementDay": {
-						"format": "int64",
-						"maximum": 28,
-						"minimum": 1,
-						"type": "integer"
-					},
-					"statementDaySet": {
-						"type": "boolean"
-					},
 					"transactionIds": {
 						"items": {
 							"type": "string"
@@ -4612,14 +4615,36 @@
 					}
 				},
 				"required": [
-					"statementDay",
 					"reserve",
 					"accountIds",
 					"spendingAccountIds",
 					"incomeScheduleIds",
-					"transactionIds",
-					"statementDaySet"
+					"transactionIds"
 				],
+				"type": "object"
+			},
+			"SafeSpendingStatement": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"closingDate": {
+						"type": "string"
+					},
+					"kind": {
+						"enum": ["closed", "estimated"],
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": ["accountId", "name", "closingDate", "kind", "amount"],
 				"type": "object"
 			},
 			"SafeSpendingSummary": {
@@ -4646,10 +4671,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"cashAfterBills": {
-						"format": "double",
-						"type": ["number", "null"]
-					},
 					"cashAsOf": {
 						"description": "UTC calendar date of the cash evidence cut",
 						"type": "string"
@@ -4664,10 +4685,26 @@
 						},
 						"type": ["array", "null"]
 					},
-					"end": {
-						"type": "string"
+					"expectedPay": {
+						"format": "double",
+						"type": ["number", "null"]
 					},
-					"outstandingBillsTotal": {
+					"payday": {
+						"type": ["string", "null"]
+					},
+					"paydayBills": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"postIncomeRoom": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"prePaydayBills": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"prePaydayRoom": {
 						"format": "double",
 						"type": ["number", "null"]
 					},
@@ -4677,8 +4714,16 @@
 						},
 						"type": ["array", "null"]
 					},
+					"reserve": {
+						"format": "double",
+						"type": "number"
+					},
 					"revision": {
 						"type": "string"
+					},
+					"safeToSpend": {
+						"format": "double",
+						"type": ["number", "null"]
 					},
 					"selectedAccountIds": {
 						"items": {
@@ -4686,8 +4731,15 @@
 						},
 						"type": ["array", "null"]
 					},
-					"start": {
-						"type": "string"
+					"statementReserve": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"statements": {
+						"items": {
+							"$ref": "#/components/schemas/SafeSpendingStatement"
+						},
+						"type": ["array", "null"]
 					},
 					"status": {
 						"type": "string"
@@ -4695,8 +4747,6 @@
 				},
 				"required": [
 					"revision",
-					"start",
-					"end",
 					"cashAsOf",
 					"status",
 					"reasons",
@@ -4705,8 +4755,16 @@
 					"checkingAvailable",
 					"confirmedMovements",
 					"bills",
-					"outstandingBillsTotal",
-					"cashAfterBills"
+					"payday",
+					"expectedPay",
+					"prePaydayBills",
+					"paydayBills",
+					"statementReserve",
+					"reserve",
+					"prePaydayRoom",
+					"postIncomeRoom",
+					"safeToSpend",
+					"statements"
 				],
 				"type": "object"
 			},
@@ -5831,10 +5889,6 @@
 					"minimumPercent": {
 						"format": "double",
 						"type": "number"
-					},
-					"statementDay": {
-						"format": "int64",
-						"type": "integer"
 					}
 				},
 				"required": ["accountId", "minimumFixed", "dueDay"],
@@ -9621,30 +9675,6 @@
 		"/v1/safe-spending-summary": {
 			"get": {
 				"operationId": "get-safe-spending-summary",
-				"parameters": [
-					{
-						"description": "Inclusive statement cycle start YYYY-MM-DD",
-						"explode": false,
-						"in": "query",
-						"name": "start",
-						"required": true,
-						"schema": {
-							"description": "Inclusive statement cycle start YYYY-MM-DD",
-							"type": "string"
-						}
-					},
-					{
-						"description": "Inclusive statement cycle end YYYY-MM-DD. Evidence is bounded by request time or cycle close, whichever is earlier. Future cycles return bills without a cash allowance.",
-						"explode": false,
-						"in": "query",
-						"name": "end",
-						"required": true,
-						"schema": {
-							"description": "Inclusive statement cycle end YYYY-MM-DD. Evidence is bounded by request time or cycle close, whichever is earlier. Future cycles return bills without a cash allowance.",
-							"type": "string"
-						}
-					}
-				],
 				"responses": {
 					"200": {
 						"content": {
@@ -9674,7 +9704,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Read observed cash and outstanding bills with evidence"
+				"summary": "Read safe spending before payday and the supporting cash and statement evidence"
 			}
 		},
 		"/v1/schedules": {

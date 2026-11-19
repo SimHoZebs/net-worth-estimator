@@ -25,6 +25,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/upgrade-transaction-rename ./scripts/one-time/transaction-rename
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/repair-claimed-posted-time ./scripts/one-time/repair-claimed-posted-time
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/upgrade-statement-closing-day ./scripts/one-time/statement-closing-day
 
 FROM alpine:3.22 AS standalone
 

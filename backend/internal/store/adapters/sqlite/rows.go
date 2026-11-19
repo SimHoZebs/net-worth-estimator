@@ -219,8 +219,8 @@ func insertAccountTx(tx *userTx, account *types.Account) error {
 	maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 	color := nullable(account.Color)
 	if _, err := tx.Exec(
-		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?, :user_id)`,
-		account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), boolToInt(account.Enabled),
+		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, statement_closing_day, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?,?, :user_id)`,
+		account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), closingDayForStore(account.StatementClosingDay), boolToInt(account.Enabled),
 	); err != nil {
 		return fmt.Errorf("insert account %s: %w", account.ID, err)
 	}
@@ -239,8 +239,8 @@ func updateAccountTx(tx *userTx, account *types.Account) error {
 	maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 	color := nullable(account.Color)
 	if _, err := tx.Exec(
-		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, display_basis = ?, enabled = ? WHERE id = ? AND user_id = :user_id`,
-		account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), boolToInt(account.Enabled), account.ID,
+		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, display_basis = ?, statement_closing_day = ?, enabled = ? WHERE id = ? AND user_id = :user_id`,
+		account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), closingDayForStore(account.StatementClosingDay), boolToInt(account.Enabled), account.ID,
 	); err != nil {
 		return fmt.Errorf("update account %s: %w", account.ID, err)
 	}
@@ -763,12 +763,11 @@ func (s *sqliteStore) SavePaymentTerms(terms types.PaymentTerms) (types.PaymentT
 			return err
 		}
 		minimumPercent := nullable(terms.MinimumPercent)
-		statementDay := nullable(terms.StatementDay)
 		if _, err := tx.Exec(
-			`INSERT INTO payment_terms (model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day, user_id) VALUES (?,?,?,?,?,?, :user_id)
+			`INSERT INTO payment_terms (model_account_id, position, minimum_fixed, minimum_percent, due_day, user_id) VALUES (?,?,?,?,?, :user_id)
 			 ON CONFLICT(user_id, model_account_id) DO UPDATE SET minimum_fixed = excluded.minimum_fixed, minimum_percent = excluded.minimum_percent,
-			 due_day = excluded.due_day, statement_day = excluded.statement_day`,
-			terms.AccountID, position, terms.MinimumFixed, minimumPercent, terms.DueDay, statementDay,
+			 due_day = excluded.due_day`,
+			terms.AccountID, position, terms.MinimumFixed, minimumPercent, terms.DueDay,
 		); err != nil {
 			return fmt.Errorf("save payment terms %s: %w", terms.AccountID, err)
 		}

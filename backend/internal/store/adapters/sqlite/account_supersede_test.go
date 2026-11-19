@@ -85,12 +85,11 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		t.Fatalf("seed evaluation: %v", err)
 	}
 	if err := scoped.SetSafeSpendingSettings(types.SafeSpendingSettings{
-		StatementDay: 1, Reserve: 0,
+		Reserve:            0,
 		AccountIDs:         []string{"manual"},
 		SpendingAccountIDs: []string{"manual"},
 		IncomeScheduleIDs:  []string{"01900000-0000-7000-8000-0000000000b4"},
 		TransactionIDs:     []string{sharingTransactionA},
-		StatementDaySet:    true,
 	}); err != nil {
 		t.Fatalf("seed safe spending: %v", err)
 	}

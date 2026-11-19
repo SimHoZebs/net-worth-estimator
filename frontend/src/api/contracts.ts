@@ -48,6 +48,8 @@ export interface BackendAccount extends HumaMetadata {
 	enabled: boolean;
 	/** Owner-facing current-balance basis: available (default) or posted. */
 	displayBasis?: "available" | "posted";
+	/** Day the card's statement closes, 1..31; day 31 means month end. */
+	statementClosingDay: number;
 }
 export type Account = BackendAccount;
 
@@ -251,7 +253,6 @@ export interface BackendPaymentTerms extends HumaMetadata {
 	dueDay: number;
 	minimumFixed: number;
 	minimumPercent?: number;
-	statementDay?: number;
 }
 
 export interface FinancialModel extends HumaMetadata {
@@ -597,7 +598,6 @@ export type StochasticSSEData =
 	| ResultSSEData
 	| ErrorSSEData;
 export interface SafeSpendingSettings {
-	statementDay: number;
 	reserve: number;
 	/** Null uses the default card selection. */
 	accountIds: string[] | null;
@@ -607,8 +607,6 @@ export interface SafeSpendingSettings {
 	incomeScheduleIds: string[];
 	/** Null includes all recurring outflows. */
 	transactionIds: string[] | null;
-	/** Explicitly chosen day. */
-	statementDaySet: boolean;
 }
 
 export interface SafeSpendingSettingsResponse {

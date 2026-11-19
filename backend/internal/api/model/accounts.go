@@ -21,6 +21,9 @@ type accountBody struct {
 	// DisplayBasis chooses the owner-facing current balance: available
 	// (the default) or posted. It never changes the modeled balance.
 	DisplayBasis types.DisplayBasis `json:"displayBasis,omitempty"`
+	// StatementClosingDay is this card's authoritative closing day, 1..31.
+	// Omitted means the default 19.
+	StatementClosingDay *int `json:"statementClosingDay,omitempty" minimum:"1" maximum:"31"`
 	// Balance with ObservedAt records the opening (create) or moved (update)
 	// balance observation atomically with the account write, so callers
 	// never sequence a second checkpoint request. Omitted balance leaves
@@ -35,12 +38,20 @@ type accountBody struct {
 	Source *string `json:"source,omitempty"`
 }
 
+// defaultStatementClosingDay is the closing day when a caller omits it.
+const defaultStatementClosingDay = 19
+
 func (b accountBody) toAccount(id string) types.Account {
+	closingDay := defaultStatementClosingDay
+	if b.StatementClosingDay != nil {
+		closingDay = *b.StatementClosingDay
+	}
 	out := types.Account{
 		Name: b.Name, Kind: b.Kind,
 		MinBalance: b.MinBalance, MaxBalance: b.MaxBalance,
 		Color: b.Color, Enabled: b.Enabled,
-		DisplayBasis: b.DisplayBasis,
+		DisplayBasis:        b.DisplayBasis,
+		StatementClosingDay: closingDay,
 	}
 	if b.ID != nil {
 		out.ID = *b.ID
@@ -160,8 +171,10 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 		body := input.Body
 		nameOK := body.Name == existing.Name ||
 			(existing.Display != nil && body.Name == existing.Display.Name)
+		closingChanged := body.StatementClosingDay != nil &&
+			*body.StatementClosingDay != existing.StatementClosingDay
 		if body.Balance != nil || body.MinBalance != nil || body.MaxBalance != nil || body.Color != nil ||
-			!nameOK || body.Kind != existing.Kind || body.Enabled != existing.Enabled {
+			!nameOK || body.Kind != existing.Kind || body.Enabled != existing.Enabled || closingChanged {
 			return huma.Error409Conflict("Edit this account through its loan form so principal, interest, and rules stay consistent.")
 		}
 		if basis == "" || !basis.Valid() {
@@ -179,12 +192,17 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 			model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		} else {
 			account.Display = types.PassthroughDisplay(account.ID, account.Name)
-			if account.DisplayBasis == "" {
-				if stored := findModelAccount(model, account.ID); stored != nil {
+			if stored := findModelAccount(model, account.ID); stored != nil {
+				if account.DisplayBasis == "" {
 					account.DisplayBasis = stored.DisplayBasis
-				} else {
-					account.DisplayBasis = types.DisplayBasisAvailable
 				}
+				// An omitted closing day keeps the stored one, so unrelated
+				// account edits never reset a card's authoritative value.
+				if input.Body.StatementClosingDay == nil {
+					account.StatementClosingDay = stored.StatementClosingDay
+				}
+			} else if account.DisplayBasis == "" {
+				account.DisplayBasis = types.DisplayBasisAvailable
 			}
 			model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		}

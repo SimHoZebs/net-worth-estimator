@@ -239,41 +239,12 @@ func TestExplicitFactualCutExcludesPreauthoredFutureTodayObservationsAndMovement
 	future.SourceAccountID = nil
 	future.Destinations = []string{"checking"}
 	m.Transactions = []types.Transaction{confirmed, future, payment("conditional-future-today-bill", 30, "2026-11-15T14:00:00Z")}
-	s := BuildAtCut(m, nil, "2026-11-15", "2026-11-15", stamp("2026-11-15T12:00:00Z"))
+	s := buildEvidence(m, nil, "2026-11-15", "2026-11-15", stamp("2026-11-15T12:00:00Z"))
 	assertMoney(t, s.CheckingAvailable, 220)
 	assertMoney(t, s.OutstandingBillsTotal, 0)
 	assertMoney(t, s.CashAfterBills, 220)
 	if len(s.Baselines) != 1 || *s.Baselines[0].ObservedAt != stamp("2026-11-15T09:00:00Z") || len(s.ConfirmedMovements) != 1 || s.ConfirmedMovements[0].TransactionID != "confirmed-income" {
 		t.Fatalf("future authored fact leaked %+v", s)
-	}
-}
-
-func TestFullCycleCashCutAndClaimSettlement(t *testing.T) {
-	m := baseModel()
-	m.Checkpoints[0].Balance = 500
-	m.Checkpoints[0].AvailableBalance = ptr(500.0)
-	m.Checkpoints = append(m.Checkpoints, types.Checkpoint{AccountID: "checking", Balance: 9999, ObservedAt: stamp("2026-11-21T09:00:00Z")})
-	m.Schedules = []types.Schedule{bill("earlier", "2026-11-10", 30), bill("later", "2026-11-20", 40)}
-	posted := payment("settled-before-baseline", 25, "2026-11-11T09:00:00Z")
-	posted.Claim = &types.TransactionClaim{ScheduleID: "earlier", OccurrenceDate: "2026-11-10"}
-	future := payment("later-posting", 35, "2026-11-19T09:00:00Z")
-	future.Claim = &types.TransactionClaim{ScheduleID: "later", OccurrenceDate: "2026-11-20"}
-	m.Transactions = []types.Transaction{posted, future, payment("unrelated", 5, "2026-11-16T09:00:00Z")}
-	for _, tc := range []struct {
-		request, asOf, laterStatus string
-		cash, unpaid               float64
-	}{
-		{"2026-11-17T12:00:00Z", "2026-11-17", "unpaid", 495, 40},
-		{"2026-11-23T12:00:00Z", "2026-11-20", "paid", 460, 0},
-	} {
-		s := BuildAtCut(m, nil, "2026-11-01", "2026-11-20", stamp(tc.request))
-		if s.CashAsOf != tc.asOf || len(s.Bills) != 2 || s.Bills[0].Status != "paid" || s.Bills[1].Status != tc.laterStatus {
-			t.Fatalf("cycle evidence %+v", s)
-		}
-		assertMoney(t, s.Bills[0].Amount, 25)
-		assertMoney(t, s.CheckingAvailable, tc.cash)
-		assertMoney(t, s.OutstandingBillsTotal, tc.unpaid)
-		assertMoney(t, s.CashAfterBills, tc.cash-tc.unpaid)
 	}
 }
 
@@ -287,24 +258,6 @@ func TestStaleBillSelectionFallsBackToEligibleRent(t *testing.T) {
 		t.Fatalf("effective selection %+v", s.Bills)
 	}
 	assertMoney(t, s.OutstandingBillsTotal, 500)
-}
-
-func TestFutureCycleReportsOnlyAlreadyObservedClaimEvidence(t *testing.T) {
-	m := baseModel()
-	m.Schedules = []types.Schedule{bill("prepaid", "2026-12-01", 25), bill("later", "2026-12-02", 50)}
-	early := payment("early", 20, "2026-11-14T10:00:00Z")
-	early.Claim = &types.TransactionClaim{ScheduleID: "prepaid", OccurrenceDate: "2026-12-01"}
-	later := payment("future", 45, "2026-11-16T10:00:00Z")
-	later.Claim = &types.TransactionClaim{ScheduleID: "later", OccurrenceDate: "2026-12-02"}
-	m.Transactions = []types.Transaction{early, later}
-	s := BuildAtCut(m, nil, "2026-12-01", "2026-12-31", stamp("2026-11-15T12:00:00Z"))
-	if s.CashAsOf != "2026-11-15" || s.Status != "missing" || !slices.Contains(s.Reasons, ReasonFutureCycle) || s.CheckingAvailable != nil || s.CashAfterBills != nil || len(s.Baselines) != 0 || len(s.ConfirmedMovements) != 0 {
-		t.Fatalf("future cash %+v", s)
-	}
-	if len(s.Bills) != 2 || s.Bills[0].Status != "paid" || s.Bills[1].Status != "unpaid" || s.Bills[1].TransactionID != nil {
-		t.Fatalf("future bills %+v", s.Bills)
-	}
-	assertMoney(t, s.OutstandingBillsTotal, 50)
 }
 
 func TestPendingClaimCannotBorrowLaterRecordedAmount(t *testing.T) {

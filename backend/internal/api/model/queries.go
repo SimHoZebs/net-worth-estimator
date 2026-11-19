@@ -74,6 +74,8 @@ type accountBalanceRow struct {
 	// DisplayBasis selects the owner-facing current balance: available
 	// (the default) or posted. It never changes the modeled balance.
 	DisplayBasis types.DisplayBasis `json:"displayBasis,omitempty"`
+	// StatementClosingDay is the account's authoritative closing day.
+	StatementClosingDay int `json:"statementClosingDay"`
 }
 
 type accountBalancesOutput struct {
@@ -189,27 +191,28 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				}
 			}
 			row := accountBalanceRow{
-				Display:          account.Display,
-				ID:               account.ID,
-				Name:             account.Name,
-				Kind:             account.Kind,
-				Enabled:          account.Enabled,
-				Archived:         isArchivedDebt(terms, account, adjusted.ObservedBalance),
-				Color:            account.Color,
-				MinBalance:       account.MinBalance,
-				MaxBalance:       account.MaxBalance,
-				Balance:          adjusted.Balance,
-				ObservedOn:       observedOn,
-				HasCheckpoint:    hasCheckpoint,
-				SyncOwned:        syncOwned,
-				ReadOnly:         s.readOnly || syncOwned,
-				Institution:      institution,
-				SyncedName:       syncedName,
-				Currency:         currency,
-				ObservedBalance:  adjusted.ObservedBalance,
-				ObservedAt:       adjusted.ObservedAt,
-				AvailableBalance: adjusted.AvailableBalance,
-				DisplayBasis:     account.DisplayBasis,
+				Display:             account.Display,
+				ID:                  account.ID,
+				Name:                account.Name,
+				Kind:                account.Kind,
+				Enabled:             account.Enabled,
+				Archived:            isArchivedDebt(terms, account, adjusted.ObservedBalance),
+				Color:               account.Color,
+				MinBalance:          account.MinBalance,
+				MaxBalance:          account.MaxBalance,
+				Balance:             adjusted.Balance,
+				ObservedOn:          observedOn,
+				HasCheckpoint:       hasCheckpoint,
+				SyncOwned:           syncOwned,
+				ReadOnly:            s.readOnly || syncOwned,
+				Institution:         institution,
+				SyncedName:          syncedName,
+				Currency:            currency,
+				ObservedBalance:     adjusted.ObservedBalance,
+				ObservedAt:          adjusted.ObservedAt,
+				AvailableBalance:    adjusted.AvailableBalance,
+				DisplayBasis:        account.DisplayBasis,
+				StatementClosingDay: account.StatementClosingDay,
 			}
 			if components[account.ID] {
 				value := adjusted.UnroundedBalance

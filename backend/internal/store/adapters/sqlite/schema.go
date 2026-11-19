@@ -145,6 +145,7 @@ func schemaStatements() []string {
 			max_balance REAL,
 			color TEXT,
 			display_basis TEXT NOT NULL DEFAULT 'available',
+			statement_closing_day INTEGER NOT NULL DEFAULT 19,
 			enabled INTEGER NOT NULL,
 			PRIMARY KEY (user_id, id)
 		)`,
@@ -261,7 +262,6 @@ func schemaStatements() []string {
 			minimum_fixed REAL NOT NULL,
 			minimum_percent REAL,
 			due_day INTEGER NOT NULL,
-			statement_day INTEGER,
 			PRIMARY KEY(user_id, model_account_id),
 			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
@@ -324,6 +324,7 @@ func schemaStatements() []string {
 		blobsqlite.Schema,
 		receiptSchema,
 		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('receipt-evidence-v1')`,
+		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('statement-closing-day-v1')`,
 		`CREATE TABLE IF NOT EXISTS provider_connections (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
@@ -742,7 +743,7 @@ var requiredSchemaColumns = map[string]string{
 	"split_settlements":               "settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_transaction_id, actor_id, request_id, created_at",
 	"split_settlement_requests":       "actor_id, request_id, settlement_id, input_hash, created_at",
 	"friendships":                     "user_id, friend_user_id, display_name, created_at",
-	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, display_basis, enabled",
+	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, display_basis, statement_closing_day, enabled",
 	"account_displays":                "user_id, account_id, display_json",
 	"checkpoints":                     "user_id, id, position, model_account_id, balance, source, provider, observed_at",
 	"checkpoint_available_balances":   "user_id, model_account_id, observed_at, available_balance",
@@ -756,7 +757,7 @@ var requiredSchemaColumns = map[string]string{
 	"recurrence_rules":                "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled",
 	"evaluations":                     "user_id, type, instance_id, position, name, enabled, config_json",
 	"model_metadata":                  "user_id, id, source_path, document_present",
-	"payment_terms":                   "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
+	"payment_terms":                   "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day",
 	"entity_ids":                      "user_id, id, kind",
 	"account_links":                   "user_id, bridge_account_id, model_account_id, bridge_name, institution, currency, origin, last_seen_at",
 	"pinned_evaluations":              "user_id, instance_id, position",

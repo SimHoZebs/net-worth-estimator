@@ -39,7 +39,6 @@ func TestRowWritesMarkModelPresent(t *testing.T) {
 func TestStoreRoundTripsPaymentTerms(t *testing.T) {
 	store := openTestStore(t)
 	percent := 0.02
-	statementDay := 15
 	if _, err := store.CreateAccount(types.Account{ID: "prime_card", Name: "Prime Card", Enabled: true}); err != nil {
 		t.Fatalf("create prime: %v", err)
 	}
@@ -47,7 +46,7 @@ func TestStoreRoundTripsPaymentTerms(t *testing.T) {
 		t.Fatalf("create checking: %v", err)
 	}
 	want := []types.PaymentTerms{
-		{AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent, DueDay: 10, StatementDay: &statementDay},
+		{AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent, DueDay: 10},
 		{AccountID: "checking", MinimumFixed: 0, DueDay: 1},
 	}
 	for _, terms := range want {

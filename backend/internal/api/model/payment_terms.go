@@ -12,13 +12,12 @@ type termsBody struct {
 	MinimumFixed   float64  `json:"minimumFixed"`
 	MinimumPercent *float64 `json:"minimumPercent,omitempty"`
 	DueDay         int      `json:"dueDay"`
-	StatementDay   *int     `json:"statementDay,omitempty"`
 }
 
 func (b termsBody) toTerms() types.PaymentTerms {
 	return types.PaymentTerms{
 		AccountID: b.AccountID, MinimumFixed: b.MinimumFixed,
-		MinimumPercent: b.MinimumPercent, DueDay: b.DueDay, StatementDay: b.StatementDay,
+		MinimumPercent: b.MinimumPercent, DueDay: b.DueDay,
 	}
 }
 

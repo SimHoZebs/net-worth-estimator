@@ -23,6 +23,7 @@ export function modelFixture(): FinancialModel {
 				maxBalance: null,
 				color: null,
 				enabled: true,
+				statementClosingDay: 19,
 			},
 			{
 				id: "loan",
@@ -32,6 +33,7 @@ export function modelFixture(): FinancialModel {
 				maxBalance: null,
 				color: null,
 				enabled: true,
+				statementClosingDay: 19,
 			},
 		],
 		checkpoints: [

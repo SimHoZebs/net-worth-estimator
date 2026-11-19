@@ -32,6 +32,7 @@ function balanceRow(
 		observedOn: "2026-01-31",
 		readOnly: false,
 		syncOwned: false,
+		statementClosingDay: 19,
 		...overrides,
 	};
 }

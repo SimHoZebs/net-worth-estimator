@@ -8,11 +8,7 @@ import {
 	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
-import {
-	DEFAULT_CYCLE_STATEMENT_DAY,
-	DEFAULT_PROTECTED_RESERVE,
-} from "@/domain/safeSpending.ts";
-import { clampStatementDay } from "@/domain/cardCycle.ts";
+import { DEFAULT_PROTECTED_RESERVE } from "@/domain/safeSpending.ts";
 import {
 	resolveEffectiveIds,
 	toggleEffectiveId,
@@ -24,9 +20,7 @@ import { userResourceKey } from "@/state/workspaceResources.ts";
 
 // Query caches server-owned safe-spending settings. Settings stay outside
 // the base projection identity, so edits do not rerun the base simulation.
-export type TotalCycleSettings = SafeSpendingSettings;
-
-export { clampStatementDay, resolveEffectiveIds, toggleEffectiveId };
+export { resolveEffectiveIds, toggleEffectiveId };
 
 function stringIds(value: unknown): string[] | null {
 	if (!Array.isArray(value)) return null;
@@ -38,10 +32,6 @@ function stringIds(value: unknown): string[] | null {
 
 /** One field list drives defaults, sanitizing and optimistic merges. */
 const settingsFields = {
-	statementDay: {
-		default: DEFAULT_CYCLE_STATEMENT_DAY,
-		read: (value: unknown) => clampStatementDay(value),
-	},
 	reserve: {
 		default: DEFAULT_PROTECTED_RESERVE,
 		read: (value: unknown) =>
@@ -68,22 +58,18 @@ const settingsFields = {
 		default: null as string[] | null,
 		read: stringIds,
 	},
-	statementDaySet: {
-		default: false,
-		read: (value: unknown) => value === true,
-	},
 };
 
-type SettingKey = keyof TotalCycleSettings;
+type SettingKey = keyof SafeSpendingSettings;
 const settingKeys = Object.keys(settingsFields) as SettingKey[];
 
-function freshSetting<K extends SettingKey>(key: K): TotalCycleSettings[K] {
+function freshSetting<K extends SettingKey>(key: K): SafeSpendingSettings[K] {
 	const value = settingsFields[key].default;
-	return (Array.isArray(value) ? [...value] : value) as TotalCycleSettings[K];
+	return (Array.isArray(value) ? [...value] : value) as SafeSpendingSettings[K];
 }
 
-export const defaultSafeSpendingSettings = (): TotalCycleSettings => {
-	const result = {} as TotalCycleSettings;
+export const defaultSafeSpendingSettings = (): SafeSpendingSettings => {
+	const result = {} as SafeSpendingSettings;
 	for (const key of settingKeys)
 		(result as unknown as Record<string, unknown>)[key] = freshSetting(key);
 	return result;
@@ -91,7 +77,7 @@ export const defaultSafeSpendingSettings = (): TotalCycleSettings => {
 
 export function sanitizeSafeSpendingSettings(
 	value: unknown,
-): TotalCycleSettings {
+): SafeSpendingSettings {
 	const result = defaultSafeSpendingSettings();
 	if (typeof value !== "object" || value === null) return result;
 	const record = value as Record<string, unknown>;
@@ -103,9 +89,9 @@ export function sanitizeSafeSpendingSettings(
 }
 
 function mergeSettings(
-	previous: TotalCycleSettings,
-	next: Partial<TotalCycleSettings>,
-): TotalCycleSettings {
+	previous: SafeSpendingSettings,
+	next: Partial<SafeSpendingSettings>,
+): SafeSpendingSettings {
 	const merged = defaultSafeSpendingSettings();
 	for (const key of settingKeys) {
 		(merged as unknown as Record<string, unknown>)[key] =
@@ -114,10 +100,10 @@ function mergeSettings(
 	return merged;
 }
 
-interface SafeSpendingSettingsState extends TotalCycleSettings {
+interface SafeSpendingSettingsState extends SafeSpendingSettings {
 	pending: boolean;
 	error: boolean;
-	updateSettings: (next: Partial<TotalCycleSettings>) => void;
+	updateSettings: (next: Partial<SafeSpendingSettings>) => void;
 	retry: () => void;
 }
 
@@ -142,16 +128,16 @@ function settingsOptions(scope = getUserScope()) {
 
 export function getSafeSpendingSettings(
 	scope = getUserScope(),
-): TotalCycleSettings {
+): SafeSpendingSettings {
 	return scope.status === "pending"
 		? defaults
-		: (serverQueryClient().getQueryData<TotalCycleSettings>(
+		: (serverQueryClient().getQueryData<SafeSpendingSettings>(
 				safeSpendingSettingsKey(scope),
 			) ?? defaults);
 }
 
 export function updateSettingsForScope(scope: UserScope = getUserScope()) {
-	return (next: Partial<TotalCycleSettings>) => {
+	return (next: Partial<SafeSpendingSettings>) => {
 		if (
 			scope !== getUserScope() ||
 			scope.status !== "ready" ||

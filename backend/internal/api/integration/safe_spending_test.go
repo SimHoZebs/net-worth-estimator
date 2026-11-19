@@ -14,20 +14,13 @@ func TestSafeSpendingSettingsHTTP(t *testing.T) {
 	if empty.Code != 200 || !json.Valid(empty.Body.Bytes()) {
 		t.Fatalf("GET = %d %s", empty.Code, empty.Body.String())
 	}
-	const valid = `{"statementDay":15,"statementDaySet":true,"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeScheduleIds":[],"transactionIds":["rent"]}`
+	const valid = `{"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeScheduleIds":[],"transactionIds":["rent"]}`
 	saved := doRowRequest(t, handler, http.MethodPut, path, valid)
 	if saved.Code != 200 {
 		t.Fatalf("PUT = %d %s", saved.Code, saved.Body.String())
 	}
-	for _, invalid := range []string{
-		`{"statementDay":0,"reserve":0,"incomeScheduleIds":[]}`,
-		`{"statementDay":29,"reserve":0,"incomeScheduleIds":[]}`,
-		`{"statementDay":20,"reserve":-1,"incomeScheduleIds":[]}`,
-	} {
-		response := doRowRequest(t, handler, http.MethodPut, path, invalid)
-		if response.Code != 422 {
-			t.Fatalf("invalid PUT = %d %s", response.Code, response.Body.String())
-		}
+	if got := doRowRequest(t, handler, http.MethodPut, path, `{"reserve":-1,"incomeScheduleIds":[]}`); got.Code != 422 {
+		t.Fatalf("negative reserve = %d", got.Code)
 	}
 	readOnly := New(database, Config{ReadOnly: true})
 	if got := doRowRequest(t, readOnly, http.MethodPut, path, valid); got.Code != 403 {

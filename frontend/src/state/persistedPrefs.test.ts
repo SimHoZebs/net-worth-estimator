@@ -239,26 +239,15 @@ describe("unified persisted prefs", () => {
 	});
 
 	it("sanitizes safe spending settings with clamping and drops unknown fields", () => {
-		expect(
-			sanitizeSafeSpendingSettings({ statementDay: 1, reserve: -5 })
-				.statementDay,
-		).toBe(1);
-		expect(
-			sanitizeSafeSpendingSettings({ statementDay: 1, reserve: -5 }).reserve,
-		).toBe(0);
-		expect(
-			sanitizeSafeSpendingSettings({ statementDay: 99, reserve: 50 })
-				.statementDay,
-		).toBe(28);
+		expect(sanitizeSafeSpendingSettings({ reserve: -5 }).reserve).toBe(0);
+		expect(sanitizeSafeSpendingSettings({ reserve: 50 }).reserve).toBe(50);
 		expect(sanitizeSafeSpendingSettings(null).reserve).toBeGreaterThanOrEqual(
 			0,
 		);
 		const state = sanitizeSafeSpendingSettings({
-			statementDay: 5,
 			reserve: 100,
 			mandatoryFrame: "cycle",
 		});
-		expect(state.statementDay).toBe(5);
 		expect(state.reserve).toBe(100);
 		expect(state).not.toHaveProperty("mandatoryFrame");
 	});
@@ -267,8 +256,6 @@ describe("unified persisted prefs", () => {
 describe("financial preference owner isolation", () => {
 	it("keeps every financial amount, date, and selected resource ID isolated across users and sample data", async () => {
 		const settingsA = {
-			statementDay: 8,
-			statementDaySet: true,
 			reserve: 12345,
 			accountIds: ["private-a-card"],
 			spendingAccountIds: ["private-a-cash"],
@@ -282,8 +269,6 @@ describe("financial preference owner isolation", () => {
 			defaultSafeSpendingSettings(),
 		);
 		const settingsB = {
-			statementDay: 16,
-			statementDaySet: true,
 			reserve: 678,
 			accountIds: ["private-b-card"],
 			spendingAccountIds: ["private-b-cash"],

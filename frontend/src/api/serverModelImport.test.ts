@@ -36,6 +36,7 @@ const account: BackendAccount = {
 	maxBalance: null,
 	color: null,
 	enabled: true,
+	statementClosingDay: 19,
 };
 
 const model: FinancialModel = {

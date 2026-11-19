@@ -150,7 +150,7 @@ test("transaction detail sheet keeps the dirty-close guard", async ({
 	await expect(sheet).not.toBeVisible();
 });
 
-test("configure and transaction sheets share the canonical shell", async ({
+test("safe spending and transaction sheets share the canonical shell", async ({
 	page,
 }) => {
 	// Exercise scrolling independently of how many Configure fields exist.
@@ -198,19 +198,41 @@ test("configure and transaction sheets share the canonical shell", async ({
 	);
 	await page.keyboard.press("Escape");
 	await expect(configure).not.toBeVisible();
-	// A transaction from the same card opens the identical shell: same
-	// bounding width, same slot policy, same close placement.
-	await card.getByRole("button", { name: "Transactions" }).click();
-	const drawer = page.locator('[data-slot="sheet-content"]').first();
-	await expect(drawer).toBeVisible();
-	const charge = drawer.getByRole("button", {
-		name: /^View Sheet parity charge /,
+	// The one-line protected summary opens the ledger drawer from the same
+	// card: same bounding width, same slot policy, same close placement.
+	await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+	const ledger = page.locator('[data-slot="sheet-content"]').first();
+	await expect(ledger).toBeVisible();
+	await expect(
+		ledger.getByRole("region", { name: "Protected obligations" }),
+	).toBeVisible();
+	await expect(
+		ledger.getByRole("region", { name: "Cash checks" }),
+	).toBeVisible();
+	await expect(
+		ledger.getByRole("region", { name: "Cash evidence" }),
+	).toBeVisible();
+	const ledgerBox = await ledger.boundingBox();
+	expect(ledgerBox).not.toBeNull();
+	expect(ledgerBox!.width).toBe(configureBox!.width);
+	const ledgerHeader = ledger.locator(':scope > [data-slot="sheet-header"]');
+	const ledgerBody = ledger.locator(':scope > [data-slot="sheet-body"]');
+	await expect(ledgerHeader).toHaveCount(1);
+	await expect(ledgerBody).toHaveCount(1);
+	const ledgerTitle = ledger.locator(':scope [data-slot="sheet-title"]');
+	const ledgerClose = ledger.getByRole("button", {
+		name: "Close",
+		exact: true,
 	});
-	await charge.click();
-	const sheets = page.locator('[data-slot="sheet-content"]');
-	await expect(sheets).toHaveCount(2);
-	const detail = sheets.nth(1);
-	await expect(detail).toBeVisible();
+	const ledgerTitleBox = await ledgerTitle.boundingBox();
+	const ledgerCloseBox = await ledgerClose.boundingBox();
+	expect(ledgerTitleBox!.x + ledgerTitleBox!.width).toBeLessThanOrEqual(
+		ledgerCloseBox!.x + 1,
+	);
+	await page.keyboard.press("Escape");
+	await expect(ledger).not.toBeVisible();
+	// A transaction detail opened from its own page uses the same shell.
+	const { sheet: detail } = await openTransactionDetail(page);
 	const detailBox = await detail.boundingBox();
 	expect(detailBox).not.toBeNull();
 	expect(detailBox!.width).toBe(configureBox!.width);
@@ -228,14 +250,6 @@ test("configure and transaction sheets share the canonical shell", async ({
 	expect(detailTitleBox!.x + detailTitleBox!.width).toBeLessThanOrEqual(
 		detailCloseBox!.x + 1,
 	);
-	// Escape closes only the nested sheet; focus returns to its row while
-	// the drawer stays open underneath.
-	await page.keyboard.press("Escape");
-	await expect(detail).not.toBeVisible();
-	await expect(drawer).toBeVisible();
-	await expect(charge).toBeFocused();
-	await page.keyboard.press("Escape");
-	await expect(drawer).not.toBeVisible();
 });
 
 test.describe("side sheet narrow layout", () => {

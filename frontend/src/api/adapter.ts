@@ -47,6 +47,7 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 		observedBalance: row.observedBalance ?? null,
 		availableBalance: row.availableBalance ?? null,
 		displayBasis: row.displayBasis === "posted" ? "posted" : "available",
+		statementClosingDay: row.statementClosingDay || 19,
 		balanceCheck: row.hasCheckpoint,
 		source: row.syncOwned
 			? "Synced balance check"

@@ -17,4 +17,8 @@ const (
 	ReasonObligationRoutingUnknown            = "obligation-routing-unknown"
 	ReasonObligationAmountUnavailable         = "obligation-amount-unavailable"
 	ReasonNegativeObligationAmount            = "negative-obligation-amount"
+	ReasonPaydayUnavailable                   = "payday-unavailable"
+	ReasonIncomeUnavailable                   = "income-unavailable"
+	ReasonStatementBalanceUnavailable         = "statement-balance-unavailable"
+	ReasonStatementEstimateUnavailable        = "statement-estimate-unavailable"
 )

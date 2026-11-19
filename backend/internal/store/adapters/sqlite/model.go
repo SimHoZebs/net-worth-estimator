@@ -218,8 +218,8 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 		color := nullable(account.Color)
 		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?, :user_id)`,
-			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), boolToInt(account.Enabled),
+			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, display_basis, statement_closing_day, enabled, user_id) VALUES (?,?,?,?,?,?,?,?,?,?, :user_id)`,
+			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, string(types.NormalizeDisplayBasis(account.DisplayBasis)), closingDayForStore(account.StatementClosingDay), boolToInt(account.Enabled),
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
 		}
@@ -391,10 +391,9 @@ func insertRule(tx *userTx, position int, rule *types.Schedule) error {
 func savePaymentTerms(tx *userTx, terms []types.PaymentTerms) error {
 	for position, term := range terms {
 		minimumPercent := nullable(term.MinimumPercent)
-		statementDay := nullable(term.StatementDay)
 		if _, err := tx.Exec(
-			`INSERT INTO payment_terms (model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day, user_id) VALUES (?,?,?,?,?,?, :user_id)`,
-			term.AccountID, position, term.MinimumFixed, minimumPercent, term.DueDay, statementDay,
+			`INSERT INTO payment_terms (model_account_id, position, minimum_fixed, minimum_percent, due_day, user_id) VALUES (?,?,?,?,?, :user_id)`,
+			term.AccountID, position, term.MinimumFixed, minimumPercent, term.DueDay,
 		); err != nil {
 			return fmt.Errorf("insert payment terms %s: %w", term.AccountID, err)
 		}
@@ -571,7 +570,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, display_basis, enabled FROM accounts WHERE user_id = :user_id ORDER BY position`)
+	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, display_basis, statement_closing_day, enabled FROM accounts WHERE user_id = :user_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -583,7 +582,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		var color sql.NullString
 		var basis string
 		var enabled int64
-		if err := accountRows.Scan(&account.ID, &account.Name, &kind, &minBalance, &maxBalance, &color, &basis, &enabled); err != nil {
+		if err := accountRows.Scan(&account.ID, &account.Name, &kind, &minBalance, &maxBalance, &color, &basis, &account.StatementClosingDay, &enabled); err != nil {
 			return nil, err
 		}
 		account.Kind = types.AccountKind(kind)
@@ -723,7 +722,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, fmt.Errorf("close evaluations: %w", err)
 	}
 
-	termRows, err := q.Query(`SELECT model_account_id, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms WHERE user_id = :user_id ORDER BY position`)
+	termRows, err := q.Query(`SELECT model_account_id, minimum_fixed, minimum_percent, due_day FROM payment_terms WHERE user_id = :user_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -731,17 +730,12 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 	for termRows.Next() {
 		var term types.PaymentTerms
 		var minimumPercent sql.NullFloat64
-		var statementDay sql.NullInt64
-		if err := termRows.Scan(&term.AccountID, &term.MinimumFixed, &minimumPercent, &term.DueDay, &statementDay); err != nil {
+		if err := termRows.Scan(&term.AccountID, &term.MinimumFixed, &minimumPercent, &term.DueDay); err != nil {
 			return nil, err
 		}
 		if minimumPercent.Valid {
 			value := minimumPercent.Float64
 			term.MinimumPercent = &value
-		}
-		if statementDay.Valid {
-			value := int(statementDay.Int64)
-			term.StatementDay = &value
 		}
 		model.PaymentTerms = append(model.PaymentTerms, term)
 	}
@@ -789,6 +783,15 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+// closingDayForStore maps the zero value of a hand-built Account to the
+// default closing day. The API applies the same default before a write.
+func closingDayForStore(day int) int {
+	if day == 0 {
+		return 19
+	}
+	return day
 }
 
 // nullable maps a pointer to a SQL nullable argument: nil becomes NULL.
