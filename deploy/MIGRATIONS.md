@@ -173,8 +173,10 @@ GitHub's manual dispatch instead requests the current `main` commit and its
 published images. Releases stay sequential: one at a time.
 
 `.github/workflows/northflank-release.yml` triggers on the `Tests` workflow for
-the exact `main` push, waits for the pinned backend-northflank and Better Auth image manifests,
-then requests the workflow with those image references. The release job has
+the exact `main` push. A documentation-only push leaves the code gates skipped,
+so no release is requested for that commit. The workflow waits for the pinned
+backend-northflank and Better Auth image manifests, then requests the workflow
+with those image references. The release job has
 read-only repository access and no Northflank API credential. Its webhook secret
 can only request workflow runs. The GitHub job confirms dispatch, not production
 completion. Check the Northflank run separately.

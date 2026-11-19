@@ -107,7 +107,7 @@ TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 
 ## Completion gate
 
-Agents run the narrowest local check, push the branch, and watch hosted `Tests` for the exact commit. Completion and release requirements live in [release gates](docs/release-gates.md). For an optional local aggregate:
+Agents run the narrowest local check, push the branch, and watch hosted `Tests` for the exact commit. Completion and release requirements live in [release gates](docs/release-gates.md). Documentation-only pushes skip the test jobs by conditional while still reporting the required checks as successful; mixed changes and manual dispatch run every gate. `scripts/ci-code-gate.test.mjs` and `scripts/ci-changed-paths.test.mjs` cover the docs patterns, diff ranges, and skip behavior in the completion gate. For an optional local aggregate:
 
 ```bash
 scripts/test --gate

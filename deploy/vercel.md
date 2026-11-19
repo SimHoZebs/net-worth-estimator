@@ -73,7 +73,9 @@ The workflow creates a deployment with `gitSource` pinned to the exact tested
 `main` commit, then polls it until `READY`. Vercel builds with the project's
 production environment variables, so the runner does not need `BACKEND_URL`,
 the public URL, or the proxy secret. A manual dispatch requests the current
-`main` commit and requires a green `main` push Tests run for it.
+`main` commit and requires a green `main` push Tests run for it. A
+documentation-only push skips the frontend deploy because the code gates did
+not run; manual dispatch still deploys the current `main` commit.
 
 Leave the project's Ignored Build Step empty. A skip command also cancels API
 and CLI deployments. During a database or API-contract migration, disable the

@@ -1,8 +1,10 @@
 # GHCR container images
 
 `.github/workflows/images.yml` publishes each tested `main` commit on GitHub
-Actions, after the `Tests` workflow succeeds. It builds a Linux AMD64 image only
-when that component changed since the last published image; otherwise it retags
+Actions, after the `Tests` workflow succeeds. A documentation-only push leaves
+the code gates skipped, so no `sha-<full commit>` tag is created for that
+commit. It builds a Linux AMD64 image only when that component changed since
+the last published image; otherwise it retags
 the previous immutable digest. Every component still receives a
 `sha-<full commit>` tag and OCI source/revision labels. A retagged image keeps
 the original build's revision label while its tag records the release commit.
@@ -30,8 +32,9 @@ remain on the existing hosts. Northflank deploys the pinned backend-northflank
 and Better Auth images; Vercel deploys the frontend from the gated `Tests`
 result.
 
-Validate the publisher with `actionlint .github/workflows/images.yml` and
-`node --test deploy/images.test.mjs`. The first successful Actions run verifies
-the actual registry upload. Verify anonymous manifest access before cutover.
+Validate the publisher with `actionlint .github/workflows/images.yml`,
+`node --test deploy/images.test.mjs`, and
+`node --test scripts/ci-code-gate.test.mjs`. The first successful Actions run
+verifies the actual registry upload. Verify anonymous manifest access before cutover.
 
 See [the deployment index](README.md) for the shared runtime and reverse-proxy contracts.

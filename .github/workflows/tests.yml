@@ -20,9 +20,38 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'pull_request' }}
 
 jobs:
+  changes:
+    name: Classify changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify the change
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          code="$(bash scripts/ci-changed-paths.sh)"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Changed paths need code gates: $code" >> "$GITHUB_STEP_SUMMARY"
+
   backend:
     name: Backend tests
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -41,7 +70,10 @@ jobs:
 
   ml:
     name: ML service tests
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -81,7 +113,10 @@ jobs:
 
   gate:
     name: Frontend and static gates
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -127,7 +162,11 @@ jobs:
 
   integration:
     name: Integration tests (shard ${{ matrix.shard }}/4)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    needs: changes
+    # A false job-level if stops the matrix before expansion, so the four
+    # required shard check names would never be reported. Keep the job
+    # eligible and gate its steps instead.
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -139,43 +178,74 @@ jobs:
       # backend plus one Vite server for this job only.
       TEST_BROWSER_SHARDS: 1
     steps:
+      - name: Gate this shard
+        id: gate
+        env:
+          RESULT: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          EVENT_NAME: ${{ github.event_name }}
+          FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" != "success" ]; then
+            echo "Classification did not succeed: $RESULT" >&2
+            exit 1
+          fi
+          case "$CODE" in
+            true|false) ;;
+            *) echo "Invalid classification output: '$CODE'" >&2; exit 1 ;;
+          esac
+          if [ "$CODE" = "true" ] && { [ "$EVENT_NAME" != "pull_request" ] || [ "$FORK" = "true" ]; }; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.gate.outputs.run == 'true'
         with:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        if: steps.gate.outputs.run == 'true'
         with:
           bun-version-file: .bun-version
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.gate.outputs.run == 'true'
         with:
           node-version: 24
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.gate.outputs.run == 'true'
         with:
           go-version-file: backend/go.mod
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Cache Bun packages
+        if: steps.gate.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', '.bun-version') }}
           restore-keys: bun-${{ runner.os }}-
       - name: Cache Playwright browsers
+        if: steps.gate.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: playwright-${{ runner.os }}-
       - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
         run: bun install --frozen-lockfile
       - name: Install Chromium
+        if: steps.gate.outputs.run == 'true'
         working-directory: frontend
         # The hosted Ubuntu image already carries Chromium's libraries.
         # Avoiding --with-deps prevents a slow font download from dominating.
         run: bunx --no-install playwright install chromium
       - name: Run integration shard
+        if: steps.gate.outputs.run == 'true'
         run: bun --filter ./frontend test:integration -- --shard=${{ matrix.shard }}/4
       - name: Upload failure artifacts
-        if: failure()
+        if: steps.gate.outputs.run == 'true' && failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: integration-artifacts-shard-${{ matrix.shard }}
@@ -185,7 +255,10 @@ jobs:
 
   extension:
     name: Extension browser tests
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

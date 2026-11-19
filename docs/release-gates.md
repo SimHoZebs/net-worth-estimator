@@ -3,9 +3,13 @@
 Nothing ships until every gate below passes on the release commit. Hosted
 CI runs the automated tiers on every branch push and every pull request
 (`.github/workflows/tests.yml`), so the run for the exact `main` SHA is the
-gate of record. A branch run covers the pre-landing content only; after a
-squash or rebase, watch the new `main` run. It also runs the disposable e2e
-gate nightly (`.github/workflows/e2e.yml`). The image workflow runs after that
+gate of record. A documentation-only change still produces a green run, but
+its test jobs are skipped by conditional so branch protection stays
+satisfied; the release workflows see the skipped gate and publish no images
+and request no deployment for that commit. Mixed changes run every gate, and
+manual dispatch always runs every gate. A branch run covers the pre-landing
+content only; after a squash or rebase, watch the new `main` run. It also runs
+the disposable e2e gate nightly (`.github/workflows/e2e.yml`). The image workflow runs after that
 `Tests` run. The Northflank workflow starts on the same `Tests` run and requests
 a deployment only after the pinned backend-northflank and Better Auth (auth) image tags exist. The
 Vercel workflow uses the `Tests` gate directly for production frontend deploys.
@@ -73,8 +77,10 @@ the QA-03 test files' headers and in section 4 below.
   the actual-provider checklist in [the deployment index](../deploy/README.md)
   stays manual. Vercel deploys after the `Tests` run for the pushed `main`
   commit succeeds. Northflank deploys after the pinned images for that commit
-   are published; the image workflow itself runs only after `Tests` succeeds. Landing and
-   release are distinct. An actual Northflank release
+   are published; the image workflow itself runs only after `Tests` succeeds.
+   A documentation-only push leaves all three downstream workflows idle
+   because their gate job was skipped. Landing and release are distinct.
+   An actual Northflank release
    requires its workflow run ID, successful migration step, backup hash,
    and an `ok` readiness response.
    A release that stops at the migration leaves the API in maintenance with the

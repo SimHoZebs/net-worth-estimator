@@ -9,18 +9,54 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: container-images-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # A docs-only Tests run finishes green with its code jobs skipped. Do not
+  # publish images for it even though workflow_run still fires.
+  code-guard:
+    name: Code change guard
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.guard.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check whether the code gates ran
+        id: guard
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TESTS_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            code=true
+          else
+            code="$(node scripts/ci-code-gate.mjs --tests-run "$TESTS_RUN_ID")"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: code-guard
+    if: >-
+      needs.code-guard.outputs.code == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
