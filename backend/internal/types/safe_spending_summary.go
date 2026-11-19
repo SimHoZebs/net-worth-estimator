@@ -3,18 +3,19 @@ package types
 // SafeSpendingSummary is a factual cash cut plus conditional outstanding bills.
 // It is not a projection: future income and simulated fulfillment never enter it.
 type SafeSpendingSummary struct {
-	Revision               string                   `json:"revision"`
-	Start                  string                   `json:"start"`
-	End                    string                   `json:"end"`
-	Status                 string                   `json:"status"`
-	Reasons                []string                 `json:"reasons"`
-	SelectedAccountIDs     []string                 `json:"selectedAccountIds"`
-	Baselines              []SafeSpendingBaseline   `json:"baselines"`
-	CheckingAvailable      *float64                 `json:"checkingAvailable"`
-	ConfirmedMovements     []SafeSpendingMovement   `json:"confirmedMovements"`
-	OutstandingObligations []SafeSpendingObligation `json:"outstandingObligations"`
-	OutstandingBillsTotal  *float64                 `json:"outstandingBillsTotal"`
-	CashAfterBills         *float64                 `json:"cashAfterBills"`
+	Revision              string                 `json:"revision"`
+	Start                 string                 `json:"start"`
+	End                   string                 `json:"end"`
+	CashAsOf              string                 `json:"cashAsOf" doc:"UTC calendar date of the cash evidence cut"`
+	Status                string                 `json:"status"`
+	Reasons               []string               `json:"reasons"`
+	SelectedAccountIDs    []string               `json:"selectedAccountIds"`
+	Baselines             []SafeSpendingBaseline `json:"baselines"`
+	CheckingAvailable     *float64               `json:"checkingAvailable"`
+	ConfirmedMovements    []SafeSpendingMovement `json:"confirmedMovements"`
+	Bills                 []SafeSpendingBill     `json:"bills"`
+	OutstandingBillsTotal *float64               `json:"outstandingBillsTotal"`
+	CashAfterBills        *float64               `json:"cashAfterBills"`
 }
 
 type SafeSpendingBaseline struct {
@@ -37,7 +38,7 @@ type SafeSpendingMovement struct {
 	Amount        float64 `json:"amount"`
 }
 
-type SafeSpendingObligation struct {
+type SafeSpendingBill struct {
 	ID            string   `json:"id"`
 	TransactionID *string  `json:"transactionId"`
 	ScheduleID    *string  `json:"scheduleId"`
@@ -45,5 +46,5 @@ type SafeSpendingObligation struct {
 	Name          string   `json:"name"`
 	Date          string   `json:"date"`
 	Amount        *float64 `json:"amount"`
-	Status        string   `json:"status"`
+	Status        string   `json:"status" enum:"paid,unpaid,pending,unknown"`
 }

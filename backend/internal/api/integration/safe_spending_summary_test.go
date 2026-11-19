@@ -52,7 +52,8 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 		handler := New(st, Config{ReadOnly: true})
-		response := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary?start="+day+"&end="+day, "")
+		start := midnight.AddDate(0, 0, -7).Format("2006-01-02")
+		response := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary?start="+start+"&end="+day, "")
 		if response.Code != 200 {
 			t.Fatalf("%s: %d %s", subject, response.Code, response.Body.String())
 		}
@@ -72,10 +73,10 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := 980.0 + float64(i)*100
-		if got.Revision != revision || got.CashAfterBills == nil || *got.CashAfterBills != want || len(got.Baselines) != 1 || got.Baselines[0].AccountName != subject || len(got.OutstandingObligations) != 1 || got.OutstandingObligations[0].Name != subject+" bill" {
+		if got.Start != start || got.CashAsOf != day || got.Revision != revision || got.CashAfterBills == nil || *got.CashAfterBills != want || len(got.Baselines) != 1 || got.Baselines[0].AccountName != subject || len(got.Bills) != 1 || got.Bills[0].Name != subject+" bill" || got.Bills[0].Status != "unpaid" {
 			t.Fatalf("%s summary %+v", subject, got)
 		}
-		for _, query := range []string{"", "?start=bad&end=" + day, "?start=2026-02-30&end=" + day, "?start=" + day, "?end=" + day, "?start=" + day + "&end=bad", "?start=" + day + "&end=" + midnight.AddDate(0, 0, -1).Format("2006-01-02"), "?start=" + midnight.AddDate(0, 0, 1).Format("2006-01-02") + "&end=" + midnight.AddDate(0, 0, 2).Format("2006-01-02")} {
+		for _, query := range []string{"", "?start=bad&end=" + day, "?start=2026-02-30&end=" + day, "?start=" + day, "?end=" + day, "?start=" + day + "&end=bad", "?start=" + day + "&end=" + midnight.AddDate(0, 0, -1).Format("2006-01-02")} {
 			res := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary"+query, "")
 			if res.Code != 422 {
 				t.Fatalf("invalid query %q: %d %s", query, res.Code, res.Body.String())
@@ -96,5 +97,18 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 		if res.Code != 200 {
 			t.Fatalf("future end %d %s", res.Code, res.Body.String())
 		}
+		nextStart := midnight.AddDate(0, 0, 1).Format("2006-01-02")
+		nextEnd := midnight.AddDate(0, 0, 62).Format("2006-01-02")
+		res = doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary?start="+nextStart+"&end="+nextEnd, "")
+		if res.Code != 200 {
+			t.Fatalf("future cycle %d %s", res.Code, res.Body.String())
+		}
+		if err := json.Unmarshal(res.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.CashAsOf != day || got.CashAfterBills != nil || got.CheckingAvailable != nil || len(got.Bills) == 0 || got.Bills[0].Status != "unpaid" {
+			t.Fatalf("future cycle %+v", got)
+		}
+
 	}
 }

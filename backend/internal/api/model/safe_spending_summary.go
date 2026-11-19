@@ -17,12 +17,12 @@ type safeSpendingSummaryOutput struct {
 }
 
 func (s *handler) getSafeSpendingSummary(_ context.Context, input *struct {
-	Start string `query:"start" required:"true" doc:"UTC cash evidence cut and inclusive bill-window start YYYY-MM-DD"`
-	End   string `query:"end" required:"true" doc:"Inclusive conditional bill-window end YYYY-MM-DD"`
+	Start string `query:"start" required:"true" doc:"Inclusive statement cycle start YYYY-MM-DD"`
+	End   string `query:"end" required:"true" doc:"Inclusive statement cycle end YYYY-MM-DD. Evidence is bounded by request time or cycle close, whichever is earlier. Future cycles return bills without a cash allowance."`
 }) (*safeSpendingSummaryOutput, error) {
 	now := time.Now().UTC()
-	if !domain.IsValidIsoDate(input.Start) || input.Start > domain.FormatIsoDate(now) {
-		return nil, huma.Error422UnprocessableEntity("start must be a UTC calendar date at or before today")
+	if !domain.IsValidIsoDate(input.Start) {
+		return nil, huma.Error422UnprocessableEntity("start must be a UTC calendar date")
 	}
 	if !domain.IsValidIsoDate(input.End) || input.End < input.Start {
 		return nil, huma.Error422UnprocessableEntity("end must be a UTC calendar date at or after start")

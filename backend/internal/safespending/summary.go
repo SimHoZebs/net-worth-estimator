@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -30,12 +31,6 @@ func posted(t types.Transaction, cut int64) bool {
 	return fact(t) && !t.Pending && t.PostedTime > 0 && t.PostedTime <= cut && domain.TransactionInstant(&t) <= cut
 }
 
-// Build uses one model snapshot. Cash is evidenced through the start UTC day;
-// bills are conditional requested amounts within the inclusive date window.
-func Build(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string) types.SafeSpendingSummary {
-	return BuildAtCut(model, settings, start, end, domain.DayCloseUnix(start))
-}
-
 // cutState carries the evidence assembled during one BuildAtCut pass. The
 // helpers below advance it through checkpoint selection, confirmed replay,
 // baseline derivation and the final availability gate.
@@ -56,8 +51,8 @@ type cutState struct {
 // The API supplies its captured request instant so authored future-today facts
 // remain conditional instead of masquerading as cash already observed.
 func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSettings, start, end string, factualCut int64) types.SafeSpendingSummary {
-	cut := min(domain.DayCloseUnix(start), factualCut)
-	s := types.SafeSpendingSummary{Start: start, End: end, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, OutstandingObligations: []types.SafeSpendingObligation{}}
+	cut := min(domain.DayCloseUnix(end), factualCut)
+	s := types.SafeSpendingSummary{Start: start, End: end, CashAsOf: domain.FormatIsoDate(time.Unix(cut, 0)), Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}}
 	if settings == nil {
 		settings = &types.SafeSpendingSettings{}
 	}
@@ -74,7 +69,14 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 		cut:      cut,
 	}
 	st.replayConfirmed()
-	st.deriveBaselines()
+	if s.Start > s.CashAsOf {
+		// Observations can inform bill amounts and claims, not the future
+		// cycle's cash baseline or cash movements.
+		s.ConfirmedMovements = []types.SafeSpendingMovement{}
+		s.Reasons = []string{ReasonFutureCycle}
+	} else {
+		st.deriveBaselines()
+	}
 	st.gateStatus()
 	return s
 }
@@ -191,17 +193,15 @@ func (st *cutState) deriveBaselines() {
 			b.PostedBalance = &cp.Balance
 			b.AvailableBalance = cp.AvailableBalance
 			b.Basis = "posted"
-			b.Status = "uncertain"
-			if cp.AvailableBalance == nil {
-				// No bank available figure: fall back to the reported posted
-				// balance itself, marked with the posted basis.
-				b.Status = "available"
-				available += cp.Balance
-			} else {
+			b.Status = "available"
+			// Both bases include confirmed movements after observation. Only a
+			// bank-reported available figure adjusts the starting cash balance.
+			accountCash := st.balances[a.ID]
+			if cp.AvailableBalance != nil {
 				b.Basis = "available"
-				b.Status = "available"
-				available += *cp.AvailableBalance + st.balances[a.ID] - cp.Balance
+				accountCash += *cp.AvailableBalance - cp.Balance
 			}
+			available += accountCash
 			for _, tx := range st.transactions {
 				if !fact(tx) || !touches(tx, a.ID) {
 					continue
@@ -211,8 +211,14 @@ func (st *cutState) deriveBaselines() {
 				// bank-reported available cash or need another deduction. The
 				// observation proves the balance, not which holds it covers;
 				// claimed bills retain their separate coverage uncertainty.
-				if tx.Pending && instant <= st.cut && instant > cp.ObservedAt {
-					reason(&b.Reasons, ReasonPendingAfterBaselineCoverageUnknown)
+				if tx.Pending && instant <= st.cut {
+					if instant > cp.ObservedAt {
+						reason(&b.Reasons, ReasonPendingAfterBaselineCoverageUnknown)
+					} else if cp.AvailableBalance == nil && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID {
+						// A posted balance does not establish spendable cash
+						// while a known outgoing authorization is still pending.
+						reason(&b.Reasons, ReasonPendingHoldWithoutAvailableBalance)
+					}
 				}
 				// A newly posted debit may settle a hold already in available cash.
 				// Aggregate gaps cannot identify which transaction held that cash.

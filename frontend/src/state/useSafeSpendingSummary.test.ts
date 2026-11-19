@@ -86,7 +86,8 @@ describe("safe spending summary query", () => {
 				outstandingBillsTotal: null,
 				cashAfterBills: null,
 				confirmedMovements: [],
-				outstandingObligations: [],
+				bills: [],
+				cashAsOf: "2026-11-15",
 				selectedAccountIds: [],
 			});
 			await refresh();

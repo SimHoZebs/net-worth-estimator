@@ -1,9 +1,32 @@
 package safespending
 
 import (
+	"slices"
+
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
+
+// Configure falls back to all eligible bills when no stored ID survives.
+func effectiveBills(rules []types.Schedule, cash map[string]bool, stored []string) []types.Schedule {
+	all, chosen := []types.Schedule{}, []types.Schedule{}
+	for _, rule := range rules {
+		if !rule.Enabled || rule.SourceAccountID == nil || !cash[*rule.SourceAccountID] {
+			continue
+		}
+		if len(rule.Destinations) > 0 && !slices.ContainsFunc(rule.Destinations, func(id string) bool { return !cash[id] }) {
+			continue
+		}
+		all = append(all, rule)
+		if slices.Contains(stored, rule.ID) {
+			chosen = append(chosen, rule)
+		}
+	}
+	if len(chosen) != 0 {
+		return chosen
+	}
+	return all
+}
 
 // effectiveAccounts preserves Configure's non-debt candidates and detected
 // checking fallback. Null, empty, and wholly stale selections do not broaden

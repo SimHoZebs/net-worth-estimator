@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
-import {
-	billCandidates,
-	billsInCycle,
-	effectiveBillIds,
-} from "./safeSpendingBills.ts";
+import { billCandidates, effectiveBillIds } from "./safeSpendingBills.ts";
 
 const schedule = (id: string, sourceAccountId: string | null, enabled = true) =>
 	({
@@ -26,14 +22,16 @@ const schedule = (id: string, sourceAccountId: string | null, enabled = true) =>
 	}) as Schedule;
 
 describe("billCandidates", () => {
-	it("excludes calculated amounts that cannot be displayed as a bill", () => {
+	it("keeps calculated bills selectable without inventing their amount", () => {
 		const recipe = schedule("percent", "checking");
 		recipe.amount = {
 			resolver: "expression",
 			config: { expression: "balance * 0.1" },
 			inputs: {},
 		};
-		expect(billCandidates([recipe], ["checking"])).toEqual([]);
+		expect(billCandidates([recipe], ["checking"])).toEqual([
+			{ id: "percent", name: "percent", amount: null },
+		]);
 	});
 
 	it("keeps enabled schedules sourced from selected cash accounts", () => {
@@ -57,18 +55,5 @@ describe("billCandidates", () => {
 		);
 		expect(effectiveBillIds(null, candidates)).toEqual(["rent", "gym"]);
 		expect(effectiveBillIds(["gym"], candidates)).toEqual(["gym"]);
-	});
-});
-
-describe("billsInCycle", () => {
-	it("lists only the selected schedules' occurrences inside the cycle", () => {
-		const schedules = [
-			schedule("rent", "checking"),
-			schedule("gym", "checking"),
-		];
-		const rows = billsInCycle(schedules, ["rent"], "2026-10-20", "2026-11-20");
-		expect(
-			rows.map((row) => [row.transactionId, row.date, row.requested]),
-		).toEqual([["rent", "2026-11-01", 120]]);
 	});
 });

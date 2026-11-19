@@ -27,12 +27,6 @@ export interface CycleViewInput {
 	monthlyIncome?: number | null;
 	scheduledOutflows?: SafeSpendingScheduledIncrease[];
 	billMarkers?: SafeSpendingScheduledIncrease[];
-	/**
-	 * Selected-window cash remainder for non-current cycles. When provided
-	 * (even as null) it replaces the current-range shape check; when absent
-	 * the exact current-range derivation applies.
-	 */
-	remainingOverride?: number | null;
 }
 
 export interface CycleViewResult {
@@ -61,7 +55,6 @@ export function cycleView({
 	monthlyIncome,
 	scheduledOutflows,
 	billMarkers,
-	remainingOverride,
 }: CycleViewInput): CycleViewResult & { ledger: AccountTransaction[] } {
 	const monthStart = `${referenceDay.slice(0, 7)}-01`;
 	const recorded = spendingLedger({
@@ -77,27 +70,14 @@ export function cycleView({
 		todayIso: referenceDay,
 	});
 	const spent = sumCents(ledger, spendingAmount);
-	const hasOverride = remainingOverride !== undefined;
-	const remaining = hasOverride
-		? remainingOverride
-		: cashSummary?.status === "available" &&
-			  cashSummary.start === referenceDay &&
-			  cashSummary.end === monthEndIso(referenceDay) &&
-			  cashSummary.cashAfterBills !== null &&
-			  Number.isFinite(cashSummary.cashAfterBills)
-			? cashSummary.cashAfterBills
-			: null;
+	const matchesCycle =
+		cashSummary?.status === "available" &&
+		cashSummary.start === cycle.start &&
+		cashSummary.end === cycle.end;
+	const remaining = matchesCycle ? cashSummary.cashAfterBills : null;
 	const protectedReserve = Math.max(0, reserve);
 	const unknownSpending = hasUnknownSpending(ledger);
-	const cashInAccount =
-		cashSummary?.status === "available" &&
-		(hasOverride ||
-			(cashSummary.start === referenceDay &&
-				cashSummary.end === monthEndIso(referenceDay))) &&
-		cashSummary.checkingAvailable !== null &&
-		Number.isFinite(cashSummary.checkingAvailable)
-			? cashSummary.checkingAvailable
-			: null;
+	const cashInAccount = matchesCycle ? cashSummary.checkingAvailable : null;
 	const incomeKnown =
 		monthlyIncome !== null &&
 		monthlyIncome !== undefined &&

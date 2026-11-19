@@ -50,7 +50,8 @@ function summary(
 		cashAfterBills: 400,
 		baselines: [],
 		confirmedMovements: [],
-		outstandingObligations: [],
+		bills: [],
+		cashAsOf: "2026-11-15",
 		...overrides,
 	};
 }
@@ -63,7 +64,7 @@ function selectedInput(
 		referenceDay: "2026-10-19",
 		transactions: [recordedCharge],
 		cashSummary: summary({
-			start: "2026-10-19",
+			start: "2026-09-20",
 			end: "2026-10-19",
 			cashAfterBills: 400,
 			checkingAvailable: 525,
@@ -71,7 +72,6 @@ function selectedInput(
 		cardSpentByCard: [{ id: "card", name: "Test card", amount: 125 }],
 		reserve: 0,
 		fullDaysLeft: 1,
-		remainingOverride: 400,
 		...overrides,
 	};
 }
@@ -100,20 +100,6 @@ describe("single selected-cycle budget", () => {
 		expect(html).not.toContain("cash-payments-value");
 		expect(html).not.toContain("Closed card balance");
 	});
-	it("uses the override remainder instead of the current-range shape", () => {
-		const shaped = cycleView({
-			...selectedInput(),
-			remainingOverride: undefined,
-		});
-		expect(shaped.view.allocation.available).toBe(false);
-		expect(shaped.trend.limit).toBeNull();
-		const overridden = cycleView(selectedInput({ remainingOverride: null }));
-		expect(overridden.view.allocation.available).toBe(false);
-		expect(overridden.trend.limit).toBeNull();
-		const restored = cycleView(selectedInput({ remainingOverride: 400 }));
-		expect(restored.view.allocation.available).toBe(true);
-		expect(restored.trend.limit).toBe(525);
-	});
 	it("renders the same main-card sections for an unavailable future window", () => {
 		const { view } = cycleView(
 			selectedInput({
@@ -121,9 +107,8 @@ describe("single selected-cycle budget", () => {
 				referenceDay: "2026-11-15",
 				transactions: [],
 				cardSpentByCard: [],
-				remainingOverride: null,
 				cashSummary: summary({
-					start: "2026-12-19",
+					start: "2026-11-20",
 					end: "2026-12-19",
 					status: "missing",
 					cashAfterBills: null,

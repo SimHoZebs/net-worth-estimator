@@ -1,150 +1,31 @@
-import { describe, expect, it } from "vitest";
-import type { Transaction } from "./model.ts";
-import { transactionFixture } from "@/mocks/projection.ts";
+import { expect, it } from "vitest";
+import type { SafeSpendingBill } from "@/api/generated/model/safeSpendingBill.ts";
 import {
-	claimedBillKeys,
 	recurringBillIncreases,
 	recurringBillMarkers,
-	unclaimedBills,
 } from "./recurringBillIncreases.ts";
 
-const bill = (
-	date: string,
-	requested: number,
-	overrides: Parameters<typeof transactionFixture>[0] = {},
-) => transactionFixture({ date, requested, name: "bill", ...overrides });
-
-const claim = (
-	id: string,
-	scheduleId: string,
-	occurrenceDate: string,
-): Transaction => ({
-	id,
-	name: "paid",
-	amount: 25,
-	amountKnown: true,
-	fromId: "checking",
-	toId: null,
-	kind: "transaction",
-	startDate: occurrenceDate,
-	endDate: null,
-	annualIncrease: 0,
-	enabled: true,
-	readOnly: false,
-	claimScheduleId: scheduleId,
-	claimOccurrenceDate: occurrenceDate,
-	postedDate: null,
-	pending: false,
-	void: false,
-	syncOwned: true,
-	category: null,
-	categorySource: null,
-	transactionTime: null,
-});
-
-describe("recurringBillIncreases", () => {
-	it("groups bill occurrences by date and sums cents", () => {
-		const increases = recurringBillIncreases({
-			transactions: [],
-			bills: [
-				bill("2026-11-20", 10, { name: "alpha" }),
-				bill("2026-11-20", 15.005, { name: "beta" }),
-				bill("2026-11-21", 25, { name: "gamma" }),
-			],
-		});
-		expect(increases).toEqual([
-			{ date: "2026-11-20", amount: 25.01, name: "alpha, beta" },
-			{ date: "2026-11-21", amount: 25, name: "gamma" },
-		]);
-	});
-
-	it("keeps distinct names once per day", () => {
-		const increases = recurringBillIncreases({
-			transactions: [],
-			bills: [
-				bill("2026-11-20", 10, { name: "alpha" }),
-				bill("2026-11-20", 5, { name: "alpha" }),
-			],
-		});
-		expect(increases).toEqual([
-			{ date: "2026-11-20", amount: 15, name: "alpha" },
-		]);
-	});
-
-	it("leaves out occurrences a recorded transaction claims", () => {
-		const bills = [
-			bill("2026-11-20", 25, { transactionId: "rent" }),
-			bill("2026-11-21", 30, { transactionId: "utilities" }),
-		];
-		const increases = recurringBillIncreases({
-			transactions: [claim("paid-1", "rent", "2026-11-20")],
-			bills,
-		});
-		expect(increases).toEqual([
-			{ date: "2026-11-21", amount: 30, name: "bill" },
-		]);
-		// Markers keep the occurred bill so its dot survives on the chart.
-		expect(recurringBillMarkers(bills)).toEqual([
-			{ date: "2026-11-20", amount: 25, name: "bill" },
-			{ date: "2026-11-21", amount: 30, name: "bill" },
-		]);
-	});
-
-	it("hides a claimed occurrence from the Bills list while markers keep it", () => {
-		const bills = [
-			bill("2026-11-20", 25, { transactionId: "rent" }),
-			bill("2026-11-21", 30, { transactionId: "utilities" }),
-		];
-		const transactions = [claim("paid-1", "rent", "2026-11-20")];
-		expect(claimedBillKeys(transactions)).toEqual(new Set(["rent|2026-11-20"]));
-		expect(
-			unclaimedBills(bills, transactions).map((row) => row.transactionId),
-		).toEqual(["utilities"]);
-		// Markers keep the occurred bill so its dot survives on the chart.
-		expect(recurringBillMarkers(bills)).toHaveLength(2);
-		// Projected increases reuse the same unclaimed list, so they cannot drift.
-		expect(recurringBillIncreases({ bills, transactions })).toEqual(
-			recurringBillMarkers(unclaimedBills(bills, transactions)),
-		);
-	});
-
-	it("keeps a bill claimed by a void or pending transaction", () => {
-		const voidClaim = {
-			...claim("void-claim", "rent", "2026-11-20"),
-			void: true,
-		};
-		const pendingClaim = {
-			...claim("pending-claim", "utilities", "2026-11-21"),
-			pending: true,
-		};
-		const increases = recurringBillIncreases({
-			transactions: [voidClaim, pendingClaim],
-			bills: [
-				bill("2026-11-20", 25, { transactionId: "rent" }),
-				bill("2026-11-21", 30, { transactionId: "utilities" }),
-			],
-		});
-		expect(increases).toHaveLength(2);
-		expect(
-			unclaimedBills(
-				[
-					bill("2026-11-20", 25, { transactionId: "rent" }),
-					bill("2026-11-21", 30, { transactionId: "utilities" }),
-				],
-				[voidClaim, pendingClaim],
-			),
-		).toHaveLength(2);
-	});
-
-	it("ignores rows with no spendable amount", () => {
-		const increases = recurringBillIncreases({
-			transactions: [],
-			bills: [
-				bill("2026-11-20", 0),
-				bill("2026-11-21", -5),
-				bill("2026-11-22", Number.NaN),
-			],
-		});
-		expect(increases).toEqual([]);
-	});
+it("groups markers from all priced occurrences but projects only unpaid bills", () => {
+	const bill: SafeSpendingBill = {
+		date: "2026-11-10",
+		name: "Phone",
+		amount: 20,
+		status: "unpaid",
+		id: "1",
+		transactionId: null,
+		scheduleId: "phone",
+		accountId: "cash",
+	};
+	const bills: SafeSpendingBill[] = [
+		bill,
+		{ ...bill, name: "Rent", status: "paid", amount: 800 },
+		{ ...bill, name: "Gas", status: "pending", amount: 25.12 },
+		{ ...bill, name: "Water", status: "unknown", amount: null },
+	];
+	expect(recurringBillIncreases(bills)).toEqual([
+		{ date: bill.date, amount: 20, name: "Phone" },
+	]);
+	expect(recurringBillMarkers(bills)).toEqual([
+		{ date: bill.date, amount: 845.12, name: "Phone, Rent, Gas" },
+	]);
 });

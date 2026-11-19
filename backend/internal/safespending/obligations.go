@@ -2,7 +2,6 @@ package safespending
 
 import (
 	"fmt"
-	"slices"
 	"sort"
 	"time"
 
@@ -110,150 +109,94 @@ func (a *amounts) record(tx types.Transaction, value float64) {
 	}
 }
 
-// obligationBuilder carries the mutable state of one buildObligations pass.
-// The add method was previously a closure over all of these values.
-type obligationBuilder struct {
-	summary      *types.SafeSpendingSummary
-	settings     *types.SafeSpendingSettings
-	selected     map[string]bool
-	observations map[string]types.Checkpoint
-	ctx          *amounts
-	cut          int64
-	start        string
-	seen         map[string]bool
-	known        bool
-	total        float64
-}
-
-func (b *obligationBuilder) add(o domain.DatedTransactionOccurrence, date string) {
-	tx := o.Transaction
-	billDate := date
-	if tx.Claim != nil {
-		billDate = tx.Claim.OccurrenceDate
-	}
-	if billDate < b.start || billDate > b.summary.End {
-		return
-	}
-	if tx.SourceAccountID == nil || !b.selected[*tx.SourceAccountID] {
-		return
-	}
-	// Only the portion leaving the selected cash set is an obligation.
-	selectedDestinations := 0
-	for _, id := range tx.Destinations {
-		if b.selected[id] {
-			selectedDestinations++
-		}
-	}
-	if len(tx.Destinations) > 0 && selectedDestinations == len(tx.Destinations) {
-		return
-	}
-	selectedID := tx.ID
-	if tx.Claim != nil {
-		selectedID = tx.Claim.ScheduleID
-	}
-	if b.settings.TransactionIDs != nil && !slices.Contains(b.settings.TransactionIDs, tx.ID) && !slices.Contains(b.settings.TransactionIDs, selectedID) {
-		return
-	}
-	if o.Rule == nil && posted(*tx, b.cut) {
-		return
-	}
-	id := "transaction:" + tx.ID
-	row := types.SafeSpendingObligation{ID: id, TransactionID: &tx.ID, AccountID: *tx.SourceAccountID, Name: tx.Name, Date: date, Status: "outstanding"}
-	if o.Rule != nil {
-		row.ID = "schedule:" + o.Rule.ID + ":" + date
-		row.TransactionID = nil
-		row.ScheduleID = &o.Rule.ID
-		// A date-only schedule at or before an observed cash day may
-		// already have been paid without a claim. It is not an arrears
-		// ledger, and neither a due date nor amount matching proves unpaid.
-		if cp, ok := b.observations[*tx.SourceAccountID]; ok && date <= domain.FormatIsoDate(time.Unix(cp.ObservedAt, 0)) {
-			row.Status = "payment-status-unknown"
-			reason(&b.summary.Reasons, ReasonScheduledPaymentStatusUnknown)
-		}
-	}
-	if tx.Claim != nil {
-		row.ScheduleID = &tx.Claim.ScheduleID
-		row.Date = tx.Claim.OccurrenceDate
-	}
-	if b.seen[row.ID] {
-		return
-	}
-	b.seen[row.ID] = true
-	if tx.Pending {
-		row.Status = "pending-coverage-unknown"
-		reason(&b.summary.Reasons, ReasonPendingObligationCoverageUnknown)
-	}
-	amount, err := b.ctx.resolve(o, date)
-	if selectedDestinations > 0 {
-		b.known = false
-		reason(&b.summary.Reasons, ReasonObligationRoutingUnknown)
-		b.summary.OutstandingObligations = append(b.summary.OutstandingObligations, row)
-		return
-	}
-	if err != nil {
-		b.known = false
-		reason(&b.summary.Reasons, ReasonObligationAmountUnavailable)
-	} else if amount < 0 {
-		b.known = false
-		reason(&b.summary.Reasons, ReasonNegativeObligationAmount)
-	} else {
-		row.Amount = money(amount)
-		b.total += *row.Amount
-	}
-	b.summary.OutstandingObligations = append(b.summary.OutstandingObligations, row)
-}
-
+// Expand selected schedules first so claims enrich the same occurrence identity,
+// even when a payment posts outside the cycle or for a different amount.
 func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts, cut int64) {
-	transactions := []types.Transaction{}
-	for _, tx := range model.Transactions {
-		if fact(tx) {
-			// ResolveOccurrences uses Enabled for simulation eligibility and its
-			// claim index. Evidence includes disabled live holds without changing
-			// the shared snapshot or the projection engine's eligibility rules.
-			tx.Enabled = true
-			transactions = append(transactions, tx)
+	claims := map[types.TransactionClaim]*types.Transaction{}
+	for i := range model.Transactions {
+		tx := &model.Transactions[i]
+		if tx.Claim != nil && (posted(*tx, cut) || (fact(*tx) && tx.Pending && domain.TransactionInstant(tx) <= cut)) {
+			claims[*tx.Claim] = tx
 		}
 	}
-	// Only explicit transaction claims suppress occurrences, including pending
-	// claims. Simulation's realized rows are never evidence that a bill was paid.
-	occurrences := domain.ResolveOccurrences(model.Schedules, transactions, s.Start, s.End, true)
-	dates := make([]string, 0, len(occurrences.ByDate))
-	for date := range occurrences.ByDate {
-		dates = append(dates, date)
-	}
-	sort.Strings(dates)
-	b := &obligationBuilder{
-		summary:      s,
-		settings:     settings,
-		selected:     selected,
-		observations: observations,
-		ctx:          ctx,
-		cut:          cut,
-		start:        s.Start,
-		seen:         map[string]bool{},
-		known:        true,
-	}
-	for _, date := range dates {
-		for _, o := range occurrences.ByDate[date] {
-			b.add(o, date)
+	schedules := effectiveBills(model.Schedules, selected, settings.TransactionIDs)
+	total := 0.0
+	exact := true
+	for date, occurrences := range domain.ResolveOccurrences(schedules, nil, s.Start, s.End, true).ByDate {
+		for _, o := range occurrences {
+			row, cause := billEvidence(o, date, claims[types.TransactionClaim{ScheduleID: o.Rule.ID, OccurrenceDate: date}], selected, observations, ctx)
+			if cause != "" {
+				reason(&s.Reasons, cause)
+				exact = false
+			}
+			if row.Status == "unpaid" && row.Amount != nil {
+				total += *row.Amount
+			}
+			s.Bills = append(s.Bills, *row)
 		}
 	}
-	// A payment can claim an occurrence inside the requested range while its
-	// transaction date is outside it. Keep its exact identity and amount.
-	for i := range transactions {
-		tx := &transactions[i]
-		if tx.Claim != nil && tx.Claim.OccurrenceDate >= b.start && tx.Claim.OccurrenceDate <= s.End {
-			b.add(domain.DatedTransactionOccurrence{Transaction: tx}, tx.Claim.OccurrenceDate)
-		}
-	}
-	sort.SliceStable(s.OutstandingObligations, func(i, j int) bool {
-		a, b := s.OutstandingObligations[i], s.OutstandingObligations[j]
+	sort.Slice(s.Bills, func(i, j int) bool {
+		a, b := s.Bills[i], s.Bills[j]
 		if a.Date != b.Date {
 			return a.Date < b.Date
 		}
 		return a.ID < b.ID
 	})
-	if b.known {
-		s.OutstandingBillsTotal = money(b.total)
+	sort.Strings(s.Reasons)
+	if exact {
+		s.OutstandingBillsTotal = money(total)
 	}
+}
+
+func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types.Transaction, selected map[string]bool, observations map[string]types.Checkpoint, ctx *amounts) (*types.SafeSpendingBill, string) {
+	rule := o.Rule
+	internal := 0
+	for _, id := range rule.Destinations {
+		if selected[id] {
+			internal++
+		}
+	}
+	row := &types.SafeSpendingBill{ID: "schedule:" + rule.ID + ":" + date, ScheduleID: &rule.ID, Date: date, Name: rule.Name, AccountID: *rule.SourceAccountID, Status: "unpaid"}
+	if claim != nil {
+		row.TransactionID = &claim.ID
+		if !claim.Pending {
+			row.Status = "paid"
+			if amount, ok := ctx.latest[claim.ID]; ok {
+				row.Amount = money(amount)
+			}
+			return row, ""
+		}
+		row.Status = "pending"
+		// Pending records have no replayed settlement amount. Only their
+		// literal inputs are evidence at authorization time; the end-of-cut
+		// provider context could contain a fact posted after the hold.
+		for _, input := range claim.Amount.Inputs {
+			if input.Source != "literal" {
+				return row, ReasonPendingObligationCoverageUnknown
+			}
+		}
+		if amount, err := ctx.resolveFact(*claim); err == nil {
+			row.Amount = money(amount)
+		}
+		return row, ReasonPendingObligationCoverageUnknown
+	}
+	if internal > 0 {
+		row.Status = "unknown"
+		return row, ReasonObligationRoutingUnknown
+	}
+	amount, err := ctx.resolve(o, date)
+	if err != nil {
+		row.Status = "unknown"
+		return row, ReasonObligationAmountUnavailable
+	}
+	if amount < 0 {
+		row.Status = "unknown"
+		return row, ReasonNegativeObligationAmount
+	}
+	row.Amount = money(amount)
+	if cp, ok := observations[row.AccountID]; ok && date <= domain.FormatIsoDate(time.Unix(cp.ObservedAt, 0)) {
+		row.Status = "unknown"
+		return row, ReasonScheduledPaymentStatusUnknown
+	}
+	return row, ""
 }

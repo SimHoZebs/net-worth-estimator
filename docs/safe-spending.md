@@ -16,8 +16,8 @@ can avoid combining different model versions.
 One selected-cycle derivation owns the spending ledger, budget, chart, and
 transaction crossing identities. Its budget reconciles recorded selected-window
 spending with the server's selected-window cash remainder. The current range
-uses cash after bills as today; a past single-day close range uses its cash
-after bills (close cash minus close-day bills). Past cycles deliberately
+uses cash observed through now; a past cycle uses cash observed through its
+closing date. Both deduct only unpaid bills in the selected cycle. Past cycles deliberately
 reconstruct the same budget rows as the current cycle from close cash evidence:
 spend by selected end, per day, and pace limits with thresholds whenever
 computable. Future windows with no evidence render the unavailable allowance
@@ -37,16 +37,15 @@ Pending charges and pending refunds both count in recorded spending, counted
 once on their transaction date. Pending status never excludes a row from the
 ledger; only voided, disabled, or future-dated rows are left out. Bills are the
 selected recurring transactions whose source is a selected cash account and
-whose occurrence falls inside the visible cycle. The Bills list shows
-unclaimed occurrences only: a scheduled occurrence with a claim from a
-recorded movement is hidden because actual spending already carries it. The
-chart's discrete markers still show every scheduled occurrence in the
-selected cycle, claimed or not, while the projected increases leave out
-claimed occurrences to avoid counting them twice. One bill definition
-supplies both the Bills list and the chart's discrete projected increases,
-so a limit crossing reflects exactly the bills the user selected. Backend outstanding
-obligations remain a separate cash fact: they reduce cash after bills through
-month end and are not the Bills list.
+whose occurrence falls inside the visible cycle. The server returns a single
+chronological bill ledger for the inclusive statement cycle. Each occurrence
+carries its due date, amount when known, and payment status. **Paid** means a
+posted movement explicitly claims that occurrence. It stays in the ledger but
+is omitted from Upcoming bills because it is already accounted for in cash. **Unpaid** contributes to
+the unpaid total. **Pending** identifies an unsettled payment and **Payment
+unknown** identifies insufficient evidence. Uncertain coverage never becomes
+a second deduction or a precise cash remainder. The chart groups priced bills
+from this same ledger by date and projects increases from unpaid bills only.
 
 ## Monthly income threshold
 
@@ -79,18 +78,19 @@ and actual versus projected values. Preserve dates, financial qualifiers, action
 meaning, and accessible names while removing filler and repeated explanations.
 
 The summary accepts an explicit inclusive `start` and `end` calendar date.
-It always returns evidenced available cash at `start` and conditional
-outstanding bills within that range. It has no current-versus-historical mode
-and does not change its meaning based on the wall clock. The current view asks
-for today through month-end. A non-current selected window asks for its closing
-date alone and reconstructs the same budget rows from that close cash evidence;
-a future window with no evidence renders the unavailable allowance state.
+The selected statement cycle determines the ledger range. `cashAsOf` identifies
+the independent evidence cut: today for the current cycle and the closing date
+for a past cycle. The unpaid total and cash after bills refer to the same cycle.
+Upcoming cycles fetch the same ledger for their dates. They show scheduled
+bills and chart markers while future cash and allowance remain unavailable.
 
 Each selected cash account has its own observation boundary. A newer retirement
 or investment observation cannot advance checking's boundary. Available cash,
 when reported at that observation, is distinct from posted balance. When the
-bank reports no available figure, the summary counts the reported posted
-balance as cash and records basis posted. Subsequent confirmed movements are counted once. Transfers between selected cash accounts
+bank reports no available figure, the summary starts from the posted balance
+and records basis posted. Both bases include confirmed movements after the
+observation through the cash cutoff. A posted bill payment reduces cash once
+through that movement; its paid occurrence adds no further deduction. Transfers between selected cash accounts
 do not create spending or income for the combined accounts.
 
 An obligation falling due today remains outstanding until there is evidence
@@ -121,8 +121,9 @@ with cash-limit labeling and the income threshold whenever computable) and the
 same side-panel shape (titled "Spending this cycle"); the cash-payments total
 lives only in that Transactions side panel, never inline on the main card, and
 there is no closed-balance row.
-The bills section has one heading and total, followed by a visibly separate list
-of bills with muted due dates and individual row dividers.
+The Upcoming bills heading shows the server’s unpaid total, followed by a list
+of bills with muted due dates and individual row dividers. Ordinary unpaid bills
+show just the due date. Only pending or unknown payments add a status beside it.
 
 Bill dates are calendar dates under the existing UTC calendar convention.
 Observation timestamps are instants. Changing the overall projection start or
@@ -142,7 +143,7 @@ spending. The same purchase must not be subtracted from cash again.
 
 A historical cash balance requires observations at or before the historical
 cut and applicable subsequent recorded movements. A missing available figure
-alone leaves cash known at the reported posted balance. Missing coverage
+alone uses the posted balance plus those movements. Missing coverage
 for a selected account makes the aggregate unavailable. Today's balance is never a
 substitute for a missing historical balance. Missing evidence is shown
 explicitly with the same unavailable allowance and cash-figure states used for

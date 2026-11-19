@@ -4464,6 +4464,48 @@
 				],
 				"type": "object"
 			},
+			"SafeSpendingBill": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"date": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"scheduleId": {
+						"type": ["string", "null"]
+					},
+					"status": {
+						"enum": ["paid", "unpaid", "pending", "unknown"],
+						"type": "string"
+					},
+					"transactionId": {
+						"type": ["string", "null"]
+					}
+				},
+				"required": [
+					"id",
+					"transactionId",
+					"scheduleId",
+					"accountId",
+					"name",
+					"date",
+					"amount",
+					"status"
+				],
+				"type": "object"
+			},
 			"SafeSpendingMovement": {
 				"additionalProperties": false,
 				"properties": {
@@ -4496,47 +4538,6 @@
 					"postedAt",
 					"effectiveAt",
 					"amount"
-				],
-				"type": "object"
-			},
-			"SafeSpendingObligation": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"amount": {
-						"format": "double",
-						"type": ["number", "null"]
-					},
-					"date": {
-						"type": "string"
-					},
-					"id": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					},
-					"scheduleId": {
-						"type": ["string", "null"]
-					},
-					"status": {
-						"type": "string"
-					},
-					"transactionId": {
-						"type": ["string", "null"]
-					}
-				},
-				"required": [
-					"id",
-					"transactionId",
-					"scheduleId",
-					"accountId",
-					"name",
-					"date",
-					"amount",
-					"status"
 				],
 				"type": "object"
 			},
@@ -4639,9 +4640,19 @@
 						},
 						"type": ["array", "null"]
 					},
+					"bills": {
+						"items": {
+							"$ref": "#/components/schemas/SafeSpendingBill"
+						},
+						"type": ["array", "null"]
+					},
 					"cashAfterBills": {
 						"format": "double",
 						"type": ["number", "null"]
+					},
+					"cashAsOf": {
+						"description": "UTC calendar date of the cash evidence cut",
+						"type": "string"
 					},
 					"checkingAvailable": {
 						"format": "double",
@@ -4659,12 +4670,6 @@
 					"outstandingBillsTotal": {
 						"format": "double",
 						"type": ["number", "null"]
-					},
-					"outstandingObligations": {
-						"items": {
-							"$ref": "#/components/schemas/SafeSpendingObligation"
-						},
-						"type": ["array", "null"]
 					},
 					"reasons": {
 						"items": {
@@ -4692,13 +4697,14 @@
 					"revision",
 					"start",
 					"end",
+					"cashAsOf",
 					"status",
 					"reasons",
 					"selectedAccountIds",
 					"baselines",
 					"checkingAvailable",
 					"confirmedMovements",
-					"outstandingObligations",
+					"bills",
 					"outstandingBillsTotal",
 					"cashAfterBills"
 				],
@@ -9617,24 +9623,24 @@
 				"operationId": "get-safe-spending-summary",
 				"parameters": [
 					{
-						"description": "UTC cash evidence cut and inclusive bill-window start YYYY-MM-DD",
+						"description": "Inclusive statement cycle start YYYY-MM-DD",
 						"explode": false,
 						"in": "query",
 						"name": "start",
 						"required": true,
 						"schema": {
-							"description": "UTC cash evidence cut and inclusive bill-window start YYYY-MM-DD",
+							"description": "Inclusive statement cycle start YYYY-MM-DD",
 							"type": "string"
 						}
 					},
 					{
-						"description": "Inclusive conditional bill-window end YYYY-MM-DD",
+						"description": "Inclusive statement cycle end YYYY-MM-DD. Evidence is bounded by request time or cycle close, whichever is earlier. Future cycles return bills without a cash allowance.",
 						"explode": false,
 						"in": "query",
 						"name": "end",
 						"required": true,
 						"schema": {
-							"description": "Inclusive conditional bill-window end YYYY-MM-DD",
+							"description": "Inclusive statement cycle end YYYY-MM-DD. Evidence is bounded by request time or cycle close, whichever is earlier. Future cycles return bills without a cash allowance.",
 							"type": "string"
 						}
 					}

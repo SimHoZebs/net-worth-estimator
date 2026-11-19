@@ -64,8 +64,8 @@ function charge(id: string, amount: number, time: string): AccountTransaction {
 	};
 }
 const summary: SafeSpendingSummary = {
-	start: "2026-11-15",
-	end: "2026-11-30",
+	start: "2026-10-20",
+	end: "2026-11-19",
 	status: "available",
 	cashAfterBills: -216.58,
 	checkingAvailable: 1244.43,
@@ -73,7 +73,8 @@ const summary: SafeSpendingSummary = {
 	revision: "synthetic",
 	baselines: [],
 	confirmedMovements: [],
-	outstandingObligations: [],
+	bills: [],
+	cashAsOf: "2026-11-15",
 	reasons: [],
 	selectedAccountIds: ["cash"],
 };
@@ -797,7 +798,12 @@ describe("canonical recorded cash selection", () => {
 				...input,
 				cycle: { start: "2026-11-10", end: "2026-12-09" },
 				transactions: rows,
-				cashSummary: { ...summary, cashAfterBills: 183.42 },
+				cashSummary: {
+					...summary,
+					start: "2026-11-10",
+					end: "2026-12-09",
+					cashAfterBills: 183.42,
+				},
 				monthlyIncome: 100,
 			});
 			expect(result.trend.monthlyIncome).toMatchObject({

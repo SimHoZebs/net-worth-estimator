@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/card.tsx";
 import { monthEndIso } from "@/domain/safeSpending.ts";
 import { inWindow } from "@/domain/safeSpendingMath.ts";
-import { billsInCycle } from "@/domain/safeSpendingBills.ts";
 import { spendingLedger, spendingAmount } from "@/domain/safeSpendingTrend.ts";
 import {
 	currentCashActivity,
@@ -55,7 +54,6 @@ import { expectedMonthlyIncome } from "@/domain/safeSpendingIncome.ts";
 import {
 	recurringBillIncreases,
 	recurringBillMarkers,
-	unclaimedBills,
 } from "@/domain/recurringBillIncreases.ts";
 import { cashPaymentSection } from "./cashPayments.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
@@ -171,42 +169,9 @@ export function SafeSpendingPreview({
 	// lies in the past; future cycles read through today.
 	const referenceDay =
 		selected.cycleEnd <= displayToday ? selected.cycleEnd : displayToday;
-	// Current cash stays mounted even while the inline view shows another
-	// cycle. Past windows read their own single-day close range. Future
-	// windows read nothing: the summary endpoint rejects starts after today,
-	// so they render the explicit unavailable state instead of an error.
-	const currentCashSummary = useSafeSpendingSummary(
-		displayToday,
-		monthEndIso(displayToday),
-	);
-	const selectedCashSummary = useSafeSpendingSummary(
+	const cashSummary = useSafeSpendingSummary(
+		selected.cycleStart,
 		selected.cycleEnd,
-		selected.cycleEnd,
-		cycleOffset < 0,
-	);
-	const cashSummary =
-		cycleOffset === 0 ? currentCashSummary : selectedCashSummary;
-
-	// Bills are the selected recurring schedules' occurrences in the visible
-	// cycle. Nothing else is folded into this list.
-	const selectedBillSchedules = useMemo(
-		() => (savedRules ?? []).filter((rule) => trackedBillIds.includes(rule.id)),
-		[savedRules, trackedBillIds],
-	);
-	const selectedBills = useMemo(
-		() =>
-			billsInCycle(
-				selectedBillSchedules,
-				trackedBillIds,
-				selected.cycleStart,
-				selected.cycleEnd,
-			),
-		[
-			selectedBillSchedules,
-			trackedBillIds,
-			selected.cycleStart,
-			selected.cycleEnd,
-		],
 	);
 	// Recorded cash uses the selected cycle window directly: no
 	// earlier-month padding and no second, looser definition of the lower bound.
@@ -304,22 +269,12 @@ export function SafeSpendingPreview({
 		[transactions, selectedCardTransactions, selectedDirectSpending],
 	);
 	const billIncreases = useMemo(
-		() =>
-			recurringBillIncreases({
-				bills: selectedBills,
-				transactions: transactions ?? [],
-			}),
-		[selectedBills, transactions],
+		() => recurringBillIncreases(cashSummary.data?.bills ?? []),
+		[cashSummary.data],
 	);
 	const billMarkers = useMemo(
-		() => recurringBillMarkers(selectedBills),
-		[selectedBills],
-	);
-	// The Bills list hides scheduled occurrences a recorded movement already
-	// claims; the chart dots keep every scheduled occurrence, claimed or not.
-	const displayBills = useMemo(
-		() => unclaimedBills(selectedBills, transactions ?? []),
-		[selectedBills, transactions],
+		() => recurringBillMarkers(cashSummary.data?.bills ?? []),
+		[cashSummary.data],
 	);
 	const selectedView = useMemo(
 		() =>
@@ -333,20 +288,12 @@ export function SafeSpendingPreview({
 					monthStart: `${referenceDay.slice(0, 7)}-01`,
 					monthEnd: monthEndIso(referenceDay),
 				}),
-				cashSummary: cashSummary.data,
+				cashSummary: cycleOffset > 0 ? undefined : cashSummary.data,
 				cardSpentByCard: selectedCardByCard,
 				reserve: settings.reserve,
 				fullDaysLeft: Math.max(1, selected.daysLeft - 1),
 				scheduledOutflows: billIncreases,
 				billMarkers,
-				remainingOverride:
-					cycleOffset === 0
-						? undefined
-						: cashSummary.data?.status === "available" &&
-							  cashSummary.data.cashAfterBills !== null &&
-							  Number.isFinite(cashSummary.data.cashAfterBills)
-							? cashSummary.data.cashAfterBills
-							: null,
 			}),
 		[
 			selected.cycleStart,
@@ -357,11 +304,11 @@ export function SafeSpendingPreview({
 			savedRules,
 			settings.incomeScheduleIds,
 			cashSummary.data,
+			cycleOffset,
 			selectedCardByCard,
 			settings.reserve,
 			billIncreases,
 			billMarkers,
-			cycleOffset,
 		],
 	);
 
@@ -485,8 +432,7 @@ export function SafeSpendingPreview({
 										summary={cashSummary.data}
 										pending={cashSummary.isPending}
 										error={cashSummary.isError}
-										bills={displayBills}
-										unavailable={cycleOffset > 0}
+										upcoming={cycleOffset > 0}
 										onRetry={() => {
 											void cashSummary.refetch();
 										}}
