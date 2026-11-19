@@ -17,9 +17,10 @@ import (
 // Plugin contract: a new check adds one type plus one definition, core loop
 // untouched. Every evaluator extends the generic Evaluator and falls under
 // one of two subtypes — ReaderDefinition or SimulatorDefinition — chosen at
-// registration. Core hooks are shared: ParseConfig parses once and returns
-// a typed config or error; EvaluatePath answers over one path; Accumulate
-// plus Finalize aggregate sampled paths; Status drives the UI verdict.
+// registration. For configured evaluations, ParseConfig parses once and
+// returns a typed config or error; Accumulate plus Finalize aggregate
+// sampled paths; Status drives the UI verdict. EvaluatePath is shared with
+// on-demand evidence readers, which take request input instead of config.
 // The subtypes differ only in simulation permission: a reader answers from
 // the cached path and never simulates; a simulator runs branch simulations
 // against shared base path state and needs DescribeStochasticWork and
@@ -121,8 +122,8 @@ type Evaluator struct {
 
 	// RequiresProjectionPath declares whether the evaluator needs a
 	// non-nil ctx.Path. Nil means required (zero-value safe, preserves
-	// behavior for all existing definitions). Future projection-free
-	// evaluations opt out explicitly; existing evaluators stay required.
+	// behavior for configured definitions). Projection-free readers opt
+	// out explicitly.
 	RequiresProjectionPath *bool
 
 	ValidateConfig func(config any) error
@@ -159,8 +160,8 @@ type Definition interface {
 	Base() *Evaluator
 }
 
-// ReaderDefinition is an Evaluator that answers from the cached path.
-// It never simulates.
+// ReaderDefinition is an Evaluator that answers from the cached path or,
+// when it explicitly requires no path, from model evidence. It never simulates.
 type ReaderDefinition struct {
 	Evaluator
 }
@@ -393,6 +394,13 @@ func withReaderGuard(definition Definition, evalType string, fn func() (PathResu
 	return fn()
 }
 
+func evaluateDefinitionPath(definition Definition, ctx *EvaluationContext, input any) (PathResult, error) {
+	base := definition.Base()
+	return withReaderGuard(definition, base.Type, func() (PathResult, error) {
+		return base.EvaluatePath(ctx, input)
+	})
+}
+
 type instanceRuntime struct {
 	evaluationType string
 	configuredRaw  any // one of *types.FIEvaluation etc.
@@ -516,9 +524,7 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 	if r.definition.Base().DiagnoseConfig != nil {
 		r.diagnostics = append(r.diagnostics, r.definition.Base().DiagnoseConfig(ctx, r.configuredRaw)...)
 	}
-	result, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {
-		return r.definition.Base().EvaluatePath(ctx, r.configuredRaw)
-	})
+	result, err := evaluateDefinitionPath(r.definition, ctx, r.configuredRaw)
 	if err != nil {
 		r.diagnostics = append(r.diagnostics, errorDiagnostic("evaluation-runtime-error", err))
 		return
@@ -559,9 +565,7 @@ func (r *instanceRuntime) consume(ctx *EvaluationContext) {
 	if r.definition.Base().NeedsProjectionPath() && ctx.GetTimeline() == nil {
 		return
 	}
-	pathResult, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {
-		return r.definition.Base().EvaluatePath(ctx, r.configuredRaw)
-	})
+	pathResult, err := evaluateDefinitionPath(r.definition, ctx, r.configuredRaw)
 	if err == nil {
 		err = r.definition.Base().Accumulate(r.accumulator, pathResult)
 	}

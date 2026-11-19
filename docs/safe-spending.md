@@ -8,10 +8,15 @@ budget. Future paychecks do not increase money available to spend today.
 
 ## Calculation ownership
 
-The backend owns the cash summary and its supporting obligation rows. The
-frontend renders those facts rather than independently summing a second set of
-transactions. The summary and other model reads carry a revision so consumers
-can avoid combining different model versions.
+Safe Spending is a built-in, projection-free Evaluation. Outlook shows its
+card automatically. It has its own settings and does not need to be created
+or pinned.
+
+The backend Evaluation runs when Outlook requests the cash summary and owns
+that summary and its supporting obligation rows. The frontend uses those facts
+to derive the selected cycle, rather than independently calculating cash after
+bills. The summary and other model reads carry a revision so consumers can
+avoid combining different model versions.
 
 One selected-cycle derivation owns the spending ledger, budget, chart, and
 transaction crossing identities. Its budget reconciles recorded selected-window

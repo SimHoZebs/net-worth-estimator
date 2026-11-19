@@ -89,7 +89,7 @@ Base forms save changes directly. Failed submissions retain their fields in the 
 
 ## Evaluation and income evidence are different things
 
-**Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.
+**Evaluation** answers a question about the financial model. Projection Evaluations are configured on the saved model and read or simulate a projection. Safe Spending is a built-in Evaluation that uses cash and spending evidence instead of a projection. It appears automatically on Outlook and has its own settings.
 
 **Income evidence** computes from recorded deposits.
 

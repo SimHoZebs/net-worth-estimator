@@ -2,7 +2,8 @@
 
 An **Analysis** is a versioned inference over saved evidence. It produces
 findings and explanations without changing the saved financial model. An
-Evaluation answers a question about a projection instead.
+[Evaluation](TERMS.md#evaluation-and-income-evidence-are-different-things) answers
+a specific question about the model using a projection or evidence instead.
 
 ## Lifecycle
 

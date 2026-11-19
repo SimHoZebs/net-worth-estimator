@@ -39,7 +39,10 @@ func (s *handler) getSafeSpendingSummary(_ context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	summary := safespending.BuildAtCut(model, settings, input.Start, input.End, now.Unix())
+	summary, err := safespending.Evaluate(model, settings, input.Start, input.End, now.Unix())
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
 	summary.Revision = revision
 	return &safeSpendingSummaryOutput{CacheControl: "private, no-store", Body: summary}, nil
 }
