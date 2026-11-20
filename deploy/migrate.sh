@@ -399,6 +399,28 @@ statement_closing_state() {
   esac
 }
 
+safe_spending_defaults_missing() {
+  sqlite3 -readonly "$1" "SELECT COUNT(*) FROM safe_spending_settings
+    WHERE json_type(settings_json, '\$.cycleStartDay') IS NULL
+       OR json_type(settings_json, '\$.paydayDay') IS NULL
+       OR json_type(settings_json, '\$.savingsTarget') IS NULL;"
+}
+
+safe_spending_settings_ok() {
+  bad=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM safe_spending_settings
+    WHERE json_valid(settings_json) IS NOT 1 OR json_type(settings_json) != 'object'
+      OR (json_type(settings_json, '\$.cycleStartDay') IS NOT NULL
+        AND (json_type(settings_json, '\$.cycleStartDay') != 'integer'
+          OR json_extract(settings_json, '\$.cycleStartDay') NOT BETWEEN 1 AND 31))
+      OR (json_type(settings_json, '\$.paydayDay') IS NOT NULL
+        AND (json_type(settings_json, '\$.paydayDay') != 'integer'
+          OR json_extract(settings_json, '\$.paydayDay') NOT BETWEEN 1 AND 31))
+      OR (json_type(settings_json, '\$.savingsTarget') IS NOT NULL
+        AND (json_type(settings_json, '\$.savingsTarget') NOT IN ('integer', 'real')
+          OR json_extract(settings_json, '\$.savingsTarget') NOT BETWEEN 0 AND 1.7976931348623157e308));") || return 1
+  test "$bad" = 0
+}
+
 cp_cols() {
   sqlite3 -readonly "$1" "SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('checkpoints') ORDER BY cid LIMIT -1);"
 }
@@ -511,6 +533,8 @@ institution_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_i
 basis_count=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';") \
   || fail "Cannot inspect accounts display_basis column."
 statement_closing=$(statement_closing_state "$db") || fail "Cannot inspect statement closing day shape."
+safe_spending_settings_ok "$db" || fail "Invalid Safe Spending settings; refusing automatic repair."
+safe_spending_missing=$(safe_spending_defaults_missing "$db") || fail "Cannot inspect Safe Spending settings."
 transactions_split=0
 if [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_sim';")" = 1 ] && \
    [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'destination_account_ids';")" = 1 ]; then
@@ -565,7 +589,7 @@ fi
 # one and a failed dry run falls through to the full path instead of stranding
 # the window. The full path provisions the candidate and keeps a verified
 # backup either way.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ] && [ "$safe_spending_missing" = 0 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -1240,6 +1264,28 @@ for table in $tables; do
   verify_same "$table" || fail "Candidate changed preserved table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
 done
 verify_statement_closing_day || fail "Candidate statement closing day verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+
+# Add missing settings keys only, after the closing-day conversion has been
+# verified against the original. No row is created for an unsaved user, and
+# already-authored values are left alone on retries.
+if [ "$safe_spending_missing" != 0 ]; then
+  if ! sqlite3 "$candidate" > "$backup/safe-spending.log" 2>&1 <<'SQL'
+.bail on
+BEGIN IMMEDIATE;
+UPDATE safe_spending_settings
+SET settings_json = json_insert(settings_json, '$.cycleStartDay', 20, '$.paydayDay', 30, '$.savingsTarget', 0)
+WHERE json_type(settings_json, '$.cycleStartDay') IS NULL
+   OR json_type(settings_json, '$.paydayDay') IS NULL
+   OR json_type(settings_json, '$.savingsTarget') IS NULL;
+COMMIT;
+SQL
+  then
+    fail "Candidate Safe Spending defaults backfill failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+safe_spending_settings_ok "$candidate" &&
+  test "$(safe_spending_defaults_missing "$candidate")" = 0 \
+  || fail "Candidate Safe Spending settings verification failed. Original unchanged; backup retained at $backup."
 
 # Schedule frequencies convert to recurrences, so the generic byte-identical
 # check cannot apply to that table on a legacy source. Every preexisting rule

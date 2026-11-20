@@ -30,8 +30,32 @@ function stringIds(value: unknown): string[] | null {
 	return ids.length ? ids : null;
 }
 
+function monthlyDay(value: unknown, fallback: number): number {
+	return typeof value === "number" &&
+		Number.isInteger(value) &&
+		value >= 1 &&
+		value <= 31
+		? value
+		: fallback;
+}
+
 /** One field list drives defaults, sanitizing and optimistic merges. */
 const settingsFields = {
+	cycleStartDay: {
+		default: 20,
+		read: (value: unknown) => monthlyDay(value, 20),
+	},
+	paydayDay: {
+		default: 30,
+		read: (value: unknown) => monthlyDay(value, 30),
+	},
+	savingsTarget: {
+		default: 0,
+		read: (value: unknown) =>
+			typeof value === "number" && Number.isFinite(value)
+				? Math.max(0, value)
+				: 0,
+	},
 	reserve: {
 		default: DEFAULT_PROTECTED_RESERVE,
 		read: (value: unknown) =>
@@ -171,17 +195,32 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 					queryKey: userResourceKey("safe-spending-summary", scope),
 				});
 			},
-			onError: (error) => {
+			onError: async (error) => {
 				if (scope !== getUserScope()) return;
 				notifyError(
 					"safe-spending-settings",
 					`Budget settings were not saved. ${error instanceof Error ? error.message : "Unknown error"}`,
 					{
 						label: "Retry save",
-						onAction: () => updateSettingsForScope(scope)({}),
+						onAction: () => updateSettingsForScope(scope)(snapshot),
 						pendingLabel: "Retrying…",
 					},
 				);
+				// Don't pair a server summary with a goal the server did not save.
+				// A preceding queued write may have succeeded, so re-read the saved
+				// values rather than restoring another optimistic snapshot.
+				if (cache.getQueryData(key) === optimistic) {
+					await cache.invalidateQueries({
+						queryKey: key,
+						exact: true,
+						refetchType: "none",
+					});
+					if (
+						scope === getUserScope() &&
+						cache.getQueryData(key) === optimistic
+					)
+						await cache.fetchQuery(settingsOptions(scope)).catch(() => {});
+				}
 			},
 		});
 		const pending = mutation.execute(undefined);

@@ -5,6 +5,26 @@ import {
 } from "./useSafeSpendingSettings.ts";
 
 describe("sanitizeSafeSpendingSettings", () => {
+	it("uses the monthly budget defaults when calendar days or the target are invalid", () => {
+		expect(
+			sanitizeSafeSpendingSettings({
+				cycleStartDay: 0,
+				paydayDay: 30.5,
+				savingsTarget: -1,
+			}),
+		).toMatchObject({ cycleStartDay: 20, paydayDay: 30, savingsTarget: 0 });
+	});
+
+	it("keeps valid monthly budget settings", () => {
+		expect(
+			sanitizeSafeSpendingSettings({
+				cycleStartDay: 1,
+				paydayDay: 31,
+				savingsTarget: 500.25,
+			}),
+		).toMatchObject({ cycleStartDay: 1, paydayDay: 31, savingsTarget: 500.25 });
+	});
+
 	it("keeps an explicit empty income-schedule selection", () => {
 		expect(
 			sanitizeSafeSpendingSettings({ incomeScheduleIds: [] }),

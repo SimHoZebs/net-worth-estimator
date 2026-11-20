@@ -52,26 +52,31 @@ export function SafeSpendingCashEvidence({
 				{labels.cashAsOf} {evidence.cashAsOf}
 			</p>
 			{evidence.baselines.length > 0 && (
-				<dl className="m-0 grid gap-2 text-sm">
-					{evidence.baselines.map((baseline) => (
-						<div
-							key={baseline.accountId}
-							className="flex justify-between gap-3"
-						>
-							<dt>
-								{baseline.accountName} ·{" "}
-								{baseline.basis === "available"
-									? "observed available"
-									: baseline.basis === "posted"
-										? "posted balance"
-										: "no balance recorded"}
-							</dt>
-							<dd className="m-0 tabular-nums">
-								{amountText(baseline.amount)}
-							</dd>
-						</div>
-					))}
-				</dl>
+				<details className="text-sm">
+					<summary className="cursor-pointer text-muted-foreground">
+						Balance evidence
+					</summary>
+					<dl className="m-0 grid gap-2 pt-2">
+						{evidence.baselines.map((baseline) => (
+							<div
+								key={baseline.accountId}
+								className="flex justify-between gap-3"
+							>
+								<dt>
+									{baseline.accountName} ·{" "}
+									{baseline.basis === "available"
+										? "observed available"
+										: baseline.basis === "posted"
+											? "posted balance"
+											: "no balance recorded"}
+								</dt>
+								<dd className="m-0 tabular-nums">
+									{amountText(baseline.amount)}
+								</dd>
+							</div>
+						))}
+					</dl>
+				</details>
 			)}
 		</section>
 	);

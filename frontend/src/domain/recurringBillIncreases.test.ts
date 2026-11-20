@@ -7,6 +7,7 @@ import {
 
 it("groups markers from all priced occurrences but projects only unpaid bills", () => {
 	const bill: SafeSpendingBill = {
+		actualDate: null,
 		date: "2026-11-10",
 		name: "Phone",
 		amount: 20,

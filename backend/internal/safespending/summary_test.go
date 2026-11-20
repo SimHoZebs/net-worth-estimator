@@ -31,7 +31,7 @@ func buildEvidence(m *types.FinancialModel, c *types.SafeSpendingSettings, start
 		m = &types.FinancialModel{}
 	}
 	st := cashEvidence(m, c, cut)
-	total := buildObligations(st.s, m, c, st.selected, st.ctx, cut, start, end)
+	total := buildObligations(st.s, m, c, st.selected, st.ctx, cut, start, end, nil)
 	st.gateStatus()
 	out := testEvidence{SafeSpendingSummary: *st.s, Start: start, End: end, OutstandingBillsTotal: total}
 	if total != nil && st.s.CheckingAvailable != nil {
@@ -55,8 +55,11 @@ func payment(id string, amount float64, at string) types.Transaction {
 }
 func assertMoney(t *testing.T, v *float64, want float64) {
 	t.Helper()
-	if v == nil || *v != want {
-		t.Fatalf("money = %v, want %.2f", v, want)
+	if v == nil {
+		t.Fatalf("money = nil, want %.2f", want)
+	}
+	if *v != want {
+		t.Fatalf("money = %.2f, want %.2f", *v, want)
 	}
 }
 
@@ -82,18 +85,29 @@ func TestExactClaimReplacesOccurrenceForPostedAndRealPending(t *testing.T) {
 	for _, pending := range []bool{true, false} {
 		t.Run(fmt.Sprint(pending), func(t *testing.T) {
 			m := baseModel()
+			m.Checkpoints[0].Balance = 1844.43
 			m.Schedules = []types.Schedule{bill("bill", "2026-11-15", 700)}
 			tx := payment("stable-bank-id", 600, "2026-11-14T12:00:00Z")
 			tx.Pending = pending
 			tx.Claim = &types.TransactionClaim{ScheduleID: "bill", OccurrenceDate: "2026-11-15"}
 			m.Transactions = []types.Transaction{tx, payment("distinct", 10, "2026-11-16T12:00:00Z")}
 			s := Build(m, nil, "2026-11-15", testEnd)
-			if len(s.Bills) != 1 || s.Bills[0].Status != "paid" || s.Bills[0].ID != "schedule:bill:2026-11-15" {
+			wantStatus := "paid"
+			if pending {
+				wantStatus = "pending"
+			}
+			if len(s.Bills) != 1 || s.Bills[0].Status != wantStatus || s.Bills[0].ID != "schedule:bill:2026-11-15" {
 				t.Fatalf("claimed occurrence %+v", s.Bills)
 			}
-			assertMoney(t, s.Bills[0].Amount, 600)
-			assertMoney(t, s.OutstandingBillsTotal, 0)
-			assertMoney(t, s.CashAfterBills, 1244.43)
+			if pending {
+				assertMoney(t, s.Bills[0].Amount, 700)
+				assertMoney(t, s.OutstandingBillsTotal, 100)
+				assertMoney(t, s.CashAfterBills, 1144.43)
+			} else {
+				assertMoney(t, s.Bills[0].Amount, 600)
+				assertMoney(t, s.OutstandingBillsTotal, 0)
+				assertMoney(t, s.CashAfterBills, 1244.43)
+			}
 			if s.Status != "available" {
 				t.Fatalf("real pending hold changed the gate %+v", s)
 			}

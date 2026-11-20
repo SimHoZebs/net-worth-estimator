@@ -12,9 +12,8 @@ import (
 // authored closing day. The card editor persists 1..31; 19 is its default.
 const defaultClosingDay = 19
 
-// BuildAtCut owns the dated payday ledger. Cash evidence is bounded by the
-// caller's instant; payday, obligations and statement payoffs are derived from
-// that evidence so the two room checks never combine different cash cuts.
+// BuildAtCut forecasts from one factual cut, with independent reset, income
+// and card payoff dates.
 func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSettings, factualCut int64) types.SafeSpendingSummary {
 	if settings == nil {
 		settings = &types.SafeSpendingSettings{}
@@ -24,41 +23,52 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 	}
 	st := cashEvidence(model, settings, factualCut)
 	today := st.s.CashAsOf
+	cycleDay := calendarDay(settings.CycleStartDay, types.DefaultSafeSpendingCycleStartDay)
+	st.s.CycleReset = nextClosingAfter(cycleDay, today)
+	st.s.NextCycleEnd = previousIsoDay(nextClosingAfter(cycleDay, st.s.CycleReset))
+	st.s.DaysUntilReset = int(domain.MustParseIsoDate(st.s.CycleReset).Sub(domain.MustParseIsoDate(today)).Hours() / 24)
 
-	payday, expectedPay, incomeKnown := selectPayday(st, model, settings, today, factualCut)
-	if payday != "" {
-		st.s.Payday = &payday
-	}
-	if incomeKnown {
-		st.s.ExpectedPay = money(expectedPay)
-	}
+	payoffDay := calendarDay(settings.PaydayDay, types.DefaultSafeSpendingPaydayDay)
+	payoff := nextClosingAfter(payoffDay, previousIsoDay(today))
+	nextPayoff := nextClosingAfter(payoffDay, payoff)
+	st.s.PayoffDate = payoff
+	st.s.PaymentPeriodStart = nextIsoDay(lastClosingBefore(payoffDay, payoff))
+	incomes, incomeScheduleKnown := forecastPaydays(st, today, payoff)
+	st.s.Payday, st.s.ExpectedPay = &incomes[0].date, incomes[0].income
 
-	// The ledger covers the current income cycle: after the previous payday
-	// through the selected payday. That keeps an unclaimed bill that came due
-	// earlier in the cycle visible and payable once, without reaching back
-	// into older arrears. Without a selected income date there is no cycle
-	// boundary, so the ledger starts today over the default horizon.
-	start, horizon := today, domain.DefaultScheduleOccurrencesThrough(today)
-	if payday != "" {
-		horizon = payday
-		if previous := previousPayday(st, model, settings, payday); previous != "" {
-			start = nextIsoDay(previous)
+	// The payment period owns the ledger. An unlinked bill from an earlier
+	// period is outside its scope, not an unpaid obligation to carry forward.
+	start, accountStarts := obligationStart(st, st.s.PaymentPeriodStart)
+	horizon := max(nextPayoff, st.s.NextCycleEnd)
+	if len(incomes) > 1 {
+		horizon = max(horizon, incomes[1].date)
+		for _, income := range incomes[2:] {
+			if income.date > horizon {
+				// Include the bills owned by the final included paycheck, but
+				// stop before a paycheck belonging to a later funding period.
+				horizon = previousIsoDay(income.date)
+				break
+			}
 		}
 	}
-	buildObligations(st.s, model, settings, st.selected, st.ctx, st.cut, start, horizon)
-	preBills, paydayBills := splitObligations(st.s, payday)
-	if preBills != nil {
-		st.s.PrePaydayBills = preBills
-	}
-	if paydayBills != nil {
-		st.s.PaydayBills = paydayBills
-	}
+	buildObligations(st.s, model, settings, st.selected, st.ctx, st.cut, start, horizon, accountStarts)
+	flagPossibleHoldOverlap(st)
+	st.s.PrePaydayBills, st.s.PaydayBills = splitObligations(st.s, payoff)
+	st.s.StatementReserve = buildStatements(st, payoff)
 
-	if reserve := buildStatements(st, model, settings, today, payday, factualCut); reserve != nil {
-		st.s.StatementReserve = reserve
+	nextIncomeDate := nextPayoff
+	if len(incomes) > 1 {
+		nextIncomeDate = incomes[1].date
 	}
-
-	computeRooms(st, incomeKnown)
+	payoffs := []string{payoff}
+	for date := nextPayoff; date <= horizon; date = nextClosingAfter(payoffDay, date) {
+		payoffs = append(payoffs, date)
+	}
+	reserves, carriedDebt, outsideHorizonDebt := followingStatementReserves(st, payoffs, nextIncomeDate)
+	computeForecast(st, incomes, incomeScheduleKnown, nextIncomeDate, horizon, reserves, carriedDebt, outsideHorizonDebt)
+	computePaymentProgress(st)
+	// Later bills are timeline inputs, not the upcoming payment ledger.
+	st.s.Bills = st.s.Bills[:sortedBillsThrough(st.s.Bills, payoff)]
 	st.gateStatus()
 	return *st.s
 }
@@ -81,22 +91,23 @@ func splitObligations(s *types.SafeSpendingSummary, payday string) (*float64, *f
 		if bill.Date > payday {
 			continue
 		}
-		if bill.Status == "paid" {
+		amount, outstanding := billCashDebit(bill)
+		if !outstanding {
 			continue
 		}
-		uncertain := bill.Status != "unpaid" || bill.Amount == nil
+		uncertain := amount == nil
 		if bill.Date == payday {
 			if uncertain {
 				paydayExact = false
 			} else {
-				onPayday += *bill.Amount
+				onPayday += *amount
 			}
 			continue
 		}
 		if uncertain {
 			preExact = false
 		} else {
-			pre += *bill.Amount
+			pre += *amount
 		}
 	}
 	var before, on *float64
@@ -109,31 +120,19 @@ func splitObligations(s *types.SafeSpendingSummary, payday string) (*float64, *f
 	return before, on
 }
 
-// computeRooms applies both cash checks. When either check lacks evidence the
-// dependent room stays unknown; a negative allowance becomes zero.
-func computeRooms(st *cutState, incomeKnown bool) {
-	if st.s.CheckingAvailable == nil || st.s.PrePaydayBills == nil {
-		return
+func calendarDay(value, fallback int) int {
+	if value >= 1 && value <= 31 {
+		return value
 	}
-	cash := *st.s.CheckingAvailable
-	st.s.PrePaydayRoom = money(cash - st.s.Reserve - *st.s.PrePaydayBills)
-	if st.s.Payday == nil || !incomeKnown || st.s.ExpectedPay == nil || st.s.PaydayBills == nil || st.s.StatementReserve == nil {
-		return
-	}
-	post := cash + *st.s.ExpectedPay - st.s.Reserve - *st.s.PrePaydayBills - *st.s.PaydayBills - *st.s.StatementReserve
-	st.s.PostIncomeRoom = money(post)
-	room := *st.s.PrePaydayRoom
-	if *st.s.PostIncomeRoom < room {
-		room = *st.s.PostIncomeRoom
-	}
-	if room < 0 {
-		room = 0
-	}
-	st.s.SafeToSpend = money(room)
+	return fallback
 }
 
 func nextIsoDay(date string) string {
 	return domain.FormatIsoDate(domain.MustParseIsoDate(date).AddDate(0, 0, 1))
+}
+
+func previousIsoDay(date string) string {
+	return domain.FormatIsoDate(domain.MustParseIsoDate(date).AddDate(0, 0, -1))
 }
 
 // closingOnOrBefore returns the occurrence of day in the month containing

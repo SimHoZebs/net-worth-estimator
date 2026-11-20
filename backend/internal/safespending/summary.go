@@ -31,15 +31,11 @@ func posted(t types.Transaction, cut int64) bool {
 	return fact(t) && !t.Pending && t.PostedTime > 0 && t.PostedTime <= cut && domain.TransactionInstant(&t) <= cut
 }
 
-// happenedByCut reports whether an actual is evidence at the cut. A posted
-// settlement and a real pending authorization both count. Void rows, projected
-// rows, and facts dated after the cut never do. A claim is only a link to one
-// exact schedule occurrence; matching amounts, names, or nearby dates do not
-// make a row happen.
-func happenedByCut(t types.Transaction, cut int64) bool {
-	if t.Claim == nil {
-		return false
-	}
+// recordedByCut reports whether a posted settlement or a real pending
+// authorization is evidence at the cut. Void rows, projected rows, and facts
+// dated after the cut never do. Unscheduled spending needs no claim, so it
+// shares this predicate with, but does not require, the claim-based helper.
+func recordedByCut(t types.Transaction, cut int64) bool {
 	return posted(t, cut) || (fact(t) && t.Pending && domain.TransactionInstant(&t) <= cut)
 }
 
@@ -189,22 +185,21 @@ func (st *cutState) deriveBaselines() {
 				accountCash += *cp.AvailableBalance - cp.Balance
 			}
 			available += accountCash
+			holds, exactHolds := 0.0, true
 			for _, tx := range st.transactions {
 				if !fact(tx) || !touches(tx, a.ID) {
 					continue
 				}
 				instant := domain.TransactionInstant(&tx)
-				// Pending rows at or before the observation do not invalidate
-				// bank-reported available cash or need another deduction. The
-				// observation proves the balance, not which holds it covers;
-				// claimed bills retain their separate coverage uncertainty.
 				if tx.Pending && instant <= st.cut {
 					if instant > cp.ObservedAt {
 						reason(&b.Reasons, ReasonPendingAfterBaselineCoverageUnknown)
-					} else if cp.AvailableBalance == nil && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID {
-						// A posted balance does not establish spendable cash
-						// while a known outgoing authorization is still pending.
-						reason(&b.Reasons, ReasonPendingHoldWithoutAvailableBalance)
+					} else if tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID {
+						if cp.AvailableBalance == nil {
+							reason(&b.Reasons, ReasonPendingHoldWithoutAvailableBalance)
+						} else {
+							addPaymentAmount(&holds, &exactHolds, st.ctx.holdAmount(tx))
+						}
 					}
 				}
 				// A newly posted debit may settle a hold already in available cash.
@@ -212,6 +207,12 @@ func (st *cutState) deriveBaselines() {
 				if posted(tx, st.cut) && instant > cp.ObservedAt && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID && cp.AvailableBalance != nil && math.Abs(cp.Balance-*cp.AvailableBalance) > .005 {
 					reason(&b.Reasons, ReasonPostedHoldCoverageUnknown)
 				}
+			}
+			// A reported balance proves only aggregate coverage. If the gap
+			// cannot cover all known outgoing authorizations, a hold cannot
+			// safely be treated as already deducted or deducted again.
+			if cp.AvailableBalance != nil && (!exactHolds || holds > max(0, cp.Balance-*cp.AvailableBalance)+.005) {
+				reason(&b.Reasons, ReasonPendingHoldCoverageUnknown)
 			}
 			if len(b.Reasons) > 0 {
 				b.Status = "uncertain"

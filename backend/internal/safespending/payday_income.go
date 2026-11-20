@@ -2,6 +2,7 @@ package safespending
 
 import (
 	"slices"
+	"sort"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -33,9 +34,7 @@ func claimState(model *types.FinancialModel, cut int64) claimStateResult {
 	return claimStateResult{settled: settled, pending: pending}
 }
 
-// incomeRules is the single selection of recurring inflows into a selected
-// cash account. Both the next payday and the previous cycle boundary use it,
-// so the obligation window cannot disagree with the income window.
+// incomeRules is the single selection of recurring inflows into selected cash.
 func incomeRules(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings) []types.Schedule {
 	cash := map[string]bool{}
 	for _, id := range st.s.SelectedAccountIDs {
@@ -58,83 +57,60 @@ func incomeRules(st *cutState, model *types.FinancialModel, settings *types.Safe
 	return rules
 }
 
-// previousPayday is the latest selected income occurrence strictly before the
-// next payday. It bounds the current income cycle: obligations after it and
-// through payday belong here, while the boundary occurrence itself belongs to
-// the previous cycle. Claims are ignored because a settled payday is still a
-// cycle boundary. Returning empty means no earlier boundary is known.
-func previousPayday(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, payday string) string {
-	rules := incomeRules(st, model, settings)
-	if len(rules) == 0 {
-		return ""
-	}
-	// The lookback boundary is inclusive: an annual income occurrence lands
-	// exactly 12 months back and is still the previous cycle boundary. Payday
-	// itself is filtered out below.
-	occurrences := domain.ResolveOccurrences(rules, nil, domain.AddMonthsClamped(payday, -12), payday, true)
-	previous := ""
-	for date := range occurrences.ByDate {
-		if date < payday && (previous == "" || date > previous) {
-			previous = date
-		}
-	}
-	return previous
+type paydayForecast struct {
+	date   string
+	income *float64
 }
 
-// selectPayday resolves the next selected income occurrence. Only recurring
-// inflows into a selected cash account are candidates, so a scheduled outflow
-// or a transfer cannot masquerade as pay. An occurrence dated today counts
-// unless a posted payment explicitly claims it; counting it a second time is
-// then impossible because the claim already advanced the observed cash.
-func selectPayday(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, today string, cut int64) (string, float64, bool) {
-	rules := incomeRules(st, model, settings)
-	if len(rules) == 0 {
-		reason(&st.s.Reasons, ReasonPaydayUnavailable)
-		return "", 0, false
-	}
-
+// forecastPaydays merges selected occurrences by date. A posted claim has
+// already entered cash; a pending claim cannot establish the incoming amount.
+// The configured day provides dates, not amounts, when no schedule supplies
+// an upcoming payday.
+func forecastPaydays(st *cutState, today, payoff string) ([]paydayForecast, bool) {
+	rules := incomeRules(st, st.model, st.settings)
 	occurrences := domain.ResolveOccurrences(rules, nil, today, domain.AddMonthsClamped(today, 12), true)
-	claims := claimState(model, cut)
-	remaining := map[string][]domain.DatedTransactionOccurrence{}
+	claims := claimState(st.model, st.cut)
+	var forecasts []paydayForecast
 	for date, rows := range occurrences.ByDate {
+		total := 0.0
+		known, remaining := true, false
 		for _, row := range rows {
-			if row.Rule == nil {
-				continue
-			}
 			claim := types.TransactionClaim{ScheduleID: row.Rule.ID, OccurrenceDate: date}
 			if claims.settled[claim] {
 				continue
 			}
-			remaining[date] = append(remaining[date], row)
+			remaining = true
+			amount, err := st.ctx.resolve(row, date)
+			if claims.pending[claim] || err != nil || amount < 0 || !allDestinationsSelected(row.Rule.Destinations, st.selected) {
+				known = false
+			} else {
+				total += amount
+			}
+		}
+		if remaining {
+			item := paydayForecast{date: date}
+			if known {
+				item.income = money(total)
+			}
+			forecasts = append(forecasts, item)
 		}
 	}
-	if len(remaining) == 0 {
+	if len(forecasts) == 0 {
 		reason(&st.s.Reasons, ReasonPaydayUnavailable)
-		return "", 0, false
+		return []paydayForecast{{date: payoff}}, false
 	}
+	sort.Slice(forecasts, func(i, j int) bool { return forecasts[i].date < forecasts[j].date })
+	if forecasts[0].income == nil {
+		reason(&st.s.Reasons, ReasonIncomeUnavailable)
+	}
+	return forecasts, true
+}
 
-	payday := ""
-	for date := range remaining {
-		if payday == "" || date < payday {
-			payday = date
+func allDestinationsSelected(destinations []string, selected map[string]bool) bool {
+	for _, id := range destinations {
+		if !selected[id] {
+			return false
 		}
 	}
-	expected := 0.0
-	known := true
-	for _, row := range remaining[payday] {
-		claim := types.TransactionClaim{ScheduleID: row.Rule.ID, OccurrenceDate: payday}
-		if claims.pending[claim] {
-			reason(&st.s.Reasons, ReasonIncomeUnavailable)
-			known = false
-			continue
-		}
-		amount, err := st.ctx.resolve(row, payday)
-		if err != nil || amount < 0 {
-			reason(&st.s.Reasons, ReasonIncomeUnavailable)
-			known = false
-			continue
-		}
-		expected += amount
-	}
-	return payday, expected, known
+	return len(destinations) > 0
 }

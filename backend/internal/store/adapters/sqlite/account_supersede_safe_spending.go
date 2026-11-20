@@ -3,8 +3,6 @@ package sqlite
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedTransactions, deletedRules map[string]bool) error {
@@ -15,8 +13,8 @@ func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedTransac
 	if !found {
 		return nil
 	}
-	var settings types.SafeSpendingSettings
-	if err := json.Unmarshal([]byte(raw), &settings); err != nil {
+	settings, err := decodeSafeSpendingSettings(raw)
+	if err != nil {
 		return fmt.Errorf("parse safe spending settings: %w", err)
 	}
 	settings.AccountIDs = supersedeReplaceIDs(settings.AccountIDs, manualID, syncedID)

@@ -169,6 +169,19 @@ describe("unified persisted prefs", () => {
 		await vi.waitFor(() => expect(closed).toContain("safe-spending-settings"));
 		expect((server.puts.at(-1) as { reserve?: number }).reserve).toBe(123);
 	});
+
+	it("restores the saved goal before pairing it with a summary after a failed write", async () => {
+		await useSafeSpendingSettings
+			.getState()
+			.updateSettings({ savingsTarget: 100 });
+		server.putErrors.push(new Error("Offline"));
+		const pending = useSafeSpendingSettings
+			.getState()
+			.updateSettings({ savingsTarget: 500 });
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(500);
+		await expect(pending).rejects.toBeInstanceOf(ApiNetworkError);
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(100);
+	});
 	it("does not mount financial preferences when the backend read fails", async () => {
 		const transport = new Error("Settings unavailable");
 		server.getError = transport;

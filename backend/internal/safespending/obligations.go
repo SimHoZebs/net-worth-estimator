@@ -2,6 +2,8 @@ package safespending
 
 import (
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"time"
 
@@ -55,7 +57,15 @@ func (a *amounts) resolve(o domain.DatedTransactionOccurrence, date string) (flo
 }
 
 func transactionDay(tx types.Transaction) string {
-	return domain.FormatIsoDate(time.Unix(domain.TransactionInstant(&tx), 0))
+	return utcDay(domain.TransactionInstant(&tx))
+}
+
+func postingDay(tx types.Transaction) string {
+	return utcDay(max(domain.TransactionInstant(&tx), tx.PostedTime))
+}
+
+func utcDay(instant int64) string {
+	return domain.FormatIsoDate(time.Unix(instant, 0))
 }
 
 // Recorded facts cannot borrow a later balance observation to recalculate an
@@ -109,47 +119,75 @@ func (a *amounts) record(tx types.Transaction, value float64) {
 	}
 }
 
-// Expand selected schedules first so claims enrich the same occurrence identity,
-// even when a payment posts outside the cycle or for a different amount. Only
-// occurrences in [start, end] are expanded, so a claim naming another cycle
-// cannot pull all-history arrears into this ledger or duplicate an occurrence
-// outside the window.
-func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, ctx *amounts, cut int64, start, end string) *float64 {
+// Expand selected schedules first so claims enrich the same occurrence identity
+// even when a payment posts outside the period or for a different amount.
+func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, ctx *amounts, cut int64, start, end string, accountStarts map[string]string) *float64 {
 	claims := map[types.TransactionClaim]*types.Transaction{}
 	for i := range model.Transactions {
 		tx := &model.Transactions[i]
-		if happenedByCut(*tx, cut) {
-			claims[*tx.Claim] = tx
+		if tx.Claim != nil && recordedByCut(*tx, cut) {
+			prior := claims[*tx.Claim]
+			if prior == nil || (prior.Pending && !tx.Pending) {
+				claims[*tx.Claim] = tx
+			}
 		}
+	}
+	// A posted settlement that happens inside the current payment window bars
+	// its exact occurrence even when that occurrence came due in an earlier
+	// period. Keeping the row prevents a payment the bar already knows about
+	// from resurfacing as an unpaid bill. An unlinked older occurrence has no
+	// such evidence and stays outside the forecast: its missing link says
+	// nothing about whether the bill was paid.
+	barred := map[types.TransactionClaim]bool{}
+	for claim, tx := range claims {
+		if tx.Pending || !posted(*tx, cut) {
+			continue
+		}
+		day := postingDay(*tx)
+		if day >= s.PaymentPeriodStart && day <= s.PayoffDate && claim.OccurrenceDate < s.PaymentPeriodStart {
+			barred[claim] = true
+		}
+	}
+	occurrenceStart := start
+	for claim := range barred {
+		occurrenceStart = min(occurrenceStart, claim.OccurrenceDate)
 	}
 	schedules := effectiveBills(model.Schedules, selected, settings.TransactionIDs)
 	total := 0.0
 	exact := true
-	for date, occurrences := range domain.ResolveOccurrences(schedules, nil, start, end, true).ByDate {
+	for date, occurrences := range domain.ResolveOccurrences(schedules, nil, occurrenceStart, end, true).ByDate {
 		for _, o := range occurrences {
-			row, cause := billEvidence(o, date, claims[types.TransactionClaim{ScheduleID: o.Rule.ID, OccurrenceDate: date}], selected, ctx)
+			claim := types.TransactionClaim{ScheduleID: o.Rule.ID, OccurrenceDate: date}
+			if earliest := accountStarts[*o.Rule.SourceAccountID]; earliest != "" && date < earliest && !barred[claim] {
+				continue
+			}
+			row, cause := billEvidence(o, date, claims[claim], selected, ctx)
 			if cause != "" {
 				reason(&s.Reasons, cause)
 				exact = false
 			}
-			if row.Status == "unpaid" && row.Amount != nil {
-				total += *row.Amount
+			if amount, outstanding := billCashDebit(*row); outstanding {
+				addPaymentAmount(&total, &exact, amount)
 			}
 			s.Bills = append(s.Bills, *row)
 		}
 	}
-	sort.Slice(s.Bills, func(i, j int) bool {
-		a, b := s.Bills[i], s.Bills[j]
-		if a.Date != b.Date {
-			return a.Date < b.Date
-		}
-		return a.ID < b.ID
-	})
+	sortBills(s.Bills)
 	sort.Strings(s.Reasons)
 	if exact {
 		return money(total)
 	}
 	return nil
+}
+
+func sortBills(bills []types.SafeSpendingBill) {
+	sort.Slice(bills, func(i, j int) bool {
+		a, b := bills[i], bills[j]
+		if a.Date != b.Date {
+			return a.Date < b.Date
+		}
+		return a.ID < b.ID
+	})
 }
 
 func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types.Transaction, selected map[string]bool, ctx *amounts) (*types.SafeSpendingBill, string) {
@@ -161,30 +199,28 @@ func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types
 		}
 	}
 	row := &types.SafeSpendingBill{ID: "schedule:" + rule.ID + ":" + date, ScheduleID: &rule.ID, Date: date, Name: rule.Name, AccountID: *rule.SourceAccountID, Status: "unpaid"}
-	if claim != nil {
-		// An exact claim that happened by the evidence cut settles the
-		// occurrence. A real pending authorization is such evidence too, even
-		// before it posts. The cash ledger already carries its movement or
-		// hold under the cash rules, so the scheduled bill is neither a second
-		// deduction nor a reason to withhold the subtotal.
+	// A pending transaction may claim an occurrence without sharing its route.
+	// Only a hold on the same cash movement can stand in for the bill in the
+	// forecast. The cash baseline independently checks whether it covers that hold.
+	if claim != nil && (!claim.Pending || pendingBillRouteMatches(rule, claim)) {
 		row.TransactionID = &claim.ID
-		row.Status = "paid"
 		if !claim.Pending {
+			row.Status = "paid"
+			actual := postingDay(*claim)
+			row.ActualDate = &actual
 			if amount, ok := ctx.latest[claim.ID]; ok {
 				row.Amount = money(amount)
 			}
 			return row, ""
 		}
-		// A hold has no replayed settlement amount. Only literal inputs are
-		// evidence at authorization time; the end-of-cut provider context
-		// could contain a fact posted after the hold.
-		for _, input := range claim.Amount.Inputs {
-			if input.Source != "literal" {
-				return row, ""
+		row.Status = "pending"
+		hold := ctx.holdAmount(*claim)
+		expected, err := ctx.resolve(o, date)
+		if err == nil && expected >= 0 {
+			row.Amount = money(expected)
+			if hold != nil {
+				row.UncoveredHold = money(max(0, expected-*hold))
 			}
-		}
-		if amount, err := ctx.resolveFact(*claim); err == nil {
-			row.Amount = money(amount)
 		}
 		return row, ""
 	}
@@ -206,4 +242,74 @@ func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types
 	// deducted once. A balance observation on its date is not settlement
 	// evidence in either direction, so it never turns the bill unknown.
 	return row, ""
+}
+
+func billCashDebit(bill types.SafeSpendingBill) (*float64, bool) {
+	switch bill.Status {
+	case "paid":
+		return nil, false
+	case "pending":
+		return bill.UncoveredHold, true
+	default:
+		return bill.Amount, true
+	}
+}
+
+func pendingBillRouteMatches(rule *types.Schedule, hold *types.Transaction) bool {
+	return hold.SourceAccountID != nil &&
+		*hold.SourceAccountID == *rule.SourceAccountID &&
+		len(hold.Destinations) <= 1 &&
+		slices.Equal(rule.Destinations, hold.Destinations)
+}
+
+// flagPossibleHoldOverlap warns about a plausible hold without converting it
+// into a claim or dropping the scheduled payment from the forecast.
+func flagPossibleHoldOverlap(st *cutState) {
+	rules := map[string]*types.Schedule{}
+	for i := range st.model.Schedules {
+		rule := &st.model.Schedules[i]
+		rules[rule.ID] = rule
+	}
+	for _, tx := range st.transactions {
+		if !tx.Pending || tx.Claim != nil || tx.SourceAccountID == nil ||
+			!st.selected[*tx.SourceAccountID] || !recordedByCut(tx, st.cut) {
+			continue
+		}
+		cp := st.latest[*tx.SourceAccountID]
+		if cp.AvailableBalance == nil || domain.TransactionInstant(&tx) > cp.ObservedAt {
+			continue
+		}
+		amount := st.ctx.holdAmount(tx)
+		if amount == nil || *amount <= 0 || *amount > cp.Balance-*cp.AvailableBalance+.005 {
+			continue
+		}
+		heldOn := domain.MustParseIsoDate(transactionDay(tx))
+		for _, bill := range st.s.Bills {
+			if bill.Date > st.s.PayoffDate || bill.Status != "unpaid" || bill.AccountID != *tx.SourceAccountID ||
+				bill.ScheduleID == nil || bill.Amount == nil || *bill.Amount != *amount {
+				continue
+			}
+			rule := rules[*bill.ScheduleID]
+			if rule != nil && pendingBillRouteMatches(rule, &tx) &&
+				math.Abs(domain.MustParseIsoDate(bill.Date).Sub(heldOn).Hours()/24) <= float64(domain.AutoClaimWindowDays(rule.Recurrence)) {
+				reason(&st.s.Reasons, ReasonPossiblePendingPaymentOverlap)
+				return
+			}
+		}
+	}
+}
+
+func (a *amounts) holdAmount(tx types.Transaction) *float64 {
+	// A hold has no replayed settlement amount. The end-of-cut provider
+	// context could contain a fact posted after the authorization.
+	for _, input := range tx.Amount.Inputs {
+		if input.Source != "literal" {
+			return nil
+		}
+	}
+	amount, err := a.resolveFact(tx)
+	if err != nil || amount < 0 {
+		return nil
+	}
+	return money(amount)
 }

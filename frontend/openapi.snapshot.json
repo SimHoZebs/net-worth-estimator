@@ -4482,6 +4482,9 @@
 					"accountId": {
 						"type": "string"
 					},
+					"actualDate": {
+						"type": ["string", "null"]
+					},
 					"amount": {
 						"format": "double",
 						"type": ["number", "null"]
@@ -4509,12 +4512,82 @@
 				"required": [
 					"id",
 					"transactionId",
+					"actualDate",
 					"scheduleId",
 					"accountId",
 					"name",
 					"date",
 					"amount",
 					"status"
+				],
+				"type": "object"
+			},
+			"SafeSpendingBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/SafeSpendingBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"cycleStartDay": {
+						"default": 20,
+						"format": "int64",
+						"maximum": 31,
+						"minimum": 1,
+						"type": "integer"
+					},
+					"incomeScheduleIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"paydayDay": {
+						"default": 30,
+						"format": "int64",
+						"maximum": 31,
+						"minimum": 1,
+						"type": "integer"
+					},
+					"reserve": {
+						"format": "double",
+						"minimum": 0,
+						"type": "number"
+					},
+					"savingsTarget": {
+						"default": 0,
+						"format": "double",
+						"minimum": 0,
+						"type": "number"
+					},
+					"spendingAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"transactionIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"reserve",
+					"accountIds",
+					"spendingAccountIds",
+					"incomeScheduleIds",
+					"transactionIds"
 				],
 				"type": "object"
 			},
@@ -4575,20 +4648,18 @@
 			"SafeSpendingSettings": {
 				"additionalProperties": false,
 				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/SafeSpendingSettings.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
 					"accountIds": {
 						"items": {
 							"type": "string"
 						},
 						"type": ["array", "null"]
+					},
+					"cycleStartDay": {
+						"default": 20,
+						"format": "int64",
+						"maximum": 31,
+						"minimum": 1,
+						"type": "integer"
 					},
 					"incomeScheduleIds": {
 						"items": {
@@ -4596,7 +4667,20 @@
 						},
 						"type": ["array", "null"]
 					},
+					"paydayDay": {
+						"default": 30,
+						"format": "int64",
+						"maximum": 31,
+						"minimum": 1,
+						"type": "integer"
+					},
 					"reserve": {
+						"format": "double",
+						"minimum": 0,
+						"type": "number"
+					},
+					"savingsTarget": {
+						"default": 0,
 						"format": "double",
 						"minimum": 0,
 						"type": "number"
@@ -4659,6 +4743,10 @@
 						"readOnly": true,
 						"type": "string"
 					},
+					"additionalSavings": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
 					"baselines": {
 						"items": {
 							"$ref": "#/components/schemas/SafeSpendingBaseline"
@@ -4670,6 +4758,10 @@
 							"$ref": "#/components/schemas/SafeSpendingBill"
 						},
 						"type": ["array", "null"]
+					},
+					"cardPayoffCapacity": {
+						"format": "double",
+						"type": ["number", "null"]
 					},
 					"cashAsOf": {
 						"description": "UTC calendar date of the cash evidence cut",
@@ -4685,7 +4777,46 @@
 						},
 						"type": ["array", "null"]
 					},
+					"cycleReset": {
+						"type": "string"
+					},
+					"daysUntilReset": {
+						"format": "int64",
+						"type": "integer"
+					},
 					"expectedPay": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"forecastCashRoom": {
+						"description": "Lowest projected cash balance before applying the optional reserve; signed",
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"fundingRoom": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"incomeFunded": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"nextCycleCarryover": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"nextCycleDiscretionary": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"nextCycleEnd": {
+						"type": "string"
+					},
+					"nextCycleIncome": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"paidByPayday": {
 						"format": "double",
 						"type": ["number", "null"]
 					},
@@ -4696,7 +4827,21 @@
 						"format": "double",
 						"type": ["number", "null"]
 					},
+					"paymentPeriodStart": {
+						"type": "string"
+					},
+					"paymentRoom": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"payoffDate": {
+						"type": "string"
+					},
 					"postIncomeRoom": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"postPaydayBalance": {
 						"format": "double",
 						"type": ["number", "null"]
 					},
@@ -4725,11 +4870,19 @@
 						"format": "double",
 						"type": ["number", "null"]
 					},
+					"savingsAllowance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
 					"selectedAccountIds": {
 						"items": {
 							"type": "string"
 						},
 						"type": ["array", "null"]
+					},
+					"spendableCash": {
+						"format": "double",
+						"type": ["number", "null"]
 					},
 					"statementReserve": {
 						"format": "double",
@@ -4743,6 +4896,10 @@
 					},
 					"status": {
 						"type": "string"
+					},
+					"unpaidByPayday": {
+						"format": "double",
+						"type": ["number", "null"]
 					}
 				},
 				"required": [
@@ -4756,6 +4913,7 @@
 					"confirmedMovements",
 					"bills",
 					"payday",
+					"payoffDate",
 					"expectedPay",
 					"prePaydayBills",
 					"paydayBills",
@@ -4763,6 +4921,24 @@
 					"reserve",
 					"prePaydayRoom",
 					"postIncomeRoom",
+					"postPaydayBalance",
+					"paymentRoom",
+					"cardPayoffCapacity",
+					"cycleReset",
+					"daysUntilReset",
+					"nextCycleEnd",
+					"spendableCash",
+					"incomeFunded",
+					"savingsAllowance",
+					"forecastCashRoom",
+					"additionalSavings",
+					"fundingRoom",
+					"nextCycleIncome",
+					"nextCycleCarryover",
+					"nextCycleDiscretionary",
+					"paymentPeriodStart",
+					"paidByPayday",
+					"unpaidByPayday",
 					"safeToSpend",
 					"statements"
 				],
@@ -9641,7 +9817,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/SafeSpendingSettings"
+								"$ref": "#/components/schemas/SafeSpendingBody"
 							}
 						}
 					},
@@ -9675,6 +9851,18 @@
 		"/v1/safe-spending-summary": {
 			"get": {
 				"operationId": "get-safe-spending-summary",
+				"parameters": [
+					{
+						"description": "Historical cut: YYYY-MM-DD (end of day) or RFC 3339 instant. Defaults to now.",
+						"explode": false,
+						"in": "query",
+						"name": "asOf",
+						"schema": {
+							"description": "Historical cut: YYYY-MM-DD (end of day) or RFC 3339 instant. Defaults to now.",
+							"type": "string"
+						}
+					}
+				],
 				"responses": {
 					"200": {
 						"content": {
@@ -9704,7 +9892,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Read safe spending before payday and the supporting cash and statement evidence"
+				"summary": "Read Safe Spending, upcoming payments, and next-cycle capacity"
 			}
 		},
 		"/v1/schedules": {

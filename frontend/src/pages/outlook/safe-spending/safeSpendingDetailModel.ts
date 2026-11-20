@@ -1,4 +1,5 @@
 import { dateLabel } from "../../../domain/format.ts";
+import type { SafeSpendingSettings } from "@/api/contracts.ts";
 
 export const SAFE_SPENDING_DETAIL_TABS = [
 	{ id: "ledger", label: "Obligations", view: "ledger" },
@@ -17,7 +18,7 @@ export function isSafeSpendingLedgerTab(
 	);
 }
 
-/** The allowance is dated by the income date the server selected. */
+/** The next income date is independent from the configured card payoff date. */
 export function allowanceCaption({
 	payday,
 	cashAsOf,
@@ -26,7 +27,7 @@ export function allowanceCaption({
 	cashAsOf: string;
 }): string {
 	return payday
-		? `Through payday · ${dateLabel(payday, true)}`
+		? `Next income · ${dateLabel(payday, true)}`
 		: `As of ${dateLabel(cashAsOf, true)}`;
 }
 
@@ -52,10 +53,9 @@ export interface DatedAllowance {
 	cashAsOf: string;
 	payday: string | null;
 	status: EvidenceStatus;
-	/** Clamped at zero; null when evidence cannot determine the allowance. */
-	amount: number | null;
 	prePaydayRoom: number | null;
 	postIncomeRoom: number | null;
+	paymentRoom: number | null;
 	expectedPay: number | null;
 	reserve: number;
 }
@@ -74,7 +74,6 @@ export interface AllowanceEvidence {
 }
 
 export interface AllowanceLedger {
-	amountLabel: string;
 	allowance: DatedAllowance;
 	sections: ObligationSection[];
 	evidence: AllowanceEvidence;
@@ -83,8 +82,10 @@ export interface AllowanceLedger {
 	obligationCount: number;
 }
 
-export interface SafeSpendingConfigHints {
-	reserve: number;
+export interface SafeSpendingConfigHints extends Pick<
+	SafeSpendingSettings,
+	"reserve" | "cycleStartDay" | "paydayDay" | "savingsTarget"
+> {
 	cards: { id: string; name: string }[];
 	trackedIds: string[];
 	spendingAccounts: { id: string; name: string }[];

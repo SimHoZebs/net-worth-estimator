@@ -24,8 +24,9 @@ import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
 import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
 import { SafeSpendingObligationLedger } from "./SafeSpendingObligationLedger.tsx";
-import { SafeSpendingConstraintCompare } from "./SafeSpendingConstraintCompare.tsx";
+import { SafeSpendingBudget } from "./SafeSpendingBudget.tsx";
 import { buildAllowanceLedger } from "./allowanceLedger.ts";
+import { capacityText, paymentCapacity } from "./paymentCapacity.ts";
 import { amountText } from "./amountText.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
 
@@ -78,6 +79,10 @@ export function SafeSpendingPreview({
 		() => (summary.data ? buildAllowanceLedger(summary.data) : undefined),
 		[summary.data],
 	);
+	const capacity = useMemo(
+		() => (summary.data ? paymentCapacity(summary.data) : null),
+		[summary.data],
+	);
 	const caption = ledger
 		? allowanceCaption({
 				payday: ledger.allowance.payday,
@@ -103,7 +108,11 @@ export function SafeSpendingPreview({
 				<SafeSpendingCardHeader
 					action={
 						<CardAction>
-							<Button variant="link" onClick={() => onDetail("configure")}>
+							<Button
+								variant="link"
+								disabled={settingsState.pending}
+								onClick={() => onDetail("configure")}
+							>
 								Configure
 							</Button>
 						</CardAction>
@@ -119,27 +128,18 @@ export function SafeSpendingPreview({
 								Retry evidence
 							</Button>
 						</Alert>
-					) : !ledger || summary.isPending ? (
+					) : !ledger ||
+					  !summary.data ||
+					  summary.isPending ||
+					  settingsState.pending ? (
 						<div aria-busy="true">
 							<Skeleton className="h-32 w-full" />
 						</div>
 					) : (
 						<>
-							<div className="grid gap-1">
-								<p className="m-0 text-sm text-muted-foreground">
-									{ledger.amountLabel}
-								</p>
-								<strong
-									className="text-3xl font-bold tabular-nums"
-									data-testid="safe-to-spend"
-								>
-									{amountText(ledger.allowance.amount)}
-								</strong>
-								<p className="m-0 text-xs text-muted-foreground">{caption}</p>
-							</div>
-							<SafeSpendingConstraintCompare
-								prePaydayRoom={ledger.allowance.prePaydayRoom}
-								postIncomeRoom={ledger.allowance.postIncomeRoom}
+							<SafeSpendingBudget
+								summary={summary.data}
+								savingsTarget={settings.savingsTarget}
 							/>
 							<Button
 								variant="link"
@@ -163,7 +163,7 @@ export function SafeSpendingPreview({
 					caption={caption}
 					onClose={() => onDetail(null)}
 				>
-					{isSafeSpendingLedgerTab(detail) && ledger && (
+					{isSafeSpendingLedgerTab(detail) && ledger && summary.data && (
 						<div className="grid content-start gap-5">
 							<section
 								className="grid content-start gap-2"
@@ -187,6 +187,26 @@ export function SafeSpendingPreview({
 										</dt>
 										<dd className="m-0 tabular-nums">
 											{amountText(ledger.allowance.postIncomeRoom)}
+										</dd>
+									</div>
+									<div className="flex justify-between gap-3">
+										<dt className="text-muted-foreground">
+											{capacity ? "Payment capacity" : labels.paymentCovered}
+										</dt>
+										<dd className="m-0 tabular-nums">
+											{capacity
+												? capacityText(capacity)
+												: amountText(ledger.allowance.paymentRoom)}
+										</dd>
+									</div>
+									<div className="flex justify-between gap-3">
+										<dt className="text-muted-foreground">
+											{labels.immediateCashCheck}
+										</dt>
+										<dd className="m-0 tabular-nums">
+											<span data-testid="safe-to-spend">
+												{amountText(summary.data?.safeToSpend)}
+											</span>
 										</dd>
 									</div>
 									<div className="flex justify-between gap-3">
@@ -218,6 +238,9 @@ export function SafeSpendingPreview({
 						<SafeSpendingConfigurePanel
 							config={{
 								reserve: settings.reserve,
+								cycleStartDay: settings.cycleStartDay,
+								paydayDay: settings.paydayDay,
+								savingsTarget: settings.savingsTarget,
 								cards: selections.candidateAccounts.map((account) => ({
 									id: account.id,
 									name: account.name,

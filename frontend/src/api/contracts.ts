@@ -599,6 +599,9 @@ export type StochasticSSEData =
 	| ErrorSSEData;
 export interface SafeSpendingSettings {
 	reserve: number;
+	cycleStartDay: number;
+	paydayDay: number;
+	savingsTarget: number;
 	/** Null uses the default card selection. */
 	accountIds: string[] | null;
 	/** Null uses the detected checking account. */

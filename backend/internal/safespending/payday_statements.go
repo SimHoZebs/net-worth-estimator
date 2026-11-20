@@ -13,6 +13,15 @@ type statementClose struct {
 	closed bool
 }
 
+type statementPayoff struct {
+	date   string
+	amount *float64
+}
+
+type carriedStatementScope struct {
+	reset, nextFundingDate string
+}
+
 // effectiveCards mirrors useSafeSpendingSelections. A null selection falls
 // back to detected debt accounts, preferring IDs ending in _card. An explicit
 // selection is authoritative even when a synced card still carries the neutral
@@ -59,19 +68,18 @@ func accountClosingDay(account types.Account) int {
 	return defaultClosingDay
 }
 
-// statementCloses enumerates every close that must be settled by payday. A
-// close on today has not happened at a midday cut, so it is a projection even
-// when today is the card's closing day.
-func statementCloses(day int, today, payday string) []statementClose {
+// statementCloses assigns a statement to the first payoff strictly after its
+// close. A close on today's date is an estimate until end-of-day evidence.
+func statementCloses(day int, today, firstPayoff, lastPayoff string, cut int64) []statementClose {
 	closes := []statementClose{}
 	current := lastClosingBefore(day, today)
-	closes = append(closes, statementClose{date: current, closed: true})
-	if payday == "" {
-		return closes
+	if today < firstPayoff && cut >= domain.DayCloseUnix(today) {
+		current = lastClosingBefore(day, nextIsoDay(today))
 	}
+	closes = append(closes, statementClose{date: current, closed: true})
 	for {
 		next := nextClosingAfter(day, current)
-		if next > payday {
+		if next >= lastPayoff {
 			break
 		}
 		closes = append(closes, statementClose{date: next})
@@ -80,32 +88,31 @@ func statementCloses(day int, today, payday string) []statementClose {
 	return closes
 }
 
-func buildStatements(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings, today, payday string, cut int64) *float64 {
+func buildStatements(st *cutState, payoff string) *float64 {
 	exact := true
 	total := 0.0
-	cards := effectiveCards(model, settings)
-	tracked := map[string]bool{}
+	cards := effectiveCards(st.model, st.settings)
+	tracked := trackedCards(cards)
 	for _, card := range cards {
-		tracked[card.ID] = true
-	}
-	for _, card := range cards {
-		closes := statementCloses(accountClosingDay(card), today, payday)
-		amounts, known := cardStatementRows(st, model, card.ID, closes, cut, tracked)
+		closes := statementCloses(accountClosingDay(card), st.s.CashAsOf, payoff, payoff, st.cut)
+		amounts, known, _ := cardStatementRows(st, card.ID, closes, tracked, []string{payoff}, nil)
 		if amounts == nil {
 			amounts = make([]*float64, len(closes))
 		}
 		if !known {
 			exact = false
-			cause := ReasonStatementEstimateUnavailable
-			if closes[0].closed {
-				cause = ReasonStatementBalanceUnavailable
-			}
-			reason(&st.s.Reasons, cause)
 		}
 		for i, close := range closes {
 			kind := "estimated"
 			if close.closed {
 				kind = "closed"
+			}
+			if amounts[i] == nil && (close.closed || amounts[0] != nil) {
+				cause := ReasonStatementEstimateUnavailable
+				if close.closed {
+					cause = ReasonStatementBalanceUnavailable
+				}
+				reason(&st.s.Reasons, cause)
 			}
 			st.s.Statements = append(st.s.Statements, types.SafeSpendingStatement{
 				AccountID:   card.ID,
@@ -132,13 +139,83 @@ func buildStatements(st *cutState, model *types.FinancialModel, settings *types.
 	return money(total)
 }
 
+func followingStatementReserves(st *cutState, payoffs []string, nextFundingDate string) ([]statementPayoff, *float64, *float64) {
+	totals := make([]float64, len(payoffs))
+	followingKnown, carriedKnown, outsideKnown := true, true, true
+	carried, outsideHorizon := 0.0, 0.0
+	first, last := payoffs[0], payoffs[len(payoffs)-1]
+	cards := effectiveCards(st.model, st.settings)
+	tracked := trackedCards(cards)
+	scope := carriedStatementScope{reset: st.s.CycleReset, nextFundingDate: nextFundingDate}
+	for _, card := range cards {
+		closes := statementCloses(accountClosingDay(card), st.s.CashAsOf, first, last, st.cut)
+		rows, exact, _ := cardStatementRows(st, card.ID, closes, tracked, payoffs, nil)
+		followingKnown = followingKnown && exact
+		if exact {
+			for i, close := range closes {
+				owner := sort.SearchStrings(payoffs, nextIsoDay(close.date))
+				totals[owner] += *rows[i]
+			}
+		} else if len(rows) > 0 && rows[0] != nil {
+			reason(&st.s.Reasons, ReasonStatementEstimateUnavailable)
+		}
+		// Reserve pre-reset charges due at later payoffs only when their cash
+		// debit belongs to the next funding bucket. An autopay funded in the
+		// current bucket has already used cash, so net it against these charges.
+		if scope.reset <= lastClosingBefore(accountClosingDay(card), first) {
+			continue
+		}
+		rows, exact, beyond := cardStatementRows(st, card.ID, closes, tracked, payoffs, &scope)
+		carriedKnown = carriedKnown && exact
+		outsideKnown = outsideKnown && exact
+		outsideHorizon += beyond
+		if exact {
+			for i, close := range closes {
+				owner := sort.SearchStrings(payoffs, nextIsoDay(close.date))
+				if owner > 0 && payoffs[owner] >= scope.nextFundingDate {
+					carried += *rows[i]
+				}
+			}
+		} else if len(rows) > 0 && rows[0] != nil {
+			reason(&st.s.Reasons, ReasonStatementEstimateUnavailable)
+		}
+	}
+	reserves := make([]statementPayoff, len(payoffs))
+	for i, date := range payoffs {
+		reserves[i].date = date
+		if i == 0 {
+			reserves[i].amount = st.s.StatementReserve
+		} else if followingKnown {
+			reserves[i].amount = money(totals[i])
+		}
+	}
+	var carriedAmount *float64
+	if carriedKnown {
+		carriedAmount = money(carried)
+	}
+	var outsideAmount *float64
+	if outsideKnown {
+		outsideAmount = money(outsideHorizon)
+	}
+	return reserves, carriedAmount, outsideAmount
+}
+
+func trackedCards(cards []types.Account) map[string]bool {
+	tracked := map[string]bool{}
+	for _, card := range cards {
+		tracked[card.ID] = true
+	}
+	return tracked
+}
+
 // cardActivity carries the owed change for one dated row. A charge raises the
 // balance of the statement whose period contains the row; a payment settles
 // the oldest unpaid statement and any excess moves forward, never back.
 type cardActivity struct {
-	date    string
-	charge  float64
-	payment float64
+	date            string
+	charge          float64
+	payment         float64
+	firstPayoffOnly bool
 }
 
 // transferLeg tells how one single-destination movement touches a card. It
@@ -201,39 +278,98 @@ func scheduledLeg(rule types.Schedule, cardID string, tracked map[string]bool) (
 // statement is funded only by its own period's charges, so summing the rows
 // never counts a carried balance twice. Payments are allocated oldest first
 // across all rows with the remainder carried forward.
-func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string, closes []statementClose, cut int64, tracked map[string]bool) ([]*float64, bool) {
+func cardStatementRows(st *cutState, cardID string, closes []statementClose, tracked map[string]bool, payoffs []string, carry *carriedStatementScope) ([]*float64, bool, float64) {
+	model, cut := st.model, st.cut
 	first := closes[0].date
 	closeCut := min(domain.DayCloseUnix(first), cut)
 	evidence := cashEvidence(model, st.settings, closeCut)
 	balance, observed := evidence.balances[cardID]
 	if !observed {
-		return nil, false
+		return nil, false, 0
 	}
 	// Opening balance is bank evidence at the close. Replaying to that instant
 	// includes charges made after an earlier checkpoint.
 	bases := make([]float64, len(closes))
-	bases[0] = max(0, -balance)
+	// A positive card balance is a credit against later charges.
+	bases[0] = -balance
+	unknownFrom := len(closes)
+	pendingOutsideForecast := false
+	outsideHorizon := 0.0
 
 	claims := claimState(model, cut)
 	activities := []cardActivity{}
 	for _, tx := range model.Transactions {
-		if !fact(tx) || !touches(tx, cardID) {
+		if !recordedByCut(tx, cut) || !touches(tx, cardID) {
 			continue
 		}
-		if len(tx.Destinations) > 1 {
-			return nil, false // no allocation evidence for a split movement
+		date := postingDay(tx)
+		incurred := date
+		if tx.Pending {
+			// An authorization that remains open cannot post into a prior
+			// close. Keep the observed statement and locate the potential
+			// liability using the earliest date it could still post.
+			date = max(date, st.s.CashAsOf)
+			if cut >= domain.DayCloseUnix(date) {
+				date = nextIsoDay(date)
+			}
 		}
-		leg := recordedLeg(tx, cardID, tracked)
-		date := transactionDay(tx)
 		if date <= first {
 			continue
 		}
-		amount, err := st.ctx.resolveFact(tx)
-		if err != nil {
-			return nil, false
+		leg := recordedLeg(tx, cardID, tracked)
+		isPayment := leg == legPayment || (leg == legNone && cashPaymentToCard(model, tx, cardID))
+		// A split incoming transfer can be a payment without a known
+		// allocation; it may change the oldest statement rather than just
+		// the open one.
+		if len(tx.Destinations) > 1 && contains(tx.Destinations, cardID) && tx.SourceAccountID != nil {
+			return nil, false, 0
 		}
-		if tx.Pending || domain.TransactionInstant(&tx) > cut {
-			return nil, false
+		period := periodOf(closes, date)
+		if !isPayment {
+			if carry != nil && incurred >= carry.reset {
+				continue
+			}
+			if period < 0 {
+				// A priced current-cycle authorization still belongs to this
+				// funding bucket when its payoff is past the ledger horizon.
+				// Reserve it once as outside-horizon carry: no in-range row
+				// exists and no next-bucket debit offset is attached to it.
+				if carry != nil && tx.Pending && tx.SourceAccountID != nil && *tx.SourceAccountID == cardID {
+					if tx.Claim != nil && claims.settled[*tx.Claim] {
+						continue
+					}
+					if held := pendingCardChargeAmount(st, tx); held != nil {
+						outsideHorizon += *held
+					} else {
+						pendingOutsideForecast = true
+					}
+				}
+				continue
+			}
+		}
+		amount, known := st.ctx.latest[tx.ID]
+		if tx.Pending {
+			// A bank-reported authorization is evidence at the cut. A priced
+			// card purchase is forecast as posted, into the earliest open
+			// statement selected above. A pending repayment is not confirmed
+			// cash, so it keeps the conservative gate rather than lowering a
+			// payoff or borrowing from a later funding bucket.
+			if isPayment {
+				return nil, false, 0
+			}
+			if tx.Claim != nil && claims.settled[*tx.Claim] {
+				continue
+			}
+			if held := pendingCardChargeAmount(st, tx); held != nil {
+				amount, known = *held, true
+			}
+		}
+		if !known || len(tx.Destinations) > 1 {
+			if isPayment {
+				return nil, false, 0
+			}
+			unknownFrom = min(unknownFrom, period)
+			continue
 		}
 		switch leg {
 		case legCharge:
@@ -244,7 +380,7 @@ func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string,
 			// movement is added: the replay already applied cashDelta once.
 			activities = append(activities, cardActivity{date: date, payment: amount})
 		default:
-			if cashPaymentToCard(model, tx, cardID) {
+			if isPayment {
 				activities = append(activities, cardActivity{date: date, payment: amount})
 			} else {
 				activities = append(activities, cardActivity{date: date, charge: -cashDelta(tx, cardID, amount)})
@@ -264,49 +400,66 @@ func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string,
 			cardRules = append(cardRules, rule)
 		}
 	}
-	for i := 1; i < len(closes); i++ {
-		occurrences := domain.ResolveOccurrences(cardRules, nil, nextIsoDay(closes[i-1].date), closes[i].date, true)
-		for date, rows := range occurrences.ByDate {
-			for _, row := range rows {
-				if row.Rule == nil {
+	through := payoffs[len(payoffs)-1]
+	occurrences := domain.ResolveOccurrences(cardRules, nil, nextIsoDay(first), through, true)
+	for date, rows := range occurrences.ByDate {
+		for _, row := range rows {
+			claim := types.TransactionClaim{ScheduleID: row.Rule.ID, OccurrenceDate: date}
+			if claims.settled[claim] || claims.pending[claim] {
+				continue
+			}
+			leg, ok := scheduledLeg(*row.Rule, cardID, tracked)
+			if carry != nil {
+				if leg == legPayment && date > payoffs[0] && date >= carry.nextFundingDate {
 					continue
 				}
-				claim := types.TransactionClaim{ScheduleID: row.Rule.ID, OccurrenceDate: date}
-				if claims.settled[claim] || claims.pending[claim] {
+				if leg != legPayment && date >= carry.reset {
 					continue
 				}
-				amount, err := st.ctx.resolve(row, date)
-				if err != nil || amount < 0 {
-					return nil, false
+			}
+			if leg != legPayment && periodOf(closes, date) < 0 {
+				continue
+			}
+			amount, err := st.ctx.resolve(row, date)
+			if !ok || err != nil || amount < 0 {
+				if leg != legCharge {
+					return nil, false, 0
 				}
-				leg, ok := scheduledLeg(*row.Rule, cardID, tracked)
-				if !ok {
-					return nil, false
-				}
-				switch leg {
-				case legCharge:
-					activities = append(activities, cardActivity{date: date, charge: amount})
-				case legPayment:
-					activities = append(activities, cardActivity{date: date, payment: amount})
-				}
+				unknownFrom = min(unknownFrom, periodOf(closes, date))
+				continue
+			}
+			switch leg {
+			case legCharge:
+				activities = append(activities, cardActivity{date: date, charge: amount})
+			case legPayment:
+				activities = append(activities, cardActivity{date: date, payment: amount})
 			}
 		}
 	}
 
 	for _, bill := range st.s.Bills {
-		if bill.ScheduleID == nil || bill.Date <= first || !scheduledPaymentTo(bill.ScheduleID, model, cardID) {
+		date := max(st.s.CashAsOf, bill.Date)
+		if date > through || (carry != nil && date > payoffs[0] && date >= carry.nextFundingDate) || bill.Status == "paid" {
 			continue
+		}
+		applies, allocated := scheduledPaymentTo(bill.ScheduleID, model, cardID)
+		if !applies {
+			continue
+		}
+		if !allocated {
+			return nil, false, 0
 		}
 		if bill.Status == "unpaid" {
 			if bill.Amount == nil {
-				return nil, false
+				return nil, false, 0
 			}
-			activities = append(activities, cardActivity{date: bill.Date, payment: *bill.Amount})
+			activities = append(activities, cardActivity{
+				date: date, payment: *bill.Amount,
+				firstPayoffOnly: carry != nil && date >= carry.nextFundingDate,
+			})
 			continue
 		}
-		if bill.Status != "paid" {
-			return nil, false
-		}
+		return nil, false, 0
 	}
 
 	// Net each period before clamping so a refund before a purchase cannot be
@@ -316,31 +469,94 @@ func cardStatementRows(st *cutState, model *types.FinancialModel, cardID string,
 			bases[index] += activity.charge
 		}
 	}
-	for i := range bases {
-		bases[i] = max(0, bases[i])
-	}
 
+	// Prior payments settle the oldest outstanding amounts first. A later
+	// next-funded payment cannot replace an earlier payment already applied
+	// to the first payoff, and cannot roll into current-funded carryover.
+	sort.SliceStable(activities, func(i, j int) bool { return activities[i].date < activities[j].date })
 	remaining := 0.0
-	for _, activity := range activities {
-		remaining += activity.payment
-	}
 	rows := make([]*float64, len(closes))
-	for i, base := range bases {
-		rows[i] = money(max(0, base-remaining))
-		remaining = max(0, remaining-base)
+	i, nextActivity := 0, 0
+	for _, payoff := range payoffs {
+		start := nextActivity
+		for nextActivity < len(activities) && activities[nextActivity].date <= payoff {
+			nextActivity++
+		}
+		credits := activities[start:nextActivity]
+		for i < len(closes) && closes[i].date < payoff {
+			if i >= unknownFrom {
+				return rows, false, 0
+			}
+			base := bases[i] - remaining
+			remaining = max(0, -base)
+			for len(credits) > 0 && base > 0 {
+				applied := min(base, credits[0].payment)
+				base -= applied
+				credits[0].payment -= applied
+				if credits[0].payment <= 0 {
+					credits = credits[1:]
+				}
+			}
+			rows[i] = money(max(0, base))
+			i++
+		}
+		for _, credit := range credits {
+			if !credit.firstPayoffOnly {
+				remaining += credit.payment
+			}
+		}
 	}
-	return rows, true
+	return rows, !pendingOutsideForecast, outsideHorizon
 }
 
-// periodOf maps a date to the close whose period contains it. Dates after the
-// last close belong to that last statement because payday settles it too.
+// pendingCardChargeAmount prices a bank-reported card purchase from its own
+// hold, falling back to an exact claimed occurrence when the hold is unpriced.
+func pendingCardChargeAmount(st *cutState, tx types.Transaction) *float64 {
+	if held := st.ctx.holdAmount(tx); held != nil {
+		return held
+	}
+	return claimedCardChargeAmount(st, tx)
+}
+
+// claimedCardChargeAmount prices a pending card purchase from the exact
+// schedule it claims when the bank hold has no usable amount. The claim
+// suppresses that occurrence in the rule loop, so this is its single count.
+func claimedCardChargeAmount(st *cutState, tx types.Transaction) *float64 {
+	if tx.Claim == nil {
+		return nil
+	}
+	for i := range st.model.Schedules {
+		rule := &st.model.Schedules[i]
+		if rule.ID != tx.Claim.ScheduleID {
+			continue
+		}
+		occurrence := domain.DatedTransactionOccurrence{
+			Transaction: &types.Transaction{
+				ID:              rule.ID,
+				Amount:          rule.Amount,
+				SourceAccountID: rule.SourceAccountID,
+				Destinations:    rule.Destinations,
+			},
+			Rule: rule,
+		}
+		amount, err := st.ctx.resolve(occurrence, tx.Claim.OccurrenceDate)
+		if err != nil || amount < 0 {
+			return nil
+		}
+		return money(amount)
+	}
+	return nil
+}
+
+// periodOf maps a posted date to its close. Debt after the last included
+// close is not yet part of any payoff in this forecast.
 func periodOf(closes []statementClose, date string) int {
 	for i := 1; i < len(closes); i++ {
 		if date <= closes[i].date {
 			return i
 		}
 	}
-	return len(closes) - 1
+	return -1
 }
 
 // cashPaymentToCard identifies a settlement by a cash account, selected or
@@ -358,16 +574,16 @@ func cashPaymentToCard(model *types.FinancialModel, tx types.Transaction, cardID
 	return false
 }
 
-func scheduledPaymentTo(scheduleID *string, model *types.FinancialModel, cardID string) bool {
+func scheduledPaymentTo(scheduleID *string, model *types.FinancialModel, cardID string) (applies, allocated bool) {
 	if scheduleID == nil {
-		return false
+		return false, false
 	}
 	for _, rule := range model.Schedules {
 		if rule.ID == *scheduleID {
-			return contains(rule.Destinations, cardID)
+			return contains(rule.Destinations, cardID), len(rule.Destinations) == 1
 		}
 	}
-	return false
+	return false, false
 }
 
 func contains(values []string, value string) bool {

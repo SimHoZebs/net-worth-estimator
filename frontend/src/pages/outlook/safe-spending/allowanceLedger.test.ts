@@ -1,32 +1,27 @@
 import { describe, expect, it } from "vitest";
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
 import { buildAllowanceLedger } from "./allowanceLedger.ts";
+import { summaryFixture } from "@/mocks/safeSpendingSummary.ts";
 
 function summary(
 	overrides: Partial<SafeSpendingSummary> = {},
 ): SafeSpendingSummary {
-	return {
-		revision: "synthetic",
+	return summaryFixture({
 		cashAsOf: "2026-11-15",
-		status: "available",
-		reasons: [],
-		selectedAccountIds: ["checking"],
-		baselines: [],
 		checkingAvailable: 900,
-		confirmedMovements: [],
-		bills: [],
-		payday: "2026-11-30",
 		expectedPay: 400,
 		prePaydayBills: 250,
 		paydayBills: 0,
 		statementReserve: 650,
+		cardPayoffCapacity: null,
 		reserve: 200,
 		prePaydayRoom: 450,
 		postIncomeRoom: 200,
+		postPaydayBalance: 400,
+		paymentRoom: 350,
 		safeToSpend: 200,
-		statements: [],
 		...overrides,
-	};
+	});
 }
 
 describe("dated allowance", () => {
@@ -36,17 +31,12 @@ describe("dated allowance", () => {
 			payday: "2026-11-30",
 			cashAsOf: "2026-11-15",
 			status: "available",
-			amount: 200,
 			prePaydayRoom: 450,
 			postIncomeRoom: 200,
+			paymentRoom: 350,
 			expectedPay: 400,
 			reserve: 200,
 		});
-	});
-
-	it("leaves zero room for a negative result", () => {
-		const { allowance } = buildAllowanceLedger(summary({ safeToSpend: -75.5 }));
-		expect(allowance.amount).toBe(0);
 	});
 
 	it("withholds the allowance without inventing arithmetic when evidence is uncertain", () => {
@@ -61,7 +51,6 @@ describe("dated allowance", () => {
 			}),
 		);
 		expect(allowance.status).toBe("uncertain");
-		expect(allowance.amount).toBeNull();
 	});
 
 	it("treats missing evidence as unavailable", () => {
@@ -69,7 +58,6 @@ describe("dated allowance", () => {
 			summary({ status: "missing", payday: null, safeToSpend: null }),
 		);
 		expect(allowance.status).toBe("missing");
-		expect(allowance.amount).toBeNull();
 		expect(allowance.payday).toBeNull();
 	});
 });
@@ -81,6 +69,7 @@ describe("protected obligation ledger", () => {
 				bills: [
 					{
 						id: "phone",
+						actualDate: null,
 						transactionId: null,
 						scheduleId: "phone-rule",
 						accountId: "checking",
@@ -91,6 +80,7 @@ describe("protected obligation ledger", () => {
 					},
 					{
 						id: "rent",
+						actualDate: "2026-11-29",
 						transactionId: null,
 						scheduleId: "rent-rule",
 						accountId: "checking",
@@ -101,6 +91,7 @@ describe("protected obligation ledger", () => {
 					},
 					{
 						id: "power",
+						actualDate: null,
 						transactionId: null,
 						scheduleId: null,
 						accountId: "checking",
@@ -122,12 +113,14 @@ describe("protected obligation ledger", () => {
 			}),
 		);
 		expect(sections.map((section) => [section.title, section.total])).toEqual([
-			["Bills before payday", 250],
-			["Bills on payday", 0],
-			["Card payoff on payday", 650],
+			["Bills before card payoff", 250],
+			["Bills on card payoff date", 0],
+			["Credit card payoffs", 650],
 		]);
 		expect(sections[0]!.rows.map((row) => row.name)).toEqual(["Phone"]);
-		expect(sections.flatMap((section) => section.rows.map((row) => row.name))).not.toContain("Rent");
+		expect(
+			sections.flatMap((section) => section.rows.map((row) => row.name)),
+		).not.toContain("Rent");
 		expect(sections[1]!.rows.map((row) => row)).toEqual([
 			{
 				id: "power",
@@ -175,6 +168,7 @@ describe("protected obligation ledger", () => {
 				bills: [
 					{
 						id: "bill",
+						actualDate: null,
 						transactionId: null,
 						scheduleId: null,
 						accountId: "checking",
@@ -226,46 +220,17 @@ describe("evidence state", () => {
 		]);
 	});
 
-	it("presents a known server allowance even when the summary is uncertain", () => {
-		const ledger = buildAllowanceLedger(
-			summary({ status: "uncertain", safeToSpend: 275 }),
-		);
-		expect(ledger.allowance.amount).toBe(275);
-		expect(ledger.amountLabel).toBe("Safe to spend before payday");
-	});
-
-	it("leads with before-payoff room when statement amounts are unknown", () => {
+	it("keeps the signed room readings even when the summary is uncertain", () => {
 		const ledger = buildAllowanceLedger(
 			summary({
 				status: "uncertain",
-				safeToSpend: null,
-				statementReserve: null,
-				statements: [
-					{
-						accountId: "card",
-						name: "Card",
-						closingDate: "2026-11-28",
-						kind: "closed",
-						amount: null,
-					},
-				],
 				prePaydayRoom: 325.5,
+				postIncomeRoom: 120,
 			}),
 		);
-		expect(ledger.allowance.amount).toBe(325.5);
-		expect(ledger.amountLabel).toBe("Before card payoffs");
-	});
-
-	it("withholds a number when neither the allowance nor before-payoff room is known", () => {
-		const ledger = buildAllowanceLedger(
-			summary({
-				status: "uncertain",
-				safeToSpend: null,
-				statementReserve: null,
-				prePaydayRoom: null,
-			}),
-		);
-		expect(ledger.allowance.amount).toBeNull();
+		expect(ledger.allowance.status).toBe("uncertain");
+		expect(ledger.allowance.prePaydayRoom).toBe(325.5);
+		expect(ledger.allowance.postIncomeRoom).toBe(120);
 	});
 });
 
@@ -276,6 +241,7 @@ describe("protected spending summary", () => {
 				bills: [
 					{
 						id: "bill",
+						actualDate: null,
 						transactionId: null,
 						scheduleId: null,
 						accountId: "checking",

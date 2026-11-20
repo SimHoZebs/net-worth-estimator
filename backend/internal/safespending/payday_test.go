@@ -25,6 +25,7 @@ func paydayFixture() (*types.FinancialModel, *types.SafeSpendingSettings) {
 		bill("rent", "2026-11-20", 250),
 		{ID: "salary", Name: "salary", Destinations: []string{"checking"}, Amount: fixed(400), Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: "2026-11-30", Enabled: true},
 	}
+	model.Schedules[0].EndDate = ptr("2026-11-20")
 	settings := &types.SafeSpendingSettings{
 		Reserve:            200,
 		AccountIDs:         []string{"card-a", "card-b"},
@@ -100,6 +101,19 @@ func TestPlannedCardPaymentReducesPayoffOnce(t *testing.T) {
 	}
 }
 
+func TestScheduledSplitCardPaymentCannotSettleBothCards(t *testing.T) {
+	model, settings := paydayFixture()
+	split := bill("split-card-payment", "2026-11-21", 150)
+	split.Destinations = []string{"card-a", "card-b"}
+	model.Schedules = append(model.Schedules, split)
+	settings.TransactionIDs = append(settings.TransactionIDs, split.ID)
+	s := BuildAtCut(model, settings, stamp(paydayCut))
+	assertMoney(t, s.PrePaydayBills, 400)
+	if s.StatementReserve != nil || s.SafeToSpend != nil {
+		t.Fatalf("unallocated split was deducted from both cards: %+v", s)
+	}
+}
+
 func TestClosingDayThirtyOneClampsInShorterMonth(t *testing.T) {
 	model, settings := paydayFixture()
 	for i := range model.Accounts {
@@ -114,9 +128,12 @@ func TestClosingDayThirtyOneClampsInShorterMonth(t *testing.T) {
 			dates = append(dates, statement.ClosingDate)
 		}
 	}
-	if !slices.Equal(dates, []string{"2026-10-31", "2026-11-30"}) {
+	if !slices.Equal(dates, []string{"2026-10-31"}) {
 		t.Fatalf("clamped closing dates %v", dates)
 	}
+	settings.PaydayDay = 1
+	summary = BuildAtCut(model, settings, stamp(paydayCut))
+	assertMoney(t, statementAmount(t, summary, "card-a", "estimated", "2026-11-30"), 0)
 }
 
 func TestCardPaymentReducesCashAndPayoffOnce(t *testing.T) {
@@ -127,6 +144,11 @@ func TestCardPaymentReducesCashAndPayoffOnce(t *testing.T) {
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, summary.CheckingAvailable, 700)
 	assertMoney(t, summary.StatementReserve, 450)
+	assertMoney(t, summary.PaidByPayday, 200)
+	assertMoney(t, summary.UnpaidByPayday, 700)
+	if len(summary.Bills) != 2 || summary.Bills[0].ActualDate == nil || *summary.Bills[0].ActualDate != "2026-11-14" {
+		t.Fatalf("missing confirmed card payment evidence: %+v", summary.Bills)
+	}
 	assertMoney(t, summary.PrePaydayRoom, 250)
 	assertMoney(t, summary.PostIncomeRoom, 200)
 	assertMoney(t, summary.SafeToSpend, 200)
@@ -303,7 +325,7 @@ func TestSplitRoutingLeavesStatementPayoffUnavailable(t *testing.T) {
 	}
 }
 
-func TestEveryStatementCloseThroughPaydayIsCounted(t *testing.T) {
+func TestEveryStatementCloseBeforeConfiguredPayoffIsCounted(t *testing.T) {
 	model, settings := paydayFixture()
 	for i := range model.Schedules {
 		if model.Schedules[i].ID == "salary" {
@@ -311,8 +333,8 @@ func TestEveryStatementCloseThroughPaydayIsCounted(t *testing.T) {
 		}
 	}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	if len(summary.Statements) != 10 {
-		t.Fatalf("expected five closes per card %+v", summary.Statements)
+	if summary.Payday == nil || *summary.Payday != "2027-02-28" || summary.PayoffDate != "2026-11-30" || len(summary.Statements) != 4 {
+		t.Fatalf("expected two closes per card before the configured payoff despite later income: %+v", summary)
 	}
 	closed := 0
 	for _, statement := range summary.Statements {
@@ -611,13 +633,13 @@ func TestPaydayRequiresInflowIntoSelectedCash(t *testing.T) {
 		}
 	}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	if summary.Payday != nil || summary.SafeToSpend != nil {
+	if summary.Payday == nil || *summary.Payday != "2026-11-30" || summary.ExpectedPay != nil || summary.SafeToSpend != nil {
 		t.Fatalf("outflow treated as payday %+v", summary)
 	}
 	model.Schedules[1].SourceAccountID = nil
 	model.Schedules[1].Destinations = []string{"card-a"}
 	summary = BuildAtCut(model, settings, stamp(paydayCut))
-	if summary.Payday != nil {
+	if summary.ExpectedPay != nil || !slices.Contains(summary.Reasons, ReasonPaydayUnavailable) {
 		t.Fatalf("inflow to a card treated as payday %+v", summary)
 	}
 }
@@ -676,9 +698,11 @@ func TestNoIncomeKeepsDatedObligationsButNoAllowance(t *testing.T) {
 	model, settings := paydayFixture()
 	settings.IncomeScheduleIDs = nil
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	if summary.Payday != nil || summary.ExpectedPay != nil || summary.PrePaydayBills != nil || summary.PrePaydayRoom != nil || summary.PostIncomeRoom != nil || summary.SafeToSpend != nil {
+	if summary.Payday == nil || *summary.Payday != "2026-11-30" || summary.ExpectedPay != nil || summary.PostIncomeRoom != nil || summary.SafeToSpend != nil {
 		t.Fatalf("missing payday invented an allowance %+v", summary)
 	}
+	assertMoney(t, summary.PrePaydayBills, 250)
+	assertMoney(t, summary.SpendableCash, 450)
 	if !slices.Contains(summary.Reasons, ReasonPaydayUnavailable) {
 		t.Fatalf("missing reason %+v", summary.Reasons)
 	}
@@ -689,40 +713,51 @@ func TestNoIncomeKeepsDatedObligationsButNoAllowance(t *testing.T) {
 
 // Synthetic regression for the evidence rule: an actual settles a bill only
 // when it happened by the cut and claims that exact occurrence. A claim naming
-// another cycle leaves the current occurrence expected, and the window adds no
-// all-history arrears or out-of-period rows.
+// another cycle leaves the current occurrence expected. Only a posted settlement
+// inside the payment window carries its own earlier occurrence into the ledger,
+// where it bars that occurrence without settling the current one.
 func TestBillSettlementRequiresExactClaimByEvidenceCut(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		claimDate string
 		status    string
 		preBills  float64
+		billDates []string
+		statuses  []string
 	}{
-		{name: "exact occurrence", claimDate: "2026-11-20", status: "paid", preBills: 0},
-		{name: "wrong cycle", claimDate: "2026-10-20", status: "unpaid", preBills: 250},
+		{name: "exact occurrence", claimDate: "2026-11-20", status: "paid", preBills: 0,
+			billDates: []string{"2026-11-20"}, statuses: []string{"paid"}},
+		{name: "wrong cycle", claimDate: "2026-10-20", status: "unpaid", preBills: 250,
+			billDates: []string{"2026-10-20", "2026-11-20"}, statuses: []string{"paid", "unpaid"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			model, settings := paydayFixture()
-			// The rule spans both cycles; only the 11-20 occurrence is in scope.
+			// The rule spans both cycles; the payment window starts 11-01.
 			model.Schedules[0].StartDate = "2026-10-20"
 			actual := payment("rent-actual", 250, "2026-11-14T19:00:00Z")
 			actual.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: tc.claimDate}
 			model.Transactions = []types.Transaction{actual}
 
 			summary := BuildAtCut(model, settings, stamp(paydayCut))
-			if len(summary.Bills) != 1 || summary.Bills[0].Date != "2026-11-20" {
-				t.Fatalf("window arrears or out-of-period rows %+v", summary.Bills)
+			dates := []string{}
+			statuses := []string{}
+			for _, row := range summary.Bills {
+				dates = append(dates, row.Date)
+				statuses = append(statuses, row.Status)
 			}
-			bill := summary.Bills[0]
-			if bill.Status != tc.status {
-				t.Fatalf("status = %s, want %s: %+v", bill.Status, tc.status, bill)
+			if !slices.Equal(dates, tc.billDates) || !slices.Equal(statuses, tc.statuses) {
+				t.Fatalf("ledger %v / %v, want %v / %v", dates, statuses, tc.billDates, tc.statuses)
+			}
+			current := summary.Bills[len(summary.Bills)-1]
+			if current.Status != tc.status {
+				t.Fatalf("current status = %s, want %s: %+v", current.Status, tc.status, current)
 			}
 			if tc.status == "paid" {
-				if bill.TransactionID == nil || *bill.TransactionID != actual.ID {
-					t.Fatalf("settled bill lost its claim %+v", bill)
+				if current.TransactionID == nil || *current.TransactionID != actual.ID {
+					t.Fatalf("settled bill lost its claim %+v", current)
 				}
-			} else if bill.TransactionID != nil {
-				t.Fatalf("wrong-cycle claim settled the bill %+v", bill)
+			} else if current.TransactionID != nil {
+				t.Fatalf("wrong-cycle claim settled the bill %+v", current)
 			}
 			assertMoney(t, summary.CheckingAvailable, 900)
 			assertMoney(t, summary.PrePaydayBills, tc.preBills)
@@ -730,13 +765,13 @@ func TestBillSettlementRequiresExactClaimByEvidenceCut(t *testing.T) {
 	}
 }
 
-// A real pending authorization is evidence at the cut. It settles its exact
-// occurrence without a second deduction, while the cash rules still decide
-// whether the hold leaves the allowance uncertain.
-func TestRealPendingClaimSettlesOccurrenceAndCashRulesOwnTheHold(t *testing.T) {
+// A real pending authorization claims its exact occurrence without a second
+// cash deduction or a confirmed payment. Cash rules gate hold coverage.
+func TestRealPendingClaimIsUnconfirmedAndCashRulesOwnTheHold(t *testing.T) {
 	for _, afterObservation := range []bool{false, true} {
 		t.Run(map[bool]string{false: "before-observation", true: "after-observation"}[afterObservation], func(t *testing.T) {
 			model, settings := paydayFixture()
+			model.Checkpoints[0].Balance = 1150
 			at := "2026-11-14T19:00:00Z"
 			if afterObservation {
 				at = "2026-11-15T09:00:00Z"
@@ -747,9 +782,10 @@ func TestRealPendingClaimSettlesOccurrenceAndCashRulesOwnTheHold(t *testing.T) {
 			model.Transactions = []types.Transaction{hold}
 
 			summary := BuildAtCut(model, settings, stamp(paydayCut))
-			if len(summary.Bills) != 1 || summary.Bills[0].Status != "paid" {
-				t.Fatalf("real pending did not settle the occurrence %+v", summary.Bills)
+			if len(summary.Bills) != 1 || summary.Bills[0].Status != "pending" {
+				t.Fatalf("pending claim lost its evidence %+v", summary.Bills)
 			}
+			assertMoney(t, summary.PaidByPayday, 0)
 			assertMoney(t, summary.PrePaydayBills, 0)
 			assertMoney(t, summary.PaydayBills, 0)
 			if afterObservation {
@@ -764,6 +800,24 @@ func TestRealPendingClaimSettlesOccurrenceAndCashRulesOwnTheHold(t *testing.T) {
 				assertMoney(t, summary.PrePaydayRoom, 700)
 			}
 		})
+	}
+}
+
+func TestPendingBillWithZeroOrInsufficientObservedHoldGapLeavesCashUnknown(t *testing.T) {
+	for _, balance := range []float64{900, 1149} {
+		model, settings := paydayFixture()
+		model.Checkpoints[0].Balance = balance
+		hold := payment("uncovered-hold", 250, "2026-11-14T19:00:00Z")
+		hold.Pending = true
+		hold.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-11-20"}
+		model.Transactions = []types.Transaction{hold}
+
+		s := BuildAtCut(model, settings, stamp(paydayCut))
+		if s.CheckingAvailable != nil || s.SafeToSpend != nil || !slices.Contains(s.Reasons, ReasonPendingHoldCoverageUnknown) {
+			t.Fatalf("treated a hold without sufficient gap as free cash: %+v", s)
+		}
+		assertMoney(t, s.PaidByPayday, 0)
+		assertMoney(t, s.UnpaidByPayday, 900)
 	}
 }
 
@@ -821,10 +875,8 @@ func TestClaimedBillAmountIsNotDeductedTwice(t *testing.T) {
 	}
 }
 
-// Synthetic regression: the ledger starts after the previous income
-// occurrence, so an unclaimed bill that came due earlier in this cycle is
-// still expected and deducted once. The prior payday itself and older cycles
-// stay out, and so does the next cycle after payday.
+// The configured payoff window includes unclaimed earlier bills, even if
+// one fell on a different selected paycheck date.
 func TestPastDueBillInCurrentIncomeCycleIsCountedOnce(t *testing.T) {
 	model, settings := paydayFixture()
 	for i := range model.Schedules {
@@ -851,18 +903,19 @@ func TestPastDueBillInCurrentIncomeCycleIsCountedOnce(t *testing.T) {
 	for _, row := range summary.Bills {
 		dates = append(dates, row.Date)
 	}
-	if !slices.Equal(dates, []string{"2026-11-10", "2026-11-20"}) {
-		t.Fatalf("cycle window %v, want only the current cycle's bills", dates)
+	if !slices.Equal(dates, []string{"2026-11-01", "2026-11-10", "2026-11-20"}) {
+		t.Fatalf("payment window %v, want the unpaid bills since the prior configured payoff", dates)
 	}
 	for _, row := range summary.Bills {
 		if row.Status != "unpaid" || row.Amount == nil {
 			t.Fatalf("expected bill lost its price %+v", row)
 		}
 	}
-	assertMoney(t, summary.Bills[0].Amount, 120)
+	assertMoney(t, summary.Bills[0].Amount, 90)
 	assertMoney(t, summary.CheckingAvailable, 900)
-	assertMoney(t, summary.PrePaydayBills, 370)
-	assertMoney(t, summary.PrePaydayRoom, 330)
+	assertMoney(t, summary.PrePaydayBills, 460)
+	// The configured Nov 30 payoff also leaves cash before Dec 1 income.
+	assertMoney(t, summary.PrePaydayRoom, -410)
 }
 
 // Annual income puts the previous payday exactly 12 months back. The inclusive

@@ -86,6 +86,9 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}
 	if err := scoped.SetSafeSpendingSettings(types.SafeSpendingSettings{
 		Reserve:            0,
+		CycleStartDay:      3,
+		PaydayDay:          27,
+		SavingsTarget:      224.50,
 		AccountIDs:         []string{"manual"},
 		SpendingAccountIDs: []string{"manual"},
 		IncomeScheduleIDs:  []string{"01900000-0000-7000-8000-0000000000b4"},
@@ -194,6 +197,9 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		len(settings.SpendingAccountIDs) != 1 || settings.SpendingAccountIDs[0] != "synced" ||
 		len(settings.TransactionIDs) != 0 || len(settings.IncomeScheduleIDs) != 1 || settings.IncomeScheduleIDs[0] != "01900000-0000-7000-8000-0000000000b4" {
 		t.Fatalf("safe spending settings did not move: %+v", settings)
+	}
+	if settings.CycleStartDay != 3 || settings.PaydayDay != 27 || settings.SavingsTarget != 224.50 {
+		t.Fatalf("safe spending user settings changed: %+v", settings)
 	}
 	cards, err := scoped.GetSyncCards()
 	if err != nil || len(cards) != 2 || cards[0] != "synced" || cards[1] != "savings" {

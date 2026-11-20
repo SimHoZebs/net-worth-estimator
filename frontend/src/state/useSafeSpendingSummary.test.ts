@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "@/mocks/resource.ts";
 import { stubTestServer } from "@/mocks/waypointServer.ts";
+import { summaryFixture } from "@/mocks/safeSpendingSummary.ts";
 import { resetServerQueryCache, serverQueryClient } from "./serverQuery.ts";
 import { safeSpendingSummaryOptions } from "./useSafeSpendingSummary.ts";
 import { refreshAccounts, refreshTransactions } from "./workspaceResources.ts";
@@ -16,7 +17,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("safe spending summary query", () => {
-	it("uses the scoped no-store transport with no cycle query", async () => {
+	it("uses the scoped no-store transport with no as-of override", async () => {
 		const server = stubTestServer();
 		const body = { revision: "synthetic", safeToSpend: 200 };
 		const fetcher = vi.fn(async () => server.ok(body));
@@ -32,6 +33,27 @@ describe("safe spending summary query", () => {
 				signal: expect.any(AbortSignal),
 			}),
 		);
+	});
+
+	it("refreshes the current-day summary at UTC midnight", async () => {
+		const server = stubTestServer();
+		const fetcher = vi.fn(async () => server.ok(summaryFixture()));
+		vi.stubGlobal("fetch", fetcher);
+		const cache = serverQueryClient();
+		const options = safeSpendingSummaryOptions(["synthetic"]);
+		const updatedAt = Date.parse("2026-11-17T23:59:58Z");
+		cache.setQueryData(options.queryKey, summaryFixture(), { updatedAt });
+		const now = vi.spyOn(Date, "now").mockReturnValue(updatedAt + 1_000);
+		try {
+			await cache.fetchQuery(options);
+			expect(fetcher).not.toHaveBeenCalled();
+			now.mockReturnValue(updatedAt + 2_000);
+			await cache.fetchQuery(options);
+			expect(fetcher).toHaveBeenCalledTimes(1);
+			expect(options.refetchOnWindowFocus).toBe(true);
+		} finally {
+			now.mockRestore();
+		}
 	});
 
 	it("separates summaries by model revision and selected settings", () => {
@@ -54,27 +76,7 @@ describe("safe spending summary query", () => {
 			stubTestServer();
 			const cache = serverQueryClient();
 			const options = safeSpendingSummaryOptions(["synthetic"]);
-			cache.setQueryData(options.queryKey, {
-				revision: "synthetic",
-				cashAsOf: "2026-11-15",
-				status: "missing",
-				reasons: [],
-				selectedAccountIds: [],
-				baselines: [],
-				checkingAvailable: null,
-				confirmedMovements: [],
-				bills: [],
-				payday: null,
-				expectedPay: null,
-				prePaydayBills: null,
-				paydayBills: null,
-				statementReserve: null,
-				reserve: 200,
-				prePaydayRoom: null,
-				postIncomeRoom: null,
-				safeToSpend: null,
-				statements: [],
-			});
+			cache.setQueryData(options.queryKey, summaryFixture());
 			await refresh();
 			expect(cache.getQueryState(options.queryKey)?.isInvalidated).toBe(true);
 		},

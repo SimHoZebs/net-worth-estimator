@@ -3,6 +3,7 @@ import { AccountToggle } from "../../../components/AccountToggle.tsx";
 import { Field, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import type { Account, Transaction } from "../../../domain/model.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import type {
@@ -11,6 +12,17 @@ import type {
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { formatRuleDetail, TogglePill } from "./TogglePill.tsx";
+
+const budgetFields = [
+	{ key: "cycleStartDay", label: "Cycle start day", min: 1, max: 31, step: 1 },
+	{ key: "paydayDay", label: "Payday of month", min: 1, max: 31, step: 1 },
+	{
+		key: "savingsTarget",
+		label: "Monthly savings goal ($)",
+		min: 0,
+		step: 0.01,
+	},
+] as const;
 
 export function SafeSpendingConfigurePanel({
 	config,
@@ -41,13 +53,65 @@ export function SafeSpendingConfigurePanel({
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
-	const reserveId = useId();
+	const fieldId = useId();
 	return (
 		<div className="grid content-start gap-3">
+			<form
+				aria-labelledby={`${fieldId}-budget`}
+				onSubmit={(event) => {
+					event.preventDefault();
+					const fields = new FormData(event.currentTarget);
+					const next: Partial<SafeSpendingSettings> = {};
+					for (const { key } of budgetFields) {
+						const value = Number(fields.get(key));
+						if (value !== config[key]) next[key] = value;
+					}
+					if (Object.keys(next).length) onUpdateConfig(next);
+				}}
+			>
+				<FieldSet>
+					<FieldLegend id={`${fieldId}-budget`} variant="label">
+						Monthly budget
+					</FieldLegend>
+					<p
+						id={`${fieldId}-dates`}
+						className="text-sm leading-relaxed text-muted-foreground"
+					>
+						Days 1–31 · Short months: last day
+					</p>
+					{budgetFields.map(({ key, label, min, step, ...limits }) => {
+						const id = `${fieldId}-${key}`;
+						return (
+							<Field key={key}>
+								<Label htmlFor={id}>{label}</Label>
+								<Input
+									key={config[key]}
+									id={id}
+									name={key}
+									type="number"
+									min={min}
+									step={step}
+									{...limits}
+									required
+									aria-describedby={`${fieldId}-dates`}
+									defaultValue={config[key]}
+								/>
+							</Field>
+						);
+					})}
+					<Button
+						className="justify-self-start self-start"
+						type="submit"
+						variant="outline"
+					>
+						Save monthly budget
+					</Button>
+				</FieldSet>
+			</form>
 			<Field>
-				<Label htmlFor={reserveId}>{`${labels.reserve} ($)`}</Label>
+				<Label htmlFor={`${fieldId}-reserve`}>{`${labels.reserve} ($)`}</Label>
 				<Input
-					id={reserveId}
+					id={`${fieldId}-reserve`}
 					type="number"
 					min={0}
 					step="0.01"
@@ -121,9 +185,6 @@ export function SafeSpendingConfigurePanel({
 							/>
 						))}
 				</div>
-				<p className="text-sm leading-relaxed text-muted-foreground">
-					Only received payments linked to selected sources count.
-				</p>
 				{!incomeScheduleIds.length && (
 					<p className="text-sm leading-relaxed text-muted-foreground">
 						Select a recurring income source.

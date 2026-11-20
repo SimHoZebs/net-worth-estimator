@@ -11,9 +11,11 @@ test("seeded account demo", async ({ page }) => {
 		page.getByRole("heading", { name: "Safe spending" }),
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
-		await expect(page.getByTestId("safe-to-spend")).toBeVisible();
 		await expect(
-			page.getByRole("region", { name: "Cash check comparison" }),
+			page.getByRole("region", { name: "Cycle budget" }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
 	}
 	await page.getByRole("button", { name: /Protected obligations ·/ }).click();

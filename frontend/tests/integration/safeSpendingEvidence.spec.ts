@@ -132,9 +132,7 @@ async function seedEvidence(api: APIRequestContext) {
 }
 
 // Synthetic production shape: one bill is due on the same UTC date as the
-// cash observation and has no posted claim. The server cannot tell whether
-// the payment is already inside the observed balance, so it withholds the
-// allowance while keeping the bill, the cash and the payday visible.
+// cash observation and has no posted claim. The payment stays outstanding.
 async function seedSameDayObservation(
 	api: APIRequestContext,
 	today: string,
@@ -171,7 +169,7 @@ async function seedSameDayObservation(
 		amount: amount(711.12),
 		recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
 		startDate: today,
-		endDate: null,
+		endDate: today,
 		annualCap: null,
 		priority: 1,
 		enabled: true,
@@ -184,6 +182,7 @@ async function seedSameDayObservation(
 		sourceAccountId: null,
 		destinations: ["evidence-checking"],
 		startDate: payday,
+		endDate: null,
 	};
 	const imported = await api.post(`${FIXTURE_API}/v1/model/import`, {
 		data: {
@@ -206,7 +205,7 @@ async function seedSameDayObservation(
 						accountId: "evidence-checking",
 						postedBalance: 1608.05,
 						availableBalance: 1244.43,
-						observedAt: Math.floor(Date.now() / 1000) - 120,
+						observedAt: Date.parse(`${today}T10:00:00Z`) / 1000,
 					},
 				],
 			},
@@ -228,10 +227,7 @@ async function seedSameDayObservation(
 // Sync provisions unknown bank accounts with the neutral cash kind. The owner
 // still tracks them as cards through the explicit selection, so the payday
 // payoff must honour that selection instead of silently dropping it.
-async function seedCashLabelledCard(
-	api: APIRequestContext,
-	payday: string,
-) {
+async function seedCashLabelledCard(api: APIRequestContext, payday: string) {
 	const reset = await api.post(`${FIXTURE_API}/__fixture/reset`, {
 		data: { bankTransactions: [] },
 	});
@@ -352,7 +348,7 @@ async function seedConfirmedBill(
 		id: "evidence-bill",
 		name: "Synthetic confirmed bill",
 		sourceAccountId: "evidence-checking",
-		destinations: [],
+		destinations: null,
 		amount: amount(100),
 		recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
 		startDate: today,
@@ -369,12 +365,12 @@ async function seedConfirmedBill(
 		destinations: ["evidence-checking"],
 		startDate: payday,
 	};
-	const posted = Date.parse(`${today}T09:00:00Z`) / 1000;
+	const posted = Math.floor(Date.now() / 1000) - 120;
 	const payment = {
 		id: "01900000-0000-7000-8000-00000000c001",
 		name: "Synthetic linked payment",
 		sourceAccountId: "evidence-checking",
-		destinations: [],
+		destinations: null,
 		amount: amount(100),
 		transactionTime: posted,
 		postedTime: posted,
@@ -514,6 +510,7 @@ async function seedFallbackNumeric(
 		data: {
 			reserve: 200,
 			accountIds: ["evidence-unknown-card"],
+			paydayDay: Number(payday.slice(-2)),
 			spendingAccountIds: ["evidence-checking"],
 			incomeScheduleIds: ["evidence-salary"],
 			transactionIds: [bill.id],
@@ -545,16 +542,21 @@ test("an explicit cash-labelled card keeps its statement payoff", async ({
 		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("safe-to-spend")).toBeVisible();
-		await card
-			.getByRole("button", { name: /Protected obligations ·/ })
-			.click();
+		await expect(
+			card.getByRole("region", { name: "Cycle budget" }),
+		).toBeVisible();
+		await expect(
+			card.getByRole("region", { name: "Next cycle spending" }),
+		).toBeVisible();
+		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
-		await expect(drawer.getByText("Card payoff on payday")).toBeVisible();
+		await expect(drawer.getByText("Credit card payoffs")).toBeVisible();
 		const payoff = drawer.getByRole("list", {
-			name: "Card payoff on payday",
+			name: "Credit card payoffs",
 		});
-		expect(await payoff.getByText("Synthetic synced card").count()).toBeGreaterThan(0);
+		expect(
+			await payoff.getByText("Synthetic synced card").count(),
+		).toBeGreaterThan(0);
 	} finally {
 		await api.dispose();
 	}
@@ -591,35 +593,29 @@ test("the dated allowance and protected obligations come from the server", async
 		expect(served).toMatchObject({ payday: PAYDAY });
 
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("safe-to-spend")).toBeVisible();
-		await expect(card.getByText("Through payday · Nov 30, 2026")).toBeVisible();
-		if (served.status === "available") {
-			await expect(
-				card.getByRole("region", { name: "Cash check comparison" }),
-			).toBeVisible();
-			await expect(card.getByText(/is the tighter check\./)).toBeVisible();
-			await expect(card.locator('[aria-label="Before payday"]')).toBeVisible();
-			await expect(
-				card.locator('[aria-label="After payday pay"]'),
-			).toBeVisible();
-		} else {
-			await expect(
-				card.getByText(/Allowance (uncertain|unavailable)/),
-			).toBeVisible();
-		}
+		await expect(
+			card.getByRole("region", { name: "Cycle budget" }),
+		).toBeVisible();
+		await expect(
+			card.getByRole("region", { name: "Next cycle spending" }),
+		).toBeVisible();
 		// Secondary detail lives in the drawer, not in the preview.
+		await expect(card.getByRole("region", { name: "Cash checks" })).toHaveCount(
+			0,
+		);
 		await expect(
 			card.getByRole("region", { name: "Protected obligations" }),
 		).toHaveCount(0);
 		await expect(card.getByTestId("cash-on-hand")).toHaveCount(0);
-		await expect(card.getByText("Bills before payday")).toHaveCount(0);
-		await expect(card.locator("details")).toHaveCount(0);
+		await expect(card.getByText("Bills before card payoff")).toHaveCount(0);
+		await expect(card.locator("details[open]")).toHaveCount(0);
 
 		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("region", { name: "Cash checks" }),
 		).toBeVisible();
+		await expect(drawer.getByText("Next income · Nov 30, 2026")).toBeVisible();
 		await expect(drawer.getByText("Expected pay")).toBeVisible();
 		await expect(
 			drawer.getByRole("region", { name: "Cash evidence" }),
@@ -628,7 +624,7 @@ test("the dated allowance and protected obligations come from the server", async
 		await expect(
 			drawer.getByRole("region", { name: "Protected obligations" }),
 		).toBeVisible();
-		await expect(drawer.getByText("Bills before payday")).toBeVisible();
+		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await page.keyboard.press("Escape");
 		await expect(drawer).toBeHidden();
 	} finally {
@@ -636,19 +632,17 @@ test("the dated allowance and protected obligations come from the server", async
 	}
 });
 
-// Verified against the real backend with this seed: cash 1244.43, reserve 200,
-// the unclaimed bill 711.12 and income 400 give 333.31 / 711.12 / 733.31.
 test("an unclaimed same-day bill stays expected and keeps a numeric allowance", async ({
 	page,
 }) => {
 	const api = await request.newContext();
 	try {
-		const today = new Date().toISOString().slice(0, 10);
-		const payday = new Date(Date.parse(`${today}T00:00:00Z`) + 11 * 86_400_000)
-			.toISOString()
-			.slice(0, 10);
+		const today = AS_OF;
+		const payday = PAYDAY;
 		await seedSameDayObservation(api, today, payday);
-		const response = await api.get(`${FIXTURE_API}/v1/safe-spending-summary`);
+		const response = await api.get(
+			`${FIXTURE_API}/v1/safe-spending-summary?asOf=${today}`,
+		);
 		expect(response.ok(), await response.text()).toBe(true);
 		const summary = await response.json();
 		expect(summary).toMatchObject({
@@ -675,21 +669,33 @@ test("an unclaimed same-day bill stays expected and keeps a numeric allowance", 
 		});
 
 		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
+		await page.route("**/v1/safe-spending-summary", async (route) => {
+			const url = new URL(route.request().url());
+			url.searchParams.set("asOf", today);
+			await route.continue({ url: url.toString() });
+		});
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByText("Safe to spend before payday")).toBeVisible();
-		await expect(card.getByTestId("safe-to-spend")).toHaveText("$333.31");
+		// The cycle budget spends the Nov 30 paycheck, not only today's cash.
+		await expect(card.getByText("Nov 30 paycheck")).toBeVisible();
+		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).toHaveText("$933.31");
+		await expect(card.getByTestId("income-funded")).toHaveText("+$400.00");
+		await expect(
+			card.getByRole("region", { name: "Next cycle spending" }),
+		).toBeVisible();
+		await expect(card.getByTestId("reserve-gap")).toHaveCount(0);
 		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
 		await expect(card.getByText(/already be included/)).toHaveCount(0);
 		await expect(
 			card.getByRole("button", { name: /Protected obligations ·/ }),
 		).toBeVisible();
-		await card
-			.getByRole("button", { name: /Protected obligations ·/ })
-			.click();
+		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
-		await expect(drawer.getByText("Bills before payday")).toBeVisible();
+		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await expect(drawer.getByText("Synthetic same-day bill")).toBeVisible();
+		await expect(drawer.getByText("Immediate cash checkpoint")).toBeVisible();
+		await expect(drawer.getByTestId("safe-to-spend")).toHaveText("$333.31");
 	} finally {
 		await api.dispose();
 	}
@@ -753,19 +759,23 @@ test("uncertain evidence withholds the allowance but keeps obligations visible",
 					status: "uncertain",
 					checkingAvailable: null,
 					safeToSpend: null,
+					fundingRoom: null,
 					prePaydayRoom: null,
 					postIncomeRoom: null,
+					paymentRoom: null,
+					nextCycleDiscretionary: null,
+					nextCycleIncome: null,
+					nextCycleCarryover: null,
 					reasons: ["pending-obligation-coverage-unknown"],
 				},
 			});
 		});
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("safe-to-spend")).toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).toHaveText("—");
+		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText("—");
+		await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
 		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
-		await expect(
-			card.getByRole("region", { name: "Cash check comparison" }),
-		).toHaveCount(0);
 		await expect(
 			card.getByText("pending-obligation-coverage-unknown"),
 		).toHaveCount(0);
@@ -774,7 +784,7 @@ test("uncertain evidence withholds the allowance but keeps obligations visible",
 		await expect(
 			drawer.getByRole("region", { name: "Protected obligations" }),
 		).toBeVisible();
-		await expect(drawer.getByText("Bills before payday")).toBeVisible();
+		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 	} finally {
 		await api.dispose();
 	}
@@ -803,9 +813,9 @@ test("a failed summary request stays retryable in the preview without data", asy
 		await expect(
 			card.getByText("Safe spending evidence could not be loaded."),
 		).toBeVisible();
-		await expect(card.getByTestId("safe-to-spend")).toHaveCount(0);
+		await expect(card.getByTestId("with-cash-cushion")).toHaveCount(0);
 		await card.getByRole("button", { name: "Retry evidence" }).click();
-		await expect(card.getByTestId("safe-to-spend")).toBeVisible();
+		await expect(card.getByTestId("with-cash-cushion")).toBeVisible();
 		expect(attempts).toBeGreaterThanOrEqual(2);
 	} finally {
 		await api.dispose();
@@ -835,17 +845,17 @@ test("a linked transaction confirms its bill and keeps a numeric allowance", asy
 		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("safe-to-spend")).not.toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText("—");
 		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
-		await expect(drawer.getByText("Bills before payday")).toBeVisible();
+		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await expect(drawer.getByText("Synthetic confirmed bill")).toHaveCount(0);
 	} finally {
 		await api.dispose();
 	}
 });
 
-test("leads with before-payoff room when statement amounts are unknown", async ({
+test("shows a missing future checkpoint when statement amounts are unknown", async ({
 	page,
 }) => {
 	const api = await request.newContext();
@@ -865,18 +875,92 @@ test("leads with before-payoff room when statement amounts are unknown", async (
 		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByText("Before card payoffs")).toBeVisible();
-		await expect(card.getByTestId("safe-to-spend")).toHaveText(
-			amountTextFor(summary.prePaydayRoom),
-		);
+		// Unknown card payoffs withhold the cycle budget rather than showing a
+		// clamped zero; the known before-payday cash check stays in the drawer.
+		await expect(card.getByTestId("with-cash-cushion")).toHaveText("—");
+		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		const drawer = page.getByRole("dialog", { name: "Safe spending" });
+		await expect(
+			drawer.getByRole("region", { name: "Cash checks" }),
+		).toBeVisible();
+		await expect(
+			drawer.getByText("Before payday", { exact: true }),
+		).toBeVisible();
+		await expect(drawer.getByText("$600.00")).toBeVisible();
 	} finally {
 		await api.dispose();
 	}
 });
 
-function amountTextFor(value: number) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(value);
-}
+test("an unknown next-cycle component stays unknown without hiding the known component", async ({
+	page,
+}) => {
+	const api = await request.newContext();
+	try {
+		await seedEvidence(api);
+		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
+		await page.route("**/v1/safe-spending-summary", async (route) => {
+			const response = await route.fetch();
+			const body = await response.json();
+			await route.fulfill({
+				response,
+				json: {
+					...body,
+					nextCycleEnd: "2026-12-29",
+					nextCycleIncome: 350,
+					nextCycleCarryover: null,
+					nextCycleDiscretionary: null,
+				},
+			});
+		});
+		await page.goto("/outlook");
+		const card = page.getByRole("region", { name: "Safe spending" });
+		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText("—");
+		await expect(card.getByTestId("next-cycle-income")).toHaveText("$350.00");
+		await expect(card.getByTestId("next-cycle-carryover")).toHaveText("—");
+		await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
+	} finally {
+		await api.dispose();
+	}
+});
+
+test("known next-cycle spending shows its funding composition", async ({
+	page,
+}) => {
+	const api = await request.newContext();
+	try {
+		await seedEvidence(api);
+		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
+		await page.route("**/v1/safe-spending-summary", async (route) => {
+			const response = await route.fetch();
+			const body = await response.json();
+			await route.fulfill({
+				response,
+				json: {
+					...body,
+					cycleReset: "2026-11-20",
+					nextCycleEnd: "2026-12-19",
+					nextCycleIncome: 200,
+					nextCycleCarryover: 150,
+					nextCycleDiscretionary: 350,
+				},
+			});
+		});
+		await page.goto("/outlook");
+		const card = page.getByRole("region", { name: "Safe spending" });
+		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
+			"$350.00",
+		);
+		const nextCycle = card.getByRole("region", { name: "Next cycle spending" });
+		await expect(nextCycle.locator("time")).toHaveText(["Nov 20", "Dec 19"]);
+		await expect(nextCycle.getByTestId("next-cycle-income")).toHaveText(
+			"$200.00",
+		);
+		await expect(nextCycle.getByTestId("next-cycle-carryover")).toHaveText(
+			"$150.00",
+		);
+		await expect(nextCycle.getByTestId("next-cycle-composition")).toBeVisible();
+	} finally {
+		await api.dispose();
+	}
+});

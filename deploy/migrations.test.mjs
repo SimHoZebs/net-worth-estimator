@@ -405,12 +405,55 @@ test("retired cycle start becomes each account's closing day", async (t) => {
   const settings = await rows(db, `SELECT settings_json FROM safe_spending_settings WHERE user_id = '${owner}' AND id = 1;`);
   assert.doesNotMatch(settings, /statementDay/);
   assert.match(settings, /"reserve":100/);
+  assert.deepEqual(JSON.parse(settings), { reserve: 100, cycleStartDay: 20, paydayDay: 30, savingsTarget: 0 });
   assert.equal((await backups(directory)).length, 1);
 
   const hashAfter = await sha256File(db);
   const repeat = await migrate(db);
   assert.match(repeat.stdout, /verified, nothing to do/);
   assert.equal(await sha256File(db), hashAfter);
+});
+
+test("Safe Spending backfills missing settings without rewriting authored rows", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-safe-spending-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  const guest = await secondUser(db);
+  await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "unsaved"]);
+  const authored = '{ "cycleStartDay": 1, "paydayDay": 31, "savingsTarget": 105.75 }';
+  await sqlite(db, `INSERT INTO safe_spending_settings(user_id, id, settings_json) VALUES
+    ('${owner}',1,'{"reserve":100,"accountIds":["card"],"spendingAccountIds":null,"paydayDay":28}'),
+    ('${guest}',1,'${authored}');`);
+
+  await migrate(db);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM safe_spending_settings;"), "2");
+  assert.deepEqual(JSON.parse(await rows(db, `SELECT settings_json FROM safe_spending_settings WHERE user_id = '${owner}';`)),
+    { reserve: 100, accountIds: ["card"], spendingAccountIds: null, cycleStartDay: 20, paydayDay: 28, savingsTarget: 0 });
+  assert.equal(await rows(db, `SELECT settings_json FROM safe_spending_settings WHERE user_id = '${guest}';`), authored);
+  assert.equal((await backups(directory)).length, 1);
+  const hashAfter = await sha256File(db);
+  assert.match((await migrate(db)).stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("Safe Spending rejects invalid authored settings before backup", async (t) => {
+  for (const raw of [
+    '{"reserve":100',
+    '{reserve:100}',
+    'null',
+    '{"cycleStartDay":null}',
+    '{"cycleStartDay":20,"paydayDay":30,"savingsTarget":1e400}',
+  ]) {
+    const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-safe-spending-invalid-"));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const { db, owner } = await fullBase(directory);
+    await sqlite(db, `INSERT INTO safe_spending_settings(user_id, id, settings_json) VALUES ('${owner}',1,'${raw}');`);
+    const hashBefore = await sha256File(db);
+    const error = await migrateFails(db);
+    assert.match(error.stderr, /Invalid Safe Spending settings/, raw);
+    assert.equal(await sha256File(db), hashBefore, raw);
+    assert.deepEqual(await backups(directory), [], raw);
+  }
 });
 
 test("unknown frequencies and undated weekly schedules fail closed with the original unchanged", async (t) => {

@@ -1,68 +1,112 @@
-# Safe spending before payday
+# Safe Spending
 
-Safe spending answers one household question: how much unscheduled spending is
-affordable before the next selected income date while keeping the reserve and
-paying off the selected cards' closed statements? The income schedule sets the
-date. Each card's closing day determines which debt belongs in the payoff.
+Safe Spending shows how much additional spending the plan can support, which
+payments it still needs to cover, and what spending less now would leave for
+the next cycle. The backend calculates the amounts from one evidence cut. The
+Outlook card displays them without treating a checking balance as an allowance.
 
-## Two cash checks
+## Three dates
 
-The allowance is the smaller of:
+- The **spending reset** is a monthly display boundary, defaulting to the 20th.
+  It does not clear liabilities or put new cash in the bank.
+- **Payday** is a cash-flow checkpoint. The configured payday, defaulting to
+  the 30th, sets when selected cards are paid. Scheduled income still arrives
+  on its own dates; moving the card payoff does not move a paycheck.
+- A card's **statement close** assigns charges to that card's own statement.
+A statement is assigned to the next applicable payoff after closing.
 
-- Cash available today less the reserve and outstanding cash obligations before
-  payday.
-- Cash available today plus expected income on payday, less the reserve, all
-  outstanding cash obligations through payday, and the remaining statement
-  payoffs planned for payday.
+Monthly days that do not exist in a given month fall on its last day. Dates in
+the ledger use UTC.
 
-A negative result leaves zero room for extra spending. Missing evidence is
-different from zero. Show the known obligations even if the allowance cannot
-be determined. The backend owns the calculation and the evidence used to
-explain it. Calendar dates use UTC.
+Existing saved settings need the [offline migration](../deploy/MIGRATIONS.md)
+before the updated API reads them. The migration fills missing settings
+without replacing authored values.
 
-## Occurrence evidence
+## One obligation, one payment
 
-A scheduled bill counts as settled only when a real transaction explicitly
-claims that exact schedule occurrence and the transaction happened by the cash
-evidence cut. A posted settlement and a real pending authorization both
-happen; projected rows, voided rows, facts dated after the cut, and claims for
-another cycle never do. Amounts, names, and nearby dates never stand in for a
-claim.
+A schedule occurrence is paid only when a posted transaction claims that exact
+occurrence by the evidence cut. A claimed payment uses the actual posted amount
+and does not deduct a second payment from cash. A pending authorization is not
+proof of payment. A confirmed balance hold offsets only the part of the bill
+it covers, and a pending claim on a different payment route does not clear the
+bill from the forecast.
 
-A settled occurrence stays in the bill ledger with status `paid` but adds no
-second deduction. Its movement or hold already changes cash under the cash
-rules, so the paid row is skipped when the before-payday and on-payday totals
-are formed and it never makes those totals unknown.
+The payment bar covers the current payment period, from the day after the previous
+configured payoff through the displayed payoff date. An overdue occurrence due in
+that window still needs coverage and stays reserved. An occurrence from an
+earlier period is outside the forecast: a missing link is not proof that it was
+paid, and it does not turn the bill into an unpaid obligation either. Observation
+history alone never rolls such a bill back into the ledger. An exact posted
+settlement that happens inside the current window is the exception. It keeps its
+own earlier occurrence in the ledger as paid so the payment bar does not show a
+payment it already knows about as outstanding. It does not settle a different
+occurrence.
 
-Without a happening claim the bill is still expected before income: it stays
-`unpaid`, keeps its resolved amount, and is deducted once through the bill
-subtotal. A cash observation on the bill's own date is not settlement evidence
-in either direction. It never confirms payment and never turns the bill or its
-subtotal unknown, so the before-payday bill total and pre-payday room remain
-available.
+An unlinked hold that matches an outstanding bill's route, amount, and date
+window is flagged as a possible overlap. It does not change the forecast or
+payment status without reconciliation.
 
-The ledger spans the current income cycle, starting after the previous income
-occurrence through the selected payday. An unclaimed bill that came due earlier
-in that cycle stays visible and is deducted once instead of being silently
-dropped. The prior payday itself, older arrears, and occurrences after payday
-stay out, so no cycle is counted twice.
+The payment bar measures obligations through the displayed payoff date. It
+includes card payoffs, not merchant charges billed to cards. An estimated charge
+contributes to its statement instead. A posted card repayment reduces that
+statement's unpaid amount; the bank movement is not a second expense.
 
-For example, suppose checking has $900, the reserve is $200, a $250 bill is
-due before payday, and the paycheck is $400. Two cards will need $500 and $150
-on payday. There is $450 available before payday, but only $200 after providing
-for both payoffs. The household can afford **$200** of unscheduled spending.
+Cash observations and confirmed movements are bounded by the evidence cut.
+Do not subtract a posted payment again when the starting observation has
+already captured it. Where a hold or a balance cannot establish what has been
+covered, leave the dependent value unknown and show the independently known
+amounts.
 
-## Statement timing and settlement
+The default evidence cut is now. The summary API also accepts a historical
+`asOf` date or timestamp for replay. Replays use the current plan and settings
+but cannot use later checkpoints or posted activity as historical evidence.
 
-A closing day of 31 means the last day in a shorter month. Closing a statement
-does not withdraw cash. A statement that closed before today can still require
-payment, and a statement closing between today and payday can increase the
-planned payoff. Identify projected amounts as estimates. Purchases alone do
-not establish a historical statement balance.
+## Spending room and next cycle
 
-A scheduled charge on a card belongs in the relevant statement estimate, not
-also in cash bills. A card payment affects cash and reduces the outstanding
-payoff once. A posted payment claiming a scheduled occurrence replaces that
-occurrence. Equal amounts or similar dates alone do not establish settlement.
-An available balance can already reflect pending payments, so uncertain payment
-coverage must not turn into a precise allowance.
+**Without cash cushion** is the paycheck funding this cycle, less the card
+spending and expected recurring payments assigned to it. It can be negative.
+**With cash cushion** adds existing cash after payments due before that
+paycheck. **After savings goal** deducts the savings target from the
+income-funded amount, not from existing cash. The projected extra cash saved
+is a change to the cash cushion, not to net worth.
+
+The cycle amounts include future income and are not all available as cash
+today. The separate timing check walks dated payments in order; cash due
+before an inflow cannot be funded by that inflow. The optional reserve is a
+separate check, not a deduction from the three cycle amounts.
+
+**Next cycle spending** separates new income-funded room from the cash carried
+forward if no additional spending occurs. A future obligation belongs to one
+funding period: a bill after payday and before the next paycheck is funded by
+the earlier paycheck. The forecast can look beyond reset and cycle-end dates
+to account for the paychecks and obligations that fund the allowance. The
+carryover and the corresponding capacity from the current cycle are the same
+money. A new purchase consumes that cash once, even if the card pays later.
+
+The payment and next-cycle bars have different denominators. The former shows
+paid versus outstanding obligations; the latter shows two sources of the same
+projected allowance. Unknown components or shortfalls are shown as text, not
+as misleading segments.
+
+Card payments reduce the oldest outstanding statements first. A planned early
+payment funded by carried cash uses that cash once; an early payment funded by
+a later paycheck does not free up the current cushion for spending today.
+A priced pending card purchase is included in the forecast as if it will post.
+It is not a posted charge or a scheduled estimate, and the posted purchase
+replaces it rather than adding a second expense. An unpriced authorization
+affects its own estimate without invalidating a supported closed statement.
+A cash shortfall already established before an unknown future payment still
+proves there is nothing safe to spend today.
+
+## November 17 example
+
+With $392 cash and $91.08 still due before payday, the existing cash available
+for immediate spending is $300.92. A $7,449.65 paycheck less $2,890.56 of card
+payoffs and $3,963.57 of other assigned bills adds $595.52, or $95.52 after a
+$500 savings target. The $896.44 combined room is not all available as cash
+before payday.
+
+If the next relevant paycheck is also $7,449.65 and funds a *different*
+$3,963.57 set of bills, it adds $3,486.08. With no additional spending, the
+$896.44 carries forward once, for $4,382.52 of projected capacity. These are
+conditional figures, not a substitute for checking the dated payments.

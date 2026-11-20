@@ -8,7 +8,6 @@ import type {
 	ObligationRow,
 	ObligationSection,
 } from "./safeSpendingDetailModel.ts";
-
 const cents = (value: number): number => Math.round(value * 100) / 100;
 
 function evidenceStatus(summary: SafeSpendingSummary): EvidenceStatus {
@@ -17,17 +16,17 @@ function evidenceStatus(summary: SafeSpendingSummary): EvidenceStatus {
 	return "missing";
 }
 
-function billRow(bill: SafeSpendingBill): ObligationRow {
+export function billRow(bill: SafeSpendingBill): ObligationRow {
 	return {
 		id: bill.id,
 		name: bill.name,
-		date: bill.date,
+		date: bill.actualDate || bill.date,
 		amount: bill.amount,
 		detail: null,
 	};
 }
 
-function statementRow(statement: SafeSpendingStatement): ObligationRow {
+export function statementRow(statement: SafeSpendingStatement): ObligationRow {
 	return {
 		id: `${statement.accountId}-${statement.closingDate}-${statement.kind}`,
 		name: statement.name,
@@ -62,61 +61,43 @@ function buildEvidence(summary: SafeSpendingSummary): AllowanceEvidence {
 export function buildAllowanceLedger(
 	summary: SafeSpendingSummary,
 ): AllowanceLedger {
-	const payday = summary.payday;
+	const payoff = summary.payoffDate;
 	const unpaidBills = (summary.bills ?? []).filter(
 		(bill) => bill.status !== "paid",
 	);
-	const beforePayday = payday
-		? unpaidBills.filter((bill) => bill.date < payday)
+	const beforePayday = payoff
+		? unpaidBills.filter((bill) => bill.date < payoff)
 		: unpaidBills;
-	const onPayday = payday
-		? unpaidBills.filter((bill) => bill.date >= payday)
+	const onPayday = payoff
+		? unpaidBills.filter((bill) => bill.date === payoff)
 		: [];
 	const status = evidenceStatus(summary);
-	const statementAmountUnknown =
-		summary.statementReserve === null ||
-		(summary.statements ?? []).some(
-			(statement) => statement.amount === null,
-		);
-	const safe = summary.safeToSpend;
-	const beforePayoffs =
-		safe === null &&
-		statementAmountUnknown &&
-		summary.prePaydayRoom !== null
-			? Math.max(0, cents(summary.prePaydayRoom))
-			: null;
-	const amount = safe !== null ? Math.max(0, cents(safe)) : beforePayoffs;
-	const amountLabel =
-		beforePayoffs !== null
-			? "Before card payoffs"
-			: "Safe to spend before payday";
 	const sections: ObligationSection[] = [
 		{
-			title: "Bills before payday",
+			title: "Bills before card payoff",
 			total: summary.prePaydayBills,
 			rows: beforePayday.map(billRow),
 		},
 		{
-			title: "Bills on payday",
+			title: "Bills on card payoff date",
 			total: summary.paydayBills,
 			rows: onPayday.map(billRow),
 		},
 		{
-			title: "Card payoff on payday",
+			title: "Credit card payoffs",
 			total: summary.statementReserve,
 			rows: (summary.statements ?? []).map(statementRow),
 		},
 	];
 	const totalsKnown = sections.every((section) => section.total !== null);
 	return {
-		amountLabel,
 		allowance: {
 			cashAsOf: summary.cashAsOf,
-			payday,
+			payday: summary.payday,
 			status,
-			amount,
 			prePaydayRoom: summary.prePaydayRoom,
 			postIncomeRoom: summary.postIncomeRoom,
+			paymentRoom: summary.paymentRoom,
 			expectedPay: summary.expectedPay,
 			reserve: summary.reserve,
 		},
