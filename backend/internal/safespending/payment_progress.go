@@ -2,20 +2,32 @@ package safespending
 
 import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 
+// computePaymentProgress totals the non-card bills in the payment window and
+// compacts the displayed detail in the same pass. A scheduled repayment owned
+// by one tracked card is already represented by the separate card section, so
+// it is neither paid cash here nor a bill detail row. computeForecast runs
+// first and still reads every repayment from s.Bills, so compaction happens
+// after the forecast has consumed its inputs.
 func computePaymentProgress(st *cutState) {
 	s := st.s
 	paid, unpaid := 0.0, 0.0
-	paidKnown, unpaidKnown := true, s.StatementReserve != nil
-	if unpaidKnown {
-		unpaid = *s.StatementReserve
-	}
-	seen := map[string]bool{}
-	for _, bill := range s.Bills {
-		if bill.TransactionID != nil {
-			// A claim keeps its ownership even if its payment posts early.
-			seen[*bill.TransactionID] = true
+	paidKnown, unpaidKnown := true, true
+	tracked := trackedCards(effectiveCards(st.model, st.settings))
+	cardRepayment := make(map[string]bool, len(st.model.Schedules))
+	for i := range st.model.Schedules {
+		rule := &st.model.Schedules[i]
+		if len(rule.Destinations) == 1 && tracked[rule.Destinations[0]] {
+			cardRepayment[rule.ID] = true
 		}
-		if bill.Date > s.PayoffDate {
+	}
+
+	kept := make([]types.SafeSpendingBill, 0, len(s.Bills))
+	for _, bill := range s.Bills {
+		ownedByCard := bill.ScheduleID != nil && cardRepayment[*bill.ScheduleID]
+		if !ownedByCard {
+			kept = append(kept, bill)
+		}
+		if ownedByCard || bill.Date > s.PayoffDate {
 			continue
 		}
 		if bill.Status == "paid" {
@@ -26,42 +38,14 @@ func computePaymentProgress(st *cutState) {
 		}
 		addPaymentAmount(&unpaid, &unpaidKnown, bill.Amount)
 	}
-	cards := effectiveCards(st.model, st.settings)
-	for _, tx := range st.transactions {
-		if seen[tx.ID] || !posted(tx, st.cut) || tx.SourceAccountID == nil || !st.selected[*tx.SourceAccountID] {
-			continue
-		}
-		date := postingDay(tx)
-		if date < s.PaymentPeriodStart || date > s.PayoffDate {
-			continue
-		}
-		for _, card := range cards {
-			if card.ID == *tx.SourceAccountID || !contains(tx.Destinations, card.ID) {
-				continue
-			}
-			if len(tx.Destinations) != 1 {
-				paidKnown = false
-				break
-			}
-			var amount *float64
-			if value, ok := st.ctx.latest[tx.ID]; ok {
-				amount = money(value)
-			}
-			addPaymentAmount(&paid, &paidKnown, amount)
-			s.Bills = append(s.Bills, types.SafeSpendingBill{
-				ID: "transaction:" + tx.ID, TransactionID: &tx.ID, ActualDate: &date,
-				AccountID: *tx.SourceAccountID, Name: tx.Name, Date: date, Amount: amount, Status: "paid",
-			})
-			break
-		}
-	}
-	sortBills(s.Bills)
+	sortBills(kept)
 	if paidKnown {
 		s.PaidByPayday = money(paid)
 	}
 	if unpaidKnown {
 		s.UnpaidByPayday = money(unpaid)
 	}
+	s.Bills = kept
 }
 
 func addPaymentAmount(total *float64, known *bool, amount *float64) {

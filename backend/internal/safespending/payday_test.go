@@ -143,10 +143,10 @@ func TestCardPaymentReducesCashAndPayoffOnce(t *testing.T) {
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, summary.CheckingAvailable, 700)
 	assertMoney(t, summary.StatementReserve, 450)
-	assertMoney(t, summary.PaidByPayday, 200)
-	assertMoney(t, summary.UnpaidByPayday, 700)
-	if len(summary.Bills) != 2 || summary.Bills[0].ActualDate == nil || *summary.Bills[0].ActualDate != "2026-11-14" {
-		t.Fatalf("missing confirmed card payment evidence: %+v", summary.Bills)
+	assertMoney(t, summary.PaidByPayday, 0)
+	assertMoney(t, summary.UnpaidByPayday, 250)
+	if len(summary.Bills) != 1 || summary.Bills[0].ID != "schedule:rent:2026-11-20" {
+		t.Fatalf("card repayment entered the bill detail: %+v", summary.Bills)
 	}
 	assertMoney(t, summary.PrePaydayRoom, 450)
 	assertMoney(t, summary.PostIncomeRoom, 400)
@@ -816,7 +816,7 @@ func TestPendingBillWithZeroOrInsufficientObservedHoldGapLeavesCashUnknown(t *te
 			t.Fatalf("treated a hold without sufficient gap as free cash: %+v", s)
 		}
 		assertMoney(t, s.PaidByPayday, 0)
-		assertMoney(t, s.UnpaidByPayday, 900)
+		assertMoney(t, s.UnpaidByPayday, 250)
 	}
 }
 

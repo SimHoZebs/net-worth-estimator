@@ -36,8 +36,8 @@ type SafeSpendingSummary struct {
 	NextCycleCarryover     *float64                `json:"nextCycleCarryover"`
 	NextCycleDiscretionary *float64                `json:"nextCycleDiscretionary"`
 	PaymentPeriodStart     string                  `json:"paymentPeriodStart"`
-	PaidByPayday           *float64                `json:"paidByPayday"`
-	UnpaidByPayday         *float64                `json:"unpaidByPayday"`
+	PaidByPayday           *float64                `json:"paidByPayday" doc:"Non-card cash bills paid through the payoff date; excludes card payoffs reported separately in statementReserve"`
+	UnpaidByPayday         *float64                `json:"unpaidByPayday" doc:"Non-card cash bills still unpaid through the payoff date; excludes card payoffs reported separately in statementReserve and does not depend on statement estimate availability"`
 	SafeToSpend            *float64                `json:"safeToSpend"`
 	Statements             []SafeSpendingStatement `json:"statements"`
 }

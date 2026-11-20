@@ -4809,6 +4809,7 @@
 						"type": ["number", "null"]
 					},
 					"paidByPayday": {
+						"description": "Non-card cash bills paid through the payoff date; excludes card payoffs reported separately in statementReserve",
 						"format": "double",
 						"type": ["number", "null"]
 					},
@@ -4886,6 +4887,7 @@
 						"type": "string"
 					},
 					"unpaidByPayday": {
+						"description": "Non-card cash bills still unpaid through the payoff date; excludes card payoffs reported separately in statementReserve and does not depend on statement estimate availability",
 						"format": "double",
 						"type": ["number", "null"]
 					}

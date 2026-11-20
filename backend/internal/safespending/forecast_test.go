@@ -212,7 +212,7 @@ func TestPaidAndUnpaidByPayoffKeepOccurrenceAndActualDates(t *testing.T) {
 	// The older observation must not roll the unlinked earlier occurrence into
 	// the forecast. Being unlinked says nothing about whether it was paid.
 	before := BuildAtCut(model, settings, stamp(paydayCut))
-	assertMoney(t, before.UnpaidByPayday, 900)
+	assertMoney(t, before.UnpaidByPayday, 250)
 	if len(before.Bills) != 1 || before.Bills[0].Date != "2026-11-20" {
 		t.Fatalf("unlinked earlier occurrence entered the ledger %+v", before.Bills)
 	}
@@ -225,7 +225,7 @@ func TestPaidAndUnpaidByPayoffKeepOccurrenceAndActualDates(t *testing.T) {
 	model.Transactions = []types.Transaction{actual, hold}
 	after := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, after.PaidByPayday, 80)
-	assertMoney(t, after.UnpaidByPayday, 900)
+	assertMoney(t, after.UnpaidByPayday, 250)
 	assertMoney(t, after.PrePaydayBills, 0)
 	if len(after.Bills) != 2 || after.Bills[0].Date != lateBill.StartDate ||
 		after.Bills[0].ActualDate == nil || *after.Bills[0].ActualDate != "2026-11-14" ||

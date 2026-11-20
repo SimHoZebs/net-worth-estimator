@@ -48,10 +48,14 @@ An unlinked hold that matches an outstanding bill's route, amount, and date
 window is flagged as a possible overlap. It does not change the forecast or
 payment status without reconciliation.
 
-The payment bar measures obligations through the displayed payoff date. It
-includes card payoffs, not merchant charges billed to cards. An estimated charge
-contributes to its statement instead. A posted card repayment reduces that
-statement's unpaid amount; the bank movement is not a second expense.
+The payment bar and bill details cover non-card cash bills through the displayed
+payoff date. Card payoffs and repayments owned by a single tracked card belong to
+the separate "Credit cards to pay" section through statementReserve, not the bar.
+A missing statement estimate does not make the bar unknown. A split card transfer
+that cannot be allocated to one tracked card stays in the bar and bill details so
+its deduction is not lost. Card repayments remain forecast inputs even though
+they are not displayed as bills. A posted repayment reduces that statement's
+unpaid amount; the bank movement is not a second expense.
 
 Cash observations and confirmed movements are bounded by the evidence cut.
 Do not subtract a posted payment again when the starting observation has

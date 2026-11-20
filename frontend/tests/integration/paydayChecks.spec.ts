@@ -13,7 +13,7 @@ const headline = {
 	payoffDate: "2026-11-30",
 	paymentPeriodStart: "2026-10-31",
 	paidByPayday: 175,
-	unpaidByPayday: 6945.21,
+	unpaidByPayday: 4054.65,
 	statementReserve: 2890.56,
 	nextCycleEnd: "2026-12-19",
 	nextCycleDiscretionary: 4382.52,
@@ -73,6 +73,7 @@ test("safe spending separates immediate room, progress, and next-cycle funding",
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
 	await expect(card.getByTestId("payment-progress")).toBeVisible();
+	await expect(card.getByTestId("unpaid-by-payday")).toHaveText("$4,054.65");
 	await expect(card.getByTestId("next-cycle-composition")).toBeVisible();
 	await expect(
 		card.getByText("Short by $20.00 before a scheduled payment"),
@@ -90,11 +91,13 @@ test("safe spending separates immediate room, progress, and next-cycle funding",
 		.locator("summary")
 		.filter({ hasText: "Credit cards to pay" });
 	await expect(cardDetails).toContainText("Nov 30");
+	await expect(cardDetails).toContainText("$2,890.56");
 	await expect(card.getByText("Synthetic rent")).toBeHidden();
 	await expect(card.getByText("Synthetic card")).toBeHidden();
 	await paymentDetails.focus();
 	await page.keyboard.press("Enter");
 	await expect(card.getByText("Synthetic rent")).toBeVisible();
+	await expect(card.getByText("Synthetic card")).toBeHidden();
 	await expect(card.getByText("Nov 2", { exact: true })).toBeVisible();
 	await cardDetails.click();
 	await expect(card.getByText("Synthetic card")).toBeVisible();

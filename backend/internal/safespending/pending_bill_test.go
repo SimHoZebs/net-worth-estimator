@@ -58,5 +58,5 @@ func TestPartiallyCoveredPendingBillReservesRemainingEstimate(t *testing.T) {
 	assertMoney(t, s.PrePaydayBills, 200)
 	assertMoney(t, s.SafeToSpend, 450)
 	assertMoney(t, s.Bills[0].Amount, 250)
-	assertMoney(t, s.UnpaidByPayday, 900)
+	assertMoney(t, s.UnpaidByPayday, 250)
 }
