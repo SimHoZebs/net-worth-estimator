@@ -12,12 +12,12 @@ type SafeSpendingSummary struct {
 	ConfirmedMovements     []SafeSpendingMovement  `json:"confirmedMovements"`
 	Bills                  []SafeSpendingBill      `json:"bills"`
 	Payday                 *string                 `json:"payday"`
+	CycleFundingPayday     *string                 `json:"cycleFundingPayday" doc:"Paycheck funding the active spending cycle; Payday stays the actual next income"`
 	PayoffDate             string                  `json:"payoffDate"`
 	ExpectedPay            *float64                `json:"expectedPay"`
 	PrePaydayBills         *float64                `json:"prePaydayBills"`
 	PaydayBills            *float64                `json:"paydayBills"`
 	StatementReserve       *float64                `json:"statementReserve"`
-	Reserve                float64                 `json:"reserve"`
 	PrePaydayRoom          *float64                `json:"prePaydayRoom"`
 	PostIncomeRoom         *float64                `json:"postIncomeRoom"`
 	PostPaydayBalance      *float64                `json:"postPaydayBalance"`
@@ -29,7 +29,7 @@ type SafeSpendingSummary struct {
 	SpendableCash          *float64                `json:"spendableCash"`
 	IncomeFunded           *float64                `json:"incomeFunded"`
 	SavingsAllowance       *float64                `json:"savingsAllowance"`
-	ForecastCashRoom       *float64                `json:"forecastCashRoom" doc:"Lowest projected cash balance before applying the optional reserve; signed"`
+	ForecastCashRoom       *float64                `json:"forecastCashRoom" doc:"Lowest projected cash balance; signed"`
 	AdditionalSavings      *float64                `json:"additionalSavings"`
 	FundingRoom            *float64                `json:"fundingRoom"`
 	NextCycleIncome        *float64                `json:"nextCycleIncome"`

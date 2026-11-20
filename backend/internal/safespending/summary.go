@@ -49,6 +49,7 @@ type cutState struct {
 	latest         map[string]types.Checkpoint
 	selected       map[string]bool
 	balances       map[string]float64
+	basis          map[string]types.DisplayBasis
 	transactions   []types.Transaction
 	ctx            *amounts
 	cut            int64
@@ -57,11 +58,23 @@ type cutState struct {
 
 func cashEvidence(model *types.FinancialModel, settings *types.SafeSpendingSettings, cut int64) *cutState {
 	day := domain.FormatIsoDate(time.Unix(cut, 0))
-	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}, Reserve: settings.Reserve}
-	st := &cutState{s: &s, model: model, settings: settings, latest: pickCheckpoints(model, cut), selected: map[string]bool{}, balances: map[string]float64{}, cut: cut}
+	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}}
+	st := &cutState{s: &s, model: model, settings: settings, latest: pickCheckpoints(model, cut), selected: map[string]bool{}, balances: map[string]float64{}, basis: map[string]types.DisplayBasis{}, cut: cut}
 	st.replayConfirmed()
 	st.deriveBaselines()
+	st.ctx.basis = st.basis
 	return st
+}
+
+// effectiveCashBasis mirrors the owner-facing display choice at this evidence
+// cut. A bank-reported available figure is the only thing that can embed
+// outgoing holds, so without one posted is the effective figure. Otherwise the
+// account's configured basis applies, with available as the default.
+func effectiveCashBasis(account types.Account, cp types.Checkpoint) types.DisplayBasis {
+	if cp.AvailableBalance == nil || types.NormalizeDisplayBasis(account.DisplayBasis) == types.DisplayBasisPosted {
+		return types.DisplayBasisPosted
+	}
+	return types.DisplayBasisAvailable
 }
 
 // pickCheckpoints keeps the newest observation at or before the cut for each
@@ -175,13 +188,16 @@ func (st *cutState) deriveBaselines() {
 			b.ObservedAt = &cp.ObservedAt
 			b.PostedBalance = &cp.Balance
 			b.AvailableBalance = cp.AvailableBalance
-			b.Basis = "posted"
+			basis := effectiveCashBasis(a, cp)
+			st.basis[a.ID] = basis
+			b.Basis = string(basis)
 			b.Status = "available"
-			// Both bases include confirmed movements after observation. Only a
-			// bank-reported available figure adjusts the starting cash balance.
+			// Replay starts from the observed posted total and adds confirmed
+			// movements after it. Only an effective available figure adjusts
+			// that total by the bank-reported gap. On the posted basis,
+			// pending holds have not been deducted from starting cash.
 			accountCash := st.balances[a.ID]
-			if cp.AvailableBalance != nil {
-				b.Basis = "available"
+			if basis == types.DisplayBasisAvailable {
 				accountCash += *cp.AvailableBalance - cp.Balance
 			}
 			available += accountCash
@@ -193,25 +209,26 @@ func (st *cutState) deriveBaselines() {
 				instant := domain.TransactionInstant(&tx)
 				if tx.Pending && instant <= st.cut {
 					if instant > cp.ObservedAt {
-						reason(&b.Reasons, ReasonPendingAfterBaselineCoverageUnknown)
-					} else if tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID {
-						if cp.AvailableBalance == nil {
-							reason(&b.Reasons, ReasonPendingHoldWithoutAvailableBalance)
-						} else {
-							addPaymentAmount(&holds, &exactHolds, st.ctx.holdAmount(tx))
+						if basis == types.DisplayBasisAvailable {
+							reason(&b.Reasons, ReasonPendingAfterBaselineCoverageUnknown)
 						}
+					} else if basis == types.DisplayBasisAvailable && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID {
+						// Outgoing holds are embedded only in a reported
+						// available total. On the posted basis they stay out
+						// of the starting cash without nulling it.
+						addPaymentAmount(&holds, &exactHolds, st.ctx.holdAmount(tx))
 					}
 				}
 				// A newly posted debit may settle a hold already in available cash.
 				// Aggregate gaps cannot identify which transaction held that cash.
-				if posted(tx, st.cut) && instant > cp.ObservedAt && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID && cp.AvailableBalance != nil && math.Abs(cp.Balance-*cp.AvailableBalance) > .005 {
+				if basis == types.DisplayBasisAvailable && posted(tx, st.cut) && instant > cp.ObservedAt && tx.SourceAccountID != nil && *tx.SourceAccountID == a.ID && math.Abs(cp.Balance-*cp.AvailableBalance) > .005 {
 					reason(&b.Reasons, ReasonPostedHoldCoverageUnknown)
 				}
 			}
 			// A reported balance proves only aggregate coverage. If the gap
 			// cannot cover all known outgoing authorizations, a hold cannot
 			// safely be treated as already deducted or deducted again.
-			if cp.AvailableBalance != nil && (!exactHolds || holds > max(0, cp.Balance-*cp.AvailableBalance)+.005) {
+			if basis == types.DisplayBasisAvailable && (!exactHolds || holds > max(0, cp.Balance-*cp.AvailableBalance)+.005) {
 				reason(&b.Reasons, ReasonPendingHoldCoverageUnknown)
 			}
 			if len(b.Reasons) > 0 {

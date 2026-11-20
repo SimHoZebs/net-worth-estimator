@@ -57,8 +57,8 @@ old packs in place.
 | exclusions | Wildcard (audience all) exclusion before later rows arrive | Exclusions evaluated at write time leak rows to later audiences |
 | ledger | Fixed household ledger with hand-computed sums for completeness journeys: every surface must show the seed's known rows | Dropped, duplicated, or miscounted seed rows; merged lookalikes; resurrected phantoms; leaked revocations |
 | negative-net-worth | Sustained negative net worth with volatile debt-driven swings below zero | Charts or domains assuming a $0 floor; backwards compact signs; dropped negative layers or unformattable sub-zero tooltips |
-| safe-spending | Card spending thresholds, pace projection, and a protected-reserve crossing | Missing income selection, card charges, or reserve hides the dividers and pace |
-| safe-spending-shortfall | A recurring bill the cash balance cannot fulfill | Missing raised savings contribution or income selection hides the unfulfilled row |
+| safe-spending | Card spending thresholds, pace projection, and a savings-goal crossing | Missing income selection, card charges, or savings goal hides the dividers and pace |
+| safe-spending-shortfall | A recurring bill the cash balance cannot fulfill | Missing raised savings goal or income selection hides the unfulfilled row |
 
 ### Seed coverage for new features
 

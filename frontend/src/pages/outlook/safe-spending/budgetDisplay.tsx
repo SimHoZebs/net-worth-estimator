@@ -8,14 +8,18 @@ export function BudgetAmount({
 	className,
 	testId,
 	describeShortfall,
+	showPlus,
+	missingText,
 }: {
 	value: number | null | undefined;
 	className?: string;
 	testId?: string;
 	describeShortfall?: (amount: string) => string;
+	showPlus?: boolean;
+	missingText?: string;
 }) {
 	const negative = value != null && value < 0;
-	const magnitude = amountText(negative ? -value : value);
+	const magnitude = amountText(negative ? -value : value, missingText);
 	return (
 		<span
 			className={cn("tabular-nums", negative && "text-danger-text", className)}
@@ -23,7 +27,7 @@ export function BudgetAmount({
 		>
 			{negative
 				? (describeShortfall?.(magnitude) ?? `−${magnitude}`)
-				: describeShortfall && value != null && value > 0
+				: showPlus && value != null && value > 0
 					? `+${magnitude}`
 					: magnitude}
 		</span>
@@ -60,6 +64,8 @@ export function BudgetMetric({
 	value,
 	testId,
 	describeShortfall,
+	showPlus,
+	missingText,
 	segment,
 	stacked,
 	primary,
@@ -68,6 +74,8 @@ export function BudgetMetric({
 	value: number | null | undefined;
 	testId?: string;
 	describeShortfall?: (amount: string) => string;
+	showPlus?: boolean;
+	missingText?: string;
 	segment?: "first" | "second";
 	stacked?: boolean;
 	primary?: boolean;
@@ -103,6 +111,8 @@ export function BudgetMetric({
 					value={value}
 					testId={testId}
 					describeShortfall={describeShortfall}
+					showPlus={showPlus}
+					missingText={missingText}
 				/>
 			</dd>
 		</div>

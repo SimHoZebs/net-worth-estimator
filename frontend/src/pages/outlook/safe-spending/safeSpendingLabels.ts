@@ -8,7 +8,6 @@ export const SAFE_SPENDING_LABELS = {
 	expectedPay: "Expected pay",
 	afterPaydayPay: "After card payoff",
 	paymentCovered: "Payments covered",
-	reserve: "Protected reserve",
 	cashChecks: "Cash checks",
 	protectedSummary: "Protected obligations",
 	cycleBudget: "Cycle budget",
@@ -17,4 +16,8 @@ export const SAFE_SPENDING_LABELS = {
 	afterSavingsGoal: "After savings goal",
 	additionalSavings: "Additional savings if you stop spending",
 	immediateCashCheck: "Immediate cash checkpoint",
+	unavailable: "Unavailable",
+	cashUnverified: "Cash unverified",
+	paycheckUnknown: "Paycheck unknown",
+	payoffUnverified: "Payoff unverified",
 } as const;

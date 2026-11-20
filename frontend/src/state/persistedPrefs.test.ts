@@ -152,7 +152,7 @@ afterEach(() => {
 describe("unified persisted prefs", () => {
 	it("reports a failed save and retries the latest settings", async () => {
 		server.putErrors.push(new Error("Offline"));
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 123 });
 		await vi.waitFor(() =>
 			expect(published).toContainEqual(
 				expect.objectContaining({
@@ -167,7 +167,9 @@ describe("unified persisted prefs", () => {
 		);
 		(options?.actionProps?.onClick as (() => void) | undefined)?.();
 		await vi.waitFor(() => expect(closed).toContain("safe-spending-settings"));
-		expect((server.puts.at(-1) as { reserve?: number }).reserve).toBe(123);
+		expect(
+			(server.puts.at(-1) as { savingsTarget?: number }).savingsTarget,
+		).toBe(123);
 	});
 
 	it("restores the saved goal before pairing it with a summary after a failed write", async () => {
@@ -191,21 +193,23 @@ describe("unified persisted prefs", () => {
 		);
 		expect(failure).toBeInstanceOf(ApiNetworkError);
 		expect((failure as Error).cause).toBe(transport);
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 999 });
-		expect(useSafeSpendingSettings.getState().reserve).toBe(
-			defaultSafeSpendingSettings().reserve,
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 999 });
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(
+			defaultSafeSpendingSettings().savingsTarget,
 		);
 		expect(server.puts).toHaveLength(0);
 	});
 
 	it("serializes rapid edits and stores them only in the backend", async () => {
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 456 });
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 123 });
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 456 });
 		await refreshSafeSpendingSettings();
 		expect(
-			server.puts.map((body) => (body as { reserve?: number }).reserve),
+			server.puts.map(
+				(body) => (body as { savingsTarget?: number }).savingsTarget,
+			),
 		).toEqual([123, 456]);
-		expect(useSafeSpendingSettings.getState().reserve).toBe(456);
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(456);
 	});
 	it("reads the stored plain-string preference and keeps corrupt data safe", async () => {
 		window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
@@ -252,16 +256,20 @@ describe("unified persisted prefs", () => {
 	});
 
 	it("sanitizes safe spending settings with clamping and drops unknown fields", () => {
-		expect(sanitizeSafeSpendingSettings({ reserve: -5 }).reserve).toBe(0);
-		expect(sanitizeSafeSpendingSettings({ reserve: 50 }).reserve).toBe(50);
-		expect(sanitizeSafeSpendingSettings(null).reserve).toBeGreaterThanOrEqual(
-			0,
-		);
+		expect(
+			sanitizeSafeSpendingSettings({ savingsTarget: -5 }).savingsTarget,
+		).toBe(0);
+		expect(
+			sanitizeSafeSpendingSettings({ savingsTarget: 50 }).savingsTarget,
+		).toBe(50);
+		expect(
+			sanitizeSafeSpendingSettings(null).savingsTarget,
+		).toBeGreaterThanOrEqual(0);
 		const state = sanitizeSafeSpendingSettings({
-			reserve: 100,
+			savingsTarget: 100,
 			mandatoryFrame: "cycle",
 		});
-		expect(state.reserve).toBe(100);
+		expect(state.savingsTarget).toBe(100);
 		expect(state).not.toHaveProperty("mandatoryFrame");
 	});
 });
@@ -269,7 +277,7 @@ describe("unified persisted prefs", () => {
 describe("financial preference owner isolation", () => {
 	it("keeps every financial amount, date, and selected resource ID isolated across users and sample data", async () => {
 		const settingsA = {
-			reserve: 12345,
+			savingsTarget: 12345,
 			accountIds: ["private-a-card"],
 			spendingAccountIds: ["private-a-cash"],
 			incomeScheduleIds: ["private-a-income", "private-a-partner"],
@@ -282,7 +290,7 @@ describe("financial preference owner isolation", () => {
 			defaultSafeSpendingSettings(),
 		);
 		const settingsB = {
-			reserve: 678,
+			savingsTarget: 678,
 			accountIds: ["private-b-card"],
 			spendingAccountIds: ["private-b-cash"],
 			incomeScheduleIds: [],
@@ -294,9 +302,10 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
-		useSafeSpendingSettings
-			.getState()
-			.updateSettings({ reserve: 42, incomeScheduleIds: ["sample-income"] });
+		useSafeSpendingSettings.getState().updateSettings({
+			savingsTarget: 42,
+			incomeScheduleIds: ["sample-income"],
+		});
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
@@ -304,39 +313,39 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsB);
 		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
-			reserve: 42,
+			savingsTarget: 42,
 			incomeScheduleIds: ["sample-income"],
 		});
 	});
 
 	it("resets synchronously during verification and rejects stale actions without overwriting saved preferences", async () => {
 		const oldAction = useSafeSpendingSettings.getState().updateSettings;
-		oldAction({ reserve: 123, incomeScheduleIds: ["private-a-income"] });
+		oldAction({ savingsTarget: 123, incomeScheduleIds: ["private-a-income"] });
 		await refreshSafeSpendingSettings();
 		suspendUserScope();
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
-		oldAction({ reserve: 999, accountIds: ["stale-a-card"] });
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 555 });
+		oldAction({ savingsTarget: 999, accountIds: ["stale-a-card"] });
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 555 });
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
 		await verifyOwner(B);
-		oldAction({ reserve: 999, incomeScheduleIds: ["stale-a-income"] });
+		oldAction({ savingsTarget: 999, incomeScheduleIds: ["stale-a-income"] });
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
-			reserve: 123,
+			savingsTarget: 123,
 			incomeScheduleIds: ["private-a-income"],
 		});
 	});
 
 	it("isolates the sample and API origins without changing global display preferences", async () => {
 		setThemePreference("dark");
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 100 });
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 100 });
 		await refreshSafeSpendingSettings();
 		const foreign = acceptOwner(A, "https://different-api.example");
 		// A foreign API origin cannot reach the network: the scope boundary
@@ -344,19 +353,20 @@ describe("financial preference owner isolation", () => {
 		await expect(hydrateFinancialPreferences(foreign)).rejects.toThrow(
 			/The API address does not match/,
 		);
-		expect(useSafeSpendingSettings.getState().reserve).toBe(
-			defaultSafeSpendingSettings().reserve,
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(
+			defaultSafeSpendingSettings().savingsTarget,
 		);
 		await verifyOwner(GUEST_USER_ID);
-		useSafeSpendingSettings
-			.getState()
-			.updateSettings({ reserve: 200, incomeScheduleIds: ["sample-income"] });
+		useSafeSpendingSettings.getState().updateSettings({
+			savingsTarget: 200,
+			incomeScheduleIds: ["sample-income"],
+		});
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
-		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(100);
 		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
-			reserve: 200,
+			savingsTarget: 200,
 			incomeScheduleIds: ["sample-income"],
 		});
 		suspendUserScope();
@@ -375,18 +385,19 @@ describe("financial preference owner isolation", () => {
 			},
 		});
 		await verifyOwner(A);
-		useSafeSpendingSettings
-			.getState()
-			.updateSettings({ reserve: 111, transactionIds: ["private-a-bill"] });
+		useSafeSpendingSettings.getState().updateSettings({
+			savingsTarget: 111,
+			transactionIds: ["private-a-bill"],
+		});
 		await refreshSafeSpendingSettings();
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
-		useSafeSpendingSettings.getState().updateSettings({ reserve: 222 });
+		useSafeSpendingSettings.getState().updateSettings({ savingsTarget: 222 });
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
-			reserve: 111,
+			savingsTarget: 111,
 			transactionIds: ["private-a-bill"],
 		});
 	});

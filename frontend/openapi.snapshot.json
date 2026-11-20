@@ -4558,11 +4558,6 @@
 						"minimum": 1,
 						"type": "integer"
 					},
-					"reserve": {
-						"format": "double",
-						"minimum": 0,
-						"type": "number"
-					},
 					"savingsTarget": {
 						"default": 0,
 						"format": "double",
@@ -4583,7 +4578,6 @@
 					}
 				},
 				"required": [
-					"reserve",
 					"accountIds",
 					"spendingAccountIds",
 					"incomeScheduleIds",
@@ -4674,11 +4668,6 @@
 						"minimum": 1,
 						"type": "integer"
 					},
-					"reserve": {
-						"format": "double",
-						"minimum": 0,
-						"type": "number"
-					},
 					"savingsTarget": {
 						"default": 0,
 						"format": "double",
@@ -4699,7 +4688,6 @@
 					}
 				},
 				"required": [
-					"reserve",
 					"accountIds",
 					"spendingAccountIds",
 					"incomeScheduleIds",
@@ -4777,6 +4765,10 @@
 						},
 						"type": ["array", "null"]
 					},
+					"cycleFundingPayday": {
+						"description": "Paycheck funding the active spending cycle; Payday stays the actual next income",
+						"type": ["string", "null"]
+					},
 					"cycleReset": {
 						"type": "string"
 					},
@@ -4789,7 +4781,7 @@
 						"type": ["number", "null"]
 					},
 					"forecastCashRoom": {
-						"description": "Lowest projected cash balance before applying the optional reserve; signed",
+						"description": "Lowest projected cash balance; signed",
 						"format": "double",
 						"type": ["number", "null"]
 					},
@@ -4859,10 +4851,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"reserve": {
-						"format": "double",
-						"type": "number"
-					},
 					"revision": {
 						"type": "string"
 					},
@@ -4913,12 +4901,12 @@
 					"confirmedMovements",
 					"bills",
 					"payday",
+					"cycleFundingPayday",
 					"payoffDate",
 					"expectedPay",
 					"prePaydayBills",
 					"paydayBills",
 					"statementReserve",
-					"reserve",
 					"prePaydayRoom",
 					"postIncomeRoom",
 					"postPaydayBalance",

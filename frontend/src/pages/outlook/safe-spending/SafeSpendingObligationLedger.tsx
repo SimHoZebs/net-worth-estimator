@@ -38,7 +38,7 @@ export function ObligationRows({
 							)}
 						</div>
 						<span className="shrink-0 tabular-nums">
-							{amountText(row.amount)}
+							{amountText(row.amount, labels.unavailable)}
 						</span>
 					</li>
 				);
@@ -66,7 +66,7 @@ export function SafeSpendingObligationLedger({
 							{section.title}
 						</h4>
 						<strong className="text-sm tabular-nums">
-							{amountText(section.total)}
+							{amountText(section.total, labels.unavailable)}
 						</strong>
 					</div>
 					{section.rows.length === 0 ? (

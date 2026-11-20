@@ -144,7 +144,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if _, err := s.SetPinnedEvaluations([]string{eval.InstanceID}); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.SetSafeSpendingSettings(types.SafeSpendingSettings{Reserve: 12}); err != nil {
+		if err := s.SetSafeSpendingSettings(types.SafeSpendingSettings{SavingsTarget: 12}); err != nil {
 			t.Fatal(err)
 		}
 		if err := s.SetLastSyncTime("before"); err != nil {
@@ -206,7 +206,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { p := preset; p.Label = "A only"; _, err := a.UpdateAmountPreset(p); return err },
 		func() error { return a.MoveAmountPreset(preset.ID, "") },
 		func() error { _, err := a.SetPinnedEvaluations([]string{"second-evaluation"}); return err },
-		func() error { return a.SetSafeSpendingSettings(types.SafeSpendingSettings{Reserve: 99}) },
+		func() error { return a.SetSafeSpendingSettings(types.SafeSpendingSettings{SavingsTarget: 99}) },
 		func() error {
 			_, err := a.SaveAccountLink(AccountLink{BridgeAccountID: "same-bridge", ModelAccountID: "checking", BridgeName: "A only"})
 			return err

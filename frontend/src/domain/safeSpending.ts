@@ -15,7 +15,6 @@ import { inWindow, occurrenceKey } from "./safeSpendingMath.ts";
 // Only the windows stay client-side; do not add new windowed sums here.
 
 export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
-export const DEFAULT_PROTECTED_RESERVE = 725;
 
 /** Last calendar day of the month containing `todayIso`. */
 export function monthEndIso(todayIso: string): string {

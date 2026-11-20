@@ -10,14 +10,6 @@ import {
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { SafeSpendingPayday } from "./SafeSpendingPayday.tsx";
 
-function missingBudgetEvidence(summary: SafeSpendingSummary): string | null {
-	if (summary.fundingRoom != null) return null;
-	if (summary.checkingAvailable == null) return "Available cash unverified";
-	if (summary.expectedPay == null) return "Next paycheck unknown";
-	if (summary.statementReserve == null) return "Next card payoff unverified";
-	return "Upcoming payments unverified";
-}
-
 export function SafeSpendingBudget({
 	summary,
 	savingsTarget,
@@ -33,12 +25,13 @@ export function SafeSpendingBudget({
 		nextCycleIncome,
 		nextCycleCarryover,
 		forecastCashRoom,
-		payday,
+		cycleFundingPayday,
 	} = summary;
 	const reset = budgetDate(cycleReset);
 	const nextEnd = budgetDate(nextCycleEnd);
-	const fundingPaycheck = budgetDate(payday);
-	const missingEvidence = missingBudgetEvidence(summary);
+	const fundingPaycheck = budgetDate(cycleFundingPayday);
+	const missingIncome =
+		cycleFundingPayday == null ? "No funding paycheck" : undefined;
 	const showComposition =
 		firstBudgetShare(nextCycleIncome, nextCycleCarryover) !== null;
 	return (
@@ -48,7 +41,9 @@ export function SafeSpendingBudget({
 					<h3 className="m-0 text-sm font-semibold">{labels.cycleBudget}</h3>
 					{fundingPaycheck && (
 						<p className="m-0 text-xs text-muted-foreground">
-							<time dateTime={payday ?? undefined}>{fundingPaycheck}</time>{" "}
+							<time dateTime={cycleFundingPayday ?? undefined}>
+								{fundingPaycheck}
+							</time>{" "}
 							paycheck
 						</p>
 					)}
@@ -63,34 +58,43 @@ export function SafeSpendingBudget({
 						· <time dateTime={cycleReset}>{reset}</time>
 					</p>
 				)}
-				{missingEvidence && (
-					<p className="m-0 text-xs text-muted-foreground">{missingEvidence}</p>
-				)}
 				<dl className="m-0 grid gap-2 text-sm">
 					<BudgetMetric
 						primary
 						label={labels.withCashCushion}
 						value={summary.fundingRoom}
 						testId="with-cash-cushion"
+						missingText={
+							summary.checkingAvailable == null
+								? "Cash balance missing"
+								: missingIncome
+						}
+						describeShortfall={(amount) => `Over by ${amount}`}
 					/>
 					<BudgetMetric
 						primary
 						label={labels.withoutCashCushion}
 						value={summary.incomeFunded}
 						testId="income-funded"
+						missingText={missingIncome}
+						showPlus
 						describeShortfall={(amount) => `Over by ${amount}`}
 					/>
 					<BudgetMetric
 						primary
-						label={`${labels.afterSavingsGoal} (${amountText(savingsTarget)} goal)`}
+						label={`${labels.afterSavingsGoal} (${amountText(savingsTarget, labels.unavailable)} goal)`}
 						value={summary.savingsAllowance}
 						testId="savings-allowance"
-						describeShortfall={(amount) => `Short of goal by ${amount}`}
+						missingText={missingIncome}
+						showPlus
+						describeShortfall={(amount) => `Short by ${amount}`}
 					/>
 					<BudgetMetric
 						label={labels.additionalSavings}
 						value={summary.additionalSavings}
 						testId="additional-savings"
+						missingText={missingIncome}
+						showPlus
 						describeShortfall={(amount) => `Uses ${amount} from your cushion`}
 					/>
 				</dl>
@@ -121,11 +125,13 @@ export function SafeSpendingBudget({
 					<BudgetAmount
 						value={nextCycleDiscretionary}
 						testId="discretionary-next-cycle"
+						describeShortfall={(amount) => `Over by ${amount}`}
 					/>
 				</p>
 				{forecastCashRoom != null && forecastCashRoom < 0 && (
 					<p className="m-0 text-xs font-medium text-danger-text">
-						Short by {amountText(-forecastCashRoom)} before a scheduled payment
+						Short by {amountText(-forecastCashRoom, labels.unavailable)} before
+						a scheduled payment
 					</p>
 				)}
 				<BudgetSplit
@@ -138,12 +144,14 @@ export function SafeSpendingBudget({
 						label="From income"
 						value={nextCycleIncome}
 						testId="next-cycle-income"
+						describeShortfall={(amount) => `Over by ${amount}`}
 						segment={showComposition ? "first" : undefined}
 					/>
 					<BudgetMetric
 						label="Cash carried forward"
 						value={nextCycleCarryover}
 						testId="next-cycle-carryover"
+						describeShortfall={(amount) => `Over by ${amount}`}
 						segment={showComposition ? "second" : undefined}
 					/>
 				</dl>

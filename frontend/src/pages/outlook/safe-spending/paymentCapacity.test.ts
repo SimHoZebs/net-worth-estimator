@@ -13,8 +13,7 @@ const summary = (
 		paydayBills: 0,
 		statementReserve: null,
 		cardPayoffCapacity: 610.03,
-		reserve: 725,
-		prePaydayRoom: -514.97,
+		prePaydayRoom: 210.03,
 		postIncomeRoom: null,
 		postPaydayBalance: null,
 		paymentRoom: null,
@@ -34,11 +33,11 @@ describe("payment capacity fallback", () => {
 		expect(capacityText(fallback!)).toBe("$50.00 short before cards");
 	});
 
-	it("leads with a definite pre-payday gap over a positive capacity", () => {
+	it("leads with the definite pre-payday gap over a positive capacity", () => {
 		const fallback = paymentCapacity(
-			summary({ cardPayoffCapacity: 200, prePaydayRoom: -150, reserve: 100 }),
+			summary({ cardPayoffCapacity: 200, prePaydayRoom: -150 }),
 		);
-		expect(fallback).toEqual({ magnitude: 50, short: true });
+		expect(fallback).toEqual({ magnitude: 150, short: true });
 	});
 
 	it("never replaces a known payment room", () => {

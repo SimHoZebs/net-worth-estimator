@@ -266,10 +266,9 @@
     {
       "kind": "settings",
       "settings": {
-        "reserve": 725,
         "cycleStartDay": 20,
         "paydayDay": 30,
-        "savingsTarget": 0,
+        "savingsTarget": 725,
         "accountIds": null,
         "spendingAccountIds": null,
         "incomeScheduleIds": [

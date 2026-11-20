@@ -9,7 +9,6 @@ import (
 
 func TestPendingClaimWithDifferentRouteDoesNotEraseCashBill(t *testing.T) {
 	model, settings := paydayFixture()
-	settings.Reserve = 0
 	model.Accounts = append(model.Accounts, types.Account{ID: "other-checking", Kind: types.AccountKindCash, Enabled: true})
 	before := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, before.SafeToSpend, 400)
@@ -31,7 +30,6 @@ func TestPendingClaimWithDifferentRouteDoesNotEraseCashBill(t *testing.T) {
 
 func TestUnclaimedCoveredHoldOnlyWarnsAboutPossibleOverlap(t *testing.T) {
 	model, settings := paydayFixture()
-	settings.Reserve = 0
 	model.Checkpoints[0].Balance = 1150
 	model.Checkpoints[0].AvailableBalance = ptr(900.0)
 	hold := payment("unclaimed-hold", 250, "2026-11-14T12:00:00Z")
@@ -48,7 +46,6 @@ func TestUnclaimedCoveredHoldOnlyWarnsAboutPossibleOverlap(t *testing.T) {
 
 func TestPartiallyCoveredPendingBillReservesRemainingEstimate(t *testing.T) {
 	model, settings := paydayFixture()
-	settings.Reserve = 0
 	model.Checkpoints[0].Balance = 950
 	model.Checkpoints[0].AvailableBalance = ptr(900.0)
 	hold := payment("partial-hold", 50, "2026-11-14T12:00:00Z")

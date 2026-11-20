@@ -8,7 +8,6 @@ import {
 	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
-import { DEFAULT_PROTECTED_RESERVE } from "@/domain/safeSpending.ts";
 import {
 	resolveEffectiveIds,
 	toggleEffectiveId,
@@ -55,16 +54,6 @@ const settingsFields = {
 			typeof value === "number" && Number.isFinite(value)
 				? Math.max(0, value)
 				: 0,
-	},
-	reserve: {
-		default: DEFAULT_PROTECTED_RESERVE,
-		read: (value: unknown) =>
-			Math.max(
-				0,
-				Number.isFinite(Number(value))
-					? Number(value)
-					: DEFAULT_PROTECTED_RESERVE,
-			),
 	},
 	accountIds: {
 		default: null as string[] | null,

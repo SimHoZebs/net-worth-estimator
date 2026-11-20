@@ -121,7 +121,6 @@ async function seedEvidence(api: APIRequestContext) {
 	expect(observations.ok(), await observations.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
-			reserve: 200,
 			accountIds: ["loan"],
 			spendingAccountIds: ["evidence-checking"],
 			incomeScheduleIds: ["evidence-salary"],
@@ -214,7 +213,6 @@ async function seedSameDayObservation(
 	expect(observations.ok(), await observations.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
-			reserve: 200,
 			accountIds: [],
 			spendingAccountIds: ["evidence-checking"],
 			incomeScheduleIds: ["evidence-salary"],
@@ -304,7 +302,6 @@ async function seedCashLabelledCard(api: APIRequestContext, payday: string) {
 	expect(observations.ok(), await observations.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
-			reserve: 200,
 			accountIds: ["evidence-synced-card"],
 			spendingAccountIds: ["evidence-checking"],
 			incomeScheduleIds: ["evidence-salary"],
@@ -406,7 +403,6 @@ async function seedConfirmedBill(
 	expect(observations.ok(), await observations.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
-			reserve: 200,
 			accountIds: [],
 			spendingAccountIds: ["evidence-checking"],
 			incomeScheduleIds: ["evidence-salary"],
@@ -508,7 +504,6 @@ async function seedFallbackNumeric(
 	expect(observations.ok(), await observations.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
-			reserve: 200,
 			accountIds: ["evidence-unknown-card"],
 			paydayDay: Number(payday.slice(-2)),
 			spendingAccountIds: ["evidence-checking"],
@@ -575,7 +570,6 @@ test("the dated allowance and protected obligations come from the server", async
 		expect(summary).toMatchObject({
 			payday: PAYDAY,
 			expectedPay: 400,
-			reserve: 200,
 			checkingAvailable: 1244.43,
 			selectedAccountIds: ["evidence-checking"],
 		});
@@ -648,14 +642,15 @@ test("an unclaimed same-day bill stays expected and keeps a numeric allowance", 
 		expect(summary).toMatchObject({
 			cashAsOf: today,
 			payday,
+			cycleFundingPayday: payday,
 			status: "available",
 			checkingAvailable: 1244.43,
-			reserve: 200,
 			expectedPay: 400,
+			incomeFunded: -311.12,
 			prePaydayBills: 711.12,
-			prePaydayRoom: 333.31,
-			postIncomeRoom: 733.31,
-			safeToSpend: 333.31,
+			prePaydayRoom: 533.31,
+			postIncomeRoom: 933.31,
+			safeToSpend: 533.31,
 		});
 		expect(summary.reasons).not.toContain("scheduled-payment-status-unknown");
 		const bill = summary.bills.find(
@@ -672,19 +667,24 @@ test("an unclaimed same-day bill stays expected and keeps a numeric allowance", 
 		await page.route("**/v1/safe-spending-summary", async (route) => {
 			const url = new URL(route.request().url());
 			url.searchParams.set("asOf", today);
-			await route.continue({ url: url.toString() });
+			await route.fulfill({
+				response: await route.fetch({ url: url.toString() }),
+			});
 		});
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		// The cycle budget spends the Nov 30 paycheck, not only today's cash.
+		// The cycle budget is captioned by its funding paycheck, not today's cash.
 		await expect(card.getByText("Nov 30 paycheck")).toBeVisible();
-		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText(
+			"Unavailable",
+		);
 		await expect(card.getByTestId("with-cash-cushion")).toHaveText("$933.31");
-		await expect(card.getByTestId("income-funded")).toHaveText("+$400.00");
+		await expect(card.getByTestId("income-funded")).toHaveText(
+			"Over by $311.12",
+		);
 		await expect(
 			card.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
-		await expect(card.getByTestId("reserve-gap")).toHaveCount(0);
 		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
 		await expect(card.getByText(/already be included/)).toHaveCount(0);
 		await expect(
@@ -695,7 +695,7 @@ test("an unclaimed same-day bill stays expected and keeps a numeric allowance", 
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await expect(drawer.getByText("Synthetic same-day bill")).toBeVisible();
 		await expect(drawer.getByText("Immediate cash checkpoint")).toBeVisible();
-		await expect(drawer.getByTestId("safe-to-spend")).toHaveText("$333.31");
+		await expect(drawer.getByTestId("safe-to-spend")).toHaveText("$533.31");
 	} finally {
 		await api.dispose();
 	}
@@ -742,9 +742,7 @@ test("changing included bills refreshes the dated allowance without reloading", 
 	}
 });
 
-test("uncertain evidence withholds the allowance but keeps obligations visible", async ({
-	page,
-}) => {
+test("no cash balance leaves the bill ledger visible", async ({ page }) => {
 	const api = await request.newContext();
 	try {
 		await seedEvidence(api);
@@ -772,8 +770,12 @@ test("uncertain evidence withholds the allowance but keeps obligations visible",
 		});
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("with-cash-cushion")).toHaveText("—");
-		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).toHaveText(
+			"Cash balance missing",
+		);
+		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
+			"Unavailable",
+		);
 		await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
 		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
 		await expect(
@@ -845,7 +847,9 @@ test("a linked transaction confirms its bill and keeps a numeric allowance", asy
 		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText(
+			"Unavailable",
+		);
 		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
@@ -877,7 +881,9 @@ test("shows a missing future checkpoint when statement amounts are unknown", asy
 		const card = page.getByRole("region", { name: "Safe spending" });
 		// Unknown card payoffs withhold the cycle budget rather than showing a
 		// clamped zero; the known before-payday cash check stays in the drawer.
-		await expect(card.getByTestId("with-cash-cushion")).toHaveText("—");
+		await expect(card.getByTestId("with-cash-cushion")).toHaveText(
+			"Unavailable",
+		);
 		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
@@ -886,7 +892,7 @@ test("shows a missing future checkpoint when statement amounts are unknown", asy
 		await expect(
 			drawer.getByText("Before payday", { exact: true }),
 		).toBeVisible();
-		await expect(drawer.getByText("$600.00")).toBeVisible();
+		await expect(drawer.getByText("$800.00")).toBeVisible();
 	} finally {
 		await api.dispose();
 	}
@@ -915,9 +921,13 @@ test("an unknown next-cycle component stays unknown without hiding the known com
 		});
 		await page.goto("/outlook");
 		const card = page.getByRole("region", { name: "Safe spending" });
-		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText("—");
+		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
+			"Unavailable",
+		);
 		await expect(card.getByTestId("next-cycle-income")).toHaveText("$350.00");
-		await expect(card.getByTestId("next-cycle-carryover")).toHaveText("—");
+		await expect(card.getByTestId("next-cycle-carryover")).toHaveText(
+			"Unavailable",
+		);
 		await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
 	} finally {
 		await api.dispose();

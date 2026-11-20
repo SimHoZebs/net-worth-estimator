@@ -2,7 +2,7 @@
   "pack": "safe-spending",
   "version": 2,
   "concern": "Safe card spending thresholds and pace projection in one household.",
-  "breaksIfMishandled": "Dropping the income selection, card charges, or reserve hides the threshold dividers and pace projection.",
+  "breaksIfMishandled": "Dropping the income selection, card charges, or savings goal hides the threshold dividers and pace projection.",
   "seeds": [
     {
       "kind": "model",
@@ -336,10 +336,9 @@
     {
       "kind": "settings",
       "settings": {
-        "reserve": 725,
         "cycleStartDay": 20,
         "paydayDay": 30,
-        "savingsTarget": 0,
+        "savingsTarget": 725,
         "accountIds": null,
         "spendingAccountIds": null,
         "incomeScheduleIds": [

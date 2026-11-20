@@ -48,8 +48,9 @@ describe("safe spending cash evidence", () => {
 				checkingAvailable: null,
 			}),
 		);
-		expect(html).toContain('data-testid="cash-on-hand">—');
+		expect(html).toContain('data-testid="cash-on-hand">Cash unverified');
 		expect(html).not.toContain("posted-hold-coverage-unknown");
+		expect(html).not.toContain("—");
 	});
 
 	it("keeps a known baseline visible in the missing state", () => {
@@ -70,6 +71,13 @@ describe("safe spending cash evidence", () => {
 		);
 		expect(html).toContain("Synthetic checking · posted balance");
 		expect(html).toContain("$500.00");
+		expect(html).not.toContain("—");
+	});
+
+	it("renders a proven zero cash balance as $0.00", () => {
+		expect(render(evidence({ checkingAvailable: 0 }))).toContain(
+			'data-testid="cash-on-hand">$0.00',
+		);
 	});
 
 	it("renders a pending slot and a retry when the read fails", () => {

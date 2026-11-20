@@ -27,7 +27,7 @@ func TestSafeSpendingSettingsPersistAndClear(t *testing.T) {
 		t.Fatalf("defaults = %+v, %v", defaults, err)
 	}
 	settings := types.SafeSpendingSettings{
-		Reserve: 725.25, CycleStartDay: 18, PaydayDay: 31, SavingsTarget: 345.67,
+		CycleStartDay: 18, PaydayDay: 31, SavingsTarget: 345.67,
 		AccountIDs: []string{"card"}, IncomeScheduleIDs: []string{},
 	}
 	if err := database.SetSafeSpendingSettings(settings); err != nil {
@@ -65,7 +65,7 @@ func TestSafeSpendingSettingsPersistAndClear(t *testing.T) {
 func TestSafeSpendingSettingsRequiresCurrentStoredDocument(t *testing.T) {
 	for _, raw := range []string{
 		`null`,
-		`{"reserve":100}`,
+		`{"reserve":100}`, // a retired reserve-only document has no runtime fallback
 		`{"cycleStartDay":20,"paydayDay":30}`,
 		`{"cycleStartDay":20,"paydayDay":30,"savingsTarget":null}`,
 	} {

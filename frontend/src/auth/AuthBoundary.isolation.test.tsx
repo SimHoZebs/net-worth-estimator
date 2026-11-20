@@ -112,7 +112,7 @@ function FinancialPreferencesProbe() {
 	const settings = useSafeSpendingSettings();
 	return (
 		<p data-testid="financial-preferences">
-			{settings.reserve}:{settings.incomeScheduleIds.join(",")}
+			{settings.savingsTarget}:{settings.incomeScheduleIds.join(",")}
 		</p>
 	);
 }
@@ -181,14 +181,14 @@ describe("authentication resource isolation", () => {
 		// The workspace is already interactive with defaults; the owner's
 		// stored preferences arrive without gating the shell.
 		expect(screen.getByTestId("financial-preferences").textContent).toBe(
-			`${defaultSafeSpendingSettings().reserve}:`,
+			`${defaultSafeSpendingSettings().savingsTarget}:`,
 		);
 		await act(async () =>
 			finish(
 				response({
 					settings: {
 						...defaultSafeSpendingSettings(),
-						reserve: 123,
+						savingsTarget: 123,
 						incomeScheduleIds: ["private-a-income"],
 					},
 				}),
@@ -213,7 +213,7 @@ describe("authentication resource isolation", () => {
 		await screen.findByTestId("financial-preferences");
 		act(() => {
 			safeSpendingSettingsObserver.getState().updateSettings({
-				reserve: 123456,
+				savingsTarget: 123456,
 				incomeScheduleIds: ["private-a-income"],
 			});
 		});
@@ -260,12 +260,12 @@ describe("authentication resource isolation", () => {
 		);
 		await act(async () => finish(response(session(B), B)));
 		await waitFor(() => expect(getUserScope().resource?.id).toBe(B));
-		expect(safeSpendingSettingsObserver.getState().reserve).toBe(
-			defaultSafeSpendingSettings().reserve,
+		expect(safeSpendingSettingsObserver.getState().savingsTarget).toBe(
+			defaultSafeSpendingSettings().savingsTarget,
 		);
 		await waitFor(() =>
 			expect(screen.getByTestId("financial-preferences").textContent).toBe(
-				`${defaultSafeSpendingSettings().reserve}:`,
+				`${defaultSafeSpendingSettings().savingsTarget}:`,
 			),
 		);
 	});

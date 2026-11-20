@@ -598,7 +598,6 @@ export type StochasticSSEData =
 	| ResultSSEData
 	| ErrorSSEData;
 export interface SafeSpendingSettings {
-	reserve: number;
 	cycleStartDay: number;
 	paydayDay: number;
 	savingsTarget: number;

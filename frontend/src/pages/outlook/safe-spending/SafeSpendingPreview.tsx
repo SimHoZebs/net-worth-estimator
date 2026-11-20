@@ -28,6 +28,7 @@ import { SafeSpendingBudget } from "./SafeSpendingBudget.tsx";
 import { buildAllowanceLedger } from "./allowanceLedger.ts";
 import { capacityText, paymentCapacity } from "./paymentCapacity.ts";
 import { amountText } from "./amountText.ts";
+import { BudgetAmount } from "./budgetDisplay.tsx";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
 
 function SafeSpendingCardHeader({ action }: { action?: React.ReactNode }) {
@@ -146,8 +147,9 @@ export function SafeSpendingPreview({
 								className="justify-start gap-1 p-0 text-sm"
 								onClick={() => onDetail("ledger")}
 							>
-								{labels.protectedSummary} · {amountText(ledger.protectedTotal)}{" "}
-								· {ledger.obligationCount}{" "}
+								{labels.protectedSummary} ·{" "}
+								{amountText(ledger.protectedTotal, labels.unavailable)} ·{" "}
+								{ledger.obligationCount}{" "}
 								{ledger.obligationCount === 1 ? "item" : "items"}
 								<ChevronRight size={14} aria-hidden="true" />
 							</Button>
@@ -178,7 +180,11 @@ export function SafeSpendingPreview({
 											{labels.beforePayday}
 										</dt>
 										<dd className="m-0 tabular-nums">
-											{amountText(ledger.allowance.prePaydayRoom)}
+											<BudgetAmount
+												value={ledger.allowance.prePaydayRoom}
+												missingText={labels.cashUnverified}
+												describeShortfall={(amount) => `Short by ${amount}`}
+											/>
 										</dd>
 									</div>
 									<div className="flex justify-between gap-3">
@@ -186,7 +192,11 @@ export function SafeSpendingPreview({
 											{labels.afterPaydayPay}
 										</dt>
 										<dd className="m-0 tabular-nums">
-											{amountText(ledger.allowance.postIncomeRoom)}
+											<BudgetAmount
+												value={ledger.allowance.postIncomeRoom}
+												missingText={labels.cashUnverified}
+												describeShortfall={(amount) => `Short by ${amount}`}
+											/>
 										</dd>
 									</div>
 									<div className="flex justify-between gap-3">
@@ -194,9 +204,15 @@ export function SafeSpendingPreview({
 											{capacity ? "Payment capacity" : labels.paymentCovered}
 										</dt>
 										<dd className="m-0 tabular-nums">
-											{capacity
-												? capacityText(capacity)
-												: amountText(ledger.allowance.paymentRoom)}
+											{capacity ? (
+												capacityText(capacity)
+											) : (
+												<BudgetAmount
+													value={ledger.allowance.paymentRoom}
+													missingText={labels.unavailable}
+													describeShortfall={(amount) => `Short by ${amount}`}
+												/>
+											)}
 										</dd>
 									</div>
 									<div className="flex justify-between gap-3">
@@ -204,9 +220,12 @@ export function SafeSpendingPreview({
 											{labels.immediateCashCheck}
 										</dt>
 										<dd className="m-0 tabular-nums">
-											<span data-testid="safe-to-spend">
-												{amountText(summary.data?.safeToSpend)}
-											</span>
+											<BudgetAmount
+												value={summary.data?.safeToSpend}
+												testId="safe-to-spend"
+												missingText={labels.cashUnverified}
+												describeShortfall={(amount) => `Short by ${amount}`}
+											/>
 										</dd>
 									</div>
 									<div className="flex justify-between gap-3">
@@ -214,13 +233,10 @@ export function SafeSpendingPreview({
 											{labels.expectedPay}
 										</dt>
 										<dd className="m-0 tabular-nums">
-											{amountText(ledger.allowance.expectedPay)}
-										</dd>
-									</div>
-									<div className="flex justify-between gap-3">
-										<dt className="text-muted-foreground">{labels.reserve}</dt>
-										<dd className="m-0 tabular-nums">
-											{amountText(ledger.allowance.reserve)}
+											<BudgetAmount
+												value={ledger.allowance.expectedPay}
+												missingText={labels.paycheckUnknown}
+											/>
 										</dd>
 									</div>
 								</dl>
@@ -237,7 +253,6 @@ export function SafeSpendingPreview({
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel
 							config={{
-								reserve: settings.reserve,
 								cycleStartDay: settings.cycleStartDay,
 								paydayDay: settings.paydayDay,
 								savingsTarget: settings.savingsTarget,

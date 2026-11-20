@@ -26,7 +26,7 @@ func TestSafeSpendingSettingsHTTP(t *testing.T) {
 	if settings := readSettings(empty.Code, empty.Body.Bytes()); settings != nil {
 		t.Fatalf("GET returned unsaved settings: %+v", settings)
 	}
-	const base = `{"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeScheduleIds":[],"transactionIds":["rent"]`
+	const base = `{"accountIds":["card"],"spendingAccountIds":null,"incomeScheduleIds":[],"transactionIds":["rent"]`
 	defaulted := doRowRequest(t, handler, http.MethodPut, path, base+`}`)
 	if settings := readSettings(defaulted.Code, defaulted.Body.Bytes()); settings == nil ||
 		settings.CycleStartDay != 20 || settings.PaydayDay != 30 || settings.SavingsTarget != 0 {
@@ -42,7 +42,7 @@ func TestSafeSpendingSettingsHTTP(t *testing.T) {
 		payload string
 		status  int
 	}{
-		{`{"reserve":-1,"incomeScheduleIds":[]}`, 422},
+		{`{"reserve":-1,"incomeScheduleIds":[]}`, 422}, // retired setting is not writable
 		{base + `,"cycleStartDay":0}`, 422},
 		{base + `,"cycleStartDay":32}`, 422},
 		{base + `,"paydayDay":0}`, 422},

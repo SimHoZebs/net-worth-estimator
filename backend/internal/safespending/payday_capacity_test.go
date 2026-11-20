@@ -5,10 +5,10 @@ import "testing"
 func TestPaymentRoomIsTighterCashCheckWithoutReserve(t *testing.T) {
 	model, settings := paydayFixture()
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	assertMoney(t, summary.PrePaydayRoom, 450)
-	assertMoney(t, summary.PostIncomeRoom, 200)
+	assertMoney(t, summary.PrePaydayRoom, 650)
+	assertMoney(t, summary.PostIncomeRoom, 400)
 	assertMoney(t, summary.PaymentRoom, 400) // min(900-250, 900+400-250-0-650)
-	assertMoney(t, summary.SafeToSpend, 200)
+	assertMoney(t, summary.SafeToSpend, 400)
 }
 
 // CardPayoffCapacity is the local fallback for payment capacity. It uses the
@@ -52,7 +52,7 @@ func TestCardPayoffCapacityIndependentOfUnknownCardPayoffs(t *testing.T) {
 		t.Fatalf("unknown card payoff still produced a statement check %+v", summary)
 	}
 	assertMoney(t, summary.CardPayoffCapacity, 1050)
-	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 
 	// A definite pre-payday shortfall stays visible even if the exact
 	// payment room is unknown.
@@ -64,11 +64,10 @@ func TestCardPayoffCapacityIndependentOfUnknownCardPayoffs(t *testing.T) {
 	if summary.PaymentRoom != nil {
 		t.Fatalf("unknown card payoff still produced a payment room %+v", summary.PaymentRoom)
 	}
-	assertMoney(t, summary.PrePaydayRoom, -950) // 900 - 200 - 1650
+	assertMoney(t, summary.PrePaydayRoom, -750) // 900 - 1650
 	assertMoney(t, summary.CardPayoffCapacity, -350)
-	prePaydayNoReserve := *summary.PrePaydayRoom + summary.Reserve
-	if prePaydayNoReserve != *summary.CheckingAvailable-*summary.PrePaydayBills || prePaydayNoReserve >= 0 {
-		t.Fatalf("definite pre-payday cash shortfall lost: %.2f", prePaydayNoReserve)
+	if *summary.PrePaydayRoom != *summary.CheckingAvailable-*summary.PrePaydayBills || *summary.PrePaydayRoom >= 0 {
+		t.Fatalf("definite pre-payday cash shortfall lost: %.2f", *summary.PrePaydayRoom)
 	}
 }
 
@@ -78,7 +77,7 @@ func TestPaymentRoomFollowsPaydayBillsAndKeepsSignedShortfall(t *testing.T) {
 	settings.TransactionIDs = []string{"rent", "payday-bill"}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, summary.PaymentRoom, 300) // min(650, 900+400-250-100-650)
-	assertMoney(t, summary.SafeToSpend, 100)
+	assertMoney(t, summary.SafeToSpend, 300)
 
 	model, settings = paydayFixture()
 	for i := range model.Checkpoints {
@@ -102,7 +101,7 @@ func TestPaymentRoomUnknownWhenCardPayoffUnknown(t *testing.T) {
 	if summary.PaymentRoom != nil {
 		t.Fatalf("unknown card payoff produced a precise payment check %+v", summary.PaymentRoom)
 	}
-	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 }
 
 func TestPaymentRoomNeedsExpectedIncome(t *testing.T) {

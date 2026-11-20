@@ -339,16 +339,22 @@ func TestEarlierOutgoingHoldNeedsBankAvailableToKnowCash(t *testing.T) {
 			assertMoney(t, s.OutstandingBillsTotal, 1461.01)
 			assertMoney(t, s.CashAfterBills, -216.58)
 
+			// A posted-only checkpoint has no available figure to embed the
+			// hold, so the replayed posted total stays the numeric cash basis.
+			// The pending hold is not a posted movement and is not deducted
+			// twice; the dated bills carry the timing check once.
 			m.Checkpoints[0].AvailableBalance = nil
 			s = Build(m, nil, "2026-11-15", testEnd)
-			if s.Status != "uncertain" || s.CheckingAvailable != nil || s.CashAfterBills != nil || len(s.Bills) != 3 || len(s.ConfirmedMovements) != 0 {
-				t.Fatalf("posted-only checkpoint presented uncertain cash as exact or deducted hold %+v", s)
+			if s.Status != "available" || len(s.Reasons) != 0 || len(s.Bills) != 3 || len(s.ConfirmedMovements) != 0 {
+				t.Fatalf("posted-only checkpoint invalidated the numeric cash basis %+v", s)
 			}
-			if len(s.Baselines) != 1 || s.Baselines[0].Basis != "posted" || s.Baselines[0].Status != "uncertain" || s.Baselines[0].AvailableBalance != nil || !slices.Contains(s.Baselines[0].Reasons, ReasonPendingHoldWithoutAvailableBalance) {
+			if len(s.Baselines) != 1 || s.Baselines[0].Basis != "posted" || s.Baselines[0].Status != "available" || s.Baselines[0].AvailableBalance != nil || len(s.Baselines[0].Reasons) != 0 {
 				t.Fatalf("posted evidence %+v", s.Baselines)
 			}
 			assertMoney(t, s.Baselines[0].PostedBalance, 1608.05)
+			assertMoney(t, s.CheckingAvailable, 1608.05)
 			assertMoney(t, s.OutstandingBillsTotal, 1461.01)
+			assertMoney(t, s.CashAfterBills, 147.04)
 		})
 	}
 }

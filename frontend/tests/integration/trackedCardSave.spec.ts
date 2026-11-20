@@ -53,7 +53,6 @@ async function seedTrackedCard(api: APIRequestContext) {
 	expect(linked.ok(), await linked.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
-			reserve: 200,
 			accountIds: [CARD_ID],
 			spendingAccountIds: [],
 			incomeScheduleIds: [],

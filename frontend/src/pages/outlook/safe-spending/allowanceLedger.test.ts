@@ -14,7 +14,6 @@ function summary(
 		paydayBills: 0,
 		statementReserve: 650,
 		cardPayoffCapacity: null,
-		reserve: 200,
 		prePaydayRoom: 450,
 		postIncomeRoom: 200,
 		postPaydayBalance: 400,
@@ -35,7 +34,6 @@ describe("dated allowance", () => {
 			postIncomeRoom: 200,
 			paymentRoom: 350,
 			expectedPay: 400,
-			reserve: 200,
 		});
 	});
 

@@ -45,7 +45,7 @@ export function SafeSpendingCashEvidence({
 					)}
 					data-testid="cash-on-hand"
 				>
-					{amountText(evidence.checkingAvailable)}
+					{amountText(evidence.checkingAvailable, labels.cashUnverified)}
 				</strong>
 			</div>
 			<p className="m-0 text-xs text-muted-foreground">
@@ -71,7 +71,7 @@ export function SafeSpendingCashEvidence({
 											: "no balance recorded"}
 								</dt>
 								<dd className="m-0 tabular-nums">
-									{amountText(baseline.amount)}
+									{amountText(baseline.amount, labels.unavailable)}
 								</dd>
 							</div>
 						))}

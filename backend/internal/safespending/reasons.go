@@ -9,7 +9,6 @@ const (
 	ReasonPostedAmountUnavailable             = "posted-amount-unavailable"
 	ReasonCashBaselineMissing                 = "cash-baseline-missing"
 	ReasonPendingAfterBaselineCoverageUnknown = "pending-after-baseline-coverage-unknown"
-	ReasonPendingHoldWithoutAvailableBalance  = "pending-hold-without-available-balance"
 	ReasonPendingHoldCoverageUnknown          = "pending-hold-coverage-unknown"
 	ReasonPossiblePendingPaymentOverlap       = "possible-pending-payment-overlap"
 	ReasonPostedHoldCoverageUnknown           = "posted-hold-coverage-unknown"

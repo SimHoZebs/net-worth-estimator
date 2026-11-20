@@ -53,8 +53,8 @@ func TestSafeSpendingPackSeedsSettings(t *testing.T) {
 	if settings == nil {
 		t.Fatal("safe-spending settings were not seeded")
 	}
-	if settings.Reserve != 725 {
-		t.Fatalf("settings = %+v, want reserve 725", settings)
+	if settings.SavingsTarget != 725 {
+		t.Fatalf("settings = %+v, want savings target 725", settings)
 	}
 	if len(settings.IncomeScheduleIDs) != 2 {
 		t.Fatalf("income schedule ids = %v, want salary and partner schedule", settings.IncomeScheduleIDs)

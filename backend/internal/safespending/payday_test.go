@@ -27,7 +27,6 @@ func paydayFixture() (*types.FinancialModel, *types.SafeSpendingSettings) {
 	}
 	model.Schedules[0].EndDate = ptr("2026-11-20")
 	settings := &types.SafeSpendingSettings{
-		Reserve:            200,
 		AccountIDs:         []string{"card-a", "card-b"},
 		SpendingAccountIDs: []string{"checking"},
 		IncomeScheduleIDs:  []string{"salary"},
@@ -47,9 +46,9 @@ func TestPaydayAllowanceIsSmallerOfTwoCashChecks(t *testing.T) {
 	assertMoney(t, summary.PrePaydayBills, 250)
 	assertMoney(t, summary.PaydayBills, 0)
 	assertMoney(t, summary.StatementReserve, 650)
-	assertMoney(t, summary.PrePaydayRoom, 450)
-	assertMoney(t, summary.PostIncomeRoom, 200)
-	assertMoney(t, summary.SafeToSpend, 200)
+	assertMoney(t, summary.PrePaydayRoom, 650)
+	assertMoney(t, summary.PostIncomeRoom, 400)
+	assertMoney(t, summary.SafeToSpend, 400)
 	if len(summary.Bills) != 1 || summary.Bills[0].Status != "unpaid" {
 		t.Fatalf("dated bills %+v", summary.Bills)
 	}
@@ -77,9 +76,9 @@ func TestPaydayObligationsDueOnPaydayAreSeparate(t *testing.T) {
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, summary.PrePaydayBills, 250)
 	assertMoney(t, summary.PaydayBills, 100)
-	assertMoney(t, summary.PrePaydayRoom, 450)
-	assertMoney(t, summary.PostIncomeRoom, 100)
-	assertMoney(t, summary.SafeToSpend, 100)
+	assertMoney(t, summary.PrePaydayRoom, 650)
+	assertMoney(t, summary.PostIncomeRoom, 300)
+	assertMoney(t, summary.SafeToSpend, 300)
 }
 
 func TestPlannedCardPaymentReducesPayoffOnce(t *testing.T) {
@@ -92,8 +91,8 @@ func TestPlannedCardPaymentReducesPayoffOnce(t *testing.T) {
 	assertMoney(t, summary.PrePaydayBills, 250)
 	assertMoney(t, summary.PaydayBills, 150)
 	assertMoney(t, summary.StatementReserve, 500)
-	assertMoney(t, summary.PostIncomeRoom, 200)
-	assertMoney(t, summary.SafeToSpend, 200)
+	assertMoney(t, summary.PostIncomeRoom, 400)
+	assertMoney(t, summary.SafeToSpend, 400)
 	for _, statement := range summary.Statements {
 		if statement.AccountID == "card-a" && statement.Kind == "closed" {
 			assertMoney(t, statement.Amount, 350)
@@ -149,9 +148,9 @@ func TestCardPaymentReducesCashAndPayoffOnce(t *testing.T) {
 	if len(summary.Bills) != 2 || summary.Bills[0].ActualDate == nil || *summary.Bills[0].ActualDate != "2026-11-14" {
 		t.Fatalf("missing confirmed card payment evidence: %+v", summary.Bills)
 	}
-	assertMoney(t, summary.PrePaydayRoom, 250)
-	assertMoney(t, summary.PostIncomeRoom, 200)
-	assertMoney(t, summary.SafeToSpend, 200)
+	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PostIncomeRoom, 400)
+	assertMoney(t, summary.SafeToSpend, 400)
 	for _, statement := range summary.Statements {
 		if statement.AccountID == "card-a" && statement.Kind == "closed" {
 			assertMoney(t, statement.Amount, 300)
@@ -187,7 +186,7 @@ func TestUncertainStatementBalanceLeavesRoomsUnknownButShowsObligations(t *testi
 		t.Fatalf("uncertain statement produced precise allowance %+v", summary)
 	}
 	assertMoney(t, summary.PrePaydayBills, 250)
-	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 	if len(summary.Bills) != 1 || len(summary.Statements) != 4 {
 		t.Fatalf("known obligations hidden %+v %+v", summary.Bills, summary.Statements)
 	}
@@ -525,7 +524,7 @@ func TestIntercardTransferAppliesDatedLegsWithoutCashOutflow(t *testing.T) {
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 650)
-	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 	for _, movement := range summary.ConfirmedMovements {
 		if movement.TransactionID == "transfer" {
 			t.Fatalf("intercard transfer deducted cash twice %+v", summary.ConfirmedMovements)
@@ -567,7 +566,7 @@ func TestIntercardTransferAcrossDifferentCloseDates(t *testing.T) {
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 600)
-	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 	for _, statement := range summary.Statements {
 		if statement.AccountID == "card-b" && statement.Kind == "estimated" {
 			t.Fatalf("destination close after payday entered the reserve %+v", statement)
@@ -599,7 +598,7 @@ func TestScheduledIntercardTransferMatchesClaimedTransfer(t *testing.T) {
 	assertMoney(t, statementAmount(t, recorded, "card-a", "estimated", "2026-11-19"), 50)
 	assertMoney(t, statementAmount(t, recorded, "card-b", "closed", "2026-10-19"), 100)
 	assertMoney(t, recorded.StatementReserve, 650)
-	assertMoney(t, recorded.PrePaydayRoom, 450)
+	assertMoney(t, recorded.PrePaydayRoom, 650)
 }
 
 func TestSplitIntercardTransferLeavesPayoffUnavailable(t *testing.T) {
@@ -618,7 +617,7 @@ func TestSplitIntercardTransferLeavesPayoffUnavailable(t *testing.T) {
 	if summary.StatementReserve != nil || summary.PostIncomeRoom != nil || summary.SafeToSpend != nil {
 		t.Fatalf("unallocatable split produced a precise payoff %+v", summary)
 	}
-	assertMoney(t, summary.PrePaydayRoom, 450)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 	if len(summary.Bills) != 1 || len(summary.Statements) == 0 {
 		t.Fatalf("known obligations or statements hidden %+v %+v", summary.Bills, summary.Statements)
 	}
@@ -702,7 +701,7 @@ func TestNoIncomeKeepsDatedObligationsButNoAllowance(t *testing.T) {
 		t.Fatalf("missing payday invented an allowance %+v", summary)
 	}
 	assertMoney(t, summary.PrePaydayBills, 250)
-	assertMoney(t, summary.SpendableCash, 450)
+	assertMoney(t, summary.SpendableCash, 650)
 	if !slices.Contains(summary.Reasons, ReasonPaydayUnavailable) {
 		t.Fatalf("missing reason %+v", summary.Reasons)
 	}
@@ -797,7 +796,7 @@ func TestRealPendingClaimIsUnconfirmedAndCashRulesOwnTheHold(t *testing.T) {
 					t.Fatalf("covered hold changed the gate %+v", summary)
 				}
 				assertMoney(t, summary.CheckingAvailable, 900)
-				assertMoney(t, summary.PrePaydayRoom, 700)
+				assertMoney(t, summary.PrePaydayRoom, 900)
 			}
 		})
 	}
@@ -838,9 +837,9 @@ func TestSameDayObservationKeepsBillExpectedAndPriced(t *testing.T) {
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.PrePaydayBills, 250)
-	assertMoney(t, summary.PrePaydayRoom, 450)
-	assertMoney(t, summary.PostIncomeRoom, 200)
-	assertMoney(t, summary.SafeToSpend, 200)
+	assertMoney(t, summary.PrePaydayRoom, 650)
+	assertMoney(t, summary.PostIncomeRoom, 400)
+	assertMoney(t, summary.SafeToSpend, 400)
 
 	actual := payment("rent-actual", 250, "2026-11-15T09:00:00Z")
 	actual.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-11-15"}
@@ -867,9 +866,9 @@ func TestClaimedBillAmountIsNotDeductedTwice(t *testing.T) {
 	settled := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, settled.CheckingAvailable, 900)
 	assertMoney(t, settled.PrePaydayBills, 0)
-	assertMoney(t, settled.PrePaydayRoom, 700)
-	assertMoney(t, settled.PostIncomeRoom, 450)
-	assertMoney(t, settled.SafeToSpend, 450)
+	assertMoney(t, settled.PrePaydayRoom, 900)
+	assertMoney(t, settled.PostIncomeRoom, 650)
+	assertMoney(t, settled.SafeToSpend, 650)
 	if len(settled.Bills) != 1 || settled.Bills[0].Status != "paid" || settled.Bills[0].Amount == nil || *settled.Bills[0].Amount != 250 {
 		t.Fatalf("settled bill ledger %+v", settled.Bills)
 	}
@@ -915,7 +914,7 @@ func TestPastDueBillInCurrentIncomeCycleIsCountedOnce(t *testing.T) {
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.PrePaydayBills, 460)
 	// The configured Nov 30 payoff also leaves cash before Dec 1 income.
-	assertMoney(t, summary.PrePaydayRoom, -410)
+	assertMoney(t, summary.PrePaydayRoom, -210)
 }
 
 // Annual income puts the previous payday exactly 12 months back. The inclusive
@@ -950,5 +949,5 @@ func TestAnnualPaydayKeepsPastDueCurrentCycleBill(t *testing.T) {
 		t.Fatalf("annual cycle window %v", dates)
 	}
 	assertMoney(t, summary.PrePaydayBills, 370)
-	assertMoney(t, summary.PrePaydayRoom, 330)
+	assertMoney(t, summary.PrePaydayRoom, 530)
 }

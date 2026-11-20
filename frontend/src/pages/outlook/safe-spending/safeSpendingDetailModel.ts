@@ -57,7 +57,6 @@ export interface DatedAllowance {
 	postIncomeRoom: number | null;
 	paymentRoom: number | null;
 	expectedPay: number | null;
-	reserve: number;
 }
 
 export interface AllowanceEvidence {
@@ -84,7 +83,7 @@ export interface AllowanceLedger {
 
 export interface SafeSpendingConfigHints extends Pick<
 	SafeSpendingSettings,
-	"reserve" | "cycleStartDay" | "paydayDay" | "savingsTarget"
+	"cycleStartDay" | "paydayDay" | "savingsTarget"
 > {
 	cards: { id: string; name: string }[];
 	trackedIds: string[];

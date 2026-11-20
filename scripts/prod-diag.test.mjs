@@ -35,7 +35,7 @@ case "$cmd" in
     case "$cmd" in *"id, name, source"*) echo '[{"id":"r1","name":"Pay","source_account_id":null,"destinations":"[\\"a1\\"]","start_date":"2026-11-30","end_date":null,"enabled":1,"frequency":"monthly"}]';; *) echo '[{"id":"r1","source_account_id":null,"destinations":"[\\"a1\\"]","start_date":"2026-11-30","end_date":null,"enabled":1,"frequency":"monthly"}]';; esac ;;
   *"FROM account_links"*)
     case "$cmd" in *"bridge_name"*) echo '[{"bridge_account_id":"b1","model_account_id":"a1","bridge_name":"Checking 1234","institution":"Bank","currency":"USD","origin":"auto","last_seen_at":"2026-11-10"}]';; *) echo '[{"model_account_id":"a1","origin":"auto"}]';; esac ;;
-  *"FROM safe_spending_settings"*) echo '[{"settings_json":"{\\"reserve\\":725}"}]' ;;
+  *"FROM safe_spending_settings"*) echo '[{"settings_json":"{\\"savingsTarget\\":725}"}]' ;;
   *) echo '[]' ;;
 esac
 `;

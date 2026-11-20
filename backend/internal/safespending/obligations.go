@@ -13,11 +13,19 @@ import (
 
 type amounts struct {
 	balances map[string]float64
+	basis    map[string]types.DisplayBasis
 	latest   map[string]float64
 	dates    map[string]string
 	years    map[string]map[string]float64
 	terms    map[string]types.PaymentTerms
 	refs     *domain.AmountReferenceContext
+}
+
+// holdEmbedded reports whether the effective cash basis already subtracted
+// outgoing holds for this account. Only a reported available figure does;
+// the posted figure leaves the hold for the dated bill debit.
+func (a *amounts) holdEmbedded(accountID string) bool {
+	return a.basis[accountID] == types.DisplayBasisAvailable
 }
 
 func newAmounts(model *types.FinancialModel, balances map[string]float64) *amounts {
@@ -214,11 +222,14 @@ func billEvidence(o domain.DatedTransactionOccurrence, date string, claim *types
 			return row, ""
 		}
 		row.Status = "pending"
-		hold := ctx.holdAmount(*claim)
 		expected, err := ctx.resolve(o, date)
 		if err == nil && expected >= 0 {
 			row.Amount = money(expected)
-			if hold != nil {
+			// Posted cash has not deducted the hold, so reserve the known full
+			// bill. Available cash already embeds the held part.
+			if !ctx.holdEmbedded(*rule.SourceAccountID) {
+				row.UncoveredHold = row.Amount
+			} else if hold := ctx.holdAmount(*claim); hold != nil {
 				row.UncoveredHold = money(max(0, expected-*hold))
 			}
 		}

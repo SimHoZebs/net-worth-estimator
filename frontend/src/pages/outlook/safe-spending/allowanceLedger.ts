@@ -99,7 +99,6 @@ export function buildAllowanceLedger(
 			postIncomeRoom: summary.postIncomeRoom,
 			paymentRoom: summary.paymentRoom,
 			expectedPay: summary.expectedPay,
-			reserve: summary.reserve,
 		},
 		sections,
 		evidence: buildEvidence(summary),

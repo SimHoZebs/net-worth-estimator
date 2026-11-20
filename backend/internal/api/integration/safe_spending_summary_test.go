@@ -31,6 +31,9 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 			cash := 1000.0 + float64(i)*100
 			account := "same-account"
 			model := &types.FinancialModel{Accounts: []types.Account{{ID: account, Name: subject, Kind: "cash", Enabled: true}}, Checkpoints: []types.Checkpoint{{AccountID: account, Balance: cash + 50, AvailableBalance: &cash, ObservedAt: midnight.Unix() - 1}}, Schedules: []types.Schedule{{ID: "same-bill", Name: subject + " bill", SourceAccountID: &account, Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "20"}, Inputs: map[string]types.AmountInputBinding{}}, Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate}, StartDate: day, Enabled: true}}}
+			if i == 1 {
+				model.Accounts[0].DisplayBasis = types.DisplayBasisPosted
+			}
 			income := model.Schedules[0]
 			income.ID = "income"
 			income.SourceAccountID = nil
@@ -76,7 +79,13 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := 980.0 + float64(i)*100
+		wantCash := 1000.0 + float64(i)*100
+		wantBasis := "available"
+		if i == 1 {
+			wantCash += 50 // Bob chose posted while Alice kept available.
+			wantBasis = "posted"
+		}
+		want := wantCash - 20
 		if got.CashAsOf != day || got.Revision != revision || got.SafeToSpend == nil || *got.SafeToSpend != want || len(got.Baselines) != 1 || got.Baselines[0].AccountName != subject || len(got.Bills) != 1 || got.Bills[0].Name != subject+" bill" || got.Bills[0].Status != "unpaid" {
 			t.Fatalf("%s summary %+v", subject, got)
 		}
@@ -84,7 +93,10 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 			t.Fatalf("%s payment room %+v", subject, got.PaymentRoom)
 		}
 		// expected pay and the pre-payday bill are both 20, so capacity is cash.
-		wantCapacity := 1000.0 + float64(i)*100
+		if got.CheckingAvailable == nil || *got.CheckingAvailable != wantCash || got.Baselines[0].Basis != wantBasis {
+			t.Fatalf("%s summary did not follow account display basis: %+v", subject, got)
+		}
+		wantCapacity := wantCash
 		if got.CardPayoffCapacity == nil || *got.CardPayoffCapacity != wantCapacity {
 			t.Fatalf("%s card payoff capacity %v want %v", subject, got.CardPayoffCapacity, wantCapacity)
 		}

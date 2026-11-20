@@ -20,51 +20,52 @@ func TestNovemberCashFundingAndNextCycleAreSeparate(t *testing.T) {
 	assertMoney(t, s.StatementReserve, 2890.56)
 	assertMoney(t, s.SpendableCash, 300.92)
 	assertMoney(t, s.SafeToSpend, 300.92)
-	assertMoney(t, s.IncomeFunded, 595.52)
-	assertMoney(t, s.AdditionalSavings, 595.52)
-	assertMoney(t, s.SavingsAllowance, 95.52)
-	assertMoney(t, s.FundingRoom, 896.44)
-	assertMoney(t, s.NextCycleCarryover, 896.44)
-	assertMoney(t, s.NextCycleIncome, 3486.08)
-	assertMoney(t, s.NextCycleDiscretionary, 4382.52)
+	assertMoney(t, s.NextCycleIncome, 3395)
+	if s.CycleFundingPayday == nil || *s.CycleFundingPayday != "2026-11-30" {
+		t.Fatalf("cycle funding payday = %v, want 2026-11-30", s.CycleFundingPayday)
+	}
+	assertMoney(t, s.IncomeFunded, 4559.09)
+	assertMoney(t, s.AdditionalSavings, 4559.09)
+	assertMoney(t, s.SavingsAllowance, 4059.09)
+	assertMoney(t, s.FundingRoom, 4951.09)
+	assertMoney(t, s.NextCycleCarryover, 4951.09)
+	assertMoney(t, s.NextCycleDiscretionary, 8346.09)
 }
 
-func TestReserveIsOutsideCycleBudgetAndNextCycle(t *testing.T) {
+func TestSavingsTargetOnlyChangesTheAfterGoalAmount(t *testing.T) {
 	model, settings := novemberForecastFixture()
-	withoutReserve := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
-	settings.Reserve = 400
-	withReserve := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
+	before := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
+	settings.SavingsTarget = 900
+	after := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
 
 	for _, field := range []struct {
 		name string
 		get  func(*types.SafeSpendingSummary) *float64
 	}{
+		{"cash cushion", func(s *types.SafeSpendingSummary) *float64 { return s.SpendableCash }},
+		{"pre-payday room", func(s *types.SafeSpendingSummary) *float64 { return s.PrePaydayRoom }},
+		{"post-income room", func(s *types.SafeSpendingSummary) *float64 { return s.PostIncomeRoom }},
+		{"safe to spend", func(s *types.SafeSpendingSummary) *float64 { return s.SafeToSpend }},
 		{"with cash cushion", func(s *types.SafeSpendingSummary) *float64 { return s.FundingRoom }},
 		{"without cash cushion", func(s *types.SafeSpendingSummary) *float64 { return s.IncomeFunded }},
-		{"after savings goal", func(s *types.SafeSpendingSummary) *float64 { return s.SavingsAllowance }},
+		{"additional savings", func(s *types.SafeSpendingSummary) *float64 { return s.AdditionalSavings }},
 		{"next cycle carryover", func(s *types.SafeSpendingSummary) *float64 { return s.NextCycleCarryover }},
 		{"next cycle budget", func(s *types.SafeSpendingSummary) *float64 { return s.NextCycleDiscretionary }},
 	} {
-		before, after := field.get(&withoutReserve), field.get(&withReserve)
-		if before == nil || after == nil || *before != *after {
-			t.Fatalf("reserve changed %s: %v → %v", field.name, before, after)
+		was, is := field.get(&before), field.get(&after)
+		if was == nil || is == nil || *was != *is {
+			t.Fatalf("savings goal changed %s: %v → %v", field.name, was, is)
 		}
 	}
-	// The cushion is the cash left before the funding paycheck; adding it to
-	// the income-funded amount reproduces the with-cushion amount exactly.
-	if got := *withoutReserve.FundingRoom; got != *withoutReserve.SpendableCash+*withoutReserve.IncomeFunded {
-		t.Fatalf("with-cushion %.2f != cushion %.2f + income %.2f", got, *withoutReserve.SpendableCash, *withoutReserve.IncomeFunded)
-	}
-	// The reserve narrows only the cash checkpoints kept in the detail view.
-	assertMoney(t, withoutReserve.SpendableCash, 300.92)
-	assertMoney(t, withReserve.SpendableCash, -99.08)
-	assertMoney(t, withoutReserve.SafeToSpend, 300.92)
-	assertMoney(t, withReserve.SafeToSpend, 0)
+	assertMoney(t, before.SavingsAllowance, 4059.09)
+	assertMoney(t, after.SavingsAllowance, 3659.09)
+	assertMoney(t, before.FundingRoom, 4951.09)
+	assertMoney(t, before.SpendableCash, 300.92)
+	assertMoney(t, before.SafeToSpend, 300.92)
 }
 
 func novemberForecastFixture() (*types.FinancialModel, *types.SafeSpendingSettings) {
 	model, settings := paydayFixture()
-	settings.Reserve = 0
 	settings.SavingsTarget = 500
 	model.Checkpoints[0].Balance = 392
 	model.Checkpoints[0].AvailableBalance = nil
@@ -94,23 +95,22 @@ func TestCurrentCycleCardPurchaseAfterItsCloseConsumesCarryoverOnce(t *testing.T
 	s := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-18"))
 	assertMoney(t, s.StatementReserve, 2890.56)
 	assertMoney(t, s.SafeToSpend, 300.92)
-	assertMoney(t, s.NextCycleCarryover, 796.44)
-	assertMoney(t, s.NextCycleIncome, 3486.08)
-	assertMoney(t, s.NextCycleDiscretionary, 4282.52)
+	assertMoney(t, s.NextCycleCarryover, 4851.09)
+	assertMoney(t, s.NextCycleIncome, 3395)
+	assertMoney(t, s.NextCycleDiscretionary, 8246.09)
 
 	// Reduce the first paycheck until the outstanding card purchase binds
 	// today's cash spending, even though the bill is paid next month.
 	model.Schedules[1].Amount = fixed(6883.21)
 	s = BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-18"))
 	assertMoney(t, s.SafeToSpend, 230)
-	assertMoney(t, s.NextCycleCarryover, 230)
-	assertMoney(t, s.AdditionalSavings, -70.92)
+	assertMoney(t, s.NextCycleCarryover, 4284.65)
+	assertMoney(t, s.AdditionalSavings, 3892.65)
 }
 
 func TestConfiguredPayoffDoesNotMoveScheduledIncome(t *testing.T) {
 	model, settings := paydayFixture()
 	settings.PaydayDay = 18
-	settings.Reserve = 0
 	model.Checkpoints[0].Balance = 500
 	model.Checkpoints[0].AvailableBalance = nil
 	s := BuildAtCut(model, settings, stamp(paydayCut))
@@ -120,14 +120,13 @@ func TestConfiguredPayoffDoesNotMoveScheduledIncome(t *testing.T) {
 	assertMoney(t, s.CardPayoffCapacity, 500)
 	assertMoney(t, s.SpendableCash, -400)
 	assertMoney(t, s.IncomeFunded, 400)
-	assertMoney(t, s.FundingRoom, 0)
+	assertMoney(t, s.FundingRoom, 900)
 	assertMoney(t, s.PaymentRoom, -150)
 	assertMoney(t, s.SafeToSpend, 0)
 }
 
 func TestLaterCashShortfallLimitsTodayEvenWhenNextIncomeIsPositive(t *testing.T) {
 	model, settings := paydayFixture()
-	settings.Reserve = 0
 	model.Schedules[1].Amount = fixed(1200)
 	model.Schedules[1].EndDate = ptr("2026-11-30")
 	later := model.Schedules[1]
@@ -141,25 +140,28 @@ func TestLaterCashShortfallLimitsTodayEvenWhenNextIncomeIsPositive(t *testing.T)
 	s := BuildAtCut(model, settings, stamp(paydayCut))
 	// The Dec 30 payoff precedes Dec 31 income. It leaves the first
 	// funding bucket short; the later paycheck cannot fix that checkpoint.
-	assertMoney(t, s.NextCycleCarryover, -300)
-	assertMoney(t, s.NextCycleIncome, 5000)
+	// The cycle budget follows the active cycle's funding paycheck; the later
+	// paycheck cannot erase the established shortfall in the cash timeline.
+	assertMoney(t, s.NextCycleCarryover, 1450)
+	assertMoney(t, s.NextCycleIncome, 3250)
 	assertMoney(t, s.ForecastCashRoom, -300)
 	assertMoney(t, s.SafeToSpend, 0)
 }
 
-func TestKnownCashShortfallSurvivesAnUnpricedFutureBill(t *testing.T) {
+func TestUnpricedFutureBillLeavesExactSafeToSpendUnknown(t *testing.T) {
 	model, settings := novemberForecastFixture()
-	settings.Reserve = 400
-	unknown := bill("unpriced-next-period-bill", "2026-12-31", 100)
+	unknown := bill("unpriced-next-period-bill", "2026-12-15", 100)
 	unknown.Amount.Resolver = "unavailable"
 	model.Schedules = append(model.Schedules, unknown)
 	settings.TransactionIDs = append(settings.TransactionIDs, unknown.ID)
 
 	s := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
 	assertMoney(t, s.StatementReserve, 2890.56)
-	assertMoney(t, s.SafeToSpend, 0)
+	if s.SafeToSpend != nil {
+		t.Fatal("an unpriced future bill cannot prove an exact safe-to-spend amount")
+	}
 	if s.ForecastCashRoom != nil {
-		t.Fatal("a reserve shortfall is not a proven shortfall for payments")
+		t.Fatal("a low cash checkpoint is not a proven shortfall for payments")
 	}
 	if s.NextCycleDiscretionary != nil {
 		t.Fatal("unpriced bill should still prevent an exact next-cycle total")
@@ -175,12 +177,11 @@ func TestFallbackAndGlobalCycleClampIndependently(t *testing.T) {
 		s.PayoffDate != "2028-02-29" || s.Payday == nil || *s.Payday != "2028-02-29" || s.ExpectedPay != nil {
 		t.Fatalf("unexpected dates and income forecast: %+v", s)
 	}
-	assertMoney(t, s.SpendableCash, 700)
+	assertMoney(t, s.SpendableCash, 900)
 }
 
 func TestStatementClosingOnPayoffAndLatePostingBelongToFollowingPayoff(t *testing.T) {
 	model, settings := paydayFixture()
-	settings.Reserve = 0
 	settings.PaydayDay = 19
 	for i := range model.Schedules {
 		model.Schedules[i].StartDate = "2026-11-19"
@@ -193,7 +194,7 @@ func TestStatementClosingOnPayoffAndLatePostingBelongToFollowingPayoff(t *testin
 
 	s := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, s.StatementReserve, 650)
-	assertMoney(t, s.NextCycleCarryover, 350)
+	assertMoney(t, s.NextCycleCarryover, 1000)
 	assertMoney(t, s.NextCycleIncome, 150)
 	if slices.ContainsFunc(s.Statements, func(row types.SafeSpendingStatement) bool { return row.ClosingDate == s.PayoffDate }) {
 		t.Fatalf("same-day close appeared in upcoming payoff: %+v", s.Statements)

@@ -67,7 +67,7 @@ func (f cashFlow) net() *float64 {
 	return money(net)
 }
 
-func computeForecast(st *cutState, incomes []paydayForecast, incomeScheduleKnown bool, nextIncomeDate, end string, reserves []statementPayoff, carriedDebt, outsideHorizonDebt *float64) {
+func computeForecast(st *cutState, incomes []paydayForecast, incomeScheduleKnown bool, nextIncomeDate, end string, reserves []statementPayoff, carriedDebt, outsideHorizonDebt *float64, cycle, following cycleBudgetScope) {
 	s := st.s
 	today, payoff := s.CashAsOf, s.PayoffDate
 	timeline, current, next := cashFlow{}, cashFlow{}, cashFlow{}
@@ -110,13 +110,14 @@ func computeForecast(st *cutState, incomes []paydayForecast, incomeScheduleKnown
 
 	cashBeforeIncome, _ := timeline.checkpoint(s.CheckingAvailable, beforeIncome)
 	if cashBeforeIncome != nil {
-		s.SpendableCash = money(*cashBeforeIncome - s.Reserve)
+		s.SpendableCash = money(*cashBeforeIncome)
 		s.PrePaydayRoom = s.SpendableCash
 	}
 	s.PostPaydayBalance, s.PaymentRoom = timeline.checkpoint(s.CheckingAvailable, payoff)
 	if s.PostPaydayBalance != nil {
-		s.PostIncomeRoom = money(*s.PostPaydayBalance - s.Reserve)
+		s.PostIncomeRoom = s.PostPaydayBalance
 	} else {
+		s.PostIncomeRoom = nil
 		s.PaymentRoom = nil // The exact payoff checkpoint is still unknown.
 	}
 	endBalance, fullMinimum := timeline.checkpoint(s.CheckingAvailable, end)
@@ -140,37 +141,15 @@ func computeForecast(st *cutState, incomes []paydayForecast, incomeScheduleKnown
 	timeline.at(fundingThrough).debit(carriedDebt)
 	timeline.at(fundingThrough).debit(outsideHorizonDebt)
 	fundingBalance, fundingMinimum := timeline.checkpoint(s.CheckingAvailable, fundingThrough)
-	if fullMinimum != nil && *fullMinimum <= s.Reserve || fundingMinimum != nil && *fundingMinimum <= s.Reserve {
+	if fullMinimum != nil && *fullMinimum <= 0 || fundingMinimum != nil && *fundingMinimum <= 0 {
 		s.SafeToSpend = money(0)
 	} else if fundingBalance != nil && endBalance != nil {
-		s.SafeToSpend = money(max(0, min(*fundingMinimum, *fullMinimum)-s.Reserve))
+		s.SafeToSpend = money(max(0, min(*fundingMinimum, *fullMinimum)))
 	}
-	// FundingRoom is the cycle budget with the existing cash cushion: the
-	// first paycheck funds the spending, the dated bills and card payoffs it
-	// owns are debited once, and the cash left before that paycheck is added.
-	// The reserve protects only the cash checkpoints above, so it must not
-	// move this value or the next-cycle budget derived from it.
-	if net := current.net(); net != nil && s.CheckingAvailable != nil {
-		s.FundingRoom = money(*s.CheckingAvailable + *net)
-		s.NextCycleCarryover = s.FundingRoom
-	}
-	// IncomeFunded is the same cycle budget without the cash cushion. Pre-income
-	// obligations are already deducted from spendable cash, so limiting the net
-	// to payday and later does not subtract those bills twice.
-	incomeFunded := cashFlow{}
-	for date, day := range current {
-		if date > beforeIncome {
-			incomeFunded[date] = day
-		}
-	}
-	s.IncomeFunded = incomeFunded.net()
-	if s.IncomeFunded != nil {
-		s.SavingsAllowance = money(*s.IncomeFunded - st.settings.SavingsTarget)
-		s.AdditionalSavings = s.IncomeFunded
-	}
-	if incomeScheduleKnown && len(incomes) > 1 {
-		s.NextCycleIncome = next.net()
-	}
+	// The cycle budget is independent of the cash timeline: it belongs to the
+	// paycheck funding the active spending cycle, not the upcoming payoff.
+	computeCycleBudget(st, incomes, reserves, carriedDebt, outsideHorizonDebt, nextIncomeDate, cycle)
+	computeFollowingBudget(st, incomes, reserves, carriedDebt, nextIncomeDate, following)
 	if s.NextCycleIncome != nil && s.NextCycleCarryover != nil {
 		s.NextCycleDiscretionary = money(*s.NextCycleIncome + *s.NextCycleCarryover)
 	}

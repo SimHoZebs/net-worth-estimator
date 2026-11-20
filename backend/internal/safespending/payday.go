@@ -35,6 +35,10 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 	st.s.PaymentPeriodStart = nextIsoDay(lastClosingBefore(payoffDay, payoff))
 	incomes, incomeScheduleKnown := forecastPaydays(st, today, payoff)
 	st.s.Payday, st.s.ExpectedPay = &incomes[0].date, incomes[0].income
+	cycle, following := cycleScopes(cycleDay, payoffDay, today, st.s.CycleReset, incomes, incomeScheduleKnown)
+	if cycle.known {
+		st.s.CycleFundingPayday = &cycle.payday
+	}
 
 	// The payment period owns the ledger. An unlinked bill from an earlier
 	// period is outside its scope, not an unpaid obligation to carry forward.
@@ -64,8 +68,13 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 	for date := nextPayoff; date <= horizon; date = nextClosingAfter(payoffDay, date) {
 		payoffs = append(payoffs, date)
 	}
+	// The following cycle needs its own card liability. Extend only the
+	// statement horizon so its payoff is estimated instead of assumed zero.
+	if following.payoff > payoffs[len(payoffs)-1] {
+		payoffs = append(payoffs, following.payoff)
+	}
 	reserves, carriedDebt, outsideHorizonDebt := followingStatementReserves(st, payoffs, nextIncomeDate)
-	computeForecast(st, incomes, incomeScheduleKnown, nextIncomeDate, horizon, reserves, carriedDebt, outsideHorizonDebt)
+	computeForecast(st, incomes, incomeScheduleKnown, nextIncomeDate, horizon, reserves, carriedDebt, outsideHorizonDebt, cycle, following)
 	computePaymentProgress(st)
 	// Later bills are timeline inputs, not the upcoming payment ledger.
 	st.s.Bills = st.s.Bills[:sortedBillsThrough(st.s.Bills, payoff)]

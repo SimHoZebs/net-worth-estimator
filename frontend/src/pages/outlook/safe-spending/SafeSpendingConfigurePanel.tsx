@@ -108,21 +108,6 @@ export function SafeSpendingConfigurePanel({
 					</Button>
 				</FieldSet>
 			</form>
-			<Field>
-				<Label htmlFor={`${fieldId}-reserve`}>{`${labels.reserve} ($)`}</Label>
-				<Input
-					id={`${fieldId}-reserve`}
-					type="number"
-					min={0}
-					step="0.01"
-					value={config.reserve}
-					onChange={(event) =>
-						onUpdateConfig({
-							reserve: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</Field>
 			<FieldSet>
 				<FieldLegend variant="label">{labels.cashAccounts}</FieldLegend>
 				<div className="flex flex-wrap gap-2">

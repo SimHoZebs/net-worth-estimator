@@ -85,7 +85,6 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		t.Fatalf("seed evaluation: %v", err)
 	}
 	if err := scoped.SetSafeSpendingSettings(types.SafeSpendingSettings{
-		Reserve:            0,
 		CycleStartDay:      3,
 		PaydayDay:          27,
 		SavingsTarget:      224.50,

@@ -38,7 +38,7 @@ func TestKnownPendingCardChargeForecastsIntoOpenStatement(t *testing.T) {
 	assertMoney(t, statementAmount(t, s, "card-a", "estimated", "2026-11-19"), 35)
 	assertMoney(t, statementAmount(t, s, "card-b", "estimated", "2026-11-19"), 0)
 	assertMoney(t, s.StatementReserve, 685)
-	assertMoney(t, s.SafeToSpend, 165)
+	assertMoney(t, s.SafeToSpend, 365)
 	if slices.Contains(s.Reasons, ReasonStatementEstimateUnavailable) ||
 		slices.Contains(s.Reasons, ReasonStatementBalanceUnavailable) {
 		t.Fatalf("priced hold still blanked the payoff: %v", s.Reasons)
@@ -67,16 +67,16 @@ func TestLatePricedPendingChargeReservesCarryoverWithoutMovingNextIncome(t *test
 
 	assertMoney(t, statementAmount(t, s, "card-a", "closed", "2026-10-30"), 500)
 	assertMoney(t, s.StatementReserve, 650)
-	// Carryover is the cycle budget with the cash cushion; the reserve only
-	// narrows the separate cash checkpoint.
-	assertMoney(t, base.FundingRoom, 400)
-	assertMoney(t, base.NextCycleCarryover, 400)
-	assertMoney(t, base.SafeToSpend, 200)
-	assertMoney(t, s.FundingRoom, 365)
-	assertMoney(t, s.NextCycleCarryover, 365)
-	assertMoney(t, s.SafeToSpend, 165)
+	// Carryover is the cycle budget with the cash cushion; the cash timing
+	// check is separate from the cycle budget.
+	assertMoney(t, base.FundingRoom, 1050)
+	assertMoney(t, base.NextCycleCarryover, 1050)
+	assertMoney(t, base.SafeToSpend, 400)
+	assertMoney(t, s.FundingRoom, 1050)
+	assertMoney(t, s.NextCycleCarryover, 1050)
+	assertMoney(t, s.SafeToSpend, 365)
 	assertMoney(t, base.NextCycleIncome, 400)
-	assertMoney(t, s.NextCycleIncome, 400)
+	assertMoney(t, s.NextCycleIncome, 365)
 	if slices.Contains(s.Reasons, ReasonStatementEstimateUnavailable) {
 		t.Fatalf("priced beyond-horizon charge blanked the forecast: %v", s.Reasons)
 	}
@@ -123,7 +123,7 @@ func TestPendingCardChargePostsAsOneExpense(t *testing.T) {
 	after := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, statementAmount(t, after, "card-a", "estimated", "2026-11-19"), 35)
 	assertMoney(t, after.StatementReserve, 685)
-	assertMoney(t, after.SafeToSpend, 165)
+	assertMoney(t, after.SafeToSpend, 365)
 }
 
 func TestPendingClaimAndPostedReplacementCountOnce(t *testing.T) {

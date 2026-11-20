@@ -8,6 +8,7 @@ import {
 	firstBudgetShare,
 } from "./budgetDisplay.tsx";
 import { ObligationRows } from "./SafeSpendingObligationLedger.tsx";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingPayday({
 	summary,
@@ -101,9 +102,7 @@ export function SafeSpendingPayday({
 				{bills.length ? (
 					<ObligationRows label="Bills through payday" rows={bills} />
 				) : (
-					<p className="m-0 text-xs text-muted-foreground">
-						No bill details
-					</p>
+					<p className="m-0 text-xs text-muted-foreground">No bill details</p>
 				)}
 			</details>
 			<details className="rounded-md border border-border px-2.5 text-sm">
@@ -115,7 +114,11 @@ export function SafeSpendingPayday({
 							· <time dateTime={payoffDate}>{payoffLabel}</time>
 						</>
 					)}{" "}
-					· <BudgetAmount value={summary.statementReserve} />
+					·{" "}
+					<BudgetAmount
+						value={summary.statementReserve}
+						missingText={labels.payoffUnverified}
+					/>
 				</summary>
 				{cards.length ? (
 					<div className="pb-2">

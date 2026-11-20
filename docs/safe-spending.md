@@ -19,8 +19,10 @@ Monthly days that do not exist in a given month fall on its last day. Dates in
 the ledger use UTC.
 
 Existing saved settings need the [offline migration](../deploy/MIGRATIONS.md)
-before the updated API reads them. The migration fills missing settings
-without replacing authored values.
+before the updated API reads them. The migration fills missing settings and
+carries the retired reserve into the savings goal where the saved goal is
+missing or zero. An authored nonzero goal is preserved. No settings are created
+for a user without a saved document.
 
 ## One obligation, one payment
 
@@ -61,27 +63,51 @@ The default evidence cut is now. The summary API also accepts a historical
 `asOf` date or timestamp for replay. Replays use the current plan and settings
 but cannot use later checkpoints or posted activity as historical evidence.
 
+Each selected cash account uses its effective display basis at that historical
+checkpoint. An explicit posted preference takes the replayed posted figure. The
+configured or default available preference takes the bank-reported available
+figure when the checkpoint carries one; with no available field, posted is the
+only real figure and is the basis. The figure not chosen stays on the baseline
+row as observed evidence so the two can be reconciled. Outgoing holds are
+embedded in the starting cash only through a reported available figure. On the
+posted basis a reliable outgoing hold is counted once by the dated bill debit,
+and the numeric cash total is neither nulled nor debited again.
+
 ## Spending room and next cycle
 
-**Without cash cushion** is the paycheck funding this cycle, less the card
-spending and expected recurring payments assigned to it. It can be negative.
-**With cash cushion** adds existing cash after payments due before that
-paycheck. **After savings goal** deducts the savings target from the
-income-funded amount, not from existing cash. The projected extra cash saved
-is a change to the cash cushion, not to net worth.
+**Payday** remains the actual next income, and its card payoff stays in the
+payment ledger. **Cycle funding payday** is the scheduled paycheck that funds
+the active spending cycle, `[reset start, next reset)`. The three budget
+amounts describe that cycle:
+
+- **Without cash cushion** is the cycle funding paycheck less the card payoff
+  assigned to that cycle and the recurring cash bills dated inside the active
+  cycle. It can be negative.
+- **With cash cushion** adds existing cash after deficits left by earlier
+  commitments. An earlier paycheck never raises the cushion above observed
+  cash, so its whole amount is not added.
+- **After savings goal** deducts the savings target from the paycheck-funded
+  amount, not from existing cash. The projected extra cash saved is a change
+  to the cash cushion, not to net worth.
+
+A charge belongs to the cycle in which it was spent even when its card payoff
+lands in the next funding bucket. The carried slice is subtracted once from
+that cycle and removed from the following payoff, so it never deducts two
+paychecks. Genuinely next-cycle charges still deduct the following budget.
 
 The cycle amounts include future income and are not all available as cash
 today. The separate timing check walks dated payments in order; cash due
-before an inflow cannot be funded by that inflow. The optional reserve is a
-separate check, not a deduction from the three cycle amounts.
+before an inflow cannot be funded by that inflow. The monthly savings goal is
+applied once, to the after-goal amount. It does not narrow the cash timing
+check or the other cycle amounts. When a paycheck, bill, or payoff is unknown,
+the dependent cycle amount stays unknown rather than becoming a verified zero
+or a positive figure; known cash totals and checkpoints survive.
 
-**Next cycle spending** separates new income-funded room from the cash carried
-forward if no additional spending occurs. A future obligation belongs to one
-funding period: a bill after payday and before the next paycheck is funded by
-the earlier paycheck. The forecast can look beyond reset and cycle-end dates
-to account for the paychecks and obligations that fund the allowance. The
-carryover and the corresponding capacity from the current cycle are the same
-money. A new purchase consumes that cash once, even if the card pays later.
+**Next cycle spending** applies the same dated-ledger selection to the cycle
+after the active one, including its own card payoff. When that payoff cannot
+be estimated, the next-cycle total stays unknown. The carryover and the
+corresponding capacity from the active cycle are the same money. A new
+purchase consumes that cash once, even if the card pays later.
 
 The payment and next-cycle bars have different denominators. The former shows
 paid versus outstanding obligations; the latter shows two sources of the same
@@ -100,13 +126,14 @@ proves there is nothing safe to spend today.
 
 ## November 17 example
 
-With $392 cash and $91.08 still due before payday, the existing cash available
-for immediate spending is $300.92. A $7,449.65 paycheck less $2,890.56 of card
-payoffs and $3,963.57 of other assigned bills adds $595.52, or $95.52 after a
-$500 savings target. The $896.44 combined room is not all available as cash
-before payday.
+At the Nov 17 cut the active cycle is Oct 20–Nov 19, funded by the Nov 30
+paycheck. With $392 cash and $91.08 due before that payday, the immediate cash
+check is $300.92. The $7,449.65 paycheck less the $2,890.56 card payoff leaves
+$4,559.09, or $4,059.09 after a $500 savings target. Adding observed cash
+gives $4,951.09 of combined room, which is not all cash today.
 
-If the next relevant paycheck is also $7,449.65 and funds a *different*
-$3,963.57 set of bills, it adds $3,486.08. With no additional spending, the
-$896.44 carries forward once, for $4,382.52 of projected capacity. These are
-conditional figures, not a substitute for checking the dated payments.
+The following cycle, Nov 20–Dec 19, is funded by the Dec 30 paycheck. The same
+$7,449.65 less the $91.08 and $3,963.57 bills dated in that cycle adds
+$3,395.00. With no additional spending, the $4,951.09 carries forward once,
+for $8,346.09 of projected capacity. These are conditional figures, not a
+substitute for checking the dated payments.

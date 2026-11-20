@@ -11,8 +11,9 @@ export interface PaymentCapacity {
 
 /**
  * Fallback when the exact payment room needs an unknown card payoff. A definite
- * pre-payday gap outranks capacity; otherwise capacity stays informational and
- * never claims the cards can be paid.
+ * pre-payday gap outranks capacity. The gap comes straight from the server's
+ * room and never depends on the savings goal; otherwise capacity stays
+ * informational and never claims the cards can be paid.
  */
 export function paymentCapacity(
 	summary: SafeSpendingSummary,
@@ -20,9 +21,8 @@ export function paymentCapacity(
 	if (summary.paymentRoom !== null && summary.paymentRoom !== undefined)
 		return null;
 	if (summary.prePaydayRoom !== null && summary.prePaydayRoom !== undefined) {
-		const prePaydayNoReserve = cents(summary.prePaydayRoom + summary.reserve);
-		if (prePaydayNoReserve < 0)
-			return { magnitude: -prePaydayNoReserve, short: true };
+		const prePaydayRoom = cents(summary.prePaydayRoom);
+		if (prePaydayRoom < 0) return { magnitude: -prePaydayRoom, short: true };
 	}
 	const capacity = summary.cardPayoffCapacity;
 	if (capacity === null || capacity === undefined) return null;

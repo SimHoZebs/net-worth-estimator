@@ -8,7 +8,8 @@ const headline = {
 	savingsAllowance: 95.52,
 	additionalSavings: 595.52,
 	fundingRoom: 896.44,
-	payday: "2026-11-27",
+	payday: "2026-11-28",
+	cycleFundingPayday: "2026-11-27",
 	payoffDate: "2026-11-30",
 	paymentPeriodStart: "2026-10-31",
 	paidByPayday: 175,
@@ -103,6 +104,30 @@ test("safe spending separates immediate room, progress, and next-cycle funding",
 	);
 });
 
+test("an unknown cycle funding payday stays undated without hiding payment or income details", async ({
+	page,
+}) => {
+	await overrideSummary(page, { cycleFundingPayday: null });
+	await page.goto("/outlook");
+	const card = page.getByRole("region", { name: "Safe spending" });
+	await expect(card.getByText(/Nov 27 paycheck|Nov 28 paycheck/)).toHaveCount(
+		0,
+	);
+	await expect(card.getByTestId("payment-progress")).toBeVisible();
+	await expect(
+		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
+	).toBeVisible();
+	await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+	const drawer = page.getByRole("dialog", { name: "Safe spending" });
+	await expect(drawer.getByText("Next income · Nov 28, 2026")).toBeVisible();
+	await expect(
+		drawer.getByRole("region", { name: "Cash checks" }),
+	).toBeVisible();
+	await expect(
+		drawer.getByText(/Payment capacity|Payments covered/),
+	).toBeVisible();
+});
+
 test("missing and negative amounts leave independently known evidence visible", async ({
 	page,
 }) => {
@@ -120,24 +145,25 @@ test("missing and negative amounts leave independently known evidence visible", 
 	});
 	await page.goto("/outlook");
 	const card = page.getByRole("region", { name: "Safe spending" });
-	await expect(card.getByTestId("with-cash-cushion")).toHaveText("—");
-	await expect(card.getByText("Available cash unverified")).toBeVisible();
+	await expect(card.getByTestId("with-cash-cushion")).toHaveText(
+		"Cash balance missing",
+	);
 	await expect(
 		card.getByText("Possible pending payment overlap"),
 	).toBeVisible();
 	await expect(card.getByTestId("income-funded")).toHaveText("Over by $110.00");
 	await expect(card.getByTestId("savings-allowance")).toHaveText(
-		"Short of goal by $610.00",
+		"Short by $610.00",
 	);
 	await expect(card.getByTestId("additional-savings")).toHaveText(
 		"Uses $110.00 from your cushion",
 	);
 	await expect(card.getByTestId("paid-by-payday")).toHaveText("$175.00");
-	await expect(card.getByTestId("unpaid-by-payday")).toHaveText("—");
+	await expect(card.getByTestId("unpaid-by-payday")).toHaveText("Unavailable");
 	await expect(card.getByTestId("payment-progress")).toHaveCount(0);
 	await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
 	await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
-		"−$80.00",
+		"Over by $80.00",
 	);
 });
 
