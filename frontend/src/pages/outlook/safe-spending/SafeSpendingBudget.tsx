@@ -6,7 +6,6 @@ import {
 	BudgetAmount,
 	budgetDate,
 	BudgetMetric,
-	BudgetSplit,
 	firstBudgetShare,
 } from "./budgetDisplay.tsx";
 import { buildCycleBudgetGraph } from "./cycleBudgetGraph.ts";
@@ -35,8 +34,12 @@ export function SafeSpendingBudget({
 	const fundingPaycheck = budgetDate(cycleFundingPayday);
 	const missingIncome =
 		cycleFundingPayday == null ? "No funding paycheck" : undefined;
-	const showComposition =
-		firstBudgetShare(nextCycleIncome, nextCycleCarryover) !== null;
+	const composition =
+		nextCycleIncome != null &&
+		nextCycleCarryover != null &&
+		firstBudgetShare(nextCycleIncome, nextCycleCarryover) !== null
+			? { income: nextCycleIncome, carryover: nextCycleCarryover }
+			: null;
 	const graph = buildCycleBudgetGraph({
 		fundingRoom: summary.fundingRoom,
 		incomeFunded: summary.incomeFunded,
@@ -90,18 +93,6 @@ export function SafeSpendingBudget({
 							}}
 							segments={graph.segments}
 						/>
-						<dl className="m-0 grid text-sm">
-							<BudgetMetric
-								label={labels.additionalSavings}
-								value={summary.additionalSavings}
-								testId="additional-savings"
-								missingText={missingIncome}
-								showPlus
-								describeShortfall={(amount) =>
-									`Uses ${amount} from your cushion`
-								}
-							/>
-						</dl>
 					</div>
 				) : (
 					<dl className="m-0 grid gap-2 text-sm">
@@ -134,14 +125,6 @@ export function SafeSpendingBudget({
 							missingText={missingIncome}
 							showPlus
 							describeShortfall={(amount) => `Short by ${amount}`}
-						/>
-						<BudgetMetric
-							label={labels.additionalSavings}
-							value={summary.additionalSavings}
-							testId="additional-savings"
-							missingText={missingIncome}
-							showPlus
-							describeShortfall={(amount) => `Uses ${amount} from your cushion`}
 						/>
 					</dl>
 				)}
@@ -181,27 +164,45 @@ export function SafeSpendingBudget({
 						a scheduled payment
 					</p>
 				)}
-				<BudgetSplit
-					first={nextCycleIncome}
-					second={nextCycleCarryover}
-					testId="next-cycle-composition"
-				/>
-				<dl className="m-0 grid gap-1 text-sm">
-					<BudgetMetric
-						label="From income"
-						value={nextCycleIncome}
-						testId="next-cycle-income"
-						describeShortfall={(amount) => `Over by ${amount}`}
-						segment={showComposition ? "first" : undefined}
+				{composition ? (
+					<SegmentedBar
+						caption="Funding composition"
+						captionClassName="sr-only"
+						formatAmount={exactMoney}
+						ariaLabel={`Next cycle funding: From income ${exactMoney(composition.income)}. Cash carried forward ${exactMoney(composition.carryover)}.`}
+						segments={[
+							{
+								label: "From income",
+								amount: composition.income,
+								tone: "sage",
+								pattern: "solid",
+								testId: "next-cycle-income",
+							},
+							{
+								label: "Cash carried forward",
+								amount: composition.carryover,
+								tone: "plum",
+								pattern: "solid",
+								testId: "next-cycle-carryover",
+							},
+						]}
 					/>
-					<BudgetMetric
-						label="Cash carried forward"
-						value={nextCycleCarryover}
-						testId="next-cycle-carryover"
-						describeShortfall={(amount) => `Over by ${amount}`}
-						segment={showComposition ? "second" : undefined}
-					/>
-				</dl>
+				) : (
+					<dl className="m-0 grid gap-1 text-sm">
+						<BudgetMetric
+							label="From income"
+							value={nextCycleIncome}
+							testId="next-cycle-income"
+							describeShortfall={(amount) => `Over by ${amount}`}
+						/>
+						<BudgetMetric
+							label="Cash carried forward"
+							value={nextCycleCarryover}
+							testId="next-cycle-carryover"
+							describeShortfall={(amount) => `Over by ${amount}`}
+						/>
+					</dl>
+				)}
 			</section>
 		</div>
 	);

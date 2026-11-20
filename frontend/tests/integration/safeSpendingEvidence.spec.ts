@@ -547,7 +547,7 @@ test("an explicitly tracked card keeps its statement payoff", async ({
 		await expect(
 			card.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
-		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(drawer.getByText("Credit card payoffs")).toBeVisible();
 		const payoff = drawer.getByRole("list", {
@@ -602,13 +602,13 @@ test("the dated allowance and protected obligations come from the server", async
 			0,
 		);
 		await expect(
-			card.getByRole("region", { name: "Protected obligations" }),
+			card.getByRole("region", { name: "Details" }),
 		).toHaveCount(0);
 		await expect(card.getByTestId("cash-on-hand")).toHaveCount(0);
 		await expect(card.getByText("Bills before card payoff")).toHaveCount(0);
 		await expect(card.locator("details[open]")).toHaveCount(0);
 
-		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("region", { name: "Cash checks" }),
@@ -620,7 +620,7 @@ test("the dated allowance and protected obligations come from the server", async
 		).toBeVisible();
 		await expect(drawer.getByTestId("cash-on-hand")).toHaveText("$1,244.43");
 		await expect(
-			drawer.getByRole("region", { name: "Protected obligations" }),
+			drawer.getByRole("region", { name: "Details" }),
 		).toBeVisible();
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await page.keyboard.press("Escape");
@@ -692,9 +692,9 @@ test("an unclaimed same-day bill stays expected and keeps a numeric allowance", 
 		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
 		await expect(card.getByText(/already be included/)).toHaveCount(0);
 		await expect(
-			card.getByRole("button", { name: /Protected obligations ·/ }),
+			card.getByRole("button", { name: /Details ·/ }),
 		).toBeVisible();
-		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await expect(drawer.getByText("Synthetic same-day bill")).toBeVisible();
@@ -717,7 +717,7 @@ test("changing included bills refreshes the dated allowance without reloading", 
 		await (await initialResponse).json();
 		const card = page.getByRole("region", { name: "Safe spending" });
 		const protectedSummary = card.getByRole("button", {
-			name: /Protected obligations ·/,
+			name: /Details ·/,
 		});
 		await expect(protectedSummary).toBeVisible();
 		const initialSummary = await protectedSummary.textContent();
@@ -780,15 +780,17 @@ test("no cash balance leaves the bill ledger visible", async ({ page }) => {
 		await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
 			"Unavailable",
 		);
-		await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
+		await expect(
+			card.getByRole("img", { name: /^Next cycle funding: / }),
+		).toHaveCount(0);
 		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
 		await expect(
 			card.getByText("pending-obligation-coverage-unknown"),
 		).toHaveCount(0);
-		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
-			drawer.getByRole("region", { name: "Protected obligations" }),
+			drawer.getByRole("region", { name: "Details" }),
 		).toBeVisible();
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 	} finally {
@@ -854,7 +856,7 @@ test("a linked transaction confirms its bill and keeps a numeric allowance", asy
 		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText(
 			"Unavailable",
 		);
-		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await expect(drawer.getByText("Synthetic confirmed bill")).toHaveCount(0);
@@ -888,7 +890,7 @@ test("shows a missing future checkpoint when statement amounts are unknown", asy
 		await expect(card.getByTestId("with-cash-cushion")).toHaveText(
 			"Unavailable",
 		);
-		await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("region", { name: "Cash checks" }),
@@ -932,7 +934,9 @@ test("an unknown next-cycle component stays unknown without hiding the known com
 		await expect(card.getByTestId("next-cycle-carryover")).toHaveText(
 			"Unavailable",
 		);
-		await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
+		await expect(
+			card.getByRole("img", { name: /^Next cycle funding: / }),
+		).toHaveCount(0);
 	} finally {
 		await api.dispose();
 	}
@@ -968,12 +972,16 @@ test("known next-cycle spending shows its funding composition", async ({
 		const nextCycle = card.getByRole("region", { name: "Next cycle spending" });
 		await expect(nextCycle.locator("time")).toHaveText(["Nov 20", "Dec 19"]);
 		await expect(nextCycle.getByTestId("next-cycle-income")).toHaveText(
-			"$200.00",
+			"From income · $200.00",
 		);
 		await expect(nextCycle.getByTestId("next-cycle-carryover")).toHaveText(
-			"$150.00",
+			"Cash carried forward · $150.00",
 		);
-		await expect(nextCycle.getByTestId("next-cycle-composition")).toBeVisible();
+		await expect(
+			nextCycle.getByRole("img", {
+				name: "Next cycle funding: From income $200.00. Cash carried forward $150.00.",
+			}),
+		).toBeVisible();
 	} finally {
 		await api.dispose();
 	}

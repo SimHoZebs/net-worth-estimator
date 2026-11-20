@@ -18,7 +18,7 @@ test("seeded account demo", async ({ page }) => {
 			page.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
 	}
-	await page.getByRole("button", { name: /Protected obligations ·/ }).click();
+	await page.getByRole("button", { name: /Details ·/ }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(
 		drawer.getByRole("region", { name: "Cash checks" }),
@@ -27,7 +27,7 @@ test("seeded account demo", async ({ page }) => {
 		drawer.getByRole("region", { name: "Cash evidence" }),
 	).toBeVisible();
 	await expect(
-		drawer.getByRole("region", { name: "Protected obligations" }),
+		drawer.getByRole("region", { name: "Details" }),
 	).toBeVisible();
 	// Keep the headed browser open until the developer stops the command.
 	const exitAfter = Number(process.env.DEMO_EXIT_AFTER_MS ?? 0);

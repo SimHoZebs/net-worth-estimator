@@ -11,7 +11,6 @@ const render = (overrides = {}) =>
 				paymentPeriodStart: "2026-10-31",
 				paidByPayday: 100,
 				unpaidByPayday: 50,
-				statementReserve: 30,
 				bills: [
 					{
 						id: "bill",
@@ -24,14 +23,16 @@ const render = (overrides = {}) =>
 						amount: 25,
 						status: "unknown",
 					},
-				],
-				statements: [
 					{
-						accountId: "card",
-						name: "Card",
-						closingDate: "2026-12-30",
-						kind: "estimated",
-						amount: 30,
+						id: "paid-bill",
+						actualDate: "2026-11-02",
+						transactionId: null,
+						scheduleId: null,
+						accountId: "checking",
+						name: "Paid rent",
+						date: "2026-11-01",
+						amount: 175,
+						status: "paid",
 					},
 				],
 				...overrides,
@@ -40,16 +41,29 @@ const render = (overrides = {}) =>
 	);
 
 describe("safe spending payday section", () => {
-	it("shows a payoff status when the reserve is unknown while siblings stay numeric", () => {
-		const html = render({ statementReserve: null });
-		expect(html).toContain("Payoff unverified");
-		expect(html).toContain('data-testid="paid-by-payday">$100.00');
-		expect(html).toContain('data-testid="unpaid-by-payday">$50.00');
-		expect(html).toContain("Payment unverified");
-		expect(html).not.toContain("—");
+	it("renders exact-value legend and text alternative for the payment bar", () => {
+		const html = render();
+		expect(html).toContain('role="img"');
+		expect(html).toContain(
+			'aria-label="Payment progress: Already paid $100.00. Still to pay $50.00."',
+		);
+		expect(html).toContain('data-testid="paid-by-payday"');
+		expect(html).toContain("Already paid · $100.00");
+		expect(html).toContain("Still to pay · $50.00");
+		expect(html).toContain('data-tone="sage" data-pattern="solid"');
+		expect(html).toContain('data-tone="tan" data-pattern="dots"');
 	});
 
-	it("renders a proven zero reserve as $0.00", () => {
-		expect(render({ statementReserve: 0 })).toContain("$0.00");
+	it("keeps the numeric rows when the split is unknown", () => {
+		const html = render({ unpaidByPayday: null });
+		expect(html).toContain('data-testid="paid-by-payday">$100.00');
+		expect(html).toContain('data-testid="unpaid-by-payday">Unavailable');
+		expect(html).not.toContain("Payment progress:");
+	});
+
+	it("lists only unpaid bills in the payment details", () => {
+		const html = render();
+		expect(html).toContain("Unverified bill");
+		expect(html).not.toContain("Paid rent");
 	});
 });

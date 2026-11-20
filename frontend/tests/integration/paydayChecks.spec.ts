@@ -131,36 +131,40 @@ test("safe spending separates immediate room, progress, and next-cycle funding",
 	await expect(
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
-	await expect(card.getByTestId("payment-progress")).toBeVisible();
-	await expect(card.getByTestId("unpaid-by-payday")).toHaveText("$4,054.65");
-	await expect(card.getByTestId("next-cycle-composition")).toBeVisible();
+	await expect(
+		card.getByRole("img", {
+			name: "Payment progress: Already paid $175.00. Still to pay $4,054.65.",
+		}),
+	).toBeVisible();
+	await expect(card.getByTestId("unpaid-by-payday")).toHaveText(
+		"Still to pay · $4,054.65",
+	);
+	await expect(
+		card.getByRole("img", {
+			name: "Next cycle funding: From income $3,486.08. Cash carried forward $896.44.",
+		}),
+	).toBeVisible();
 	await expect(
 		card.getByText("Short by $20.00 before a scheduled payment"),
 	).toBeVisible();
 	await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
 		"$4,382.52",
 	);
-	await expect(card.getByTestId("next-cycle-carryover")).toHaveText("$896.44");
+	await expect(card.getByTestId("next-cycle-carryover")).toHaveText(
+		"Cash carried forward · $896.44",
+	);
 	await expect(card.getByTestId("cash-on-hand")).toHaveCount(0);
 
 	const paymentDetails = card
 		.locator("summary")
 		.filter({ hasText: "Payment details" });
-	const cardDetails = card
-		.locator("summary")
-		.filter({ hasText: "Credit cards to pay" });
-	await expect(cardDetails).toContainText("Nov 30");
-	await expect(cardDetails).toContainText("$2,890.56");
-	await expect(card.getByText("Synthetic rent")).toBeHidden();
-	await expect(card.getByText("Synthetic card")).toBeHidden();
+	await expect(card.getByText("Synthetic rent")).toHaveCount(0);
+	await expect(card.getByText("Synthetic card")).toHaveCount(0);
 	await paymentDetails.focus();
 	await page.keyboard.press("Enter");
-	await expect(card.getByText("Synthetic rent")).toBeVisible();
-	await expect(card.getByText("Synthetic card")).toBeHidden();
-	await expect(card.getByText("Nov 2", { exact: true })).toBeVisible();
-	await cardDetails.click();
-	await expect(card.getByText("Synthetic card")).toBeVisible();
-	await expect(card.getByText("Synthetic rent")).toBeVisible();
+	await expect(card.getByText("No bill details")).toBeVisible();
+	await expect(card.getByText("Synthetic rent")).toHaveCount(0);
+	await expect(card.getByText("Synthetic card")).toHaveCount(0);
 	expect(await card.evaluate((node) => node.scrollWidth)).toBeLessThanOrEqual(
 		await card.evaluate((node) => node.clientWidth),
 	);
@@ -175,11 +179,13 @@ test("an unknown cycle funding payday stays undated without hiding payment or in
 	await expect(card.getByText(/Nov 27 paycheck|Nov 28 paycheck/)).toHaveCount(
 		0,
 	);
-	await expect(card.getByTestId("payment-progress")).toBeVisible();
+	await expect(
+		card.getByRole("img", { name: /^Payment progress: / }),
+	).toBeVisible();
 	await expect(
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
-	await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+	await card.getByRole("button", { name: /Details ·/ }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(drawer.getByText("Next income · Nov 28, 2026")).toBeVisible();
 	await expect(
@@ -217,13 +223,14 @@ test("missing and negative amounts leave independently known evidence visible", 
 	await expect(card.getByTestId("savings-allowance")).toHaveText(
 		"Short by $610.00",
 	);
-	await expect(card.getByTestId("additional-savings")).toHaveText(
-		"Uses $110.00 from your cushion",
-	);
 	await expect(card.getByTestId("paid-by-payday")).toHaveText("$175.00");
 	await expect(card.getByTestId("unpaid-by-payday")).toHaveText("Unavailable");
-	await expect(card.getByTestId("payment-progress")).toHaveCount(0);
-	await expect(card.getByTestId("next-cycle-composition")).toHaveCount(0);
+	await expect(card.getByRole("img", { name: /^Payment progress: / })).toHaveCount(
+		0,
+	);
+	await expect(card.getByRole("img", { name: /^Next cycle funding: / })).toHaveCount(
+		0,
+	);
 	await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
 		"Over by $80.00",
 	);

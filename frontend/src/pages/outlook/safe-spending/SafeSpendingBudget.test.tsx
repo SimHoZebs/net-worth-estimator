@@ -110,7 +110,6 @@ describe("safe spending cycle budget", () => {
 			"with-cash-cushion",
 			"income-funded",
 			"savings-allowance",
-			"additional-savings",
 		]) {
 			expect(html).toContain(`data-testid="${testId}">$0.00`);
 		}
@@ -132,9 +131,7 @@ describe("safe spending cycle budget", () => {
 		expect(html).toContain('data-testid="with-cash-cushion">Over by $110.00');
 		expect(html).toContain('data-testid="income-funded">Over by $110.00');
 		expect(html).toContain('data-testid="savings-allowance">Short by $610.00');
-		expect(html).toContain(
-			'data-testid="additional-savings">Uses $110.00 from your cushion',
-		);
+		expect(html).not.toContain("Additional savings");
 		expect(html).toContain(
 			'data-testid="discretionary-next-cycle">Over by $80.00',
 		);
@@ -195,6 +192,31 @@ describe("safe spending cycle budget", () => {
 		);
 		expect(boundary).toBeCloseTo((595.52 / 896.44) * 100, 6);
 		expect(html).not.toContain("After savings goal ($500.00 goal)");
+	});
+
+	it("renders next-cycle funding as a bar with exact-value legend and text alternative", () => {
+		const html = render(500, {
+			nextCycleIncome: 3486.08,
+			nextCycleCarryover: 896.44,
+			nextCycleDiscretionary: 4382.52,
+		});
+		expect(html).toContain('data-testid="discretionary-next-cycle">$4,382.52');
+		expect(html).toContain(
+			'aria-label="Next cycle funding: From income $3,486.08. Cash carried forward $896.44."',
+		);
+		expect(html).toContain('data-testid="next-cycle-income"');
+		expect(html).toContain("From income · $3,486.08");
+		expect(html).toContain('data-testid="next-cycle-carryover"');
+		expect(html).toContain("Cash carried forward · $896.44");
+		expect(html).toContain('data-tone="sage" data-pattern="solid"');
+		expect(html).toContain('data-tone="plum" data-pattern="solid"');
+		expect(html).not.toContain("Additional savings");
+		const widths = [...html.matchAll(/--segment-width:([0-9.]+)%/g)].map(
+			(match) => Number(match[1]),
+		);
+		expect(widths).toHaveLength(5);
+		expect(widths[3]).toBeCloseTo((3486.08 / 4382.52) * 100, 6);
+		expect(widths[4]).toBeCloseTo((896.44 / 4382.52) * 100, 6);
 	});
 
 	it("omits a zero savings goal and a zero cash cushion from the bar", () => {

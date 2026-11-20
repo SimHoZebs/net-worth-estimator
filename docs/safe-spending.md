@@ -50,7 +50,8 @@ payment status without reconciliation.
 
 The payment bar and bill details cover non-card cash bills through the displayed
 payoff date. Card payoffs and repayments owned by a single tracked card belong to
-the separate "Credit cards to pay" section through statementReserve, not the bar.
+the "Credit card payoffs" section in the detail drawer through statementReserve,
+not the bar.
 A missing statement estimate does not make the bar unknown. A split card transfer
 that cannot be allocated to one tracked card stays in the bar and bill details so
 its deduction is not lost. Card repayments remain forecast inputs even though

@@ -200,11 +200,11 @@ test("safe spending and transaction sheets share the canonical shell", async ({
 	await expect(configure).not.toBeVisible();
 	// The one-line protected summary opens the ledger drawer from the same
 	// card: same bounding width, same slot policy, same close placement.
-	await card.getByRole("button", { name: /Protected obligations ·/ }).click();
+	await card.getByRole("button", { name: /Details ·/ }).click();
 	const ledger = page.locator('[data-slot="sheet-content"]').first();
 	await expect(ledger).toBeVisible();
 	await expect(
-		ledger.getByRole("region", { name: "Protected obligations" }),
+		ledger.getByRole("region", { name: "Details" }),
 	).toBeVisible();
 	await expect(
 		ledger.getByRole("region", { name: "Cash checks" }),

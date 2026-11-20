@@ -1,14 +1,13 @@
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
-import { billRow, statementRow } from "./allowanceLedger.ts";
+import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import { exactMoney } from "@/domain/format.ts";
+import { billRow } from "./allowanceLedger.ts";
 import {
-	BudgetAmount,
 	budgetDate,
 	BudgetMetric,
-	BudgetSplit,
 	firstBudgetShare,
 } from "./budgetDisplay.tsx";
 import { ObligationRows } from "./SafeSpendingObligationLedger.tsx";
-import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingPayday({
 	summary,
@@ -19,33 +18,26 @@ export function SafeSpendingPayday({
 		summary;
 	const payoffLabel = budgetDate(payoffDate);
 	const periodStart = budgetDate(paymentPeriodStart);
-	const showProgress = firstBudgetShare(paidByPayday, unpaidByPayday) !== null;
+	const progress =
+		paidByPayday != null &&
+		unpaidByPayday != null &&
+		firstBudgetShare(paidByPayday, unpaidByPayday) !== null
+			? { paid: paidByPayday, unpaid: unpaidByPayday }
+			: null;
 	const bills = (summary.bills ?? [])
 		.filter((bill) => {
 			if (payoffDate && bill.date > payoffDate) return false;
-			return (
-				bill.status !== "paid" ||
-				!paymentPeriodStart ||
-				bill.date >= paymentPeriodStart ||
-				(bill.actualDate !== null && bill.actualDate >= paymentPeriodStart)
-			);
+			return bill.status !== "paid";
 		})
 		.map((bill) => ({
 			...billRow(bill),
 			detail:
-				bill.status === "paid"
-					? "Paid"
-					: bill.status === "pending"
-						? "Pending · Estimated"
-						: bill.status === "unknown"
-							? "Payment unverified"
-							: "Still to pay · Estimated",
+				bill.status === "pending"
+					? "Pending · Estimated"
+					: bill.status === "unknown"
+						? "Payment unverified"
+						: "Still to pay · Estimated",
 		}));
-	const cards = (summary.statements ?? [])
-		.filter(
-			(statement) => statement.amount !== 0 || statement.kind === "estimated",
-		)
-		.map(statementRow);
 
 	return (
 		<section
@@ -69,27 +61,45 @@ export function SafeSpendingPayday({
 					</p>
 				)}
 			</div>
-			<BudgetSplit
-				first={paidByPayday}
-				second={unpaidByPayday}
-				testId="payment-progress"
-			/>
-			<dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-				<BudgetMetric
-					label="Already paid"
-					value={paidByPayday}
-					testId="paid-by-payday"
-					stacked
-					segment={showProgress ? "first" : undefined}
+			{progress ? (
+				<SegmentedBar
+					caption="Payment progress"
+					captionClassName="sr-only"
+					formatAmount={exactMoney}
+					ariaLabel={`Payment progress: Already paid ${exactMoney(progress.paid)}. Still to pay ${exactMoney(progress.unpaid)}.`}
+					segments={[
+						{
+							label: "Already paid",
+							amount: progress.paid,
+							tone: "sage",
+							pattern: "solid",
+							testId: "paid-by-payday",
+						},
+						{
+							label: "Still to pay",
+							amount: progress.unpaid,
+							tone: "tan",
+							pattern: "dots",
+							testId: "unpaid-by-payday",
+						},
+					]}
 				/>
-				<BudgetMetric
-					label="Still to pay"
-					value={unpaidByPayday}
-					testId="unpaid-by-payday"
-					stacked
-					segment={showProgress ? "second" : undefined}
-				/>
-			</dl>
+			) : (
+				<dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+					<BudgetMetric
+						label="Already paid"
+						value={paidByPayday}
+						testId="paid-by-payday"
+						stacked
+					/>
+					<BudgetMetric
+						label="Still to pay"
+						value={unpaidByPayday}
+						testId="unpaid-by-payday"
+						stacked
+					/>
+				</dl>
+			)}
 			{summary.reasons?.includes("possible-pending-payment-overlap") && (
 				<p className="m-0 text-xs text-muted-foreground">
 					Possible pending payment overlap
@@ -103,31 +113,6 @@ export function SafeSpendingPayday({
 					<ObligationRows label="Bills through payday" rows={bills} />
 				) : (
 					<p className="m-0 text-xs text-muted-foreground">No bill details</p>
-				)}
-			</details>
-			<details className="rounded-md border border-border px-2.5 text-sm">
-				<summary className="cursor-pointer py-2 font-medium">
-					Credit cards to pay
-					{payoffLabel && (
-						<>
-							{" "}
-							· <time dateTime={payoffDate}>{payoffLabel}</time>
-						</>
-					)}{" "}
-					·{" "}
-					<BudgetAmount
-						value={summary.statementReserve}
-						missingText={labels.payoffUnverified}
-					/>
-				</summary>
-				{cards.length ? (
-					<div className="pb-2">
-						<ObligationRows label="Card payoff details" rows={cards} />
-					</div>
-				) : (
-					<p className="m-0 pb-2 text-xs text-muted-foreground">
-						No card payoff details
-					</p>
 				)}
 			</details>
 		</section>

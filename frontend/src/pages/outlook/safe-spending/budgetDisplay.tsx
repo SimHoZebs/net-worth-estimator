@@ -1,4 +1,3 @@
-import { cssVariables } from "@/components/cssVariables.ts";
 import { isIsoDate, monthDay } from "@/domain/format.ts";
 import { cn } from "@/lib/utils.ts";
 import { amountText } from "./amountText.ts";
@@ -31,31 +30,6 @@ export function BudgetAmount({
 					? `+${magnitude}`
 					: magnitude}
 		</span>
-	);
-}
-
-export function BudgetSplit({
-	first,
-	second,
-	testId,
-}: {
-	first: number | null | undefined;
-	second: number | null | undefined;
-	testId?: string;
-}) {
-	const share = firstBudgetShare(first, second);
-	if (share === null) return null;
-	return (
-		<div
-			aria-hidden="true"
-			className="flex h-2 w-full overflow-hidden rounded-full bg-chart-series-2"
-			data-testid={testId}
-		>
-			<span
-				className="w-(--first-share) bg-chart-series-1"
-				style={cssVariables({ "--first-share": `${share}%` })}
-			/>
-		</div>
 	);
 }
 
