@@ -52,6 +52,26 @@ export function checkingAccountId(accounts: Account[]): string | null {
 	return anyCash?.id ?? null;
 }
 
+/**
+ * Automatic Safe Spending card set. The declared kind is authoritative: a
+ * card is never inferred from an account name or an id suffix. An explicit
+ * owner selection still overrides this through the settings resolver, so the
+ * automatic set only decides what `null` means.
+ */
+export function safeSpendingCards(accounts: Account[]): Account[] {
+	return accounts.filter(
+		(account) =>
+			account.enabled && !account.archived && account.kind === "credit_card",
+	);
+}
+
+export function selectedCardIds(
+	stored: string[] | null,
+	available: readonly string[],
+): string[] {
+	return stored === null ? [...available] : stored.filter((id) => available.includes(id));
+}
+
 /** One predicate for a bill occurrence in a mandatory window. */
 function isMandatoryOccurrence(
 	row: TransactionResult,

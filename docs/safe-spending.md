@@ -57,6 +57,21 @@ its deduction is not lost. Card repayments remain forecast inputs even though
 they are not displayed as bills. A posted repayment reduces that statement's
 unpaid amount; the bank movement is not a second expense.
 
+## Reviewing card payments
+
+Record the billed balance, close date, and due date on the credit card account.
+In the payment transaction, Suggestions can identify an open statement once
+the destination card is known. An exact match to the remaining balance is strong
+evidence for the suggestion, not proof or automatic confirmation. A smaller
+payment can still be applied to the statement without marking it paid in full.
+
+A missing statement does not turn a known card payment into a purchase. The
+payment still reduces checking cash, and the card's purchases still account for
+the spending. Identifying a payment and applying it to a statement are separate
+decisions.
+
+## Cash evidence
+
 Cash observations and confirmed movements are bounded by the evidence cut.
 Do not subtract a posted payment again when the starting observation has
 already captured it. Where a hold or a balance cannot establish what has been
@@ -118,9 +133,11 @@ paid versus outstanding obligations; the latter shows two sources of the same
 projected allowance. Unknown components or shortfalls are shown as text, not
 as misleading segments.
 
-Card payments reduce the oldest outstanding statements first. A planned early
-payment funded by carried cash uses that cash once; an early payment funded by
-a later paycheck does not free up the current cushion for spending today.
+When forecasting from account activity, card payments reduce estimated
+outstanding amounts oldest first. This forecast rule does not confirm whether
+an issued statement is paid in full. A planned early payment funded by carried
+cash uses that cash once; an early payment funded by a later paycheck does not
+free up the current cushion for spending today.
 A priced pending card purchase is included in the forecast as if it will post.
 It is not a posted charge or a scheduled estimate, and the posted purchase
 replaces it rather than adding a second expense. An unpriced authorization

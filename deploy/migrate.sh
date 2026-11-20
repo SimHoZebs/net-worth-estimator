@@ -22,7 +22,10 @@
 #   7. The account_displays table is provisioned when absent.
 #   8. The suppression-key and checkpoint available-balance sidecars are
 #      provisioned when absent.
-#   9. Historical forward no-op bank checkpoints are pruned: posted balances
+#   9. The card-statement, statement-allocation, and statement-allocation-event
+#      tables and their marker are provisioned when absent; a partial group
+#      fails closed. These tables start empty on existing databases.
+#  10. Historical forward no-op bank checkpoints are pruned: posted balances
 #      that match the modeled balance need no row. Owner rows, first
 #      observations, and changed available balances survive.
 #      setupdb then validates the complete candidate without upgrades.
@@ -381,6 +384,28 @@ available_state() {
   echo 1
 }
 
+# Card statements, allocations and allocation events are one additive schema
+# group: three initially-empty tables plus a schema marker. Absent means
+# provision on the candidate; complete means verify the exact columns and
+# marker; any partial or mixed shape fails closed before any backup is taken.
+card_statements_state() {
+  tables=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('card_statements','statement_allocations','statement_allocation_events');") \
+    || fail "Cannot inspect card statement schema; refusing to guess."
+  marked=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM schema_migrations WHERE name = 'recorded-card-statements-v1';") \
+    || fail "Cannot inspect card statement marker; refusing to guess."
+  case "$tables:$marked" in
+    0:0) echo absent; return 0 ;;
+    3:1)
+      sqlite3 -readonly "$1" '
+        SELECT user_id, id, position, account_id, closing_date, due_date, balance, currency, source, note, created_at FROM card_statements LIMIT 0;
+        SELECT user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at FROM statement_allocations LIMIT 0;
+        SELECT user_id, id, allocation_id, action, actor, created_at FROM statement_allocation_events LIMIT 0;' \
+        || fail "Incomplete card statement schema. Refusing automatic repair."
+      echo current ;;
+    *) fail "Partial card statement schema ($tables tables, $marked markers); refusing automatic repair." ;;
+  esac
+}
+
 # Statement closing day is one authoritative account property. Legacy sources
 # carry payment_terms.statement_day with no marker; converted sources carry
 # accounts.statement_closing_day and the marker. Exactly one source column must
@@ -516,6 +541,7 @@ else
 fi
 suppressed=$(suppressed_state "$db") || fail "Cannot inspect suppression-key schema; refusing to guess."
 available=$(available_state "$db") || fail "Cannot inspect available-balance schema; refusing to guess."
+card_statements=$(card_statements_state "$db") || fail "Cannot inspect card statement schema; refusing to guess."
 if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
 fi
@@ -544,6 +570,8 @@ statement_closing=$(statement_closing_state "$db") || fail "Cannot inspect state
 safe_spending_settings_ok "$db" || fail "Invalid Safe Spending settings; refusing automatic repair."
 safe_spending_missing=$(safe_spending_defaults_missing "$db") || fail "Cannot inspect Safe Spending settings."
 safe_spending_reserve=$(safe_spending_reserve_present "$db") || fail "Cannot inspect retired Safe Spending reserve."
+legacy_cards=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM accounts a WHERE a.kind = 'debt' AND EXISTS (SELECT 1 FROM safe_spending_settings s, json_each(s.settings_json, '$.accountIds') j WHERE s.user_id = a.user_id AND j.value = a.id);") \
+  || fail "Cannot inspect legacy card selections; refusing to guess."
 transactions_split=0
 if [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_sim';")" = 1 ] && \
    [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'destination_account_ids';")" = 1 ]; then
@@ -598,7 +626,7 @@ fi
 # one and a failed dry run falls through to the full path instead of stranding
 # the window. The full path provisions the candidate and keeps a verified
 # backup either way.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ] && [ "$safe_spending_missing" = 0 ] && [ "$safe_spending_reserve" = 0 ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$card_statements" = current ] && [ "$legacy_cards" = 0 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ] && [ "$safe_spending_missing" = 0 ] && [ "$safe_spending_reserve" = 0 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -925,6 +953,65 @@ fi
 suppressed_state "$candidate" || fail "Candidate suppression-key schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
 available_state "$candidate" || fail "Candidate available-balance schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
 
+# Provision the card statement, allocation and allocation-event tables and
+# their marker on sources that predate recorded card statements. This is
+# purely additive: every table starts empty and no financial row is touched.
+# The DDL mirrors the application schema exactly; the marker is inserted
+# idempotently. Any partial source shape already failed the source preflight.
+if [ "$card_statements" = absent ]; then
+  card_statements_sql="$backup/card-statements.sql"
+  cat > "$card_statements_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS card_statements (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  account_id TEXT NOT NULL,
+  closing_date TEXT NOT NULL,
+  due_date TEXT NOT NULL,
+  balance REAL NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  source TEXT NOT NULL DEFAULT 'user',
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, id),
+  UNIQUE (user_id, account_id, closing_date),
+  FOREIGN KEY (user_id, account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE IF NOT EXISTS statement_allocations (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  statement_id TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  amount REAL NOT NULL,
+  state TEXT NOT NULL DEFAULT 'confirmed' CHECK (state IN ('confirmed','dismissed')),
+  evidence TEXT NOT NULL DEFAULT '',
+  actor TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, id),
+  UNIQUE (user_id, transaction_id),
+  FOREIGN KEY (user_id, statement_id) REFERENCES card_statements(user_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id, transaction_id) REFERENCES transactions(user_id, id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE IF NOT EXISTS statement_allocation_events (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id INTEGER NOT NULL,
+  allocation_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('created','dismissed','confirmed')),
+  actor TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, id),
+  FOREIGN KEY (user_id, allocation_id) REFERENCES statement_allocations(user_id, id) ON DELETE CASCADE
+);
+INSERT OR IGNORE INTO schema_migrations(name) VALUES ('recorded-card-statements-v1');
+DDL
+  if ! sqlite3 "$candidate" < "$card_statements_sql" > "$backup/card-statements.log" 2>&1; then
+    printf 'migrate: card statement upgrade failed: %s\n' "$(cat "$backup/card-statements.log")" >&2
+    fail "Candidate card statement upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+card_statements_state "$candidate" || fail "Candidate card statement schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
 
 # Provision the sharing tracks on pre-sharing candidates. The DDL mirrors
 # the application schema exactly; rows are never touched, so preexisting
@@ -1476,6 +1563,11 @@ if [ "$available" = 0 ]; then
   test "$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM checkpoint_available_balances;")" = 0 \
     || fail "Provisioned available balances are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
+if [ "$card_statements" = absent ]; then
+  empty_card=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM card_statements) + (SELECT COUNT(*) FROM statement_allocations) + (SELECT COUNT(*) FROM statement_allocation_events);") \
+    || fail "Cannot verify provisioned card statement tables. Original unchanged; backup retained at $backup."
+  test "$empty_card" = 0 || fail "Provisioned card statement tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
 
 # Verify purchase conversion separately against the already-verified timestamp
 # candidate. The original database still has no writes at this point.
@@ -1870,6 +1962,56 @@ validation_after=$(sqlite3 "$candidate" .dump | sha256sum)
 test "$validation_before" = "$validation_after" || fail "Candidate setup changed schema or rows. Original unchanged; backup retained at $backup."
 check_integrity "$candidate" || fail "Candidate integrity check failed after purchase conversion. Original unchanged; backup retained at $backup."
 
+# Promote explicitly selected legacy cards to the first-class credit_card
+# kind. This runs after every row-preservation check so those checks still
+# compare the original rows, and before publication. Only an account named in
+# a saved accountIds selection and still labelled debt changes; this never
+# guesses from account names or from the generic debt fallback.
+legacy_card_count=$(sqlite3 -readonly "$candidate" "
+  SELECT COUNT(*) FROM accounts a
+  WHERE a.kind = 'debt'
+    AND EXISTS (
+      SELECT 1 FROM safe_spending_settings s, json_each(s.settings_json, '$.accountIds') j
+      WHERE s.user_id = a.user_id AND j.value = a.id
+    );") || fail "Cannot inspect legacy card selections; refusing to guess."
+if ! sqlite3 "$candidate" <<'SQL' > "$backup/card-kind.log" 2>&1
+UPDATE accounts
+SET kind = 'credit_card'
+WHERE kind = 'debt'
+  AND EXISTS (
+    SELECT 1 FROM safe_spending_settings s, json_each(s.settings_json, '$.accountIds') j
+    WHERE s.user_id = accounts.user_id AND j.value = accounts.id
+  );
+SQL
+then
+  printf 'migrate: credit card kind promotion failed: %s\n' "$(cat "$backup/card-kind.log")" >&2
+  fail "Candidate credit card kind promotion failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+remaining_legacy_cards=$(sqlite3 -readonly "$candidate" "
+  SELECT COUNT(*) FROM accounts a
+  WHERE a.kind = 'debt'
+    AND EXISTS (
+      SELECT 1 FROM safe_spending_settings s, json_each(s.settings_json, '$.accountIds') j
+      WHERE s.user_id = a.user_id AND j.value = a.id
+    );") || fail "Cannot verify credit card kind promotion; refusing to publish."
+if [ "$remaining_legacy_cards" != 0 ]; then
+  fail "Candidate still has explicitly selected debt accounts. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+# A debt account that only looks like a card by name and was never explicitly
+# selected cannot be classified safely. Flag it for the operator instead.
+ambiguous_cards=$(sqlite3 -readonly "$candidate" "
+  SELECT COUNT(*) FROM accounts a
+  WHERE a.kind = 'debt' AND a.id LIKE '%_card'
+    AND EXISTS (
+      SELECT 1 FROM safe_spending_settings s
+      WHERE s.user_id = a.user_id AND json_extract(s.settings_json, '$.accountIds') IS NULL
+    );") || fail "Cannot check ambiguous legacy cards; refusing to publish."
+if [ "$ambiguous_cards" != 0 ]; then
+  printf 'migrate: warning: %s debt account(s) look like cards but were never explicitly selected; review them before the next release.\n' "$ambiguous_cards"
+fi
+printf 'migrate: promoted %s explicitly selected legacy card(s) to credit_card.\n' "$legacy_card_count"
+check_integrity "$candidate" || fail "Candidate integrity check failed after card kind promotion. Original unchanged; backup retained at $backup."
+
 # Publish the verified candidate over the original with the backup API.
 # The destination file keeps its path, permissions, and ownership.
 sqlite3 "$candidate" ".backup main '$(esc "$db")'" \
@@ -1878,6 +2020,7 @@ check_target "$db" || fail "Published database failed Analysis verification. Rec
 check_projection "$db" || fail "Published database failed unified projection verification. Recover from the verified backup at $backup. Keep the API stopped."
 suppressed_state "$db" || fail "Published database failed suppression-key verification. Recover from the verified backup at $backup. Keep the API stopped."
 available_state "$db" || fail "Published database failed available-balance verification. Recover from the verified backup at $backup. Keep the API stopped."
+card_statements_state "$db" || fail "Published database failed card statement verification. Recover from the verified backup at $backup. Keep the API stopped."
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('account_links') WHERE name='institution';")" = 1 \
   || fail "Published database is missing the account_links institution column. Recover from the verified backup at $backup. Keep the API stopped."
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name='display_basis';")" = 1 \

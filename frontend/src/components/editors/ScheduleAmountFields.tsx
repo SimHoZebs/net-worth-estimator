@@ -6,6 +6,7 @@ import {
 	type AmountFields,
 } from "../../domain/scheduleAmounts.ts";
 import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
+import { isLiability } from "../../domain/accountKinds.ts";
 import { EditorField, EditorSelect } from "./editorFields.tsx";
 
 export function ScheduleAmountFields({
@@ -148,8 +149,8 @@ function AmountOptionField({
 							(account) =>
 								!isGroupedDisplay(account) &&
 								(field.kind === "debt"
-									? account.kind === "debt"
-									: account.kind !== "debt"),
+									? isLiability(account)
+									: !isLiability(account)),
 						)
 				).map((entry) => ({
 					value: entry.id,

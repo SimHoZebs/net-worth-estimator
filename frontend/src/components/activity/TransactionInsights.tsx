@@ -6,6 +6,11 @@ import { dateLabel, money } from "@/domain/format.ts";
 import type { Transaction } from "@/domain/model.ts";
 import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import {
+	statementSuggestionKey,
+	type StatementPaymentSuggestion,
+} from "@/domain/statementPayment.ts";
+import { StatementPaymentSuggestion as StatementPaymentSuggestionView } from "./StatementPaymentSuggestion.tsx";
+import {
 	directionLabel,
 	frequencyLabel,
 	groupRecurringPatterns,
@@ -56,6 +61,11 @@ export type InsightSuggestion =
 			kind: "recurring";
 			pattern: RecurringPattern;
 			priority: number;
+	  }
+	| {
+			kind: "statement";
+			match: StatementPaymentSuggestion;
+			priority: number;
 	  };
 
 function isPendingBnpl(finding: AnalysisFinding): boolean {
@@ -99,6 +109,7 @@ export function buildInsightSuggestions({
 	transactionId,
 	voidRow,
 	candidates,
+	statementMatches = [],
 }: {
 	findings: AnalysisFinding[];
 	transactionId: string;
@@ -106,8 +117,13 @@ export function buildInsightSuggestions({
 	voidRow?: Transaction;
 	/** Server-ranked posted charges for this hold. */
 	candidates?: SettleCandidateRow[];
+	/** Exact remaining-balance matches for this card payment, suggestion only. */
+	statementMatches?: StatementPaymentSuggestion[];
 }): InsightSuggestion[] {
 	const suggestions: InsightSuggestion[] = [];
+	for (const match of statementMatches) {
+		suggestions.push({ kind: "statement", match, priority: 0 });
+	}
 	if (voidRow?.id === transactionId && voidRow.void && candidates?.length) {
 		suggestions.push({
 			kind: "void",
@@ -160,12 +176,15 @@ export function TransactionInsightsTrigger({
 
 function suggestionKey(suggestion: InsightSuggestion): string {
 	if (suggestion.kind === "void") return `void-${suggestion.voidRow.id}`;
+	if (suggestion.kind === "statement")
+		return statementSuggestionKey(suggestion.match);
 	return suggestion.kind === "bnpl"
 		? suggestion.finding.id
 		: suggestion.pattern.anchor.id;
 }
 
 function suggestionEvidence(suggestion: InsightSuggestion): string {
+	if (suggestion.kind === "statement") return suggestion.match.evidence ?? "";
 	if (suggestion.kind === "void") {
 		const first = suggestion.candidates[0];
 		if (!first) return "A posted charge matches this vanished hold.";
@@ -191,6 +210,10 @@ export function TransactionInsightsPanel({
 	readOnly,
 	onDone,
 	onMergeVoid,
+	onApplyStatement,
+	onChooseStatement,
+	onDismissStatement,
+	onUndoStatement,
 }: {
 	suggestions: InsightSuggestion[];
 	names: Map<string, string>;
@@ -198,6 +221,17 @@ export function TransactionInsightsPanel({
 	onDone: () => void;
 	/** Merge a vanished hold into its posted charge, then remove the hold. */
 	onMergeVoid?: (candidateId: string) => Promise<boolean>;
+	/** Apply an amount of the card payment to a statement. */
+	onApplyStatement?: (
+		statementId: string,
+		amount: number,
+	) => Promise<boolean> | boolean;
+	/** Move the payment to another issued statement. */
+	onChooseStatement?: (statementId: string) => Promise<boolean> | boolean;
+	/** Defer a statement suggestion without changing any statement. */
+	onDismissStatement?: () => Promise<boolean> | boolean;
+	/** Undo a previous statement apply or dismiss. */
+	onUndoStatement?: () => Promise<boolean> | boolean;
 }) {
 	const review = useReviewAnalysisFinding();
 	const dismiss = useDismissAnalysisFinding();
@@ -268,6 +302,30 @@ export function TransactionInsightsPanel({
 		setVoidError(null);
 	};
 
+	// A statement match leaves the queue only when the server confirms the
+	// change. An exact remaining-balance match stays a question until the
+	// owner applies an amount explicitly.
+	const applyStatement = async (statementId: string, amount: number) => {
+		if (!onApplyStatement || active?.kind !== "statement") return false;
+		const ok = await onApplyStatement(statementId, amount);
+		if (ok) markHandled(active);
+		return ok;
+	};
+	const chooseStatement = async (statementId: string) => {
+		if (!onChooseStatement) return false;
+		return onChooseStatement(statementId);
+	};
+	const dismissStatement = async () => {
+		if (!onDismissStatement || active?.kind !== "statement") return false;
+		const ok = await onDismissStatement();
+		if (ok) markHandled(active);
+		return ok;
+	};
+	const undoStatement = async () => {
+		if (!onUndoStatement) return false;
+		return onUndoStatement();
+	};
+
 	// Derived from the live queue only; the dialog below stays mounted by id.
 	const shown: InsightSuggestion | null = active;
 	const closeRuleDialog = (kind: "new" | "existing") => {
@@ -325,6 +383,31 @@ export function TransactionInsightsPanel({
 						</Button>
 					</EmptyContent>
 				</Empty>
+				{scheduleDialog}
+			</>
+		);
+	}
+
+	if (shown.kind === "statement") {
+		const done = handled.filter((key) =>
+			suggestions.some((item) => suggestionKey(item) === key),
+		).length;
+		return (
+			<>
+				<StatementPaymentSuggestionView
+					key={shown.match.statementId}
+					suggestion={shown.match}
+					position={done + 1}
+					total={Math.max(done + open.length, 1)}
+					readOnly={readOnly}
+					busy={review.isPending || dismiss.isPending}
+					error={error}
+					onApply={applyStatement}
+					onChooseStatement={onChooseStatement ? chooseStatement : undefined}
+					onDismiss={onDismissStatement ? dismissStatement : undefined}
+					onUndo={onUndoStatement ? undoStatement : undefined}
+					onError={setError}
+				/>
 				{scheduleDialog}
 			</>
 		);

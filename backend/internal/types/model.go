@@ -51,6 +51,7 @@ const (
 	AccountKindCash       AccountKind = "cash"
 	AccountKindInvestment AccountKind = "investment"
 	AccountKindDebt       AccountKind = "debt"
+	AccountKindCreditCard AccountKind = "credit_card"
 	AccountKindProperty   AccountKind = "property"
 )
 
@@ -58,6 +59,7 @@ var accountKinds = []AccountKind{
 	AccountKindCash,
 	AccountKindInvestment,
 	AccountKindDebt,
+	AccountKindCreditCard,
 	AccountKindProperty,
 }
 

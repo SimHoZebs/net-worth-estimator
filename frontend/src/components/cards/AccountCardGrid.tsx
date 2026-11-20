@@ -29,7 +29,7 @@ export function AccountCardGrid({
 	const needle = query.trim().toLowerCase();
 	const shown = needle
 		? cards.filter((card) =>
-				`${card.name} ${card.institution} ${card.kind}`
+				`${card.name} ${card.institution} ${card.kind} ${card.kind.replaceAll("_", " ")}`
 					.toLowerCase()
 					.includes(needle),
 			)

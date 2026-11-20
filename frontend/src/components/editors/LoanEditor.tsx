@@ -19,6 +19,7 @@ import { DiscardConfirm, useDiscardGuard } from "./EditorDialog.tsx";
 import { EditorField, EditorSelect, MoneyField } from "./editorFields.tsx";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
+import { isLiability } from "../../domain/accountKinds.ts";
 
 const frequencies = [
 	"daily",
@@ -138,9 +139,8 @@ function LoanForm({
 		),
 		funding:
 			paymentRule?.sourceAccountId ??
-			accounts.find(
-				(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
-			)?.id ??
+			accounts.find((a) => a.id !== item?.id && !isLiability(a) && !a.archived)
+				?.id ??
 			"",
 		interestFrequency: loanFrequencyOf(charge),
 		paymentFrequency: loanFrequencyOf(paymentRule),
@@ -330,7 +330,7 @@ function LoanForm({
 							emptyLabel="Select funding account"
 							options={accounts
 								.filter(
-									(a) => a.id !== item?.id && a.kind !== "debt" && !a.archived,
+									(a) => a.id !== item?.id && !isLiability(a) && !a.archived,
 								)
 								.map((a) => ({
 									value: a.id,

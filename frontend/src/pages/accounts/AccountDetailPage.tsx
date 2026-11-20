@@ -29,10 +29,10 @@ import {
 	useRemoteProjection,
 } from "../../state/useRemoteProjection.ts";
 import { useSchedules } from "../../state/workspaceResources.ts";
-import { useSafeSpendingSettings } from "../../state/useSafeSpendingSettings.ts";
 import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import { AccountIcon } from "../../components/AccountIcon.tsx";
 import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
+import { AccountStatements } from "../../components/activity/AccountStatements.tsx";
 import { LoanDetails } from "../../components/activity/LoanDetails.tsx";
 import {
 	accountBalanceHeaderData,
@@ -89,7 +89,6 @@ export function AccountDetailView({
 		!isGroupedDisplay(account),
 	);
 	const edit = useAccountEdit(account, locked, adjustments.data ?? []);
-	const trackedCardIds = useSafeSpendingSettings().accountIds ?? [];
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
 		if (edit.saving) return;
@@ -339,8 +338,15 @@ export function AccountDetailView({
 							key={account.id}
 							account={account}
 							edit={edit}
-							readOnly={locked}
-							cardAccountIds={trackedCardIds}
+							readOnly={readOnly}
+						/>
+					)}
+					{account.kind === "credit_card" && !isGroupedDisplay(account) && (
+						<AccountStatements
+							key={`statements-${account.id}`}
+							accountId={account.id}
+							accountName={account.name}
+							readOnly={readOnly}
 						/>
 					)}
 				</TabsContent>

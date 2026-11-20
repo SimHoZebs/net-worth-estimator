@@ -35,7 +35,12 @@ export interface ProblemDetails extends HumaMetadata {
 export const NO_FLOOR_SENTINEL = -10_000_000_000_000;
 export const NO_CEILING_SENTINEL = 10_000_000_000_000;
 
-export type AccountKind = "cash" | "investment" | "debt" | "property";
+export type AccountKind =
+	| "cash"
+	| "investment"
+	| "credit_card"
+	| "debt"
+	| "property";
 
 export interface BackendAccount extends HumaMetadata {
 	display?: import("./generated/model/accountDisplay.ts").AccountDisplay;

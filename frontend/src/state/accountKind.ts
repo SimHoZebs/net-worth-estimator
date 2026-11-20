@@ -7,10 +7,8 @@ import type { AccountKind } from "@/api/contracts.ts";
 
 /**
  * Refusal reason when a synced kind change contradicts the bank balance,
- * or null when the kind may be saved. Kind is a user label, but debt must
- * not contradict the owned facts: debt holds no positive balance.
- * Non-debt accounts may hold a negative bank balance (for example an
- * overdrawn checking account), so only a positive debt balance refuses.
+ * or null when the kind may be saved. Loan debt must not have a positive
+ * balance. A credit card may have a credit after an overpayment or refund.
  */
 export function syncedKindError(
 	balance: number | null,

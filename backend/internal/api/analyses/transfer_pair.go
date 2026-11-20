@@ -6,6 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -75,6 +76,39 @@ func (s *handler) removeTransferLink(ctx context.Context, input *struct {
 }, error) {
 	if s.canWrite != nil && !s.canWrite(ctx) {
 		return nil, huma.Error403Forbidden("Write permission is required")
+	}
+	// Removing a confirmed link must not strand a live statement allocation
+	// whose card identity came from that link.
+	links, err := s.store.ListTransferLinks()
+	if err != nil {
+		return nil, huma.Error500InternalServerError("The transfer link could not be removed.")
+	}
+	found := false
+	remaining := make([]types.TransferLink, 0, len(links))
+	for _, link := range links {
+		if link.LegA == input.TransactionID || link.LegB == input.TransactionID {
+			found = true
+			continue
+		}
+		remaining = append(remaining, link)
+	}
+	if !found {
+		return nil, huma.Error404NotFound("Transfer link not found")
+	}
+	model, err := s.store.LoadModel()
+	if err != nil {
+		return nil, huma.Error500InternalServerError("The transfer link could not be removed.")
+	}
+	allocations, err := s.store.ListStatementAllocations("")
+	if err != nil {
+		return nil, huma.Error500InternalServerError("The transfer link could not be removed.")
+	}
+	statements, err := s.store.ListCardStatements("")
+	if err != nil {
+		return nil, huma.Error500InternalServerError("The transfer link could not be removed.")
+	}
+	if !domain.ConfirmedAllocationCardsResolvable(model, remaining, allocations, statements) {
+		return nil, huma.Error409Conflict("This transfer link still backs a confirmed statement allocation. Dismiss it before removing the link.")
 	}
 	if _, err := s.store.RemoveTransferLinkByLeg(input.TransactionID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {

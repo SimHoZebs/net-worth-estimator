@@ -14,8 +14,8 @@ func paydayFixture() (*types.FinancialModel, *types.SafeSpendingSettings) {
 	model := baseModel()
 	model.Checkpoints[0] = types.Checkpoint{AccountID: "checking", Balance: 900, AvailableBalance: ptr(900.0), ObservedAt: stamp("2026-11-14T20:00:00Z")}
 	model.Accounts = append(model.Accounts,
-		types.Account{ID: "card-a", Name: "Card A", Kind: types.AccountKindDebt, Enabled: true, StatementClosingDay: 19},
-		types.Account{ID: "card-b", Name: "Card B", Kind: types.AccountKindDebt, Enabled: true, StatementClosingDay: 19},
+		types.Account{ID: "card-a", Name: "Card A", Kind: types.AccountKindCreditCard, Enabled: true, StatementClosingDay: 19},
+		types.Account{ID: "card-b", Name: "Card B", Kind: types.AccountKindCreditCard, Enabled: true, StatementClosingDay: 19},
 	)
 	model.Checkpoints = append(model.Checkpoints,
 		types.Checkpoint{AccountID: "card-a", Balance: -500, ObservedAt: domain.DayCloseUnix("2026-10-19")},
@@ -368,18 +368,31 @@ func TestSelectedDebtAccountNeedsNoPaymentTerms(t *testing.T) {
 	}
 }
 
-func TestNullCardSelectionPrefersCardSuffix(t *testing.T) {
+func TestNullCardSelectionUsesDeclaredCreditCards(t *testing.T) {
 	model, settings := paydayFixture()
 	settings.AccountIDs = nil
-	model.Accounts = append(model.Accounts, types.Account{ID: "prime_card", Name: "Prime", Kind: types.AccountKindDebt, Enabled: true, StatementClosingDay: 19})
+	model.Accounts = append(model.Accounts,
+		types.Account{ID: "prime_card", Name: "Prime", Kind: types.AccountKindCreditCard, Enabled: true, StatementClosingDay: 19},
+		types.Account{ID: "loan-other", Kind: types.AccountKindDebt, Enabled: true},
+	)
 	model.Checkpoints = append(model.Checkpoints, types.Checkpoint{AccountID: "prime_card", Balance: -50, ObservedAt: domain.DayCloseUnix("2026-10-19")})
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
+	// A null selection tracks every declared credit card and nothing else:
+	// no _card suffix heuristic and no generic debt fallback.
+	want := map[string]bool{"card-a": true, "card-b": true, "prime_card": true}
+	seen := map[string]bool{}
 	for _, statement := range summary.Statements {
-		if statement.AccountID != "prime_card" {
-			t.Fatalf("null selection ignored the card suffix %+v", summary.Statements)
+		if !want[statement.AccountID] {
+			t.Fatalf("null selection included a non-card %+v", statement)
+		}
+		seen[statement.AccountID] = true
+	}
+	for id := range want {
+		if !seen[id] {
+			t.Fatalf("null selection missed declared card %s", id)
 		}
 	}
-	assertMoney(t, summary.StatementReserve, 50)
+	assertMoney(t, summary.StatementReserve, 700)
 }
 
 func TestCardSelectionDistinguishesNullFromEmpty(t *testing.T) {
@@ -402,38 +415,39 @@ func TestCardSelectionDistinguishesNullFromEmpty(t *testing.T) {
 	}
 }
 
-func TestExplicitSelectionKeepsSyncedCardsLabelledCash(t *testing.T) {
+func TestExplicitSelectionRequiresDeclaredCreditCard(t *testing.T) {
 	model, settings := paydayFixture()
-	// Sync provisions unknown accounts with the neutral cash label and never
-	// infers card kind from bridge data. An explicit tracked-card selection is
-	// the owner's intent and must still produce statement payoffs.
-	model.Accounts = append(model.Accounts, types.Account{
-		ID: "synced_card", Name: "Synced card", Kind: types.AccountKindCash,
-		Enabled: true, StatementClosingDay: 19,
-	})
+	// An explicitly selected account is tracked only when it is declared a
+	// credit card. A neutral cash label or an unrelated loan is not tracked,
+	// mirroring the frontend's declared-card picker.
+	model.Accounts = append(model.Accounts,
+		types.Account{ID: "synced_card", Name: "Synced card", Kind: types.AccountKindCreditCard,
+			Enabled: true, StatementClosingDay: 19},
+		types.Account{ID: "cash_account", Kind: types.AccountKindCash, Enabled: true},
+	)
 	model.Checkpoints = append(model.Checkpoints, types.Checkpoint{
 		AccountID: "synced_card", Balance: -75,
 		ObservedAt: domain.DayCloseUnix("2026-10-19"),
 	})
-	settings.AccountIDs = []string{"synced_card"}
+	settings.AccountIDs = []string{"synced_card", "cash_account"}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
 	if len(summary.Statements) == 0 {
-		t.Fatalf("explicit cash-labelled card produced no statements %+v", summary)
+		t.Fatalf("explicit declared card produced no statements %+v", summary)
 	}
 	for _, statement := range summary.Statements {
 		if statement.AccountID != "synced_card" {
-			t.Fatalf("explicit selection included an unselected account %+v", statement)
+			t.Fatalf("explicit selection included an account that is not a declared card %+v", statement)
 		}
 	}
 }
 
 func TestCardToCardTransferFollowsBalanceReplay(t *testing.T) {
 	model, settings := paydayFixture()
-	// Two explicitly tracked cards that sync left with the cash kind. The
-	// neutral label must not change which leg is a charge and which a payment.
+	// Two explicitly tracked declared credit cards. Their kind must not change
+	// which leg is a charge and which a payment.
 	model.Accounts = append(model.Accounts,
-		types.Account{ID: "cash-card-x", Name: "Card X", Kind: types.AccountKindCash, Enabled: true, StatementClosingDay: 19},
-		types.Account{ID: "cash-card-y", Name: "Card Y", Kind: types.AccountKindCash, Enabled: true, StatementClosingDay: 19},
+		types.Account{ID: "cash-card-x", Name: "Card X", Kind: types.AccountKindCreditCard, Enabled: true, StatementClosingDay: 19},
+		types.Account{ID: "cash-card-y", Name: "Card Y", Kind: types.AccountKindCreditCard, Enabled: true, StatementClosingDay: 19},
 	)
 	closeAt := domain.DayCloseUnix("2026-10-19")
 	model.Checkpoints = append(model.Checkpoints,
@@ -603,7 +617,7 @@ func TestScheduledIntercardTransferMatchesClaimedTransfer(t *testing.T) {
 
 func TestSplitIntercardTransferLeavesPayoffUnavailable(t *testing.T) {
 	model, settings := paydayFixture()
-	model.Accounts = append(model.Accounts, types.Account{ID: "card-c", Name: "Card C", Kind: types.AccountKindDebt, Enabled: true, StatementClosingDay: 19})
+	model.Accounts = append(model.Accounts, types.Account{ID: "card-c", Name: "Card C", Kind: types.AccountKindCreditCard, Enabled: true, StatementClosingDay: 19})
 	model.Checkpoints = append(model.Checkpoints, types.Checkpoint{AccountID: "card-c", Balance: -75, ObservedAt: domain.DayCloseUnix("2026-10-19")})
 	settings.AccountIDs = []string{"card-a", "card-b", "card-c"}
 	transferAt := stamp("2026-11-10T10:00:00Z")

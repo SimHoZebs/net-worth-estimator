@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { Account, PlannedPurchase } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
+import { isLiability } from "../../domain/accountKinds.ts";
 import { plannedPurchaseSchema } from "../../domain/modelSchemas.ts";
 import { EditorDialog } from "../../components/editors/EditorDialog.tsx";
 import {
@@ -55,7 +56,7 @@ export function PlannedPurchaseEditor({
 	const accountId = useId();
 	const earliestId = useId();
 	const fundable = visibleAccounts(accounts).filter(
-		(account) => account.enabled && account.kind !== "debt",
+		(account) => account.enabled && !isLiability(account),
 	);
 	const [name, setName] = useState(item?.name ?? "");
 	const [amount, setAmount] = useState(item ? String(item.amount) : "");

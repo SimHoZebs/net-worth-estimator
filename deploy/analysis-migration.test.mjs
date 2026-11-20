@@ -134,6 +134,37 @@ test("Analysis migration provisions transfer links on a six-table source and rep
   assert.equal(await sha256File(db), hashBefore);
 });
 
+test("card statement tables are provisioned empty on a pre-card-statement source and repeat cleanly", async () => {
+  const { directory, db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
+  // Model a deployed database from before recorded card statements existed.
+  await sql(db, `DROP TABLE card_statements; DROP TABLE statement_allocations; DROP TABLE statement_allocation_events;
+    DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+  const preserved = "SELECT id, issuer, subject FROM users; SELECT * FROM accounts; SELECT * FROM checkpoints; SELECT * FROM transactions;";
+  const before = await sql(db, preserved);
+  await migrate(db);
+  assert.equal(await sql(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await sql(db, "PRAGMA foreign_key_check;"), "");
+  assert.equal(await sql(db, preserved), before);
+  assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('card_statements','statement_allocations','statement_allocation_events');"), "3");
+  assert.equal(await sql(db, "SELECT count(*) FROM card_statements; SELECT count(*) FROM statement_allocations; SELECT count(*) FROM statement_allocation_events;"), "0\n0\n0");
+  assert.equal(await sql(db, "SELECT count(*) FROM schema_migrations WHERE name='recorded-card-statements-v1';"), "1");
+  assert.equal((await backups(directory)).length, 1);
+  const hashBefore = await sha256File(db);
+  await migrate(db);
+  assert.equal(await sha256File(db), hashBefore);
+  assert.equal((await backups(directory)).length, 1);
+});
+
+test("partial card statement schema fails closed and preserves the original", async () => {
+  const { directory, db } = await sourceDatabase();
+  await sql(db, "DROP TABLE statement_allocations;");
+  const dumpBefore = await sql(db, ".dump");
+  await assert.rejects(migrate(db), /Partial card statement schema/);
+  assert.equal(await sql(db, ".dump"), dumpBefore);
+  assert.equal((await backups(directory)).length, 0);
+});
+
 test("Analysis migration leaves the original untouched on setup failure and permits retry", async () => {
   const { directory, db, owner } = await sourceDatabase();
   await seedFinalRows(db, owner);

@@ -3,7 +3,13 @@ import type { BackendPlannedPurchase } from "./contracts.ts";
 import { NO_CEILING_SENTINEL, NO_FLOOR_SENTINEL } from "./contracts.ts";
 import type { Account, PlannedPurchase } from "../domain/model.ts";
 
-const ACCOUNT_KINDS = new Set(["cash", "investment", "debt", "property"]);
+const ACCOUNT_KINDS = new Set([
+	"cash",
+	"investment",
+	"credit_card",
+	"debt",
+	"property",
+]);
 
 function accountKindOf(kind: string): Account["kind"] {
 	return (ACCOUNT_KINDS.has(kind) ? kind : "cash") as Account["kind"];

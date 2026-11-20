@@ -57,7 +57,7 @@ const settingsFields = {
 	},
 	accountIds: {
 		default: null as string[] | null,
-		read: stringIds,
+		read: (value: unknown) => Array.isArray(value) ? (stringIds(value) ?? []) : null,
 	},
 	spendingAccountIds: {
 		default: null as string[] | null,

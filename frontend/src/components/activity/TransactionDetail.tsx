@@ -125,6 +125,8 @@ import {
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
 import { TransferLinkSection } from "./TransferLinkSection.tsx";
+import { AppliedStatementPayment } from "./AppliedStatementPayment.tsx";
+import { useStatementPaymentReview } from "./useStatementPaymentReview.ts";
 import { scheduleHistoryTransactions } from "../../domain/scheduleHistory.ts";
 import { ScheduleHistory } from "./ScheduleHistory.tsx";
 import { TransactionSharing } from "./TransactionSharing.tsx";
@@ -796,6 +798,13 @@ export function TransactionDetail({
 	const insightNames = useMemo(() => {
 		return new Map(allTransactions.map((row) => [row.id, row.name]));
 	}, [allTransactions]);
+	const statementReview = useStatementPaymentReview(
+		savedTransaction.id,
+		once && !savedTransaction.pending && !savedTransaction.void,
+		Boolean(readOnly),
+		accounts,
+	);
+	const statementSuggestion = statementReview.suggestion;
 	const insightSuggestions = useMemo(
 		() =>
 			once
@@ -804,9 +813,16 @@ export function TransactionDetail({
 						transactionId: savedTransaction.id,
 						voidRow: savedTransaction,
 						candidates: voidCandidates,
+						statementMatches: statementSuggestion ? [statementSuggestion] : [],
 					})
 				: [],
-		[once, findingsQuery.data?.findings, savedTransaction, voidCandidates],
+		[
+			once,
+			findingsQuery.data?.findings,
+			savedTransaction,
+			voidCandidates,
+			statementSuggestion,
+		],
 	);
 	// A void hold is read-only as a row, but its merge suggestion stays
 	// actionable for the owner. Only the app-level read-only gate blocks it.
@@ -1238,6 +1254,15 @@ export function TransactionDetail({
 								readOnly={readOnly}
 							/>
 						)}
+						{statementReview.current && (
+							<AppliedStatementPayment
+								current={statementReview.current}
+								readOnly={Boolean(readOnly)}
+								undoing={statementReview.undoing}
+								undoError={statementReview.undoError}
+								onUndo={statementReview.undo}
+							/>
+						)}
 						<div
 							ref={scheduleSectionRef}
 							id={`${edit.formId}-schedule-section`}
@@ -1418,6 +1443,9 @@ export function TransactionDetail({
 								readOnly={insightReadOnly}
 								onDone={() => setInsightsOpen(false)}
 								onMergeVoid={savedTransaction.void ? mergeVoidHold : undefined}
+								onApplyStatement={statementReview.apply}
+								onChooseStatement={statementReview.choose}
+								onDismissStatement={statementReview.dismiss}
 							/>
 						</SheetBody>
 					</SheetContent>

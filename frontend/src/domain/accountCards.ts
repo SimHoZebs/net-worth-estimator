@@ -39,14 +39,14 @@ export interface AccountCardModel {
 }
 
 function cardKindFor(account: Account): CardKind {
-	const name = account.name.toLowerCase();
 	if (account.kind === "cash") {
+		const name = account.name.toLowerCase();
 		if (/(saving|savings|hysa)/.test(name)) return "savings";
 		return "checking";
 	}
 	if (account.kind === "investment") return "brokerage";
 	if (account.kind === "property") return "other";
-	if (/(credit|card|visa|mastercard|amex)/.test(name)) return "credit_card";
+	if (account.kind === "credit_card") return "credit_card";
 	return "loan";
 }
 
@@ -56,6 +56,7 @@ function rolesFor(account: Account): CardRole[] {
 			return ["cash"];
 		case "investment":
 			return ["investment"];
+		case "credit_card":
 		case "debt":
 			return ["debt"];
 		case "property":
@@ -64,11 +65,9 @@ function rolesFor(account: Account): CardRole[] {
 }
 
 function balanceLabelFor(account: Account, kind: CardKind): string {
-	if (account.kind === "debt") {
-		return kind === "credit_card"
-			? "Current balance owed"
-			: "Outstanding balance";
-	}
+	if (kind === "credit_card")
+		return account.balance > 0 ? "Credit balance" : "Current balance owed";
+	if (kind === "loan") return "Outstanding balance";
 	if (kind === "brokerage") return "Total account value";
 	return "Current balance";
 }
@@ -100,19 +99,19 @@ export function toAccountCard({
 	];
 	if (account.maxBalance !== null) {
 		metrics.push({
-			label: account.kind === "debt" ? "Credit limit" : "Balance ceiling",
+			label: kind === "credit_card" ? "Credit limit" : "Balance ceiling",
 			value: money(account.maxBalance),
 		});
 	}
 	let creditUtilization: number | undefined;
 	if (
-		account.kind === "debt" &&
+		kind === "credit_card" &&
 		account.maxBalance !== null &&
 		account.maxBalance > 0
 	) {
 		creditUtilization = Math.min(
 			100,
-			Math.max(0, (magnitude / account.maxBalance) * 100),
+			Math.max(0, (-account.balance / account.maxBalance) * 100),
 		);
 	}
 	return {

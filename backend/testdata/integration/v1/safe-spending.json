@@ -73,7 +73,7 @@
           {
             "id": "loan",
             "name": "Student loan",
-            "kind": "debt",
+            "kind": "credit_card",
             "statementClosingDay": 19,
             "minBalance": null,
             "maxBalance": 0,

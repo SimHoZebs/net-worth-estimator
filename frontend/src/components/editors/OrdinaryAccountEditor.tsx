@@ -77,10 +77,14 @@ export function OrdinaryAccountEditor({
 			setError("Give the account a name.");
 			return;
 		}
+		const parsedBalance = parseDisplayNumber(balance) ?? 0;
+		if (kind === "debt" && parsedBalance > 0) {
+			setError("Enter debt as a negative balance.");
+			return;
+		}
 		setSaving(true);
 		onSavingChange(true);
 		setError(null);
-		const parsedBalance = parseDisplayNumber(balance) ?? 0;
 		const body = {
 			name: trimmedName,
 			kind,

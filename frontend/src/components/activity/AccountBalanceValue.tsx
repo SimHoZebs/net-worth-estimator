@@ -1,3 +1,4 @@
+import { isLiability } from "../../domain/accountKinds.ts";
 import type { AccountEdit } from "./useAccountEdit.ts";
 import { exactMoney } from "../../domain/format.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
@@ -36,7 +37,7 @@ export function AccountBalanceValue({
 						min={
 							readOnly
 								? undefined
-								: edit.draft.kind === "debt"
+								: isLiability(edit.draft)
 									? "-10000000000"
 									: "0"
 						}

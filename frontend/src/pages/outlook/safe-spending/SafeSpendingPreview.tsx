@@ -256,7 +256,7 @@ export function SafeSpendingPreview({
 								cycleStartDay: settings.cycleStartDay,
 								paydayDay: settings.paydayDay,
 								savingsTarget: settings.savingsTarget,
-								cards: selections.candidateAccounts.map((account) => ({
+								cards: selections.cards.map((account) => ({
 									id: account.id,
 									name: account.name,
 								})),

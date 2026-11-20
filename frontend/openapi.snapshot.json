@@ -1247,6 +1247,139 @@
 				"required": ["adjustments", "revision"],
 				"type": "object"
 			},
+			"CardStatement": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"closingDate": {
+						"type": "string"
+					},
+					"createdAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"dueDate": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"note": {
+						"type": "string"
+					},
+					"source": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"accountId",
+					"closingDate",
+					"dueDate",
+					"balance",
+					"currency",
+					"createdAt"
+				],
+				"type": "object"
+			},
+			"CardStatementBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/CardStatementBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountId": {
+						"type": "string"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"closingDate": {
+						"type": "string"
+					},
+					"currency": {
+						"maxLength": 3,
+						"type": "string"
+					},
+					"dueDate": {
+						"type": "string"
+					},
+					"id": {
+						"format": "uuid",
+						"type": "string"
+					},
+					"note": {
+						"maxLength": 500,
+						"type": "string"
+					},
+					"source": {
+						"type": "string"
+					}
+				},
+				"required": ["accountId", "closingDate", "dueDate", "balance"],
+				"type": "object"
+			},
+			"CardStatementOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/CardStatementOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"statement": {
+						"$ref": "#/components/schemas/CardStatement"
+					}
+				},
+				"required": ["statement", "revision"],
+				"type": "object"
+			},
+			"CardStatementsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/CardStatementsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"statements": {
+						"items": {
+							"$ref": "#/components/schemas/StatementAllocationRead"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["statements", "revision"],
+				"type": "object"
+			},
 			"Checkpoint": {
 				"additionalProperties": false,
 				"properties": {
@@ -3418,6 +3551,94 @@
 					"cadence",
 					"accountId"
 				],
+				"type": "object"
+			},
+			"PaymentCandidate": {
+				"additionalProperties": false,
+				"properties": {
+					"allocatedToStatementId": {
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"amountDelta": {
+						"format": "double",
+						"type": "number"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"dayGapToDue": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"evidence": {
+						"items": {
+							"$ref": "#/components/schemas/PaymentEvidence"
+						},
+						"type": ["array", "null"]
+					},
+					"name": {
+						"type": "string"
+					},
+					"postedDate": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transactionId",
+					"name",
+					"amount",
+					"postedDate",
+					"currency",
+					"evidence"
+				],
+				"type": "object"
+			},
+			"PaymentCandidatesOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PaymentCandidatesOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"candidates": {
+						"items": {
+							"$ref": "#/components/schemas/PaymentCandidate"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"statementId": {
+						"type": "string"
+					}
+				},
+				"required": ["statementId", "candidates", "revision"],
+				"type": "object"
+			},
+			"PaymentEvidence": {
+				"additionalProperties": false,
+				"properties": {
+					"code": {
+						"type": "string"
+					},
+					"reason": {
+						"type": "string"
+					}
+				},
+				"required": ["code", "reason"],
 				"type": "object"
 			},
 			"PaymentTerms": {
@@ -5621,6 +5842,26 @@
 				],
 				"type": "object"
 			},
+			"Set-statement-allocation-stateRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Set-statement-allocation-stateRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"state": {
+						"enum": ["dismissed", "confirmed"],
+						"type": "string"
+					}
+				},
+				"required": ["state"],
+				"type": "object"
+			},
 			"SettleCandidateRow": {
 				"additionalProperties": false,
 				"properties": {
@@ -5696,6 +5937,236 @@
 					}
 				},
 				"required": ["transactionId", "candidates", "revision"],
+				"type": "object"
+			},
+			"StatementAllocation": {
+				"additionalProperties": false,
+				"properties": {
+					"actor": {
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"createdAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"evidence": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string"
+					},
+					"statementId": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": "string"
+					},
+					"updatedAt": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"id",
+					"statementId",
+					"transactionId",
+					"amount",
+					"state",
+					"evidence",
+					"createdAt",
+					"updatedAt"
+				],
+				"type": "object"
+			},
+			"StatementAllocationEvent": {
+				"additionalProperties": false,
+				"properties": {
+					"action": {
+						"type": "string"
+					},
+					"actor": {
+						"type": "string"
+					},
+					"allocationId": {
+						"type": "string"
+					},
+					"createdAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": ["id", "allocationId", "action", "createdAt"],
+				"type": "object"
+			},
+			"StatementAllocationEventsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/StatementAllocationEventsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"events": {
+						"items": {
+							"$ref": "#/components/schemas/StatementAllocationEvent"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["events"],
+				"type": "object"
+			},
+			"StatementAllocationInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/StatementAllocationInputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"evidence": {
+						"maxLength": 500,
+						"type": "string"
+					},
+					"transactionId": {
+						"maxLength": 100,
+						"type": "string"
+					}
+				},
+				"required": ["transactionId", "amount", "evidence"],
+				"type": "object"
+			},
+			"StatementAllocationOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/StatementAllocationOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"allocation": {
+						"$ref": "#/components/schemas/StatementAllocation"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["allocation", "revision"],
+				"type": "object"
+			},
+			"StatementAllocationRead": {
+				"additionalProperties": false,
+				"properties": {
+					"allocated": {
+						"format": "double",
+						"type": "number"
+					},
+					"allocations": {
+						"items": {
+							"$ref": "#/components/schemas/StatementAllocation"
+						},
+						"type": ["array", "null"]
+					},
+					"remaining": {
+						"format": "double",
+						"type": "number"
+					},
+					"statement": {
+						"$ref": "#/components/schemas/CardStatement"
+					}
+				},
+				"required": ["statement", "allocations", "allocated", "remaining"],
+				"type": "object"
+			},
+			"StatementPaymentSuggestion": {
+				"additionalProperties": false,
+				"properties": {
+					"payment": {
+						"$ref": "#/components/schemas/PaymentCandidate"
+					},
+					"read": {
+						"$ref": "#/components/schemas/StatementAllocationRead"
+					}
+				},
+				"required": ["read", "payment"],
+				"type": "object"
+			},
+			"StatementPaymentSuggestionResult": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"statementId": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					}
+				},
+				"required": ["status"],
+				"type": "object"
+			},
+			"StatementPaymentSuggestionsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/StatementPaymentSuggestionsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"current": {
+						"$ref": "#/components/schemas/StatementAllocation"
+					},
+					"matches": {
+						"items": {
+							"$ref": "#/components/schemas/StatementPaymentSuggestion"
+						},
+						"type": ["array", "null"]
+					},
+					"result": {
+						"$ref": "#/components/schemas/StatementPaymentSuggestionResult"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": ["transactionId", "matches", "result", "revision"],
 				"type": "object"
 			},
 			"StatusOutputBody": {
@@ -8034,6 +8505,218 @@
 				}
 			}
 		},
+		"/v1/card-statements": {
+			"get": {
+				"operationId": "list-card-statements",
+				"parameters": [
+					{
+						"explode": false,
+						"in": "query",
+						"name": "accountId",
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CardStatementsOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List recorded card statements and their payment allocations"
+			},
+			"post": {
+				"operationId": "save-card-statement",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CardStatementBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CardStatementOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Record or update one card statement with its observed close, due date, and balance"
+			}
+		},
+		"/v1/card-statements/{id}": {
+			"delete": {
+				"operationId": "delete-card-statement",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one recorded card statement and its allocations"
+			}
+		},
+		"/v1/card-statements/{id}/allocations": {
+			"post": {
+				"operationId": "save-statement-allocation",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/StatementAllocationInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StatementAllocationOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Explicitly allocate one posted payment to a statement"
+			}
+		},
+		"/v1/card-statements/{id}/payment-candidates": {
+			"get": {
+				"operationId": "list-statement-payment-candidates",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PaymentCandidatesOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List posted payments with advisory evidence for one statement"
+			}
+		},
 		"/v1/checkpoints": {
 			"delete": {
 				"operationId": "delete-checkpoint",
@@ -10239,6 +10922,99 @@
 				"summary": "Change the cadence or window of one schedule"
 			}
 		},
+		"/v1/statement-allocations/{id}": {
+			"patch": {
+				"operationId": "set-statement-allocation-state",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Set-statement-allocation-stateRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StatementAllocationOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Dismiss or undo one statement allocation"
+			}
+		},
+		"/v1/statement-allocations/{id}/events": {
+			"get": {
+				"operationId": "list-statement-allocation-events",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StatementAllocationEventsOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List the audit trail for one statement allocation"
+			}
+		},
 		"/v1/status": {
 			"get": {
 				"operationId": "get-server-status",
@@ -11110,6 +11886,51 @@
 					}
 				},
 				"summary": "List posted charges that could settle a vanished hold"
+			}
+		},
+		"/v1/transactions/{id}/statement-payment-suggestions": {
+			"get": {
+				"operationId": "list-transaction-statement-payment-suggestions",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StatementPaymentSuggestionsOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List ranked statement suggestions for one posted payment"
 			}
 		},
 		"/v1/transfer-links": {

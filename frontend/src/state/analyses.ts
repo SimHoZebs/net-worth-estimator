@@ -19,6 +19,7 @@ import { getUserScope } from "@/auth/resourceScope.ts";
 import { reloadWorkspace } from "./workspaceResources.ts";
 import { financialQueryFilter, serverQueryClient } from "./serverQuery.ts";
 import { useUserScope } from "./useUserScope.ts";
+import { refreshCardStatements } from "./cardStatements.ts";
 
 export const analysisFindingsKey = (scope = getUserScope()) =>
 	["user-resources", scope.key, "analysis-findings"] as const;
@@ -248,9 +249,8 @@ export function useConfirmTransferPair() {
 			}) => {
 				if (scope !== getUserScope() || scope.status !== "ready")
 					throw new UserScopeError();
-				const result = (
-					await confirmTransferPair(id, { peerTransactionId })
-				).data;
+				const result = (await confirmTransferPair(id, { peerTransactionId }))
+					.data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},
@@ -262,6 +262,7 @@ export function useConfirmTransferPair() {
 				await cache.invalidateQueries({
 					queryKey: transferLinksKey(scope),
 				});
+				await refreshCardStatements(scope);
 				await cache.invalidateQueries({
 					queryKey: ["flow-graph", scope.key],
 				});
@@ -294,6 +295,7 @@ export function useRemoveTransferLinkByLeg() {
 				await cache.invalidateQueries({
 					queryKey: transferLinksKey(scope),
 				});
+				await refreshCardStatements(scope);
 				await cache.invalidateQueries({
 					queryKey: ["flow-graph", scope.key],
 				});

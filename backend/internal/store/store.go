@@ -87,6 +87,22 @@ type Store interface {
 	MoveEvaluation(evalType, instanceID, beforeID string) error
 	SavePaymentTerms(terms types.PaymentTerms) (types.PaymentTerms, error)
 	DeletePaymentTerms(accountID string) error
+	// Recorded card statements are evidence, not projection inputs. Writes do
+	// not mark the model dirty. An empty accountID lists every statement.
+	GetCardStatement(id string) (types.CardStatement, error)
+	ListCardStatements(accountID string) ([]types.CardStatement, error)
+	SaveCardStatement(statement types.CardStatement) (types.CardStatement, error)
+	DeleteCardStatement(id string) error
+	// Statement allocations annotate posted cash transfers. One payment backs
+	// at most one allocation, so both transfer legs are never counted twice.
+	ListStatementAllocations(statementID string) ([]types.StatementAllocation, error)
+	StatementAllocationForTransaction(transactionID string) (*types.StatementAllocation, error)
+	SaveStatementAllocation(allocation types.StatementAllocation) (types.StatementAllocation, error)
+	// ReactivateStatementAllocation restores a dismissed allocation when the
+	// owner applies the payment again, preserving the row and its audit trail.
+	ReactivateStatementAllocation(id, statementID string, amount float64, evidence, actor string) (types.StatementAllocation, error)
+	SetStatementAllocationState(id, state, actor string) (types.StatementAllocation, error)
+	ListStatementAllocationEvents(allocationID string) ([]types.StatementAllocationEvent, error)
 	ListAmountPresets() ([]types.AmountPreset, error)
 	CreateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error)
 	UpdateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error)

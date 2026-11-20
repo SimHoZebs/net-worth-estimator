@@ -7,6 +7,8 @@ import {
 	updateAccount,
 } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
+import type { AccountKind } from "../../api/contracts.ts";
+import { isLiability } from "../../domain/accountKinds.ts";
 import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
@@ -146,8 +148,7 @@ export function useAccountEdit(
 			onRejected: setError,
 		});
 		setSaving(false);
-		if (ok)
-			edit.update({ minimumFixed: "", minimumPercent: "", dueDay: "" });
+		if (ok) edit.update({ minimumFixed: "", minimumPercent: "", dueDay: "" });
 	};
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -170,7 +171,10 @@ export function useAccountEdit(
 			const closingDay = closingChanged
 				? parseDay(edit.value.statementClosingDay)
 				: null;
-			if (closingChanged && (closingDay === null || closingDay < 1 || closingDay > 31)) {
+			if (
+				closingChanged &&
+				(closingDay === null || closingDay < 1 || closingDay > 31)
+			) {
 				setError("Enter a statement closing day between 1 and 31.");
 				return;
 			}
@@ -262,7 +266,7 @@ export function useAccountEdit(
 		}
 		const termFields = ["minimumFixed", "minimumPercent", "dueDay"] as const;
 		const termsDirty =
-			edit.value.kind === "debt" &&
+			isLiability(edit.value) &&
 			termFields.some((field) => edit.value[field] !== source[field]);
 		let cardTerms: {
 			accountId: string;
@@ -329,7 +333,7 @@ export function useAccountEdit(
 							? ({
 									id: row.id,
 									name: row.name || row.id,
-									kind: row.kind as "cash" | "investment" | "debt" | "property",
+									kind: row.kind as AccountKind,
 									minBalance: row.minBalance,
 									maxBalance: row.maxBalance,
 									color: row.color ?? null,

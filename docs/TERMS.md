@@ -87,6 +87,23 @@ A **guest** is a provisioned user with limited assigned permissions. Guest acces
 
 Base forms save changes directly. Failed submissions retain their fields in the form for retry.
 
+## H. Credit card statements
+
+A **credit card** is an account kind that contributes to debts, not available
+cash. The account kind does not establish which purchases have been imported.
+
+A **statement** records what the issuer billed for one card at a specific
+**statement close**, with a **statement balance** and **due date**. The configured
+closing day helps forecast future closes; it does not establish the balance of
+an issued statement. A current balance or an estimate from imported activity is
+not the statement balance.
+
+A **card payment** is a movement to a credit card. When both sides are present,
+the linked transfer is one payment. **Apply payment** records which statement a
+posted card payment covers. The **remaining statement balance** is the billed
+amount less payments applied to it. A statement is **paid in full** when that
+amount reaches zero. A suggestion alone does not apply the payment.
+
 ## Evaluation and income evidence are different things
 
 **Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.

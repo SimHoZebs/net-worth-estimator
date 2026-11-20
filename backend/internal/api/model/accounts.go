@@ -145,6 +145,16 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 		return nil, err
 	}
 	guard := func(model *types.FinancialModel) error {
+		if existing := findModelAccount(model, input.ID); existing != nil &&
+			existing.Kind == types.AccountKindCreditCard && account.Kind != types.AccountKindCreditCard {
+			live, err := s.cardHasLiveAllocations(input.ID)
+			if err != nil {
+				return huma.Error500InternalServerError(err.Error())
+			}
+			if live {
+				return huma.Error409Conflict("This card still has confirmed statement allocations. Dismiss them before changing its account kind.")
+			}
+		}
 		if requireOrdinaryAccount(model, input.ID) == nil {
 			if account.Kind != types.AccountKindDebt {
 				return nil
@@ -230,7 +240,21 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 	} `json:"body"`
 }, error) {
 	id := input.ID
-	_, issues, saved, revision, err := runFinanceRowWriteGuarded(s, func(model *types.FinancialModel) error { return requireOrdinaryAccount(model, id) }, func(model *types.FinancialModel) {
+	_, issues, saved, revision, err := runFinanceRowWriteGuarded(s, func(model *types.FinancialModel) error {
+		if err := requireOrdinaryAccount(model, id); err != nil {
+			return err
+		}
+		if existing := findModelAccount(model, id); existing != nil && existing.Kind == types.AccountKindCreditCard {
+			live, err := s.cardHasLiveAllocations(id)
+			if err != nil {
+				return huma.Error500InternalServerError(err.Error())
+			}
+			if live {
+				return huma.Error409Conflict("This card still has confirmed statement allocations. Dismiss them before deleting the account.")
+			}
+		}
+		return nil
+	}, func(model *types.FinancialModel) {
 		model.Accounts = removeByID(model.Accounts, id, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteAccount(id)

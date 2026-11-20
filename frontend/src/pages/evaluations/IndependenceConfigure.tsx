@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from "react";
-import type { JsonValue } from "@/api/contracts.ts";
+import type { AccountKind, JsonValue } from "@/api/contracts.ts";
+import { ACCOUNT_KINDS } from "@/domain/accountKinds.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
 import {
 	Field,
@@ -138,13 +139,7 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 			).map((account) => ({
 				id: account.id,
 				name: account.name,
-				kind:
-					parseUnion(account.kind, [
-						"cash",
-						"investment",
-						"debt",
-						"property",
-					] as const) ?? "cash",
+				kind: parseUnion(account.kind, ACCOUNT_KINDS) ?? "cash",
 				color: account.color ?? null,
 			})),
 		[balances.data],
@@ -217,7 +212,7 @@ function IndependenceForm({
 	accounts: {
 		id: string;
 		name: string;
-		kind: "cash" | "investment" | "debt" | "property";
+		kind: AccountKind;
 		color: string | null;
 	}[];
 	incomeCandidates: { id: string; name: string; detail: string }[];

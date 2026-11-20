@@ -1,6 +1,8 @@
 package model
 
 import (
+	"context"
+
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -10,11 +12,12 @@ type handler struct {
 	store    store.Store
 	receipts *receipts.Service
 	readOnly bool
+	actor    func(context.Context) string
 }
 
 // Register adds canonical model reads and writes to the shared Huma API.
-func Register(api huma.API, st store.Store, receiptService *receipts.Service, readOnly bool) {
-	s := &handler{store: st, receipts: receiptService, readOnly: readOnly}
+func Register(api huma.API, st store.Store, receiptService *receipts.Service, readOnly bool, actor func(context.Context) string) {
+	s := &handler{store: st, receipts: receiptService, readOnly: readOnly, actor: actor}
 	api = huma.NewGroup(api, "/v1")
 	s.registerPlannedPurchaseRoutes(api)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-summary", Method: "GET", Path: "/safe-spending-summary", Summary: "Read Safe Spending, upcoming payments, and next-cycle capacity"}, s.getSafeSpendingSummary)
@@ -70,6 +73,14 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "move-amount-preset", Method: "POST", Path: "/amount-presets/reorder", Summary: "Move one amount recipe"}, s.movePreset)
 	huma.Register(api, huma.Operation{OperationID: "save-payment-terms", Method: "POST", Path: "/payment-terms", Summary: "Upsert payment terms for one account"}, s.savePaymentTerms)
 	huma.Register(api, huma.Operation{OperationID: "delete-payment-terms", Method: "DELETE", Path: "/payment-terms/{accountId}", Summary: "Delete payment terms for one account"}, s.deletePaymentTerms)
+	huma.Register(api, huma.Operation{OperationID: "list-card-statements", Method: "GET", Path: "/card-statements", Summary: "List recorded card statements and their payment allocations"}, s.listCardStatements)
+	huma.Register(api, huma.Operation{OperationID: "save-card-statement", Method: "POST", Path: "/card-statements", Summary: "Record or update one card statement with its observed close, due date, and balance"}, s.saveCardStatement)
+	huma.Register(api, huma.Operation{OperationID: "delete-card-statement", Method: "DELETE", Path: "/card-statements/{id}", Summary: "Delete one recorded card statement and its allocations"}, s.deleteCardStatement)
+	huma.Register(api, huma.Operation{OperationID: "list-statement-payment-candidates", Method: "GET", Path: "/card-statements/{id}/payment-candidates", Summary: "List posted payments with advisory evidence for one statement"}, s.listPaymentCandidates)
+	huma.Register(api, huma.Operation{OperationID: "list-transaction-statement-payment-suggestions", Method: "GET", Path: "/transactions/{id}/statement-payment-suggestions", Summary: "List ranked statement suggestions for one posted payment"}, s.listTransactionStatementPaymentSuggestions)
+	huma.Register(api, huma.Operation{OperationID: "save-statement-allocation", Method: "POST", Path: "/card-statements/{id}/allocations", Summary: "Explicitly allocate one posted payment to a statement"}, s.saveStatementAllocation)
+	huma.Register(api, huma.Operation{OperationID: "set-statement-allocation-state", Method: "PATCH", Path: "/statement-allocations/{id}", Summary: "Dismiss or undo one statement allocation"}, s.setStatementAllocationState)
+	huma.Register(api, huma.Operation{OperationID: "list-statement-allocation-events", Method: "GET", Path: "/statement-allocations/{id}/events", Summary: "List the audit trail for one statement allocation"}, s.listStatementAllocationEvents)
 	huma.Register(api, huma.Operation{OperationID: "get-pinned-evaluations", Method: "GET", Path: "/pinned-evaluations", Summary: "List pinned evaluation instance IDs"}, s.getPinnedEvaluations)
 	huma.Register(api, huma.Operation{OperationID: "set-pinned-evaluations", Method: "PUT", Path: "/pinned-evaluations", Summary: "Replace pinned evaluation instance IDs"}, s.setPinnedEvaluations)
 	huma.Register(api, huma.Operation{

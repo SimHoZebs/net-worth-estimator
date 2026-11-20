@@ -41,7 +41,7 @@ func effectiveAccounts(model *types.FinancialModel, settings *types.SafeSpending
 			continue
 		}
 		visible = append(visible, a)
-		if a.Kind != types.AccountKindDebt {
+		if a.Kind != types.AccountKindDebt && a.Kind != types.AccountKindCreditCard {
 			known[a.ID] = true
 		}
 	}

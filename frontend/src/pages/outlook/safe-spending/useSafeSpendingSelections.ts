@@ -2,7 +2,12 @@ import { useMemo } from "react";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { Account, Transaction } from "@/domain/model.ts";
 import { visibleAccounts } from "@/domain/model.ts";
-import { checkingAccountId } from "@/domain/safeSpending.ts";
+import {
+	checkingAccountId,
+	safeSpendingCards,
+	selectedCardIds,
+} from "@/domain/safeSpending.ts";
+import { isLiability } from "@/domain/accountKinds.ts";
 import {
 	billCandidates as buildBillCandidates,
 	effectiveBillIds,
@@ -42,32 +47,15 @@ export function useSafeSpendingSelections({
 		() => visibleAccounts(accounts),
 		[accounts],
 	);
-
-	// Before a card designation exists the detected card accounts stay the
-	// default; every toggle follows the same null-means-auto rule.
-	const defaultCardIds = useMemo(() => {
-		const debtAccounts = candidateAccounts.filter(
-			(account) => account.kind === "debt",
-		);
-		const cardLike = debtAccounts
-			.map((account) => account.id)
-			.filter((id) => id.endsWith("_card"));
-		return cardLike.length
-			? cardLike
-			: debtAccounts.map((account) => account.id);
-	}, [candidateAccounts]);
+	const cards = useMemo(() => safeSpendingCards(accounts), [accounts]);
+	const cardIds = useMemo(() => cards.map(({ id }) => id), [cards]);
 	const trackedIds = useMemo(
-		() =>
-			resolveEffectiveIds(
-				accountIds,
-				candidateAccounts.map((account) => account.id),
-				defaultCardIds,
-			),
-		[accountIds, candidateAccounts, defaultCardIds],
+		() => selectedCardIds(accountIds, cardIds),
+		[accountIds, cardIds],
 	);
 
 	const spendableAccounts = useMemo(
-		() => candidateAccounts.filter((account) => account.kind !== "debt"),
+		() => candidateAccounts.filter((account) => !isLiability(account)),
 		[candidateAccounts],
 	);
 	const spendingIds = useMemo(() => {
@@ -98,15 +86,12 @@ export function useSafeSpendingSelections({
 		[transactionIds, billCandidates],
 	);
 
-	const toggleAccount = (accountId: string) =>
-		updateSettings({
-			accountIds: toggleEffectiveId(
-				accountIds,
-				candidateAccounts.map((account) => account.id),
-				accountId,
-				defaultCardIds,
-			),
-		});
+	const toggleAccount = (accountId: string) => {
+		const next = trackedIds.includes(accountId)
+			? trackedIds.filter((id) => id !== accountId)
+			: [...trackedIds, accountId];
+		updateSettings({ accountIds: next });
+	};
 	const toggleSpendingAccount = (accountId: string) => {
 		const knownIds = spendableAccounts.map((account) => account.id);
 		const fallbackId = checkingAccountId(accounts);
@@ -139,7 +124,7 @@ export function useSafeSpendingSelections({
 		});
 
 	return {
-		candidateAccounts,
+		cards,
 		trackedIds,
 		spendableAccounts,
 		spendingIds,

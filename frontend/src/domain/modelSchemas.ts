@@ -6,6 +6,7 @@ import { z } from "zod";
 export const accountKindSchema = z.enum([
 	"cash",
 	"investment",
+	"credit_card",
 	"debt",
 	"property",
 ]);

@@ -5,7 +5,11 @@ import {
 	canChooseDisplayBasis,
 	effectiveDisplayBasis,
 } from "../../domain/accountDisplay.ts";
-import { ACCOUNT_TYPE_LABELS } from "../../domain/accountKinds.ts";
+import {
+	ACCOUNT_KINDS,
+	ACCOUNT_TYPE_LABELS,
+	isLiability,
+} from "../../domain/accountKinds.ts";
 import type { AccountKind } from "../../api/contracts.ts";
 import { accountKindIcons } from "../AccountIcon.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
@@ -68,26 +72,13 @@ export function AccountDetails({
 	account,
 	edit,
 	readOnly,
-	cardAccountIds = [],
 }: {
 	account: Account;
 	edit: AccountEdit;
 	readOnly: boolean;
-	/** Explicitly tracked cards, including ones sync labelled as cash. */
-	cardAccountIds?: string[];
 }) {
-	const locked = readOnly || edit.saving;
-	// The display basis is owner config, not bank evidence, so it stays
-	// editable on synced accounts. A workspace-level read-only view still
-	// locks it: readOnly without account.readOnly means the session, not
-	// the bank, forbids writes.
-	const basisLocked = edit.saving || (readOnly && !account.readOnly);
-	// A tracked card keeps an editable closing day even when sync owns the
-	// account, but a session-level read-only view still locks it.
-	const trackedCard = cardAccountIds.includes(account.id);
-	const closingLocked = trackedCard
-		? edit.saving || (readOnly && !account.readOnly)
-		: locked;
+	const ownerLocked = readOnly || edit.saving;
+	const locked = ownerLocked || account.readOnly;
 	const { draft, formId } = edit;
 	const data = accountBalanceDisplayData(account);
 	// With both figures present the selector follows the owner's in-progress
@@ -96,13 +87,11 @@ export function AccountDetails({
 	const basis = canChooseDisplayBasis(account)
 		? (draft.displayBasis ?? "available")
 		: effectiveDisplayBasis(account);
-	const kindOptions = (["cash", "investment", "property", "debt"] as const).map(
-		(kind: AccountKind) => ({
-			value: kind,
-			label: ACCOUNT_TYPE_LABELS[kind],
-			icon: accountKindIcons[kind],
-		}),
-	);
+	const kindOptions = ACCOUNT_KINDS.map((kind: AccountKind) => ({
+		value: kind,
+		label: ACCOUNT_TYPE_LABELS[kind],
+		icon: accountKindIcons[kind],
+	}));
 	const KindIcon = accountKindIcons[draft.kind];
 
 	const rows: { key: string; node: ReactNode }[] = [];
@@ -112,17 +101,11 @@ export function AccountDetails({
 			<SettingRow label="Account type" htmlFor={`${formId}-kind`}>
 				<Select
 					value={draft.kind}
-					disabled={edit.saving}
+					disabled={ownerLocked}
 					onValueChange={(kind) =>
 						edit.update(
 							{
-								kind:
-									parseUnion(kind, [
-										"cash",
-										"investment",
-										"property",
-										"debt",
-									] as const) ?? "cash",
+								kind: parseUnion(kind, ACCOUNT_KINDS) ?? "cash",
 							},
 							"kind",
 						)
@@ -315,7 +298,7 @@ export function AccountDetails({
 			<SettingRow label="Display value" htmlFor={`${formId}-display-basis`}>
 				<Select
 					value={basis}
-					disabled={basisLocked || !canChooseDisplayBasis(account)}
+					disabled={ownerLocked || !canChooseDisplayBasis(account)}
 					onValueChange={(basis) =>
 						edit.update(
 							{
@@ -351,7 +334,7 @@ export function AccountDetails({
 			</SettingRow>
 		),
 	});
-	if (draft.kind === "debt") {
+	if (isLiability(draft)) {
 		const hasTerms = getPaymentTermsForAccount(account.id) !== null;
 		rows.push({
 			key: "minimum",
@@ -441,9 +424,7 @@ export function AccountDetails({
 		});
 	}
 
-	// Sync leaves real cards with the neutral cash kind, so a deliberately
-	// tracked card must keep an editable closing day independent of its kind.
-	if (draft.kind === "debt" || trackedCard) {
+	if (draft.kind === "credit_card") {
 		rows.push({
 			key: "closing-day",
 			node: (
@@ -458,7 +439,7 @@ export function AccountDetails({
 						step="1"
 						className="w-48"
 						value={draft.statementClosingDay}
-						readOnly={closingLocked}
+						readOnly={ownerLocked}
 						onChange={(event) =>
 							edit.update(
 								{ statementClosingDay: event.target.value },

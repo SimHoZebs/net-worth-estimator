@@ -222,10 +222,7 @@ async function seedSameDayObservation(
 	expect(settings.ok(), await settings.text()).toBe(true);
 }
 
-// Sync provisions unknown bank accounts with the neutral cash kind. The owner
-// still tracks them as cards through the explicit selection, so the payday
-// payoff must honour that selection instead of silently dropping it.
-async function seedCashLabelledCard(api: APIRequestContext, payday: string) {
+async function seedTrackedCard(api: APIRequestContext, payday: string) {
 	const reset = await api.post(`${FIXTURE_API}/__fixture/reset`, {
 		data: { bankTransactions: [] },
 	});
@@ -250,7 +247,11 @@ async function seedCashLabelledCard(api: APIRequestContext, payday: string) {
 		},
 	});
 	const checking = account("evidence-checking", "Synthetic checking", "cash");
-	const card = account("evidence-synced-card", "Synthetic synced card", "cash");
+	const card = account(
+		"evidence-synced-card",
+		"Synthetic synced card",
+		"credit_card",
+	);
 	const salary = {
 		id: "evidence-salary",
 		name: "Synthetic future salary",
@@ -470,7 +471,10 @@ async function seedFallbackNumeric(
 				accounts: [
 					...baseline.accounts,
 					account("evidence-checking", "Synthetic checking"),
-					account("evidence-unknown-card", "Synthetic unknown card"),
+					{
+						...account("evidence-unknown-card", "Synthetic unknown card"),
+						kind: "credit_card",
+					},
 				],
 				schedules: [...baseline.schedules, bill, salary],
 				checkpoints: [
@@ -514,7 +518,7 @@ async function seedFallbackNumeric(
 	expect(settings.ok(), await settings.text()).toBe(true);
 }
 
-test("an explicit cash-labelled card keeps its statement payoff", async ({
+test("an explicitly tracked card keeps its statement payoff", async ({
 	page,
 }) => {
 	const api = await request.newContext();
@@ -523,7 +527,7 @@ test("an explicit cash-labelled card keeps its statement payoff", async ({
 		const payday = new Date(Date.parse(`${today}T00:00:00Z`) + 11 * 86_400_000)
 			.toISOString()
 			.slice(0, 10);
-		await seedCashLabelledCard(api, payday);
+		await seedTrackedCard(api, payday);
 		const response = await api.get(`${FIXTURE_API}/v1/safe-spending-summary`);
 		expect(response.ok(), await response.text()).toBe(true);
 		const summary = await response.json();

@@ -71,7 +71,7 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	receipthttp.Register(api, receiptService, st)
 	analyses.Register(api, st, serverConfig.CanWrite, serverConfig.Actor)
 	evaluations.Register(api, st)
-	model.Register(api, st, receiptService, serverConfig.ReadOnly)
+	model.Register(api, st, receiptService, serverConfig.ReadOnly, serverConfig.Actor)
 	synchttp.Register(api, st, serverConfig.SyncRunner)
 	gmailhttp.Register(api, st, serverConfig.GmailService, serverConfig.ReadOnly)
 	integrationshttp.Register(api, integrations.NewRegistry(

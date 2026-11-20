@@ -92,6 +92,65 @@ const checkpointAvailableBalancesDDL = `CREATE TABLE IF NOT EXISTS checkpoint_av
 	PRIMARY KEY (user_id, model_account_id, observed_at)
 )`
 
+// cardStatementsDDL records owner-entered statements for credit cards. A
+// statement carries the observed close date, due date, and billed balance.
+// The observed close date is evidence, not a third configurable close-day
+// setting: Account.statementClosingDay remains the recurring cycle anchor the
+// forecast uses. One statement per account and close date survives retries.
+const cardStatementsDDL = `CREATE TABLE IF NOT EXISTS card_statements (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	id TEXT NOT NULL,
+	position INTEGER NOT NULL,
+	account_id TEXT NOT NULL,
+	closing_date TEXT NOT NULL,
+	due_date TEXT NOT NULL,
+	balance REAL NOT NULL,
+	currency TEXT NOT NULL DEFAULT 'USD',
+	source TEXT NOT NULL DEFAULT 'user',
+	note TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, id),
+	UNIQUE (user_id, account_id, closing_date),
+	FOREIGN KEY (user_id, account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
+)`
+
+// statementAllocationsDDL records an owner's explicit decision that one
+// posted payment settles part of one statement. The payment stays a cash
+// transfer in the model; an allocation annotates it and never moves money.
+// UNIQUE(user_id, transaction_id) keeps one real payment from backing two
+// allocations, so both legs of a transfer are never counted twice.
+const statementAllocationsDDL = `CREATE TABLE IF NOT EXISTS statement_allocations (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	id TEXT NOT NULL,
+	position INTEGER NOT NULL,
+	statement_id TEXT NOT NULL,
+	transaction_id TEXT NOT NULL,
+	amount REAL NOT NULL,
+	state TEXT NOT NULL DEFAULT 'confirmed' CHECK (state IN ('confirmed', 'dismissed')),
+	evidence TEXT NOT NULL DEFAULT '',
+	actor TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, id),
+	UNIQUE (user_id, transaction_id),
+	FOREIGN KEY (user_id, statement_id) REFERENCES card_statements(user_id, id) ON DELETE CASCADE,
+	FOREIGN KEY (user_id, transaction_id) REFERENCES transactions(user_id, id) DEFERRABLE INITIALLY DEFERRED
+)`
+
+// statementAllocationEventsDDL is the append-only audit trail for allocation
+// state changes: creation, dismissal, and undo (confirm). It records who acted
+// and when; never transaction evidence.
+const statementAllocationEventsDDL = `CREATE TABLE IF NOT EXISTS statement_allocation_events (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	id INTEGER NOT NULL,
+	allocation_id TEXT NOT NULL,
+	action TEXT NOT NULL CHECK (action IN ('created', 'dismissed', 'confirmed')),
+	actor TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, id),
+	FOREIGN KEY (user_id, allocation_id) REFERENCES statement_allocations(user_id, id) ON DELETE CASCADE
+)`
+
 func schemaStatements() []string {
 	statements := []string{
 		accountDisplaysDDL,
@@ -163,6 +222,9 @@ func schemaStatements() []string {
 			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		checkpointAvailableBalancesDDL,
+		cardStatementsDDL,
+		statementAllocationsDDL,
+		statementAllocationEventsDDL,
 		`CREATE TABLE IF NOT EXISTS transactions (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
@@ -325,6 +387,7 @@ func schemaStatements() []string {
 		receiptSchema,
 		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('receipt-evidence-v1')`,
 		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('statement-closing-day-v1')`,
+		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('recorded-card-statements-v1')`,
 		`CREATE TABLE IF NOT EXISTS provider_connections (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
@@ -747,6 +810,9 @@ var requiredSchemaColumns = map[string]string{
 	"account_displays":                "user_id, account_id, display_json",
 	"checkpoints":                     "user_id, id, position, model_account_id, balance, source, provider, observed_at",
 	"checkpoint_available_balances":   "user_id, model_account_id, observed_at, available_balance",
+	"card_statements":                 "user_id, id, position, account_id, closing_date, due_date, balance, currency, source, note, created_at",
+	"statement_allocations":           "user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at",
+	"statement_allocation_events":     "user_id, id, allocation_id, action, actor, created_at",
 	"transactions":                    "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome",
 	"transaction_sim":                 "user_id, transaction_id, position, enabled, execution_order",
 	"transaction_claims":              "user_id, transaction_id, fulfills_rule_id, fulfills_occurrence_date",
@@ -842,6 +908,9 @@ func expectedSchemaTables() []string {
 		"accounts",
 		"checkpoints",
 		"checkpoint_available_balances",
+		"card_statements",
+		"statement_allocations",
+		"statement_allocation_events",
 		"transactions",
 		"transaction_sim",
 		"transaction_claims",

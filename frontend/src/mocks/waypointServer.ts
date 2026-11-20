@@ -4,6 +4,7 @@ import type {
 	FinancialModelResponse,
 	ServerStatus,
 } from "../api/index.ts";
+import { isLiability } from "../domain/accountKinds.ts";
 import { ok } from "./fetch.ts";
 import { transactionResponse } from "./transactionResponse.ts";
 
@@ -286,7 +287,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						: asOf,
 					hasCheckpoint: latest !== null,
 					archived:
-						account.kind === "debt" &&
+						isLiability({ kind: account.kind }) &&
 						latest !== null &&
 						Math.abs(balance) < 0.005,
 					syncOwned,

@@ -2,7 +2,6 @@ package safespending
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -22,35 +21,23 @@ type carriedStatementScope struct {
 	reset, nextFundingDate string
 }
 
-// effectiveCards mirrors useSafeSpendingSelections. A null selection falls
-// back to detected debt accounts, preferring IDs ending in _card. An explicit
-// selection is authoritative even when a synced card still carries the neutral
-// cash label, so the owner's tracked cards are not silently dropped. Only IDs
-// the owner selected enter the explicit path; unrelated loans stay out.
+// effectiveCards mirrors the frontend's declared-credit-card selection in
+// both paths. A null selection falls back to every enabled credit_card
+// account. An explicit selection is authoritative but still limited to
+// declared credit cards, so a neutral synced cash account or an unrelated loan
+// is never tracked as a card and a declared card is never silently dropped.
 func effectiveCards(model *types.FinancialModel, settings *types.SafeSpendingSettings) []types.Account {
+	cards := []types.Account{}
+	for _, account := range model.Accounts {
+		if account.Enabled && account.Kind == types.AccountKindCreditCard {
+			cards = append(cards, account)
+		}
+	}
 	if settings.AccountIDs == nil {
-		candidates := []types.Account{}
-		for _, account := range model.Accounts {
-			if account.Enabled && account.Kind == types.AccountKindDebt {
-				candidates = append(candidates, account)
-			}
-		}
-		cardLike := []types.Account{}
-		for _, account := range candidates {
-			if strings.HasSuffix(account.ID, "_card") {
-				cardLike = append(cardLike, account)
-			}
-		}
-		if len(cardLike) > 0 {
-			return cardLike
-		}
-		return candidates
+		return cards
 	}
 	chosen := []types.Account{}
-	for _, account := range model.Accounts {
-		if !account.Enabled {
-			continue
-		}
+	for _, account := range cards {
 		for _, id := range settings.AccountIDs {
 			if account.ID == id {
 				chosen = append(chosen, account)

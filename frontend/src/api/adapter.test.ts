@@ -53,6 +53,14 @@ function purchaseRow(
 }
 
 describe("balance rows to display accounts", () => {
+	it("keeps a declared credit card kind instead of coercing it to cash", () => {
+		expect(
+			balanceRowToDisplay(
+				balanceRow({ id: "card", kind: "credit_card", balance: -250 }),
+			).kind,
+		).toBe("credit_card");
+	});
+
 	it("keeps the observation separate from the adjusted server balance", () => {
 		expect(
 			balanceRowToDisplay(

@@ -676,6 +676,131 @@ test("partial sidecar schemas fail closed with the original unchanged", async (t
   assert.deepEqual(await backups(directory), []);
 });
 
+test("pre-card-statement database gains empty statement tables with data preserved", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statements-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  // Model a deployed database from before recorded card statements existed.
+  await sqlite(db, `DROP TABLE card_statements;
+    DROP TABLE statement_allocations;
+    DROP TABLE statement_allocation_events;
+    DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+  const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+
+  assert.equal(await rows(db, "SELECT user_id, id, position, account_id, closing_date, due_date, balance, currency, source, note, created_at FROM card_statements LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at FROM statement_allocations LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT user_id, id, allocation_id, action, actor, created_at FROM statement_allocation_events LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM card_statements;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM statement_allocations;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM statement_allocation_events;"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name = 'recorded-card-statements-v1';"), "1");
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal((await backups(directory)).length, 1);
+
+  // The provisioned target now repeats read-only.
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("existing card statement rows survive migration byte-identical", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statement-rows-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO account_displays(user_id,account_id,display_json) VALUES ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');`);
+  await sqlite(db, `INSERT INTO card_statements(user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at) VALUES ('${owner}','stmt-1',0,'checking','2026-03-10','2026-03-25',100,'USD','user','',1773187199);`);
+  const before = await rows(db, "SELECT user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at FROM card_statements ORDER BY id;");
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "SELECT user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at FROM card_statements ORDER BY id;"), before);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("explicitly selected legacy cards are promoted without name-based guesses", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-kind-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
+    ('${owner}','legacy_card',0,'Legacy','debt',1),
+    ('${owner}','named_card',1,'Named card','debt',1),
+    ('${owner}','loan',2,'Loan','debt',1);`);
+  await sqlite(db, `INSERT INTO safe_spending_settings(user_id,id,settings_json) VALUES ('${owner}',1,'{"accountIds":["legacy_card"]}')
+    ON CONFLICT(user_id,id) DO UPDATE SET settings_json=excluded.settings_json;`);
+  await sqlite(db, `DROP TABLE card_statements;
+    DROP TABLE statement_allocations;
+    DROP TABLE statement_allocation_events;
+    DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /promoted 1 explicitly selected legacy card/);
+  assert.equal(await rows(db, "SELECT kind FROM accounts WHERE id='legacy_card';"), "credit_card");
+  assert.equal(await rows(db, "SELECT kind FROM accounts WHERE id='named_card';"), "debt");
+  assert.equal(await rows(db, "SELECT kind FROM accounts WHERE id='loan';"), "debt");
+  assert.equal(await rows(db, "SELECT json_extract(settings_json,'$.accountIds') FROM safe_spending_settings;"), '["legacy_card"]');
+
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("current-schema database with explicit debt selection still promotes cards", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-kind-current-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
+    ('${owner}','legacy_card',0,'Legacy','debt',1);`);
+  await sqlite(db, `INSERT INTO safe_spending_settings(user_id,id,settings_json) VALUES ('${owner}',1,'{"accountIds":["legacy_card"]}')
+    ON CONFLICT(user_id,id) DO UPDATE SET settings_json=excluded.settings_json;`);
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.match(result.stdout, /promoted 1 explicitly selected legacy card/);
+  assert.equal(await rows(db, "SELECT kind FROM accounts WHERE id='legacy_card';"), "credit_card");
+
+  const hashAfterCurrent = await sha256File(db);
+  const repeatCurrent = await migrate(db);
+  assert.match(repeatCurrent.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfterCurrent);
+});
+
+test("partial card statement schema fails closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statement-shape-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE statement_allocation_events;`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /Partial card statement schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("card statement marker mismatch fails closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statement-marker-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /Partial card statement schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
 test("account displays with columns but without constraints fail closed", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-displayconstraints-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
