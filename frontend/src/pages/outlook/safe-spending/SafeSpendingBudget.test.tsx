@@ -33,9 +33,10 @@ describe("safe spending cycle budget", () => {
 		expect(html).toContain("With cash cushion");
 		expect(html).toContain('data-testid="with-cash-cushion">$896.44');
 		expect(html).toContain("Without cash cushion");
-		expect(html).toContain('data-testid="income-funded">+$595.52');
-		expect(html).toContain("After savings goal ($500.00 goal)");
-		expect(html).toContain('data-testid="savings-allowance">+$95.52');
+		expect(html).toContain("Without cash cushion · $595.52");
+		expect(html).toContain("After savings goal · $95.52");
+		expect(html).toContain("Monthly savings goal (set aside) · $500.00");
+		expect(html).toContain("Cash cushion · $300.92");
 		expect(html).not.toContain("—");
 	});
 
@@ -63,8 +64,8 @@ describe("safe spending cycle budget", () => {
 		const withoutCheckpoint = render(500, { safeToSpend: 300.92 });
 		for (const markup of [withCheckpoint, withoutCheckpoint]) {
 			expect(markup).toContain('data-testid="with-cash-cushion">$896.44');
-			expect(markup).toContain('data-testid="income-funded">+$595.52');
-			expect(markup).toContain('data-testid="savings-allowance">+$95.52');
+			expect(markup).toContain("Without cash cushion · $595.52");
+			expect(markup).toContain("After savings goal · $95.52");
 		}
 		// The immediate cash checkpoint stays in the detail view, not here.
 		expect(withCheckpoint).not.toContain("Immediate cash checkpoint");
@@ -153,15 +154,81 @@ describe("safe spending cycle budget", () => {
 			cycleReset: "2026-12-20",
 			nextCycleEnd: "2027-01-19",
 		});
-		for (const testId of [
-			"with-cash-cushion",
-			"income-funded",
-			"savings-allowance",
-			"discretionary-next-cycle",
-		]) {
+		for (const testId of ["with-cash-cushion", "discretionary-next-cycle"]) {
 			const value = (markup: string) =>
-				markup.match(new RegExp(`data-testid="${testId}">([^<]+)<`))?.[1];
+				markup
+					.match(
+						new RegExp(`data-testid="${testId}"[^>]*>([\\s\\S]*?)</span>`),
+					)?.[1]
+					?.replace(/<[^>]+>/g, "");
 			expect(value(second)).toBe(value(first));
 		}
+		for (const testId of ["income-funded", "savings-allowance"]) {
+			const value = (markup: string) =>
+				markup
+					.match(
+						new RegExp(`data-testid="${testId}"[^>]*>([\\s\\S]*?)</li>`),
+					)?.[1]
+					?.replace(/<[^>]+>/g, "")
+					.trim();
+			expect(value(second)).toBe(value(first));
+			expect(value(first)).not.toBe("");
+		}
 	});
+
+	it("draws the full funding room as additive segments with a cash-cushion boundary", () => {
+		const html = render();
+		expect(html).toContain('data-testid="cycle-budget-graph"');
+		expect(html).toContain(
+			'aria-label="With cash cushion $896.44. After savings goal $95.52. Monthly savings goal (set aside) $500.00. Cash cushion $300.92. Without cash cushion $595.52."',
+		);
+		const widths = [...html.matchAll(/--segment-width:([0-9.]+)%/g)].map(
+			(match) => Number(match[1]),
+		);
+		expect(widths).toHaveLength(3);
+		expect(widths[0]).toBeCloseTo((95.52 / 896.44) * 100, 6);
+		expect(widths[1]).toBeCloseTo((500 / 896.44) * 100, 6);
+		expect(widths[2]).toBeCloseTo((300.92 / 896.44) * 100, 6);
+		expect(widths.reduce((sum, width) => sum + width, 0)).toBeCloseTo(100, 6);
+		const boundary = Number(
+			html.match(/data-boundary-marker="true" style="left:([0-9.]+)%/)?.[1],
+		);
+		expect(boundary).toBeCloseTo((595.52 / 896.44) * 100, 6);
+		expect(html).not.toContain("After savings goal ($500.00 goal)");
+	});
+
+	it("omits a zero savings goal and a zero cash cushion from the bar", () => {
+		const noGoal = render(0, { savingsAllowance: 595.52 });
+		expect(noGoal).toContain('data-testid="cycle-budget-graph"');
+		expect(noGoal).toContain('data-testid="savings-allowance"');
+		expect(noGoal).not.toContain('data-testid="savings-target"');
+		expect(noGoal).toContain('data-testid="cash-cushion"');
+
+		const noCushion = render(500, {
+			fundingRoom: 595.52,
+			incomeFunded: 595.52,
+			savingsAllowance: 95.52,
+		});
+		expect(noCushion).toContain('data-testid="cycle-budget-graph"');
+		expect(noCushion).toContain('data-testid="savings-target"');
+		expect(noCushion).not.toContain('data-testid="cash-cushion"');
+	});
+
+	for (const [name, overrides] of [
+		["missing funding room", { fundingRoom: null, checkingAvailable: null }],
+		[
+			"shortfall",
+			{ fundingRoom: -110, incomeFunded: -110, savingsAllowance: -610 },
+		],
+		["negative cash cushion", { fundingRoom: 500, incomeFunded: 595.52 }],
+		["inconsistent totals", { savingsAllowance: 100 }],
+	] as const) {
+		it(`falls back to the signed amount rows for ${name}`, () => {
+			const html = render(500, overrides);
+			expect(html).not.toContain('data-testid="cycle-budget-graph"');
+			expect(html).toContain('data-testid="with-cash-cushion"');
+			expect(html).toContain('data-testid="income-funded"');
+			expect(html).toContain('data-testid="savings-allowance"');
+		});
+	}
 });

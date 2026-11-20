@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "./base.ts";
+import { expect, request, test, type Page } from "./base.ts";
+import { FIXTURE_API } from "./fixture.ts";
 
 const headline = {
 	cycleReset: "2026-11-20",
@@ -54,11 +55,32 @@ async function overrideSummary(
 	});
 }
 
+async function setSavingsTarget(savingsTarget: number) {
+	const api = await request.newContext();
+	try {
+		const response = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
+			data: {
+				cycleStartDay: 20,
+				paydayDay: 30,
+				savingsTarget,
+				accountIds: null,
+				spendingAccountIds: null,
+				incomeScheduleIds: [],
+				transactionIds: null,
+			},
+		});
+		expect(response.ok(), await response.text()).toBe(true);
+	} finally {
+		await api.dispose();
+	}
+}
+
 test("safe spending separates immediate room, progress, and next-cycle funding", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 360, height: 800 });
 	await overrideSummary(page);
+	await setSavingsTarget(500);
 	await page.goto("/outlook");
 	const card = page.getByRole("region", { name: "Safe spending" });
 	await expect(
@@ -67,8 +89,45 @@ test("safe spending separates immediate room, progress, and next-cycle funding",
 	await expect(card.getByText("Nov 27 paycheck")).toBeVisible();
 	await expect(card.getByTestId("with-cash-cushion")).toHaveText("$896.44");
 	await expect(card.getByText("Resets in 3 days")).toBeVisible();
-	await expect(card.getByTestId("income-funded")).toHaveText("+$595.52");
-	await expect(card.getByTestId("savings-allowance")).toHaveText("+$95.52");
+	await expect(card.getByTestId("cycle-budget-graph")).toBeVisible();
+	await expect(card.getByTestId("income-funded")).toHaveText(
+		"Without cash cushion · $595.52",
+	);
+	await expect(card.getByTestId("savings-allowance")).toHaveText(
+		"After savings goal · $95.52",
+	);
+	await expect(card.getByTestId("savings-target")).toHaveText(
+		"Monthly savings goal (set aside) · $500.00",
+	);
+	await expect(card.getByTestId("cash-cushion")).toHaveText(
+		"Cash cushion · $300.92",
+	);
+	await expect(
+		card.getByRole("img", {
+			name: "With cash cushion $896.44. After savings goal $95.52. Monthly savings goal (set aside) $500.00. Cash cushion $300.92. Without cash cushion $595.52.",
+		}),
+	).toBeVisible();
+	const bar = card.getByTestId("cycle-budget-graph").getByRole("img");
+	const widths = await bar
+		.locator("[data-tone]")
+		.evaluateAll((nodes) =>
+			nodes.map((node) =>
+				Number.parseFloat(
+					(node as HTMLElement).style.getPropertyValue("--segment-width"),
+				),
+			),
+		);
+	expect(widths).toHaveLength(3);
+	expect(widths[0]).toBeCloseTo((95.52 / 896.44) * 100, 6);
+	expect(widths[1]).toBeCloseTo((500 / 896.44) * 100, 6);
+	expect(widths[2]).toBeCloseTo((300.92 / 896.44) * 100, 6);
+	const boundaryLeft = await card
+		.locator("[data-boundary-marker]")
+		.evaluate((node) => Number.parseFloat((node as HTMLElement).style.left));
+	expect(boundaryLeft).toBeCloseTo((595.52 / 896.44) * 100, 3);
+	await expect(card.getByText("After savings goal ($500.00 goal)")).toHaveCount(
+		0,
+	);
 	await expect(
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
@@ -208,7 +267,11 @@ test("monthly budget uses native validation and saves all three fields", async (
 		savingsTarget: 500,
 	});
 	await page.keyboard.press("Escape");
-	await expect(
-		card.getByText("After savings goal ($500.00 goal)"),
-	).toBeVisible();
+	await expect(card.getByTestId("cycle-budget-graph")).toBeVisible();
+	await expect(card.getByTestId("savings-target")).toHaveText(
+		"Monthly savings goal (set aside) · $500.00",
+	);
+	await expect(card.getByText("After savings goal ($500.00 goal)")).toHaveCount(
+		0,
+	);
 });

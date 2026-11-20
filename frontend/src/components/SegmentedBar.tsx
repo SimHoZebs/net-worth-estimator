@@ -25,6 +25,15 @@ export interface BarSegment {
 	amount: number;
 	pattern: SegmentPattern;
 	tone: SegmentTone;
+	testId?: string;
+}
+
+/** A marker at a cumulative point inside the pool, labelled in the legend.
+ * The caller owns the wording; the bar only draws the line at that share. */
+export interface BarBoundary {
+	amount: number;
+	label: string;
+	testId?: string;
 }
 
 /** A stacked bar splitting one pool of money into labeled segments.
@@ -38,6 +47,8 @@ export function SegmentedBar({
 	className,
 	captionClassName,
 	showAmounts = true,
+	formatAmount = money,
+	boundary,
 }: {
 	caption: string;
 	segments: BarSegment[];
@@ -46,8 +57,16 @@ export function SegmentedBar({
 	className?: string;
 	captionClassName?: string;
 	showAmounts?: boolean;
+	formatAmount?: (value: number) => string;
+	boundary?: BarBoundary;
 }) {
 	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
+	// Compare in integer cents: float segment widths can sum marginally below
+	// a cent-exact boundary (e.g. 12.2 + 1.35), which must not drop the marker.
+	const showBoundary =
+		boundary != null &&
+		Math.round(boundary.amount * 100) > 0 &&
+		Math.round(boundary.amount * 100) <= Math.round(total * 100);
 	// oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists.
 	return (
 		<div className={cn("grid gap-2", className)}>
@@ -62,7 +81,7 @@ export function SegmentedBar({
 				</p>
 			)}
 			<div
-				className="m-0 flex h-3.5 overflow-hidden rounded-md bg-accent"
+				className="m-0 relative flex h-3.5 overflow-hidden rounded-md bg-accent"
 				role="img"
 				aria-label={ariaLabel}
 			>
@@ -82,6 +101,14 @@ export function SegmentedBar({
 						/>
 					) : null,
 				)}
+				{showBoundary && (
+					<span
+						aria-hidden="true"
+						className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-card"
+						data-boundary-marker="true"
+						style={{ left: `${(boundary!.amount / total) * 100}%` }}
+					/>
+				)}
 			</div>
 			{showDetails && (
 				<ul
@@ -90,7 +117,11 @@ export function SegmentedBar({
 					aria-label={`${caption} details`}
 				>
 					{segments.map((segment) => (
-						<li key={segment.label} className="flex items-center gap-2">
+						<li
+							key={segment.label}
+							className="flex items-center gap-2"
+							data-testid={segment.testId}
+						>
 							<span
 								className={cn(
 									"inline-block h-2.5 w-3.5 flex-none rounded-md",
@@ -101,9 +132,22 @@ export function SegmentedBar({
 								aria-hidden="true"
 							/>
 							{segment.label}
-							{showAmounts && ` · ${money(segment.amount)}`}
+							{showAmounts && ` · ${formatAmount(segment.amount)}`}
 						</li>
 					))}
+					{showBoundary && (
+						<li
+							className="flex items-center gap-2"
+							data-testid={boundary!.testId}
+						>
+							<span
+								aria-hidden="true"
+								className="inline-block h-2.5 w-0.5 flex-none rounded-sm bg-foreground"
+							/>
+							{boundary!.label}
+							{showAmounts && ` · ${formatAmount(boundary!.amount)}`}
+						</li>
+					)}
 				</ul>
 			)}
 		</div>

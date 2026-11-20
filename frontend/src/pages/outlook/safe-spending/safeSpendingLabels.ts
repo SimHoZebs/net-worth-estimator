@@ -14,6 +14,8 @@ export const SAFE_SPENDING_LABELS = {
 	withCashCushion: "With cash cushion",
 	withoutCashCushion: "Without cash cushion",
 	afterSavingsGoal: "After savings goal",
+	savingsGoalSetAside: "Monthly savings goal (set aside)",
+	cashCushion: "Cash cushion",
 	additionalSavings: "Additional savings if you stop spending",
 	immediateCashCheck: "Immediate cash checkpoint",
 	unavailable: "Unavailable",

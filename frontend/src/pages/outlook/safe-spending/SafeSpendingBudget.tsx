@@ -1,4 +1,6 @@
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
+import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import { exactMoney } from "@/domain/format.ts";
 import { amountText } from "./amountText.ts";
 import {
 	BudgetAmount,
@@ -7,6 +9,7 @@ import {
 	BudgetSplit,
 	firstBudgetShare,
 } from "./budgetDisplay.tsx";
+import { buildCycleBudgetGraph } from "./cycleBudgetGraph.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { SafeSpendingPayday } from "./SafeSpendingPayday.tsx";
 
@@ -34,6 +37,12 @@ export function SafeSpendingBudget({
 		cycleFundingPayday == null ? "No funding paycheck" : undefined;
 	const showComposition =
 		firstBudgetShare(nextCycleIncome, nextCycleCarryover) !== null;
+	const graph = buildCycleBudgetGraph({
+		fundingRoom: summary.fundingRoom,
+		incomeFunded: summary.incomeFunded,
+		savingsAllowance: summary.savingsAllowance,
+		savingsTarget,
+	});
 	return (
 		<div className="grid min-w-0 gap-4">
 			<section aria-label={labels.cycleBudget} className="grid gap-2">
@@ -58,46 +67,84 @@ export function SafeSpendingBudget({
 						· <time dateTime={cycleReset}>{reset}</time>
 					</p>
 				)}
-				<dl className="m-0 grid gap-2 text-sm">
-					<BudgetMetric
-						primary
-						label={labels.withCashCushion}
-						value={summary.fundingRoom}
-						testId="with-cash-cushion"
-						missingText={
-							summary.checkingAvailable == null
-								? "Cash balance missing"
-								: missingIncome
-						}
-						describeShortfall={(amount) => `Over by ${amount}`}
-					/>
-					<BudgetMetric
-						primary
-						label={labels.withoutCashCushion}
-						value={summary.incomeFunded}
-						testId="income-funded"
-						missingText={missingIncome}
-						showPlus
-						describeShortfall={(amount) => `Over by ${amount}`}
-					/>
-					<BudgetMetric
-						primary
-						label={`${labels.afterSavingsGoal} (${amountText(savingsTarget, labels.unavailable)} goal)`}
-						value={summary.savingsAllowance}
-						testId="savings-allowance"
-						missingText={missingIncome}
-						showPlus
-						describeShortfall={(amount) => `Short by ${amount}`}
-					/>
-					<BudgetMetric
-						label={labels.additionalSavings}
-						value={summary.additionalSavings}
-						testId="additional-savings"
-						missingText={missingIncome}
-						showPlus
-						describeShortfall={(amount) => `Uses ${amount} from your cushion`}
-					/>
-				</dl>
+				{graph ? (
+					<div className="grid gap-2" data-testid="cycle-budget-graph">
+						<dl className="m-0 grid text-sm">
+							<BudgetMetric
+								primary
+								label={labels.withCashCushion}
+								value={graph.headline}
+								testId="with-cash-cushion"
+								describeShortfall={(amount) => `Over by ${amount}`}
+							/>
+						</dl>
+						<SegmentedBar
+							caption="Funding breakdown"
+							captionClassName="sr-only"
+							formatAmount={exactMoney}
+							ariaLabel={`${labels.withCashCushion} ${exactMoney(graph.headline)}. ${graph.segments.map((segment) => `${segment.label} ${exactMoney(segment.amount)}`).join(". ")}. ${labels.withoutCashCushion} ${exactMoney(graph.boundary)}.`}
+							boundary={{
+								amount: graph.boundary,
+								label: labels.withoutCashCushion,
+								testId: "income-funded",
+							}}
+							segments={graph.segments}
+						/>
+						<dl className="m-0 grid text-sm">
+							<BudgetMetric
+								label={labels.additionalSavings}
+								value={summary.additionalSavings}
+								testId="additional-savings"
+								missingText={missingIncome}
+								showPlus
+								describeShortfall={(amount) =>
+									`Uses ${amount} from your cushion`
+								}
+							/>
+						</dl>
+					</div>
+				) : (
+					<dl className="m-0 grid gap-2 text-sm">
+						<BudgetMetric
+							primary
+							label={labels.withCashCushion}
+							value={summary.fundingRoom}
+							testId="with-cash-cushion"
+							missingText={
+								summary.checkingAvailable == null
+									? "Cash balance missing"
+									: missingIncome
+							}
+							describeShortfall={(amount) => `Over by ${amount}`}
+						/>
+						<BudgetMetric
+							primary
+							label={labels.withoutCashCushion}
+							value={summary.incomeFunded}
+							testId="income-funded"
+							missingText={missingIncome}
+							showPlus
+							describeShortfall={(amount) => `Over by ${amount}`}
+						/>
+						<BudgetMetric
+							primary
+							label={`${labels.afterSavingsGoal} (${amountText(savingsTarget, labels.unavailable)} goal)`}
+							value={summary.savingsAllowance}
+							testId="savings-allowance"
+							missingText={missingIncome}
+							showPlus
+							describeShortfall={(amount) => `Short by ${amount}`}
+						/>
+						<BudgetMetric
+							label={labels.additionalSavings}
+							value={summary.additionalSavings}
+							testId="additional-savings"
+							missingText={missingIncome}
+							showPlus
+							describeShortfall={(amount) => `Uses ${amount} from your cushion`}
+						/>
+					</dl>
+				)}
 			</section>
 			<SafeSpendingPayday summary={summary} />
 			<section
