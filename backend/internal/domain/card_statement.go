@@ -8,8 +8,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// DefaultCardStatementCurrency is the owner-facing currency when a statement
-// omits one, matching the USD-oriented financial model.
+// DefaultCardStatementCurrency is the owner-facing currency of a derived
+// statement, matching the USD-oriented financial model.
 const DefaultCardStatementCurrency = "USD"
 
 // MoneyCents converts a dollar amount to integer cents with consistent
@@ -38,62 +38,26 @@ func NormalizeCardStatementCurrency(currency string) string {
 	return strings.ToUpper(strings.TrimSpace(currency))
 }
 
-// ValidateCardStatement checks an owner-entered statement before it is saved.
-// The close date is an observed fact; it is never derived from a close day,
-// and a close day alone never proves the billed balance.
-func ValidateCardStatement(statement types.CardStatement, accounts []types.Account) error {
-	accountByID := make(map[string]types.Account, len(accounts))
-	for _, account := range accounts {
-		accountByID[account.ID] = account
-	}
-	account, ok := accountByID[statement.AccountID]
-	if !ok {
-		return fmt.Errorf("statement account %q does not exist", statement.AccountID)
-	}
-	if account.Kind != types.AccountKindCreditCard {
-		return fmt.Errorf("statements require a saved credit_card account")
-	}
-	if !IsValidIsoDate(statement.ClosingDate) {
-		return fmt.Errorf("closingDate must be a YYYY-MM-DD calendar date")
-	}
-	if !IsValidIsoDate(statement.DueDate) {
-		return fmt.Errorf("dueDate must be a YYYY-MM-DD calendar date")
-	}
-	if CompareIsoDates(statement.DueDate, statement.ClosingDate) < 0 {
-		return fmt.Errorf("dueDate must be the same as or later than closingDate")
-	}
-	if statement.Balance <= 0 || math.IsInf(statement.Balance, 0) || math.IsNaN(statement.Balance) || statement.Balance > 1_000_000_000_000 {
-		return fmt.Errorf("balance must be a positive finite amount")
-	}
-	if HasSubCent(statement.Balance) {
-		return fmt.Errorf("balance must be an exact number of cents")
-	}
-	// The model is USD-first: receipts and transfer netting require USD, so a
-	// recorded statement follows the same convention instead of introducing a
-	// second currency reality for the same billed balance.
-	if NormalizeCardStatementCurrency(statement.Currency) != DefaultCardStatementCurrency {
-		return fmt.Errorf("only USD statements are supported")
-	}
-	if len(statement.Note) > 500 {
-		return fmt.Errorf("note is too long")
-	}
-	return nil
-}
-
 // ValidateStatementAllocation gates one explicit allocation. The payment must
 // be a settled transfer into the card, the amount must be a positive part of
 // that payment and of the statement's remaining balance, and the payment must
-// post no earlier than the recorded close. No amount-based auto-claim happens
-// here: the owner has already chosen the payment and statement.
-func ValidateStatementAllocation(statement types.CardStatement, postedDate, currency string, paymentAmount, amount, remaining float64) error {
+// post no earlier than the statement close. A statement whose balance could
+// not be derived cannot back an allocation: unknown is never invented into a
+// billed amount. No amount-based auto-claim happens here; the owner has
+// already chosen the payment and statement.
+func ValidateStatementAllocation(statement types.DerivedStatement, postedDate, currency string, paymentAmount, amount, remaining float64) error {
+	if statement.Balance == nil {
+		return fmt.Errorf("the statement balance is not known from bank evidence")
+	}
+	balance := *statement.Balance
 	if amount <= 0 || math.IsInf(amount, 0) || math.IsNaN(amount) || amount > 1_000_000_000_000 {
 		return fmt.Errorf("allocation amount must be a positive finite amount")
 	}
 	if HasSubCent(amount) {
 		return fmt.Errorf("allocation amount must be an exact number of cents")
 	}
-	if HasSubCent(statement.Balance) || HasSubCent(remaining) || HasSubCent(paymentAmount) {
-		return fmt.Errorf("statement and payment amounts must be exact numbers of cents")
+	if balance <= 0 || HasSubCent(balance) || HasSubCent(remaining) || HasSubCent(paymentAmount) {
+		return fmt.Errorf("statement and payment amounts must be exact positive numbers of cents")
 	}
 	amountCents, paymentCents, remainingCents := MoneyCents(amount), MoneyCents(paymentAmount), MoneyCents(remaining)
 	if paymentCents <= 0 || amountCents > paymentCents {

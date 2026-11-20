@@ -92,11 +92,13 @@ Base forms save changes directly. Failed submissions retain their fields in the 
 A **credit card** is an account kind that contributes to debts, not available
 cash. The account kind does not establish which purchases have been imported.
 
-A **statement** records what the issuer billed for one card at a specific
-**statement close**, with a **statement balance** and **due date**. The configured
-closing day helps forecast future closes; it does not establish the balance of
-an issued statement. A current balance or an estimate from imported activity is
-not the statement balance.
+A **statement** is derived for each close in a card's history from its
+**statement closing day** and recorded bank evidence. The latest bank balance
+observed in that statement cycle, taken as debt, is the **statement balance**;
+posted activity after that observation is replayed from it. The open cycle is
+an estimate until it closes. A close with no observation is unknown, never
+zero and never a guess from a closing day or a current balance. Payment terms
+supply the **due date**; a card without terms has no known due date.
 
 A **card payment** is a movement to a credit card. When both sides are present,
 the linked transfer is one payment. **Apply payment** records which statement a

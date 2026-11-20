@@ -1,6 +1,8 @@
-import type { CardStatement } from "@/api/generated/model/cardStatement.ts";
+import type { DerivedStatement } from "@/api/generated/model/derivedStatement.ts";
 import type { PaymentEvidence } from "@/api/generated/model/paymentEvidence.ts";
 import type { StatementAllocationRead } from "@/api/generated/model/statementAllocationRead.ts";
+import type { DerivedCardStatement } from "./derivedStatement.ts";
+import { derivedStatementStatus } from "./derivedStatement.ts";
 import { dateLabel } from "./format.ts";
 import type {
 	StatementPaymentActions,
@@ -8,7 +10,45 @@ import type {
 	StatementPaymentSuggestion,
 } from "./statementPayment.ts";
 
-export function statementLabel(statement: CardStatement): string {
+/** A statement read whose billed amount is known, so a payment can target it. */
+export type KnownBalanceRead = Omit<StatementAllocationRead, "statement"> & {
+	statement: Omit<DerivedStatement, "balance"> & { balance: number };
+};
+
+/** Statements with an unknown billed amount are never payment targets. */
+export function hasKnownBalance(
+	read: StatementAllocationRead,
+): read is KnownBalanceRead {
+	return read.statement.balance !== null;
+}
+
+/** Narrow a posted-payment match whose statement can receive an allocation. */
+export function isKnownBalanceMatch<
+	T extends { read: StatementAllocationRead },
+>(match: T): match is T & { read: KnownBalanceRead } {
+	return hasKnownBalance(match.read);
+}
+
+/** Map a statement allocation read into the derived-statement view model. */
+export function toDerivedCardStatement(
+	read: StatementAllocationRead,
+): DerivedCardStatement {
+	const billedAmount = read.statement.balance;
+	const remaining = read.remaining;
+	const allocated = read.allocated;
+	return {
+		id: read.statement.id,
+		accountId: read.statement.accountId,
+		closingDate: read.statement.closingDate,
+		billedAmount,
+		remaining,
+		allocated,
+		dueDate: read.statement.dueDate,
+		status: derivedStatementStatus({ billedAmount, remaining, allocated }),
+	};
+}
+
+export function statementLabel(statement: DerivedStatement): string {
 	return `${dateLabel(statement.closingDate, true)} statement`;
 }
 
@@ -31,13 +71,13 @@ export function toStatementPaymentSuggestion({
 	actions,
 	key = read.statement.id,
 }: {
-	read: StatementAllocationRead;
+	read: KnownBalanceRead;
 	paymentAmount: number;
 	/** Transfer-link evidence composed by the transaction view. */
 	evidence: string | null;
 	/** Reasons from the posted-payment candidate, shown on request. */
 	paymentEvidence?: PaymentEvidence[];
-	alternatives?: StatementAllocationRead[];
+	alternatives?: KnownBalanceRead[];
 	actions: StatementPaymentActions;
 	key?: string;
 }): StatementPaymentSuggestion {

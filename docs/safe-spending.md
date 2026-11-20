@@ -60,11 +60,12 @@ unpaid amount; the bank movement is not a second expense.
 
 ## Reviewing card payments
 
-Record the billed balance, close date, and due date on the credit card account.
-In the payment transaction, Suggestions can identify an open statement once
-the destination card is known. An exact match to the remaining balance is strong
-evidence for the suggestion, not proof or automatic confirmation. A smaller
-payment can still be applied to the statement without marking it paid in full.
+Statements are derived from each card's closing day and bank evidence, so no
+billed balance, close date, or due date is recorded by hand. In the payment
+transaction, Suggestions can identify an open statement once the destination
+card is known. An exact match to the remaining balance is strong evidence for
+the suggestion, not proof or automatic confirmation. A smaller payment can
+still be applied to the statement without marking it paid in full.
 
 A missing statement does not turn a known card payment into a purchase. The
 payment still reduces checking cash, and the card's purchases still account for

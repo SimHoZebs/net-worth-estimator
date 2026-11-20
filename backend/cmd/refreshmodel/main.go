@@ -24,7 +24,7 @@ import (
 var financialTables = []string{
 	"account_displays",
 	"accounts", "checkpoints", "checkpoint_available_balances", "transactions", "transaction_sim", "transaction_claims", "transaction_sync_keys", "suppressed_sync_keys", "transaction_categories",
-	"card_statements", "statement_allocations", "statement_allocation_events",
+	"statement_allocations", "statement_allocation_events",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "gmail_credentials", "amount_presets", "safe_spending_settings",

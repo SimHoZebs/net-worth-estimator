@@ -676,29 +676,27 @@ test("partial sidecar schemas fail closed with the original unchanged", async (t
   assert.deepEqual(await backups(directory), []);
 });
 
-test("pre-card-statement database gains empty statement tables with data preserved", async (t) => {
+test("pre-derived-statement database gains empty allocation tables with data preserved", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statements-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
   await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
-  // Model a deployed database from before recorded card statements existed.
-  await sqlite(db, `DROP TABLE card_statements;
-    DROP TABLE statement_allocations;
+  // Model a deployed database from before derived card statements existed.
+  await sqlite(db, `DROP TABLE statement_allocations;
     DROP TABLE statement_allocation_events;
-    DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+    DELETE FROM schema_migrations WHERE name = 'derived-card-statements-v1';`);
   const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
   const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
 
   const result = await migrate(db);
   assert.doesNotMatch(result.stdout, /verified, nothing to do/);
 
-  assert.equal(await rows(db, "SELECT user_id, id, position, account_id, closing_date, due_date, balance, currency, source, note, created_at FROM card_statements LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='card_statements';"), "0");
   assert.equal(await rows(db, "SELECT user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at FROM statement_allocations LIMIT 0;"), "");
   assert.equal(await rows(db, "SELECT user_id, id, allocation_id, action, actor, created_at FROM statement_allocation_events LIMIT 0;"), "");
-  assert.equal(await rows(db, "SELECT COUNT(*) FROM card_statements;"), "0");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM statement_allocations;"), "0");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM statement_allocation_events;"), "0");
-  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name = 'recorded-card-statements-v1';"), "1");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name='derived-card-statements-v1';"), "1");
   assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
   assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
@@ -712,19 +710,88 @@ test("pre-card-statement database gains empty statement tables with data preserv
   assert.equal(await sha256File(db), hashAfter);
 });
 
-test("existing card statement rows survive migration byte-identical", async (t) => {
+test("legacy recorded statements are rekeyed to derived identities and dropped", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statement-rows-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db, owner } = await fullBase(directory);
   await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
-  await sqlite(db, `INSERT INTO account_displays(user_id,account_id,display_json) VALUES ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');`);
-  await sqlite(db, `INSERT INTO card_statements(user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at) VALUES ('${owner}','stmt-1',0,'checking','2026-03-10','2026-03-25',100,'USD','user','',1773187199);`);
-  const before = await rows(db, "SELECT user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at FROM card_statements ORDER BY id;");
+  await sqlite(db, `INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('${owner}','payment','Card payoff','checking','null','{}',1773140400,1773129600,'user',0,0);`);
+  // Rebuild the legacy three-table shape with allocation rows pointing at a
+  // recorded statement id, including the now-retired statement FK.
+  await sqlite(db, `PRAGMA foreign_keys=OFF;
+    CREATE TABLE card_statements (
+      user_id TEXT NOT NULL, id TEXT NOT NULL, position INTEGER NOT NULL,
+      account_id TEXT NOT NULL, closing_date TEXT NOT NULL, due_date TEXT NOT NULL,
+      balance REAL NOT NULL, currency TEXT NOT NULL DEFAULT 'USD',
+      source TEXT NOT NULL DEFAULT 'user', note TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL, PRIMARY KEY(user_id,id));
+    INSERT INTO card_statements(user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at) VALUES ('${owner}','stmt-1',0,'checking','2026-03-10','2026-03-25',100,'USD','user','',1773187199);
+    CREATE TABLE statement_allocations_legacy (
+      user_id TEXT NOT NULL, id TEXT NOT NULL, position INTEGER NOT NULL,
+      statement_id TEXT NOT NULL, transaction_id TEXT NOT NULL, amount REAL NOT NULL,
+      state TEXT NOT NULL, evidence TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(user_id,id),
+      UNIQUE(user_id,transaction_id),
+      FOREIGN KEY(user_id,statement_id) REFERENCES card_statements(user_id,id));
+    INSERT INTO statement_allocations_legacy SELECT user_id,id,position,statement_id,transaction_id,amount,state,evidence,actor,created_at,updated_at FROM statement_allocations;
+    DROP TABLE statement_allocations;
+    ALTER TABLE statement_allocations_legacy RENAME TO statement_allocations;
+    INSERT INTO statement_allocations(user_id,id,position,statement_id,transaction_id,amount,state,evidence,actor,created_at,updated_at) VALUES ('${owner}','alloc-1',0,'stmt-1','payment',60.20,'confirmed','test','owner',1773187199,1773187199);
+    INSERT INTO statement_allocation_events(user_id,id,allocation_id,action,actor,created_at) VALUES ('${owner}',1,'alloc-1','created','owner',1773187199);
+    DELETE FROM schema_migrations WHERE name = 'derived-card-statements-v1';
+    INSERT INTO schema_migrations(name) VALUES ('recorded-card-statements-v1');`);
 
   const result = await migrate(db);
-  assert.match(result.stdout, /verified, nothing to do/);
-  assert.equal(await rows(db, "SELECT user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at FROM card_statements ORDER BY id;"), before);
-  assert.deepEqual(await backups(directory), []);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='card_statements';"), "0");
+  assert.equal(await rows(db, "SELECT statement_id FROM statement_allocations;"), "2026-03-10~checking");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM statement_allocations WHERE statement_id='stmt-1';"), "0");
+  assert.equal(await rows(db, "SELECT action FROM statement_allocation_events;"), "created");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_list('statement_allocations') WHERE \"table\"='card_statements';"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name='recorded-card-statements-v1';"), "0");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM schema_migrations WHERE name='derived-card-statements-v1';"), "1");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("legacy allocations without a recorded statement row fail closed", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statement-unmapped-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('${owner}','payment','Card payoff','checking','null','{}',1773140400,1773129600,'user',0,0);`);
+  // Rebuild the legacy three-table shape, then point one allocation at a
+  // statement row that does not exist, so the rekey cannot map it.
+  await sqlite(db, `PRAGMA foreign_keys=OFF;
+    CREATE TABLE card_statements (
+      user_id TEXT NOT NULL, id TEXT NOT NULL, position INTEGER NOT NULL,
+      account_id TEXT NOT NULL, closing_date TEXT NOT NULL, due_date TEXT NOT NULL,
+      balance REAL NOT NULL, currency TEXT NOT NULL DEFAULT 'USD',
+      source TEXT NOT NULL DEFAULT 'user', note TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL, PRIMARY KEY(user_id,id));
+    INSERT INTO card_statements(user_id,id,position,account_id,closing_date,due_date,balance,currency,source,note,created_at) VALUES ('${owner}','stmt-1',0,'checking','2026-03-10','2026-03-25',100,'USD','user','',1773187199);
+    CREATE TABLE statement_allocations_legacy (
+      user_id TEXT NOT NULL, id TEXT NOT NULL, position INTEGER NOT NULL,
+      statement_id TEXT NOT NULL, transaction_id TEXT NOT NULL, amount REAL NOT NULL,
+      state TEXT NOT NULL, evidence TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(user_id,id),
+      UNIQUE(user_id,transaction_id));
+    INSERT INTO statement_allocations_legacy SELECT user_id,id,position,statement_id,transaction_id,amount,state,evidence,actor,created_at,updated_at FROM statement_allocations;
+    DROP TABLE statement_allocations;
+    ALTER TABLE statement_allocations_legacy RENAME TO statement_allocations;
+    INSERT INTO statement_allocations(user_id,id,position,statement_id,transaction_id,amount,state,evidence,actor,created_at,updated_at) VALUES ('${owner}','alloc-1',0,'stmt-missing','payment',60.20,'confirmed','test','owner',1773187199,1773187199);
+    DELETE FROM schema_migrations WHERE name = 'derived-card-statements-v1';
+    INSERT INTO schema_migrations(name) VALUES ('recorded-card-statements-v1');`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /without a recorded statement row/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
 });
 
 test("explicitly selected legacy cards are promoted without name-based guesses", async (t) => {
@@ -737,10 +804,9 @@ test("explicitly selected legacy cards are promoted without name-based guesses",
     ('${owner}','loan',2,'Loan','debt',1);`);
   await sqlite(db, `INSERT INTO safe_spending_settings(user_id,id,settings_json) VALUES ('${owner}',1,'{"accountIds":["legacy_card"]}')
     ON CONFLICT(user_id,id) DO UPDATE SET settings_json=excluded.settings_json;`);
-  await sqlite(db, `DROP TABLE card_statements;
-    DROP TABLE statement_allocations;
+  await sqlite(db, `DROP TABLE statement_allocations;
     DROP TABLE statement_allocation_events;
-    DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+    DELETE FROM schema_migrations WHERE name = 'derived-card-statements-v1';`);
 
   const result = await migrate(db);
   assert.match(result.stdout, /promoted 1 explicitly selected legacy card/);
@@ -783,7 +849,7 @@ test("partial card statement schema fails closed with the original unchanged", a
   const expected = (await sqlite(db, ".dump")).stdout;
 
   const error = await migrateFails(db);
-  assert.match(error.stderr ?? error.stdout ?? "", /Partial card statement schema/);
+  assert.match(error.stderr ?? error.stdout ?? "", /Partial derived statement schema/);
   assert.equal((await sqlite(db, ".dump")).stdout, expected);
   assert.deepEqual(await backups(directory), []);
 });
@@ -792,11 +858,11 @@ test("card statement marker mismatch fails closed with the original unchanged", 
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-card-statement-marker-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { db } = await fullBase(directory);
-  await sqlite(db, `DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';`);
+  await sqlite(db, `DELETE FROM schema_migrations WHERE name = 'derived-card-statements-v1';`);
   const expected = (await sqlite(db, ".dump")).stdout;
 
   const error = await migrateFails(db);
-  assert.match(error.stderr ?? error.stdout ?? "", /Partial card statement schema/);
+  assert.match(error.stderr ?? error.stdout ?? "", /Partial derived statement schema/);
   assert.equal((await sqlite(db, ".dump")).stdout, expected);
   assert.deepEqual(await backups(directory), []);
 });

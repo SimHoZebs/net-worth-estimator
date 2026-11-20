@@ -3,6 +3,7 @@ import { FIXTURE_API } from "./fixture.ts";
 
 const CARD_ID = "synthetic-synced-card";
 const BRIDGE_ID = "sf2.synthetic.card";
+const DERIVED_CARD_ID = "synthetic-derived-card";
 
 // The bank owns observed data, while the owner sets the closing day.
 async function seedTrackedCard(api: APIRequestContext) {
@@ -60,6 +61,42 @@ async function seedTrackedCard(api: APIRequestContext) {
 	expect(settings.ok(), await settings.text()).toBe(true);
 }
 
+// A recorded cycle end derives the statement. There is no manual entry path.
+async function seedDerivedCard(api: APIRequestContext) {
+	const closeInstant = Math.floor(Date.parse("2026-01-31T23:59:59Z") / 1000);
+	const card = await api.post(`${FIXTURE_API}/v1/accounts`, {
+		data: {
+			id: DERIVED_CARD_ID,
+			name: "Synthetic derived card",
+			kind: "credit_card",
+			enabled: true,
+			statementClosingDay: 31,
+			balance: -125.55,
+			observedAt: closeInstant,
+		},
+	});
+	expect(card.ok(), await card.text()).toBe(true);
+	const terms = await api.post(`${FIXTURE_API}/v1/payment-terms`, {
+		data: {
+			accountId: DERIVED_CARD_ID,
+			minimumFixed: 25,
+			dueDay: 20,
+		},
+	});
+	expect(terms.ok(), await terms.text()).toBe(true);
+	const payment = await api.post(`${FIXTURE_API}/v1/transactions`, {
+		data: {
+			name: "Synthetic card payoff",
+			sourceAccountId: "checking",
+			destinations: [DERIVED_CARD_ID],
+			amount: { value: 125.55 },
+			date: "2026-02-01",
+			enabled: true,
+		},
+	});
+	expect(payment.ok(), await payment.text()).toBe(true);
+}
+
 test("a synced credit card saves its closing day through the real API", async ({
 	page,
 }) => {
@@ -94,35 +131,20 @@ test("a synced credit card saves its closing day through the real API", async ({
 	}
 });
 
-test("a saved statement appears on its card and is only paid after applying the transaction", async ({
+test("a derived statement is only paid after applying the transaction, and undo reopens it", async ({
 	page,
 }) => {
 	const api = await request.newContext();
 	try {
-		await seedTrackedCard(api);
-		const payment = await api.post(`${FIXTURE_API}/v1/transactions`, {
-			data: {
-				name: "Synthetic card payoff",
-				sourceAccountId: "checking",
-				destinations: [CARD_ID],
-				amount: { value: 125.55 },
-				date: "2026-02-01",
-				enabled: true,
-			},
-		});
-		expect(payment.ok(), await payment.text()).toBe(true);
+		await seedDerivedCard(api);
 
-		await page.goto(`/accounts/${CARD_ID}`);
+		await page.goto(`/accounts/${DERIVED_CARD_ID}`);
 		await page.getByRole("tab", { name: "Account details" }).click();
-		await page.getByRole("button", { name: "Add statement" }).click();
-		await page
-			.getByLabel("Statement close", { exact: true })
-			.fill("2026-01-19");
-		await page.getByLabel("Statement balance").fill("125.55");
-		await page.getByLabel("Due date").fill("2026-02-03");
-		await page.getByRole("button", { name: "Save statement" }).click();
-
 		const statements = page.getByRole("region", { name: "Card statements" });
+		await expect(statements.getByText("Jan 31, 2026 statement")).toBeVisible();
+		await expect(
+			statements.getByText("Due Feb 20, 2026 · $125.55 billed"),
+		).toBeVisible();
 		await expect(
 			statements.getByText("$125.55 remaining · Open"),
 		).toBeVisible();
@@ -146,7 +168,7 @@ test("a saved statement appears on its card and is only paid after applying the 
 		await expect(
 			page.getByRole("button", { name: "Review 1 suggestion" }),
 		).toBeVisible();
-		await page.goto(`/accounts/${CARD_ID}`);
+		await page.goto(`/accounts/${DERIVED_CARD_ID}`);
 		await page.getByRole("tab", { name: "Account details" }).click();
 		await expect(
 			statements.getByText("$125.55 remaining · Open"),

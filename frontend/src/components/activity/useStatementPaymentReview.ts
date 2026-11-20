@@ -4,7 +4,10 @@ import {
 	setStatementAllocationState,
 } from "@/api/generated/endpoints.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
-import { toStatementPaymentSuggestion } from "@/domain/statementPaymentAdapter.ts";
+import {
+	isKnownBalanceMatch,
+	toStatementPaymentSuggestion,
+} from "@/domain/statementPaymentAdapter.ts";
 import {
 	refreshCardStatements,
 	useStatementPaymentSuggestions,
@@ -23,7 +26,7 @@ export function useStatementPaymentReview(
 	}>();
 	const [undoing, setUndoing] = useState(false);
 	const [undoError, setUndoError] = useState(false);
-	const matches = query.data?.matches ?? [];
+	const matches = (query.data?.matches ?? []).filter(isKnownBalanceMatch);
 	const allocation = query.data?.current;
 	const applied = matches.find(
 		({ read }) => read.statement.id === allocation?.statementId,
@@ -49,13 +52,15 @@ export function useStatementPaymentReview(
 		? toStatementPaymentSuggestion({
 				read: match.read,
 				paymentAmount: match.payment.amount,
-				evidence:
-					match.payment.evidence?.some((item) => item.code === "amount-exact")
-						? "Payment matches the remaining statement balance."
-						: null,
-				paymentEvidence: match.payment.evidence?.filter(
-					(item) => item.code !== "amount-exact",
-				) ?? [],
+				evidence: match.payment.evidence?.some(
+					(item) => item.code === "amount-exact",
+				)
+					? "Payment matches the remaining statement balance."
+					: null,
+				paymentEvidence:
+					match.payment.evidence?.filter(
+						(item) => item.code !== "amount-exact",
+					) ?? [],
 				alternatives: available
 					.filter((candidate) => candidate !== match)
 					.map(({ read }) => read),

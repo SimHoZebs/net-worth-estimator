@@ -2,8 +2,11 @@ package integration
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 )
 
 func createStatementTestAccount(t *testing.T, handler http.Handler, name, kind string) string {
@@ -28,6 +31,34 @@ func createStatementTestAccount(t *testing.T, handler http.Handler, name, kind s
 	return payload.Value.ID
 }
 
+func createDerivedCard(t *testing.T, handler http.Handler, closingDay int, balance float64, closeDate string) string {
+	t.Helper()
+	body := fmt.Sprintf(`{"name":"Card","kind":"credit_card","enabled":true,"statementClosingDay":%d,"balance":%g,"observedAt":%d}`,
+		closingDay, balance, domain.DayCloseUnix(closeDate))
+	response := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", body)
+	if response.Code != http.StatusOK {
+		t.Fatalf("create card status = %d, body %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Value struct {
+			ID string `json:"id"`
+		} `json:"value"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	return payload.Value.ID
+}
+
+func saveDueTerms(t *testing.T, handler http.Handler, accountID string, dueDay int) {
+	t.Helper()
+	body := fmt.Sprintf(`{"accountId":"%s","minimumFixed":25,"dueDay":%d}`, accountID, dueDay)
+	response := doRowRequest(t, handler, http.MethodPost, "/v1/payment-terms", body)
+	if response.Code != http.StatusOK {
+		t.Fatalf("save terms status = %d, body %s", response.Code, response.Body.String())
+	}
+}
+
 func createStatementTestRecord(t *testing.T, handler http.Handler, body string) string {
 	t.Helper()
 	response := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", body)
@@ -49,51 +80,73 @@ func createStatementTestRecord(t *testing.T, handler http.Handler, body string) 
 	return payload.Value.ID
 }
 
+type listedStatement struct {
+	ID        string  `json:"id"`
+	AccountID string  `json:"accountId"`
+	Closing   string  `json:"closingDate"`
+	DueDate   *string `json:"dueDate"`
+	Balance   *float64 `json:"balance"`
+	Kind      string  `json:"kind"`
+}
+
+type listedRead struct {
+	Statement listedStatement `json:"statement"`
+	Remaining float64         `json:"remaining"`
+	Allocated float64         `json:"allocated"`
+}
+
+func listDerivedStatements(t *testing.T, handler http.Handler, accountID string) ([]listedRead, string) {
+	t.Helper()
+	response := doRowRequest(t, handler, http.MethodGet, "/v1/card-statements?accountId="+accountID, "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("list status = %d, body %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Statements []listedRead `json:"statements"`
+		Revision   string       `json:"revision"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	return payload.Statements, payload.Revision
+}
+
+func findDerivedStatement(t *testing.T, reads []listedRead, closingDate string) listedRead {
+	t.Helper()
+	for _, read := range reads {
+		if read.Statement.Closing == closingDate {
+			return read
+		}
+	}
+	t.Fatalf("statement for %s not found in %+v", closingDate, reads)
+	return listedRead{}
+}
+
 func TestCardStatementsEndToEnd(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	checking := createStatementTestAccount(t, handler, "Checking", "cash")
-	card := createStatementTestAccount(t, handler, "Card", "credit_card")
+	card := createDerivedCard(t, handler, 31, -100.30, "2026-01-31")
+	saveDueTerms(t, handler, card, 20)
 
 	payment := createStatementTestRecord(t, handler, `{"name":"Card payoff","sourceAccountId":"`+checking+`","destinations":["`+card+`"],"amount":{"resolver":"expression","config":{"expression":"60.20"},"inputs":{}},"date":"2026-01-31","enabled":true}`)
 
-	statementBody := `{"accountId":"` + card + `","closingDate":"2026-01-31","dueDate":"2026-02-20","balance":100.30,"currency":"USD"}`
-	created := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements", statementBody)
-	if created.Code != http.StatusOK {
-		t.Fatalf("create statement status = %d, body %s", created.Code, created.Body.String())
+	reads, _ := listDerivedStatements(t, handler, card)
+	statement := findDerivedStatement(t, reads, "2026-01-31")
+	if statement.Statement.ID != "2026-01-31~"+card {
+		t.Fatalf("derived id = %q", statement.Statement.ID)
 	}
-	var statementPayload struct {
-		Statement struct {
-			ID string `json:"id"`
-		} `json:"statement"`
+	if statement.Statement.Balance == nil || *statement.Statement.Balance != 100.30 || statement.Statement.Kind != "closed" {
+		t.Fatalf("statement = %+v, want 100.30 closed", statement.Statement)
 	}
-	if err := json.Unmarshal(created.Body.Bytes(), &statementPayload); err != nil {
-		t.Fatalf("decode statement: %v", err)
+	if statement.Statement.DueDate == nil || *statement.Statement.DueDate != "2026-02-20" {
+		t.Fatalf("due date = %v, want 2026-02-20", statement.Statement.DueDate)
 	}
-	statementID := statementPayload.Statement.ID
-	if statementID == "" {
-		t.Fatalf("statement id empty in %s", created.Body.String())
+	if statement.Remaining != 100.30 || statement.Allocated != 0 {
+		t.Fatalf("totals = %+v, want 0 allocated and 100.30 remaining", statement)
 	}
 
-	listed := doRowRequest(t, handler, http.MethodGet, "/v1/card-statements?accountId="+card, "")
-	if listed.Code != http.StatusOK {
-		t.Fatalf("list status = %d, body %s", listed.Code, listed.Body.String())
-	}
-	var listPayload struct {
-		Statements []struct {
-			Statement struct{ Balance, Allocated, Remaining float64 } `json:"statement"`
-			Remaining float64                                         `json:"remaining"`
-			Allocated float64                                         `json:"allocated"`
-		} `json:"statements"`
-	}
-	if err := json.Unmarshal(listed.Body.Bytes(), &listPayload); err != nil {
-		t.Fatalf("decode list: %v", err)
-	}
-	if len(listPayload.Statements) != 1 || listPayload.Statements[0].Remaining != 100.30 {
-		t.Fatalf("list = %+v, want one statement with 100.30 remaining", listPayload)
-	}
-
-	candidates := doRowRequest(t, handler, http.MethodGet, "/v1/card-statements/"+statementID+"/payment-candidates", "")
+	candidates := doRowRequest(t, handler, http.MethodGet, "/v1/card-statements/"+statement.Statement.ID+"/payment-candidates", "")
 	if candidates.Code != http.StatusOK {
 		t.Fatalf("candidates status = %d, body %s", candidates.Code, candidates.Body.String())
 	}
@@ -132,7 +185,7 @@ func TestCardStatementsEndToEnd(t *testing.T) {
 	if err := json.Unmarshal(suggestions.Body.Bytes(), &suggestionPayload); err != nil {
 		t.Fatalf("decode suggestions: %v", err)
 	}
-	if len(suggestionPayload.Matches) != 1 || suggestionPayload.Matches[0].Read.Statement.ID != statementID {
+	if len(suggestionPayload.Matches) != 1 || suggestionPayload.Matches[0].Read.Statement.ID != statement.Statement.ID {
 		t.Fatalf("suggestions = %+v, want one match for the statement", suggestionPayload)
 	}
 	if suggestionPayload.Result.Status != "unallocated" || suggestionPayload.Current != nil {
@@ -140,21 +193,14 @@ func TestCardStatementsEndToEnd(t *testing.T) {
 	}
 
 	// Apply a first partial payment. Integer-cent math must leave 60.20.
-	first := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements/"+statementID+"/allocations",
+	first := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements/"+statement.Statement.ID+"/allocations",
 		`{"transactionId":"`+payment+`","amount":40.10,"evidence":"partial test"}`)
 	if first.Code != http.StatusOK {
 		t.Fatalf("first allocation status = %d, body %s", first.Code, first.Body.String())
 	}
-	listed = doRowRequest(t, handler, http.MethodGet, "/v1/card-statements?accountId="+card, "")
-	var afterFirst struct {
-		Statements []struct {
-			Remaining float64 `json:"remaining"`
-		} `json:"statements"`
-	}
-	if err := json.Unmarshal(listed.Body.Bytes(), &afterFirst); err != nil {
-		t.Fatalf("decode list after first: %v", err)
-	}
-	if len(afterFirst.Statements) != 1 || afterFirst.Statements[0].Remaining != 60.20 {
+	reads, _ = listDerivedStatements(t, handler, card)
+	afterFirst := findDerivedStatement(t, reads, "2026-01-31")
+	if afterFirst.Remaining != 60.20 || afterFirst.Allocated != 40.10 {
 		t.Fatalf("remaining after 40.10 = %+v, want 60.20", afterFirst)
 	}
 }
@@ -163,34 +209,23 @@ func TestCardStatementsValidationAndUndoReapply(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	checking := createStatementTestAccount(t, handler, "Checking", "cash")
-	card := createStatementTestAccount(t, handler, "Card", "credit_card")
+	card := createDerivedCard(t, handler, 31, -100.30, "2026-01-31")
+	saveDueTerms(t, handler, card, 20)
 	payment := createStatementTestRecord(t, handler, `{"name":"Card payoff","sourceAccountId":"`+checking+`","destinations":["`+card+`"],"amount":{"resolver":"expression","config":{"expression":"100.30"},"inputs":{}},"date":"2026-02-01","enabled":true}`)
+	statementID := "2026-01-31~" + card
 
-	badDate := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements",
-		`{"accountId":"`+card+`","closingDate":"2026-02-20","dueDate":"2026-02-01","balance":100.30,"currency":"USD"}`)
-	if badDate.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("bad date status = %d, want 422", badDate.Code)
+	// There is no manual statement path: a synthetic id cannot be allocated.
+	missing := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements/2026-01-31~ghost/allocations",
+		`{"transactionId":"`+payment+`","amount":1,"evidence":"x"}`)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unknown statement status = %d, want 404: %s", missing.Code, missing.Body.String())
 	}
-	subCent := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements",
-		`{"accountId":"`+card+`","closingDate":"2026-01-31","dueDate":"2026-02-20","balance":100.305,"currency":"USD"}`)
+
+	subCent := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements/"+statementID+"/allocations",
+		`{"transactionId":"`+payment+`","amount":1.001,"evidence":"x"}`)
 	if subCent.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("sub-cent balance status = %d, want 422", subCent.Code)
+		t.Fatalf("sub-cent allocation status = %d, want 422: %s", subCent.Code, subCent.Body.String())
 	}
-	wrongKind := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements",
-		`{"accountId":"`+checking+`","closingDate":"2026-01-31","dueDate":"2026-02-20","balance":100.30,"currency":"USD"}`)
-	if wrongKind.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("wrong kind status = %d, want 422", wrongKind.Code)
-	}
-
-	created := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements",
-		`{"accountId":"`+card+`","closingDate":"2026-01-31","dueDate":"2026-02-20","balance":100.30,"currency":"USD"}`)
-	var payload struct {
-		Statement struct{ ID string } `json:"statement"`
-	}
-	if err := json.Unmarshal(created.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	statementID := payload.Statement.ID
 
 	applied := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements/"+statementID+"/allocations",
 		`{"transactionId":"`+payment+`","amount":100.30,"evidence":"full"}`)
@@ -198,10 +233,13 @@ func TestCardStatementsValidationAndUndoReapply(t *testing.T) {
 		t.Fatalf("apply status = %d, body %s", applied.Code, applied.Body.String())
 	}
 	var allocation struct {
-		Allocation struct{ ID string } `json:"allocation"`
+		Allocation struct{ ID, StatementID, State string } `json:"allocation"`
 	}
 	if err := json.Unmarshal(applied.Body.Bytes(), &allocation); err != nil {
 		t.Fatal(err)
+	}
+	if allocation.Allocation.StatementID != statementID {
+		t.Fatalf("allocation statement id = %q, want %q", allocation.Allocation.StatementID, statementID)
 	}
 	allocationID := allocation.Allocation.ID
 

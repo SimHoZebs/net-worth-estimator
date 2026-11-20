@@ -1247,114 +1247,6 @@
 				"required": ["adjustments", "revision"],
 				"type": "object"
 			},
-			"CardStatement": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"balance": {
-						"format": "double",
-						"type": "number"
-					},
-					"closingDate": {
-						"type": "string"
-					},
-					"createdAt": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"currency": {
-						"type": "string"
-					},
-					"dueDate": {
-						"type": "string"
-					},
-					"id": {
-						"type": "string"
-					},
-					"note": {
-						"type": "string"
-					},
-					"source": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"id",
-					"accountId",
-					"closingDate",
-					"dueDate",
-					"balance",
-					"currency",
-					"createdAt"
-				],
-				"type": "object"
-			},
-			"CardStatementBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/CardStatementBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"accountId": {
-						"type": "string"
-					},
-					"balance": {
-						"format": "double",
-						"type": "number"
-					},
-					"closingDate": {
-						"type": "string"
-					},
-					"currency": {
-						"maxLength": 3,
-						"type": "string"
-					},
-					"dueDate": {
-						"type": "string"
-					},
-					"id": {
-						"format": "uuid",
-						"type": "string"
-					},
-					"note": {
-						"maxLength": 500,
-						"type": "string"
-					},
-					"source": {
-						"type": "string"
-					}
-				},
-				"required": ["accountId", "closingDate", "dueDate", "balance"],
-				"type": "object"
-			},
-			"CardStatementOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/CardStatementOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"statement": {
-						"$ref": "#/components/schemas/CardStatement"
-					}
-				},
-				"required": ["statement", "revision"],
-				"type": "object"
-			},
 			"CardStatementsOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -1627,6 +1519,43 @@
 					}
 				},
 				"required": ["deletedId"],
+				"type": "object"
+			},
+			"DerivedStatement": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"balance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"closingDate": {
+						"type": "string"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"dueDate": {
+						"type": ["string", "null"]
+					},
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"accountId",
+					"closingDate",
+					"dueDate",
+					"balance",
+					"kind",
+					"currency"
+				],
 				"type": "object"
 			},
 			"DeterministicOutputBody": {
@@ -6099,7 +6028,7 @@
 						"type": "number"
 					},
 					"statement": {
-						"$ref": "#/components/schemas/CardStatement"
+						"$ref": "#/components/schemas/DerivedStatement"
 					}
 				},
 				"required": ["statement", "allocations", "allocated", "remaining"],
@@ -8547,81 +8476,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "List recorded card statements and their payment allocations"
-			},
-			"post": {
-				"operationId": "save-card-statement",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/CardStatementBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/CardStatementOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Record or update one card statement with its observed close, due date, and balance"
-			}
-		},
-		"/v1/card-statements/{id}": {
-			"delete": {
-				"operationId": "delete-card-statement",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Delete one recorded card statement and its allocations"
+				"summary": "List derived card statements and their payment allocations"
 			}
 		},
 		"/v1/card-statements/{id}/allocations": {
@@ -8669,7 +8524,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Explicitly allocate one posted payment to a statement"
+				"summary": "Explicitly allocate one posted payment to a derived statement"
 			}
 		},
 		"/v1/card-statements/{id}/payment-candidates": {
@@ -8714,7 +8569,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "List posted payments with advisory evidence for one statement"
+				"summary": "List posted payments with advisory evidence for one derived statement"
 			}
 		},
 		"/v1/checkpoints": {

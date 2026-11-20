@@ -384,25 +384,38 @@ available_state() {
   echo 1
 }
 
-# Card statements, allocations and allocation events are one additive schema
-# group: three initially-empty tables plus a schema marker. Absent means
-# provision on the candidate; complete means verify the exact columns and
-# marker; any partial or mixed shape fails closed before any backup is taken.
+# Card statements are derived from closing-day cadence plus bank evidence, so
+# there is no card_statements table in the current schema. Allocations carry
+# the derived identity closingDate~accountId in statement_id.
+#   absent  = no tables or markers; provision on the candidate
+#   legacy  = old three-table group with the recorded marker; rekey every
+#             allocation through the rows being dropped, then drop the table
+#   current = two tables, derived marker, and no statement allocation FK
+# Any partial or mixed shape fails closed before any backup is taken.
 card_statements_state() {
-  tables=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('card_statements','statement_allocations','statement_allocation_events');") \
+  statements=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='card_statements';") \
     || fail "Cannot inspect card statement schema; refusing to guess."
-  marked=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM schema_migrations WHERE name = 'recorded-card-statements-v1';") \
+  alloc=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='statement_allocations';") \
+    || fail "Cannot inspect statement allocation schema; refusing to guess."
+  events=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='statement_allocation_events';") \
+    || fail "Cannot inspect statement allocation event schema; refusing to guess."
+  old_marker=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM schema_migrations WHERE name = 'recorded-card-statements-v1';") \
     || fail "Cannot inspect card statement marker; refusing to guess."
-  case "$tables:$marked" in
-    0:0) echo absent; return 0 ;;
-    3:1)
+  new_marker=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM schema_migrations WHERE name = 'derived-card-statements-v1';") \
+    || fail "Cannot inspect derived card statement marker; refusing to guess."
+  case "$statements:$alloc:$events:$old_marker:$new_marker" in
+    0:0:0:0:0) echo absent; return 0 ;;
+    1:1:1:1:0) echo legacy; return 0 ;;
+    0:1:1:0:1)
       sqlite3 -readonly "$1" '
-        SELECT user_id, id, position, account_id, closing_date, due_date, balance, currency, source, note, created_at FROM card_statements LIMIT 0;
         SELECT user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at FROM statement_allocations LIMIT 0;
         SELECT user_id, id, allocation_id, action, actor, created_at FROM statement_allocation_events LIMIT 0;' \
-        || fail "Incomplete card statement schema. Refusing automatic repair."
+        || fail "Incomplete derived statement schema. Refusing automatic repair."
+      stale_fk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('statement_allocations') WHERE \"table\" = 'card_statements';") \
+        || fail "Cannot inspect statement allocation keys; refusing to guess."
+      test "$stale_fk" = 0 || fail "Statement allocations still key to the retired card_statements table. Refusing automatic repair."
       echo current ;;
-    *) fail "Partial card statement schema ($tables tables, $marked markers); refusing automatic repair." ;;
+    *) fail "Partial derived statement schema ($statements:$alloc:$events:$old_marker:$new_marker); refusing automatic repair." ;;
   esac
 }
 
@@ -953,30 +966,15 @@ fi
 suppressed_state "$candidate" || fail "Candidate suppression-key schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
 available_state "$candidate" || fail "Candidate available-balance schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
 
-# Provision the card statement, allocation and allocation-event tables and
-# their marker on sources that predate recorded card statements. This is
-# purely additive: every table starts empty and no financial row is touched.
-# The DDL mirrors the application schema exactly; the marker is inserted
-# idempotently. Any partial source shape already failed the source preflight.
+# Provision the statement-allocation and allocation-event tables and their
+# marker on sources that predate derived card statements. This is purely
+# additive: every table starts empty and no financial row is touched. The DDL
+# mirrors the application schema exactly; allocations key to the derived
+# identity closingDate~accountId, so there is no card_statements table and no
+# statement allocation FK. Any partial source shape already failed preflight.
 if [ "$card_statements" = absent ]; then
   card_statements_sql="$backup/card-statements.sql"
   cat > "$card_statements_sql" <<'DDL'
-CREATE TABLE IF NOT EXISTS card_statements (
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  id TEXT NOT NULL,
-  position INTEGER NOT NULL,
-  account_id TEXT NOT NULL,
-  closing_date TEXT NOT NULL,
-  due_date TEXT NOT NULL,
-  balance REAL NOT NULL,
-  currency TEXT NOT NULL DEFAULT 'USD',
-  source TEXT NOT NULL DEFAULT 'user',
-  note TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, id),
-  UNIQUE (user_id, account_id, closing_date),
-  FOREIGN KEY (user_id, account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
-);
 CREATE TABLE IF NOT EXISTS statement_allocations (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   id TEXT NOT NULL,
@@ -991,7 +989,6 @@ CREATE TABLE IF NOT EXISTS statement_allocations (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, id),
   UNIQUE (user_id, transaction_id),
-  FOREIGN KEY (user_id, statement_id) REFERENCES card_statements(user_id, id) ON DELETE CASCADE,
   FOREIGN KEY (user_id, transaction_id) REFERENCES transactions(user_id, id) DEFERRABLE INITIALLY DEFERRED
 );
 CREATE TABLE IF NOT EXISTS statement_allocation_events (
@@ -1004,11 +1001,65 @@ CREATE TABLE IF NOT EXISTS statement_allocation_events (
   PRIMARY KEY (user_id, id),
   FOREIGN KEY (user_id, allocation_id) REFERENCES statement_allocations(user_id, id) ON DELETE CASCADE
 );
-INSERT OR IGNORE INTO schema_migrations(name) VALUES ('recorded-card-statements-v1');
+INSERT OR IGNORE INTO schema_migrations(name) VALUES ('derived-card-statements-v1');
 DDL
   if ! sqlite3 "$candidate" < "$card_statements_sql" > "$backup/card-statements.log" 2>&1; then
-    printf 'migrate: card statement upgrade failed: %s\n' "$(cat "$backup/card-statements.log")" >&2
-    fail "Candidate card statement upgrade failed. Original unchanged; backup retained at $backup."
+    printf 'migrate: derived card statement upgrade failed: %s\n' "$(cat "$backup/card-statements.log")" >&2
+    fail "Candidate derived card statement upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+
+# Convert a legacy recorded-statement schema. Every allocation is mapped
+# through the card_statements row it points at before that table is dropped:
+# statement_id becomes closingDate~accountId. Unmapped allocations fail closed
+# rather than silently losing their statement identity. The allocations table
+# is rebuilt without the now-dangling statement FK while FK enforcement is
+# off, preserving every row and its audit trail.
+if [ "$card_statements" = legacy ]; then
+  unmapped=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM statement_allocations a WHERE NOT EXISTS (SELECT 1 FROM card_statements s WHERE s.user_id = a.user_id AND s.id = a.statement_id);") \
+    || fail "Cannot verify allocation mapping; refusing to guess."
+  test "$unmapped" = 0 || fail "Found $unmapped allocations without a recorded statement row; refusing to rekey."
+  rekey_sql="$backup/derived-card-statements.sql"
+  cat > "$rekey_sql" <<'DDL'
+PRAGMA foreign_keys=OFF;
+BEGIN IMMEDIATE;
+UPDATE statement_allocations
+  SET statement_id = (
+    SELECT s.closing_date || '~' || s.account_id FROM card_statements s
+    WHERE s.user_id = statement_allocations.user_id AND s.id = statement_allocations.statement_id
+  )
+  WHERE EXISTS (
+    SELECT 1 FROM card_statements s
+    WHERE s.user_id = statement_allocations.user_id AND s.id = statement_allocations.statement_id
+  );
+DROP TABLE card_statements;
+CREATE TABLE statement_allocations_rekey (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  statement_id TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  amount REAL NOT NULL,
+  state TEXT NOT NULL DEFAULT 'confirmed' CHECK (state IN ('confirmed','dismissed')),
+  evidence TEXT NOT NULL DEFAULT '',
+  actor TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, id),
+  UNIQUE (user_id, transaction_id),
+  FOREIGN KEY (user_id, transaction_id) REFERENCES transactions(user_id, id) DEFERRABLE INITIALLY DEFERRED
+);
+INSERT INTO statement_allocations_rekey(user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at)
+  SELECT user_id, id, position, statement_id, transaction_id, amount, state, evidence, actor, created_at, updated_at FROM statement_allocations;
+DROP TABLE statement_allocations;
+ALTER TABLE statement_allocations_rekey RENAME TO statement_allocations;
+DELETE FROM schema_migrations WHERE name = 'recorded-card-statements-v1';
+INSERT OR IGNORE INTO schema_migrations(name) VALUES ('derived-card-statements-v1');
+COMMIT;
+DDL
+  if ! sqlite3 "$candidate" < "$rekey_sql" > "$backup/derived-card-statements.log" 2>&1; then
+    printf 'migrate: derived statement rekey failed: %s\n' "$(cat "$backup/derived-card-statements.log")" >&2
+    fail "Candidate derived statement rekey failed. Original unchanged; backup retained at $backup."
   fi
 fi
 card_statements_state "$candidate" || fail "Candidate card statement schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
@@ -1353,7 +1404,14 @@ verify_simplefin_keys() {
   fi
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays','recurrence_rules','accounts','payment_terms','safe_spending_settings') ORDER BY name;") \
+# A legacy statement conversion deliberately drops card_statements and rekeys
+# statement_allocations; those two are verified by card_statements_state instead
+# of the byte-identical preserved-table pass.
+statement_exclude=""
+if [ "$card_statements" = legacy ]; then
+  statement_exclude=",'card_statements','statement_allocations'"
+fi
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','transactions','transaction_sim','transaction_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','transaction_sync_keys','suppressed_sync_keys','account_displays','recurrence_rules','accounts','payment_terms','safe_spending_settings'$statement_exclude) ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
@@ -1552,7 +1610,13 @@ if [ "$sharing" = 0 ]; then
     || fail "Cannot verify provisioned sharing tables; refusing to publish."
   test "$empty_sharing" = 0 || fail "Provisioned sharing tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
-markers_kept=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (SELECT name FROM before.schema_migrations EXCEPT SELECT name FROM main.schema_migrations);") \
+# The legacy statement conversion replaces the recorded marker with the
+# derived one, so the retired name is intentionally absent from the candidate.
+marker_filter=""
+if [ "$card_statements" = legacy ]; then
+  marker_filter=" WHERE name != 'recorded-card-statements-v1'"
+fi
+markers_kept=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (SELECT name FROM before.schema_migrations$marker_filter EXCEPT SELECT name FROM main.schema_migrations);") \
   || fail "Cannot verify schema markers; refusing to publish."
 test "$markers_kept" = 0 || fail "Candidate dropped schema markers. Original unchanged; backup retained at $backup. Keep the API stopped."
 if [ "$suppressed" = 0 ]; then
@@ -1564,9 +1628,14 @@ if [ "$available" = 0 ]; then
     || fail "Provisioned available balances are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 if [ "$card_statements" = absent ]; then
-  empty_card=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM card_statements) + (SELECT COUNT(*) FROM statement_allocations) + (SELECT COUNT(*) FROM statement_allocation_events);") \
-    || fail "Cannot verify provisioned card statement tables. Original unchanged; backup retained at $backup."
-  test "$empty_card" = 0 || fail "Provisioned card statement tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
+  empty_card=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM statement_allocations) + (SELECT COUNT(*) FROM statement_allocation_events);") \
+    || fail "Cannot verify provisioned derived statement tables. Original unchanged; backup retained at $backup."
+  test "$empty_card" = 0 || fail "Provisioned derived statement tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+if [ "$card_statements" = legacy ]; then
+  stale_key=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM statement_allocations WHERE statement_id NOT LIKE '%~%';") \
+    || fail "Cannot verify rekeyed statement allocations. Original unchanged; backup retained at $backup."
+  test "$stale_key" = 0 || fail "Rekeyed allocations still carry a recorded statement row id. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 
 # Verify purchase conversion separately against the already-verified timestamp

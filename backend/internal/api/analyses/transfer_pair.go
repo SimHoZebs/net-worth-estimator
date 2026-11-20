@@ -3,10 +3,12 @@ package analyses
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/safespending"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -103,10 +105,11 @@ func (s *handler) removeTransferLink(ctx context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError("The transfer link could not be removed.")
 	}
-	statements, err := s.store.ListCardStatements("")
+	settings, err := s.store.GetSafeSpendingSettings()
 	if err != nil {
 		return nil, huma.Error500InternalServerError("The transfer link could not be removed.")
 	}
+	statements := safespending.DeriveStatements(model, settings, time.Now().Unix())
 	if !domain.ConfirmedAllocationCardsResolvable(model, remaining, allocations, statements) {
 		return nil, huma.Error409Conflict("This transfer link still backs a confirmed statement allocation. Dismiss it before removing the link.")
 	}

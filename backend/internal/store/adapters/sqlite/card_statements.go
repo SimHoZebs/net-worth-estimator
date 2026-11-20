@@ -8,152 +8,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// This file implements the recorded-statement sidecars. These rows are
-// evidence, not projection inputs: writes deliberately do not mark the model
-// dirty. The payment transactions they reference stay cash activity and are
-// never reclassified as spend.
-
-func scanCardStatement(rows interface{ Scan(...any) error }) (types.CardStatement, error) {
-	var statement types.CardStatement
-	err := rows.Scan(
-		&statement.ID, &statement.AccountID, &statement.ClosingDate, &statement.DueDate,
-		&statement.Balance, &statement.Currency, &statement.Source, &statement.Note, &statement.CreatedAt,
-	)
-	return statement, err
-}
-
-const cardStatementColumns = `id, account_id, closing_date, due_date, balance, currency, source, note, created_at`
-
-func (s *sqliteStore) GetCardStatement(id string) (types.CardStatement, error) {
-	var statement types.CardStatement
-	err := s.db.QueryRow(`SELECT `+cardStatementColumns+` FROM card_statements WHERE id = ? AND user_id = :user_id`, id).Scan(
-		&statement.ID, &statement.AccountID, &statement.ClosingDate, &statement.DueDate,
-		&statement.Balance, &statement.Currency, &statement.Source, &statement.Note, &statement.CreatedAt,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return types.CardStatement{}, NotFound(id)
-		}
-		return types.CardStatement{}, err
-	}
-	return statement, nil
-}
-
-func (s *sqliteStore) ListCardStatements(accountID string) ([]types.CardStatement, error) {
-	query := `SELECT ` + cardStatementColumns + ` FROM card_statements WHERE 1 = 1`
-	args := []any{}
-	if accountID != "" {
-		query += ` AND account_id = ?`
-		args = append(args, accountID)
-	}
-	query += ` AND user_id = :user_id`
-	query += ` ORDER BY closing_date, position`
-	rows, err := s.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	statements := []types.CardStatement{}
-	for rows.Next() {
-		statement, err := scanCardStatement(rows)
-		if err != nil {
-			return nil, err
-		}
-		statements = append(statements, statement)
-	}
-	return statements, rows.Err()
-}
-
-func (s *sqliteStore) SaveCardStatement(statement types.CardStatement) (types.CardStatement, error) {
-	if statement.ID == "" {
-		id, err := newRowID()
-		if err != nil {
-			return types.CardStatement{}, err
-		}
-		statement.ID = id
-	}
-	if id, err := uuid.Parse(statement.ID); err != nil || id.String() != statement.ID {
-		return types.CardStatement{}, InvalidID(statement.ID)
-	}
-	err := withRowTx(s.db, func(tx *userTx) error {
-		var exists int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM card_statements WHERE id = ? AND user_id = :user_id`, statement.ID).Scan(&exists); err != nil {
-			return err
-		}
-		position := 0
-		if exists == 0 {
-			if err := claimRowID(tx, statement.ID, "card-statement"); err != nil {
-				return err
-			}
-			next, err := nextTablePosition(tx, "card_statements")
-			if err != nil {
-				return err
-			}
-			position = next
-			statement.CreatedAt = time.Now().Unix()
-			_, err = tx.Exec(`INSERT INTO card_statements(id, position, account_id, closing_date, due_date, balance, currency, source, note, created_at, user_id)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
-				statement.ID, position, statement.AccountID, statement.ClosingDate, statement.DueDate,
-				statement.Balance, statement.Currency, statement.Source, statement.Note, statement.CreatedAt)
-			if err != nil {
-				if isUniqueViolation(err) {
-					return IDConflict(statement.ClosingDate)
-				}
-				return err
-			}
-			return nil
-		}
-		var storedID, storedCurrency, storedSource, storedNote string
-		var storedCreated int64
-		if err := tx.QueryRow(`SELECT id, currency, source, note, created_at FROM card_statements WHERE id = ? AND user_id = :user_id`, statement.ID).Scan(
-			&storedID, &storedCurrency, &storedSource, &storedNote, &storedCreated,
-		); err != nil {
-			return err
-		}
-		statement.CreatedAt = storedCreated
-		if statement.Currency == "" {
-			statement.Currency = storedCurrency
-		}
-		if statement.Source == "" {
-			statement.Source = storedSource
-		}
-		if statement.Note == "" {
-			statement.Note = storedNote
-		}
-		_, err := tx.Exec(`UPDATE card_statements SET account_id = ?, closing_date = ?, due_date = ?, balance = ?, currency = ?, source = ?, note = ? WHERE id = ? AND user_id = :user_id`,
-			statement.AccountID, statement.ClosingDate, statement.DueDate, statement.Balance,
-			statement.Currency, statement.Source, statement.Note, statement.ID)
-		if err != nil {
-			if isUniqueViolation(err) {
-				return IDConflict(statement.ClosingDate)
-			}
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return types.CardStatement{}, err
-	}
-	return statement, nil
-}
-
-func (s *sqliteStore) DeleteCardStatement(id string) error {
-	err := withRowTx(s.db, func(tx *userTx) error {
-		result, err := tx.Exec(`DELETE FROM card_statements WHERE id = ? AND user_id = :user_id`, id)
-		if err != nil {
-			return err
-		}
-		count, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if count == 0 {
-			return NotFound(id)
-		}
-		return releaseRowID(tx, id)
-	})
-	return err
-}
+// This file implements the statement-allocation sidecars. A statement is no
+// longer a stored row: its identity is derived from an account and close date
+// (see types.DerivedStatementID). These rows are evidence, not projection
+// inputs, so writes deliberately do not mark the model dirty. The payment
+// transactions they reference stay cash activity and are never reclassified
+// as spend.
 
 func scanStatementAllocation(rows interface{ Scan(...any) error }) (types.StatementAllocation, error) {
 	var allocation types.StatementAllocation
@@ -214,17 +74,13 @@ func (s *sqliteStore) SaveStatementAllocation(allocation types.StatementAllocati
 	if id, err := uuid.Parse(allocation.ID); err != nil || id.String() != allocation.ID {
 		return types.StatementAllocation{}, InvalidID(allocation.ID)
 	}
+	if _, _, ok := types.ParseDerivedStatementID(allocation.StatementID); !ok {
+		return types.StatementAllocation{}, InvalidID(allocation.StatementID)
+	}
 	if allocation.State == "" {
 		allocation.State = "confirmed"
 	}
 	err := withRowTx(s.db, func(tx *userTx) error {
-		var statements int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM card_statements WHERE id = ? AND user_id = :user_id`, allocation.StatementID).Scan(&statements); err != nil {
-			return err
-		}
-		if statements == 0 {
-			return NotFound(allocation.StatementID)
-		}
 		if err := claimRowID(tx, allocation.ID, "statement-allocation"); err != nil {
 			return err
 		}
@@ -253,6 +109,9 @@ func (s *sqliteStore) SaveStatementAllocation(allocation types.StatementAllocati
 }
 
 func (s *sqliteStore) ReactivateStatementAllocation(id, statementID string, amount float64, evidence, actor string) (types.StatementAllocation, error) {
+	if _, _, ok := types.ParseDerivedStatementID(statementID); !ok {
+		return types.StatementAllocation{}, InvalidID(statementID)
+	}
 	var allocation types.StatementAllocation
 	err := withRowTx(s.db, func(tx *userTx) error {
 		now := time.Now().Unix()
@@ -265,13 +124,6 @@ func (s *sqliteStore) ReactivateStatementAllocation(id, statementID string, amou
 		}
 		if state != "dismissed" {
 			return IDConflict(transactionID)
-		}
-		var statements int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM card_statements WHERE id = ? AND user_id = :user_id`, statementID).Scan(&statements); err != nil {
-			return err
-		}
-		if statements == 0 {
-			return NotFound(statementID)
 		}
 		result, err := tx.Exec(`UPDATE statement_allocations SET statement_id = ?, amount = ?, state = 'confirmed', evidence = ?, actor = ?, updated_at = ? WHERE id = ? AND user_id = :user_id`,
 			statementID, amount, evidence, actor, now, id)

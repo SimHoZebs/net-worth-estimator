@@ -7,32 +7,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func seedCardStatementFixture(t *testing.T, s *sqliteStore, accountID, transactionID string) (types.CardStatement, types.StatementAllocation) {
-	t.Helper()
-	statement, err := s.SaveCardStatement(types.CardStatement{
-		AccountID: accountID, ClosingDate: "2026-01-31", DueDate: "2026-02-20",
-		Balance: 100.30, Currency: "USD", Source: "user",
-	})
-	if err != nil {
-		t.Fatalf("save statement: %v", err)
-	}
-	allocation, err := s.SaveStatementAllocation(types.StatementAllocation{
-		StatementID: statement.ID, TransactionID: transactionID,
-		Amount: 60.20, State: "confirmed", Evidence: "test", Actor: "owner",
-	})
-	if err != nil {
-		t.Fatalf("save allocation: %v", err)
-	}
-	return statement, allocation
-}
-
-func TestCardStatementAllocationIsExclusiveAndAudited(t *testing.T) {
+func TestStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
-	card, err := s.CreateAccount(types.Account{ID: "card", Name: "Card", Kind: types.AccountKindCreditCard, Enabled: true})
-	if err != nil {
-		t.Fatalf("create card: %v", err)
-	}
 	otherID, err := newRowID()
 	if err != nil {
 		t.Fatal(err)
@@ -41,11 +18,21 @@ func TestCardStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 	if _, err := s.CreateTransaction(payment); err != nil {
 		t.Fatalf("create payment: %v", err)
 	}
-	statement, allocation := seedCardStatementFixture(t, s, card.ID, otherID)
+	statementID := types.DerivedStatementID("card", "2026-01-31")
+	allocation, err := s.SaveStatementAllocation(types.StatementAllocation{
+		StatementID: statementID, TransactionID: otherID,
+		Amount: 60.20, State: "confirmed", Evidence: "test", Actor: "owner",
+	})
+	if err != nil {
+		t.Fatalf("save allocation: %v", err)
+	}
+	if allocation.StatementID != statementID {
+		t.Fatalf("statement id = %q, want %q", allocation.StatementID, statementID)
+	}
 
 	// One payment backs at most one allocation. The second insert conflicts.
 	if _, err := s.SaveStatementAllocation(types.StatementAllocation{
-		StatementID: statement.ID, TransactionID: otherID, Amount: 0.01,
+		StatementID: statementID, TransactionID: otherID, Amount: 0.01,
 	}); err == nil || !store.IsIDConflict(err) {
 		t.Fatalf("second allocation error = %v, want id conflict", err)
 	}
@@ -71,7 +58,7 @@ func TestCardStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 		t.Fatalf("events after dismiss = %+v, err %v", events, err)
 	}
 
-	if _, err := s.ReactivateStatementAllocation(allocation.ID, statement.ID, 60.20, "again", "owner"); err != nil {
+	if _, err := s.ReactivateStatementAllocation(allocation.ID, statementID, 60.20, "again", "owner"); err != nil {
 		t.Fatalf("reactivate: %v", err)
 	}
 	events, err = s.ListStatementAllocationEvents(allocation.ID)
@@ -79,20 +66,22 @@ func TestCardStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 		t.Fatalf("events after reapply = %+v, err %v", events, err)
 	}
 
-	// Deleting the statement cascades its allocation and audit trail but does
-	// not touch the payment transaction, which stays cash activity.
-	if err := s.DeleteCardStatement(statement.ID); err != nil {
-		t.Fatalf("delete statement: %v", err)
-	}
-	allocations, err := s.ListStatementAllocations(statement.ID)
-	if err != nil || len(allocations) != 0 {
-		t.Fatalf("allocations after delete = %+v, err %v", allocations, err)
-	}
-	events, err = s.ListStatementAllocationEvents(allocation.ID)
-	if err != nil || len(events) != 0 {
-		t.Fatalf("events after delete = %+v, err %v", events, err)
+	allocations, err := s.ListStatementAllocations(statementID)
+	if err != nil || len(allocations) != 1 || allocations[0].ID != allocation.ID {
+		t.Fatalf("allocations for derived statement = %+v, err %v", allocations, err)
 	}
 	if _, err := s.StatementAllocationForTransaction(otherID); err != nil {
-		t.Fatalf("payment lookup after delete: %v", err)
+		t.Fatalf("payment lookup: %v", err)
+	}
+}
+
+func TestStatementAllocationRejectsMalformedDerivedID(t *testing.T) {
+	s := openSQLiteStore(t)
+	bad := types.StatementAllocation{StatementID: "not-a-derived-id", TransactionID: "tx", Amount: 1}
+	if _, err := s.SaveStatementAllocation(bad); err == nil {
+		t.Fatal("malformed derived statement id should be rejected")
+	}
+	if _, err := s.ReactivateStatementAllocation("missing", "not-a-derived-id", 1, "", ""); err == nil {
+		t.Fatal("reactivation with a malformed derived statement id should be rejected")
 	}
 }

@@ -2,10 +2,12 @@ package model
 
 import (
 	"context"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/safespending"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -16,11 +18,59 @@ func (s *handler) actorFrom(ctx context.Context) string {
 	return s.actor(ctx)
 }
 
-// cardHasLiveAllocations reports whether an account's recorded statements are
+// derivedStatements reconstructs the current statement history from the model
+// and bank evidence. An empty accountID returns every card's statements.
+func (s *handler) derivedStatements(accountID string) ([]types.DerivedStatement, error) {
+	model, err := s.store.LoadModel()
+	if err != nil {
+		return nil, err
+	}
+	settings, err := s.store.GetSafeSpendingSettings()
+	if err != nil {
+		return nil, err
+	}
+	statements := safespending.DeriveStatements(model, settings, time.Now().Unix())
+	if accountID == "" {
+		return statements, nil
+	}
+	filtered := []types.DerivedStatement{}
+	for _, statement := range statements {
+		if statement.AccountID == accountID {
+			filtered = append(filtered, statement)
+		}
+	}
+	return filtered, nil
+}
+
+// statementContext resolves a derived statement ID into the model and the
+// statement it names. A missing or stale ID is a 404: there is no longer a
+// stored row to resurrect, the statement must exist in the current history.
+func (s *handler) statementContext(id string) (*types.FinancialModel, types.DerivedStatement, error) {
+	accountID, closingDate, ok := types.ParseDerivedStatementID(id)
+	if !ok {
+		return nil, types.DerivedStatement{}, huma.Error404NotFound("statement not found")
+	}
+	model, err := s.store.LoadModel()
+	if err != nil {
+		return nil, types.DerivedStatement{}, modelstate.WriteError(err)
+	}
+	settings, err := s.store.GetSafeSpendingSettings()
+	if err != nil {
+		return nil, types.DerivedStatement{}, modelstate.WriteError(err)
+	}
+	for _, statement := range safespending.DeriveStatements(model, settings, time.Now().Unix()) {
+		if statement.AccountID == accountID && statement.ClosingDate == closingDate {
+			return model, statement, nil
+		}
+	}
+	return nil, types.DerivedStatement{}, huma.Error404NotFound("statement not found")
+}
+
+// cardHasLiveAllocations reports whether an account's derived statements are
 // still backing confirmed allocations. Account edits or removals that would
 // strand those allocations are rejected instead of silently invalidating them.
 func (s *handler) cardHasLiveAllocations(accountID string) (bool, error) {
-	statements, err := s.store.ListCardStatements(accountID)
+	statements, err := s.derivedStatements(accountID)
 	if err != nil {
 		return false, err
 	}
@@ -43,68 +93,10 @@ func (s *handler) cardHasLiveAllocations(accountID string) (bool, error) {
 	return false, nil
 }
 
-// Recorded statements and their payment allocations are evidence. They never
+// Derived statements and their payment allocations are evidence. They never
 // enter the financial model, never mark the projection dirty, and never turn a
 // replay estimate into a confirmed statement. The payment transactions stay
 // cash transfers; an allocation only records which statement they settle.
-
-// cardStatementBody is the write shape: identity and creation time are owned
-// by the server, so they are optional on input even though the stored record
-// always carries them.
-type cardStatementBody struct {
-	ID          *string       `json:"id,omitempty" format:"uuid"`
-	AccountID   string        `json:"accountId"`
-	ClosingDate types.IsoDate `json:"closingDate"`
-	DueDate     types.IsoDate `json:"dueDate"`
-	Balance     float64       `json:"balance"`
-	Currency    string        `json:"currency,omitempty" maxLength:"3"`
-	Source      string        `json:"source,omitempty"`
-	Note        string        `json:"note,omitempty" maxLength:"500"`
-}
-
-type cardStatementInput struct {
-	Body cardStatementBody `json:"body"`
-}
-
-type cardStatementOutput struct {
-	Body struct {
-		Statement types.CardStatement `json:"statement"`
-		Revision  string              `json:"revision"`
-	} `json:"body"`
-}
-
-func (s *handler) saveCardStatement(ctx context.Context, input *cardStatementInput) (*cardStatementOutput, error) {
-	statement := types.CardStatement{
-		AccountID: input.Body.AccountID, ClosingDate: input.Body.ClosingDate,
-		DueDate: input.Body.DueDate, Balance: input.Body.Balance,
-		Currency: domain.NormalizeCardStatementCurrency(input.Body.Currency),
-		Source:   input.Body.Source, Note: input.Body.Note,
-	}
-	if input.Body.ID != nil {
-		statement.ID = *input.Body.ID
-	}
-	model, err := s.store.LoadModel()
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	if err := domain.ValidateCardStatement(statement, model.Accounts); err != nil {
-		return nil, huma.Error422UnprocessableEntity(err.Error())
-	}
-	if statement.Source == "" {
-		statement.Source = "user"
-	}
-	saved, err := s.store.SaveCardStatement(statement)
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	revision, err := modelstate.CurrentRevision(s.store)
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	output := &cardStatementOutput{}
-	output.Body.Statement, output.Body.Revision = saved, revision
-	return output, nil
-}
 
 type cardStatementsOutput struct {
 	CacheControl string `header:"Cache-Control"`
@@ -114,10 +106,10 @@ type cardStatementsOutput struct {
 	} `json:"body"`
 }
 
-// statementReads builds one view per recorded statement and the payment-to-
+// statementReads builds one view per derived statement and the payment-to-
 // statement index used to reject a second allocation of the same payment.
 func (s *handler) statementReads(accountID string) ([]types.StatementAllocationRead, map[string]string, error) {
-	statements, err := s.store.ListCardStatements(accountID)
+	statements, err := s.derivedStatements(accountID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -138,7 +130,10 @@ func (s *handler) statementReads(accountID string) ([]types.StatementAllocationR
 	reads := make([]types.StatementAllocationRead, 0, len(statements))
 	for _, statement := range statements {
 		allocations := byStatement[statement.ID]
-		balanceCents := domain.MoneyCents(statement.Balance)
+		balanceCents := int64(0)
+		if statement.Balance != nil {
+			balanceCents = domain.MoneyCents(*statement.Balance)
+		}
 		allocatedCents := int64(0)
 		for _, allocation := range allocations {
 			if allocation.State == "confirmed" {
@@ -188,7 +183,7 @@ type statementPaymentSuggestionsOutput struct {
 // listTransactionStatementPaymentSuggestions answers the Suggestions modal in
 // one call. The input transaction may be the manual transfer into the card or
 // one leg of a confirmed transfer link; the server resolves the card identity
-// and ranks every statement against its remaining balance.
+// and ranks every derived statement against its remaining balance.
 func (s *handler) listTransactionStatementPaymentSuggestions(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*statementPaymentSuggestionsOutput, error) {
@@ -234,21 +229,6 @@ func (s *handler) listTransactionStatementPaymentSuggestions(_ context.Context, 
 	return output, nil
 }
 
-func (s *handler) deleteCardStatement(_ context.Context, input *struct {
-	ID string `path:"id"`
-}) (*modelstate.ReorderOutput, error) {
-	if err := s.store.DeleteCardStatement(input.ID); err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	revision, err := modelstate.CurrentRevision(s.store)
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	return &modelstate.ReorderOutput{Body: struct {
-		Revision string `json:"revision"`
-	}{Revision: revision}}, nil
-}
-
 type paymentCandidatesOutput struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
@@ -261,13 +241,9 @@ type paymentCandidatesOutput struct {
 func (s *handler) listPaymentCandidates(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*paymentCandidatesOutput, error) {
-	statement, err := s.store.GetCardStatement(input.ID)
+	model, statement, err := s.statementContext(input.ID)
 	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	model, err := s.store.LoadModel()
-	if err != nil {
-		return nil, modelstate.WriteError(err)
+		return nil, err
 	}
 	all, err := s.store.ListStatementAllocations("")
 	if err != nil {
@@ -310,19 +286,15 @@ type statementAllocationOutput struct {
 }
 
 func (s *handler) saveStatementAllocation(ctx context.Context, input *statementAllocationInput) (*statementAllocationOutput, error) {
-	statement, err := s.store.GetCardStatement(input.ID)
+	model, statement, err := s.statementContext(input.ID)
 	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	model, err := s.store.LoadModel()
-	if err != nil {
-		return nil, modelstate.WriteError(err)
+		return nil, err
 	}
 	all, err := s.store.ListStatementAllocations("")
 	if err != nil {
 		return nil, modelstate.WriteError(err)
 	}
-	statements, err := s.store.ListCardStatements("")
+	derived, err := s.derivedStatements("")
 	if err != nil {
 		return nil, modelstate.WriteError(err)
 	}
@@ -330,8 +302,8 @@ func (s *handler) saveStatementAllocation(ctx context.Context, input *statementA
 	if err != nil {
 		return nil, modelstate.WriteError(err)
 	}
-	statementAccounts := make(map[string]bool, len(statements))
-	for _, item := range statements {
+	statementAccounts := make(map[string]bool, len(derived))
+	for _, item := range derived {
 		statementAccounts[item.AccountID] = true
 	}
 	// Both modal lookups and apply use one stable canonical leg ID, even when
@@ -344,7 +316,8 @@ func (s *handler) saveStatementAllocation(ctx context.Context, input *statementA
 		}
 	}
 	// The server-side matcher decides whether the named transaction is a posted
-	// payment to this card. Amount similarity never creates or proves a claim.
+	// payment to this statement's card. Amount similarity never creates or
+	// proves a claim.
 	match := domain.StatementPaymentCandidate(model, links, statement, canonicalID, taken)
 	if match == nil {
 		return nil, huma.Error422UnprocessableEntity("transaction is not a posted payment to this statement's card")
@@ -366,7 +339,10 @@ func (s *handler) saveStatementAllocation(ctx context.Context, input *statementA
 			allocatedCents += domain.MoneyCents(allocation.Amount)
 		}
 	}
-	remainingCents := domain.MoneyCents(statement.Balance) - allocatedCents
+	remainingCents := int64(0)
+	if statement.Balance != nil {
+		remainingCents = domain.MoneyCents(*statement.Balance) - allocatedCents
+	}
 	if remainingCents < 0 {
 		remainingCents = 0
 	}

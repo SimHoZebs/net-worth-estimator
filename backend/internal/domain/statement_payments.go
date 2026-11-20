@@ -25,16 +25,19 @@ type paymentEvidence struct {
 // a statement's candidate list, or remaining (billed minus confirmed
 // allocations) for a payment's suggestions. Similarity is evidence, never
 // proof and never an automatic claim.
-func paymentCandidate(statement types.CardStatement, payment paymentEvidence, taken map[string]string, basis float64) *types.PaymentCandidate {
+func paymentCandidate(statement types.DerivedStatement, payment paymentEvidence, taken map[string]string, basis float64) *types.PaymentCandidate {
 	if !IsValidIsoDate(payment.PostedDate) || CompareIsoDates(payment.PostedDate, statement.ClosingDate) < 0 {
 		return nil
 	}
 	basisCents, amountCents := MoneyCents(basis), MoneyCents(payment.Amount)
 	evidence := []types.PaymentEvidence{
-		{Code: "posted-after-close", Reason: "Payment posted on or after the recorded statement close."},
+		{Code: "posted-after-close", Reason: "Payment posted on or after the derived statement close."},
 		{Code: "currency-match", Reason: "Payment currency matches the statement currency."},
 	}
-	gap := isoDayDelta(statement.DueDate, payment.PostedDate)
+	gap := 0
+	if statement.DueDate != nil {
+		gap = isoDayDelta(*statement.DueDate, payment.PostedDate)
+	}
 	if math.Abs(float64(gap)) <= 7 {
 		evidence = append(evidence, types.PaymentEvidence{Code: "near-due-date", Reason: "Payment posts within seven days of the statement due date."})
 	}
@@ -173,12 +176,15 @@ func resolvePayment(model *types.FinancialModel, links []types.TransferLink, tra
 
 // StatementPaymentCandidate resolves one named transaction into a candidate
 // for one statement, covering both the direct and confirmed-link routes.
-func StatementPaymentCandidate(model *types.FinancialModel, links []types.TransferLink, statement types.CardStatement, transactionID string, taken map[string]string) *types.PaymentCandidate {
+func StatementPaymentCandidate(model *types.FinancialModel, links []types.TransferLink, statement types.DerivedStatement, transactionID string, taken map[string]string) *types.PaymentCandidate {
+	if statement.Balance == nil {
+		return nil
+	}
 	payment := resolvePayment(model, links, transactionID, map[string]bool{statement.AccountID: true})
 	if payment == nil || payment.CardAccountID != statement.AccountID {
 		return nil
 	}
-	return paymentCandidate(statement, *payment, taken, statement.Balance)
+	return paymentCandidate(statement, *payment, taken, *statement.Balance)
 }
 
 // ResolveCanonicalPaymentID returns the single leg identity used by apply and
@@ -196,9 +202,9 @@ func ResolveCanonicalPaymentID(model *types.FinancialModel, links []types.Transf
 // recorded statement. The result is advisory evidence only: a candidate is
 // never automatically claimed, and an amount match is never proof. Payments
 // posted before the recorded close are excluded.
-func StatementPaymentCandidates(model *types.FinancialModel, links []types.TransferLink, statement types.CardStatement, taken map[string]string) []types.PaymentCandidate {
+func StatementPaymentCandidates(model *types.FinancialModel, links []types.TransferLink, statement types.DerivedStatement, taken map[string]string) []types.PaymentCandidate {
 	candidates := []types.PaymentCandidate{}
-	if model == nil || len(statement.AccountID) == 0 {
+	if model == nil || statement.Balance == nil || len(statement.AccountID) == 0 {
 		return candidates
 	}
 	accounts := map[string]bool{statement.AccountID: true}
@@ -208,7 +214,7 @@ func StatementPaymentCandidates(model *types.FinancialModel, links []types.Trans
 		if payment == nil {
 			continue
 		}
-		if candidate := paymentCandidate(statement, *payment, taken, statement.Balance); candidate != nil {
+		if candidate := paymentCandidate(statement, *payment, taken, *statement.Balance); candidate != nil {
 			candidates = append(candidates, *candidate)
 			seen[payment.ID] = true
 		}
@@ -225,7 +231,7 @@ func StatementPaymentCandidates(model *types.FinancialModel, links []types.Trans
 		if payment == nil || payment.CardAccountID != statement.AccountID || seen[payment.ID] {
 			continue
 		}
-		if candidate := paymentCandidate(statement, *payment, taken, statement.Balance); candidate != nil {
+		if candidate := paymentCandidate(statement, *payment, taken, *statement.Balance); candidate != nil {
 			candidates = append(candidates, *candidate)
 			seen[payment.ID] = true
 		}
@@ -268,7 +274,7 @@ func StatementPaymentSuggestions(model *types.FinancialModel, links []types.Tran
 		return matches, transactionID
 	}
 	for _, read := range reads {
-		if read.Statement.AccountID != payment.CardAccountID {
+		if read.Statement.AccountID != payment.CardAccountID || read.Statement.Balance == nil {
 			continue
 		}
 		candidate := paymentCandidate(read.Statement, *payment, taken, read.Remaining)
@@ -301,7 +307,7 @@ func StatementPaymentSuggestions(model *types.FinancialModel, links []types.Tran
 // ConfirmedAllocationCardsResolvable verifies that every confirmed allocation
 // still has a card identity after a proposed transfer-link removal. It fails
 // closed: a link that would strand a live allocation is rejected.
-func ConfirmedAllocationCardsResolvable(model *types.FinancialModel, links []types.TransferLink, allocations []types.StatementAllocation, statements []types.CardStatement) bool {
+func ConfirmedAllocationCardsResolvable(model *types.FinancialModel, links []types.TransferLink, allocations []types.StatementAllocation, statements []types.DerivedStatement) bool {
 	statementAccounts := map[string]bool{}
 	for _, statement := range statements {
 		statementAccounts[statement.AccountID] = true

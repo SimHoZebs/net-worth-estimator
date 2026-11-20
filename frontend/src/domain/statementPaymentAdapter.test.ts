@@ -1,24 +1,41 @@
 import { describe, expect, it } from "vitest";
 import type { StatementAllocationRead } from "@/api/generated/model/statementAllocationRead.ts";
 import {
+	hasKnownBalance,
 	statementLabel,
 	statementStatusFromTotals,
+	toDerivedCardStatement,
 	toStatementPaymentSuggestion,
+	type KnownBalanceRead,
 } from "./statementPaymentAdapter.ts";
 
-function read(
-	overrides: Partial<StatementAllocationRead> = {},
-): StatementAllocationRead {
+const octStatement: KnownBalanceRead["statement"] = {
+	id: "2026-10-19~card-a",
+	accountId: "card-a",
+	closingDate: "2026-10-19",
+	dueDate: "2026-11-10",
+	balance: 1000,
+	currency: "USD",
+	kind: "closed",
+};
+
+const novStatement: KnownBalanceRead["statement"] = {
+	id: "2026-11-19~card-a",
+	accountId: "card-a",
+	closingDate: "2026-11-19",
+	dueDate: "2026-12-10",
+	balance: 410,
+	currency: "USD",
+	kind: "closed",
+};
+
+function known(
+	overrides: Partial<Omit<KnownBalanceRead, "statement">> & {
+		statement?: KnownBalanceRead["statement"];
+	} = {},
+): KnownBalanceRead {
 	return {
-		statement: {
-			id: "stmt-oct",
-			accountId: "card-a",
-			closingDate: "2026-10-19",
-			dueDate: "2026-11-10",
-			balance: 1000,
-			currency: "USD",
-			createdAt: 0,
-		},
+		statement: octStatement,
 		allocations: [],
 		allocated: 0,
 		remaining: 1000,
@@ -35,7 +52,7 @@ const actions = {
 
 describe("statement payment adapter", () => {
 	it("labels a statement from its observed close date", () => {
-		expect(statementLabel(read().statement)).toBe("Oct 19, 2026 statement");
+		expect(statementLabel(octStatement)).toBe("Oct 19, 2026 statement");
 	});
 
 	it("derives status from the authoritative totals", () => {
@@ -44,34 +61,54 @@ describe("statement payment adapter", () => {
 		expect(statementStatusFromTotals(1000, 0)).toBe("paid-in-full");
 	});
 
+	it("maps a derived statement with its nullable billed amount and due date", () => {
+		const statement = toDerivedCardStatement(
+			known({ allocated: 724.45, remaining: 275.55 }),
+		);
+		expect(statement).toMatchObject({
+			id: "2026-10-19~card-a",
+			accountId: "card-a",
+			closingDate: "2026-10-19",
+			billedAmount: 1000,
+			remaining: 275.55,
+			allocated: 724.45,
+			dueDate: "2026-11-10",
+			status: "partially-paid",
+		});
+	});
+
+	it("keeps an unknown billed amount and due date unknown", () => {
+		const unknown: StatementAllocationRead = {
+			statement: { ...octStatement, balance: null, dueDate: null },
+			allocations: [],
+			allocated: 0,
+			remaining: 0,
+		};
+		expect(hasKnownBalance(unknown)).toBe(false);
+		expect(toDerivedCardStatement(unknown)).toMatchObject({
+			billedAmount: null,
+			remaining: 0,
+			allocated: 0,
+			dueDate: null,
+			status: "unknown",
+		});
+	});
+
 	it("maps a statement read, transfer evidence, and alternatives", () => {
 		const suggestion = toStatementPaymentSuggestion({
-			read: read({ allocated: 724.45, remaining: 275.55 }),
+			read: known({ allocated: 724.45, remaining: 275.55 }),
 			paymentAmount: 275.55,
 			evidence: "Both sides of this card payment are observed.",
 			paymentEvidence: [
 				{ code: "amount", reason: "Same cents on both legs." },
 				{ code: "date", reason: "Posted after the close." },
 			],
-			alternatives: [
-				read({
-					statement: {
-						id: "stmt-nov",
-						accountId: "card-a",
-						closingDate: "2026-11-19",
-						dueDate: "2026-12-10",
-						balance: 410,
-						currency: "USD",
-						createdAt: 0,
-					},
-					remaining: 410,
-				}),
-			],
+			alternatives: [known({ statement: novStatement, remaining: 410 })],
 			actions,
 		});
 		expect(suggestion).toMatchObject({
-			key: "stmt-oct",
-			statementId: "stmt-oct",
+			key: "2026-10-19~card-a",
+			statementId: "2026-10-19~card-a",
 			statementLabel: "Oct 19, 2026 statement",
 			statementClose: "2026-10-19",
 			dueDate: "2026-11-10",
@@ -85,7 +122,7 @@ describe("statement payment adapter", () => {
 		});
 		expect(suggestion.alternatives).toEqual([
 			{
-				statementId: "stmt-nov",
+				statementId: "2026-11-19~card-a",
 				label: "Nov 19, 2026 statement",
 				statementClose: "2026-11-19",
 				remainingBalance: 410,
@@ -95,7 +132,7 @@ describe("statement payment adapter", () => {
 
 	it("leaves matcher detail empty when the candidate has no reasons", () => {
 		const suggestion = toStatementPaymentSuggestion({
-			read: read(),
+			read: known(),
 			paymentAmount: 275.55,
 			evidence: null,
 			actions,

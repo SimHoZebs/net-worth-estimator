@@ -345,8 +345,6 @@ export function AccountDetailView({
 						<AccountStatements
 							key={`statements-${account.id}`}
 							accountId={account.id}
-							accountName={account.name}
-							readOnly={readOnly}
 						/>
 					)}
 				</TabsContent>

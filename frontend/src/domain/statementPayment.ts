@@ -15,7 +15,9 @@ export type StatementPaymentStatus =
 	/** Some amount has been applied; a remaining balance is still owed. */
 	| "partially-paid"
 	/** The remaining balance reached zero. */
-	| "paid-in-full";
+	| "paid-in-full"
+	/** A billed amount or allocation total is not known, so status cannot be told. */
+	| "unknown";
 
 /** One other statement the current card payment could cover. */
 export interface StatementPaymentOption {
@@ -73,6 +75,8 @@ export function statementStatusLabel(status: StatementPaymentStatus): string {
 			return "Partially paid";
 		case "open":
 			return "Open";
+		case "unknown":
+			return "Status unknown";
 	}
 }
 
