@@ -1,4 +1,86 @@
-# Pattern detection bloat audit
+# Optimization audit — 2026-11-21
+
+Audited the full repository at HEAD `7ac73105` on `main`. Eight scoped read-only reviews ran in parallel, then deduped to one term per concept below. Findings continue from the prior pass at 059. All findings start at `needs-review`.
+
+## Current finding index (059-116)
+
+| ID | Title | Scope | Status |
+| --- | --- | --- | --- |
+| [059](059-calendar-date-validity.md) | Use one calendar date validity check | contracts-types | rejected |
+| [060](060-api-payload-types.md) | Give each API payload one type definition | contracts-types | needs-review |
+| [061](061-sse-payload-validation.md) | Validate stream event payloads before typing them | contracts-types | needs-review |
+| [062](062-sse-stream-consumption.md) | Use one stream consumption loop | frontend-state | accepted |
+| [063](063-release-commit-check.md) | Share the release commit verification | deploy-build-test | accepted |
+| [064](064-container-image-check.md) | Wire the standalone image test into CI | deploy-build-test | accepted |
+| [065](065-dead-snapshot-index.md) | Delete the dead snapshot index pair | deploy-build-test | accepted |
+| [066](066-store-conformance-no-op.md) | Remove the no-op store conformance check | backend-api-persist | accepted |
+| [067](067-shared-run-registration.md) | Register a shared run only after the stream is writable | backend-api-persist | needs-review |
+| [068](068-slice-id-helper.md) | Share one slice-ID filter helper in the SQLite adapter | backend-api-persist | accepted |
+| [069](069-projection-source-comment.md) | Correct the projection source comment | backend-api-persist | accepted |
+| [070](070-insight-suggestions-memo.md) | Stabilize the statement suggestion passed to the insights memo | frontend-state | accepted |
+| [071](071-scoped-write-helper.md) | Share the scoped fetch and write lifecycle | frontend-state | accepted |
+| [072](072-row-revision-fingerprint.md) | Build the saved-row fingerprint in one place | frontend-state | accepted |
+| [073](073-bnpl-finding-wording.md) | Use one finding-state wording for BNPL rows | frontend-domain | needs-review |
+| [074](074-safe-spending-forecast-dead-layer.md) | Delete the Safe Spending forecast layer left by the server takeover | frontend-domain | accepted |
+| [075](075-dead-domain-exports.md) | Delete unreferenced domain exports and the unused prop | frontend-domain | accepted |
+| [076](076-month-boundary-math.md) | Leave one owner for month-boundary math | frontend-domain | accepted |
+| [077](077-statement-status-rule.md) | Derive statement status in one place | frontend-domain | accepted |
+| [078](078-closed-statement-pricing.md) | Price a closed statement with one engine | backend-domain | needs-review |
+| [079](079-transfer-leg-matching.md) | Match transfer legs with one shared rule | backend-domain | needs-review |
+| [080](080-categorization-judgment-validation.md) | Apply the same judgment response validation to categorization | backend-domain | needs-review |
+| [081](081-judgment-error-precedence.md) | Decide judgment error precedence in one place | backend-domain | needs-review |
+| [082](082-projection-engine-version.md) | Remove the single-value projection engine version check | backend-domain | needs-review |
+| [083](083-migration-ledger-repair-script.md) | Record the posted-time repair script in the migration ledger | backend-domain | needs-review |
+| [084](084-dead-with-providers-shadow.md) | Delete the dead WithProviders shadow method | backend-domain | accepted |
+| [085](085-claim-state-index.md) | Build one claim-state index in the Safe Spending replay | backend-domain | needs-review |
+| [086](086-dead-provider-verbs.md) | Delete zero-caller provider verbs and the legacy fallback | backend-domain | accepted |
+| [087](087-receipt-provenance-version.md) | Keep one source for the receipt provenance version | backend-domain | accepted |
+| [088](088-projection-override-wire-keys.md) | Correct the override keys in the projection example | doc-audit-reference | accepted |
+| [089](089-stale-transaction-sync-path.md) | Correct the transaction sync key source path | doc-audit-reference | accepted |
+| [090](090-biweekly-schedule-limitation.md) | Remove the false biweekly schedule limitation | doc-audit-reference | accepted |
+| [091](091-schedule-start-mechanism.md) | Correct the schedule start and anti-duplication description | doc-audit-reference | accepted |
+| [092](092-testing-auth-env-vars.md) | Remove the nonexistent auth variables from the test matrix | doc-audit-reference | accepted |
+| [093](093-shared-database-setup-scope.md) | Scope the shared-database setup prohibition to conversion | doc-audit-reference | accepted |
+| [094](094-authorization-migration-checklist.md) | Remove the orphaned authorization migration checklist | doc-audit-reference | accepted |
+| [095](095-error-feedback-spec-inventory.md) | Correct the error-feedback regression spec inventory | doc-audit-reference | accepted |
+| [096](096-northflank-release-arguments.md) | List all required Northflank release arguments | doc-audit-reference | accepted |
+| [097](097-primitives-manrope-font.md) | Update the retired font in the primitives artifact | doc-audit-reference | accepted |
+| [098](098-uncovered-automation-inventory.md) | Give the uncovered-by-automation list one owner | doc-audit-reference | accepted |
+| [099](099-terms-non-glossary-content.md) | Keep the glossary to term definitions | doc-audit-reference | accepted |
+| [100](100-backup-command-copies.md) | Keep the backup command in one owner | doc-audit-reference | accepted |
+| [101](101-analysis-evaluation-definitions.md) | Point analysis and evaluation definitions at the glossary | doc-audit-reference | accepted |
+| [102](102-retry-backoff-owner.md) | Give the retry backoff one documented owner | doc-audit-reference | accepted |
+| [103](103-release-gates-recipes.md) | Point release gates at the deploy recipes | doc-audit-reference | accepted |
+| [104](104-passkey-removal-focus.md) | Restore focus and announce passkey removal | ui-ux | needs-review |
+| [105](105-auth-feedback-live-region.md) | Make auth feedback announce errors assertively | ui-ux | needs-review |
+| [106](106-toggle-accessible-names.md) | Keep a stable name on pin and reveal toggles | ui-ux | needs-review |
+| [107](107-pattern-review-tabs-scrollable.md) | Make the pattern-review tab strip scrollable | ui-ux | needs-review |
+| [108](108-sheet-description-duplication.md) | Remove the duplicated sheet description | ui-ux | needs-review |
+| [109](109-textarea-recipe-composition.md) | Compose the textarea from the shared input recipe | ui-ux | needs-review |
+| [110](110-font-family-owners.md) | Keep font family strings in one owner | ui-ux | needs-review |
+| [111](111-warning-badge-owner.md) | Own the transaction warning badge in one place | ui-ux | needs-review |
+| [112](112-transaction-row-truncation.md) | Bound transaction title truncation by the container | ui-ux | needs-review |
+| [113](113-evidence-dialog-unused-callback.md) | Remove the unused evidence edit callback | ui-ux | accepted |
+| [114](114-redundant-control-hints.md) | Remove hints that restate the control | ui-ux | needs-review |
+| [115](115-share-until-explicit-choice.md) | Make an open-ended share an explicit choice | ui-ux | needs-review |
+| [116](116-empty-state-roadmap-copy.md) | Remove tutorial and roadmap text from empty states | ui-ux | needs-review |
+
+### Retired aliases
+
+| User term | Code names merged into it |
+| --- | --- |
+| Calendar date validity | `isIsoDate`, `calendarDayMs` |
+| API payload types | hand-written `contracts.ts` interfaces, generated model types, `/v1/flows` contract mirror, `as never` bridges |
+
+### Documentation-only findings
+
+Findings 088-103 are documentation-only. They correct contradictions and stale guidance, or give a duplicated fact one owner. The code they describe is cited in each finding, including wire keys, source paths, environment variables, spec inventories, release arguments, and command recipes. No runtime change is proposed in that group.
+
+No benchmarks, builds, browser renders, or screen-reader sessions were run. Render cost, visual, keyboard, and responsive claims are structural or code-derived; verification sections are proposed acceptance checks. Duplicate line counts describe existing code, not measured savings. A repo-wide heading-anchor scan found no broken in-repo links, and the prior pass findings 001-058 were cross-checked rather than re-argued.
+
+---
+
+## Pattern detection bloat audit
 
 Audited the pattern detection system on 2026-11-18: `backend/internal/analysis/payment_patterns.go`, `pattern_to_*.go`, `types/analysis_pattern_*.go`, `api/analyses/pattern_*.go`, `store/adapters/sqlite/analysis_pattern_*.go`, `frontend/src/domain/patternReview.ts` plus review UI, and `docs/payment-patterns.md`. Eight scoped read-only reviews ran in parallel, then deduped to one term per concept below.
 
