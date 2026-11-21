@@ -118,7 +118,7 @@ type StatementPaymentSuggestionResult struct {
 // of confirmed allocations; Remaining is the billed balance still to allocate.
 // A statement whose balance is unknown cannot back an allocation.
 type StatementAllocationRead struct {
-	Statement   DerivedStatement       `json:"statement"`
+	Statement   DerivedStatement      `json:"statement"`
 	Allocations []StatementAllocation `json:"allocations"`
 	Allocated   float64               `json:"allocated"`
 	Remaining   float64               `json:"remaining"`

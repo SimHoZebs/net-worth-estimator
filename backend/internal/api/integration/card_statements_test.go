@@ -81,12 +81,12 @@ func createStatementTestRecord(t *testing.T, handler http.Handler, body string) 
 }
 
 type listedStatement struct {
-	ID        string  `json:"id"`
-	AccountID string  `json:"accountId"`
-	Closing   string  `json:"closingDate"`
-	DueDate   *string `json:"dueDate"`
+	ID        string   `json:"id"`
+	AccountID string   `json:"accountId"`
+	Closing   string   `json:"closingDate"`
+	DueDate   *string  `json:"dueDate"`
 	Balance   *float64 `json:"balance"`
-	Kind      string  `json:"kind"`
+	Kind      string   `json:"kind"`
 }
 
 type listedRead struct {
