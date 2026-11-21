@@ -1,4 +1,5 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import { findingStateLabel } from "./paymentFindings.ts";
 
 export function activeBNPLFinding(
 	findings: AnalysisFinding[],
@@ -15,19 +16,34 @@ export function activeBNPLFinding(
 	);
 }
 
-export function findingLabel(
-	finding: Pick<AnalysisFinding, "strength" | "review">,
-) {
+/** The label helper has always accepted a strength and review pair, while its
+ * callers pass the whole finding. The shared owner needs the complete shape. */
+type LabelFinding = Pick<AnalysisFinding, "strength" | "review"> &
+	Partial<AnalysisFinding>;
+
+export function findingLabel(finding: LabelFinding) {
+	// The badge reads "BNPL" where the shared label style says "Confirmed BNPL".
 	if (finding.review?.decision === "confirmed") return "BNPL";
-	return finding.strength === "strong" ? "Likely BNPL" : "Possible BNPL";
+	return findingStateLabel(
+		{ ...finding, kind: "BNPL" } as AnalysisFinding,
+		"label",
+	);
 }
 
 export function findingStatus(finding: AnalysisFinding) {
-	if (finding.review?.decision === "rejected") return "Not BNPL";
-	if (finding.dismissed) return "Dismissed";
-	if (finding.review?.decision === "confirmed") return "Confirmed";
-	if (finding.stale) return "Awaiting analysis";
-	return finding.status === "withdrawn" ? "Withdrawn" : "Active";
+	const answered =
+		Boolean(finding.review?.decision) || finding.dismissed || finding.stale;
+	// The shared owner checks withdrawal before answers and staleness. BNPL rows
+	// keep the latest answer visible, so clear the operational status there.
+	const state: AnalysisFinding = {
+		...finding,
+		kind: "BNPL",
+		status:
+			answered && finding.status === "withdrawn" ? "active" : finding.status,
+	};
+	const shared = findingStateLabel(state, "status");
+	// The column reads "Active" where the shared status style says "Needs review".
+	return shared === "Needs review" ? "Active" : shared;
 }
 
 export function providerLabel(provider: string) {

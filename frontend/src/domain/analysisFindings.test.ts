@@ -35,6 +35,26 @@ describe("BNPL transaction flags", () => {
 		expect(findingLabel(finding)).toBe("Likely BNPL");
 		expect(findingLabel({ strength: "moderate" })).toBe("Possible BNPL");
 	});
+	it("reads Not BNPL in both columns for a rejected strong finding", () => {
+		const rejected = {
+			...finding,
+			review: { decision: "rejected", provider: "klarna", answeredAt: 2 },
+		};
+		expect(findingLabel(rejected)).toBe("Not BNPL");
+		expect(findingStatus(rejected)).toBe("Not BNPL");
+	});
+	it("uses the shared judgment wording for the finding column", () => {
+		const unsupported = {
+			...finding,
+			judgment: {
+				requestId: "r",
+				status: "ready",
+				decision: "unsupported",
+				strength: "strong",
+			},
+		} as AnalysisFinding;
+		expect(findingLabel(unsupported)).toBe("Not BNPL");
+	});
 	it("keeps confirmed labels through stale inputs and withdrawn inference", () => {
 		const confirmed = {
 			...finding,
