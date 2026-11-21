@@ -1,5 +1,4 @@
 import { accountTransactions } from "./accountActivity.ts";
-import { dateLabel, money } from "./format.ts";
 import type { Account, Transaction } from "./model.ts";
 import type { TransactionResult, Projection } from "./result.ts";
 
@@ -292,9 +291,4 @@ export function deriveFundingGaps({
 			},
 		];
 	});
-}
-
-export function fundingGapCaption(gap: FundingGap): string {
-	const summary = summarizeFundingGap(gap);
-	return `${gap.name} on ${dateLabel(gap.date, true)}: ${money(summary.available)} available of ${money(gap.requiredAmount)} required, ${money(summary.shortfall)} short.`;
 }

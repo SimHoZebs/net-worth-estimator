@@ -1,23 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
 	defaultFlowWindow,
-	firstDayOfMonthIso,
 	flowPresetRange,
-	lastDayOfMonthIso,
 	matchFlowPreset,
 } from "./flowWindow.ts";
 
 describe("flowWindow month boundaries", () => {
-	it("returns first and last day of the current month", () => {
-		expect(firstDayOfMonthIso("2026-03-15")).toBe("2026-03-01");
-		expect(lastDayOfMonthIso("2026-03-15")).toBe("2026-03-31");
-		expect(lastDayOfMonthIso("2026-04-01")).toBe("2026-04-30");
-	});
-
 	it("handles leap year February", () => {
-		expect(firstDayOfMonthIso("2024-02-15")).toBe("2024-02-01");
-		expect(lastDayOfMonthIso("2024-02-15")).toBe("2024-02-29");
-		expect(lastDayOfMonthIso("2023-02-15")).toBe("2023-02-28");
+		expect(flowPresetRange("this-month", "2024-02-15")).toEqual({
+			startDate: "2024-02-01",
+			endDate: "2024-02-29",
+		});
+		expect(flowPresetRange("this-month", "2023-02-15")).toEqual({
+			startDate: "2023-02-01",
+			endDate: "2023-02-28",
+		});
 	});
 
 	it("resolves this-month to whole current month", () => {

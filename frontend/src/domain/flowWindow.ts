@@ -1,4 +1,4 @@
-import { isoDate, utcDate } from "./format.ts";
+import { clampMonth, utcDate } from "./format.ts";
 
 export type FlowRangePresetId =
 	| "this-month"
@@ -18,22 +18,11 @@ function monthParts(todayIso: string): { year: number; month: number } {
 }
 
 function firstOfMonth(year: number, month: number): string {
-	return isoDate(new Date(Date.UTC(year, month, 1, 12, 0, 0)));
+	return clampMonth({ year, month, day: 1 });
 }
 
 function lastOfMonth(year: number, month: number): string {
-	const maxDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-	return isoDate(new Date(Date.UTC(year, month, maxDay, 12, 0, 0)));
-}
-
-export function firstDayOfMonthIso(todayIso: string): string {
-	const { year, month } = monthParts(todayIso);
-	return firstOfMonth(year, month);
-}
-
-export function lastDayOfMonthIso(todayIso: string): string {
-	const { year, month } = monthParts(todayIso);
-	return lastOfMonth(year, month);
+	return clampMonth({ year, month, day: 31 });
 }
 
 export function flowPresetRange(
@@ -70,14 +59,16 @@ export function flowPresetRange(
 	}
 }
 
-export const FLOW_RANGE_PRESETS: Array<{ id: FlowRangePresetId; label: string }> =
-	[
-		{ id: "this-month", label: "This month" },
-		{ id: "last-month", label: "Last month" },
-		{ id: "last-3-months", label: "Last 3 months" },
-		{ id: "year-to-date", label: "Year to date" },
-		{ id: "last-12-months", label: "Last 12 months" },
-	];
+export const FLOW_RANGE_PRESETS: Array<{
+	id: FlowRangePresetId;
+	label: string;
+}> = [
+	{ id: "this-month", label: "This month" },
+	{ id: "last-month", label: "Last month" },
+	{ id: "last-3-months", label: "Last 3 months" },
+	{ id: "year-to-date", label: "Year to date" },
+	{ id: "last-12-months", label: "Last 12 months" },
+];
 
 export function matchFlowPreset(
 	window: FlowWindow,

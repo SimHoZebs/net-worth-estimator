@@ -262,10 +262,6 @@ export function plainLanguageForAmount(
 	return "Calculated from the values you pick below.";
 }
 
-export function templateById(id: string): AmountTemplate | null {
-	return FALLBACK_TEMPLATES.find((template) => template.id === id) ?? null;
-}
-
 // Built-in recipe names the builder knows how to render field editors for.
 // Server presets with other names render their stored amount directly.
 export const BUILT_IN_TEMPLATE_IDS: ReadonlySet<string> = new Set(

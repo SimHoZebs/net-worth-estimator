@@ -29,10 +29,6 @@ export function isPendingTransaction(
 	return transaction.pending === true;
 }
 
-export function isArchivedAccount(account: Pick<Account, "archived">): boolean {
-	return account.archived === true;
-}
-
 export function visibleAccounts(accounts: Account[]): Account[] {
 	return accounts.filter((account) => !account.archived);
 }

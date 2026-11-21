@@ -19,6 +19,25 @@ export type StatementPaymentStatus =
 	/** A billed amount or allocation total is not known, so status cannot be told. */
 	| "unknown";
 
+/** Status of a statement whose totals are all known. */
+export type KnownStatementPaymentStatus = Exclude<
+	StatementPaymentStatus,
+	"unknown"
+>;
+
+/** The single status ladder for known statement totals. */
+export function knownStatementStatus({
+	remaining,
+	allocated,
+}: {
+	remaining: number;
+	allocated: number;
+}): KnownStatementPaymentStatus {
+	if (remaining <= 0) return "paid-in-full";
+	if (allocated > 0) return "partially-paid";
+	return "open";
+}
+
 /** One other statement the current card payment could cover. */
 export interface StatementPaymentOption {
 	statementId: string;

@@ -5,7 +5,10 @@
  * contract is mapped into this model at the API boundary.
  */
 
-import type { StatementPaymentStatus } from "./statementPayment.ts";
+import {
+	knownStatementStatus,
+	type StatementPaymentStatus,
+} from "./statementPayment.ts";
 
 /** One statement derived from one recorded cycle-end close. */
 export interface DerivedCardStatement {
@@ -36,7 +39,5 @@ export function derivedStatementStatus(statement: {
 	const { billedAmount, remaining, allocated } = statement;
 	if (billedAmount === null || remaining === null || allocated === null)
 		return "unknown";
-	if (remaining <= 0) return "paid-in-full";
-	if (allocated > 0) return "partially-paid";
-	return "open";
+	return knownStatementStatus({ remaining, allocated });
 }

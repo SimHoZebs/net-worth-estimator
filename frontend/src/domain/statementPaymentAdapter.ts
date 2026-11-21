@@ -4,10 +4,11 @@ import type { StatementAllocationRead } from "@/api/generated/model/statementAll
 import type { DerivedCardStatement } from "./derivedStatement.ts";
 import { derivedStatementStatus } from "./derivedStatement.ts";
 import { dateLabel } from "./format.ts";
-import type {
-	StatementPaymentActions,
-	StatementPaymentOption,
-	StatementPaymentSuggestion,
+import {
+	knownStatementStatus,
+	type StatementPaymentActions,
+	type StatementPaymentOption,
+	type StatementPaymentSuggestion,
 } from "./statementPayment.ts";
 
 /** A statement read whose billed amount is known, so a payment can target it. */
@@ -56,9 +57,7 @@ export function statementStatusFromTotals(
 	allocated: number,
 	remaining: number,
 ): StatementPaymentSuggestion["status"] {
-	if (remaining <= 0) return "paid-in-full";
-	if (allocated > 0) return "partially-paid";
-	return "open";
+	return knownStatementStatus({ remaining, allocated });
 }
 
 /** Map a statement read into one suggestion for a posted card payment. */

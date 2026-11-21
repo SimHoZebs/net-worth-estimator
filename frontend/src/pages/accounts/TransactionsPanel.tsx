@@ -18,14 +18,12 @@ import {
 	type Account,
 	type Transaction,
 } from "../../domain/model.ts";
-import type { ResolvedTransactionAmount } from "../../domain/resolvedTransactionAmounts.ts";
 
 export function TransactionsPanel({
 	transactions,
 	accounts,
 	startDate,
 	readOnly,
-	resolvedAmounts,
 	ruleCadence,
 	showHeaders = false,
 }: {
@@ -33,7 +31,6 @@ export function TransactionsPanel({
 	accounts: Account[];
 	startDate: string;
 	readOnly: boolean;
-	resolvedAmounts?: Map<string, ResolvedTransactionAmount>;
 	/** Display cadence per rule id, read from the rule rows by the caller. */
 	ruleCadence?: Map<string, string>;
 	showHeaders?: boolean;
@@ -56,9 +53,6 @@ export function TransactionsPanel({
 		? (transactions.find((transaction) => transaction.id === selectedId) ??
 			null)
 		: null;
-	const selectedResolved = selected
-		? resolvedAmounts?.get(selected.id)
-		: undefined;
 	const selectedClaimRuleName = selected?.claimScheduleId
 		? (transactions.find(
 				(transaction) => transaction.id === selected.claimScheduleId,
@@ -140,10 +134,7 @@ export function TransactionsPanel({
 							}}
 							amount={
 								<>
-									<TransactionAmount
-										transaction={transaction}
-										resolved={resolvedAmounts?.get(transaction.id)}
-									/>
+									<TransactionAmount transaction={transaction} />
 									{pending ? <Badge variant="secondary">Pending</Badge> : null}
 								</>
 							}
@@ -159,7 +150,6 @@ export function TransactionsPanel({
 						transaction: selected,
 						accounts,
 						startDate,
-						resolved: selectedResolved,
 					})}
 					savedTransaction={selected}
 					accounts={accounts}
@@ -173,36 +163,13 @@ export function TransactionsPanel({
 	);
 }
 
-function TransactionAmount({
-	transaction,
-	resolved,
-}: {
-	transaction: Transaction;
-	resolved: ResolvedTransactionAmount | undefined;
-}) {
+function TransactionAmount({ transaction }: { transaction: Transaction }) {
 	if (transaction.amountKnown)
 		return (
 			<strong className={cn("text-sm font-semibold max-sm:text-xs")}>
 				{money(transaction.amount)}
 			</strong>
 		);
-	if (resolved) {
-		const label =
-			transaction.kind === "transaction"
-				? `Calculated for ${dateLabel(resolved.date, true)}`
-				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
-		return (
-			<>
-				<strong
-					className={cn("text-sm font-semibold max-sm:text-xs")}
-					title={label}
-				>
-					{money(resolved.amount)}
-				</strong>
-				<Badge variant="secondary">Varies</Badge>
-			</>
-		);
-	}
 	return (
 		<strong
 			className={cn("text-sm font-semibold max-sm:text-xs")}

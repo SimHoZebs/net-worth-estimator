@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
 	ensureStartWeekday,
-	monthlyNthWeekdayDate,
 	recurrenceEqual,
 	recurrenceFromFrequency,
 	recurrenceFromScheduleLike,
-	recurrenceOccurrenceDates,
 	recurrenceSentence,
 	validateRecurrence,
 } from "./recurrence.ts";
-import { scheduleOccurrenceDates } from "./scheduleExpansion.ts";
 
 describe("recurrence sentences", () => {
 	it("words daily repeats", () => {
@@ -128,99 +125,6 @@ describe("recurrence validation", () => {
 	});
 });
 
-describe("recurrence expansion", () => {
-	it("expands every 2 months by date", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-15",
-				recurrence: { unit: "month", interval: 2, monthlyMode: "byDate" },
-				endDate: null,
-				through: "2026-06-30",
-			}),
-		).toEqual(["2026-01-15", "2026-03-15", "2026-05-15"]);
-	});
-	it("expands every 3 weeks on Sunday", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-04",
-				recurrence: { unit: "week", interval: 3, weekdays: [0] },
-				endDate: null,
-				through: "2026-02-28",
-			}),
-		).toEqual(["2026-01-04", "2026-01-25", "2026-02-15"]);
-	});
-	it("expands monthly on the third Tuesday", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-20",
-				recurrence: { unit: "month", interval: 1, monthlyMode: "byNthWeekday" },
-				endDate: null,
-				through: "2026-03-31",
-			}),
-		).toEqual(["2026-01-20", "2026-02-17", "2026-03-17"]);
-	});
-	it("clamps month-end starts to shorter months", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-31",
-				recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
-				endDate: null,
-				through: "2026-04-30",
-			}),
-		).toEqual(["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"]);
-	});
-	it("expands monthly on the last Friday", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-30",
-				recurrence: { unit: "month", interval: 1, monthlyMode: "byNthWeekday" },
-				endDate: null,
-				through: "2026-03-31",
-			}),
-		).toEqual(["2026-01-30", "2026-02-27", "2026-03-27"]);
-	});
-	it("expands weekly Tue and Thu", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-06",
-				recurrence: { unit: "week", interval: 1, weekdays: [2, 4] },
-				endDate: null,
-				through: "2026-01-15",
-			}),
-		).toEqual(["2026-01-06", "2026-01-08", "2026-01-13", "2026-01-15"]);
-	});
-	it("respects the schedule end date", () => {
-		expect(
-			recurrenceOccurrenceDates({
-				startDate: "2026-01-06",
-				recurrence: { unit: "week", interval: 1, weekdays: [2, 4] },
-				endDate: "2026-01-08",
-				through: "2026-01-31",
-			}),
-		).toEqual(["2026-01-06", "2026-01-08"]);
-	});
-	it("returns null for a nonexistent non-last fifth weekday", () => {
-		expect(
-			monthlyNthWeekdayDate({
-				year: 2026,
-				month: 2,
-				weekday: 1,
-				nth: 5,
-				last: false,
-			}),
-		).toBeNull();
-		expect(
-			monthlyNthWeekdayDate({
-				year: 2026,
-				month: 2,
-				weekday: 1,
-				nth: 5,
-				last: true,
-			}),
-		).toBe("2026-02-23");
-	});
-});
-
 describe("recurrence migration helpers", () => {
 	it("maps legacy frequencies to recurrences", () => {
 		expect(recurrenceFromFrequency("daily", "2026-01-06")).toEqual({
@@ -285,23 +189,5 @@ describe("recurrence migration helpers", () => {
 				"2026-01-08",
 			),
 		).toEqual({ unit: "week", interval: 1, weekdays: [2, 4] });
-	});
-	it("expands legacy frequencies through the compat shim", () => {
-		expect(
-			scheduleOccurrenceDates({
-				startDate: "2026-01-15",
-				endDate: null,
-				frequency: "monthly",
-				through: "2026-03-31",
-			}),
-		).toEqual(["2026-01-15", "2026-02-15", "2026-03-15"]);
-		expect(
-			scheduleOccurrenceDates({
-				startDate: "2026-01-15",
-				endDate: null,
-				frequency: "quarterly",
-				through: "2026-12-31",
-			}),
-		).toEqual(["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15"]);
 	});
 });

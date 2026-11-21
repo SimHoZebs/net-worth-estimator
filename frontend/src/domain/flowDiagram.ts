@@ -15,8 +15,6 @@ export interface FlowViewFilters {
 	accountId: string | null;
 }
 
-export const ALL_MOVEMENTS: MovementFilter = "all";
-
 /** Edges surviving the movement and account filters. The account filter
  * focuses the subgraph touching that account; window totals still describe
  * the whole graph and the view labels the focus explicitly. */
