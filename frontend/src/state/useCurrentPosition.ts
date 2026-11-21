@@ -8,6 +8,7 @@ import { projectionModelKey } from "./projectionKeys.ts";
 import {
 	projectionStartDate,
 	projectionStartDateFromRows,
+	savedRowFingerprint,
 } from "./projectionSource.ts";
 import {
 	balancesOptions,
@@ -28,8 +29,7 @@ export function useCurrentPosition({
 	// Position is backend-owned historical replay: it keys on the saved
 	// rows only, never on forecast evaluation preferences.
 	const scope = useUserScope();
-	const rowActive =
-		model === undefined && enabled && scope.status === "ready";
+	const rowActive = model === undefined && enabled && scope.status === "ready";
 	const client = serverQueryClient();
 	const balances = useQuery(
 		{ ...balancesOptions(scope), enabled: rowActive },
@@ -56,21 +56,30 @@ export function useCurrentPosition({
 		transactions.data !== undefined;
 	const rowPending =
 		model === undefined &&
-		(checkpoints.isPending ||
-			schedules.isPending ||
-			transactions.isPending);
+		(checkpoints.isPending || schedules.isPending || transactions.isPending);
 	const rowRevision = useMemo(() => {
 		if (!rowActive) return "";
-		const parts: string[] = [];
-		const take = (revision: string | null | undefined, content: unknown, name: string) => {
-			if (revision) parts.push(`${name}:${revision}`);
-			else if (content !== undefined) parts.push(`${name}:${JSON.stringify(content)}`);
-		};
-		take(balances.data?.revision, balances.data?.accounts, "balances");
-		take(checkpoints.data?.revision, checkpoints.data?.checkpoints, "checkpoints");
-		take(schedules.data?.revision, schedules.data?.schedules, "schedules");
-		take(transactions.data?.revision, transactions.data?.transactions, "transactions");
-		return parts.join("|");
+		return savedRowFingerprint(
+			{
+				balances: {
+					revision: balances.data?.revision,
+					content: balances.data?.accounts,
+				},
+				checkpoints: {
+					revision: checkpoints.data?.revision,
+					content: checkpoints.data?.checkpoints,
+				},
+				schedules: {
+					revision: schedules.data?.revision,
+					content: schedules.data?.schedules,
+				},
+				transactions: {
+					revision: transactions.data?.revision,
+					content: transactions.data?.transactions,
+				},
+			},
+			{ includeEvaluations: false, skipMissingContent: true },
+		);
 	}, [
 		rowActive,
 		balances.data,
@@ -80,9 +89,7 @@ export function useCurrentPosition({
 	]);
 	const baseKey = useMemo(
 		() =>
-			hasOverride
-				? projectionModelKey(baseModel)
-				: rowRevision || "pending",
+			hasOverride ? projectionModelKey(baseModel) : rowRevision || "pending",
 		[hasOverride, baseModel, rowRevision],
 	);
 	const asOfDate = useMemo(() => {
@@ -93,13 +100,22 @@ export function useCurrentPosition({
 			schedules: schedules.data!.schedules,
 			transactions: transactions.data!.transactions,
 		});
-	}, [hasOverride, baseModel, rowDataReady, checkpoints.data, schedules.data, transactions.data]);
-	const hasBase = hasOverride
-		? baseModel !== null
-		: rowDataReady;
+	}, [
+		hasOverride,
+		baseModel,
+		rowDataReady,
+		checkpoints.data,
+		schedules.data,
+		transactions.data,
+	]);
+	const hasBase = hasOverride ? baseModel !== null : rowDataReady;
 	const rowsError = hasOverride
 		? null
-		: balances.error ?? checkpoints.error ?? schedules.error ?? transactions.error ?? null;
+		: (balances.error ??
+			checkpoints.error ??
+			schedules.error ??
+			transactions.error ??
+			null);
 	const query = useQuery({
 		queryKey: currentPositionQueryKey(baseKey, asOfDate),
 		enabled: enabled && hasBase && !rowsError,

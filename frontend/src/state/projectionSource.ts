@@ -79,6 +79,50 @@ export function projectionSourceFromModel(
 	};
 }
 
+/** A named saved row that can identify which model a hook is looking at. */
+export interface SavedRowRevision {
+	revision: string | null | undefined;
+	content: unknown;
+}
+
+export type SavedRowName =
+	| "balances"
+	| "checkpoints"
+	| "schedules"
+	| "transactions"
+	| "evaluations";
+
+/**
+ * Fingerprint the saved rows that identify a model in view. A server
+ * revision is preferred; without one the row content is serialized. Callers
+ * choose their row set: current position omits evaluations, which are
+ * backend-owned and must not move its key.
+ */
+export function savedRowFingerprint(
+	rows: Partial<Record<SavedRowName, SavedRowRevision>>,
+	options: {
+		includeEvaluations?: boolean;
+		skipMissingContent?: boolean;
+	} = {},
+): string {
+	const names: SavedRowName[] = [
+		"balances",
+		"checkpoints",
+		"schedules",
+		"transactions",
+	];
+	if (options.includeEvaluations) names.push("evaluations");
+	const parts: string[] = [];
+	for (const name of names) {
+		const row = rows[name];
+		if (!row) continue;
+		if (row.revision) parts.push(`${name}:${row.revision}`);
+		else if (options.skipMissingContent && row.content === undefined) continue;
+		else parts.push(`${name}:${JSON.stringify(row.content)}`);
+	}
+	return parts.join("|");
+}
+
 /** Latest checkpoint, else first schedule, else first transaction, else today. */
 export function projectionStartDateFromRows({
 	checkpoints,

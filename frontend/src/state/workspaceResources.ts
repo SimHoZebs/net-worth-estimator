@@ -1,5 +1,6 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { getUserScope, type UserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
+import { assertCurrentScope } from "@/state/scopedState.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError } from "@/state/notifications.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
@@ -58,10 +59,7 @@ export function userResourceKey(
 	return ["user-resources", scope.key, kind] as const;
 }
 
-function current(scope: UserScope, signal?: AbortSignal) {
-	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
-		throw new Error("The active user changed or the request was canceled.");
-}
+const USER_CHANGED = "The active user changed or the request was canceled.";
 
 const defaults = {
 	staleTime: Infinity,
@@ -75,7 +73,7 @@ export function statusOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("status", scope),
 		queryFn: async ({ signal }) => {
 			const result: ServerStatus = (await fetchServerStatus({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return result;
 		},
 	});
@@ -128,7 +126,7 @@ export function presetsOptions(scope = getUserScope()) {
 		queryFn: async ({ signal }) => {
 			try {
 				const result = (await listAmountPresets({ signal })).data;
-				current(scope, signal);
+				assertCurrentScope(scope, signal, USER_CHANGED);
 				return (result.presets ?? []).map(normalizePreset);
 			} catch (error) {
 				if (scope === getUserScope() && !signal.aborted)
@@ -149,9 +147,9 @@ export function resolversOptions(scope = getUserScope()) {
 		...defaults,
 		queryKey: userResourceKey("resolvers", scope),
 		queryFn: async ({ signal }) => {
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			const result = (await getAmountResolvers({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return result;
 		},
 	});
@@ -313,7 +311,7 @@ export function balancesOptions(scope = getUserScope(), asOf?: string) {
 			const result = (
 				await listAccountBalances(asOf ? { asOf } : undefined, { signal })
 			).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				accounts: result.accounts ?? [],
 				asOf: result.asOf ?? "",
@@ -337,7 +335,7 @@ export function transactionsOptions(
 					signal,
 				})
 			).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				transactions: result.transactions ?? [],
 				revision: result.revision ?? null,
@@ -358,7 +356,7 @@ export function schedulesOptions(
 			const result = (
 				await listSchedules(accountId ? { accountId } : {}, { signal })
 			).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				schedules: result.schedules ?? [],
 				revision: result.revision ?? null,
@@ -373,7 +371,7 @@ export function purchasesOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("purchases", scope),
 		queryFn: async ({ signal }): Promise<PurchaseList> => {
 			const result = (await listPlannedPurchases({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				plannedPurchases: (result.plannedPurchases ?? []).map(
 					normalizePurchase,
@@ -390,7 +388,7 @@ export function catalogOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("catalog", scope),
 		queryFn: async ({ signal }): Promise<TransactionCatalog> => {
 			const result = (await listTransactionCatalog({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				items: result.items ?? [],
 				revision: result.revision ?? null,
@@ -415,7 +413,7 @@ export function paymentTermsOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("terms", scope),
 		queryFn: async ({ signal }): Promise<PaymentTermsList> => {
 			const result = (await getFinancialModel({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				paymentTerms: result.model?.paymentTerms ?? [],
 				revision: result.revision ?? null,
@@ -605,7 +603,7 @@ export function checkpointsOptions(
 					{ signal },
 				)
 			).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
 				checkpoints: result.checkpoints ?? [],
 				revision: result.revision ?? null,
@@ -620,7 +618,7 @@ export function evalSummaryOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("eval-summary", scope),
 		queryFn: async ({ signal }): Promise<EvaluationSummary> => {
 			const result = (await listEvaluationSummary({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal, USER_CHANGED);
 			const tables = result.evaluations;
 			const normalize = (
 				rows: EvaluationInstanceInterface[] | null | undefined,

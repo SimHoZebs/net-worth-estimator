@@ -10,11 +10,8 @@ import {
 import { getUserScope } from "@/auth/resourceScope.ts";
 import type { PlannedPurchase } from "@/domain/model.ts";
 import { movePurchase } from "@/domain/purchases.ts";
-import { serverQueryClient } from "@/state/serverQuery.ts";
-import {
-	purchasesOptions,
-	userResourceKey,
-} from "@/state/workspaceResources.ts";
+import { fetchScopedQuery } from "@/state/scopedState.ts";
+import { purchasesOptions } from "@/state/workspaceResources.ts";
 import { performSave } from "./workspaceWrites.ts";
 
 /**
@@ -154,15 +151,9 @@ async function runOperations(
 /** Refetch the authoritative purchase queue after a save attempt. */
 export async function refreshPurchases(): Promise<void> {
 	const scope = getUserScope();
-	const cache = serverQueryClient();
-	await cache.invalidateQueries({
-		queryKey: userResourceKey("purchases", scope),
-		refetchType: "none",
-	});
-	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// A reload failure propagates: performSave reports "saved but not
 	// reloaded" instead of claiming success on stale data.
-	await cache.fetchQuery(purchasesOptions(scope));
+	await fetchScopedQuery(purchasesOptions(scope), true);
 }
 
 /**

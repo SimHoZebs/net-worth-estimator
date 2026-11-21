@@ -4,7 +4,10 @@ import type { FlowGraph } from "../api/flows.ts";
 import { requestFlowGraph } from "../api/flows.ts";
 import type { FlowWindow } from "../domain/flowWindow.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { projectionStartDateFromRows } from "./projectionSource.ts";
+import {
+	projectionStartDateFromRows,
+	savedRowFingerprint,
+} from "./projectionSource.ts";
 import {
 	balancesOptions,
 	checkpointsOptions,
@@ -42,11 +45,26 @@ export function useFlowGraph(window: FlowWindow | null) {
 	const scope = useUserScope();
 	const active = scope.status === "ready";
 	const client = serverQueryClient();
-	const balances = useQuery({ ...balancesOptions(scope), enabled: active }, client);
-	const checkpoints = useQuery({ ...checkpointsOptions(scope), enabled: active }, client);
-	const schedules = useQuery({ ...schedulesOptions(scope), enabled: active }, client);
-	const transactions = useQuery({ ...transactionsOptions(scope), enabled: active }, client);
-	const summary = useQuery({ ...evalSummaryOptions(scope), enabled: active }, client);
+	const balances = useQuery(
+		{ ...balancesOptions(scope), enabled: active },
+		client,
+	);
+	const checkpoints = useQuery(
+		{ ...checkpointsOptions(scope), enabled: active },
+		client,
+	);
+	const schedules = useQuery(
+		{ ...schedulesOptions(scope), enabled: active },
+		client,
+	);
+	const transactions = useQuery(
+		{ ...transactionsOptions(scope), enabled: active },
+		client,
+	);
+	const summary = useQuery(
+		{ ...evalSummaryOptions(scope), enabled: active },
+		client,
+	);
 	const rowsReady =
 		active &&
 		balances.data !== undefined &&
@@ -56,18 +74,39 @@ export function useFlowGraph(window: FlowWindow | null) {
 		summary.data !== undefined;
 	const baseKey = useMemo(() => {
 		if (!rowsReady) return "pending";
-		const parts: string[] = [];
-		const take = (revision: string | null | undefined, content: unknown, name: string) => {
-			if (revision) parts.push(`${name}:${revision}`);
-			else parts.push(`${name}:${JSON.stringify(content)}`);
-		};
-		take(balances.data!.revision, balances.data!.accounts, "balances");
-		take(checkpoints.data!.revision, checkpoints.data!.checkpoints, "checkpoints");
-		take(schedules.data!.revision, schedules.data!.schedules, "schedules");
-		take(transactions.data!.revision, transactions.data!.transactions, "transactions");
-		take(summary.data!.revision, summary.data!.evaluations, "evaluations");
-		return parts.join("|");
-	}, [rowsReady, balances.data, checkpoints.data, schedules.data, transactions.data, summary.data]);
+		return savedRowFingerprint(
+			{
+				balances: {
+					revision: balances.data!.revision,
+					content: balances.data!.accounts,
+				},
+				checkpoints: {
+					revision: checkpoints.data!.revision,
+					content: checkpoints.data!.checkpoints,
+				},
+				schedules: {
+					revision: schedules.data!.revision,
+					content: schedules.data!.schedules,
+				},
+				transactions: {
+					revision: transactions.data!.revision,
+					content: transactions.data!.transactions,
+				},
+				evaluations: {
+					revision: summary.data!.revision,
+					content: summary.data!.evaluations,
+				},
+			},
+			{ includeEvaluations: true },
+		);
+	}, [
+		rowsReady,
+		balances.data,
+		checkpoints.data,
+		schedules.data,
+		transactions.data,
+		summary.data,
+	]);
 	const startDate = window?.startDate;
 	const endDate = window?.endDate;
 	return useQuery<FlowGraph, Error>(

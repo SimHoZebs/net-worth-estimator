@@ -608,7 +608,9 @@ function useProjectionSource(enabled: boolean): {
 		const transactionRows = transactionsData.transactions;
 		const scheduleRows = schedulesData.schedules;
 		const checkpointRows = checkpointsData.checkpoints;
-		const revisions = [
+		// Distinct from savedRowFingerprint: this cache identifies a projection
+		// by the deduplicated, sorted set of row revisions, not named rows.
+		const projectionRevisions = [
 			balancesData.revision,
 			transactionsData.revision,
 			schedulesData.revision,
@@ -617,7 +619,7 @@ function useProjectionSource(enabled: boolean): {
 			summaryData.revision,
 		].filter((revision): revision is string => Boolean(revision));
 		return {
-			revision: [...new Set(revisions)].sort().join("|"),
+			revision: [...new Set(projectionRevisions)].sort().join("|"),
 			startDate: projectionStartDateFromRows({
 				checkpoints: checkpointRows,
 				schedules: scheduleRows,

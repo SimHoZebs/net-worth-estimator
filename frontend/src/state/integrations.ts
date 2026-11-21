@@ -3,6 +3,7 @@ import { listIntegrations } from "@/api/generated/endpoints.ts";
 import type { ProviderEntry } from "@/api/generated/model/index.ts";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
+import { fetchScopedQuery } from "@/state/scopedState.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 
@@ -44,15 +45,8 @@ function integrationsOptions(scope = getUserScope()) {
 
 export async function refreshIntegrations(force = false): Promise<void> {
 	const scope = getUserScope();
-	if (scope.status === "pending") return;
 	try {
-		const options = integrationsOptions(scope);
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
+		await fetchScopedQuery(integrationsOptions(scope), force);
 	} catch {
 		/* The query reports its current-resource failure. */
 	}

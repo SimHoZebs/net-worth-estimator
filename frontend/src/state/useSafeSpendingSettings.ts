@@ -14,6 +14,7 @@ import {
 } from "@/domain/safeSpendingSelection.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
+import { fetchScopedQuery, runScopedMutation } from "@/state/scopedState.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import { userResourceKey } from "@/state/workspaceResources.ts";
 
@@ -57,7 +58,8 @@ const settingsFields = {
 	},
 	accountIds: {
 		default: null as string[] | null,
-		read: (value: unknown) => Array.isArray(value) ? (stringIds(value) ?? []) : null,
+		read: (value: unknown) =>
+			Array.isArray(value) ? (stringIds(value) ?? []) : null,
 	},
 	spendingAccountIds: {
 		default: null as string[] | null,
@@ -165,11 +167,9 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 		void cache.cancelQueries({ queryKey: key, exact: true });
 		// The cache contains an explicit optimistic value until this mutation succeeds.
 		const optimistic = cache.setQueryData(key, snapshot);
-		const mutation = cache.getMutationCache().build(cache, {
-			mutationKey: key,
-			scope: { id: JSON.stringify(key) },
+		const pending = runScopedMutation<void>({
+			key,
 			mutationFn: async () => {
-				if (scope !== getUserScope()) return;
 				const data = (await setSafeSpendingSettings(snapshot as never)).data;
 				if (scope !== getUserScope()) return;
 				if (cache.getQueryData(key) === optimistic)
@@ -184,6 +184,7 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 					queryKey: userResourceKey("safe-spending-summary", scope),
 				});
 			},
+			rethrow: true,
 			onError: async (error) => {
 				if (scope !== getUserScope()) return;
 				notifyError(
@@ -212,7 +213,6 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 				}
 			},
 		});
-		const pending = mutation.execute(undefined);
 		void pending.catch(() => {});
 		return pending;
 	};
@@ -234,8 +234,7 @@ export async function refreshSafeSpendingSettings() {
 		});
 	}
 	if (scope !== getUserScope()) return;
-	await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
-	await cache.fetchQuery(settingsOptions(scope));
+	await fetchScopedQuery(settingsOptions(scope), true);
 }
 
 /** Query owns both the saved response and its explicit optimistic updates. */

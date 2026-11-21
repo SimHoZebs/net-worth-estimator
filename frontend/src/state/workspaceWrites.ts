@@ -13,6 +13,7 @@ import {
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
+import { runScopedMutation } from "@/state/scopedState.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import {
@@ -172,36 +173,28 @@ async function write<T>(
 		(kind === "model" && cache.isMutating({ mutationKey: key }))
 	)
 		return false;
-	const mutation = cache.getMutationCache().build(cache, {
-		mutationKey: key,
-		scope: { id: JSON.stringify(key) },
+	const result = await runScopedMutation<T>({
+		key,
 		mutationFn: async () => {
+			const value = await perform();
 			if (scope !== getUserScope())
 				throw new Error("The active resource changed.");
-			const result = await perform();
-			if (scope !== getUserScope())
-				throw new Error("The active resource changed.");
-			return result;
+			return value;
 		},
-		onError: (error) => {
+		mutationOnError: (error) => {
 			if (opts?.silent) return;
-			if (scope === getUserScope())
-				notifyError(
-					kind === "presets" ? "amount-presets" : "workspace",
-					error instanceof Error ? error.message : "The server write failed.",
-					{
-						label: "Retry server request",
-						onAction: () => reloadWorkspace(),
-						pendingLabel: "Retrying…",
-					},
-				);
+			notifyError(
+				kind === "presets" ? "amount-presets" : "workspace",
+				error instanceof Error ? error.message : "The server write failed.",
+				{
+					label: "Retry server request",
+					onAction: () => reloadWorkspace(),
+					pendingLabel: "Retrying…",
+				},
+			);
 		},
 	});
-	try {
-		return await mutation.execute(undefined);
-	} catch {
-		return false;
-	}
+	return result ?? false;
 }
 
 export function useWorkspaceSaving() {

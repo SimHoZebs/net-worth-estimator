@@ -142,6 +142,20 @@ export class SSEParser {
 		return this.failure;
 	}
 
+	/** Parse one complete block, dispatch its event, and record parse failures. */
+	private applyBlock(block: string): ParsedSSEEvent[] | SSEParseError {
+		const parsed = parseBlock(block, this.callbacks);
+		if (parsed instanceof Error) {
+			this.failure =
+				parsed instanceof SSEParseError ? parsed : new SSEParseError(parsed);
+			this.callbacks.onParseError?.(this.failure);
+			return this.failure;
+		}
+		if (!parsed) return [];
+		dispatchEvent(parsed, this.callbacks);
+		return [parsed];
+	}
+
 	feed(chunk: Uint8Array | string): ParsedSSEEvent[] {
 		if (this.failure) return [];
 		const text =
@@ -150,116 +164,73 @@ export class SSEParser {
 				: this.decoder.decode(chunk, { stream: true });
 		this.buffer += text;
 		const events: ParsedSSEEvent[] = [];
-		const consume = (): boolean => {
+		while (true) {
 			const end = findBlockEnd(this.buffer);
-			if (!end) return true;
+			if (!end) break;
 			const block = this.buffer.slice(0, end.index);
 			this.buffer = this.buffer.slice(end.index + end.length);
-			const parsed = parseBlock(block, this.callbacks);
-			if (parsed instanceof Error) {
-				this.failure =
-					parsed instanceof SSEParseError ? parsed : new SSEParseError(parsed);
-				this.callbacks.onParseError?.(this.failure);
-				return false;
-			}
-			if (parsed) {
-				dispatchEvent(parsed, this.callbacks);
-				events.push(parsed);
-			}
-			return true;
-		};
-		while (consume()) {
-			if (!findBlockEnd(this.buffer)) break;
+			const applied = this.applyBlock(block);
+			if (applied instanceof Error) break;
+			events.push(...applied);
 		}
 		return events;
 	}
 
 	finish(): ParsedSSEEvent[] | SSEParseError {
 		if (this.failure) return this.failure;
-		const tail = this.decoder.decode();
-		this.buffer += tail;
+		this.buffer += this.decoder.decode();
 		if (this.buffer.trim()) {
-			const parsed = parseBlock(this.buffer, this.callbacks);
+			const applied = this.applyBlock(this.buffer);
 			this.buffer = "";
-			if (parsed instanceof Error) {
-				this.failure =
-					parsed instanceof SSEParseError ? parsed : new SSEParseError(parsed);
-				this.callbacks.onParseError?.(this.failure);
-				return this.failure;
-			}
-			if (parsed) {
-				dispatchEvent(parsed, this.callbacks);
-				return [parsed];
-			}
+			return applied;
 		}
 		this.buffer = "";
 		return [];
 	}
-
-	push(chunk: Uint8Array | string): ParsedSSEEvent[] {
-		return this.feed(chunk);
-	}
-
-	end(): ParsedSSEEvent[] | SSEParseError {
-		return this.finish();
-	}
 }
 
-export function createSSEParser(callbacks: SSEParserCallbacks = {}): SSEParser {
-	return new SSEParser(callbacks);
+function abortError(): SSETransportError {
+	return new SSETransportError(
+		new DOMException("The event stream was aborted.", "AbortError"),
+	);
 }
 
-async function consumeReader(
+/** Expose a reader as a chunk iterable so every transport shares one loop. */
+async function* readerChunks(
 	reader: ReadableStreamDefaultReader<Uint8Array>,
-	parser: SSEParser,
 	signal?: AbortSignal,
-): Promise<SSEParseError | SSETransportError | null> {
-	try {
-		while (true) {
-			if (signal?.aborted)
-				return new SSETransportError(
-					new DOMException("The event stream was aborted.", "AbortError"),
-				);
-			const chunk = await reader.read();
-			if (signal?.aborted)
-				return new SSETransportError(
-					new DOMException("The event stream was aborted.", "AbortError"),
-				);
-			if (chunk.done) break;
-			if (!chunk.value) continue;
-			parser.feed(chunk.value);
-			if (parser.error) return parser.error;
-		}
-	} catch (cause) {
-		return cause instanceof SSEParseError
-			? cause
-			: new SSETransportError(cause);
+): AsyncGenerator<Uint8Array> {
+	while (true) {
+		if (signal?.aborted) throw abortError();
+		const chunk = await reader.read();
+		if (signal?.aborted) throw abortError();
+		if (chunk.done) return;
+		if (chunk.value) yield chunk.value;
 	}
+}
+
+function finishParser(parser: SSEParser): SSEParseError | null {
 	const finished = parser.finish();
 	return finished instanceof Error ? finished : null;
 }
 
-async function consumeAsyncIterable(
+async function consumeChunks(
 	source: AsyncIterable<Uint8Array | string>,
 	parser: SSEParser,
 	signal?: AbortSignal,
 ): Promise<SSEParseError | SSETransportError | null> {
 	try {
 		for await (const chunk of source) {
-			if (signal?.aborted)
-				return new SSETransportError(
-					new DOMException("The event stream was aborted.", "AbortError"),
-				);
+			if (signal?.aborted) return abortError();
 			parser.feed(chunk);
 			if (parser.error) return parser.error;
 		}
 	} catch (cause) {
-		return cause instanceof SSEParseError
-			? cause
-			: new SSETransportError(cause);
+		if (cause instanceof SSEParseError || cause instanceof SSETransportError)
+			return cause;
+		return new SSETransportError(cause);
 	}
-	const finished = parser.finish();
-	return finished instanceof Error ? finished : null;
+	return finishParser(parser);
 }
 
 export async function parseSSE(
@@ -271,8 +242,7 @@ export async function parseSSE(
 	if (typeof input === "string") {
 		parser.feed(input);
 		if (parser.error) return parser.error;
-		const finished = parser.finish();
-		return finished instanceof Error ? finished : null;
+		return finishParser(parser);
 	}
 	if (typeof Response !== "undefined" && input instanceof Response) {
 		if (!input.body)
@@ -281,14 +251,18 @@ export async function parseSSE(
 			);
 		const reader = input.body.getReader();
 		try {
-			return await consumeReader(reader, parser, signal);
+			return await consumeChunks(readerChunks(reader, signal), parser, signal);
 		} finally {
 			reader.releaseLock();
 		}
 	}
 	if ("getReader" in input && typeof input.getReader === "function")
-		return consumeReader(input.getReader(), parser, signal);
-	return consumeAsyncIterable(
+		return consumeChunks(
+			readerChunks(input.getReader(), signal),
+			parser,
+			signal,
+		);
+	return consumeChunks(
 		input as AsyncIterable<Uint8Array | string>,
 		parser,
 		signal,

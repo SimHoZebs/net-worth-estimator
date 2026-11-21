@@ -14,23 +14,19 @@ import type {
 	GmailCredentialBody,
 	ScanSummary,
 } from "@/api/generated/model/index.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-	type UserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
+import {
+	assertCurrentScope,
+	fetchScopedQuery,
+	runScopedMutation,
+} from "@/state/scopedState.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { refreshIntegrations } from "@/state/integrations.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 
 export function gmailCredentialKey(scope = getUserScope()) {
 	return ["gmail-credential", scope.key] as const;
-}
-
-function current(scope: UserScope, signal?: AbortSignal) {
-	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
-		throw new Error("The active resource changed or the request was canceled.");
 }
 
 function credentialOptions(scope = getUserScope()) {
@@ -42,7 +38,7 @@ function credentialOptions(scope = getUserScope()) {
 			// silent so one failure keeps one place to find.
 			const data: GmailCredentialBody = (await getGmailCredential({ signal }))
 				.data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal);
 			dismissKey("gmail-credential");
 			return data;
 		},
@@ -51,15 +47,8 @@ function credentialOptions(scope = getUserScope()) {
 
 export async function refreshGmailSettings(force = false): Promise<void> {
 	const scope = getUserScope();
-	if (scope.status === "pending") return;
 	try {
-		const options = credentialOptions(scope);
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
+		await fetchScopedQuery(credentialOptions(scope), force);
 	} catch {
 		/* The query reports its current-resource failure. */
 	}
@@ -71,30 +60,15 @@ async function runMutation<T>(
 	mutationFn: () => Promise<T>,
 	notice: string,
 ): Promise<T | null> {
-	const scope = getUserScope();
-	if (scope.status === "pending") return null;
-	const cache = serverQueryClient();
-	const mutation = cache.getMutationCache().build(cache, {
-		mutationKey: key,
-		scope: { id: JSON.stringify(key) },
-		mutationFn: async () => {
-			if (scope !== getUserScope())
-				throw new Error("The active resource changed.");
-			return mutationFn();
-		},
-	});
-	try {
-		const result = await mutation.execute(undefined);
-		if (scope !== getUserScope()) return null;
-		return result as T;
-	} catch (error) {
-		if (scope === getUserScope())
+	return runScopedMutation({
+		key,
+		mutationFn,
+		onError: (error) =>
 			notifyError(
 				notice,
 				error instanceof Error ? error.message : "The Gmail request failed.",
-			);
-		return null;
-	}
+			),
+	});
 }
 
 // startGmailConsent fetches the server-built consent URL (read-only scope,
@@ -172,7 +146,7 @@ function receiptsOptions(scope = getUserScope()) {
 			const data = (
 				await listGmailReceipts({ verdict: "receipt,refund" }, { signal })
 			).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal);
 			dismissKey("gmail-receipts");
 			return data.receipts as EmailReceipt[];
 		},
@@ -181,15 +155,8 @@ function receiptsOptions(scope = getUserScope()) {
 
 export async function refreshGmailReceipts(force = false): Promise<void> {
 	const scope = getUserScope();
-	if (scope.status === "pending") return;
 	try {
-		const options = receiptsOptions(scope);
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
+		await fetchScopedQuery(receiptsOptions(scope), force);
 	} catch {
 		/* The query reports its current-resource failure. */
 	}

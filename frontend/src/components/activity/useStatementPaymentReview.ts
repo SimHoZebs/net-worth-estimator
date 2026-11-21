@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
 	saveStatementAllocation,
 	setStatementAllocationState,
@@ -26,60 +26,72 @@ export function useStatementPaymentReview(
 	}>();
 	const [undoing, setUndoing] = useState(false);
 	const [undoError, setUndoError] = useState(false);
-	const matches = (query.data?.matches ?? []).filter(isKnownBalanceMatch);
-	const allocation = query.data?.current;
-	const applied = matches.find(
-		({ read }) => read.statement.id === allocation?.statementId,
-	);
-	const current =
-		allocation?.state === "confirmed" && applied
-			? { allocation, read: applied.read }
+	// One memo keeps the suggestion reference stable across editor keystrokes
+	// while these inputs hold. A real statement or account change still
+	// invalidates it so TransactionDetail's insights memo recomputes.
+	const { matches, current, suggestion } = useMemo(() => {
+		const matches = (query.data?.matches ?? []).filter(isKnownBalanceMatch);
+		const allocation = query.data?.current;
+		const applied = matches.find(
+			({ read }) => read.statement.id === allocation?.statementId,
+		);
+		const current =
+			allocation?.state === "confirmed" && applied
+				? { allocation, read: applied.read }
+				: null;
+		const active =
+			selection?.transactionId === transactionId
+				? matches.find(
+						({ read }) => read.statement.id === selection.statementId,
+					)
+				: undefined;
+		const dismissed =
+			selection?.transactionId === transactionId &&
+			selection.statementId === null;
+		const available = matches.filter(({ read }) => read.remaining > 0);
+		const match =
+			!current && !dismissed
+				? ((active && active.read.remaining > 0 ? active : undefined) ??
+					available[0])
+				: undefined;
+		const built = match
+			? toStatementPaymentSuggestion({
+					read: match.read,
+					paymentAmount: match.payment.amount,
+					evidence: match.payment.evidence?.some(
+						(item) => item.code === "amount-exact",
+					)
+						? "Payment matches the remaining statement balance."
+						: null,
+					paymentEvidence:
+						match.payment.evidence?.filter(
+							(item) => item.code !== "amount-exact",
+						) ?? [],
+					alternatives: available
+						.filter((candidate) => candidate !== match)
+						.map(({ read }) => read),
+					actions: {
+						apply: !readOnly,
+						applyPartial: !readOnly,
+						dismiss: !readOnly,
+						undo: false,
+					},
+				})
 			: null;
-	const active =
-		selection?.transactionId === transactionId
-			? matches.find(({ read }) => read.statement.id === selection.statementId)
-			: undefined;
-	const dismissed =
-		selection?.transactionId === transactionId &&
-		selection.statementId === null;
-	const available = matches.filter(({ read }) => read.remaining > 0);
-	const match =
-		!current && !dismissed
-			? ((active && active.read.remaining > 0 ? active : undefined) ??
-				available[0])
-			: undefined;
-	const suggestion = match
-		? toStatementPaymentSuggestion({
-				read: match.read,
-				paymentAmount: match.payment.amount,
-				evidence: match.payment.evidence?.some(
-					(item) => item.code === "amount-exact",
-				)
-					? "Payment matches the remaining statement balance."
-					: null,
-				paymentEvidence:
-					match.payment.evidence?.filter(
-						(item) => item.code !== "amount-exact",
-					) ?? [],
-				alternatives: available
-					.filter((candidate) => candidate !== match)
-					.map(({ read }) => read),
-				actions: {
-					apply: !readOnly,
-					applyPartial: !readOnly,
-					dismiss: !readOnly,
-					undo: false,
-				},
-			})
-		: null;
+		return {
+			matches,
+			current,
+			suggestion: built && {
+				...built,
+				accountName: accounts.find(
+					({ id }) => id === match?.read.statement.accountId,
+				)?.name,
+			},
+		};
+	}, [query.data, selection, readOnly, transactionId, accounts]);
 
 	return {
-		suggestion: suggestion && {
-			...suggestion,
-			accountName: accounts.find(
-				({ id }) => id === match?.read.statement.accountId,
-			)?.name,
-		},
+		suggestion,
 		current,
 		undoing,
 		undoError,

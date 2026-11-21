@@ -17,6 +17,11 @@ import {
 	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
+import {
+	assertCurrentScope,
+	fetchScopedQuery,
+	runScopedMutation,
+} from "@/state/scopedState.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { integrationsKey } from "@/state/integrations.ts";
 import { refreshWorkspaceAfterSync } from "@/state/syncWorkspaceRefresh.ts";
@@ -39,11 +44,6 @@ function syncTriggerKey(scope = getUserScope()) {
 	return ["sync-trigger", scope.key] as const;
 }
 
-function current(scope: UserScope, signal?: AbortSignal) {
-	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
-		throw new Error("The active resource changed or the request was canceled.");
-}
-
 function credentialOptions(scope = getUserScope()) {
 	return {
 		queryKey: syncCredentialKey(scope),
@@ -53,7 +53,7 @@ function credentialOptions(scope = getUserScope()) {
 			// silent so one failure keeps one place to find.
 			const data: SyncCredentialBody = (await getSyncCredential({ signal }))
 				.data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal);
 			dismissKey("sync-credential");
 			return data;
 		},
@@ -66,7 +66,7 @@ function linksOptions(scope = getUserScope()) {
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
 			const data = (await listAccountLinks({ signal })).data;
-			current(scope, signal);
+			assertCurrentScope(scope, signal);
 			dismissKey("sync-links");
 			return (data.links ?? []) as AccountLink[];
 		},
@@ -96,26 +96,13 @@ async function refreshSyncData(scope: UserScope) {
 
 export async function refreshSyncSettings(force = false): Promise<void> {
 	const scope = getUserScope();
-	if (scope.status === "pending") return;
 	try {
-		const options = credentialOptions(scope);
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
+		await fetchScopedQuery(credentialOptions(scope), force);
 	} catch {
 		/* The query reports its current-resource failure. */
 	}
 	try {
-		const options = linksOptions(scope);
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
+		await fetchScopedQuery(linksOptions(scope), force);
 	} catch {
 		/* The query reports its current-resource failure. */
 	}
@@ -126,30 +113,17 @@ async function runMutation<T>(
 	mutationFn: () => Promise<T>,
 	notice: string | null,
 ): Promise<T | null> {
-	const scope = getUserScope();
-	if (scope.status === "pending") return null;
-	const cache = serverQueryClient();
-	const mutation = cache.getMutationCache().build(cache, {
-		mutationKey: key,
-		scope: { id: JSON.stringify(key) },
-		mutationFn: async () => {
-			if (scope !== getUserScope())
-				throw new Error("The active resource changed.");
-			return mutationFn();
+	return runScopedMutation({
+		key,
+		mutationFn,
+		onError: (error) => {
+			if (notice)
+				notifyError(
+					notice,
+					error instanceof Error ? error.message : "The sync request failed.",
+				);
 		},
 	});
-	try {
-		const result = await mutation.execute(undefined);
-		if (scope !== getUserScope()) return null;
-		return result as T;
-	} catch (error) {
-		if (notice && scope === getUserScope())
-			notifyError(
-				notice,
-				error instanceof Error ? error.message : "The sync request failed.",
-			);
-		return null;
-	}
 }
 
 async function settleMutation<T>(

@@ -5,6 +5,7 @@ import {
 } from "@/api/generated/endpoints.ts";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
+import { fetchScopedQuery, runScopedMutation } from "@/state/scopedState.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 
@@ -44,15 +45,8 @@ function pinsOptions() {
 }
 
 export async function refreshPins(force = false): Promise<void> {
-	if (getUserScope().status === "pending") return;
-	const options = pinsOptions();
 	try {
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
+		await fetchScopedQuery(pinsOptions(), force);
 	} catch {
 		/* The query reports its current-resource failure. */
 	}
@@ -63,12 +57,9 @@ export async function togglePin(id: string): Promise<boolean> {
 	if (scope.status === "pending") return false;
 	const cache = serverQueryClient();
 	const key = pinnedEvaluationsKey();
-	const mutation = cache.getMutationCache().build(cache, {
-		mutationKey: key,
-		scope: { id: JSON.stringify(key) },
+	const result = await runScopedMutation({
+		key,
 		mutationFn: async () => {
-			if (scope !== getUserScope())
-				throw new Error("The active resource changed.");
 			if (cache.getQueryData(key) === undefined)
 				await cache.fetchQuery(pinsOptions());
 			if (scope !== getUserScope())
@@ -90,14 +81,7 @@ export async function togglePin(id: string): Promise<boolean> {
 				throw error;
 			}
 		},
-	});
-	try {
-		await mutation.execute(undefined);
-		if (scope !== getUserScope()) return false;
-		dismissKey("evaluation-pins");
-		return true;
-	} catch (error) {
-		if (scope === getUserScope()) {
+		onError: async (error) => {
 			await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
 			notifyError(
 				"evaluation-pins",
@@ -108,9 +92,11 @@ export async function togglePin(id: string): Promise<boolean> {
 					pendingLabel: "Reloading…",
 				},
 			);
-		}
-		return false;
-	}
+		},
+	});
+	if (result === null) return false;
+	dismissKey("evaluation-pins");
+	return true;
 }
 
 export function resetPinnedEvaluationsClient() {
