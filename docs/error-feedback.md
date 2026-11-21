@@ -22,6 +22,4 @@ workspace notification center. Messages state one failure and one action in
 one sentence. Failed edits keep entered values and retry controls intact;
 the workspace notice carries the failure while the form keeps its state.
 
-No dedicated error-feedback specs exist. Under the regression-only UI policy
-in `TESTING.md`, new specs cover observed regressions only (currently
-`selectLabels.spec.ts`); do not re-add broad error-layout coverage.
+Regression specs follow the [integration-suite policy](../TESTING.md#integration-suite).

@@ -47,9 +47,9 @@ changes an assignment to member, viewer, or none. Revocation takes effect on the
 next request, including across API processes. Already admitted streams can finish.
 The policy database belongs to the application and needs its own safe backup.
 
-Sharing, exclusions, and current social-group membership remain transactional
-authorization rules beside the data they protect. This migration preserves their
-existing behavior. They do not grant access to another user's full workspace.
+Sharing, exclusions, and current social-group membership are transactional
+authorization rules that stay beside the data they protect across releases.
+They do not grant access to another user's full workspace.
 
 ## Data isolation
 
@@ -134,9 +134,6 @@ without a verified session takes over the full screen.
 The rule is the same in dev and production. Better Auth and a provisioned Casbin
 policy database are required. Missing state fails closed at startup.
 
-Before an existing authenticated deployment starts the new code:
-
-Better Auth is the current provider and no import path remains.
 Retain the exact issuer and subjects. Grant reviewed effective action decisions,
 not inferred username ownership. Verify guest, member, second-user, denial,
 revocation, and provider-outage cases before release.
@@ -145,7 +142,9 @@ See [the shared database guide](shared-database.md) for backup and rollback.
 Runtime startup never merges files or guesses an owner.
 
 No source update automatically publishes private data or changes live identity
-permissions. The owner assignment is a one-time data migration, not signup role selection.
+permissions. Account creation records member on first verified access and viewer
+for the provisioned guest; see
+[Resources, actions, and roles](#resources-actions-and-roles).
 
 ## Scope limits
 

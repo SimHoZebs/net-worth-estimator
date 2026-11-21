@@ -66,13 +66,7 @@ See [authorization](../docs/authorization.md) for the policy model and later rol
 
 ## Backups
 
-Treat the whole application database as a credential store. It holds provider tokens and financial data for every user, so a full backup stays private and never serves as published guest data. Never copy a live database file alone; use the SQLite backup API and verify the backup before relying on it.
-
-```bash
-sqlite3 "$DB" ".backup '$BACKUP'"
-sqlite3 "$BACKUP" 'PRAGMA integrity_check;'
-sqlite3 "$BACKUP" 'SELECT COUNT(*) FROM pragma_foreign_key_check;'
-```
+Treat the whole application database as a credential store. It holds provider tokens and financial data for every user, so a full backup stays private and never serves as published guest data. Never copy a live database file alone; use the SQLite backup API and verify the backup before relying on it. The commands and verification steps are in [the migration SOP](MIGRATIONS.md#3-back-up-execute-and-verify).
 
 Before new writes, restoring a verified backup returns the exact pre-upgrade state. After new writes, a rollback requires reconciliation or an accepted loss of those writes.
 

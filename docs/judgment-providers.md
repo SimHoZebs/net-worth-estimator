@@ -53,10 +53,11 @@ Each judgment contains `requestId`, `status`, optional `decision`, `strength`, a
 
 Evaluation must return promptly and honor cancellation. A human queue returns
 pending rather than waiting for a reviewer. The worker publishes deferred
-results with a 30-second retry backoff. Providers must change their opaque
-revision when policy or available decisions change, including delayed human
-answers, prompt changes, and engine replacement. That triggers another run
-without a bank sync. Provider decisions never become a user's saved review.
+results with the retry backoff in [the analyses lifecycle](analyses.md#lifecycle).
+Providers must change their opaque revision when policy or available decisions
+change, including delayed human answers, prompt changes, and engine replacement.
+That triggers another run without a bank sync. Provider decisions never become a
+user's saved review.
 
 ## Optional feedback
 

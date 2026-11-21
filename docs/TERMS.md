@@ -20,12 +20,11 @@ Use **transaction** for a recorded movement. The saved model's "Transactions" ta
 ## B. Balance check
 
 A recorded account balance that corrects modeled history for that account.
-A check carries its exact observation time. Several checks per account per
-day survive; the replay orders them by instant, executes same-time
-transactions first on a tie, and lets an owner check win only at its own
-instant.
+A check carries its exact observation time.
 
 Use **balance check**. Its date column is **balance**; its tab is "Balance checks".
+Replay ordering is owned in
+[Historical Replay and Checkpoints](../TECHNICAL_OVERVIEW.md#7-historical-replay-and-checkpoints).
 
 - Only an owner-disabled row shows **Excluded from account**. A
   pending or void bank row is recorded bank evidence. Settled bank rows
@@ -106,14 +105,6 @@ posted card payment covers. The **remaining statement balance** is the billed
 amount less payments applied to it. A statement is **paid in full** when that
 amount reaches zero. A suggestion alone does not apply the payment.
 
-## Evaluation and income evidence are different things
-
-**Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.
-
-**Income evidence** computes from recorded deposits.
-
-Both produce a result from their own inputs.
-
 ## Verbs
 
 | Action                   | Use                                   |
@@ -129,4 +120,5 @@ Both produce a result from their own inputs.
 
 ## Keeping the names
 
-The interface is the surface these names appear on. The browser route-name sweep retired with the UI specs under the regression-first baseline, so no automated check currently exercises every route name. Re-add one only for an observed regression.
+The interface is the surface these names appear on. Regression coverage for
+interface names follows [TESTING.md](../TESTING.md#integration-suite).

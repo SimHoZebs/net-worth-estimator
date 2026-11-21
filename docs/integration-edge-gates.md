@@ -155,12 +155,10 @@ duo/full/group journeys run in the Go suite.
 
 ## Uncovered by automation (never faked green)
 
-- Real-provider login, virtual passkeys, restart, revocation, and session
-  behavior are automated by [disposable E2E](e2e-gate.md). Live target
-  identity conversion and administrator recovery remain operator checks.
-- Physical passkeys and phone recovery: the manual checklist above.
-- Live bank sync and real mail OAuth exchange: manual direct checks; the
-  automation seam stays at the sync-apply and fetch boundaries with the
-  lifecycle pack covering everything downstream.
-- Image extraction: the local stand-in covers OCR; real upload, storage,
-  review, and link paths around it are covered.
+The shared gaps have one owner in
+[Uncovered by automation (never faked green)](release-gates.md#4-uncovered-by-automation-never-faked-green).
+This tier adds no separate device or passkey item. Its tier-specific notes are
+that the automation seam stays at the sync-apply and fetch boundaries, with the
+lifecycle pack covering everything downstream, and that the local stand-in
+covers OCR while the real upload, storage, review, and link paths around it are
+exercised.

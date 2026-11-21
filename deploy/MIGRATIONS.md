@@ -172,7 +172,11 @@ the only switch back to the API.
 Use workflow concurrency `queue` so releases never overlap or drop newer commits.
 Disable per-service CI/CD bypasses: disable direct Git CI and pin both services
 to published image tags, not `latest`. For a manual **Northflank UI/API** run,
-override `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` with reviewed values.
+override `RELEASE_SHA`, `API_IMAGE`, `IDENTITY_IMAGE`, `IDENTITY_SERVICE_ID`, and
+`IDENTITY_DATABASE_ADDON_ID` with reviewed values. The identity IDs are prepared
+Northflank IDs supplied automatically by the gated workflow and needed explicitly
+only for this manual run; [`northflank/release.json`](northflank/release.json)
+owns the argument list.
 GitHub's manual dispatch instead requests the current `main` commit and its
 published images. Releases stay sequential: one at a time.
 

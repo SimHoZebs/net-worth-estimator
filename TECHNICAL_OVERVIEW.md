@@ -147,10 +147,10 @@ The frontend displays these provider-neutral sync signals. Provider setup and ra
   "overrides": {
     "addedAccounts": [],
     "addedTransactions": [],
-    "addedRules": [],
+    "addedSchedules": [],
     "disabledAccountIds": [],
     "disabledTransactionIds": [],
-    "disabledRuleIds": []
+    "disabledScheduleIds": []
   },
   "settings": {
     "fallbackProjectionStartDate": "YYYY-MM-DD",
@@ -325,7 +325,7 @@ Amount presets are saved amount recipes managed through `GET /v1/amount-presets`
 Persisted transactions use canonical UUIDs; the store generates UUIDv7 IDs when the
 caller supplies none. Sources with non-UUID transaction IDs are unsupported. Exact upstream `(provider, account_id, transaction_id)` identity
 lives in `transaction_sync_keys`, separate from local transaction IDs (see
-`transactionSyncKey` in `backend/internal/store/sync_pending.go`).
+`transactionSyncKey` in `backend/internal/store/adapters/sqlite/sync_pending.go`).
 
 ### Result durability
 

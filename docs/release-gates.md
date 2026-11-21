@@ -67,11 +67,10 @@ the QA-03 test files' headers and in section 4 below.
 - Payment-pattern scale-up to hundreds of active overlapping classifications
   on arbitrary histories stays gated on broader CPU/memory/load measurements
   before enabling such workloads.
-- Image publishing validates with `actionlint
-  .github/workflows/images.yml` and `node --test
-  deploy/images.test.mjs`. Container checks run under the deployment
-  portability gate in [TESTING.md](../TESTING.md#deployment-portability)
-  against disposable state, never the dev stack or production data.
+- Image publishing validates under the deployment portability gate in
+  [TESTING.md](../TESTING.md#deployment-portability) against disposable state,
+  never the dev stack or production data. The validation commands live in
+  [the images guide](../deploy/images.md).
 - The Vercel/Render settings stay per their guides
   ([Vercel](../deploy/vercel.md), [Render/container host](../deploy/render.md));
   the actual-provider checklist in [the deployment index](../deploy/README.md)
@@ -84,13 +83,9 @@ the QA-03 test files' headers and in section 4 below.
    requires its workflow run ID, successful migration step, backup hash,
    and an `ok` readiness response.
    A release that stops at the migration leaves the API in maintenance with the
-   database unchanged. Request the release again. A GitHub dispatch of the
-   release workflow requests the current `main` commit, so it releases the
-   failed target only while `main` still points at it; otherwise run the
-   workflow from the Northflank UI or API with the failed target's `RELEASE_SHA`,
-   `API_IMAGE`, and `IDENTITY_IMAGE`. Record the retried run; recovery
-   commands are in the
-   [Northflank deployment guide](../deploy/northflank/README.md#release-window-and-recovery).
+   database unchanged. Request the release again and record the retried run;
+   the retry procedure and dispatch caveat are in
+   [the Northflank release window](../deploy/northflank/README.md#release-window-and-recovery).
 
 ## 3. Credential-gated and manual gates
 
@@ -109,6 +104,9 @@ A release notes each outcome; a skip names its reason.
   `scripts/smoke-compose.sh`) against disposable instances.
 
 ## 4. Uncovered by automation (never faked green)
+
+This is the single owner for the shared gaps; the other gate docs link here
+instead of restating them.
 
 - Receipt matcher ranking with approve, reject, and hand-linking mail
   receipts to transactions: no such product surface exists yet. Mail

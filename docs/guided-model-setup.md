@@ -21,7 +21,7 @@ Komodo model. No personal amounts or credentials belong in this document.
 | Automatic investing | Engine can reference another schedule's realized amount | No percentage-of-income option in Add schedule. Reference timing is not visible there. |
 | Card payment | Balance reference and payment terms exist | Current balance payoff differs from statement payoff. A generic debt account and a Loan do not model all credit-card behavior. |
 | RSU grant | Multiple transfer schedules and separate vested/unvested accounts | Users must construct tranche formulas, dates, and growth rules. No grant-level ownership, units, vesting, or withholding workflow. |
-| Pay cadence | Daily, weekly, monthly, quarterly, annual | Biweekly and semimonthly pay need a real recurrence contract, not approximate monthly amounts. |
+| Pay cadence | Daily, weekly, monthly, quarterly, annual in the pinned Komodo revision; current source also creates biweekly rules | Semimonthly pay still needs a real recurrence contract, not approximate monthly amounts. The biweekly gap applied to the pinned revision only. |
 | Contribution caps | Annual cap per schedule | No shared cap across employers/accounts. Tax-year and catch-up rules cannot be assumed. |
 | Rule maintenance | Generic schedule terms and a separate amount catalog | Calculated schedules show Varies. The first slice permits normal metadata edits without replacing their formulas. Calculation-input editing remains a gap. |
 

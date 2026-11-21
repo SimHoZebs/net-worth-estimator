@@ -32,10 +32,11 @@ failure. Leftover containers, volumes, or networks fail the gate.
 
 ## What stays manual (with reasons)
 
-- **Physical passkeys and phone recovery** (`docs/authentication.md` checklist).
-  Hardware authenticators and real-device prompts cannot run headless; virtual
-  authenticators prove the protocol path only. This is a device limitation,
-  not automation reluctance.
+- **Physical passkeys and phone recovery:** the
+  [manual checklist](authentication.md#manual-physical-device-and-recovery-checklist)
+  and the shared
+  [Uncovered by automation (never faked green)](release-gates.md#4-uncovered-by-automation-never-faked-green)
+  list own this gap.
 - **Production mutation of any kind.** No gate step reads production
   credentials, data, or hostnames. Release verification against live hosts
   stays an explicit operator runbook (`deploy/README.md`), never a gate leg.

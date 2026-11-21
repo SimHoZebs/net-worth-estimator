@@ -335,7 +335,7 @@ Exercise each row through the real identity boundary against disposable state:
 | Owner with global read-only enabled | allowed | 403 |
 | Provider unavailable when verification is due | 503 | 503 |
 
-A shared Authorization bearer header cannot replace a session or bypass a denied permission. `AUTH_TOKEN` and `AUTH_PROVIDER=none` cause server startup to fail. After each rejected write, confirm financial data stays unchanged. Row validation can return 200 with error-severity issues and `saved: false`. The provider gate must verify creation-time member/viewer assignment, application-credential UUID lookup, viewer write denial, and permission revocation. A guest granted an action in the disposable provider must pass the same runtime enforcement as any other user; no user-kind branch may override that decision.
+A shared Authorization bearer header cannot replace a session or bypass a denied permission. After each rejected write, confirm financial data stays unchanged. Row validation can return 200 with error-severity issues and `saved: false`. The provider gate must verify creation-time member/viewer assignment, application-credential UUID lookup, viewer write denial, and permission revocation. A guest granted an action in the disposable provider must pass the same runtime enforcement as any other user; no user-kind branch may override that decision.
 
 ### CORS checks
 

@@ -79,8 +79,10 @@ Use the same private environment file and volume for setup and the API. Komodo
 runs this setup as the stack `post_deploy` step on every deploy. That step
 provisions a fresh database or validates a current one. It does not perform
 version upgrades. Complete any required one-time upgrade before the new API
-starts. Do not put setup in the server entrypoint or an automatic startup
-dependency. Outside Komodo, run this maintenance command explicitly.
+starts. Keep version upgrades and data conversion out of the server entrypoint
+and any automatic startup dependency. Fresh or current schema provisioning may
+run through `/app/api-boot.sh`, as [the migration SOP](../deploy/MIGRATIONS.md)
+describes. Outside Komodo, run setup and any conversion explicitly.
 Dev setup and the isolated fixture harness also provision explicitly.
 
 New user signup still inserts user and default-preset rows. It does not
@@ -95,22 +97,12 @@ backup, and record the backup hash with the source/target SHAs and run ID in
 the release checklist. Never overwrite a backup set on retry, and never copy a
 live database file alone.
 
-```bash
-sqlite3 "$DB" ".backup '$BACKUP'"
-sqlite3 "$BACKUP" 'PRAGMA integrity_check;'
-sqlite3 "$BACKUP" 'SELECT COUNT(*) FROM pragma_foreign_key_check;'
-```
+The SOP owns the exact backup and integrity-check commands.
 
 Downgrade recovery restores the verified backup, never a reverse migration.
 With all API writers still stopped, verify the backup, publish it over the
-database with the backup API, and verify the restored file:
-
-```bash
-sqlite3 "$BACKUP" 'PRAGMA integrity_check;'
-sqlite3 "$BACKUP" ".backup main '$DB'"
-sqlite3 "$DB" 'PRAGMA integrity_check;'
-sqlite3 "$DB" 'SELECT COUNT(*) FROM pragma_foreign_key_check;'
-```
+database with the backup API, and verify the restored file. The SOP owns the
+restore commands and their verification order.
 
 Then confirm the restored users and financial rows match the recorded backup
 hash (`sha256sum` against the backup set's `sha256sum.txt`), restore the

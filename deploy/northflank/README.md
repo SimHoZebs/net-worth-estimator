@@ -64,9 +64,12 @@ At installation, replace `INJECT_PRIVATE_WEBHOOK_TOKEN` in `release.json`
 with a new private token and keep that value when applying later definition
 updates. Save the resulting webhook URL as the GitHub Actions secret through
 standard input, never command arguments, and never commit the token or URL.
-Northflank accepts `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` in the
-URL query, not a POST body. `RELEASE_SHA` is recorded for identification;
-the image references drive the deployment.
+Northflank accepts `RELEASE_SHA`, `API_IMAGE`, `IDENTITY_IMAGE`,
+`IDENTITY_SERVICE_ID`, and `IDENTITY_DATABASE_ADDON_ID` in the URL query, not a
+POST body. `RELEASE_SHA` is recorded for identification; the image references
+drive the deployment. The two identity IDs are prepared Northflank IDs that the
+gated workflow supplies automatically; they are needed explicitly only for a
+manual run. [`release.json`](release.json) owns the argument list.
 
 ## Release window and recovery
 
@@ -101,8 +104,11 @@ maintenance with the database unchanged. Request the release again. A GitHub
 manual dispatch of the release workflow requests the current `main` commit and
 its published images, so use it while `main` still points at the failed commit.
 To release the failed target exactly, run the workflow from the Northflank UI
-or API with `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` overridden to
-that target's values, as [the migration SOP](../MIGRATIONS.md) describes. A
+or API with `RELEASE_SHA`, `API_IMAGE`, `IDENTITY_IMAGE`, `IDENTITY_SERVICE_ID`,
+and `IDENTITY_DATABASE_ADDON_ID` overridden to that target's values, as
+[the migration SOP](../MIGRATIONS.md) describes. The identity IDs are prepared
+Northflank IDs supplied automatically by the gated workflow and needed explicitly
+only for this manual run; [`release.json`](release.json) owns the full list. A
 release that fails after the migration published must release that same
 reviewed target, or a newer commit that contains that migration, and never
 older code. A second release queues behind the first and never overlaps it.

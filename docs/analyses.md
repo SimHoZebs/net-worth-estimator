@@ -1,8 +1,7 @@
 # Background Analysis
 
-An **Analysis** is a versioned inference over saved evidence. It produces
-findings and explanations without changing the saved financial model. An
-Evaluation answers a question about a projection instead.
+This guide uses **Analysis** and **Evaluation** as defined in the glossary's
+[Evaluation](TERMS.md#e-evaluation) and [Analysis](TERMS.md#f-income-evidence) sections.
 
 ## Lifecycle
 
@@ -191,8 +190,9 @@ response-only and human-queue adapters do not implement a training API.
   missing, or mismatched responses before applying any judgment in a batch.
 - A pending judgment publishes deterministic findings with `judgment-pending`.
   Unavailability publishes deterministic findings with `judgment-unavailable`.
-  Both are retryable after 30 seconds; neither blocks the worker or invents a
-  user's answer. A provider revision change refreshes unchanged bank evidence.
+  Both follow the [lifecycle retry rule](#lifecycle); neither blocks the worker
+  or invents a user's answer. A provider revision change refreshes unchanged bank
+  evidence.
 - Explicit confirm/reject feedback remains an immutable, owner-scoped audit
   event with the original request and run. Providers may consume it or ignore
   it. Hide and restore are never labels. API reviews never wait on a provider.
@@ -224,10 +224,9 @@ remain the evidence, schedules remain the forecast.
 - `GET /v1/analysis-findings/{id}/pattern-to-new-schedule-preview` describes the schedule the
   pattern would create (name, amount, schedule, start) plus the forecast
   movements behind it and the recorded evidence. The plan stays visible
-  before acceptance, with creation available directly. Patterns that repeat
-  every two weeks stay visible with a plain-language reason: schedules expand
-  weekly, monthly, quarterly, or yearly, and no biweekly schedule exists
-  yet.
+  before acceptance, with creation available directly. Daily, weekly, biweekly,
+  monthly, quarterly, and annual patterns are creatable; only unknown cadences
+  get a plain-language reason instead.
 - `POST /v1/analysis-findings/{id}/pattern-to-new-schedule` creates the approved
   schedule through the ordinary finance row-write contract (validation,
   revision, last-write-wins). It accepts an active, non-dismissed finding and refuses a
@@ -240,9 +239,10 @@ remain the evidence, schedules remain the forecast.
   occurrence claims. Disabling or deleting the schedule leaves findings and
   feedback intact; a disabled or deleted schedule frees the pattern for a
   replacement.
-- The generated schedule always starts one full interval after the latest
-  recorded movement, so approval never duplicates bank facts as forecast
-  movements. Creation reads evidence only; preview is available in
+- The generated schedule starts on the oldest recorded movement. Creation claims
+  each recorded movement onto its occurrence, so approval never duplicates bank
+  facts as forecast movements. `Upcoming` lists the six scheduled dates after the
+  latest movement. Creation reads evidence only; preview is available in
   read-only mode while approval requires write permission.
 - Confirm and reject corrections apply to every independent claim kind.
   Plan duration stays BNPL-specific and never corrects a recurrence claim.
@@ -358,7 +358,7 @@ match that lists all candidates ranked best-first for review.
   accepts `findingId`, `cursor`, and `limit` (at most 100). No raw bank snapshots
   or feedback leave the application for external training.
 
-Configuration's **Analysis** tab lists findings and explanations. Transaction
+Configuration's **Analysis** tab lists findings with reasons and uncertainty. Transaction
 lists batch-load flags. Transaction details ask only whether the payment is BNPL
 from the provider, with Yes/No buttons. Yes asks “How long is the plan?” and saves
 weeks or months. Saved answers show a compact provider/duration summary with a
