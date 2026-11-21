@@ -34,8 +34,6 @@ type Notifier interface {
 // interprets them. The orchestrator owns provisioning, apply, last-sync
 // stamping, and dirty marking identically for every provider.
 type Adapter interface {
-	// Key identifies the provider in sync keys and checkpoint rows.
-	Key() string
 	// Fetch returns the provider-native snapshot for the window.
 	Fetch(ctx context.Context, start, end time.Time) (any, error)
 	// Provisions lists bridge accounts from the snapshot for linking.

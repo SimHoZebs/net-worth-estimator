@@ -7,25 +7,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// categoryFeedbackSource opens judgment sessions without training feedback. The
-// v1 category learner is evaluation-only: user overrides never travel back as
-// training events, so every page is immediately complete.
-type categoryFeedbackSource struct{}
-
-func (categoryFeedbackSource) Owner() string { return "categorization" }
-
-func (categoryFeedbackSource) Page(after string, limit int) (judgment.FeedbackPage, error) {
-	return judgment.FeedbackPage{Cursor: after}, nil
-}
-
 // MLClassifier judges category hypotheses through a judgment provider. It
 // returns an entry only for a ready, strong, supported judgment; anything
 // else leaves the transaction uncategorized for the keyword fallback.
 //
-// Feedback is an optional journal-backed training source, set per tick by
-// the worker from the scoped store. Nil keeps the original behavior: the
-// session opens with an immediately-complete empty source and user labels
-// never train.
+// Feedback is the journal-backed training source, set per tick by the
+// worker from the scoped store before Classify opens the session.
 type MLClassifier struct {
 	provider judgment.Provider
 	Feedback judgment.FeedbackSource
@@ -75,11 +62,7 @@ func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string
 	if len(batch) == 0 {
 		return map[string]Classified{}, nil
 	}
-	source := m.Feedback
-	if source == nil {
-		source = categoryFeedbackSource{}
-	}
-	session, err := m.provider.Open(ctx, source)
+	session, err := m.provider.Open(ctx, m.Feedback)
 	if err != nil {
 		return nil, err
 	}

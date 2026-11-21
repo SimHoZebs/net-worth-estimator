@@ -27,15 +27,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-// ReceiptProducer and ReceiptProducerVersion identify extracted email
-// receipt provenance. They version the complete detector/extractor
-// composition so a future change invalidates cached review standing the
-// same way receipt Source identity versions extraction reuse.
-const (
-	ReceiptProducer        = "gmail-receipt-email"
-	ReceiptProducerVersion = "v1"
-)
-
 // ReadyConfidenceThreshold is the minimum extraction confidence that
 // needs no user review. Anything below it is stored as needs-review.
 const ReadyConfidenceThreshold = 0.75

@@ -12,8 +12,10 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Projection-Source identifies the result's origin. Every projection
-// computes directly: no stored results exist.
+// Projection-Source identifies the result's origin. computed marks a result
+// derived from the canonical model, whether computed on this request or
+// assembled from a stored build; only shared marks attachment to an
+// in-flight stochastic run.
 const projectionSourceComputed = "computed"
 
 const projectionSourceShared = "shared"

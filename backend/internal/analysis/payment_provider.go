@@ -21,14 +21,6 @@ func NewPaymentPatterns(provider judgment.Provider) Definition {
 	return paymentProviderDefinition{provider: provider}
 }
 
-// WithProviders attaches a lazy provider catalog while keeping the prepared
-// judgment provider. It shadows the embedded PaymentPatterns method so the
-// composition keeps its session instead of degrading to a bare value.
-func (d paymentProviderDefinition) WithProviders(r ProviderResolver) Definition {
-	d.Providers = r
-	return d
-}
-
 func defaultPaymentPatterns() Definition {
 	endpoint := strings.TrimSpace(os.Getenv("ML_JUDGMENT_URL"))
 	if endpoint == "" {

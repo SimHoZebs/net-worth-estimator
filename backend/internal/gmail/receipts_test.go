@@ -228,8 +228,9 @@ func TestScanExtractsAndAdvancesCursor(t *testing.T) {
 	if receipt.AmountCents == nil || *receipt.AmountCents != 4250 || receipt.Currency != "USD" || receipt.Reference != "AB-12345" {
 		t.Fatalf("receipt = %+v, want amount/currency/reference", receipt)
 	}
-	if receipt.Provenance.Producer != ReceiptProducer || receipt.Provenance.Version != ReceiptProducerVersion {
-		t.Fatalf("provenance = %+v, want gmail receipt producer identity", receipt.Provenance)
+	wantProvenance := store.ReceiptProvenanceForEmail()
+	if receipt.Provenance != wantProvenance {
+		t.Fatalf("provenance = %+v, want %+v", receipt.Provenance, wantProvenance)
 	}
 	shipping := byID["ship-1"]
 	if shipping.Verdict != store.EmailReceiptVerdictShipping {

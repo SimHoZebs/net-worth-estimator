@@ -16,7 +16,6 @@ type fakeSnapshot struct {
 }
 
 type fakeAdapter struct {
-	key          string
 	provisions   []store.SyncProvision
 	snapshot     fakeSnapshot
 	checkpoints  func(resolved map[string]string) []store.SyncCheckpoint
@@ -27,8 +26,6 @@ type fakeAdapter struct {
 	fetchStart   time.Time
 	fetchEnd     time.Time
 }
-
-func (a *fakeAdapter) Key() string { return a.key }
 
 func (a *fakeAdapter) Fetch(_ context.Context, start, end time.Time) (any, error) {
 	a.fetchStart, a.fetchEnd = start, end
@@ -92,7 +89,6 @@ func TestSyncAppliesAndMarksDirty(t *testing.T) {
 	checkpointAt := time.Date(2026, time.August, 2, 23, 59, 59, 0, time.UTC).Unix()
 	transactionAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC).Unix()
 	adapter := &fakeAdapter{
-		key:        "fake",
 		snapshot:   fakeSnapshot{bridges: []string{"bridge-checking"}},
 		provisions: []store.SyncProvision{{BridgeID: "bridge-checking", Name: "Checking", Currency: "USD"}},
 		checkpoints: func(resolved map[string]string) []store.SyncCheckpoint {
@@ -133,7 +129,6 @@ func TestSyncSkipsForwardNoOpCheckpoints(t *testing.T) {
 	seedIngestLink(t, st, "bridge-checking", "checking")
 	checkpoints := []store.SyncCheckpoint{}
 	adapter := &fakeAdapter{
-		key:        "fake",
 		snapshot:   fakeSnapshot{bridges: []string{"bridge-checking"}},
 		provisions: []store.SyncProvision{{BridgeID: "bridge-checking", Name: "Checking", Currency: "USD"}},
 		checkpoints: func(map[string]string) []store.SyncCheckpoint {
@@ -204,7 +199,6 @@ func TestSyncKeepsFirstZeroObservation(t *testing.T) {
 	seedIngestLink(t, st, "bridge-empty", "empty")
 	checkpointAt := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC).Unix()
 	adapter := &fakeAdapter{
-		key:        "fake",
 		snapshot:   fakeSnapshot{bridges: []string{"bridge-empty"}},
 		provisions: []store.SyncProvision{{BridgeID: "bridge-empty", Name: "Empty", Currency: "USD"}},
 		checkpoints: func(resolved map[string]string) []store.SyncCheckpoint {
@@ -229,7 +223,6 @@ func TestSyncKeepsChangedAvailableBalance(t *testing.T) {
 	seedIngestLink(t, st, "bridge-checking", "checking")
 	checkpoints := []store.SyncCheckpoint{}
 	adapter := &fakeAdapter{
-		key:        "fake",
 		snapshot:   fakeSnapshot{bridges: []string{"bridge-checking"}},
 		provisions: []store.SyncProvision{{BridgeID: "bridge-checking", Name: "Checking", Currency: "USD"}},
 		checkpoints: func(map[string]string) []store.SyncCheckpoint {
@@ -296,7 +289,6 @@ func TestSyncRequestWindow(t *testing.T) {
 				}
 			}
 			adapter := &fakeAdapter{
-				key:         "fake",
 				checkpoints: func(map[string]string) []store.SyncCheckpoint { return nil },
 				skipped:     map[string]int{},
 			}
@@ -320,7 +312,6 @@ func TestSyncRequestWindow(t *testing.T) {
 func TestSyncEmptyRunMarksNothing(t *testing.T) {
 	st := openIngestStore(t)
 	adapter := &fakeAdapter{
-		key:         "fake",
 		checkpoints: func(map[string]string) []store.SyncCheckpoint { return nil },
 		skipped:     map[string]int{},
 	}
@@ -344,7 +335,6 @@ func TestSyncDropsStaleBridges(t *testing.T) {
 		t.Fatalf("delete account: %v", err)
 	}
 	adapter := &fakeAdapter{
-		key:         "fake",
 		snapshot:    fakeSnapshot{bridges: []string{"bridge-old"}},
 		provisions:  []store.SyncProvision{{BridgeID: "bridge-old", Name: "Old", Currency: "USD"}},
 		checkpoints: func(map[string]string) []store.SyncCheckpoint { return nil },

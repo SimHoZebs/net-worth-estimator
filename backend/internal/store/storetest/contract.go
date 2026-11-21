@@ -76,8 +76,6 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("ApplySyncRefreshesPendingSnapshot", func(t *testing.T) {
 		testApplySyncRefreshesPendingSnapshot(t, newStore)
 	})
-	t.Run("ArtifactsRoundTripAndKeepFirstWrite", func(t *testing.T) {
-	})
 	t.Run("SyncStateDefaultsEmptyAndRoundTrips", func(t *testing.T) {
 		testSyncStateDefaultsEmptyAndRoundTrips(t, newStore)
 	})

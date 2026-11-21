@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -250,13 +249,12 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 	defer tx.Rollback()
 	linkByBridge := map[string]string{}
 	if len(items) > 0 {
-		placeholders := make([]string, len(items))
-		args := make([]any, len(items))
+		bridgeIDs := make([]string, len(items))
 		for i, item := range items {
-			placeholders[i] = "?"
-			args[i] = item.BridgeID
+			bridgeIDs[i] = item.BridgeID
 		}
-		rows, err := tx.Query(`SELECT bridge_account_id, model_account_id FROM account_links WHERE bridge_account_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...)
+		placeholders, args := sliceIDArgs(bridgeIDs)
+		rows, err := tx.Query(`SELECT bridge_account_id, model_account_id FROM account_links WHERE bridge_account_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("read account links: %w", err)
 		}
@@ -280,13 +278,8 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 		for _, modelID := range linkByBridge {
 			ids = append(ids, modelID)
 		}
-		placeholders := make([]string, len(ids))
-		args := make([]any, len(ids))
-		for i, id := range ids {
-			placeholders[i] = "?"
-			args[i] = id
-		}
-		rows, err := tx.Query(`SELECT id FROM accounts WHERE id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...)
+		placeholders, args := sliceIDArgs(ids)
+		rows, err := tx.Query(`SELECT id FROM accounts WHERE id IN (`+placeholders+`) AND user_id = :user_id`, args...)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("check accounts: %w", err)
 		}

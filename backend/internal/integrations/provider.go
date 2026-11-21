@@ -58,18 +58,6 @@ func NewRegistry(providers ...Provider) *Registry {
 	return &Registry{providers: providers}
 }
 
-// IDs returns the registered provider IDs in list order.
-func (r *Registry) IDs() []string {
-	if r == nil {
-		return nil
-	}
-	ids := make([]string, 0, len(r.providers))
-	for _, provider := range r.providers {
-		ids = append(ids, provider.ID())
-	}
-	return ids
-}
-
 // Snapshot returns one status entry per registered provider, in list order.
 func (r *Registry) Snapshot(ctx context.Context) ([]Entry, error) {
 	if r == nil {

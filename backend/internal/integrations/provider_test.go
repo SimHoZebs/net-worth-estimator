@@ -22,9 +22,6 @@ func TestRegistrySnapshotListsProvidersInOrder(t *testing.T) {
 	if len(entries) != 2 || entries[0].ID != "b" || entries[1].ID != "a" {
 		t.Fatalf("entries = %+v, want [b a] in registration order", entries)
 	}
-	if got := registry.IDs(); len(got) != 2 || got[0] != "b" || got[1] != "a" {
-		t.Fatalf("IDs = %v, want [b a]", got)
-	}
 }
 
 func TestNilRegistrySnapshotsEmpty(t *testing.T) {
@@ -35,9 +32,6 @@ func TestNilRegistrySnapshotsEmpty(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("entries = %+v, want empty", entries)
-	}
-	if ids := registry.IDs(); len(ids) != 0 {
-		t.Fatalf("IDs = %v, want empty", ids)
 	}
 }
 

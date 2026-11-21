@@ -12,6 +12,19 @@ import (
 
 const defaultProjectionStateID = "default"
 
+// sliceIDArgs builds the positional placeholders and ordered arguments for
+// an IN clause over slice IDs. Callers splice the SQL into an IN (...) list
+// and pass args to Query or Exec.
+func sliceIDArgs(sliceIDs []string) (string, []any) {
+	placeholders := make([]string, len(sliceIDs))
+	args := make([]any, len(sliceIDs))
+	for i, id := range sliceIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	return strings.Join(placeholders, ","), args
+}
+
 // GetProjectionState returns the single state row, creating it on first use.
 func (s *sqliteStore) GetProjectionState() (types.ProjectionState, error) {
 	var state types.ProjectionState
@@ -318,13 +331,8 @@ func (s *sqliteStore) SaveGeneratedTransactions(rows []GeneratedTransaction) err
 		seenSlices[row.SliceID] = struct{}{}
 		sliceIDs = append(sliceIDs, row.SliceID)
 	}
-	placeholders := make([]string, len(sliceIDs))
-	args := make([]any, len(sliceIDs))
-	for i, id := range sliceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	if _, err := tx.Exec(`DELETE FROM transactions WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+	placeholders, args := sliceIDArgs(sliceIDs)
+	if _, err := tx.Exec(`DELETE FROM transactions WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
 		return fmt.Errorf("replace generated transactions: %w", err)
 	}
 	for _, row := range rows {
@@ -359,13 +367,8 @@ func (s *sqliteStore) ListGeneratedTransactions(sliceIDs []string) ([]GeneratedT
 	if len(sliceIDs) == 0 {
 		return out, nil
 	}
-	placeholders := make([]string, len(sliceIDs))
-	args := make([]any, len(sliceIDs))
-	for i, id := range sliceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	rows, err := s.db.Query(`SELECT projection_slice_id, name, source_account_id, destination_account_ids, posted_time, transaction_time, event_json, applied_amount, outcome FROM transactions WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY posted_time, transaction_time, id`, args...)
+	placeholders, args := sliceIDArgs(sliceIDs)
+	rows, err := s.db.Query(`SELECT projection_slice_id, name, source_account_id, destination_account_ids, posted_time, transaction_time, event_json, applied_amount, outcome FROM transactions WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id ORDER BY posted_time, transaction_time, id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list generated transactions: %w", err)
 	}
@@ -409,13 +412,8 @@ func (s *sqliteStore) DeleteGeneratedTransactions(sliceIDs []string) error {
 	if len(sliceIDs) == 0 {
 		return nil
 	}
-	placeholders := make([]string, len(sliceIDs))
-	args := make([]any, len(sliceIDs))
-	for i, id := range sliceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	if _, err := s.db.Exec(`DELETE FROM transactions WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+	placeholders, args := sliceIDArgs(sliceIDs)
+	if _, err := s.db.Exec(`DELETE FROM transactions WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
 		return fmt.Errorf("delete generated transactions: %w", err)
 	}
 	return nil
@@ -439,13 +437,8 @@ func (s *sqliteStore) ListProjectionRows(sliceIDs []string) ([]ProjectionRowPayl
 	if len(sliceIDs) == 0 {
 		return out, nil
 	}
-	placeholders := make([]string, len(sliceIDs))
-	args := make([]any, len(sliceIDs))
-	for i, id := range sliceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	rows, err := s.db.Query(`SELECT projection_slice_id, date, payload FROM projection_rows WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY date`, args...)
+	placeholders, args := sliceIDArgs(sliceIDs)
+	rows, err := s.db.Query(`SELECT projection_slice_id, date, payload FROM projection_rows WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id ORDER BY date`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list projection rows: %w", err)
 	}
@@ -468,13 +461,8 @@ func (s *sqliteStore) DeleteProjectionRows(sliceIDs []string) error {
 	if len(sliceIDs) == 0 {
 		return nil
 	}
-	placeholders := make([]string, len(sliceIDs))
-	args := make([]any, len(sliceIDs))
-	for i, id := range sliceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	if _, err := s.db.Exec(`DELETE FROM projection_rows WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+	placeholders, args := sliceIDArgs(sliceIDs)
+	if _, err := s.db.Exec(`DELETE FROM projection_rows WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
 		return fmt.Errorf("delete projection rows: %w", err)
 	}
 	return nil
@@ -485,13 +473,8 @@ func (s *sqliteStore) DeleteMonteCarloStatistics(sliceIDs []string) error {
 	if len(sliceIDs) == 0 {
 		return nil
 	}
-	placeholders := make([]string, len(sliceIDs))
-	args := make([]any, len(sliceIDs))
-	for i, id := range sliceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	if _, err := s.db.Exec(`DELETE FROM monte_carlo_statistics WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+	placeholders, args := sliceIDArgs(sliceIDs)
+	if _, err := s.db.Exec(`DELETE FROM monte_carlo_statistics WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
 		return fmt.Errorf("delete statistics: %w", err)
 	}
 	return nil
