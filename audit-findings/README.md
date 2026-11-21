@@ -20,7 +20,7 @@ Audited the full repository at HEAD `7ac73105` on `main`. Eight scoped read-only
 | [070](070-insight-suggestions-memo.md) | Stabilize the statement suggestion passed to the insights memo | frontend-state | accepted |
 | [071](071-scoped-write-helper.md) | Share the scoped fetch and write lifecycle | frontend-state | accepted |
 | [072](072-row-revision-fingerprint.md) | Build the saved-row fingerprint in one place | frontend-state | accepted |
-| [073](073-bnpl-finding-wording.md) | Use one finding-state wording for BNPL rows | frontend-domain | needs-review |
+| [073](073-bnpl-finding-wording.md) | Use one finding-state wording for BNPL rows | frontend-domain | implemented |
 | [074](074-safe-spending-forecast-dead-layer.md) | Delete the Safe Spending forecast layer left by the server takeover | frontend-domain | accepted |
 | [075](075-dead-domain-exports.md) | Delete unreferenced domain exports and the unused prop | frontend-domain | accepted |
 | [076](076-month-boundary-math.md) | Leave one owner for month-boundary math | frontend-domain | accepted |
