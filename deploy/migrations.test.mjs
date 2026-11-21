@@ -1500,7 +1500,8 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
   assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
-  assert.match(workflow, /tests\.yml/);
+  assert.match(workflow, /node scripts\/verify-release-sha\.mjs/);
+  assert.equal((workflow.match(/persist-credentials: false/g) ?? []).length, 2);
   assert.match(workflow, /ghcr\.io\/token/);
   assert.match(workflow, /manifests\/\$\{tag\}/);
   assert.match(workflow, /IMAGE_POLL_INTERVAL_MS/);
@@ -1512,7 +1513,9 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
 
   const blocks = [...workflow.matchAll(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/g)]
     .map((match) => match[1].split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n"));
-  const gateSource = blocks[0];
+  const gateScript = await readFile(new URL("../scripts/verify-release-sha.mjs", import.meta.url), "utf8");
+  assert.match(gateScript, /tests\.yml/);
+  const gateSource = gateScript.replace(/^#![^\n]*\n/, "");
   const waitSource = blocks.find((block) => block.includes("ghcr.io/token"));
   const releaseSource = blocks.find((block) => block.includes("RELEASE_WEBHOOK"));
   const executeGate = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", gateSource);

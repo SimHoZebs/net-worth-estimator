@@ -61,6 +61,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Verify the tested commit
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -71,34 +74,7 @@ jobs:
           DISPATCH_REF: ${{ github.ref }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          node --input-type=module <<'JS'
-          const sha = process.env.RELEASE_SHA;
-          if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
-
-          if (process.env.EVENT_NAME === "workflow_run") {
-            if (process.env.TESTS_CONCLUSION !== "success" ||
-                process.env.TESTS_EVENT !== "push" ||
-                process.env.TESTS_BRANCH !== "main") {
-              throw new Error("The Tests workflow run is not a green push to main");
-            }
-          } else if (process.env.EVENT_NAME === "workflow_dispatch") {
-            if (process.env.DISPATCH_REF !== "refs/heads/main") throw new Error("Manual dispatch only releases main");
-            const api = process.env.GITHUB_API_URL ?? "https://api.github.com";
-            const query = new URLSearchParams({ head_sha: sha, status: "completed", per_page: "100" });
-            const response = await fetch(`${api}/repos/${process.env.GITHUB_REPOSITORY}/actions/workflows/tests.yml/runs?${query}`, {
-              headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: "application/vnd.github+json" },
-            });
-            if (!response.ok) throw new Error(`Cannot read Tests runs (HTTP ${response.status})`);
-            const runs = (await response.json()).workflow_runs ?? [];
-            const green = runs.some((run) =>
-              run.conclusion === "success" && run.event === "push" && run.head_branch === "main");
-            if (!green) throw new Error(`No successful main Tests run for ${sha}`);
-          } else {
-            throw new Error("Unsupported release event");
-          }
-          console.log(`Tests passed for ${sha}.`);
-          JS
+        run: node scripts/verify-release-sha.mjs
 
       - name: Wait for the pinned images
         env:

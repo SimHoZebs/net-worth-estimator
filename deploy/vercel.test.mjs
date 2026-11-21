@@ -117,8 +117,11 @@ test("Vercel production deploys wait for a green main Tests run", async () => {
   assert.match(workflow, /project\.link\?\.repoId/);
   assert.doesNotMatch(workflow, /vercel@\d|npx --yes vercel|git rev-parse HEAD/);
 
-  const source = workflow.match(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/)[1]
-    .split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n");
+  assert.match(workflow, /node scripts\/verify-release-sha\.mjs/);
+  assert.equal((workflow.match(/persist-credentials: false/g) ?? []).length, 2);
+  const gateScript = readFileSync(new URL("../scripts/verify-release-sha.mjs", import.meta.url), "utf8");
+  assert.match(gateScript, /tests\.yml/);
+  const source = gateScript.replace(/^#![^\n]*\n/, "");
   const execute = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", source);
   const sha = "a".repeat(40);
   const baseEnv = {

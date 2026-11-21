@@ -110,6 +110,18 @@ jobs:
         run: NORTHFLANK_TEST_IMAGE=northflank-ml-test node --test deploy/northflank/container.test.mjs
       - name: Verify offline migration in the deployment image
         run: DEPLOYMENT_TEST_IMAGE=northflank-ml-test node --test --test-name-pattern 'API image migrates' deploy/migrations.test.mjs
+      - name: Build the standalone deployment image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          tags: waypoint-deployment-test
+          cache-from: type=gha,scope=deployment-test
+          # Merge-ref caches are throwaway, so only main persists layers.
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=deployment-test' || '' }}
+      - name: Verify the standalone deployment image
+        run: DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs
 
   gate:
     name: Frontend and static gates
