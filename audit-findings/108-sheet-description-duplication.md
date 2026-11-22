@@ -7,11 +7,11 @@ status: needs-review
 
 ## Scenario
 
-On the activity screen you click a transaction row and a transaction detail panel slides in from the right. When the app has found suggestions for that single transaction, a Review suggestions link appears in the detail panel footer. Clicking it opens a second, nested panel titled Suggestions. The browser builds this panel at the moment you click the link, before the panel becomes visible, so the two copies of the hint are rendered together as the sheet opens.
+On the activity screen you click a transaction row and a transaction detail panel slides in from the right. When the app has found suggestions for that single transaction, a Review suggestions link appears in the detail panel footer. Clicking that link opens a second, nested panel titled Suggestions. Both the transaction detail panel and the nested Suggestions panel are built by `TransactionDetail` in `frontend/src/components/activity/TransactionDetail.tsx`. The browser renders the nested panel at the moment you click the link, before the panel becomes visible, so both copies of the hint are rendered together as the sheet opens.
 
-To a sighted user the panel starts with a short hint line, Small checks to improve future estimates, above the suggestions themselves. A screen reader, software that reads the screen aloud for people who cannot see it, cannot read that hint off the page visually. Instead it relies on the panel's accessible description, a short text the panel publishes through the DOM, the browser's in-memory tree of page elements, so the screen reader can announce what the panel is for when it opens. The sheet component exists to publish exactly that description. Its description element is wired into the accessibility tree even though a style called sr-only hides it from sight, and the same component is reused across the app's right-side sheets.
+To a sighted user the Suggestions panel starts with a short hint line, "Small checks to improve future estimates", above the suggestion rows themselves. A screen reader, software that reads the screen aloud for people who cannot see it, cannot read that hint off the page visually. Instead it relies on the panel's accessible description, a short text the panel publishes through the DOM, the browser's in-memory tree of page elements, so the screen reader can announce what the panel is for when it opens. The `Sheet` UI component in `frontend/src/components/ui/sheet.tsx` exists to publish exactly that description: `SheetDescription` renders the description element and wires it into the accessibility tree, even though the `sr-only` style hides that element from sight. The same `Sheet` component is reused across the app's right-side sheets.
 
-The problem is that this sentence is written twice in the same sheet, once in the hidden description element and once as the visible hint paragraph. Both copies land in the DOM, so a screen reader reaches the sentence twice, and the two copies have to be edited together to keep the announced and visible wording aligned.
+The problem is that the sentence "Small checks to improve future estimates" is written twice in the Suggestions panel. The `SheetDescription` element in `frontend/src/components/activity/TransactionDetail.tsx` holds one copy, and a visible paragraph in the panel body holds the other. Both copies land in the DOM, so a screen reader reaches the sentence twice, and the two copies have to be edited together to keep the announced and visible wording aligned.
 
 ## Executive summary
 
@@ -19,7 +19,7 @@ The suggestions sheet, opened from a transaction, writes the sentence Small chec
 
 ## Recommended action
 
-Keep the screen-reader-only description element and delete the duplicated visible paragraph, or surface that description once as the visible text. The sheet component already exists and publishes the accessible description, so this removes the second copy of the string without adding any component.
+Keep the screen-reader-only description element and delete the duplicated visible paragraph, or surface that description once as the visible text. The `Sheet` component in `frontend/src/components/ui/sheet.tsx` already exists and its `SheetDescription` publishes the accessible description, so this removes the second copy of the string without adding any component.
 
 ## Before and after
 
@@ -52,6 +52,6 @@ Every screen reader user of the suggestions sheet hears the same sentence twice,
 
 ## Verification
 
-Verify that the phrase occurs once in the DOM while the sheet is open and that the sheet still publishes an accessible description.
+With the Suggestions sheet open, verify that the phrase "Small checks to improve future estimates" occurs once in the DOM and that `SheetDescription` still publishes the sheet's accessible description.
 
 References: `frontend/src/components/activity/TransactionDetail.tsx:1433,1438`.

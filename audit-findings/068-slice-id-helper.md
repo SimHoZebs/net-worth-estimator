@@ -7,13 +7,17 @@ status: accepted
 
 ## Scenario
 
-The SQLite adapter is the layer that turns store calls into SQL for the local database. When the API builds or reads a projection, it stores and loads the engine's output per slice, where a slice is one calendar-year partition of the projection window identified by a slice ID. A revision is the version number of a saved row, incremented on each write, and built rows carry the revision they were built at so the reader can assemble a result from only the current slices. The artifacts involved are generated transactions, timeline rows, and Monte Carlo statistics. Because SQL cannot take a varying-length list directly, the adapter builds an `IN` clause, meaning a condition that matches a column against a supplied list, using a `?` placeholder for each ID; each placeholder is filled by an argument value when the query runs. Account provisioning is a separate internal path: when a sync runs, the ingest step calls the adapter to resolve linked bridge accounts, and those queries use the same placeholder pattern for bridge account IDs and model account IDs. No screen calls these methods directly; the projection build and read code calls the artifact methods, and the ingest step calls provisioning. Both paths run before the projection result or the provisioned account appears on screen. The helper exists so the loop that turns a list of IDs into a placeholder list and an ordered argument list is written once instead of being copied at every storage call.
+The SQLite adapter in `backend/internal/store/adapters/sqlite` is the layer that turns store calls into SQL for the app's local database. When the API builds or reads a projection, it stores the engine's output per slice. A slice is one partition of the projection window, identified by a slice ID; a revision is the version number of a saved row, incremented on each write, and built rows carry the revision they were built at so the reader can assemble a result from only the current slices. The artifacts stored per slice are generated transactions, timeline rows, and Monte Carlo statistics.
+
+No browser screen calls these storage methods directly. The projection build and read code calls the artifact methods, and the sync ingest step calls account provisioning; both run before a projection result or a newly provisioned account appears on screen. During provisioning, the ingest step asks the adapter to resolve linked bridge accounts by looking up bridge account IDs in the `account_links` table and then checking the resolved model account IDs in the `accounts` table.
+
+SQL cannot take a varying-length list of IDs directly, so the adapter builds an `IN` clause, meaning a condition that matches a column against a supplied list, with one `?` placeholder per ID. Each `?` is filled by an argument value when the query runs, and the arguments must stay in the same order as the placeholders. The helper exists so the loop that turns a list of slice IDs into a comma-separated placeholder list and a matching ordered argument list is written once instead of being copied into every storage call.
 
 ## Executive summary
 
-Every projection artifact is stored per slice, where a slice is one partition of the user's data identified by a slice ID. Six projection methods and two queries in account provisioning each allocate a `placeholders` slice and an `args` slice, fill them from the slice IDs, and join them into a SQL `IN` clause. The `?` in such a clause is a placeholder that a supplied argument fills at execution time.
+Every projection artifact is stored per slice, where a slice is one partition of the user's projection window identified by a slice ID. Six projection methods and two queries in account provisioning each allocate a `placeholders` slice and an `args` slice, fill them from the slice IDs, and join them into a SQL `IN` clause. The `?` in such a clause is a placeholder that a supplied argument fills at execution time.
 
-This is an adapter-wide idiom rather than a one-off. Adding another slice-scoped artifact table means copying the loop again, and any change to placeholder or argument handling has to be applied at every one of the eight sites. The fix is a single private helper that turns a list of slice IDs into the comma-separated `?` list and the matching argument list.
+This is an adapter-wide idiom rather than a one-off. Adding another slice-scoped artifact table means copying the loop again, and any change to placeholder or argument handling has to be applied at every one of the eight sites. The fix is a single private helper in the SQLite adapter that turns a list of slice IDs into the comma-separated `?` list and the matching argument list.
 
 ## Recommended action
 
@@ -48,7 +52,7 @@ Slice filtering has one implementation, so placeholder and argument handling is 
 
 ## Downside of rejecting
 
-The same loop exists in eight places. A future change to how slice IDs become placeholders or arguments has to be repeated everywhere, and a missed site produces SQL that filters on the wrong slices. Adding a new artifact table means writing the loop again.
+The same placeholder-and-argument loop exists in eight places. A future change to how slice IDs become placeholders or arguments has to be repeated everywhere, and a missed site produces SQL that filters on the wrong slices. Adding a new artifact table means writing the loop again.
 
 ## Verification
 

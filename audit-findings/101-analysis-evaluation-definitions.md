@@ -7,11 +7,15 @@ status: accepted
 
 ## Scenario
 
-When a maintainer opens the Background Analysis guide to understand or change how the worker turns saved bank evidence into findings, the guide first tells the reader what Analysis and Evaluation mean. Those words are defined normatively in the glossary — the source that wins when another document disagrees — where Analysis is a versioned inference over saved evidence that produces findings with reasons and uncertainty, and Evaluation is a named question asked of a projection with a stored configuration and a result. The guide restates both definitions in glossary-like wording, but its phrase "findings and explanations" has already drifted from the glossary's "findings with reasons and uncertainty". No request or parser is involved; this is a documentation workflow the reader starts before changing analysis behavior. The glossary exists so a term has one definition that every guide can link to instead of copying it.
+When a maintainer opens the Background Analysis guide `docs/analyses.md` to understand or change how the backend worker turns saved bank evidence into findings, the guide first tells the reader what Analysis and Evaluation mean (`docs/analyses.md:3-5`). The worker checks durable evidence revisions and computes findings without changing the saved financial model, which is why the guide needs those two words before it describes the lifecycle.
+
+The glossary `docs/TERMS.md` in the repository's `docs/` directory is the normative list of agreed words: when another document disagrees with the glossary, the glossary wins. Its Analysis section at `docs/TERMS.md:68-71` defines Analysis as a versioned inference over saved evidence that produces findings with reasons and uncertainty, and its Evaluation section at `docs/TERMS.md:52-55` defines Evaluation as a named question asked of a projection with a stored configuration and a result. Maintainers own the glossary, and every guide is expected to link to it instead of copying a definition.
+
+In the audited guide, both definitions were restated in glossary-like wording, and the restated phrase "findings and explanations" had already drifted from the glossary's "findings with reasons and uncertainty". Two homes for the same terms guarantee further drift: the next glossary edit must be mirrored by hand in `docs/analyses.md`, and a missed mirror leaves two descriptions of the same words carrying different meanings. No browser request or parser is involved; this is a documentation workflow the reader starts before changing analysis behavior. What stays in the guide after the rewrite is the single line that states which terms this guide uses.
 
 ## Executive summary
 
-The analyses guide defines Analysis and Evaluation in glossary-like wording, but the phrasing has already drifted from the glossary. The guide says "findings and explanations" where the glossary says "findings with reasons and uncertainty." Two homes for the same terms guarantee further drift. Replace the two definitions with a pointer to the glossary and keep only the doc-local scope statement.
+The Background Analysis guide `docs/analyses.md` defines Analysis and Evaluation in glossary-like wording, but the phrasing has already drifted from the glossary `docs/TERMS.md`. The guide says "findings and explanations" where the glossary says "findings with reasons and uncertainty". Two homes for the same terms guarantee further drift. Replace the two definitions with a pointer to the glossary's Evaluation and Analysis sections and keep only the doc-local line that states which terms the guide uses.
 
 ## Recommended action
 
@@ -44,6 +48,6 @@ Each glossary edit must be mirrored by hand, and any missed edit leaves two desc
 
 ## Verification
 
-After the edit, search each contested phrase and confirm it returns only the glossary. This is a proposed acceptance check, not a recorded result.
+After the edit, search each contested phrase and confirm it returns only `docs/TERMS.md`, not `docs/analyses.md`. This is a proposed acceptance check, not a recorded result.
 
 References: `docs/analyses.md:3-5`; `docs/TERMS.md:69-72,109-111`.

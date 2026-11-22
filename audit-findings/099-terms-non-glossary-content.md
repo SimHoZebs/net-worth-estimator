@@ -7,15 +7,23 @@ status: accepted
 
 ## Scenario
 
-When a maintainer writes product copy or reviews a change, they open the terminology glossary, the project's normative list of agreed words — normative means that when another document or an interface string disagrees, the glossary wins. Three of its sections go beyond naming. One restates the replay-ordering algorithm, the rule for the order in which balance checks and transactions are applied when rebuilding an account's history, which the technical overview owns. One duplicates the distinction between Analysis (a versioned inference over saved evidence that produces findings with reasons and uncertainty) and income evidence (the result of the payments Analysis) and adds a sentence about where the result appears on the Outlook screen. One states the UI test policy together with a negative claim that a new route-name check would make false. No browser request or parser is involved; this is a documentation workflow the maintainer starts before the wording reaches a screen. The glossary exists so one name is agreed in one place while the owning documents keep the detail.
+Maintainers write product copy and review changes against the terminology glossary, the file `docs/TERMS.md` in the repository's `docs/` directory. The glossary is the project's normative list of agreed words, where normative means that when another document or a string shown in the interface disagrees with the glossary, the glossary wins. Maintainers own the file and read it before wording reaches a screen. Three sections in the audited glossary go beyond naming a word.
+
+The balance-check section at `docs/TERMS.md:22-26` restates the replay-ordering rule. Replay ordering is the rule for the order in which a balance observation, a recorded account balance that resets modeled history, and transactions, recorded money movements, are applied when rebuilding an account's history. The technical overview `TECHNICAL_OVERVIEW.md` at the repository root owns replay ordering in its "Historical Replay and Checkpoints" section, and the Go code in `backend/internal/domain/prepare.go:180-198` implements the sort: events are ordered by their instant, transactions run before an observation at the same instant, and an owner-authored observation runs last at that instant. The glossary section gives the rule a second home alongside the technical overview.
+
+A second section at `docs/TERMS.md:109-115` restates the distinction between Evaluation, a named question asked of a projection with a stored configuration and a result, and income evidence, the computed result of recorded deposits. The section at `docs/TERMS.md:109-115` then adds a sentence about where the result appears on the Outlook screen. The technical overview owns the Outlook placement at `TECHNICAL_OVERVIEW.md:622`, which says Outlook renders only saved evaluation pins, using the same compact evaluation card components as the Evaluations page. The glossary's own Evaluation and Analysis sections already carry the definitions.
+
+A third section at `docs/TERMS.md:130-132` states the UI test policy together with a negative claim: the browser route-name sweep was retired with the UI specs under the regression-first baseline, so no automated check exercises every interface route name. `TESTING.md:79,87,98` states the regression-first policy and the integration-suite commands. Adding a route-name check to catch a real regression would make the glossary's negative claim false the moment the check lands.
+
+No browser request or parser is involved. The glossary workflow starts before the wording reaches a screen, and the glossary exists so one name is agreed in one place while the owning documents keep the detail.
 
 ## Executive summary
 
-The glossary is the single home for the project's agreed words. Three of its sections are not term definitions. One restates the replay-ordering algorithm owned by the technical overview, one duplicates the analysis-versus-income-evidence distinction from that same overview while adding a single sentence about where the result appears in the UI, and one states test policy together with a negative claim that becomes false the moment a route-name check is added. The code currently matches the documented ordering, so these are drift risks rather than contradictions. Reduce each passage to a naming fact plus a link.
+The glossary at `docs/TERMS.md` is the single home for the project's agreed words. Three of its sections are not term definitions. One restates the replay-ordering algorithm owned by `TECHNICAL_OVERVIEW.md` and implemented in `backend/internal/domain/prepare.go`; one duplicates the Analysis-versus-income-evidence distinction from that overview and `docs/TERMS.md`'s own sections while adding a single sentence about Outlook placement; one states test policy together with a negative claim that becomes false the moment a route-name check is added. The code currently matches the documented ordering, so these are drift risks rather than contradictions. Reduce each passage to a naming fact plus a link.
 
 ## Recommended action
 
-Reduce the replay section to naming facts plus a link to the technical overview. Delete the redundant distinction after moving the outlook sentence into the overview if that sentence is worth keeping. Reduce the test-policy section to the durable naming statement plus a `TESTING.md` link.
+Reduce the replay section to naming facts plus a link to the technical overview. Delete the redundant distinction after moving the Outlook sentence into the technical overview if that sentence is worth keeping. Reduce the test-policy section to the durable naming statement plus a `TESTING.md` link.
 
 ## Before and after
 
@@ -51,6 +59,6 @@ Replay ordering, the analysis distinction, and test policy each keep two homes, 
 
 ## Verification
 
-Read the three passages side by side and confirm each fact resolves to exactly one owner. The code currently matches the documented ordering, so this is a drift risk rather than a contradiction. This is a proposed acceptance check, not a recorded result.
+Read the three passages side by side and confirm replay ordering resolves to `TECHNICAL_OVERVIEW.md`, the Analysis and Evaluation distinction resolves to the glossary's own sections, and the test policy resolves to `TESTING.md`. The code currently matches the documented ordering, so this is a drift risk rather than a contradiction. This is a proposed acceptance check, not a recorded result.
 
 References: `docs/TERMS.md:22-26,109-115,130-132`; `TECHNICAL_OVERVIEW.md:316,512-515,622`; `backend/internal/domain/prepare.go:74-82,180-198`; `TESTING.md:79,87,98`.
