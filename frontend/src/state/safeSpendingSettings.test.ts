@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { toGeneratedSafeSpendingBody } from "@/api/contracts.ts";
 import {
+	defaultSafeSpendingSettings,
 	resolveEffectiveIds,
 	sanitizeSafeSpendingSettings,
 } from "./useSafeSpendingSettings.ts";
@@ -41,6 +43,42 @@ describe("sanitizeSafeSpendingSettings", () => {
 			spendingAccountIds: ["checking", "gone"],
 			incomeScheduleIds: ["salary", "bonus"],
 		});
+	});
+});
+
+describe("safe spending settings round-trip", () => {
+	it("preserves cycleStartDay, paydayDay, and savingsTarget through the generated body", () => {
+		const settings = sanitizeSafeSpendingSettings({
+			cycleStartDay: 7,
+			paydayDay: 15,
+			savingsTarget: 1234.56,
+		});
+		const body = toGeneratedSafeSpendingBody(settings);
+		expect(body).toMatchObject({
+			cycleStartDay: 7,
+			paydayDay: 15,
+			savingsTarget: 1234.56,
+		});
+		expect(sanitizeSafeSpendingSettings(body)).toEqual(settings);
+	});
+
+	it("falls back to defaults when the saved response omits the calendar fields", () => {
+		const settings = {
+			...defaultSafeSpendingSettings(),
+			cycleStartDay: 7,
+			paydayDay: 15,
+			savingsTarget: 1234.56,
+		};
+		const body = toGeneratedSafeSpendingBody(settings);
+		const echoed = {
+			accountIds: body.accountIds,
+			incomeScheduleIds: body.incomeScheduleIds,
+			spendingAccountIds: body.spendingAccountIds,
+			transactionIds: body.transactionIds,
+		};
+		expect(sanitizeSafeSpendingSettings(echoed)).toEqual(
+			defaultSafeSpendingSettings(),
+		);
 	});
 });
 

@@ -1,12 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useReducer } from "react";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
-import type { SafeSpendingSettings } from "@/api/contracts.ts";
+import {
+	type SafeSpendingSettings,
+	toGeneratedSafeSpendingBody,
+} from "@/api/contracts.ts";
 import {
 	getUserScope,
 	subscribeUserScope,
 	type UserScope,
 } from "@/auth/resourceScope.ts";
+import { isRecord } from "@/domain/guards.ts";
 import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
 import {
 	resolveEffectiveIds,
@@ -39,8 +43,15 @@ function monthlyDay(value: unknown, fallback: number): number {
 		: fallback;
 }
 
+type SettingKey = keyof SafeSpendingSettings;
+
+type SettingsField<K extends SettingKey> = {
+	default: SafeSpendingSettings[K];
+	read: (value: unknown) => SafeSpendingSettings[K];
+};
+
 /** One field list drives defaults, sanitizing and optimistic merges. */
-const settingsFields = {
+const settingsFields: { [K in SettingKey]: SettingsField<K> } = {
 	cycleStartDay: {
 		default: 20,
 		read: (value: unknown) => monthlyDay(value, 20),
@@ -75,31 +86,38 @@ const settingsFields = {
 	},
 };
 
-type SettingKey = keyof SafeSpendingSettings;
 const settingKeys = Object.keys(settingsFields) as SettingKey[];
 
 function freshSetting<K extends SettingKey>(key: K): SafeSpendingSettings[K] {
-	const value = settingsFields[key].default;
-	return (Array.isArray(value) ? [...value] : value) as SafeSpendingSettings[K];
+	return structuredClone(settingsFields[key].default);
 }
 
-export const defaultSafeSpendingSettings = (): SafeSpendingSettings => {
-	const result = {} as SafeSpendingSettings;
-	for (const key of settingKeys)
-		(result as unknown as Record<string, unknown>)[key] = freshSetting(key);
-	return result;
-};
+/** Generic keyed assignment keeps each field's value tied to its own key. */
+function assignSetting<K extends SettingKey>(
+	target: SafeSpendingSettings,
+	key: K,
+	value: SafeSpendingSettings[K],
+): void {
+	target[key] = value;
+}
+
+export const defaultSafeSpendingSettings = (): SafeSpendingSettings => ({
+	cycleStartDay: freshSetting("cycleStartDay"),
+	paydayDay: freshSetting("paydayDay"),
+	savingsTarget: freshSetting("savingsTarget"),
+	accountIds: freshSetting("accountIds"),
+	spendingAccountIds: freshSetting("spendingAccountIds"),
+	incomeScheduleIds: freshSetting("incomeScheduleIds"),
+	transactionIds: freshSetting("transactionIds"),
+});
 
 export function sanitizeSafeSpendingSettings(
 	value: unknown,
 ): SafeSpendingSettings {
 	const result = defaultSafeSpendingSettings();
-	if (typeof value !== "object" || value === null) return result;
-	const record = value as Record<string, unknown>;
+	if (!isRecord(value)) return result;
 	for (const key of settingKeys)
-		(result as unknown as Record<string, unknown>)[key] = settingsFields[
-			key
-		].read(record[key]);
+		assignSetting(result, key, settingsFields[key].read(value[key]));
 	return result;
 }
 
@@ -109,8 +127,8 @@ function mergeSettings(
 ): SafeSpendingSettings {
 	const merged = defaultSafeSpendingSettings();
 	for (const key of settingKeys) {
-		(merged as unknown as Record<string, unknown>)[key] =
-			next[key] !== undefined ? next[key] : previous[key];
+		const value = next[key];
+		assignSetting(merged, key, value === undefined ? previous[key] : value);
 	}
 	return merged;
 }
@@ -170,14 +188,16 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 		const pending = runScopedMutation<void>({
 			key,
 			mutationFn: async () => {
-				const data = (await setSafeSpendingSettings(snapshot as never)).data;
+				const data = (
+					await setSafeSpendingSettings(toGeneratedSafeSpendingBody(snapshot))
+				).data;
 				if (scope !== getUserScope()) return;
 				if (cache.getQueryData(key) === optimistic)
 					cache.setQueryData(
 						key,
-						sanitizeSafeSpendingSettings(
-							(data.settings ?? snapshot) as SafeSpendingSettings,
-						),
+						isRecord(data.settings)
+							? sanitizeSafeSpendingSettings(data.settings)
+							: snapshot,
 					);
 				dismissKey("safe-spending-settings");
 				void cache.invalidateQueries({

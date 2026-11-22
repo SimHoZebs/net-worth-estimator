@@ -1,16 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+	FLOW_EXTERNAL_LABEL,
 	FLOW_NODE_ID_EXTERNAL,
+	type FlowEdge,
+	flowNodeById,
+	flowNodeName,
+	isFlowGraph,
+	readFlowGraph,
 	type FlowGraph,
-	requestFlowGraph,
 } from "./flows.ts";
-import { waypointFetch } from "./waypoint-fetch.ts";
-
-vi.mock("./waypoint-fetch.ts", () => ({
-	waypointFetch: vi.fn(),
-}));
-
-const fetchMock = vi.mocked(waypointFetch);
+import { readFlowGraphResponse } from "../state/useFlowGraph.ts";
+import type {
+	FlowCoverage as GeneratedFlowCoverage,
+	FlowEdge as GeneratedFlowEdge,
+	FlowGraph as GeneratedFlowGraph,
+	FlowsOutputBody,
+} from "./generated/model/index.ts";
 
 function graph(): FlowGraph {
 	return {
@@ -34,7 +39,24 @@ function graph(): FlowGraph {
 				outflow: 100,
 			},
 		],
-		edges: [],
+		edges: [
+			{
+				from: "checking",
+				to: FLOW_NODE_ID_EXTERNAL,
+				kind: "outflow",
+				movement: "actual",
+				amount: 40,
+				sources: [
+					{
+						transactionId: "tx-1",
+						date: "2026-01-02",
+						sequence: 1,
+						requestedAmount: 40,
+						realizedAmount: 40,
+					},
+				],
+			},
+		],
 		unmatched: [],
 		unobserved: [],
 		coverage: { observedAccounts: ["checking"], unobservedAccounts: [] },
@@ -61,38 +83,99 @@ function graph(): FlowGraph {
 	};
 }
 
-describe("requestFlowGraph", () => {
-	it("resolves the graph from the flows response", async () => {
-		const expected = graph();
-		fetchMock.mockResolvedValueOnce({ data: { graph: expected } });
-		const result = await requestFlowGraph({
-			settings: {
-				fallbackProjectionStartDate: "2026-01-01",
-				horizonYears: 1,
-				evaluations: {},
-			} as never,
-			range: { startDate: "2026-01-01", endDate: "2026-12-31" },
+function response(graphValue: unknown): FlowsOutputBody {
+	return { graph: graphValue as FlowsOutputBody["graph"] };
+}
+
+describe("flow payload key parity", () => {
+	it("keeps the generated keys while narrowing their values", () => {
+		expectTypeOf<keyof FlowGraph>().toEqualTypeOf<keyof GeneratedFlowGraph>();
+		expectTypeOf<keyof FlowEdge>().toEqualTypeOf<keyof GeneratedFlowEdge>();
+		expectTypeOf<keyof import("./flows.ts").FlowCoverage>().toEqualTypeOf<
+			keyof GeneratedFlowCoverage
+		>();
+	});
+});
+
+describe("isFlowGraph", () => {
+	it("accepts a full graph and narrows generated nullable arrays", () => {
+		const payload = graph();
+		const nullable = {
+			...payload,
+			edges: null,
+			unmatched: null,
+			unobserved: null,
+			coverage: { observedAccounts: null, unobservedAccounts: null },
+		};
+		expect(isFlowGraph(nullable)).toBe(true);
+		expect(readFlowGraph(nullable)).toEqual({
+			...payload,
+			edges: [],
+			unmatched: [],
+			unobserved: [],
+			coverage: { observedAccounts: [], unobservedAccounts: [] },
 		});
-		expect(result).toEqual(expected);
-		expect(fetchMock).toHaveBeenCalledWith(
-			"/v1/flows",
-			expect.objectContaining({ method: "POST" }),
+	});
+
+	it("rejects a payload missing the contract keys", () => {
+		expect(isFlowGraph({ nodes: [], edges: [] })).toBe(false);
+	});
+
+	it("rejects unknown edge kinds and movements", () => {
+		const payload = graph();
+		expect(
+			isFlowGraph({
+				...payload,
+				edges: [{ ...payload.edges[0]!, kind: "mystery" }],
+			}),
+		).toBe(false);
+		expect(
+			isFlowGraph({
+				...payload,
+				edges: [{ ...payload.edges[0]!, movement: "maybe" }],
+			}),
+		).toBe(false);
+	});
+
+	it("rejects null and non-numeric scalar fields", () => {
+		const payload = graph();
+		expect(
+			isFlowGraph({
+				...payload,
+				reconciliation: { ...payload.reconciliation, windowEvents: null },
+			}),
+		).toBe(false);
+		expect(isFlowGraph({ ...payload, endDate: null })).toBe(false);
+	});
+
+	it("rejects a non-object payload", () => {
+		expect(isFlowGraph(null)).toBe(false);
+		expect(isFlowGraph("graph")).toBe(false);
+	});
+});
+
+describe("flow node helpers", () => {
+	it("finds nodes and labels the external counterparty in plain language", () => {
+		const payload = graph();
+		expect(flowNodeById(payload, "checking")?.name).toBe("Checking");
+		expect(flowNodeName(payload, "checking")).toBe("Checking");
+		expect(flowNodeName(payload, FLOW_NODE_ID_EXTERNAL)).toBe(
+			FLOW_EXTERNAL_LABEL,
+		);
+		expect(flowNodeName(payload, "unknown")).toBe("unknown");
+	});
+});
+
+describe("readFlowGraphResponse", () => {
+	it("surfaces the server error message", () => {
+		expect(() => readFlowGraphResponse({ error: "no model" })).toThrow(
+			"no model",
 		);
 	});
 
-	it("surfaces the server error message", async () => {
-		fetchMock.mockResolvedValueOnce({ data: { error: "no model" } });
-		await expect(
-			requestFlowGraph({
-				settings: {} as never,
-				range: { endDate: "2026-12-31" },
-			}),
-		).rejects.toThrow("no model");
-	});
-
-	it("joins error-severity issues when no graph arrives", async () => {
-		fetchMock.mockResolvedValueOnce({
-			data: {
+	it("joins error-severity issues when no graph arrives", () => {
+		expect(() =>
+			readFlowGraphResponse({
 				issues: [
 					{
 						severity: "error",
@@ -101,25 +184,17 @@ describe("requestFlowGraph", () => {
 						path: [],
 					},
 				],
-			},
-		});
-		await expect(
-			requestFlowGraph({
-				settings: {} as never,
-				range: { endDate: "2026-12-31" },
 			}),
-		).rejects.toThrow("invalid model");
+		).toThrow("invalid model");
 	});
 
-	it("rejects a payload missing the contract keys", async () => {
-		fetchMock.mockResolvedValueOnce({
-			data: { graph: { nodes: [], edges: [] } },
-		});
-		await expect(
-			requestFlowGraph({
-				settings: {} as never,
-				range: { endDate: "2026-12-31" },
-			}),
-		).rejects.toThrow("no money-flow graph");
+	it("reports an absent graph", () => {
+		expect(() => readFlowGraphResponse({})).toThrow("no money-flow graph");
+	});
+
+	it("produces a user-facing error for a malformed graph", () => {
+		expect(() =>
+			readFlowGraphResponse(response({ nodes: [], edges: [] })),
+		).toThrow("invalid money-flow graph");
 	});
 });

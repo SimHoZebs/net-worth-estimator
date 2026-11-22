@@ -14,6 +14,8 @@ import {
 	type ProjectionResult,
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
+	normalizeProjectionResult,
+	toGeneratedProjectionRequestBody,
 } from "../api/index.ts";
 import { projectionTransactions } from "../api/projectionTransactions.ts";
 import {
@@ -143,15 +145,18 @@ async function fetchDeterministicResult(
 		...(pinModel ? { model: pinModel } : {}),
 		range,
 	};
-	const response = (await projectDeterministic(request as never, { signal }))
-		.data as unknown as DeterministicProjectionResponse;
+	const response: DeterministicProjectionResponse = (
+		await projectDeterministic(toGeneratedProjectionRequestBody(request), {
+			signal,
+		})
+	).data;
 	const responseError = projectionResponseError(response);
 	if (responseError) throw responseError;
 	if (!response.result)
 		throw new Error(
 			"The server returned no deterministic projection result. Retry the request.",
 		);
-	return response.result;
+	return normalizeProjectionResult(response.result);
 }
 
 export function projectionRequest(

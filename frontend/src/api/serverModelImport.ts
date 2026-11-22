@@ -1,5 +1,8 @@
 import * as errore from "errore";
-import type { FinancialModel } from "@/api/contracts.ts";
+import {
+	type FinancialModel,
+	toGeneratedFinancialModel,
+} from "@/api/contracts.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { responseScopeError } from "@/api/scopedRequest.ts";
 import { importModel } from "@/api/generated/endpoints.ts";
@@ -46,7 +49,7 @@ export async function importServerModel({
 		});
 	let applied: Awaited<ReturnType<typeof importModel>>;
 	try {
-		applied = await importModel({ model: model as never });
+		applied = await importModel({ model: toGeneratedFinancialModel(model) });
 	} catch (cause) {
 		return cause instanceof Error ? cause : new Error(String(cause));
 	}

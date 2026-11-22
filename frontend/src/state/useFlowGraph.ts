@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { toGeneratedProjectionRequestBody } from "../api/contracts.ts";
+import { buildFlowGraph } from "../api/generated/endpoints.ts";
+import type { FlowsOutputBody } from "../api/generated/model/index.ts";
 import type { FlowGraph } from "../api/flows.ts";
-import { requestFlowGraph } from "../api/flows.ts";
+import { readFlowGraph } from "../api/flows.ts";
 import type { FlowWindow } from "../domain/flowWindow.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import {
@@ -35,6 +38,29 @@ function flowGraphQueryKey(
 	window: FlowWindow,
 ): readonly unknown[] {
 	return ["flow-graph", scopeKey, modelKey, window.startDate, window.endDate];
+}
+
+/** Turn the generated flow response into the UI graph. Errors and issues
+ * are surfaced before the payload guard so a malformed graph cannot render
+ * a blank diagram without an explanation. */
+export function readFlowGraphResponse(body: FlowsOutputBody): FlowGraph {
+	if (body.error) throw new Error(body.error);
+	const errors = (body.issues ?? []).filter(
+		(issue) => issue.severity === "error",
+	);
+	if (errors.length)
+		throw new Error(errors.map((issue) => issue.message).join(" "));
+	if (!body.graph)
+		throw new Error(
+			"The server returned no money-flow graph. Retry the request.",
+		);
+	try {
+		return readFlowGraph(body.graph);
+	} catch (cause) {
+		throw new Error(
+			`The server returned an invalid money-flow graph. ${cause instanceof Error ? cause.message : "Retry the request."}`,
+		);
+	}
 }
 
 /** Time-bounded money-flow graph for the saved model. Date-filter changes
@@ -132,17 +158,18 @@ export function useFlowGraph(window: FlowWindow | null) {
 					schedules: schedules.data!.schedules,
 					transactions: transactions.data!.transactions,
 				});
-				return requestFlowGraph(
-					{
+				const response = await buildFlowGraph(
+					toGeneratedProjectionRequestBody({
 						settings: {
 							fallbackProjectionStartDate: start,
 							horizonYears: flowHorizonYears(start, endDate!),
 							evaluations: normalizedEvaluations(summary.data!.evaluations),
 						},
 						range: { startDate, endDate },
-					},
+					}),
 					{ signal },
 				);
+				return readFlowGraphResponse(response.data);
 			},
 			staleTime: 30_000,
 			retry: false,

@@ -11,6 +11,8 @@ import {
 	type AmountPreset,
 	type FinancialModel,
 	READ_ONLY_IMPORT_MESSAGE,
+	toGeneratedAmountPreset,
+	toGeneratedFinancialModel,
 } from "@/api/index.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { runScopedMutation } from "@/state/scopedState.ts";
@@ -242,7 +244,9 @@ export async function importServerModel(
 					status: 403,
 					message: READ_ONLY_IMPORT_MESSAGE,
 				});
-			const result = await importModelRequest({ model: model as never });
+			const result = await importModelRequest({
+				model: toGeneratedFinancialModel(model),
+			});
 			if (scope !== getUserScope()) return false;
 			if (result.data.saved === false)
 				throw new Error(
@@ -284,10 +288,15 @@ async function changePreset(action: () => Promise<{ saved: boolean }>) {
 	);
 }
 export const createPreset = (preset: AmountPreset) =>
-	changePreset(async () => (await createAmountPreset(preset as never)).data);
+	changePreset(
+		async () =>
+			(await createAmountPreset(toGeneratedAmountPreset(preset))).data,
+	);
 export const updatePreset = (preset: AmountPreset) =>
 	changePreset(
-		async () => (await updateAmountPreset(preset.id, preset as never)).data,
+		async () =>
+			(await updateAmountPreset(preset.id, toGeneratedAmountPreset(preset)))
+				.data,
 	);
 export const deletePreset = (id: string) =>
 	changePreset(async () => {

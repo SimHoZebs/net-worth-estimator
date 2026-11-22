@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { resolveCurrentPosition } from "../api/generated/endpoints.ts";
-import type { PositionRequestBody } from "../api/generated/model/index.ts";
-import type { CurrentPositionResponse } from "../api/position.ts";
+import {
+	generatedPositionRequest,
+	normalizeCurrentPosition,
+} from "../api/contracts.ts";
 import { currentPositionQueryKey, serverQueryClient } from "./serverQuery.ts";
 import { projectionModelKey } from "./projectionKeys.ts";
 import {
@@ -124,13 +126,10 @@ export function useCurrentPosition({
 			// Stored-only: the server resolves the saved model. The local
 			// derivation supplies only the as-of date.
 			const response = (
-				await resolveCurrentPosition(
-					{
-						asOfDate,
-					} as unknown as PositionRequestBody,
-					{ signal },
-				)
-			).data as unknown as CurrentPositionResponse;
+				await resolveCurrentPosition(generatedPositionRequest(asOfDate), {
+					signal,
+				})
+			).data;
 			const issues = response.issues?.filter(
 				(issue) => issue.severity === "error",
 			);
@@ -140,7 +139,7 @@ export function useCurrentPosition({
 				);
 			if (!response.result)
 				throw new Error("The server returned no current position.");
-			return response.result;
+			return normalizeCurrentPosition(response.result);
 		},
 	});
 	return {
