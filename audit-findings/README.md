@@ -14,7 +14,7 @@ Audited the full repository at HEAD `7ac73105` on `main`. Eight scoped read-only
 | [064](064-container-image-check.md) | Wire the standalone image test into CI | deploy-build-test | accepted |
 | [065](065-dead-snapshot-index.md) | Delete the dead snapshot index pair | deploy-build-test | accepted |
 | [066](066-store-conformance-no-op.md) | Remove the no-op store conformance check | backend-api-persist | accepted |
-| [067](067-shared-run-registration.md) | Register a shared run only after the stream is writable | backend-api-persist | needs-review |
+| [067](067-shared-run-registration.md) | Register a shared run only after the stream is writable | backend-api-persist | implemented |
 | [068](068-slice-id-helper.md) | Share one slice-ID filter helper in the SQLite adapter | backend-api-persist | accepted |
 | [069](069-projection-source-comment.md) | Correct the projection source comment | backend-api-persist | accepted |
 | [070](070-insight-suggestions-memo.md) | Stabilize the statement suggestion passed to the insights memo | frontend-state | accepted |

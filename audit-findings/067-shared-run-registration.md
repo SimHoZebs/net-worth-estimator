@@ -2,7 +2,7 @@
 id: 067
 title: Register a shared run only after the stream is writable
 scope: backend-api-persist
-status: needs-review
+status: implemented
 ---
 
 ## Scenario
@@ -72,6 +72,8 @@ A client whose writer is not an `http.Flusher` leaves a `sharedStochasticRun` in
 
 ## Verification
 
-Use a writer that is not an `http.Flusher`. After the first request, a second request carrying the same model, overrides, settings, run count, and seed must not report `Projection-Source: shared`, must complete with its own result, and the registry must have no entry for that key. This is a proposed acceptance check; the finding does not record a real result yet.
+Use a writer that is not an `http.Flusher`. After the first request, a second request carrying the same model, overrides, settings, run count, and seed must not report `Projection-Source: shared`, must complete with its own result, and the registry must have no entry for that key.
+
+Implemented in commit `a241b748`. The regression test serves a request with a non-flushing writer, confirms no registry entry, then sends the identical seeded request with a normal writer and confirms `computed`, one result, and an empty registry. Observed: focused projection tests passed, including under the race detector, and the wider API package tests passed. The test was confirmed to fail against the original ordering.
 
 References: `backend/internal/api/projections/stochastic.go:82-91,107,174-180`; `backend/internal/api/projections/runs.go:38-50,97-104`; `backend/internal/api/projections/stochastic_test.go:87-99`.
