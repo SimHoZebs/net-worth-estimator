@@ -1,9 +1,10 @@
-import { isRecord } from "../domain/guards.ts";
+import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import { projectStochastic } from "./generated/endpoints.ts";
 import type { StochasticRequest } from "./generated/model/stochasticRequest.ts";
 import type {
 	ErrorSSEData,
 	PartialSSEData,
+	PercentileBands,
 	ProgressSSEData,
 	ResultSSEData,
 	StochasticProgress,
@@ -50,23 +51,108 @@ type StreamSource =
 	| AsyncIterable<Uint8Array | string>;
 export type SSEInput = Response | StreamSource | string;
 
-function eventPayload<T>(value: unknown): T {
-	return value as T;
+// The stream is untyped text, so each payload is narrowed with the shared
+// guards before a typed callback can receive it. A shape mismatch is a parse
+// error, the same boundary the JSON reader already uses for bad payloads.
+
+// Progress callbacks read only `fraction`; the remaining progress fields are
+// display detail that the domain layer tolerates being absent in test streams.
+function isStochasticProgress(value: unknown): value is StochasticProgress {
+	return isRecord(value) && finite(value.fraction) !== null;
+}
+
+function isPercentileBands(value: unknown): value is PercentileBands {
+	return (
+		isRecord(value) &&
+		finite(value.p10) !== null &&
+		finite(value.p25) !== null &&
+		finite(value.p50) !== null &&
+		finite(value.p75) !== null &&
+		finite(value.p90) !== null
+	);
+}
+
+function isStochasticProjectionResult(
+	value: unknown,
+): value is StochasticProjectionResult {
+	if (
+		!isRecord(value) ||
+		!isRecord(value.config) ||
+		finite(value.config.runCount) === null ||
+		!Array.isArray(value.bands) ||
+		!isRecord(value.milestones) ||
+		!isPercentileBands(value.milestones.finalNetWorthPercentiles) ||
+		!isRecord(value.evaluations)
+	)
+		return false;
+	// The projection consumer reads each band's percentile fields directly.
+	if (
+		!value.bands.every(
+			(band) => isRecord(band) && isPercentileBands(band.netWorth),
+		)
+	)
+		return false;
+	// These four tables are iterated without a fallback; the optional tables
+	// are not, so they stay unchecked here.
+	const tables = value.evaluations;
+	return (
+		Array.isArray(tables.financialIndependence) &&
+		Array.isArray(tables.netWorthThreshold) &&
+		Array.isArray(tables.accountBalance) &&
+		Array.isArray(tables.transactionFulfillment)
+	);
+}
+
+function isProgressData(value: unknown): value is ProgressSSEData {
+	return isRecord(value) && isStochasticProgress(value.progress);
+}
+
+function isPartialData(value: unknown): value is PartialSSEData {
+	return (
+		isRecord(value) &&
+		isStochasticProgress(value.progress) &&
+		isStochasticProjectionResult(value.partial)
+	);
+}
+
+function isResultData(value: unknown): value is ResultSSEData {
+	return isRecord(value) && isStochasticProjectionResult(value.result);
+}
+
+function isErrorData(value: unknown): value is ErrorSSEData {
+	return isRecord(value) && stringValue(value.error) !== null;
+}
+
+function invalidPayload(eventName: string): SSEParseError {
+	return new SSEParseError(
+		new Error(`SSE "${eventName}" event payload has an invalid shape.`),
+	);
 }
 
 function dispatchEvent(
 	event: ParsedSSEEvent,
 	callbacks: SSEParserCallbacks,
-): void {
+): SSEParseError | null {
 	callbacks.onEvent?.(event);
-	if (event.event === "progress")
-		callbacks.onProgress?.(eventPayload<ProgressSSEData>(event.data));
-	if (event.event === "partial")
-		callbacks.onPartial?.(eventPayload<PartialSSEData>(event.data));
-	if (event.event === "result")
-		callbacks.onResult?.(eventPayload<ResultSSEData>(event.data));
-	if (event.event === "error")
-		callbacks.onError?.(eventPayload<ErrorSSEData>(event.data));
+	switch (event.event) {
+		case "progress":
+			if (!isProgressData(event.data)) return invalidPayload(event.event);
+			callbacks.onProgress?.(event.data);
+			break;
+		case "partial":
+			if (!isPartialData(event.data)) return invalidPayload(event.event);
+			callbacks.onPartial?.(event.data);
+			break;
+		case "result":
+			if (!isResultData(event.data)) return invalidPayload(event.event);
+			callbacks.onResult?.(event.data);
+			break;
+		case "error":
+			if (!isErrorData(event.data)) return invalidPayload(event.event);
+			callbacks.onError?.(event.data);
+			break;
+	}
+	return null;
 }
 
 function parseBlock(
@@ -152,7 +238,12 @@ export class SSEParser {
 			return this.failure;
 		}
 		if (!parsed) return [];
-		dispatchEvent(parsed, this.callbacks);
+		const shapeError = dispatchEvent(parsed, this.callbacks);
+		if (shapeError) {
+			this.failure = shapeError;
+			this.callbacks.onParseError?.(shapeError);
+			return shapeError;
+		}
 		return [parsed];
 	}
 
