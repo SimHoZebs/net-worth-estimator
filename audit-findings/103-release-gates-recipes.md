@@ -5,20 +5,24 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+When a release is ready, an operator opens the release-gates document to confirm each gate and carry out the release steps: validate the deployment images, then request the Northflank release and record its run ID, migration backup hash and readiness result. The operator starts this work after the Tests workflow is green, and the published images plus the live API are the visible result. The exact validation commands are a recipe owned by the images guide, and the failed-release retry and dispatch caveat — the fact that a GitHub manual dispatch requests the current main commit, so a specific failed commit has to be released from Northflank with explicit parameters — are owned by the Northflank guide. The release-gates document keeps the gate-level claims and points at those guides. No browser request or data format crosses a boundary here; the guides exist to hold detailed commands that the gate document would otherwise carry as a partial copy.
+
 ## Executive summary
 
-The release-gates doc partially restates Deployment Guide recipes. Its image-validation line names two of the three commands in the images guide and omits the code-gate test, and its failed-release paragraph repeats a dispatch caveat that is stated more completely in the Northflank guide while also linking to it. A partial copy is worse than either a full recipe or a pointer. Keep the gate-level claims and point to the owning guides for the recipes.
+The release-gates document keeps gate-level claims but partially carries the deployment recipes. Its image-validation line points at the images guide without giving the full recipe, which includes the code-gate test, and its failed-release paragraph names the dispatch caveat while linking to the Northflank guide where that caveat is explained in full. A partial copy is worse than either a full recipe or a pointer. Keep the gate-level claims and point to the owning guides for the recipes.
 
 ## Recommended action
 
-Keep the gate-level claim and point to the images guide for the recipe. Reduce the failed-release paragraph to the release requirements plus one link to the Northflank release-window section. No new recipe text is created.
+Keep the gate-level claim and point to the images guide for the full validation recipe. Reduce the failed-release paragraph to the release requirements plus one link to the Northflank release-window section. No new recipe text is created.
 
 ## Before and after
 
 | Passage | Before | After |
 | --- | --- | --- |
-| Image validation | Two of three commands restated; code-gate test omitted | Gate-level claim plus a link to the images guide |
-| Failed release | Requirements plus a repeated dispatch caveat and a link | Requirements plus one link to the Northflank release window |
+| Image validation | Partial recipe in the gate doc, with the code-gate test omitted | Gate-level claim plus a link to the full images guide recipe |
+| Failed release | Requirements plus a named dispatch caveat and a link | Requirements plus one link to the Northflank release window |
 
 ```mermaid
 flowchart LR
@@ -36,7 +40,7 @@ Commands and caveats live in their owning guides, so a recipe is updated once an
 
 ## Downside of rejecting
 
-The gate doc keeps naming only two of the three validation commands, so a reader can treat the partial list as complete and skip the code-gate test.
+The gate doc keeps naming only some of the validation commands, so a reader can treat the partial list as complete and skip the code-gate test.
 
 ## Verification
 

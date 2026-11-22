@@ -5,6 +5,10 @@ scope: frontend-domain
 status: implemented
 ---
 
+## Scenario
+
+You open the Sources page and view the detected transaction findings table, which includes buy-now-pay-later (BNPL) rows. The browser fetches those findings as JSON when the page opens, and each record carries a strength, a status, a review decision, dismissal and staleness flags, and sometimes a judgment state. The table has a Finding column and a Status column, and the wording appears once the findings request completes. A finding is a detected result about a transaction, and the table's helpers translate its state into plain words such as "Likely BNPL" or "Not BNPL". A single shared wording owner already serves the review chips and dialogs, so the helpers exist to give the table the same vocabulary as those surfaces. The BNPL table kept its own pair of helpers that look only at strength and review decision, so a rejected strong finding reads "Likely BNPL" in the Finding column beside "Not BNPL" in the Status column, and a judgment state never appears in the Finding column.
+
 ## Executive summary
 
 A finding is a detected result such as a BNPL, or buy-now-pay-later, row. Prior finding 045 consolidated finding wording into `findingStateLabel` and is implemented, but the BNPL table kept a separate pair of helpers. `findingLabel` checks only `confirmed` and `strength`, so it has no branch for rejected, dismissed, stale, or judgment states, while `findingStatus` beside it does branch on those fields. The BNPL pair also ignores `judgment`, which the shared owner handles.

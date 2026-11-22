@@ -5,6 +5,10 @@ scope: ui-ux
 status: needs-review
 ---
 
+## Scenario
+
+Every auth page — sign in, sign up, the Passkeys list on Account, and device approval — has one shared feedback paragraph that the client fills with a message after an action. The browser makes the sign-in or passkey request when the user presses the relevant button, and the message appears after the response. The client's `report()` helper writes the text and a tone attribute, error by default and success when set, so the same region carries both outcomes. The region is a polite live region — an element whose text changes assistive technology announces only after a pause — and the stylesheet hides it while empty, then reveals it when text is injected. A client-side passkey failure therefore stays polite and may be announced too late or not at all, while the project's canonical field error uses the assertive alert role. No JSON format crosses a browser boundary here; the feedback is written directly into the page, which is why the markup itself must carry the announcement behavior.
+
 ## Executive summary
 
 The auth feedback region keeps `role="status"` and `aria-live="polite"` even when `report()` sets an error, so client-side passkey errors are not announced assertively. Its `:empty { display: none }` rule also removes the live region until text is injected, which screen readers often miss. Error versus success is carried only by token colors, while the canonical `FieldError` uses `role="alert"` (the assertive announcement role). Switch the region by tone, keep it present while empty, and add a non-color state cue.

@@ -5,6 +5,12 @@ scope: frontend-state
 status: accepted
 ---
 
+## Scenario
+
+The Outlook forecast and the scenario views on Evaluations, account detail, purchase planner, and the evidence dialog start a stochastic projection when the page needs a range. The browser sends the request and keeps the connection open; the API replies with server-sent events, a long-lived text stream of small updates rather than one finished reply. The generated client hands back the raw HTTP response, the object representing the network reply, because this stream bypasses the JSON envelope handler. The projection query passes that response to `parseSSE`, a text reader that splits incoming text into complete blocks, parses each block into an event, and calls a progress, partial, result, or error callback.
+
+That reader accepts several input forms: an HTTP response with a byte reader in the browser, a byte stream or an async iterable — an object that yields chunks over time — and a plain string in tests that replay recorded events. An abort signal, a handle that lets the caller cancel work, stops the stream when the user changes a scenario. The several forms are why the same consumption work is written more than once: a reader, an async iterable, and a whole string each walk through the same steps of checking for cancellation, feeding text, handling a parse failure, and finishing the parser, so a change to cancellation or error handling has to be applied to each copy.
+
 ## Executive summary
 
 `parseSSE` accepts strings, `Response`, `ReadableStream`, and `AsyncIterable`. Its `consumeReader` and `consumeAsyncIterable` repeat the same loop: abort check, feed, parse-error check, `catch` mapping to `SSEParseError` or `SSETransportError`, and a `parser.finish()` tail. The string branch repeats that finish tail, so the step exists three times.

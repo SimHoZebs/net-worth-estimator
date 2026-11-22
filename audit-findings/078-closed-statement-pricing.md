@@ -5,6 +5,10 @@ scope: backend-domain
 status: needs-review
 ---
 
+## Scenario
+
+Two surfaces price a closed credit-card statement. The card statements API feeds the card statements list and the transfer-pair analysis; the Safe Spending summary feeds the spending-availability view. When you open either screen, the browser asks the API for statements or a Safe Spending summary, and the API builds them from recorded bank evidence rather than stored statement rows. The data crossing the boundary is a derived statement in JSON, a text format for exchanging structured data: a closing date, a balance amount that may be null, a kind of closed, estimated, or unknown, a due date, and a currency. For a cycle that has not closed there is no observed balance, so a replay engine named `cardStatementRows` exists to replay posted charges and payments from a saved balance snapshot—a checkpoint—at the last close and estimate the current amount. For a closed cycle the two paths diverge: `DeriveStatements` negates the bank balance observed inside the cycle into a positive debt amount, while `buildStatements` still runs the checkpoint replay. Both functions are internal and are called by the API handlers when the browser requests those screens. The doc comment on `DerivedStatement` describes the replay rule, but the closed-cycle path does not use it.
+
 ## Executive summary
 
 Statements are no longer stored rows; both pricing paths derive them from recorded evidence. For a closed cycle `DeriveStatements` negates the bank balance observed inside the cycle, while `buildStatements` opens a checkpoint replay (replaying posted charges and payments from a saved balance at the first close) and carries them forward. They feed different surfaces — the card-statements API and transfer-pair analysis use the first, the Safe Spending summary the second — and nothing marks one authoritative. The `DerivedStatement` doc describes the replay rule that the function does not use for closed cycles.

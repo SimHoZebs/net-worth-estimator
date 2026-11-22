@@ -5,6 +5,10 @@ scope: backend-api-persist
 status: accepted
 ---
 
+## Scenario
+
+The SQLite adapter is the layer that turns store calls into SQL for the local database. When the API builds or reads a projection, it stores and loads the engine's output per slice, where a slice is one calendar-year partition of the projection window identified by a slice ID. A revision is the version number of a saved row, incremented on each write, and built rows carry the revision they were built at so the reader can assemble a result from only the current slices. The artifacts involved are generated transactions, timeline rows, and Monte Carlo statistics. Because SQL cannot take a varying-length list directly, the adapter builds an `IN` clause, meaning a condition that matches a column against a supplied list, using a `?` placeholder for each ID; each placeholder is filled by an argument value when the query runs. Account provisioning is a separate internal path: when a sync runs, the ingest step calls the adapter to resolve linked bridge accounts, and those queries use the same placeholder pattern for bridge account IDs and model account IDs. No screen calls these methods directly; the projection build and read code calls the artifact methods, and the ingest step calls provisioning. Both paths run before the projection result or the provisioned account appears on screen. The helper exists so the loop that turns a list of IDs into a placeholder list and an ordered argument list is written once instead of being copied at every storage call.
+
 ## Executive summary
 
 Every projection artifact is stored per slice, where a slice is one partition of the user's data identified by a slice ID. Six projection methods and two queries in account provisioning each allocate a `placeholders` slice and an `args` slice, fill them from the slice IDs, and join them into a SQL `IN` clause. The `?` in such a clause is a placeholder that a supplied argument fills at execution time.

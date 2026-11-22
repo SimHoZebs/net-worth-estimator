@@ -5,6 +5,10 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+When the API server boots, it starts the background analysis worker, which checks saved bank evidence for changes every 15 seconds and, for a run it has already attempted, waits at least 30 seconds before retrying a failure. The worker starts this work at boot, not the browser, and the user sees the result later as findings on the analysis screens. The 30-second retry backoff — the minimum wait before trying a failed analysis run again — is implemented once in the analysis run store, but the analyses guide states it twice in its lifecycle prose and the judgment-providers guide restates it, with the 15-second poll, the separate interval for checking for new evidence, as a different value. This is an internal workflow with no request crossing a browser boundary; the guides exist so a reader can see the lifecycle without reading the store code, which is why one of them should own the number and the other should link.
+
 ## Executive summary
 
 The 30-second retry backoff is implemented once, but it is stated independently in the judgment-providers guide and twice in the analyses guide. Four prose sites for one number make a future change easy to half-apply. The 15-second poll is a distinct value and must stay separate. Keep the full lifecycle statement in the analyses guide, reduce the judgment-providers mention to a link, and do not change either value.

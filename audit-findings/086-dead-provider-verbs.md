@@ -5,6 +5,10 @@ scope: backend-domain
 status: accepted
 ---
 
+## Scenario
+
+These paths are internal backend work with no single screen. Three workflows start them. When you open the Integrations screen, the browser requests the integrations list; the API asks the registry, meaning the in-memory list of connected bank providers, for a snapshot of each provider's status and returns a JSON list of provider IDs and connection state. A separate sync worker calls the ingest orchestrator with an adapter, meaning the provider-specific plugin, for each bank. The adapter fetches a provider-native snapshot, the raw bank response that only that adapter interprets, and the orchestrator translates it into checkpoints, meaning saved sync positions, and bank rows; the provider key is written directly at each checkpoint rather than read from the adapter. A third background worker categorizes uncategorized transactions and injects a journal-backed feedback source, meaning the store of matured user overrides used as training labels, so user corrections train the learner. Production always injects that source. Each of the three dead members is a leftover verb on these frameworks: `Adapter.Key` declares a provider key nobody reads, `Registry.IDs` duplicates the snapshot call, and `categoryFeedbackSource` is a nil fallback, meaning a branch taken only when no source is injected, inherited from the old version. Nothing a user does reaches them.
+
 ## Executive summary
 
 Three small dead members remain in live frameworks. `ingest.Adapter.Key` is declared and documented as the provider key, but the orchestrator never reads it; its implementation returns the same literal written directly at every checkpoint, and a test fake carries an unread `key` field. `integrations.Registry.IDs` duplicates `Snapshot()` and is called only by two assertions in its own test. `categoryFeedbackSource` is a superseded v1 nil fallback: production always injects the journal source, so it is reachable only from direct unit tests, and the docs already record the supersession. Each is maintenance surface with no live caller. The recommended action is to delete all three and their fixtures and assertions.

@@ -5,21 +5,27 @@ scope: contracts-types
 status: rejected
 ---
 
+## Scenario
+
+When you add a recurring transaction or edit a schedule's repeat rule, the schedule editor shows Google Calendar-style repeat controls: a start date you picked, a repeat interval, and day, week, month, or year units. The browser turns that start date into a weekday and a day of the month to anchor the repeat preview, but only after a small text check called `isIsoDate` accepts the date. The date is stored and sent as `YYYY-MM-DD`, meaning a four-digit year, a two-digit month, and a two-digit day; UTC is the shared clock that keeps the same date meaning the same day everywhere. When you open an evaluation, the browser asks the API for its result and receives it as JSON, a text format for named values; that same check then decides which candidate dates and milestone dates become real rows and outcomes on the analysis screen. Both checks are browser work: one runs while the repeat editor renders, the other while the returned result is mapped, and both run before you see a preview or an analysis.
+
+The stricter helper `calendarDayMs` already serves other editors and snapshot code. It parses the same date text and then round-trips it through UTC to reject impossible days such as February 30, which the browser's built-in date silently rolls into the next month. The loose check is the one guarding external evaluation dates and the weekly repeat anchor, so the two checks can disagree about whether a given day is real.
+
 ## Executive summary
 
-The frontend has two ways to decide whether a `YYYY-MM-DD` value is a real calendar day. `calendarDayMs` round-trips the parsed UTC date and rejects a day that `Date` silently rolls into the next month, with a comment recording why. `isIsoDate` only applies a regex and a `NaN` check, so `isIsoDate("2024-02-30")` returns true even though `utcDate` turns that value into March 1.
+The frontend has two ways to decide whether a `YYYY-MM-DD` value is a real calendar day. `calendarDayMs` round-trips the parsed UTC date and rejects a day that `Date` silently rolls into the next month, with a comment recording why. `isIsoDate` only applies a text pattern and a parse check, so `isIsoDate("2024-02-30")` returns true even though `utcDate` turns that value into March 1.
 
 The loose check is the one used on external evaluation dates and as a recurrence gate, which is exactly where an impossible day changes which occurrences a rule produces. The maintenance cost is two competing definitions of validity that can drift apart.
 
-The proposed action is to make `isIsoDate` delegate to `calendarDayMs` and delete the regex-plus-`NaN` implementation, leaving one calendar date validity owner in the frontend, while `utcDate` keeps parsing and display.
+The proposed action is to make `isIsoDate` delegate to `calendarDayMs` and delete the pattern-plus-parse implementation, leaving one calendar date validity owner in the frontend, while `utcDate` keeps parsing and display.
 
 ## Recommended action
 
-Make `isIsoDate` call `calendarDayMs` and remove its regex-plus-`NaN` body. Nothing new needs to be created, `calendarDayMs` already exists and carries the reasoning in its comment. `utcDate` remains responsible for parsing and display and does not change.
+Make `isIsoDate` call `calendarDayMs` and remove its pattern-plus-parse body. Nothing new needs to be created: `calendarDayMs` already exists and carries the reasoning in its comment. `utcDate` remains responsible for parsing and display and does not change.
 
 ## Before and after
 
-Before: `isIsoDate` validates with a regex plus a `NaN` check and accepts impossible days such as `2024-02-30`. `calendarDayMs` is a separate, stricter owner of calendar validity.
+Before: `isIsoDate` validates with a text pattern plus a parse check and accepts impossible days such as `2024-02-30`. `calendarDayMs` is a separate, stricter owner of calendar validity.
 
 After: `isIsoDate` delegates to `calendarDayMs`, so the same rule applies everywhere and impossible days are rejected.
 

@@ -5,9 +5,15 @@ scope: deploy-build-test
 status: accepted
 ---
 
+## Scenario
+
+Production releases here start from automation rather than a screen. When the `Tests` workflow finishes green on `main`, or when a maintainer manually starts a release workflow — an action called workflow dispatch — the `Request Northflank release` and `Deploy frontend to Vercel` workflows begin. Before either one asks its provider to release, a step named Verify the tested commit checks that the release SHA, the 40-character identifier of the commit to ship, is well formed and, on manual dispatch, asks the GitHub API whether a green push-to-main `Tests` run exists for it. Only after that check does the workflow call Northflank or Vercel.
+
+The data crossing this boundary is event context: the triggering run's conclusion, branch, and commit identifier, handed to a short inline script as environment variables, which are named values the runner passes to a process. The check exists because a release must ship the exact commit that passed tests; it is a security gate on production. The smaller code-guard job that runs just before it is repeated in the same three workflows, but its logic already lives in a script, so the duplication that matters here is the release verification itself.
+
 ## Executive summary
 
-Both production release workflows carry a verbatim inline node step named "Verify the tested commit". It validates the 40-character release SHA and, on manual dispatch, queries the GitHub API for a green push-to-main `Tests` run before any release is requested. This is a security gate on production releases.
+Both production release workflows carry a verbatim inline node step named Verify the tested commit. It validates the 40-character release SHA and, on manual dispatch, queries the GitHub API for a green push-to-main `Tests` run before any release is requested. This is a security gate on production releases.
 
 The two copies have already drifted: the Northflank copy declares `GITHUB_REPOSITORY` in its step environment while the Vercel copy omits it and relies on GitHub's implicit default. A later fix to the SHA check, API query, or dispatch-ref rule applied in one file silently leaves the other gate running old logic. The smaller `code-guard` job is likewise repeated in three workflows, though its logic is already centralized in a script.
 
@@ -19,7 +25,7 @@ Move the shared verification into one checked-in script, for example `scripts/ve
 
 ## Before and after
 
-Before: two verbatim inline "Verify the tested commit" steps, one per release workflow, already differing on `GITHUB_REPOSITORY`.
+Before: two verbatim inline Verify the tested commit steps, one per release workflow, already differing on `GITHUB_REPOSITORY`.
 
 After: both workflows call one script with the same environment, so a fix to the SHA, API, or dispatch-ref logic applies to both gates at once.
 

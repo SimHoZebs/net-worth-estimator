@@ -5,6 +5,10 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+When you open an analysis finding for a recurring payment pattern and ask to preview a schedule from it, the API describes the schedule it would create and whether it is creatable before you accept it. A cadence, meaning how often the pattern repeats, is mapped to a recurrence rule, a schedule frequency made of a unit and an interval such as every two weeks. The preview crosses the boundary as JSON carrying the proposed schedule, a creatable flag, and a reason when creation is not allowed. The mapping already turns daily, weekly, biweekly, monthly, quarterly, and annual patterns into creatable rules, and only an unknown cadence gets the non-creatable reason; a regression asserts that a biweekly preview is creatable. The analyses guide instead told readers that biweekly patterns were non-actionable because no biweekly schedule existed. The guided-model-setup guide lists a similar gap but pins itself to a specific older Komodo revision, so its statement describes that snapshot rather than current source. The docs matter here because readers decide whether to ask for a feature based on them; the runtime already supports the case.
+
 ## Executive summary
 
 The analyses guide says biweekly patterns stay non-actionable because no biweekly schedule exists yet. In fact `recurringCadenceRecurrence` maps biweekly to a creatable `Recurrence{Week, Interval: 2}` and daily to a creatable daily rule; only unknown cadences receive the non-creatable reason. A regression already asserts that a biweekly preview is creatable. The recommended action is to delete the false limitation and state the real rule, while framing the guided-model-setup note if its pinned snapshot is intentional.

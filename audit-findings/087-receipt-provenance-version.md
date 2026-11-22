@@ -5,6 +5,10 @@ scope: backend-domain
 status: accepted
 ---
 
+## Scenario
+
+Gmail receipt discovery is a scheduled background scan, not a screen the user clicks. The scan worker fetches new Gmail messages, decides whether each is a receipt, extracts the merchant, amount, and reference, and saves a receipt row before the user reviews receipts on the receipts screen. Each saved row carries provenance, meaning a producer name and a version string recording which detector-and-extractor combination produced it. The detector classifies a message as a receipt, shipping notice, or other verdict; the extractor pulls out the merchant and amount. The version matters because changing that combination must invalidate cached review standing, meaning a previously reviewed receipt must be reviewed again, and the later receipt-matching step consumes the same identity to claim a receipt against a transaction. The value crosses into SQLite as two strings inside the stored receipt row; no request body carries it. The version is written once by the store helper used at every save site. A test also compares the stored value against constants declared in the Gmail package. That second declaration is the duplicate: a version bump applied to one source but not the other leaves two different provenance values saved on receipts with no failing signal.
+
 ## Executive summary
 
 The producer name and version string recorded on receipts exist in two places: as gmail constants and as the return value of `store.ReceiptProvenanceForEmail()`. Production writes use the store function; the gmail constants are referenced only by a test asserting the two agree. A version bump can therefore be half-applied with no signal. The recommended action is to delete the gmail constants and have the test compare against the store function.

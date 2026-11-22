@@ -5,6 +5,12 @@ scope: backend-api-persist
 status: accepted
 ---
 
+## Scenario
+
+The persistence layer has a shared conformance suite, a set of Go tests that every Store implementation must pass to earn the Store name. A developer adding or swapping a backend starts this internal path through `go test`; the SQLite adapter's `TestStoreConformance` calls `storetest.Run` with its own store factory, and that call is the caller that runs the suite. The suite exercises the Store interface, the set of operations for saving and loading model data, through public methods only, with no SQL or file paths, so a replacement backend can prove it behaves the same way. Each check is a named Go subtest, and the list of names is what callers read to judge coverage.
+
+One of those names, `ArtifactsRoundTripAndKeepFirstWrite`, refers to a retired artifact model; the current seam persists projection state, slices, rows, and evaluation outputs instead. Its body is empty, so the test runner reports it as a passing check without ever checking anything, and the pass appears in the green result before a developer reviews the report. The data crossing the boundary here is the Store interface itself — operations such as saving and getting projection state — not a network payload.
+
 ## Executive summary
 
 The Store conformance suite, the shared set of tests every Store implementation must pass, advertises a check named `ArtifactsRoundTripAndKeepFirstWrite`, but its body is empty. The suite is the contract gate callers use to judge any Store implementation, so an always-passing entry gives false coverage.

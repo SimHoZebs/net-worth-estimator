@@ -5,19 +5,33 @@ scope: ui-ux
 status: needs-review
 ---
 
+## Scenario
+
+When you open the activity page for an account, click an account card to open its detail dialog, or open a transaction's detail sheet, the app shows a table of transaction rows. You start the work by opening that screen or dialog; there is no separate request you type. The app draws the rows as soon as the screen is ready, using transaction records it already holds together with projected occurrences when a forecast has been requested. Each row shows a date, an icon, a title, and an amount. The title is the plain-text name stored on the transaction.
+
+The three surfaces do not each build their own table. A single shared row component, described in the code as the one "single visual transaction row", owns the table layout, the class names, and the click-to-view behavior; the three screens only supply the transaction data and a handler. That component exists so the same row looks and behaves the same everywhere instead of every screen duplicating the table and its interaction.
+
+The layout puts the title in a flex child, meaning a box inside a flex container, which is a row that lets its children share the available width. By default a flex child will not shrink narrower than its own text, so the component relies on a rule called min-w-0, which lets that child shrink below its natural text width. When there is not enough room, the title is truncated, meaning cut short with an ellipsis, so it does not widen the table. The date and amount columns hold fixed widths and the title column takes whatever space is left.
+
+The problem appears at the moment the row is drawn. The title is capped twice: once by a character count and once by a maximum width computed from the viewport, which is the visible area of the browser window, on small screens, using a guessed allowance for the side columns. That guessed width only makes sense when the row is as wide as the page. In the account dialog and the detail sheet the row is far narrower than the viewport, so the character cap cuts titles off too early on desktop while the viewport-based cap does not hold them at all inside the narrow dialog and sheet.
+
 ## Executive summary
 
-The shared transaction row caps its title with `max-sm:max-w-[calc(100vw_-_13rem)]`, where `13rem` is a guessed clearance for date, amount, and icon, and also caps it by a character count. The same row renders inside the account-detail dialog and detail sheets, where `100vw` is not the row's width, so titles truncate too early on desktop and not at all in a narrow dialog. Remove both the character cap and the viewport-relative override, keep `min-w-0` on the flex child (the title's layout slot) so it can shrink, and let the existing fixed table columns bound the text.
+The shared transaction row draws the title of every transaction on the activity page, in the account-detail dialog, and in detail sheets. It is the single row layout that all three surfaces reuse, so a mistake in how the title is sized shows up everywhere.
+
+The title is currently capped twice: by a character count and by a viewport-relative maximum width that uses a guessed allowance for the side columns. That only works when the row is as wide as the page. In the dialog and the sheet the row is much narrower, so titles are cut off too early on desktop and are not bounded at all inside those narrow views.
+
+Remove both caps and let the fixed width of the date and amount columns bound the text, keeping the rule that lets the title's layout slot shrink.
 
 ## Recommended action
 
-Remove the character cap and the viewport-relative max-width from the title, keep `min-w-0` on the flex child, and let the existing fixed table columns bound the text. No new layout rule is needed.
+Remove the character cap and the viewport-relative maximum width from the title, keep the shrink rule on the title's flex child, and let the existing fixed-width date and amount columns bound the text. No new layout rule is needed.
 
 ## Before and after
 
 | Before | After |
 | --- | --- |
-| Title capped by a character count and a viewport-based max-width using a guessed `13rem` clearance; wrong wherever the row is not page-width. | Title bounded by its container and fixed columns through `min-w-0`, consistent on the page, in the account dialog, and in detail sheets. |
+| Title capped by a character count and a maximum width derived from the viewport with a guessed allowance for the side columns, so the result is wrong wherever the row is not page-width. | Title bounded by its own container and the fixed date and amount columns through the shrink rule, so it behaves the same on the page, in the account dialog, and in detail sheets. |
 
 ```mermaid
 flowchart LR
@@ -36,7 +50,7 @@ Titles truncate based on the space the row actually has, so they no longer cut o
 ## Alternatives considered
 
 - Leave as is — rejected because the guessed clearance stays wrong wherever the row is not page-width.
-- Give each container its own max-width override — rejected because it reintroduces the same duplicated, guessed constants this finding removes; container-bound sizing through `min-w-0` is the existing mechanism.
+- Give each container its own maximum-width override — rejected because it reintroduces the same duplicated, guessed constants this finding removes; container-bound sizing through the shrink rule is the existing mechanism.
 
 ## Downside of rejecting
 
@@ -44,6 +58,6 @@ Long titles keep truncating inconsistently — too short on the desktop page, no
 
 ## Verification
 
-Verify at 360px and desktop with a long title in the page table, the account dialog, and the detail sheet. These responsive claims are code-derived and require visual confirmation.
+Verify at narrow phone width and desktop with a long title in the page table, the account dialog, and the detail sheet. These responsive claims are code-derived and require visual confirmation.
 
 References: `frontend/src/components/activity/TransactionItem.tsx:85-94`; `frontend/src/components/cards/AccountDetailsModal.tsx:136`.

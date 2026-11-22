@@ -5,9 +5,15 @@ scope: contracts-types
 status: implemented
 ---
 
+## Scenario
+
+When you open the Money Flows page, or change its date window, the browser reads the saved model from the API — balances, checkpoints, schedules, transactions, and evaluations — and asks the API to build a money-flow graph for that window. The reply is JSON, a text format for named values, containing nodes for accounts, edges for money moving between them, totals, and a reconciliation summary. The browser checks the reply before drawing a Sankey diagram, a chart whose band thickness shows how much money moved, next to a filterable table and an edge detail panel.
+
+Every server reply like this has two descriptions in the frontend. A hand-written set of interfaces lives in the client contract file, and a generated set is rebuilt at container start from the OpenAPI snapshot, a checked-in file describing each endpoint and the shape of its JSON. The generated descriptions exist so a change to the API flows into the client automatically; the hand-written ones exist for values the UI owns, such as display labels and narrower kind types. Having both means a snapshot change can silently desync the hand-written copy without a compile error. At several write sites a cast, an instruction telling the type checker to treat a value as a chosen type without verifying it, bridges the two descriptions and removes that checking. The flows endpoint repeats the duplication locally with a hand-written graph guard and wrapper even though the generated client now provides the graph type, response body, and builder.
+
 ## Executive summary
 
-Server payloads are declared twice. The hand-written contract file declares roughly fifty interfaces while the generated model tree declares the same shapes from the OpenAPI snapshot, a checked-in description of the API that the client is generated from. The two disagree: generated `FinancialModel` uses `Account[] | null` where the hand-written one uses non-null `BackendAccount[]`.
+Server payloads are declared twice. The hand-written contract file declares roughly fifty interfaces while the generated model tree declares the same shapes from the OpenAPI snapshot. The two disagree: generated `FinancialModel` uses `Account[] | null` where the hand-written one uses non-null `BackendAccount[]`.
 
 Because of that gap, endpoint calls cross between the two with `as never` or `as unknown as` casts and lose type checking at five write sites. The `/v1/flows` mirror is the same problem in one place: its header claims VIS-01 has not landed and that generation cannot emit the types, but the snapshot and generated client now provide `FlowGraph`, `FlowsOutputBody`, and `buildFlowGraph`.
 

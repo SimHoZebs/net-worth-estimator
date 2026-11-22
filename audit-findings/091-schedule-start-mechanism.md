@@ -5,20 +5,26 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+The Analysis screen lists recurring patterns the system found in a person's bank movements. When the user opens a pattern to turn it into a forecast rule, a "Forecast plan" dialog appears, and the browser asks the API for a preview as soon as that dialog opens, before the user approves anything. The API builds a proposal and returns it as a JSON object, a plain text format for structured data that the browser reads directly. The object carries the proposed rule, its name and amount, its recurrence (the repeating rule, such as every two weeks), the start date, each recorded occurrence (one instance of the recurring movement) tied to its bank transaction, and an "Upcoming" list of future dates.
+
+To "claim" a recorded movement means to mark it as already represented by the schedule, so approving the schedule does not add the same bank fact a second time as a forecast movement. The preview helper exists so the user can review the proposal without writing any data; approval is a separate, later request that creates the schedule. The analyses guide is the reference a developer or reviewer reads to understand this flow. It currently says the start is moved forward by one full interval past the latest movement to prevent duplication. The code sets the start to the oldest recorded movement and claims each movement at creation instead.
+
 ## Executive summary
 
-The analyses guide explains how a generated schedule starts and claims recorded bank movements so that approving the schedule never duplicates those facts. It currently says the schedule starts one full interval after the latest recorded movement for that purpose. The code does not do that. It sets `StartDate` to `firstDay`, the oldest movement, while the `Upcoming` list advances from `lastDay`. The source comment records the real mechanism: creation claims each recorded movement onto its occurrence, and `Upcoming` then lists six dates after the latest movement. The single fix is to correct the sentence in the guide.
+The analyses guide explains how a generated schedule starts and claims recorded bank movements so that approving the schedule never duplicates those facts. It currently says the schedule starts one full interval after the latest movement for that purpose, but the code does not do that. It sets the start date to the oldest movement, while the "Upcoming" list advances from the latest movement. The source comment records the real mechanism: creation claims each recorded movement onto its occurrence, and "Upcoming" then lists six dates after the latest movement. The single fix is to correct the sentence in the guide.
 
 ## Recommended action
 
-Rewrite the sentence in the analyses guide to match the existing code. No code change is needed. Say that the schedule starts on the oldest movement, that each recorded movement is claimed onto its occurrence at creation, and that `Upcoming` lists six dates after the latest movement. Drop the claim that the start is advanced by one interval to prevent duplication; claim-at-creation is what prevents duplication.
+Rewrite the sentence in the analyses guide to match the existing code. No code change is needed. Say that the schedule starts on the oldest movement, that each recorded movement is claimed onto its occurrence at creation, and that "Upcoming" lists six dates after the latest movement. Drop the claim that the start is advanced by one interval to prevent duplication; claim-at-creation is what prevents duplication.
 
 ## Before and after
 
 | | Description in the guide |
 |---|---|
 | Before | Schedule starts one full interval after the latest recorded movement so approval never duplicates bank facts |
-| After | Schedule starts at the oldest movement, each recorded movement is claimed at creation, and `Upcoming` lists six dates after the latest |
+| After | Schedule starts at the oldest movement, each recorded movement is claimed at creation, and "Upcoming" lists six dates after the latest |
 
 ```mermaid
 flowchart LR
@@ -39,7 +45,7 @@ The guide stops describing behavior the code does not have, so a reader approvin
 ## Alternatives considered
 
 - Leave as is. This keeps a description that contradicts the code and misleads readers about where the schedule begins. Rejected.
-- Change the code to match the guide. This would alter how schedules start and how movements are claimed, a behavior change far beyond a documentation correction. Rejected.
+- Change the code to match the guide. That would alter how schedules start and how movements are claimed, a behavior change far beyond a documentation correction. Rejected.
 
 ## Downside of rejecting
 

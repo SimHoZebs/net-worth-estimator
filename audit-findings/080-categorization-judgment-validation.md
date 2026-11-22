@@ -5,6 +5,10 @@ scope: backend-domain
 status: needs-review
 ---
 
+## Scenario
+
+Two backend features ask the same machine-learning provider at the URL configured by `ML_JUDGMENT_URL`: payment analysis asks it to judge findings, and transaction categorization asks it to suggest a category. When you open an analysis, or when imported transactions are categorized, the work starts internally—the payment path through `judgePayments`, the categorization path through the classifier worker—and the browser sees the finished judgments or categories afterward. In both cases the provider receives a batch, a group of up to 100 requests handled together, and replies with structured data as JSON, a text format for exchanging data: one decision per request carrying a request ID, a status such as ready or pending, a decision, a strength, and an optional reason. `judgment.Assess` is the shared gate for payments: it rejects duplicate or mismatched request IDs, impossible statuses, and reasons over 2000 bytes before any decision is applied. The categorization learner called the provider session directly and accepted a row only when status was ready, decision supported, and strength strong, so a malformed response that payments would reject could still assign a category. The gate exists because a provider answer is untrusted data and must be checked before it changes results.
+
 ## Executive summary
 
 Payments pass every provider batch through `judgment.Assess`, which rejects duplicate request IDs, missing or mismatched IDs, structurally impossible statuses, and reasons over 2000 bytes. The categorization learner calls `session.Evaluate` directly and accepts a row only when its status is `ready` with a strong supported decision, so a duplicate ID or overlong reason passes there and fails in payments. Both run live under the same `ML_JUDGMENT_URL`, so one provider contract has two enforcement points.

@@ -5,6 +5,10 @@ scope: backend-domain
 status: needs-review
 ---
 
+## Scenario
+
+Payment analysis asks a machine-learning provider to judge candidates in batches of up to 100, and the provider can answer ready, pending, or unavailable. Pending means a later retry may produce an answer; unavailable means the provider could not answer at all. Because one batch can contain a mix, the backend must choose a single deferred error—a reason to report the result as not yet final—for the whole run, using the rule that unavailable outranks pending. When you open an analysis, or change settings enough to trigger a recompute, the browser requests the analysis and sees the chosen status only after the backend has aggregated every batch. The work is internal: `judgment.Assess` decides the error for one batch, `judgePayments` and `judgeSelectedPayments` combine batch errors during full recompute, the incremental path does the same for changed streams, and `scanPaymentJudgments` picks the final status from the resulting findings. The data involved is judgment status values carried in JSON, a text format for exchanging structured data. The precedence rule exists so a run containing any unavailable answer is reported as unavailable instead of being softened to pending.
+
 ## Executive summary
 
 The precedence rule "unavailable outranks pending" is decided in three places: in `judgment.Assess`, again when `judgePayments` and `judgeSelectedPayments` aggregate 100-item batches, and again in `scanPaymentJudgments` when final findings are scanned. The comments on the incremental helpers say they match `judgment.Assess`, so the rule is currently kept consistent by prose rather than code.

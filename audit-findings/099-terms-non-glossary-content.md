@@ -5,6 +5,10 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+When a maintainer writes product copy or reviews a change, they open the terminology glossary, the project's normative list of agreed words — normative means that when another document or an interface string disagrees, the glossary wins. Three of its sections go beyond naming. One restates the replay-ordering algorithm, the rule for the order in which balance checks and transactions are applied when rebuilding an account's history, which the technical overview owns. One duplicates the distinction between Analysis (a versioned inference over saved evidence that produces findings with reasons and uncertainty) and income evidence (the result of the payments Analysis) and adds a sentence about where the result appears on the Outlook screen. One states the UI test policy together with a negative claim that a new route-name check would make false. No browser request or parser is involved; this is a documentation workflow the maintainer starts before the wording reaches a screen. The glossary exists so one name is agreed in one place while the owning documents keep the detail.
+
 ## Executive summary
 
 The glossary is the single home for the project's agreed words. Three of its sections are not term definitions. One restates the replay-ordering algorithm owned by the technical overview, one duplicates the analysis-versus-income-evidence distinction from that same overview while adding a single sentence about where the result appears in the UI, and one states test policy together with a negative claim that becomes false the moment a route-name check is added. The code currently matches the documented ordering, so these are drift risks rather than contradictions. Reduce each passage to a naming fact plus a link.

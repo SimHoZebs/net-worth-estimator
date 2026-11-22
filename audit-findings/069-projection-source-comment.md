@@ -5,6 +5,10 @@ scope: backend-api-persist
 status: accepted
 ---
 
+## Scenario
+
+The Outlook forecast and the Evaluations page read a single-shot projection to draw the net-worth chart and current amounts, and the browser asks for it when those views load, before anything can be displayed. The API replies with a JSON body and one response header named `Projection-Source`, meaning a small piece of metadata sent alongside the body, whose value is deliberately one word: `computed` or `shared`. The header tells the client whether the number came from its own calculation or from a calculation another request already started. The manual checks in `TESTING.md` state that a deterministic request, meaning a canonical request with no request-supplied model and no overrides, always reports `computed`. Canonical requests try to assemble the answer from stored slices, timeline rows, and evaluation outputs that an earlier build produced; only when that stored build is missing or stale does the API compute directly. `shared` is reserved for a browser that attaches to an in-flight stochastic run started elsewhere. A short comment beside the `computed` constant is the only in-code explanation of this rule, and the wording this finding targets says stored results do not exist. That would lead a maintainer to treat the read-and-build path as dead code and remove it. The fix changes the comment only; the header values stay as they are.
+
 ## Executive summary
 
 The `Projection-Source` header tells the client where a projection result came from and is deliberately single-valued: `computed` or `shared`. The constant for `computed` is documented as "Every projection computes directly: no stored results exist." That comment is wrong. The file's own canonical read path first tries `readDeterministic`, which assembles a result from stored slices, rows, and evaluation outputs and labels that cache hit `computed`.

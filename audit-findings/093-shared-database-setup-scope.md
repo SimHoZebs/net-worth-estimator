@@ -5,20 +5,26 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+Startup on Northflank is not a user screen. Northflank starts the API service by running a boot script, the small wrapper that prepares the process before the server itself starts. That wrapper runs the schema setup tool before launching the server because, on a diskless host, a machine without a persistent data disk, the database file is fresh on every boot and its tables must be created again before the server can read or write them. The work happens at boot, before the API answers any request, so a reader never sees a failure message from it. Here setup means provisioning the database schema, the set of tables the app needs, not upgrading an existing database. The migration SOP keeps those jobs separate: fresh or current schema setup may run at boot, while version upgrades and data conversion of existing data run as a one-time operator step. The shared-database guide is what an operator reads to decide where setup belongs.
+
+That guide currently says not to put setup in the server entrypoint or an automatic startup dependency. Read as a blanket ban, it tells the operator to remove the wrapper that makes the diskless boot work. The fix is to scope the sentence to conversion.
+
 ## Executive summary
 
-The shared-database guide says not to put setup in the server entrypoint or an automatic startup dependency. Here setup means database schema provisioning, and the entrypoint is the script that starts the server. In practice `deploy/api-boot.sh` runs `setupdb` on every boot for diskless hosts, which are hosts without a persistent data disk, and the migration SOP separates that fresh-schema provisioning from the conversion hook that upgrades existing data. A reader following the blanket ban would remove the wrapper that makes the Northflank boot work. The fix is to scope the sentence to conversion only.
+The shared-database guide says not to put setup in the server entrypoint or an automatic startup dependency. Here setup means database schema provisioning, and the entrypoint is the script that starts the server. In practice the boot wrapper runs the schema setup tool on every boot for diskless hosts, and the migration SOP separates that fresh-schema provisioning from the conversion hook that upgrades existing data. A reader following the blanket ban would remove the wrapper that makes the Northflank boot work. The fix is to scope the sentence to conversion only.
 
 ## Recommended action
 
-Narrow the sentence in the shared-database guide. State that version upgrades and data conversion stay out of the entrypoint, while fresh or current schema provisioning may run through `api-boot.sh` as the migration SOP describes. No code change is needed.
+Narrow the sentence in the shared-database guide. State that version upgrades and data conversion stay out of the entrypoint, while fresh or current schema provisioning may run through the boot wrapper as the migration SOP describes. No code change is needed.
 
 ## Before and after
 
 | | Guidance in the guide |
 |---|---|
 | Before | Do not put setup in the server entrypoint or an automatic startup dependency |
-| After | Keep version upgrades and data conversion out of the entrypoint; fresh or current schema provisioning may run through `api-boot.sh` as the SOP describes |
+| After | Keep version upgrades and data conversion out of the entrypoint; fresh or current schema provisioning may run through the boot wrapper as the SOP describes |
 
 ```mermaid
 flowchart LR
@@ -33,16 +39,16 @@ flowchart LR
 
 ## Expected improvement
 
-The guide matches the documented boot path, so a reader will not strip out `setupdb` from the startup wrapper. This is a documentation-accuracy improvement rather than a measured speed or size gain; no benchmarks were run for this finding.
+The guide matches the documented boot path, so a reader will not strip out the schema setup call from the startup wrapper. This is a documentation-accuracy improvement rather than a measured speed or size gain; no benchmarks were run for this finding.
 
 ## Alternatives considered
 
 - Leave as is. The blanket ban conflicts with the boot wrapper and the SOP, and a reader may break the Northflank boot by following it. Rejected.
-- Change `api-boot.sh` to stop provisioning at boot. That would break diskless hosts that rely on it and is a behavior change, not a documentation fix. Rejected.
+- Change the boot wrapper to stop provisioning at boot. That would break diskless hosts that rely on it and is a behavior change, not a documentation fix. Rejected.
 
 ## Downside of rejecting
 
-The blanket prohibition stays, so operators may remove the `setupdb` call from the boot wrapper and leave diskless hosts without the schema they need to start.
+The blanket prohibition stays, so operators may remove the schema setup call from the boot wrapper and leave diskless hosts without the schema they need to start.
 
 ## Verification
 

@@ -5,6 +5,10 @@ scope: frontend-domain
 status: accepted
 ---
 
+## Scenario
+
+Two credit-card surfaces show a statement's status. The card statements list shows each derived statement with a label such as Open, Partially paid, Paid in full, or Status unknown. The payment suggestion queue shows proposed matches between a posted card payment and a statement, using the same kind of label. When either screen loads, the browser asks the API for statement reads, and the API replies with each statement's billed amount, the total allocated to it, and the remaining balance as JSON, a text format for exchanging structured data. The statement read deliberately carries no status field, so the frontend domain layer—plain functions that shape server data for display—derives the label in the browser before the text is drawn. A status ladder is the ordered rule that maps those amounts to a label: a zero or negative remaining balance means paid in full, a positive allocation means partially paid, otherwise open. `derivedStatementStatus` applied that ladder for the list with an "unknown" guard when any amount is missing, while `statementStatusFromTotals` repeated the same ladder for the suggestion queue. Both are internal functions with no screen calling them directly; they exist because the backend sends the authoritative amounts and leaves the labeling to the client.
+
 ## Executive summary
 
 The backend statement read does not return a status field, so the frontend derives it. It derives it twice: `derivedStatementStatus` maps remaining and allocated amounts to paid-in-full, partially-paid, or open with an `"unknown"` guard for missing amounts, while `statementStatusFromTotals` repeats the same ladder for the payment suggestion path. The two copies already handle nulls differently.

@@ -5,6 +5,10 @@ scope: deploy-build-test
 status: accepted
 ---
 
+## Scenario
+
+This is repository housekeeping, not a screen or a user action. At the repository root sit two tracked files: a 39 KB binary Git index snapshot and a zero-byte lock file. A Git index is the staging-area file that records which files are tracked and their checksums; committing a snapshot of it captured a baseline of an older frontend layout. No application code starts this work and no tracked source references either name, so there is no runtime caller to name — the files are inert content added by a single baseline commit. Nothing happens on a screen and no data crosses a runtime boundary; the format is a binary index file plus an empty lock file, and they remain only because that baseline was committed. The layout they describe — a root-level app file, a package lock, and a CI workflow under a different name — no longer exists in the checkout, so the pair can only invite a reader to mistake an old baseline for current state.
+
 ## Executive summary
 
 `.snapshot-index` is a 39 KB binary Git index snapshot and `.snapshot-index.lock` is a zero-byte file, both tracked at the repository root. No tracked source references either name. Their last change added an obsolete layout, `package-lock.json`, `biome.json`, `components.json`, a root-level `src/App.tsx`, and `.github/workflows/ci.yml`, none of which exist in the current checkout.

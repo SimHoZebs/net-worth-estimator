@@ -5,6 +5,10 @@ scope: frontend-domain
 status: accepted
 ---
 
+## Scenario
+
+The app's Cash flow screen shows money moving between accounts over a chosen period, with a date-range picker above the diagram offering presets such as "This month", "Last month", "Last 3 months", "Year to date", and "Last 12 months". When you open the screen or pick a preset, the browser asks the API for the flow data for that window and the API replies with the matching transactions as JSON, a text format for exchanging structured data. Choosing a preset also runs a frontend domain helper—a plain function that shapes data for display—that turns the friendly label into a concrete start and end date. That calculation must find the first and last day of a month correctly at month ends and in leap years, including when the requested day does not exist in that month. The shared helper `clampMonth` already did this for the forecast horizon label in `horizonDate`, using UTC—a clock-independent time standard that keeps dates stable across time zones—and day 31 to mean "the last day of the month". The flow-window helpers `firstOfMonth` and `lastOfMonth` instead reimplemented the same rule with their own UTC math. Two exports, `firstDayOfMonthIso` and `lastDayOfMonthIso`, existed only so the flow-window test could assert those boundaries; both helpers and the wrappers are internal, with no screen calling them directly.
+
 ## Executive summary
 
 Two frontend helpers compute the first and last day of a month with their own UTC math, duplicating the clamped-month formula that `clampMonth` already owns for `horizonDate`. Leap-year and month-end correctness is therefore maintained in two live files, and the `flowWindow` test pins its own copy instead of the shared one. Two more exports, `firstDayOfMonthIso` and `lastDayOfMonthIso`, exist only to serve that test.

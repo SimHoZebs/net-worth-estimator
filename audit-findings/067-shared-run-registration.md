@@ -5,6 +5,10 @@ scope: backend-api-persist
 status: needs-review
 ---
 
+## Scenario
+
+When a pinned threshold card is shown on the Outlook forecast, or when the Evaluations page has evaluations to score, the screen asks the API for a projected range of outcomes. The browser posts a JSON request carrying the financial model and a fixed seed. That calculation runs many simulations, so instead of waiting for one reply the API keeps the connection open and sends a series of small text updates: a progress update, partial ranges, then a final result or an error. This is a stream of Server-Sent Events, meaning a long-lived text response whose updates the browser splits into messages with a small text reader, because the generated client describes the stream only as text and cannot describe the JSON inside each update. The browser makes the request when the view needs the range, before the chart or card can display it. Because identical seeded requests produce identical work, the API keeps a registry, a map keyed by the request's result key, so a second request can join the first instead of recomputing it. The request that starts the computation is the owner, and a request that joins is labelled `shared` in the `Projection-Source` response header. The registry entry is currently created before the stream body runs. That body first checks whether the writer can push bytes straight to the browser, and on a writer that cannot it stops before running the part that starts the owner's computation and removes the entry.
+
 ## Executive summary
 
 `stochasticSSE` serves a probabilistic projection result by registering a shared run in a package-global registry before it returns the streaming response. A run is the in-flight computation that two requests with the same seed can share, and the registry is the map keyed by that seed's result key. The owner is the request that actually starts the computation.

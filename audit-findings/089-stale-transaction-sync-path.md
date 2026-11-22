@@ -5,6 +5,10 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+This is a documentation lookup, not a user screen. A developer reading the transaction-identity section of the technical overview wants to see how a bank transaction keeps the identity it had at the provider when it is saved locally. The section points them to a Go helper named `transactionSyncKey` by file path, so the format crossing here is just a path string in the document leading to source code. That helper stores the exact upstream triple, meaning the provider name plus the provider's account ID and transaction ID, in the local database, separate from the canonical UUID, the app's own stable ID assigned to the row. The helper lives in the SQLite adapter, the package that talks to the application's local database file. The pointer used to name a path outside that adapter, where no such type exists, so a reader following it lands on a missing file. The same wrong path has been copied into a grooming note, meaning a planning note for later cleanup work, so the error is spreading. The pointer exists to make that identity rule verifiable in code; a stale path defeats that purpose.
+
 ## Executive summary
 
 The transaction-identity section points at `backend/internal/store/sync_pending.go`, which does not exist; the type lives under the SQLite adapter. The same stale path is propagating into a grooming note. A reader following the pointer hits a missing file. The recommended action is to correct the pointer in both places.

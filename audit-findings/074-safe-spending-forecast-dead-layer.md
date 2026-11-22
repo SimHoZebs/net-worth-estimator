@@ -5,6 +5,10 @@ scope: frontend-domain
 status: accepted
 ---
 
+## Scenario
+
+The Safe Spending section of the Outlook page answers how much you can spend next cycle and shows the cards, the bills still to cover, and an expected-pay figure. When you open Outlook, the browser asks the API for a Safe Spending summary and displays the returned JSON before showing those amounts. The API computes the amounts from one evidence cut, meaning the snapshot of posted and pending facts used for that single calculation, and the paid or pending state of each schedule occurrence. The client only decides display windows, such as which payment period a bill belongs to. Before the server became the sole owner of the amounts, the client also summed windowed totals and re-expanded recurring schedules, meaning it turned a repeating schedule into its individual future occurrences, to forecast income. Those functions and the recurrence helpers they called stayed in the domain layer after the takeover. This is an internal path: no screen calls them, their only callers are their own tests, and a stale grooming inventory still describes callers that no longer exist. They matter because they offer a second way to compute the same income figure, which can disagree with the server's `expectedPay` after any change to recurrence rules.
+
 ## Executive summary
 
 Safe Spending answers how much the user can spend. `safeSpending.ts` states the current rule: every amount comes from the server summary and only time windows stay on the client. Several pre-takeover windowed sums and forecasts survived with no production caller.

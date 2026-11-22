@@ -5,6 +5,10 @@ scope: backend-domain
 status: needs-review
 ---
 
+## Scenario
+
+No screen starts this work; it belongs to the operator workflow for upgrading an existing installation. When an operator opens a maintenance window, stops the API, and runs the deployment migration body from the target image, they also have to repair databases that an older bug may have damaged. That bug cleared the posted time, meaning the instant a bank payment actually settled, on settled rows while a pending refresh, meaning a bank update carrying a temporary authorization, arrived for a transaction that was claimed, or linked to an expected recurring payment. A live guard now stops that from happening again, but a database already written by the old code still needs a one-time fix. The operator runs the repair helper by hand against a verified backup copy of the SQLite database, the application's local store on disk, while the API is stopped. It edits that copy only after its own checks pass and refuses to write when any check fails. No user sees a result, because the upgraded service has not started yet. The helper exists because the guard protects only future writes, not rows already written. The migration ledger is the list operators use to find one-time tools and retire them once every target verifies; this helper is absent from it, so only someone who reads its own README knows it must be run.
+
 ## Executive summary
 
 `repair-claimed-posted-time` is a one-time script that fixes settled bank transactions whose posted time was zeroed when a pending refresh arrived while the transaction was claimed. A live guard in `writeBankValues` now stops that from happening again. The migration ledger (`MIGRATIONS.md`) requires every one-time script to be listed as pending and retired only after each target verifies, but this tool appears in no migration doc and in no `migrate.sh` step. An operator can only find it by reading its README by hand.
@@ -13,7 +17,7 @@ The maintenance cost is a repair tool that sits outside the system meant to trac
 
 ## Recommended action
 
-Add a pending-table row in `deploy/MIGRATIONS.md` with the operator command and the postcondition that no settled rows have non-positive posted time. Wire the binary into `deploy/migrate.sh` using the same fail-closed candidate-copy execution as the other one-time tools — the script applies changes to a copy and only swaps it in after checks pass. Do not delete the script until targets verify. This extends the ledger, not the runtime.
+Add a pending-table row in `deploy/MIGRATIONS.md` with the operator command and the postcondition that no settled rows have non-positive posted time. Wire the binary into `deploy/migrate.sh` using the same fail-closed candidate-copy execution as the other one-time tools: the script applies changes to a copy and only swaps it in after checks pass. Do not delete the script until targets verify. This extends the ledger, not the runtime.
 
 ## Before and after
 

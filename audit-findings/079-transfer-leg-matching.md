@@ -5,6 +5,10 @@ scope: backend-domain
 status: needs-review
 ---
 
+## Scenario
+
+A transfer between two of your own accounts arrives from the bank as two separate records: an outflow from one account and an inflow into the other, which can post days apart because the two sides are logged separately. The analysis pipeline pairs them as one transfer so the money is not counted twice, and excludes transfer legs from payment evidence. This work is internal to the backend analysis and store layers and starts when the browser requests an analysis or payment findings: the transfer detector, the payment-stream exclusion path, and the link validator that runs when an owner confirms a pair. The data crossing those internal boundaries is bank transaction facts—an amount string, a currency, and a posting timestamp—carried in JSON, a text format for exchanging structured data. The matching predicate—a yes/no rule—requires settled legs (posted and final, not pending or void), USD, opposite signs, different accounts, amounts equal to the cent, and a gap of at most seven days. A second predicate nets a confirmed external outflow with an external inflow of equal rounded amounts so row totals count the pair once rather than twice. The seven-day window was chosen as a product rule because the two legs are logged apart, which is why the value appears as a constant in each path with a comment saying one copy mirrors another.
+
 ## Executive summary
 
 The rule for matching opposite transfer legs — settled, USD, opposite sign, different accounts, equal cents, within seven days — is implemented in three places: the transfer detector, the payment-stream exclusion path, and the SQLite link validator, which carries its own copy of the seven-day constant with a comment that it mirrors the detector. A second rule, the nettable-link predicate of an external outflow plus an external inflow with equal rounded amounts, is implemented again in both the path netter and the flow-graph netter.

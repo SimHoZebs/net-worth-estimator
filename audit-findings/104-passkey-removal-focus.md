@@ -5,6 +5,10 @@ scope: ui-ux
 status: needs-review
 ---
 
+## Scenario
+
+On the Account page's Passkeys list, a signed-in user presses Remove on one passkey. The browser sends a delete request to the auth service carrying that passkey's id, and when the request succeeds the client calls `listPasskeys()`, a helper that refetches the whole list and rebuilds every list item so the display matches the server. The response is a short JSON array of passkeys with ids and optional names; it arrives after the click and just before the updated list appears. `listPasskeys()` exists as the simplest way to refresh the list after a change, but it clears and recreates the Remove button that had focus, so keyboard focus falls to the document body, and no success message is reported on the successful path. The list is not a live region — an element whose text changes assistive technology announces — so a screen-reader user gets no confirmation.
+
 ## Executive summary
 
 Removing a passkey calls `listPasskeys()`, which clears and rebuilds every list item. The focused Remove button is destroyed, so focus falls back to the document body. No success feedback is reported and the list has no live region (an element whose text changes assistive technology announces), so a screen-reader user gets no confirmation and a keyboard user must tab from the top again. Remove only the affected item, move focus to a known control, and report success.

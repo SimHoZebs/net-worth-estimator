@@ -5,6 +5,10 @@ scope: backend-domain
 status: needs-review
 ---
 
+## Scenario
+
+Forecast screens such as Outlook, Evaluations, and the purchase planner show a projection—the computed forecast result the app keeps for display. When you open one of these screens, the browser asks the API for the projection and the backend either serves stored results or recomputes them. The stored projection state crosses the internal boundary as JSON, a text format for exchanging structured data, carrying a revision counter, a dirty-from date marking where stored results must be rebuilt, a projection start and horizon, and an engine version that defaults to `v1`. On every read the handler compared that version with a Go constant—a fixed value defined in the source code—and, on a mismatch, reinitialized the state, bumped the revision, and set the dirty-from date to the projection start so cached results would be rebuilt. A cache is stored output kept so it can be reused instead of recomputed, and the version check exists to invalidate that cache when the calculation engine changes. The check is internal and runs whenever the projection handler reads or builds a projection. No second version exists or is proposed: commit `d82ce5b1` removed the dead recurrence pipeline and duplicate engine but left the version constant, so the mismatch branch can only be reached by manually editing a stored value. SimpleFIN protocol 2 is a separate data-import migration and is untouched by this finding.
+
 ## Executive summary
 
 A projection — the computed forecast result kept for display — carries a schema column that defaults to `v1`, mirrored by a Go constant. That value is checked on every projection read and, on a mismatch, can reinitialize state, bump the revision, and set `dirty_from`. No `v2` exists or is proposed. Commit `d82ce5b1` removed the dead recurrence pipeline and duplicate engine but left `unifiedEngineVersion` untouched, so the check is machinery for invalidating a cache on a value that never changes.

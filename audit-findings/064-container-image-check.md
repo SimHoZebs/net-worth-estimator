@@ -5,6 +5,12 @@ scope: deploy-build-test
 status: accepted
 ---
 
+## Scenario
+
+The backend is shipped to a hosting provider as a container image, a packaged filesystem plus startup settings such as the default command and the healthcheck that reports readiness. A maintainer building for a standalone provider follows the deployment guide and runs `deploy/container.test.mjs` against the named image to check that it is portable: it runs as a non-root user, has no entrypoint — a command an image always runs before its command, which would block command overrides — defaults to the API server, exposes its readiness probe on the provider-assigned port, and boots with schema setup only, without creating the configured guest before authorized access. The test reads the image metadata and a readiness response, launches the image with disposable state and no external network, then checks that an unauthenticated session request is denied. The image name crosses the boundary through an environment variable called `DEPLOYMENT_TEST_IMAGE`.
+
+This is internal verification work rather than a user screen. The callers are the deployment guides and a maintainer following them, plus the hosted `Tests` workflow, which builds the Northflank target and runs that target's container test instead. The e2e gate builds the standalone image but does not assert these image-metadata or no-guest-at-boot properties, so a regression in the Dockerfile or the boot script can pass every hosted gate.
+
 ## Executive summary
 
 `deploy/container.test.mjs` asserts image-level properties of the standalone backend image that nothing else checks: a non-root `app:app` user, no entrypoint, `/app/server` as the default command, the healthcheck target, and schema-only boot that does not provision the configured guest. An entrypoint is the command an image runs by default.

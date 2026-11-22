@@ -5,6 +5,10 @@ scope: frontend-state
 status: accepted
 ---
 
+## Scenario
+
+When you work in the Gmail panel, sync settings, integrations, evaluation pins, Safe Spending settings, or purchases, the screen reads and writes through the shared query client. A scope is the workspace resource the data belongs to, and a mutation is a write request that changes server state. A cache is the browser's stored copy of those results, kept under a key that includes the scope. The browser starts reads when the screen loads and writes when you change a setting or pin an evaluation, and the result arrives as JSON from the endpoint before the screen shows the updated value. A read or write can finish after you have switched to another resource, so each module compares the scope captured when the request started with the current one before publishing its result; this identity guard keeps the old resource's data out of the newly selected resource. The helper exists because the same guard and publish lifecycle was written out in several separate state modules, so a fix to the guard has to land in each one.
+
 ## Executive summary
 
 Five state modules independently rebuild the same three operations against the shared query client, where a scope is the workspace resource the data belongs to and a mutation is a write operation. The `current(scope, signal)` identity guard — a check that the scope is still the one that started a request when the async result arrives — is written verbatim in Gmail and sync settings and nearly verbatim in workspace resources.

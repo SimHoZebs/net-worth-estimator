@@ -5,6 +5,10 @@ scope: ui-ux
 status: needs-review
 ---
 
+## Scenario
+
+On the Evaluations and Outlook screens, pin buttons on evaluation and funding-gap cards let a user choose whether a card appears on Outlook; on the Sources connect form, a Show token button reveals the setup token field. The user presses the toggle and the button immediately updates both its pressed state — reported to assistive technology by `aria-pressed`, the attribute that says whether a toggle is on — and the name that assistive technology announces. That name currently flips at the same time: pin buttons change their title and aria-label from Pin to Unpin, and the token button changes its visible text from Show token to Hide token. Nothing crosses a network boundary for the announcement; it is markup assembled by the browser when the card or form renders, which is why the announcement is decided by the name and pressed-state attributes. The repository already has the correct pattern in pattern review, where the name stays fixed and only `aria-pressed` changes.
+
 ## Executive summary
 
 These native buttons change `title` and `aria-label` (the control's accessible name) between "Pin" and "Unpin" or "Hide token" and "Show token" while also setting `aria-pressed` (the attribute that reports a toggle's on or off state). The announced name then asserts the opposite of the pressed state, so a user cannot tell whether the item is pinned. The repository already uses the correct stable-name pattern in pattern review. Keep one name and let `aria-pressed` carry the state.

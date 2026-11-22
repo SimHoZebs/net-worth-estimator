@@ -5,20 +5,26 @@ scope: doc-audit-reference
 status: accepted
 ---
 
+## Scenario
+
+On the Outlook screen, the page asks the API for account balances and safe-spending evidence as it loads. The browser makes those requests when the page opens, and the forecast and Safe spending card appear only after they succeed. If a request fails, the page shows a local alert, a box holding an error message and a Retry button, instead of the content; clicking Retry asks again, and when the retry succeeds the alert disappears. The response that crosses the boundary is a JSON error body, a short structured text message describing what failed, such as a 422 for balances or a 500 for evidence. A spec is an automated test file that drives a real browser. Two integration specs deliberately intercept those requests to return synthetic failures, then assert the alert text and the Retry button, so a failed prerequisite cannot leave the forecast disabled forever. The error-feedback guide is where the rules for this presentation live.
+
+That guide closes by saying no dedicated error-feedback specs exist and that only one current spec covers the area. The claim is stale: two specs directly exercise the retry presentation the guide owns. The fix is to remove the inventory claims rather than keep a count that goes out of date with each added spec.
+
 ## Executive summary
 
-The error-feedback guide closes by saying no dedicated error-feedback specs exist and that the only current spec is `selectLabels.spec.ts`. A spec is an automated test file. There are twelve spec files at this HEAD, and two directly exercise the presentation this guide owns: `outlookLoading.spec.ts` asserts a named alert with a Retry button and its disappearance after retry, and `safeSpendingEvidence.spec.ts` asserts a failure message and "Retry evidence" after a 500. This reopens territory finding 029 partly addressed, since that finding removed obsolete references but left an inventory that later additions made stale. The fix is to remove both inventory claims.
+The error-feedback guide closes by saying no dedicated error-feedback specs exist and that the only current spec is `selectLabels.spec.ts`. A spec is an automated test file. There are twelve spec files at this HEAD, and two directly exercise the presentation this guide owns: `outlookLoading.spec.ts` asserts a named alert with a Retry button and its disappearance after retry, and `safeSpendingEvidence.spec.ts` asserts a failure message and a Retry evidence button after a server error. This reopens territory finding 029 partly addressed, since that finding removed obsolete references but left an inventory that later additions made stale. The fix is to remove both inventory claims.
 
 ## Recommended action
 
-Remove both inventory claims from the error-feedback guide. Keep the single-channel and failed-edit retry rules as they are. Point to the integration-suite section of `TESTING.md` for current policy instead of maintaining a local count. No code change is needed.
+Remove both inventory claims from the error-feedback guide. Keep the single-channel and failed-edit retry rules as they are. Point to the integration-suite section of the testing guide for current policy instead of maintaining a local count. No code change is needed.
 
 ## Before and after
 
 | | Closing inventory in the guide |
 |---|---|
 | Before | No dedicated error-feedback specs; only current spec is `selectLabels.spec.ts` |
-| After | No inventory claims; keep the retry rules and point to the `TESTING.md` integration-suite section for current policy |
+| After | No inventory claims; keep the retry rules and point to the testing guide's integration-suite section for current policy |
 
 ```mermaid
 flowchart LR

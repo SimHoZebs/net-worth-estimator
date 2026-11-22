@@ -5,6 +5,10 @@ scope: frontend-state
 status: accepted
 ---
 
+## Scenario
+
+You open a transaction's detail sheet from the Activity list. While the sheet is open the browser fetches the analysis findings for that transaction and a statement-payment suggestion, meaning a match between the transaction and a card statement payment, and shows an Insights section with suggested actions such as applying a statement payment or settling a void hold whose transaction vanished. Both requests start when the detail opens, before the Insights section can show its suggestions. The findings and match records arrive as JSON, and a small adapter turns a raw match into a suggestion object with evidence and available actions, because the raw records are not in the shape the Insights builder expects. Typing in the detail editor causes renders, meaning re-runs of the component's display code. A memo is a cached value that recomputes only when one of its listed inputs changes, so the detail memoizes the Insights list to avoid walking the findings on every keystroke. Its listed input for the statement suggestion is meant to keep Insights current when the match changes, but the hook that builds the suggestion recreates that object on every render while a match is active. The memo then recomputes in the very case it was written to protect.
+
 ## Executive summary
 
 `TransactionDetail` memoizes `insightSuggestions` so that `buildInsightSuggestions` does not walk analysis findings on every editor keystroke. A memo is a cached value that only recomputes when one of its listed dependencies changes. The memo lists `statementSuggestion` as a dependency.
