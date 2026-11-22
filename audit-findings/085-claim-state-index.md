@@ -5,10 +5,50 @@ scope: backend-domain
 status: needs-review
 ---
 
-The claim and link mechanisms are sound and still needed: auto-claim writes the ordinary claim row, bank-row dedup uses provider keys, and canonical-payment IDs prevent one posted payment backing two allocations. The duplication is narrower. `buildObligations` builds a claim-to-transaction map with a posted-beats-pending preference while `claimState` builds separate settled and pending sets over the same transactions at the same cut. Both classify the same claim identities and can drift on precedence.
+## Executive summary
+
+The claim and link mechanisms are sound and still needed: auto-claim writes the ordinary claim row, bank-row dedup uses provider keys, and canonical-payment IDs prevent one posted payment backing two allocations. The duplication is narrower. A claim associates a transaction with an expected payment occurrence, and "at a cut" means at one replay boundary. `buildObligations` builds a claim-to-transaction map with a posted-beats-pending preference, while `claimState` builds separate settled and pending sets over the same transactions at the same cut. Both classify the same claim identities, so their precedence can drift.
+
+The recommended action is to compute one claim-state index and pass it to all three consumers instead of rebuilding the classification in each.
+
+## Recommended action
 
 Compute one claim-state index at the start of `BuildAtCut`, keep the posted-beats-pending rule in it, and pass it to `buildObligations`, `forecastPaydays`, and `cardStatementRows`. Leave the claim, reconcile, and canonical-payment paths untouched.
 
-Verify with a case containing a pending and a posted row claiming the same occurrence and assert both consumers classify it identically, then run claim, auto-claim, payday, and pending-statement tests. No disagreement was observed; the risk is drift and the two indexes return different shapes.
+## Before and after
+
+| Before | After |
+| --- | --- |
+| Two indexes over the same transactions at the same cut: an obligations map with posted-beats-pending, and separate settled/pending sets in `claimState`. | One shared claim-state index built once and consumed by obligations, payday forecast, and card statement rows. |
+
+```mermaid
+flowchart LR
+  subgraph Before
+    A[transactions] --> B[obligations map]
+    A --> D[claimState sets]
+  end
+  subgraph After
+    E[transactions] --> I[one index] --> O[obligations]
+    I --> F[forecastPaydays]
+    I --> C[cardStatementRows]
+  end
+```
+
+## Expected improvement
+
+Structural. A single classification keeps the posted-beats-pending rule from drifting between the obligations view and the payday and statement views. No benchmarks were run, so no speed or size improvement is claimed.
+
+## Alternatives considered
+
+- Keep two indexes. Rejected because precedence can drift and the two return different shapes.
+- Merge the claim, reconcile, and canonical-payment paths as well. Rejected as out of scope; those paths are sound and this finding targets only the duplicated classification.
+
+## Downside of rejecting
+
+Two indexes over the same data can classify the same claim differently, producing inconsistent obligations versus payday and statement results with no single place to fix the rule.
+
+## Verification
+
+Use a case with a pending and a posted row claiming the same occurrence and assert both consumers classify it identically, then run claim, auto-claim, payday, and pending-statement tests. These are proposed acceptance checks. No disagreement was observed; the risk is drift and the two indexes returning different shapes.
 
 References: `backend/internal/safespending/obligations.go:132-158`; `backend/internal/safespending/payday_income.go:11-35`; `backend/internal/safespending/payday_statements.go:286,324-327`; `backend/internal/domain/auto_claim.go:184-301`.

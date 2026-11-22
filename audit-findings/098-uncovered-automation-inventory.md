@@ -5,10 +5,49 @@ scope: doc-audit-reference
 status: accepted
 ---
 
-The integration-edge guide cedes the ship-or-no-ship checklist to the release-gates doc but keeps its own "Uncovered by automation" list. The mail-OAuth seam and image-extraction stand-in appear in both, and passkeys appear in both plus the e2e gate. A maintenance change to any one of those gaps must be applied in several docs.
+## Executive summary
 
-Make the release-gates section the sole owner. Replace the edge-tier section with a pointer that retains only tier-specific gaps, and link to the manual checklist instead of restating the passkey item.
+The integration-edge guide cedes the ship-or-no-ship checklist to the release-gates doc but keeps its own "Uncovered by automation" list, which records gaps not covered by automated tests. The mail-OAuth seam, the boundary of the mail OAuth integration, and the image-extraction stand-in, a test double for image extraction, appear in both lists. Passkeys appear in both plus the e2e gate. A maintenance change to any one gap must be applied in several docs. The fix is to give the release-gates section sole ownership.
 
-Verify that one owning list remains and the other two sites are pointers with the same heading.
+## Recommended action
+
+Make the release-gates section the sole owner. Replace the edge-tier section in the integration-edge guide with a pointer that retains only tier-specific gaps, and link to the manual checklist instead of restating the passkey item. No code change is needed.
+
+## Before and after
+
+| | Location of the gaps |
+|---|---|
+| Before | Integration-edge guide and release-gates doc both list the gaps; passkeys also in the e2e gate |
+| After | Release-gates section is the single owning list; other two sites become pointers with the same heading |
+
+```mermaid
+flowchart LR
+  subgraph before[Before]
+    A[Integration-edge guide lists gaps]
+    B[Release-gates doc lists gaps]
+    C[e2e gate lists passkeys]
+  end
+  subgraph after[After]
+    D[Release-gates owns the list]
+    E[Other two sites point to it]
+  end
+```
+
+## Expected improvement
+
+A change to a coverage gap is made in one place instead of several, so the lists cannot drift apart. This is a documentation-maintenance improvement rather than a measured speed or size gain; no benchmarks were run for this finding.
+
+## Alternatives considered
+
+- Leave as is. Each gap change still has to be applied in multiple docs, and the lists can disagree. Rejected.
+- Keep the edge-tier list as a full copy and only sync it manually. That preserves the duplication and the drift risk. Rejected.
+
+## Downside of rejecting
+
+The three sites keep overlapping, so a gap update applied in one doc but not the others leaves editors with conflicting guidance on what is covered by automation.
+
+## Verification
+
+Confirm one owning list remains and the other two sites are pointers with the same heading. This is a proposed acceptance check, not a recorded result.
 
 References: `docs/integration-edge-gates.md:3-4,156-166`; `docs/release-gates.md:111-131,121-127`; `docs/e2e-gate.md:35`.

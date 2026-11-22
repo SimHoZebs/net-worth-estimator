@@ -5,10 +5,50 @@ scope: frontend-state
 status: accepted
 ---
 
-`useFlowGraph` and `useCurrentPosition` each define a `take(revision, content, name)` closure inside a `useMemo` that concatenates `name:revision` parts with `|`, falling back to `JSON.stringify(content)`. The closures differ only in one guard. `useRemoteProjection` computes model identity a third way by filtering revisions, deduplicating and sorting them, and joining with `|`. Three hooks therefore derive which saved model is in view with different rules. Today the difference is intentional — current position excludes evaluations because they are backend-owned — but it is expressed by copying the function rather than by an explicit input.
+## Executive summary
 
-Move the fingerprint builder into `projectionSource.ts` as one function taking the row set, and have both hooks call it with their chosen set of rows. Express the evaluation exclusion in `useCurrentPosition` as an argument, not a modified copy. Leave the projection hook's deduplicated revision scheme alone because it serves a different cache, but name it distinctly so the three are not mistaken for one another.
+Three hooks derive which saved model is in view by building a fingerprint — a short key that changes when the underlying saved row changes. `useFlowGraph` and `useCurrentPosition` each define a `take(revision, content, name)` closure inside a `useMemo` that concatenates `name:revision` parts with `|` and falls back to `JSON.stringify(content)` when there are no revisions. A revision is the version number of a saved row. The two closures differ only in one guard. `useRemoteProjection` computes model identity a third way, by filtering revisions, deduplicating and sorting them, and joining with `|`.
 
-Verify with fixed saved rows that both hook keys change on the same row revision, and that toggling an evaluation changes the flow-graph key but not the current-position key. Confirm no extra refetch appears in either hook on an unrelated render.
+Today the difference is intentional: current position excludes evaluations, which are backend-owned, but that exclusion is expressed by copying the function rather than by an explicit input. The fix is one shared fingerprint builder in `projectionSource.ts` that takes the chosen row set.
+
+## Recommended action
+
+Move the fingerprint builder into `projectionSource.ts` as one function taking the row set, and have both hooks call it with their chosen rows. Express the evaluation exclusion in `useCurrentPosition` as an argument, not a modified copy. Leave `useRemoteProjection`'s deduplicated revision scheme alone because it serves a different cache, but give it a distinct name so the three are not mistaken for one scheme.
+
+## Before and after
+
+| | Before | After |
+|---|---|---|
+| Flow graph and current position | Each copies the `take` closure | Both call one shared builder with their row set |
+| Evaluation exclusion | Hidden in a copied guard | An explicit argument |
+| Remote projection | Third, deduplicated scheme under a similar name | Same scheme, distinctly named |
+
+```mermaid
+flowchart LR
+  subgraph Before
+    B1[Three hooks, three fingerprint rules]
+  end
+  subgraph After
+    A1[Flow graph + current position] --> A2[one fingerprint builder]
+    A3[Remote projection] --> A4[distinctly named scheme]
+  end
+```
+
+## Expected improvement
+
+The revision-and-fallback rule lives in one place, and the intentional evaluation exclusion becomes an explicit argument instead of a hidden difference between copies. This is a structural clarity improvement. No benchmarks were run, so no speed, render, or bundle benefit is claimed.
+
+## Alternatives considered
+
+- **Leave as is** — the rule exists in three copies, so a change to how a saved model is identified must be made three times, and the exclusion stays hidden in a copied guard.
+- **Unify all three hooks** — rejected, because `useRemoteProjection` needs a deduplicated revision scheme for a different cache; only its name should change.
+
+## Downside of rejecting
+
+The fingerprint rule stays duplicated across three hooks. A future change to revision handling can be applied unevenly, and the evaluation exclusion remains an implicit difference in a copied guard that is easy to remove accidentally, which would make current position react to backend-owned evaluations.
+
+## Verification
+
+With fixed saved rows, both hook keys must change on the same row revision, and toggling an evaluation must change the flow-graph key but not the current-position key. Confirm no extra refetch appears in either hook on an unrelated render.
 
 References: `frontend/src/state/useFlowGraph.ts:57-70`; `frontend/src/state/useCurrentPosition.ts:62-80`; `frontend/src/state/useRemoteProjection.ts:611-620`.

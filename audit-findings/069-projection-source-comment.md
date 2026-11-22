@@ -5,10 +5,49 @@ scope: backend-api-persist
 status: accepted
 ---
 
-The constant that labels a result's origin is documented as "Every projection computes directly: no stored results exist." The same file's canonical read path first tries `readDeterministic`, which assembles a result from stored slices, rows, and evaluation outputs, and labels that cache hit `computed`. The header is deliberately single-valued, and `TESTING.md` states deterministic requests always report `computed`, so this is not a request to change the wire contract. It is a stale comment that would lead a maintainer to treat the whole read-and-build orchestration as dead code.
+## Executive summary
 
-Correct the comment to say that `computed` marks a result derived from the canonical model, whether computed on this request or assembled from a stored build, and that only `shared` marks attachment to an in-flight stochastic run. Leave the constant values and the `TESTING.md` statement as they are.
+The `Projection-Source` header tells the client where a projection result came from and is deliberately single-valued: `computed` or `shared`. The constant for `computed` is documented as "Every projection computes directly: no stored results exist." That comment is wrong. The file's own canonical read path first tries `readDeterministic`, which assembles a result from stored slices, rows, and evaluation outputs and labels that cache hit `computed`.
 
-Verify with `go test ./backend/internal/api/projections/...` and a grep that no source still claims stored results do not exist. No header value should change.
+`TESTING.md` states deterministic requests always report `computed`, so this is not a request to change the wire contract. It is a stale comment that would lead a maintainer to treat the whole read-and-build path as dead code. The fix is to correct the comment to describe what the code actually does.
+
+## Recommended action
+
+Rewrite the comment so it says `computed` marks a result derived from the canonical model, whether computed on this request or assembled from a stored build, and that only `shared` marks attachment to an in-flight stochastic run. Leave the constant values and the `TESTING.md` statement unchanged.
+
+## Before and after
+
+| | Before | After |
+|---|---|---|
+| Comment | Claims no stored results exist | Says `computed` covers fresh computation and a stored build |
+| Code | `readDeterministic` assembles a stored build | Unchanged |
+| Header values | `computed` / `shared` | Unchanged |
+
+```mermaid
+flowchart LR
+  subgraph Before
+    B1["Comment: no stored results"] --- B2[readDeterministic assembles a stored build]
+  end
+  subgraph After
+    A1["Comment: computed means canonical-model result"] --- A2[readDeterministic assembles a stored build]
+  end
+```
+
+## Expected improvement
+
+The comment no longer contradicts the live read path, so a maintainer is less likely to delete code that deterministic results depend on. This is a documentation-only, structural improvement with no behavior change. No benchmarks were run, so no speed or size benefit is claimed.
+
+## Alternatives considered
+
+- **Leave as is** — the comment keeps implying the read-and-build path is dead, inviting someone to remove it.
+- **Change the header contract** — rejected, because the header is deliberately single-valued and `TESTING.md` relies on deterministic requests reporting `computed`.
+
+## Downside of rejecting
+
+The stale comment stays in place. A maintainer reading it can conclude the stored-build orchestration is unnecessary and remove it, which would break the deterministic results that currently come from assembled stored slices, rows, and evaluation outputs.
+
+## Verification
+
+Run `go test ./backend/internal/api/projections/...` and grep to confirm no source still claims stored results do not exist. No header value should change.
 
 References: `backend/internal/api/projections/deterministic.go:15-19,66-88`; `backend/internal/api/projections/stochastic.go:174-177`; `TESTING.md:305,323`.

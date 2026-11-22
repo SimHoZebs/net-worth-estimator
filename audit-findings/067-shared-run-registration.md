@@ -5,10 +5,52 @@ scope: backend-api-persist
 status: needs-review
 ---
 
-`stochasticSSE` calls `getOrStartSharedRun` before returning a `huma.StreamResponse`, so the run is registered in the package-global registry immediately. The stream's preamble runs later, when Huma invokes `Body`, and its first action is a type assertion for `http.Flusher`. On the non-Flusher path the handler writes `streaming unsupported` and returns without calling the `serve` callback. That callback is the only place that starts the owner's computation and calls `run.finish`, which closes `done` and evicts the key. A run registered for a non-writable stream therefore stays in the registry forever, and a later identical seeded request joins a run that can never finish or yield a result.
+## Executive summary
 
-Move `getOrStartSharedRun` and the owner decision into the `serve` closure after the flusher check and set `Projection-Source` from inside that closure. A smaller alternative is a cleanup callback that removes `resultKey` whenever `stochasticStream` returns before invoking `serve`.
+`stochasticSSE` serves a probabilistic projection result by registering a shared run in a package-global registry before it returns the streaming response. A run is the in-flight computation that two requests with the same seed can share, and the registry is the map keyed by that seed's result key. The owner is the request that actually starts the computation.
 
-Verify with a writer that is not an `http.Flusher`: after the first request, a second identical seeded request must not report `Projection-Source: shared` and must complete with its own result, and the registry must have no entry for that key. The existing shared/owner tests cover only the happy path.
+The problem is ordering. The run is registered immediately, but the stream's preamble runs later, when Huma invokes `Body`, and its first step is a check for `http.Flusher`. On a writer that cannot flush, the handler writes `streaming unsupported` and returns without ever calling the `serve` callback. That callback is the only place that starts the owner's computation and calls `run.finish`, which closes `done` and evicts the key.
+
+So a run registered for a non-writable stream stays in the registry forever, and a later identical seeded request joins a run that can never finish or produce a result. The fix is to move registration and the owner decision into `serve`, after the flusher check, and set the `Projection-Source` header there.
+
+## Recommended action
+
+Move `getOrStartSharedRun` and the owner decision into the `serve` closure after the flusher check, and set `Projection-Source` from inside that closure. A non-writable stream then never registers a run. The smaller alternative is a cleanup callback that removes `resultKey` whenever `stochasticStream` returns before invoking `serve`, but that still registers the run before knowing the stream is writable.
+
+## Before and after
+
+| | Before | After |
+|---|---|---|
+| Registration | Before the stream response is returned | Inside `serve`, after the flusher check |
+| Owner decision | Made at registration time | Made inside `serve` |
+| `Projection-Source` | Set outside the stream body | Set from inside the closure |
+| Non-writable stream | Leaves a permanent registry entry | Never registers a run |
+
+```mermaid
+flowchart LR
+  subgraph Before
+    B1[Register run] --> B2[Flusher check fails] --> B3["No serve / entry stuck"]
+  end
+  subgraph After
+    A1[Flusher check] --> A2[Register run in serve] --> A3[serve finishes and evicts]
+  end
+```
+
+## Expected improvement
+
+The registry no longer accumulates entries for streams that cannot be written, and no later seeded request can attach to a run that will never produce a result. This is a structural correctness improvement. No benchmarks were run, so no speed or size benefit is claimed.
+
+## Alternatives considered
+
+- **Leave as is** — keeps the failure: any non-flushing writer leaves a stale entry and a later identical request waits on a run that never finishes.
+- **Cleanup callback on early return** — smaller change, but it still registers the run before the stream is known to be writable and relies on every early-return path calling the callback.
+
+## Downside of rejecting
+
+A client whose writer is not an `http.Flusher` leaves a run in the registry that nothing will finish or evict. A subsequent request with the same seed joins it, reads `Projection-Source: shared`, and never gets its own result. The existing shared/owner tests cover only the happy path, so nothing catches this today.
+
+## Verification
+
+Use a writer that is not an `http.Flusher`. After the first request, a second identical seeded request must not report `Projection-Source: shared`, must complete with its own result, and the registry must have no entry for that key. This is a proposed acceptance check; the finding does not record a real result yet.
 
 References: `backend/internal/api/projections/stochastic.go:82-91,107,174-180`; `backend/internal/api/projections/runs.go:38-50,97-104`; `backend/internal/api/projections/stochastic_test.go:87-99`.
