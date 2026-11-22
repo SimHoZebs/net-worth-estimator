@@ -48,6 +48,29 @@ func resetSharedRunsForTest() {
 	sharedStochasticRegistry.byKey = map[string]*sharedStochasticRun{}
 }
 
+// nonFlushingResponseWriter satisfies http.ResponseWriter without also
+// satisfying http.Flusher, so the SSE preamble takes its unsupported path.
+type nonFlushingResponseWriter struct {
+	header http.Header
+	body   bytes.Buffer
+	code   int
+}
+
+func (w *nonFlushingResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *nonFlushingResponseWriter) Write(p []byte) (int, error) {
+	return w.body.Write(p)
+}
+
+func (w *nonFlushingResponseWriter) WriteHeader(code int) {
+	w.code = code
+}
+
 func projectionTestHandler(t *testing.T) http.Handler {
 	t.Helper()
 	router := chi.NewRouter()
@@ -125,6 +148,46 @@ func TestStochasticSSEUnseededBypassesRegistry(t *testing.T) {
 	sharedStochasticRegistry.Unlock()
 	if inflight != 0 {
 		t.Fatalf("unseeded run leaked %d registry entries", inflight)
+	}
+}
+
+func TestStochasticSSEUnsupportedStreamDoesNotRegisterRun(t *testing.T) {
+	resetSharedRunsForTest()
+	t.Cleanup(resetSharedRunsForTest)
+	handler := projectionTestHandler(t)
+	seed := int64(7)
+	body := apitest.StochasticBody(t, 2, &seed)
+
+	unsupported := &nonFlushingResponseWriter{}
+	request := httptest.NewRequest(http.MethodPost, "/v1/projections/stochastic", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(unsupported, request)
+	if !bytes.Contains(unsupported.body.Bytes(), []byte("streaming unsupported")) {
+		t.Fatalf("unsupported stream body = %q", unsupported.body.String())
+	}
+	if unsupported.code != http.StatusInternalServerError {
+		t.Fatalf("unsupported stream status = %d, want 500", unsupported.code)
+	}
+
+	sharedStochasticRegistry.Lock()
+	inflight := len(sharedStochasticRegistry.byKey)
+	sharedStochasticRegistry.Unlock()
+	if inflight != 0 {
+		t.Fatalf("non-flushing stream registered %d shared runs", inflight)
+	}
+
+	second := apitest.PostStochastic(t, handler, body)
+	if got := second.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("second Projection-Source = %q, want computed", got)
+	}
+	if len(apitest.SSEEvents(t, second.Body.String())["result"]) != 1 {
+		t.Fatalf("second response has no result event, body %s", second.Body.String())
+	}
+	sharedStochasticRegistry.Lock()
+	inflight = len(sharedStochasticRegistry.byKey)
+	sharedStochasticRegistry.Unlock()
+	if inflight != 0 {
+		t.Fatalf("completed run left %d registry entries", inflight)
 	}
 }
 

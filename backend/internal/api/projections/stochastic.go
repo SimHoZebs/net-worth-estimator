@@ -78,8 +78,18 @@ func startSSEHeartbeat(w io.Writer, flusher http.Flusher, writeMu *sync.Mutex, d
 	}()
 }
 
+// sseBody is the blocking event loop of a stream, started only after the
+// headers and the stream preamble have been committed.
+type sseBody func(context.Context, sseEventWriter)
+
+// stochasticServe prepares one SSE stream. Huma calls it after the flusher
+// check but before the first flush, so it can set Projection-Source and
+// register a shared run only while the stream is known to be writable. It
+// returns the event loop to run once the preamble is on the wire.
+type stochasticServe func(huma.Context) sseBody
+
 // stochasticStream commits source headers only after request preparation.
-func stochasticStream(source string, heartbeat bool, serve func(context.Context, sseEventWriter)) *huma.StreamResponse {
+func stochasticStream(heartbeat bool, serve stochasticServe) *huma.StreamResponse {
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
 		writer := ctx.BodyWriter()
 		flusher, ok := writer.(http.Flusher)
@@ -91,7 +101,9 @@ func stochasticStream(source string, heartbeat bool, serve func(context.Context,
 		}
 		ctx.SetHeader("Content-Type", "text/event-stream")
 		ctx.SetHeader("Cache-Control", "no-store")
-		ctx.SetHeader("Projection-Source", source)
+		body := serve(ctx)
+		// SetStatus writes the header on the real ResponseWriter, so the
+		// source chosen by serve must be set before it commits.
 		ctx.SetStatus(http.StatusOK)
 		flusher.Flush()
 		if _, err := fmt.Fprintf(writer, "retry: %d\n\n", sseRetryMs); err == nil {
@@ -104,7 +116,7 @@ func stochasticStream(source string, heartbeat bool, serve func(context.Context,
 			defer close(heartbeatDone)
 			startSSEHeartbeat(writer, flusher, &writeMu, heartbeatDone)
 		}
-		serve(ctx.Context(), newSSEEventWriter(writer, flusher, &writeMu))
+		body(ctx.Context(), newSSEEventWriter(writer, flusher, &writeMu))
 	}}
 }
 
@@ -149,16 +161,22 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 	// Unseeded results are fresh random draws: they cancel on disconnect
 	// and are never shared or stored.
 	if body.Config.Seed == nil {
-		return stochasticStream(projectionSourceComputed, true, func(ctx context.Context, writeEvent sseEventWriter) {
-			s.serveStochasticInline(ctx, writeEvent, model, body.Settings, body.Overrides, body.Config)
+		return stochasticStream(true, func(ctx huma.Context) sseBody {
+			ctx.SetHeader("Projection-Source", projectionSourceComputed)
+			return func(ctx context.Context, writeEvent sseEventWriter) {
+				s.serveStochasticInline(ctx, writeEvent, model, body.Settings, body.Overrides, body.Config)
+			}
 		}), nil
 	}
 	if result, served, err := s.readStochastic(model, &body.Settings, body.Config); err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	} else if served {
-		return stochasticStream(projectionSourceComputed, false, func(_ context.Context, writeEvent sseEventWriter) {
-			if err := writeEvent("done", "result", map[string]any{"result": result}); err != nil {
-				log.Printf("stochastic sse: stored result write failed: %v", err)
+		return stochasticStream(false, func(ctx huma.Context) sseBody {
+			ctx.SetHeader("Projection-Source", projectionSourceComputed)
+			return func(_ context.Context, writeEvent sseEventWriter) {
+				if err := writeEvent("done", "result", map[string]any{"result": result}); err != nil {
+					log.Printf("stochastic sse: stored result write failed: %v", err)
+				}
 			}
 		}), nil
 	}
@@ -171,65 +189,68 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 			"seed":     body.Config.Seed,
 		},
 	})
-	run, owner := getOrStartSharedRun(resultKey)
-	source := projectionSourceShared
-	if owner {
-		source = projectionSourceComputed
-	}
-
-	return stochasticStream(source, true, func(ctx context.Context, writeEvent sseEventWriter) {
+	return stochasticStream(true, func(ctx huma.Context) sseBody {
+		run, owner := getOrStartSharedRun(resultKey)
+		source := projectionSourceShared
 		if owner {
-			// The computation is detached from the request context: this
-			// stream dropping must never cancel the shared run.
-			computeCtx := context.WithoutCancel(ctx)
-			go func() {
-				result, runErr := s.buildStochastic(model, &body.Settings, body.Config)
-				if runErr != nil {
-					// Canonical build refused (non-canonical config): fall
-					// back to inline compute inside the shared run so
-					// attachers still converge on one result.
-					progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
-						run.publish(stochasticStreamEvent{progress: progress, partial: partial})
-					}
-					result, runErr = domain.StochasticProjection(computeCtx, model, &body.Settings, body.Overrides, body.Config, progressCallback)
-				}
-				run.finish(resultKey, result, runErr)
-				if runErr != nil {
-					log.Printf("stochastic finish status=error error=%v", runErr)
-				} else {
-					log.Printf("stochastic finish status=ok runs=%d", body.Config.RunCount)
-				}
-			}()
+			source = projectionSourceComputed
 		}
+		ctx.SetHeader("Projection-Source", source)
 
-		ch, snapshot, hasSnapshot, finished := run.subscribe()
-		if finished {
-			log.Printf("stochastic attach outcome=finished")
-			s.writeSharedRunOutcome(writeEvent, run)
-			return
-		}
-		defer run.unsubscribe(ch)
-		completedRuns := 0
-		if hasSnapshot {
-			completedRuns = snapshot.progress.CompletedRuns
-			log.Printf("stochastic attach outcome=resume completedRuns=%d", completedRuns)
-			writeStochasticProgress(writeEvent, snapshot.progress, snapshot.partial)
-		} else {
-			log.Printf("stochastic attach outcome=resume completedRuns=0")
-		}
-		for {
-			select {
-			case event := <-ch:
-				completedRuns = event.progress.CompletedRuns
-				writeStochasticProgress(writeEvent, event.progress, event.partial)
-			case <-run.done:
+		return func(ctx context.Context, writeEvent sseEventWriter) {
+			if owner {
+				// The computation is detached from the request context: this
+				// stream dropping must never cancel the shared run.
+				computeCtx := context.WithoutCancel(ctx)
+				go func() {
+					result, runErr := s.buildStochastic(model, &body.Settings, body.Config)
+					if runErr != nil {
+						// Canonical build refused (non-canonical config): fall
+						// back to inline compute inside the shared run so
+						// attachers still converge on one result.
+						progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
+							run.publish(stochasticStreamEvent{progress: progress, partial: partial})
+						}
+						result, runErr = domain.StochasticProjection(computeCtx, model, &body.Settings, body.Overrides, body.Config, progressCallback)
+					}
+					run.finish(resultKey, result, runErr)
+					if runErr != nil {
+						log.Printf("stochastic finish status=error error=%v", runErr)
+					} else {
+						log.Printf("stochastic finish status=ok runs=%d", body.Config.RunCount)
+					}
+				}()
+			}
+
+			ch, snapshot, hasSnapshot, finished := run.subscribe()
+			if finished {
+				log.Printf("stochastic attach outcome=finished")
 				s.writeSharedRunOutcome(writeEvent, run)
 				return
-			case <-ctx.Done():
-				// Detach only; the shared run continues for others. The
-				// completedRuns count shows how far this stream got.
-				log.Printf("stochastic detach completedRuns=%d", completedRuns)
-				return
+			}
+			defer run.unsubscribe(ch)
+			completedRuns := 0
+			if hasSnapshot {
+				completedRuns = snapshot.progress.CompletedRuns
+				log.Printf("stochastic attach outcome=resume completedRuns=%d", completedRuns)
+				writeStochasticProgress(writeEvent, snapshot.progress, snapshot.partial)
+			} else {
+				log.Printf("stochastic attach outcome=resume completedRuns=0")
+			}
+			for {
+				select {
+				case event := <-ch:
+					completedRuns = event.progress.CompletedRuns
+					writeStochasticProgress(writeEvent, event.progress, event.partial)
+				case <-run.done:
+					s.writeSharedRunOutcome(writeEvent, run)
+					return
+				case <-ctx.Done():
+					// Detach only; the shared run continues for others. The
+					// completedRuns count shows how far this stream got.
+					log.Printf("stochastic detach completedRuns=%d", completedRuns)
+					return
+				}
 			}
 		}
 	}), nil
