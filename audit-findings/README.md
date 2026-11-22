@@ -8,7 +8,7 @@ Audited the full repository at HEAD `7ac73105` on `main`. Eight scoped read-only
 | --- | --- | --- | --- |
 | [059](059-calendar-date-validity.md) | Use one calendar date validity check | contracts-types | rejected |
 | [060](060-api-payload-types.md) | Give each API payload one type definition | contracts-types | implemented |
-| [061](061-sse-payload-validation.md) | Validate stream event payloads before typing them | contracts-types | needs-review |
+| [061](061-sse-payload-validation.md) | Validate stream event payloads before typing them | contracts-types | implemented |
 | [062](062-sse-stream-consumption.md) | Use one stream consumption loop | frontend-state | accepted |
 | [063](063-release-commit-check.md) | Share the release commit verification | deploy-build-test | accepted |
 | [064](064-container-image-check.md) | Wire the standalone image test into CI | deploy-build-test | accepted |

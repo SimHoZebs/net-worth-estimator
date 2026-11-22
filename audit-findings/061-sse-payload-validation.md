@@ -2,7 +2,7 @@
 id: 061
 title: Validate stream event payloads before typing them
 scope: contracts-types
-status: needs-review
+status: implemented
 ---
 
 ## Scenario
@@ -48,6 +48,8 @@ A field rename or malformed event keeps reaching domain code unchecked, producin
 
 ## Verification
 
-Verify that a malformed result event whose data object contains only an unrelated field fires `onParseError` and runs no typed callback, while valid progress, partial, result, and error events still drive the stream to a completed range. `sse.test.ts` and the stochastic query tests cover the valid paths. These are proposed acceptance checks; no result was recorded.
+Verify that a malformed result event whose data object contains only an unrelated field fires `onParseError` and runs no typed callback, while valid progress, partial, result, and error events still drive the stream to a completed range. `sse.test.ts` and the stochastic query tests cover the valid paths.
+
+Implemented in commit `96d54ab0`. Guard-based checks now cover the four event payload kinds, and review found a gap where nested result fields were unchecked; band percentile data and the four evaluation tables the projection consumer reads are now required. Observed: typecheck clean, 10 focused SSE tests passed, full frontend suite passed with 824 tests, and lint reported zero violations. Direct read-only checks confirmed malformed nested results now raise `SSEParseError` with no typed callback.
 
 References: `frontend/src/api/sse.ts:53-69,107-116`; `frontend/src/state/stochasticProjectionQuery.ts:62-81`; `backend/internal/api/projections/stochastic.go:40-53`; `backend/internal/api/projections/routes.go:46`.
