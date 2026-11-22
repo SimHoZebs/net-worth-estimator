@@ -13,6 +13,17 @@ The Remove button's click handler sends the request `POST /passkey/delete-passke
 
 `listPasskeys()` exists as the simplest way to make the display match the server after a change, but it destroys the Remove button that had keyboard focus, so focus falls to the document body. The successful delete path calls no `report()`; `report(message, tone)` at `client.ts:8-11` is the helper that writes text into the shared feedback paragraph, and the failure path calls it while the success path does not. The passkeys list is not a live region, an element whose text changes assistive technology announces, so a screen-reader user gets no confirmation that the passkey was removed.
 
+```mermaid
+flowchart LR
+  A[Signed-in user presses Remove on a passkey in the passkeys list] --> B[Browser sends POST /passkey/delete-passkey with a JSON body carrying the id]
+  B --> C[Response arrives then the handler calls await listPasskeys again]
+  C --> D[listPasskeys refetches GET /passkey/list-user-passkeys and rebuilds every list item]
+  D --> E[list.replaceChildren clears the list and fresh Remove buttons are created]
+  E --> F[The focused Remove button is destroyed so focus falls to the document body]
+  D --> G[The success path calls no report and the list is not a live region]
+  G --> H[A screen-reader user gets no confirmation that the passkey was removed]
+```
+
 ## Executive summary
 
 Removing a passkey calls `listPasskeys()` in `auth/better-auth/src/client.ts`, which clears and rebuilds every item in the passkeys list on the Account page. The focused Remove button is destroyed, so focus falls back to the document body. No success feedback is written to the feedback paragraph and the list has no live region, an element whose text changes assistive technology announces, so a screen-reader user gets no confirmation and a keyboard user must tab from the top again. Remove only the affected item, move focus to a known control, and report success.

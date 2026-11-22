@@ -13,6 +13,15 @@ Running 400 trials takes long enough that waiting for one reply would leave the 
 
 The generated API client is TypeScript code produced by Orval from `frontend/openapi.snapshot.json`, the checked-in OpenAPI document that declares each endpoint's request and reply. That document declares the `/v1/projections/stochastic` response only as `text/event-stream` with a string schema, meaning it declares only that the body is text. It declares no types for the individual events or for the JSON values inside them, so the generator emits only a function that returns the raw HTTP response and no types for the events. That is why the hand-written reader exists: it does the work the generated client was never told about. A guard is a small runtime shape check; `frontend/src/domain/guards.ts` already has guards that verify a value before treating it as a particular type. Today `parseBlock` checks only that the parsed `data` value is a plain object, and `eventPayload<T>` casts that object to a typed event shape without checking its fields — a cast is an instruction to the type checker to treat a value as a chosen type without verifying it — so a renamed field reaches typed callbacks and surfaces as a confusing downstream error rather than at the boundary, the point where external data enters the client.
 
+```mermaid
+flowchart LR
+  A[You pin a threshold evaluation on Outlook] --> B[Browser sends POST /v1/projections/stochastic with 400 trials and seed 42]
+  B --> C[API streams SSE events named progress, partial, result, and error]
+  C --> D[parseSSE JSON-parses each data line and casts it to a typed event]
+  D -->|fields match| E[Pinned evaluation card shows the share of trials that met the goal]
+  D -->|renamed field passes the plain-object check| F[Confusing downstream error or wrong progress value]
+```
+
 ## Executive summary
 
 Server-sent events, the stream of JSON events the server sends to the browser, are the one external JSON boundary in the client that parses data and then casts it straight to a typed domain shape. `parseBlock` checks only that `data` is an object, and `dispatchEvent` passes it through `eventPayload<T>`, a bare `as T` cast, to typed callbacks. Consumers immediately read nested fields such as progress fraction, result, and error.

@@ -11,6 +11,14 @@ A release is not a user screen. It starts when a GitHub workflow or an operator 
 
 The Northflank guide lists only three arguments, `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE`, in both its overview and its incident-recovery override procedure. The release configuration declares five. The fix is to account for both identity IDs in the guide.
 
+```mermaid
+flowchart LR
+  A[Workflow or operator requests the Northflank release] --> B[Webhook carries name-and-value arguments in the query string]
+  B -->|Gated workflow supplies all five automatically| C[Release dumps the database, deploys images, and restarts the API]
+  B -->|Manual override lists only RELEASE_SHA, API_IMAGE, IDENTITY_IMAGE| D[IDENTITY_SERVICE_ID and IDENTITY_DATABASE_ADDON_ID are missing]
+  D --> E[Pre-deploy dump and identity image deploy fail]
+```
+
 ## Executive summary
 
 The Northflank guide `deploy/northflank/README.md` lists exactly three release query arguments, `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE`, in both the overview and the incident-recovery override procedure. The release configuration `deploy/northflank/release.json` declares five: `IDENTITY_SERVICE_ID` and `IDENTITY_DATABASE_ADDON_ID` drive the pre-deploy dump, a database backup taken before deployment, and the identity image deploy. An operator re-releasing a failed target from the UI or API submits an incomplete set and fails at the identity steps. The fix is to account for both IDs in the guide.

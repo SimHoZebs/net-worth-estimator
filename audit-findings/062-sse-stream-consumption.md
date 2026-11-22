@@ -11,6 +11,15 @@ The Outlook forecast with a pinned threshold evaluation and the Evaluations page
 
 That reader accepts several input forms: an HTTP `Response` with a byte reader in the browser, a `ReadableStream` or an `AsyncIterable` — an object that yields byte chunks over time — and a plain string in tests that replay recorded events. An abort signal, a handle that lets the caller cancel work, stops the stream when the user changes a scenario. With several input forms, the same consumption work was written more than once: a reader, an async iterable, and a whole string each walk through checking for cancellation, feeding text to the parser, mapping a parse failure to `SSEParseError` or `SSETransportError`, and finishing the parser. A change to cancellation or error handling therefore has to be applied to each copy.
 
+```mermaid
+flowchart LR
+  A[You pin a threshold evaluation on Outlook or change a scenario] --> B[Browser sends POST /v1/projections/stochastic with 400 trials and seed 42]
+  B --> C[API streams SSE as a raw Response, bypassing the JSON envelope handler]
+  C --> D[parseSSE consumes the stream from a Response, ReadableStream, AsyncIterable, or string]
+  D --> E[progress, partial, result, and error callbacks fill the pinned evaluation card]
+  D -->|you change scenario| F[Abort signal stops the stream]
+```
+
 ## Executive summary
 
 `parseSSE` accepts strings, `Response`, `ReadableStream`, and `AsyncIterable`. Its `consumeReader` and `consumeAsyncIterable` repeat the same loop: abort check, feed, parse-error check, `catch` mapping to `SSEParseError` or `SSETransportError`, and a `parser.finish()` tail. The string branch repeats that finish tail, so the step exists three times.

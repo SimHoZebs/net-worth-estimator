@@ -11,6 +11,15 @@ The backend is shipped to a hosting provider as a container image — a packaged
 
 This is internal verification work rather than a user screen. The callers are the deployment guides and a maintainer following them, plus the hosted `Tests` workflow, which builds the `northflank` target of `backend/Dockerfile` and runs `deploy/northflank/container.test.mjs` instead. The `e2e` gate builds the standalone image but runs user journeys rather than image-metadata or no-guest-at-boot assertions, so a regression in `backend/Dockerfile` or `deploy/api-boot.sh` can pass every hosted gate.
 
+```mermaid
+flowchart LR
+  A[A maintainer follows TESTING.md and deploy/README.md] --> B[Build the standalone image from backend/Dockerfile]
+  B --> C[Run deploy/container.test.mjs with DEPLOYMENT_TEST_IMAGE set]
+  C --> D[Test checks app:app user, no entrypoint, /app/server, /readyz on PORT, guest not provisioned]
+  D -->|pass| E[Portable image confirmed for the standalone provider]
+  F[Hosted Tests builds the northflank target instead] --> G[No hosted gate runs these standalone assertions]
+```
+
 ## Executive summary
 
 `deploy/container.test.mjs` asserts image-level properties of the standalone backend image that nothing else checks: a non-root `app:app` user, no entrypoint, `/app/server` as the default command, the healthcheck target, and schema-only boot that does not provision the configured guest. An entrypoint is the command an image runs by default.

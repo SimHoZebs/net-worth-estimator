@@ -13,6 +13,15 @@ A cadence, meaning how often the detected pattern repeats, is mapped by `recurri
 
 The analyses guide instead told readers that biweekly patterns stay non-actionable because no biweekly schedule exists. The guided-model-setup guide `docs/guided-model-setup.md:24,28-30` lists a similar gap but pins itself to a specific older Komodo revision, app revision `b8bd4a967a86`, so its statement describes that pinned snapshot rather than current source. Readers use these guides to decide whether to ask for a feature, so a false limitation sends them asking for behavior the runtime already has.
 
+```mermaid
+flowchart LR
+  A[You open a recurring-payment finding on Analyses and ask for a schedule preview] --> B["Browser sends GET /v1/analysis-findings/{id}/pattern-to-new-schedule-preview"]
+  B --> C["recurringCadenceRecurrence maps biweekly to Recurrence{Unit: Week, Interval: 2}"]
+  C --> D[JSON preview returns the proposed schedule with a creatable flag]
+  D --> E[Preview shows biweekly creation is allowed]
+  E -. guide says otherwise .-> G[Reader asks for a biweekly feature the runtime already has, per docs/analyses.md]
+```
+
 ## Executive summary
 
 The analyses guide says biweekly patterns stay non-actionable because no biweekly schedule exists yet. In fact `recurringCadenceRecurrence` maps biweekly to a creatable `Recurrence{Week, Interval: 2}` and daily to a creatable daily rule; only unknown cadences receive the non-creatable reason. A regression already asserts that a biweekly preview is creatable. The recommended action is to delete the false limitation and state the real rule, while framing the guided-model-setup note if its pinned snapshot is intentional.

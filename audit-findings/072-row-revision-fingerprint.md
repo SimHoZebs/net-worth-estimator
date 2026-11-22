@@ -11,6 +11,14 @@ The Flows page draws a time-bounded money-flow graph, a dialog shows the current
 
 Each hook then builds a fingerprint, meaning a short key that changes when the underlying saved rows change, from those rows. A revision is the version number of a saved row, incremented on each write, and the key uses the revision when present and otherwise falls back to the row contents serialized into text. The fingerprint is used as a client cache key: it makes the screen refetch when the saved rows change and reuse the cached answer otherwise. The helper the finding calls for exists because three hooks need the same revision-and-fallback rule. The Flows graph includes evaluations in its fingerprint, while current position excludes them because current position is a backend-owned replay of recorded history and must not move when evaluation preferences change; that exclusion is currently expressed by copying the builder. The remote projection keeps a third, deduplicated variant of the rule for its own cache, so it needs a distinct name rather than being merged with the other two.
 
+```mermaid
+flowchart LR
+  A[You open Flows, the current-position dialog, or a projection view] --> B[Browser sends build-flow-graph or resolve-current-position, or reads saved rows as JSON]
+  B --> C[Hook builds a fingerprint from revisions, falling back to serialized row contents]
+  C --> D[Flows includes evaluations; current position excludes them as backend-owned]
+  D --> E[View draws and refetches only when the fingerprint changes]
+```
+
 ## Executive summary
 
 Three hooks derive which saved model is in view by building a fingerprint — a short key that changes when the underlying saved row changes. `useFlowGraph` and `useCurrentPosition` each define a `take(revision, content, name)` closure inside a `useMemo` that concatenates `name:revision` parts with `|` and falls back to `JSON.stringify(content)` when there are no revisions. A revision is the version number of a saved row. `useRemoteProjection` computes model identity a third way, by filtering revisions, deduplicating and sorting them, and joining with `|`.

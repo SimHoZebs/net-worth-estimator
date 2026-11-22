@@ -13,6 +13,17 @@ That state record carries a revision counter, a dirty-from date marking the earl
 
 No second engine version exists or is proposed. Commit `d82ce5b1` removed the dead recurrence pipeline and the duplicate engine but left the version constant behind, so the mismatch branch can only be reached by manually editing a stored value. SimpleFIN protocol 2 is a separate data-import migration and is untouched by this finding.
 
+```mermaid
+flowchart LR
+  A[You open Outlook, Evaluations, or the purchase planner] --> B[Browser asks the API for the projection]
+  B --> C[Backend reads projection state from projection_states via GetProjectionState]
+  C --> D[ensureCanonicalState compares the stored version with unifiedEngineVersion v1]
+  D -->|mismatch| E[Reinitialize state, bump revision, set dirty_from to projection start so results rebuild]
+  D -->|match| F[Serve the stored projection result]
+  E --> G[Forecast screen shows a rebuilt projection]
+  F --> G
+```
+
 ## Executive summary
 
 A projection — the computed forecast result kept for display — carries a schema column that defaults to `v1`, mirrored by a Go constant. That value is checked on every projection read and, on a mismatch, can reinitialize state, bump the revision, and set `dirty_from`. No `v2` exists or is proposed. Commit `d82ce5b1` removed the dead recurrence pipeline and duplicate engine but left `unifiedEngineVersion` untouched, so the check is machinery for invalidating a cache on a value that never changes.

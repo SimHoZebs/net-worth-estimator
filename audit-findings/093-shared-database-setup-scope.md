@@ -11,6 +11,16 @@ Startup on Northflank is not a user screen. Northflank starts the API service by
 
 The shared-database guide currently says not to put setup in the server entrypoint or an automatic startup dependency. Read as a blanket ban, that sentence tells the operator to remove the `api-boot.sh` wrapper that makes the diskless boot work. The fix is to scope the sentence to conversion.
 
+```mermaid
+flowchart LR
+  A[Operator deploys the API service on Northflank] --> B[Northflank runs deploy/api-boot.sh]
+  B --> C{Does the boot wrapper still call /app/setupdb?}
+  C -->|yes| D[Wrapper sets NET_WORTH_ESTIMATOR_DB, runs /app/setupdb, then /app/server]
+  D --> E[Fresh diskless SQLite has its tables before the API answers any request]
+  C -->|no, blanket ban followed| F[Setup call stripped from the boot wrapper]
+  F --> G[Diskless host boots without schema and the server cannot read or write]
+```
+
 ## Executive summary
 
 The shared-database guide `docs/shared-database.md` says not to put setup in the server entrypoint or an automatic startup dependency. Setup here means database schema provisioning, and the entrypoint is the script that starts the server. In practice the boot wrapper `deploy/api-boot.sh` runs the schema setup tool on every boot for diskless hosts, and the migration SOP `deploy/MIGRATIONS.md` separates that fresh-schema provisioning from the conversion hook that upgrades existing data. A reader following the blanket ban would remove the wrapper that makes the Northflank boot work. The fix is to scope the sentence to conversion only.

@@ -9,6 +9,15 @@ status: implemented
 
 You open the Sources page and view the detected transaction findings table, which includes buy-now-pay-later (BNPL) rows. When the page opens, the browser sends the analysis-findings query (`useAnalysisFindings`) and the findings arrive as JSON; each record carries a strength, a status, a review decision, dismissal and staleness flags, and sometimes a judgment state. The table has a Finding column and a Status column, and the wording appears once the findings request completes. A finding is a detected result about a transaction, and the table's helpers `findingLabel` and `findingStatus` in `frontend/src/domain/analysisFindings.ts` translate that state into plain words such as "Likely BNPL" or "Not BNPL". A single shared wording owner, `findingStateLabel` in `frontend/src/domain/paymentFindings.ts`, already serves the review chips and dialogs, so the table helpers exist to give the table the same vocabulary as those surfaces. The BNPL table kept its own pair of helpers that look only at strength and review decision, so a rejected strong finding reads "Likely BNPL" in the Finding column beside "Not BNPL" in the Status column, and a judgment state never appears in the Finding column.
 
+```mermaid
+flowchart LR
+  A[You open the Sources page findings table] --> B[useAnalysisFindings returns JSON findings rows]
+  B --> C[findingLabel and findingStatus read strength and review decision]
+  C --> D{Strong finding rejected?}
+  D -->|yes| E[Finding column shows Likely BNPL beside Not BNPL in Status]
+  D -->|no| F[Finding column shows Likely BNPL or Possible BNPL]
+```
+
 ## Executive summary
 
 A finding is a detected result such as a BNPL, or buy-now-pay-later, row. Prior finding 045 consolidated finding wording into `findingStateLabel` and is implemented, but the BNPL table kept a separate pair of helpers. `findingLabel` checks only `confirmed` and `strength`, so it has no branch for rejected, dismissed, stale, or judgment states, while `findingStatus` beside it does branch on those fields. The BNPL pair also ignores `judgment`, which the shared owner handles.

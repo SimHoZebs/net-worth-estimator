@@ -13,6 +13,15 @@ No browser screen calls these storage methods directly. The projection build and
 
 SQL cannot take a varying-length list of IDs directly, so the adapter builds an `IN` clause, meaning a condition that matches a column against a supplied list, with one `?` placeholder per ID. Each `?` is filled by an argument value when the query runs, and the arguments must stay in the same order as the placeholders. The helper exists so the loop that turns a list of slice IDs into a comma-separated placeholder list and a matching ordered argument list is written once instead of being copied into every storage call.
 
+```mermaid
+flowchart LR
+  A[You open a projection view or run sync ingest] --> B[API builds or reads the projection; ingest resolves bridge accounts]
+  B --> C[SQLite adapter stores generated transactions, timeline rows, and Monte Carlo statistics per slice ID]
+  C --> D[Ingest looks up bridge IDs in account_links then model IDs in accounts]
+  D --> E[Eight sites each build an IN clause of ? placeholders plus ordered args]
+  E --> F[Current-slice result or newly provisioned account appears on screen]
+```
+
 ## Executive summary
 
 Every projection artifact is stored per slice, where a slice is one partition of the user's projection window identified by a slice ID. Six projection methods and two queries in account provisioning each allocate a `placeholders` slice and an `args` slice, fill them from the slice IDs, and join them into a SQL `IN` clause. The `?` in such a clause is a placeholder that a supplied argument fills at execution time.

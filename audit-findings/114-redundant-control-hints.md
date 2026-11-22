@@ -17,6 +17,16 @@ In the Financial Independence detail view, the Configure tab shows a note readin
 
 All five passages are static copy: four are rendered by React components under `frontend/src/pages/` and one is written into the HTML template in the identity service. No parser is involved because no data format is being decoded. The values that actually cross an API boundary are the selected scan-window day count, the sign-up password, and the saved configuration fields. The passages were written to teach on first use, but each one renders on every visit and repeats what the label, the bounds, the browser's own validation, or the disabled state already says.
 
+```mermaid
+flowchart LR
+  A[Member opens the Gmail panel on Sources] --> B["Panel shows 'Initial scan window (days)' input, 'Save scan window' button, and restating paragraph"]
+  B --> C[Member types a day count and activates Save scan window]
+  C --> D{Browser native validation: value within 1 through 365?}
+  D -->|no| E[Native validation stops the request; the paragraph still shows]
+  D -->|yes| F[Save handler sends the chosen count as a number to the API]
+  F --> G[Value saved; the paragraph still shows after save]
+```
+
 ## Executive summary
 
 Five persistent helper passages repeat what the control beside each one already communicates. The Gmail scan-window paragraph restates the input's label and its 1-through-365 bounds. The sign-up note duplicates the browser's built-in 8-character minimum for the password field. The planned-purchase alert and the Configure tab's read-only note restate disabled fields and a disabled save button, and the Configure tab's other note lists the form's own field labels and the effect of saving. The UI principles state that a disabled control, a lock icon, and a status readout together say "read-only" and that a sentence saying it again is not information, and they allow hint text only for non-obvious behavior or consequential qualifications. The cost is a small attention tax on every viewing and five strings that must be updated whenever a label or bound changes. Delete the five passages and keep the native validation and disabled-state cues that already carry the same information.

@@ -11,6 +11,17 @@ Signing in is the starting action. When a person first reaches the app with a ve
 
 The authorization guide `docs/authorization.md` is the reference an operator or reviewer reads to understand how roles are assigned and what migrations exist. It currently suggests owner assignment is a one-time data migration, a separate operator task rather than something that happens at sign-in. The code does not perform such a migration, and the migration SOP `deploy/MIGRATIONS.md` contains no owner-assignment migration. The guide also ends a sentence with a colon that introduces no list, then says no import path remains and that a nearby migration preserves existing behavior. Those claims describe steps that do not exist in the current path.
 
+```mermaid
+flowchart LR
+  A[Person signs in with a verified identity from the auth provider] --> B[Authorization client Resolve receives the issuer-and-subject pair]
+  B --> C[Records member, or viewer for NET_WORTH_ESTIMATOR_GUEST_SUBJECT, in the Casbin policy database]
+  C --> D[Person can use the workspace with that role]
+  C -.-> E[No one-time owner-assignment migration exists in deploy/MIGRATIONS.md]
+  D --> F{Admin later changes the role?}
+  F -->|none| G[Automatic re-enrollment blocked on later login]
+  F -->|viewer| H[Viewer stays authoritative on every later login]
+```
+
 ## Executive summary
 
 The authorization guide `docs/authorization.md` ends a sentence with a colon that introduces no list, then says no import path remains and that owner assignment is a one-time data migration rather than signup role selection. The code does neither: the authorization client records `member` or `viewer` on first verified access, and the migration SOP `deploy/MIGRATIONS.md` contains no owner-assignment migration. A nearby line also claims a migration preserves existing behavior. The fix is to delete the stale lead-in and import-path claim and bring the owner-assignment text in line with the current first-access rule.

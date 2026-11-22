@@ -11,6 +11,18 @@ Font selection has no dedicated screen, user action, or request/response boundar
 
 A few terms matter here. A theme is a named group of these values applied together; the app has a light and a dark theme, and the dark one changes colors but keeps the same families. The cascade is the rule that picks a winner when the same custom property is declared in more than one stylesheet, and when one declaration hides another that is shadowing. The typography rules in `frontend/src/styles/typography.css` exist so a family is chosen by the role of the text, whether it is body text, a display heading, or code, rather than by the page it appears on. The title components exist so the titles of cards, dialogs, sheets, alerts, and empty states get the display family along with their own size and weight; `CardTitle` in `frontend/src/components/ui/card.tsx` is one of them and selects the utility class `font-heading`. The problem this finding addresses is that the family strings are written in two owners, `index.css` and `tokens.css`, and the title utilities read a name that the display headings do not, so the two can silently drift apart.
 
+```mermaid
+flowchart LR
+  A[You open any screen] --> B[Browser loads stylesheets on its own at render time, no request]
+  B --> C["index.css sets --font-sans and --font-heading to Geist / Merriweather literals"]
+  B --> D["tokens.css sets --font-ui and --font-display and redeclares --font-sans"]
+  C --> E["Cascade: tokens.css --font-sans shadows the index.css literal"]
+  D --> E
+  E --> F["Body text shows Geist; display headings follow --font-display = Merriweather"]
+  C --> G["font-heading used by CardTitle and four other title recipes stays a literal"]
+  G --> H[Changing tokens.css updates body and headings but leaves those titles stale]
+```
+
 ## Executive summary
 
 Body text in this app is set in Geist, while display headings and titles are set in Merriweather. The two family strings are declared in two places. `index.css` declares `--font-sans` and `--font-heading` with literal family names, while `tokens.css` declares the same families as `--font-ui` and `--font-display` and redeclares `--font-sans` to point at `--font-ui`, so the literal in `index.css` is shadowed. Display headings in `typography.css` follow `--font-display`, but `font-heading`, used by five title recipes, stays a literal in `index.css`; changing the documented owner leaves those titles stale. The single action is to keep both family strings only in `tokens.css`.

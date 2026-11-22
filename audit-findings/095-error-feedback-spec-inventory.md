@@ -11,6 +11,15 @@ On the Outlook screen, the browser sends `GET /v1/accounts/balances` and `GET /v
 
 The two specs are `frontend/tests/integration/outlookLoading.spec.ts`, which intercepts `GET /v1/accounts/balances` with a 422 and asserts a named alert with a Retry button and its disappearance after retry, and `frontend/tests/integration/safeSpendingEvidence.spec.ts`, which intercepts `GET /v1/safe-spending-summary` with a 500 and asserts a failure message and a `Retry evidence` button. The error-feedback guide `docs/error-feedback.md` is where the rules for this presentation live. That guide closes by saying no dedicated error-feedback specs exist and that the only current spec is `selectLabels.spec.ts`. The claim is stale: the two named specs directly exercise the retry presentation the guide owns. The fix is to remove the inventory claims rather than keep a count that goes out of date with each added spec.
 
+```mermaid
+flowchart LR
+  A[User opens the Outlook screen] --> B[Browser sends GET /v1/accounts/balances and GET /v1/safe-spending-summary]
+  B -->|HTTP 422 balances or HTTP 500 evidence| C[Page shows a local alert with the error message and a Retry button]
+  C -->|User clicks Retry| D[Browser sends the same request again]
+  D -->|retry succeeds| E[Alert disappears and the affected content appears]
+  B -.->|Spec substitutes a synthetic failure| F[outlookLoading.spec.ts asserts the named alert and Retry; safeSpendingEvidence.spec.ts asserts Retry evidence]
+```
+
 ## Executive summary
 
 The error-feedback guide `docs/error-feedback.md` closes by saying no dedicated error-feedback specs exist and that the only current spec is `selectLabels.spec.ts`. A spec is an automated test file. There are twelve spec files at this HEAD, and two directly exercise the presentation this guide owns: `outlookLoading.spec.ts` asserts a named alert with a Retry button and its disappearance after retry, and `safeSpendingEvidence.spec.ts` asserts a failure message and a `Retry evidence` button after a server error. This reopens territory finding 029 (`audit-findings/029-current-error-feedback-docs.md`) partly addressed, since that finding removed obsolete references but left an inventory that later additions made stale. The fix is to remove both inventory claims.

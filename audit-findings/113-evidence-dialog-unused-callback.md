@@ -13,6 +13,16 @@ Browser navigation starts the work. The `useWorkspaceOverlays` hook in `frontend
 
 Across the parent-child boundary, `WorkspaceDialogs` passes `EvidenceDialog` three props, which are inputs a parent hands to a child: `target`, the evidence view to show; `onClose`, a function to close the dialog; and `onEdit`, a function to open an editor. That last input is a callback, a function the child could call to ask the parent to act, and the value supplied is `editFromEvidence`, a wrapper defined in `useWorkspaceOverlays` whose only job is to forward that call to `openEditor` in the same file. The callback was meant to let a user jump from an evidence row into an editor for that record, but no evidence row calls it: `EvidenceDialog` destructures only `target` and `onClose` from its props. The `onEdit` prop exists solely because the dialog's props type demands such a function. The overlay state is owned by `useWorkspaceOverlays`, not by `EvidenceDialog`.
 
+```mermaid
+flowchart LR
+  A[You follow an evidence overlay URL for failure or safe-spending] --> B[useWorkspaceOverlays reads search params into a target]
+  B --> C[WorkspaceEvidence mounts EvidenceDialog for the forecast-evidence kind]
+  C --> D[useRemoteProjection sends projectDeterministic with years DEFAULT_PROJECTION_YEARS and ranges false]
+  D --> E[API reply builds the evidence table the user reads]
+  C --> F[WorkspaceDialogs also passes onEdit = editFromEvidence, forwarding to openEditor]
+  F --> G[No evidence row calls onEdit; the wrapper exists only to satisfy the props type]
+```
+
 ## Executive summary
 
 `EvidenceDialog` renders the supporting detail behind two Outlook forecast results: the first transaction that runs short of funds and the scheduled transactions for the next 30 days. `WorkspaceEvidence` hands it an `onEdit` callback that `EvidenceDialog` never calls, supplied through a trivial `editFromEvidence` wrapper that exists only to satisfy the props type. Readers reasonably assume evidence rows can open an editor when they cannot. Remove `onEdit` from the props type, the call site, and the wrapper export.

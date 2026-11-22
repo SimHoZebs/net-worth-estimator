@@ -13,6 +13,16 @@ A control's appearance is decided by a class list, which is one space-separated 
 
 `Textarea` exists because a multi-line field needs a different surface from a one-line input: it grows with its content (`field-sizing-content`) and has a minimum height (`min-h-16`) instead of a fixed one (`h-8`), while it should otherwise look exactly the same. To get that look `frontend/src/components/ui/textarea.tsx` currently copies the entire shared class list from `inputClassName` and changes only the sizing tokens. The class merger `cn`, exported from `frontend/src/lib/utils.ts`, joins class lists and lets a later token win when two rules conflict. Composing the textarea from `inputClassName` plus its sizing tokens through that merger keeps a single visual owner.
 
+```mermaid
+flowchart LR
+  A[You type tax brackets into the Brackets field on Sources Amounts tab] --> B[Browser draws the form just before the control paints]
+  B --> C[Input and Better Auth controls read shared inputClassName from control-styles.ts]
+  B --> D[Textarea from textarea.tsx copies the whole chain, changing only field-sizing-content and min-h-16]
+  C --> E[cn joins the class lists into the class attribute at paint time]
+  D --> E
+  E --> F[Both look alike now; a later inputClassName change leaves Textarea stale]
+```
+
 ## Executive summary
 
 `frontend/src/components/ui/control-styles.ts` declares one visual owner, the shared class recipe `inputClassName`, for control surface, focus ring, invalid, disabled, and dark states, and it is consumed by `Input` in `frontend/src/components/ui/input.tsx` and by the React-free controls in `auth/better-auth/src/controls.ts`. `Textarea` repeats that whole class chain verbatim and differs only in sizing. Any change to the control contract must be applied in two places and silently leaves textareas behind when the shared recipe changes. Compose the textarea from `inputClassName` plus its sizing overrides so the class merger resolves them.

@@ -17,6 +17,18 @@ A third background worker categorizes uncategorized transactions. Before `Classi
 
 `Adapter.Key`, `Registry.IDs`, and `categoryFeedbackSource` are each leftover surface on these frameworks. Nothing a user does on the Integrations screen, in sync, or in categorization reaches them.
 
+```mermaid
+flowchart LR
+  A[You open the Integrations screen] --> B[GET /v1/integrations, registry Snapshot returns JSON provider IDs and connection state]
+  X1[Registry.IDs is called only by two test assertions] -. no live caller .-> B
+  C[Sync worker runs ingest with the SimpleFIN adapter] --> D[Adapter fetches a provider-native snapshot, orchestrator writes the provider key at each checkpoint]
+  X2[Adapter.Key is unread] -. no live caller .-> D
+  D --> E[Bank rows and checkpoints written]
+  F[Background worker categorizes uncategorized transactions] --> G[Classify opens a judgment session with injected journal-backed MLClassifier.Feedback]
+  X3[categoryFeedbackSource nil fallback is superseded] -. no production caller .-> G
+  G --> H[Transactions categorized using user-correction labels]
+```
+
 ## Executive summary
 
 Three small dead members remain in live frameworks. `ingest.Adapter.Key` is declared and documented as the provider key, but the orchestrator never reads it; its implementation returns the same literal written directly at every checkpoint, and a test fake carries an unread `key` field. `integrations.Registry.IDs` duplicates `Snapshot()` and is called only by two assertions in its own test. `categoryFeedbackSource` is a superseded v1 nil fallback: production always injects the journal source, so it is reachable only from direct unit tests, and the docs already record the supersession. Each is maintenance surface with no live caller. The recommended action is to delete all three and their fixtures and assertions.

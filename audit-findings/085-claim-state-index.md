@@ -13,6 +13,18 @@ Central to the Safe Spending replay is a claim, the link in `transaction_claims`
 
 `buildObligations` in `backend/internal/safespending/obligations.go:132-158` builds a claim-to-transaction map with the posted-beats-pending preference to work out bills. `claimState` in `backend/internal/safespending/payday_income.go:11-35` builds separate settled and pending sets from the same transactions at the same cut, and `forecastPaydays` in `payday_income.go:69` and `cardStatementRows` in `backend/internal/safespending/payday_statements.go:286,324-327` read those sets for the payday forecast and card statement rows. Both classifications start from the same `TransactionClaim` identities, the pair of schedule ID and occurrence date, over the same transactions at the same cut. Because the inputs are equal, the posted-beats-pending rule can drift between the bills view and the payday and statement views with no single place to fix it.
 
+```mermaid
+flowchart LR
+  A[You open the Safe Spending screen] --> B[Browser sends GET /v1/safe-spending-summary?asOf=close of day]
+  B --> C[API replays stored transactions and schedules to the cut in BuildAtCut]
+  C --> D[buildObligations builds a claim-to-transaction map with posted-beats-pending]
+  C --> E[claimState builds separate settled and pending sets over the same transactions at the same cut]
+  D --> F[bills still needing cover]
+  E --> G[forecastPaydays and cardStatementRows]
+  F --> H[JSON returns spendable amount, bills, and card statement rows shown on screen]
+  G --> H
+```
+
 ## Executive summary
 
 The claim and link mechanisms are sound and still needed: auto-claim writes the ordinary claim row in `backend/internal/domain/auto_claim.go`, bank-row dedup uses provider keys, and canonical-payment IDs prevent one posted payment backing two allocations. The duplication is narrower. A claim associates a transaction with an expected payment occurrence, and "at a cut" means at one replay boundary. `buildObligations` builds a claim-to-transaction map with a posted-beats-pending preference, while `claimState` builds separate settled and pending sets over the same transactions at the same cut. Both classify the same claim identities, so their precedence can drift.

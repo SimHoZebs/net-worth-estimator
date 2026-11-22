@@ -13,6 +13,16 @@ The operator starts the backup workflow by stopping all API writers (`docs/share
 
 No data format crosses a network boundary. The commands work on a SQLite database file on the host and produce a private backup set. The backup helper exists because copying a live database file directly can capture a half-written state, which is why `deploy/README.md:69` and `deploy/MIGRATIONS.md:110` both forbid copying the active file alone.
 
+```mermaid
+flowchart LR
+  A[Operator stops all API writers before a schema upgrade] --> B[Follows the backup contract in deploy/MIGRATIONS.md]
+  B --> C[runs sqlite3 .backup to a consistent copy of the SQLite database]
+  C --> D[PRAGMA integrity_check returns ok and foreign_key_check returns no rows]
+  D --> E[Backup set with sha256sum.txt and hash recorded in the release checklist]
+  B --> F[The shared-database guide and deploy README restate the command in prose]
+  F --> G[A path or verification change in the SOP leaves the restatements stale]
+```
+
 ## Executive summary
 
 The migration SOP `deploy/MIGRATIONS.md` owns the backup contract, but the shared-database guide `docs/shared-database.md` and the deploy README `deploy/README.md` each restate that backup and verification contract in prose. Three homes for safety-critical guidance drift easily, especially when one changes the file path or the verification step, so an operator can follow a stale restatement while the SOP states a different, correct contract. Keep one owning statement and point the other two docs at it.

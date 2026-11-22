@@ -15,6 +15,15 @@ Two developer-authored domain files used to supply figures for those rows. `fron
 
 The leftover plumbing is the `resolvedAmounts` prop on `TransactionsPanel` — a prop is a value a parent React component passes to a child. `AccountSections`, the only place that renders `TransactionsPanel`, never supplies `resolvedAmounts`, so calculated rows already show `Varies`. Five more named exports are each defined once and read nowhere else: `daysBetweenInclusive` in `frontend/src/domain/format.ts`, `isArchivedAccount` in `frontend/src/domain/model.ts`, `fundingGapCaption` in `frontend/src/domain/fundingGaps.ts`, `ALL_MOVEMENTS` in `frontend/src/domain/flowDiagram.ts`, and `templateById` in `frontend/src/domain/amountCatalog.ts`. The live paths that must stay are `forecastPaydays` for payday values and `scheduleTransaction`'s `resolved` argument, which `ScheduleHistory.tsx` still passes inline.
 
+```mermaid
+flowchart LR
+  A[You open Accounts and select one account] --> B[Browser sends the account-detail request]
+  B --> C[API returns the account, transaction rows, and projected occurrences as JSON]
+  C --> D[Domain functions shape the rows into labels and amounts]
+  D --> E[TransactionsPanel receives no resolvedAmounts from its only render site AccountSections]
+  E --> F[TransactionAmount shows Varies for rows with amountKnown unset]
+```
+
 ## Executive summary
 
 Two helpers in the frontend domain layer stay exported although no screen imports them, and one component carries a prop its only render site never supplies. `nextProjectedPayments` picks the earliest projected payment per rule and has no caller or test; its caller was removed when Safe Spending moved to a cash-backed budget and payday values now come from `forecastPaydays`. `resolveTransactionAmounts` summarizes projected amounts for a "Varies" fallback in calculated rows, but its only caller is its own test. `TransactionsPanel` still accepts a `resolvedAmounts` map for the representative amount, yet its only render site in `AccountSections` never passes it, so calculated rows already show "Varies".

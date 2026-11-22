@@ -15,6 +15,16 @@ The operator supplies a `--db` control value, the path to the backup copy the to
 
 `deploy/MIGRATIONS.md` is the migration ledger, the list operators use to find one-time tools and retire each one only after every supported target verifies the upgrade. `deploy/migrate.sh` is the single migration body that deployment adapters run from the target image, and it applies each conversion inside a candidate copy of a verified backup, publishing the candidate over the original only after the postconditions pass. `repair-claimed-posted-time` appears in neither `MIGRATIONS.md` nor `migrate.sh`, so an operator can learn that the tool must be run only by reading the tool's own README.
 
+```mermaid
+flowchart LR
+  A[Operator opens a maintenance window and stops the API] --> B[Runs the deployment migration body from the target image]
+  B --> C{Where is the repair command?}
+  C -->|tool absent from MIGRATIONS.md and migrate.sh| D[Reads repair-claimed-posted-time README]
+  D --> E[Runs tool by hand: --db backup copy, optional --dry-run]
+  E --> F[Copies transaction_time into posted_time for settled rows with non-positive posted time]
+  F --> G[Checks pass: integrity_check ok, no FK violations, backup repaired, no user sees a result]
+```
+
 ## Executive summary
 
 `repair-claimed-posted-time` is a one-time tool that fixes settled bank transactions whose posted time was zeroed when a pending refresh arrived while the transaction carried a claim. A live guard in `writeBankValues` at `backend/internal/store/adapters/sqlite/sync_pending.go:259-268` now stops that write from happening again, but the guard does not rewrite rows already stored.

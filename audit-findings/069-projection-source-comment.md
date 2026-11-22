@@ -11,6 +11,15 @@ When the Outlook forecast or the Evaluations page opens, the browser asks the AP
 
 The manual checks in `TESTING.md` state that a deterministic request, meaning one with no request-supplied model and no overrides, always reports `Projection-Source: computed`. For such a request the API first tries `readDeterministic`, which assembles the answer from stored slices, timeline rows, and evaluation outputs produced by an earlier build; only when that stored build is missing or stale does the handler compute the projection directly. A short comment beside the `computed` constant in `backend/internal/api/projections/deterministic.go` is the only in-code explanation of this rule, and the wording this finding targets says that no stored results exist. A maintainer who reads that comment can conclude the read-and-build path is dead code. The fix changes the comment only; the header values stay as they are.
 
+```mermaid
+flowchart LR
+  A[You open Outlook forecast or Evaluations] --> B[Browser sends POST /v1/projections/deterministic with project-deterministic, settings and ISO range]
+  B --> C[No model or overrides, so API tries readDeterministic]
+  C --> D[Stored slices, timeline rows, and evaluation outputs are assembled]
+  D --> E[Net-worth chart and amounts appear with Projection-Source: computed]
+  C -. comment claims no stored results .-> F[Maintainer may treat read-and-build as dead code]
+```
+
 ## Executive summary
 
 The `Projection-Source` header tells the client where a projection result came from and is deliberately single-valued: `computed` or `shared`. The constant for `computed` was documented as claiming that every projection computes directly and that no stored results exist. That comment is wrong. The file's own canonical read path first tries `readDeterministic`, which assembles a result from stored slices, rows, and evaluation outputs and labels that cache hit `computed`.

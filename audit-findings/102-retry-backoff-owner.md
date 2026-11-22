@@ -13,6 +13,17 @@ When the worker has already attempted a run, it waits at least 30 seconds before
 
 Two guides describe the same worker. The analyses guide `docs/analyses.md:18,194` states the backoff twice in its lifecycle prose, and the judgment-providers guide `docs/judgment-providers.md:56` restates it when describing deferred provider results. The 15-second poll is a distinct value — the interval for checking for new evidence — and must stay separate from the 30-second retry backoff. This is an internal workflow with no request crossing a browser boundary; the guides exist so a reader can see the lifecycle without reading the store code, which is why one guide should own the number and the other should link to it.
 
+```mermaid
+flowchart LR
+  A[Operator starts the API server] --> B[main.go starts the analysis worker with a 15-second poll and an immediate pass]
+  B --> C[Worker checks saved bank evidence for changes]
+  C --> D{Failed run on unchanged input?}
+  D -->|yes| E[analysis_runs.go reuses the run only if it completed less than 30 seconds ago]
+  E --> F[User later sees findings on the analysis screens]
+  B --> G[The analyses guide states the 30-second backoff twice and judgment-providers guide once more]
+  G --> H[A backoff change applied to some sites leaves docs and code disagreeing]
+```
+
 ## Executive summary
 
 The 30-second retry backoff is implemented once in `backend/internal/store/adapters/sqlite/analysis_runs.go`, but it is stated independently in `docs/judgment-providers.md` and twice in `docs/analyses.md`. Four prose sites for one number make a future change easy to half-apply. The 15-second poll that starts the worker in `backend/cmd/server/main.go` is a distinct value and must stay separate. Keep the full lifecycle statement in the analyses guide, reduce the judgment-providers mention to a link, and do not change either value.

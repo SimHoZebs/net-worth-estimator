@@ -13,6 +13,18 @@ The two warning states are **Excluded from account** and **Shortfall**. Excluded
 
 The badges come from the shared `Badge` component in `frontend/src/components/ui/badge.tsx`. That component exposes a variant, a named style preset — a name like `secondary` or `success` that the component maps to a fixed set of CSS classes — so every badge of a given kind looks alike. The Badge component has no warning variant, so each warning badge site repeats the workaround of choosing the plain `secondary` preset and adding the warning color tokens by hand. Prior finding `audit-findings/052-success-badge.md` added a success variant for exactly this reason but did not add a warning one, leaving the two warning states to be styled at each site instead of in one owner.
 
+```mermaid
+flowchart LR
+  A[You open an account activity view] --> B[Browser builds the transaction list from saved browser state, no request]
+  B --> C[TransactionRow renders badges for excluded true and shortfall greater than 0.01]
+  C --> D[List badges use secondary preset plus bg-warning-bg and text-warning-text]
+  C --> E[You click a row; detail sheet shows the same states as plain secondary badges]
+  C --> F[You open the account details dialog; reused rows show the tinted badges]
+  D --> G[One concept gets two treatments and each new site copies the override string]
+  E --> G
+  F --> G
+```
+
 ## Executive summary
 
 The shared Badge component owns a set of named style presets, but it has no warning preset. The two transaction warning states, Excluded from account and Shortfall, are therefore styled at each site: the list rows and the modal table tint them with warning color tokens, while the detail sheet opened from a row shows the same states as plain secondary badges. The same concept gets two visual treatments at two depths, and each new consumer copies the override string. Prior finding `audit-findings/052-success-badge.md` covered the success badge, not the warning badge. Add one warning status badge variant, or a single status-badge owner, and use it at all sites.

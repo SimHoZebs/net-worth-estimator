@@ -11,6 +11,15 @@ When you open the Money Flows page through `frontend/src/pages/flows/FlowsPage.t
 
 Every server response body like the `/v1/flows` response has two type descriptions in the frontend. A hand-written set of interfaces lives in `frontend/src/api/contracts.ts`, and a generated model tree lives under `frontend/src/api/generated/model/`. The generated tree is produced by Orval from `frontend/openapi.snapshot.json`, the checked-in OpenAPI document that declares each endpoint and the shape of its JSON body. A Go API test exports that snapshot from the API's own served specification and `scripts/refresh-openapi` runs the export before invoking Orval; Orval also runs at the frontend build and test gates. The generated descriptions exist so an API change reaches the client automatically; the hand-written ones exist for values the UI owns, such as display labels and narrower kind unions. Having both means a snapshot change can silently desync the hand-written copy without a compile error. At several write sites a cast — an instruction telling the type checker to treat a value as a chosen type without verifying it — bridges the two descriptions and removes that checking. The `/v1/flows` call repeats the duplication locally: `frontend/src/api/flows.ts` declares a hand-written `FlowGraph` and a `readFlowGraph` guard even though the generated client now provides the `FlowGraph` type, the `FlowsOutputBody` envelope, and the `buildFlowGraph` function.
 
+```mermaid
+flowchart LR
+  A[You open the Money Flows page or change its date window] --> B[useFlowGraph sends POST /v1/flows via generated buildFlowGraph]
+  B --> C[API resolves the saved model from its store and returns JSON FlowsOutputBody]
+  C --> D[Browser validates the graph with readFlowGraph]
+  D -->|valid| E[Sankey diagram, filterable table, and edge detail panel render]
+  D -->|malformed graph| F[User-facing error]
+```
+
 ## Executive summary
 
 Server payloads are declared twice. The hand-written contract file declares roughly fifty interfaces while the generated model tree declares the same shapes from the OpenAPI snapshot. The two disagree: generated `FinancialModel` uses `Account[] | null` where the hand-written one uses non-null `BackendAccount[]`.

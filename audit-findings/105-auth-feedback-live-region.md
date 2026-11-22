@@ -13,6 +13,17 @@ When the user presses Sign in or a passkey action, the browser makes the sign-in
 
 Error versus success is carried only by the danger and success color tokens. The project's canonical field error is `FieldError` from `frontend/src/components/ui/field.tsx`, which renders its message with `role="alert"`, the assertive announcement role. No JSON format crosses a browser boundary for the message itself; the text is written directly into the page, which is why the markup must carry the announcement behavior.
 
+```mermaid
+flowchart LR
+  A[User presses Sign in or a passkey action on an auth page] --> B[Browser makes the sign-in POST or passkey request]
+  B --> C[Response arrives then report puts text into the feedback paragraph]
+  C --> D[report sets data-tone to error by default or success]
+  D --> E[The paragraph stays role status with aria-live polite]
+  E --> F[CSS hides it while empty so the region is absent from the accessibility tree]
+  F --> G[A client-side passkey error may be announced too late or not at all]
+  D --> H[Error versus success is shown only by danger or success color tokens]
+```
+
 ## Executive summary
 
 The shared feedback paragraph on the auth pages keeps `role="status"` and `aria-live="polite"` even when `report()` sets an error tone, so client-side passkey errors are not announced assertively. Its `:empty { display: none }` rule also removes the live region until text is injected, which screen readers often miss. Error versus success is carried only by token colors, while the canonical `FieldError` uses `role="alert"`, the assertive announcement role. Switch the region by tone, keep it present while empty, and add a non-color state cue.

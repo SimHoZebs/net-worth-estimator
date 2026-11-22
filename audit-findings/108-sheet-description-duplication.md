@@ -13,6 +13,17 @@ To a sighted user the Suggestions panel starts with a short hint line, "Small ch
 
 The problem is that the sentence "Small checks to improve future estimates" is written twice in the Suggestions panel. The `SheetDescription` element in `frontend/src/components/activity/TransactionDetail.tsx` holds one copy, and a visible paragraph in the panel body holds the other. Both copies land in the DOM, so a screen reader reaches the sentence twice, and the two copies have to be edited together to keep the announced and visible wording aligned.
 
+```mermaid
+flowchart LR
+  A[You click a transaction row on activity screen] --> B[Detail panel slides in; Review suggestions link appears in footer]
+  B --> C[You click Review suggestions]
+  C --> D[TransactionDetail renders nested Suggestions sheet before it becomes visible]
+  D --> E[SheetDescription adds sr-only copy of Small checks to improve future estimates]
+  D --> F[Visible paragraph adds second copy of the same sentence]
+  E --> G[Screen reader announces the sentence twice and two strings must stay in sync]
+  F --> G
+```
+
 ## Executive summary
 
 The suggestions sheet, opened from a transaction, writes the sentence Small checks to improve future estimates twice: once in a screen-reader-only description element that publishes the sheet's accessible description, and once as a visible paragraph in the sheet body. Assistive technology therefore reaches the sentence twice, and a wording change must be applied in two places to keep the visible and announced text aligned. Keep the hidden description and delete the visible paragraph, or make the description visible once.

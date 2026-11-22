@@ -11,6 +11,15 @@ Production releases here start from automation rather than a screen. Two workflo
 
 The data crossing this boundary is event context: the triggering run's conclusion, branch, and commit identifier, handed to a short inline `node` script as environment variables, which are named values the Actions runner passes to a process. The check exists because a release must ship the exact commit that passed tests; it is a security gate on production. The smaller `code-guard` job that runs just before it is repeated in the same three workflows, but its logic already lives in `scripts/ci-code-gate.mjs`, so the duplication that matters here is the release verification itself.
 
+```mermaid
+flowchart LR
+  A[Tests finishes green on a push to main or a maintainer dispatches a release] --> B[Verify the tested commit checks the 40-character release SHA]
+  B -->|manual dispatch| C[GitHub API confirms a green push-to-main Tests run for that SHA]
+  B -->|valid| D[northflank-release.yml asks Northflank to release backend and identity images]
+  B -->|valid| E[vercel-release.yml asks Vercel to deploy the frontend]
+  B -->|bad or non-green SHA| F[Workflow stops before any release is requested]
+```
+
 ## Executive summary
 
 Both production release workflows carry a verbatim inline node step named Verify the tested commit. It validates the 40-character release SHA and, on manual dispatch, queries the GitHub API for a green push-to-main `Tests` run before any release is requested. This is a security gate on production releases.

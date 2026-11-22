@@ -11,6 +11,15 @@ When you open a transaction's detail sheet from the Activity list, the sheet ask
 
 Typing in the detail editor causes renders, meaning re-runs of the component's display code. A memo is a cached value that recomputes only when one of its listed inputs changes; `TransactionDetail` memoizes the Insights list so `buildInsightSuggestions` does not walk the findings on every keystroke. The memo lists `statementSuggestion` as an input so a genuine statement change still refreshes Insights. The problem this finding targets is that `useStatementPaymentReview` rebuilt the `suggestion` object in the render body, the code that runs on every render, whenever the matcher had a live match: it built a suggestion from the match and then spread that object again to attach `accountName`. While a match was active, `statementSuggestion` therefore got a new identity on every render and the memo recomputed in the very case it was written to protect. The other memo inputs were stable.
 
+```mermaid
+flowchart LR
+  A[You open a transaction detail sheet from Activity] --> B[useAnalysisFindings and useStatementPaymentSuggestions return JSON]
+  B --> C[toStatementPaymentSuggestion builds a suggestion with evidence and actions]
+  C --> D[You type in the detail editor, triggering a render]
+  D --> E[useStatementPaymentReview rebuilds suggestion and spreads in accountName]
+  E --> F[statementSuggestion gets a new identity, so the Insights memo recomputes buildInsightSuggestions]
+```
+
 ## Executive summary
 
 `TransactionDetail` memoizes `insightSuggestions` so that `buildInsightSuggestions` does not walk analysis findings on every editor keystroke. A memo is a cached value that only recomputes when one of its listed dependencies changes. The memo lists `statementSuggestion`, the value returned by `useStatementPaymentReview`, as a dependency.

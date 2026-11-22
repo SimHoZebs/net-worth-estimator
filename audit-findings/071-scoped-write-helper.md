@@ -11,6 +11,15 @@ Several settings and review screens read and write data through the shared TanSt
 
 A read or write can finish after you have switched to another workspace resource, so each module captures the scope when the request starts and, when the result arrives, checks that the captured scope is still `getUserScope()`. This identity guard, provided today by `assertCurrentScope` in `frontend/src/state/scopedState.ts` and called from the state modules, keeps the old resource's data from being published into the newly selected resource. The helper the finding calls for exists because the same guard and publish lifecycle, together with the mutation wrapper and the refresh wrapper around it, were written out separately in several state modules, so a fix to the guard has to land in each one.
 
+```mermaid
+flowchart LR
+  A[You change a setting or pin an evaluation on a settings screen] --> B[State module sends a read or write such as getGmailCredential or getPinnedEvaluations]
+  B --> C[Module captures the scope at request start]
+  C --> D{assertCurrentScope: captured scope still getUserScope?}
+  D -->|yes| E[JSON is published under the scoped query key and the screen shows the updated value]
+  D -->|no, you switched resources| F[Old resource data is blocked from the newly selected resource]
+```
+
 ## Executive summary
 
 Five state modules independently rebuild the same three operations against the shared query client, where a scope is the workspace resource the data belongs to and a mutation is a write operation. The `current(scope, signal)` identity guard — a check that the scope is still the one that started a request when the async result arrives — is written verbatim in Gmail and sync settings and nearly verbatim in workspace resources.

@@ -13,6 +13,15 @@ Payment-pattern analysis is the internal pass that examines a user's bank transa
 
 The dead shadow lives on `paymentProviderDefinition` and carries the same name and comment as the live method. A reader following the extension seam can mistake the shadow for the real extension point. The shadow has no caller, is absent from the `Definition` interface in `backend/internal/analysis/runner.go:16` that the analyzer uses, and duplicates the copy that `Prepare` already performs into the base value. The payment-patterns doc at `docs/payment-patterns.md:118-124` reserves the catalog for later utility and insurance providers, so the live extension seam stays; only the extra method on the prepared definition is dead. Nothing a user does on the Analyses screen, and nothing the evaluation harness does, reaches the shadow.
 
+```mermaid
+flowchart LR
+  A[You open the Analyses screen or developer runs the evaluation harness] --> B[Payment-pattern analysis is set up]
+  B --> C[PaymentPatterns.WithProviders attaches a resolver mapping merchants to utility-provider or insurance-provider before analysis runs]
+  C --> D[Prepare copies Classifications and Providers into the returned base value]
+  D --> E[Recurring-payment findings appear on the Analyses screen]
+  B -. no caller reaches it .-> S[paymentProviderDefinition.WithProviders shadow stays dead]
+```
+
 ## Executive summary
 
 `PaymentPatterns.WithProviders` is the live extension seam used by the evaluation harness and tests. `paymentProviderDefinition.WithProviders` shadows the live `PaymentPatterns.WithProviders` seam on the prepared definition but has no caller, is absent from the `Definition` interface, and duplicates what `Prepare` already copies into the base value. A second copy of an extension seam invites drift between the two. The recommended action is to delete only the shadow method and its comment.

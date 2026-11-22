@@ -9,6 +9,14 @@ status: accepted
 
 The primitives page is a documentation artifact, not a product screen. A developer opens the static HTML file `docs/primitives.html` in a browser to see the project's UI building blocks and the styles applied to them. Because it is a static file, the browser loads it directly and no API request takes place. The style that matters is a CSS `font-family` declaration on the page's body, a rule that tells the browser which typeface to use for text. A typeface is the design of the lettering, and a font stack is the preferred typeface followed by fallback choices; the body rule currently names `Manrope`. The controlling typography rules live in `docs/UI_UX_PRINCIPLES.md`, which assigns Geist to UI, data, and value roles and Merriweather to display headings, and in `frontend/src/styles/tokens.css`, where the `--font-ui` variable is the stack `"Geist Variable", sans-serif` and `--font-display` is `"Merriweather Variable", serif`. The page should reflect that adopted choice. Instead the single `font-family` literal on the page names the retired typeface Manrope, which no current style or controlling document uses, so a reader sees typography the project no longer ships. Because the UI principles and token styles are the sources of truth, that one literal on the page is what must change.
 
+```mermaid
+flowchart LR
+  A[Developer opens docs/primitives.html in a browser] --> B[Browser loads the static file with no API request]
+  B --> C[Body font-family rule renders Manrope]
+  C --> D[Reader sees a typeface the project no longer ships]
+  E[docs/UI_UX_PRINCIPLES.md and frontend/src/styles/tokens.css adopt Geist and Merriweather] -.->|sources of truth| C
+```
+
 ## Executive summary
 
 The typography decision to use Geist and Merriweather was applied to the controlling docs `docs/UI_UX_PRINCIPLES.md` and `frontend/src/styles/tokens.css`, but the documentation artifact `docs/primitives.html` still names the retired font Manrope in its body `font-family` rule. A repo-wide search finds the name only in that artifact and in the historical finding 011 record `audit-findings/011-typography-decision.md`. A reader using the primitives page, which shows the project's UI building blocks, sees a font the project no longer uses. The fix is to swap the one literal to the adopted UI stack.

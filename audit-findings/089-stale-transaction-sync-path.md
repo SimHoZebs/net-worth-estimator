@@ -11,6 +11,14 @@ This is a documentation lookup, not a user screen. A developer reading the trans
 
 The pointer named `backend/internal/store/sync_pending.go`, a path outside the SQLite adapter where no `transactionSyncKey` type exists, so a reader following the pointer lands on a missing file. The same stale path was copied into a grooming note, a planning note for later cleanup work under `tasks/to-groom/long-chaining/sync-snapshot.md` that inventories the SimpleFIN snapshot call chain. The pointer exists to make the identity rule verifiable in code; a stale path defeats that purpose.
 
+```mermaid
+flowchart LR
+  A[Developer reads the transaction-identity section of TECHNICAL_OVERVIEW.md] --> B[Follows the pointer string backend/internal/store/sync_pending.go]
+  B --> C[No transactionSyncKey type exists at that path outside the SQLite adapter]
+  C --> D[Reader hits a missing file, so the upstream-triple identity rule in transaction_sync_keys cannot be verified]
+  C -. same stale path copied into .-> G[sync-snapshot.md grooming note]
+```
+
 ## Executive summary
 
 The transaction-identity section points at `backend/internal/store/sync_pending.go`, which does not exist; the type lives under the SQLite adapter. The same stale path is propagating into a grooming note. A reader following the pointer hits a missing file. The recommended action is to correct the pointer in both places.

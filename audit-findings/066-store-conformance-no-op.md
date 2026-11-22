@@ -11,6 +11,14 @@ The persistence layer has a shared conformance suite, a set of Go tests in `back
 
 One of those names, `ArtifactsRoundTripAndKeepFirstWrite`, refers to a retired artifact model; the current seam persists projection state, slices, rows, and evaluation outputs instead. The subtest body is empty, so the test runner reports the name as a passing check without checking anything, and that pass appears in the green result before a developer reviews the report. The data crossing the boundary here is the Store interface itself — calls such as saving and getting projection state — not a network payload.
 
+```mermaid
+flowchart LR
+  A[A developer adds or swaps a backend and runs go test] --> B[SQLite TestStoreConformance calls storetest.Run]
+  B --> C[Suite exercises the Store interface through SaveProjectionState and GetProjectionState]
+  C --> D[go test reports ArtifactsRoundTripAndKeepFirstWrite as passing]
+  D -->|body is empty| E[Caller reads false coverage for a retired artifact model]
+```
+
 ## Executive summary
 
 The Store conformance suite, the shared set of tests every Store implementation must pass, advertises a check named `ArtifactsRoundTripAndKeepFirstWrite`, but its body is empty. The suite is the contract gate callers use to judge any Store implementation, so an always-passing entry gives false coverage.

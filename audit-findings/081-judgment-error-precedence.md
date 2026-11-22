@@ -11,6 +11,16 @@ Payment analysis asks a machine-learning provider to judge candidates in batches
 
 When the browser opens an analysis, or when settings change enough to trigger a recompute, the browser requests the analysis and sees the chosen status only after the backend has aggregated every batch. The work is internal: `judgment.Assess` in `backend/internal/judgment/assess.go` chooses the error for one batch; `judgePayments` in `backend/internal/analysis/payment_judgment.go` and `judgeSelectedPayments` in `backend/internal/analysis/payment_incremental.go` combine those batch errors during full recompute and incremental analysis; and `scanPaymentJudgments` in `payment_incremental.go` picks the final status by scanning the resulting findings. The data involved is judgment status values carried in JSON, a text format for structured data. The comments on the incremental helpers say they match `judgment.Assess`, so the precedence rule is currently kept consistent by prose rather than by one shared piece of code.
 
+```mermaid
+flowchart LR
+  A[You open an analysis or change settings enough to trigger recompute] --> B[Browser requests the analysis]
+  B --> C[Provider answers batches of up to 100 with ready, pending, or unavailable statuses]
+  C --> D[judgment.Assess picks each batch error with unavailable outranking pending]
+  D --> E[judgePayments and judgeSelectedPayments aggregate the batch errors]
+  E --> F[scanPaymentJudgments picks the final status from the findings]
+  F --> G[Browser shows one deferred error for the whole analysis]
+```
+
 ## Executive summary
 
 The precedence rule "unavailable outranks pending" is decided in three places: in `judgment.Assess`, again when `judgePayments` and `judgeSelectedPayments` aggregate 100-item batches, and again in `scanPaymentJudgments` when final findings are scanned. The comments on the incremental helpers say they match `judgment.Assess`, so the rule is currently kept consistent by prose rather than code.

@@ -11,6 +11,15 @@ When you add a recurring transaction or edit a schedule's repeat rule, the sched
 
 The stricter helper `calendarDayMs` in `frontend/src/domain/calendarDay.ts` already serves other editors and snapshot code. It parses the same date text and then round-trips the parsed fields through UTC to reject impossible days: the browser's built-in `Date` silently rolls `2024-02-30` into `2024-03-01`, while `calendarDayMs` builds a UTC value from the year, month, and day and checks that reading the value back reproduces those fields. `isIsoDate` only applies a text pattern and a parse check, so `isIsoDate("2024-02-30")` returns true. The `isIsoDate` call is the one guarding evaluation dates and the repeat-rule anchor, so `isIsoDate` and `calendarDayMs` can disagree about whether a given day is real.
 
+```mermaid
+flowchart LR
+  A[You pick a first-occurrence date in RecurrenceFields.tsx repeat controls] --> B[Browser runs isIsoDate text check on the YYYY-MM-DD value]
+  B -->|accepted| C[utcDate parses at noon UTC and the date anchors weekly and monthly repeats]
+  B -->|impossible day 2024-02-30| D[isIsoDate returns true while calendarDayMs would reject it]
+  E[You open an evaluation] --> F[financialIndependence.ts maps the JSON envelope with the same isIsoDate]
+  F --> G[Candidate dates and trajectory rows become outcomes on the analysis screen]
+```
+
 ## Executive summary
 
 The frontend has two ways to decide whether a `YYYY-MM-DD` value is a real calendar day. `calendarDayMs` round-trips the parsed UTC date and rejects a day that `Date` silently rolls into the next month, with a comment recording why. `isIsoDate` only applies a text pattern and a parse check, so `isIsoDate("2024-02-30")` returns true even though `utcDate` turns that value into March 1.

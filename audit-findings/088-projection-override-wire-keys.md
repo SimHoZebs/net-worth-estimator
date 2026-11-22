@@ -13,6 +13,16 @@ The names a JSON field must use to be accepted are called wire tags, declared on
 
 The reference example instead documented `overrides.addedRules` and `overrides.disabledRuleIds`. A client copying the example sends JSON fields that the Go decoder drops, so the projection looks correct while ignoring the intended what-if change. `TECHNICAL_OVERVIEW.md` section 2 already owns the request shape and defers to the OpenAPI snapshot as the authority, so the example is the only thing wrong: the Go wire tags, the allow-list, the generated contract, and the API all already use `addedSchedules` and `disabledScheduleIds`.
 
+```mermaid
+flowchart LR
+  A[Client requests a deterministic projection with what-if overrides] --> B[Browser posts JSON to POST /v1/projections/deterministic]
+  B --> C{Override field names in the body}
+  C -->|addedSchedules and disabledScheduleIds from the Go wire tags and generated contract| D[Go decoder accepts them and applies the what-if change]
+  C -->|addedRules and disabledRuleIds copied from the TECHNICAL_OVERVIEW example| E[Go decoder silently drops the fields and ignores the change]
+  D --> F[Projected result shown on screen]
+  E --> F
+```
+
 ## Executive summary
 
 The deterministic projection example documents `overrides.addedRules` and `overrides.disabledRuleIds`, but the Go wire tags, the JSON field names the API actually accepts, are `addedSchedules` and `disabledScheduleIds`. A client copying the example sends fields Go silently drops, so the override does nothing while looking canonical. `TECHNICAL_OVERVIEW.md` section 2 already owns this shape and defers to the OpenAPI snapshot, meaning the spec-derived contract is the authority. The recommended action is to replace both keys in the example.

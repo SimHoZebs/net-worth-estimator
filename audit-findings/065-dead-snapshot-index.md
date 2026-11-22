@@ -9,6 +9,14 @@ status: accepted
 
 This is repository housekeeping, not a screen or a user action, so no request crosses a runtime boundary. At the repository root sit two tracked files added by the single baseline commit `32252b84`: `.snapshot-index`, a 39 KB binary Git index snapshot, and `.snapshot-index.lock`, a zero-byte lock file. A Git index is the staging-area file that records which files are tracked and their checksums; committing a snapshot of it captured a baseline of an older frontend layout. No application code starts this work and no tracked source references either filename, so there is no runtime producer or reader to name — the files are inert content from that baseline commit. The format is a binary index file plus an empty lock companion, and the pair remains only because the baseline was committed. The layout they describe — `package-lock.json`, `biome.json`, `components.json`, a root-level `src/App.tsx`, and `.github/workflows/ci.yml` — no longer exists in the checkout, so the pair can only invite a reader to mistake an old baseline for current state.
 
+```mermaid
+flowchart LR
+  A[A maintainer inspects the repository root] --> B[Finds .snapshot-index and .snapshot-index.lock tracked from commit 32252b84]
+  B --> C[The 39 KB binary index and empty lock describe a dead layout]
+  C -->|no tracked source references them| D[A reader could mistake the old baseline for current state]
+  C -->|delete both| E[Repository no longer carries the stale baseline]
+```
+
 ## Executive summary
 
 `.snapshot-index` is a 39 KB binary Git index snapshot and `.snapshot-index.lock` is a zero-byte file, both tracked at the repository root. No tracked source references either name. Their last change added an obsolete layout, `package-lock.json`, `biome.json`, `components.json`, a root-level `src/App.tsx`, and `.github/workflows/ci.yml`, none of which exist in the current checkout.

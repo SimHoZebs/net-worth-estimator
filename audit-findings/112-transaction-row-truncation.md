@@ -15,6 +15,17 @@ The layout puts the title in a flex child, meaning a box inside a flex container
 
 The problem appears at the moment the row is drawn. The title is capped twice: once by the `max-w-[48ch]` class, a 48-character maximum, and once by `max-sm:max-w-[calc(100vw_-_13rem)]`, a maximum width computed from the viewport — the visible area of the browser window — on small screens, where `13rem` is a guessed allowance for the side columns. That guessed width only makes sense when the row is as wide as the page. In the account dialog and the detail sheet the row is far narrower than the viewport, so the character cap cuts titles off too early on desktop while the viewport-based cap does not hold them at all inside the narrow dialog and sheet.
 
+```mermaid
+flowchart LR
+  A[You open activity page, account detail dialog, or a detail sheet] --> B[Browser renders rows locally from saved transaction data]
+  B --> C[Shared TransactionItem owns the row: date, icon, title, amount]
+  C --> D[Title flex child shrinks via min-w-0 and truncate adds the ellipsis]
+  C --> E["Title capped by max-w-[48ch] and max-sm:max-w-[calc(100vw_-_13rem)] with 13rem guessed"]
+  E --> F{Where does the row render?}
+  F -->|page width| G[Character cap cuts long titles off too early on desktop]
+  F -->|narrow dialog or sheet| H[Viewport cap does not bound the title at all]
+```
+
 ## Executive summary
 
 The shared transaction row draws the title of every transaction on the activity page, in the account-detail dialog, and in detail sheets. It is the single row layout that all three surfaces reuse, so a mistake in how the title is sized shows up everywhere.

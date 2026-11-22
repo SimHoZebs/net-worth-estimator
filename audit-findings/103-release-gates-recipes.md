@@ -15,6 +15,16 @@ The failed-release retry procedure and the dispatch caveat are owned by the Nort
 
 No browser request or data format crosses a boundary here. The guides exist to hold detailed commands that the gate document would otherwise carry as a partial copy, and operators read the gate document first to decide which recipe they need.
 
+```mermaid
+flowchart LR
+  A[Operator opens docs/release-gates.md after Tests is green] --> B[Validates deployment images using the gate doc list]
+  B --> C[Gate doc names actionlint and images.test.mjs but omits ci-code-gate.test.mjs]
+  C --> D{Reader treats the partial list as complete?}
+  D -->|yes| E[Code-gate test is skipped so doc-only gating is missed]
+  B --> F[Requests the Northflank release and records run ID migration step backup hash and ok readiness]
+  F --> G[Failed retry caveat lives in deploy/northflank/README.md not the gate doc]
+```
+
 ## Executive summary
 
 The release-gates document `docs/release-gates.md` keeps gate-level claims but partially carries the deployment recipes. Its image-validation line points at `deploy/images.md` without giving the full recipe, which includes the code-gate test, and its failed-release paragraph names the dispatch caveat while linking to `deploy/northflank/README.md`, where that caveat is explained in full. A partial copy is worse than either a full recipe or a pointer. Keep the gate-level claims and point to the owning guides for the recipes.

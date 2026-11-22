@@ -11,6 +11,16 @@ Two credit-card surfaces show a statement's status. The card statements list sho
 
 A derived statement is one statement reconstructed from a recorded cycle end; the backend owns the amounts and leaves the labeling to the client. The status ladder is the ordered rule that maps those amounts to a label: a remaining balance of zero or less means paid in full, a positive allocation means partially paid, and otherwise the statement is open. `statementStatusLabel` in `frontend/src/domain/statementPayment.ts` turns those statuses into the four visible strings. `derivedStatementStatus` in `frontend/src/domain/derivedStatement.ts` applies the ladder for the statements list and returns `unknown` when the billed amount, remaining, or allocated is null; a null guard is the check that refuses to treat a missing amount as zero. `statementStatusFromTotals` in `frontend/src/domain/statementPaymentAdapter.ts` repeats the same ladder for the suggestion queue. The screens reach these two functions through `toDerivedCardStatement` and `toStatementPaymentSuggestion` rather than calling them directly.
 
+```mermaid
+flowchart LR
+  A[You open the card statements list or the payment suggestion queue] --> B[Browser asks the API for statement allocation reads]
+  B --> C[API returns balance, allocated, and remaining as JSON with no status field]
+  C --> D[toDerivedCardStatement calls derivedStatementStatus for the list]
+  C --> E[toStatementPaymentSuggestion calls statementStatusFromTotals for the queue]
+  D --> F[List shows Open, Partially paid, Paid in full, or Status unknown when an amount is null]
+  E --> G[Queue shows the same labels on proposed matches]
+```
+
 ## Executive summary
 
 The backend statement read does not return a status field, so the frontend derives it. It derives it twice: `derivedStatementStatus` maps remaining and allocated amounts to paid-in-full, partially-paid, or open with an `"unknown"` guard for missing amounts, while `statementStatusFromTotals` repeats the same ladder for the payment suggestion path. The two copies already handle nulls differently.

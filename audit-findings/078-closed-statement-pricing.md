@@ -13,6 +13,17 @@ A cycle is closed when its closing date has passed and a bank observation exists
 
 For a closed cycle the two paths disagree. `DeriveStatements` in `backend/internal/safespending/derive_statements.go` takes the bank balance observed inside the cycle, negates it into a positive debt amount, clamps negatives to zero, and rounds to cents. `buildStatements` in `payday_statements.go` still opens the checkpoint replay for that same closed cycle. Both functions are internal and are called by the API handlers; nothing marks one authoritative. The doc comment on `DerivedStatement` in `backend/internal/types/card_statement.go` describes the replay rule — an observed checkpoint at the close, later closes replayed from posted activity — but the closed-cycle path in `DeriveStatements` does not use that replay.
 
+```mermaid
+flowchart LR
+  A[You open the card statements list or the spending-availability view] --> B[Browser requests that surface from the API]
+  B --> C[API derives statements from bank evidence as JSON with closing date, balance, kind, due date, and currency]
+  C --> D{Closed-cycle pricing rule}
+  D -->|DeriveStatements| E[Negate the observed balance, clamp negatives to zero, round to cents]
+  D -->|buildStatements| F[Open the checkpoint replay of posted charges and payments]
+  E --> G[Card statements list and transfer-pair analysis show a closed balance]
+  F --> H[Safe Spending summary shows a closed balance]
+```
+
 ## Executive summary
 
 Statements are no longer stored rows; both pricing paths derive them from recorded evidence. For a closed cycle `DeriveStatements` negates the bank balance observed inside the cycle, while `buildStatements` opens a checkpoint replay (replaying posted charges and payments from a saved balance at the first close) and carries them forward. They feed different surfaces — the card-statements API and transfer-pair analysis use the first, the Safe Spending summary the second — and nothing marks one authoritative. The `DerivedStatement` doc describes the replay rule that the function does not use for closed cycles.

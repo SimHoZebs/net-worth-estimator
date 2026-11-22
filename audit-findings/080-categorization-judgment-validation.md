@@ -13,6 +13,17 @@ In both paths the provider receives a batch, meaning a group of up to 100 reques
 
 The categorization learner calls the provider session directly instead. `MLClassifier.Classify` accepts a reply row only when the status is `ready`, the decision is `supported`, and the strength is `strong`, so a duplicate request ID or an overlong reason can assign a category there while the same batch fails in payments. The classifier sits inside a keyword-first composition: `CompositeClassifier` in the same file runs the deterministic keyword classifier first and lets the learner backfill only the transactions keywords skipped, because the learner may only add labels and never replace a keyword answer. The gate exists because a provider answer is untrusted data and both features run under the same `ML_JUDGMENT_URL` contract.
 
+```mermaid
+flowchart LR
+  A[You open an analysis or import transactions to categorize] --> B[Backend sends a batch of up to 100 requests to ML_JUDGMENT_URL]
+  B --> C[Provider replies as JSON with request ID, status, decision, strength, and reason up to 2000 bytes]
+  C --> D[Payment path runs judgment.Assess, which rejects duplicate IDs and reasons over 2000 bytes]
+  C --> E[Categorization path calls MLClassifier.Classify directly]
+  E --> F[Classifier accepts a row only when ready, supported, and strong]
+  D --> G[Analysis shows validated judgments]
+  F --> H[Transactions get categories from a batch payments would reject]
+```
+
 ## Executive summary
 
 Payments pass every provider batch through `judgment.Assess`, which rejects duplicate request IDs, missing or mismatched IDs, structurally impossible statuses, and reasons over 2000 bytes. The categorization learner calls `session.Evaluate` directly and accepts a row only when its status is `ready` with a strong supported decision, so a duplicate ID or overlong reason passes there and fails in payments. Both run live under the same `ML_JUDGMENT_URL`, so one provider contract has two enforcement points.

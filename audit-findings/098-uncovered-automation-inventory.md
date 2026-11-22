@@ -9,6 +9,15 @@ status: accepted
 
 Preparing a release is a documentation workflow rather than a runtime path. An engineer checks the gate docs to see which behaviors automation, meaning automated tests, actually covers and which gaps stay manual. A seam is the boundary where a test substitutes a fake for a real service, such as the mail OAuth fetch boundary where the test replaces the real email provider's message fetch, or the local stand-in for image extraction, a test double that mimics OCR, meaning optical character recognition that reads text from an image. Physical passkeys, a sign-in method that uses a device key, are another gap. These gaps are recorded as lists in several Markdown docs: the release gate `docs/release-gates.md` owns the shared list headed "Uncovered by automation (never faked green)", while `docs/integration-edge-gates.md` keeps a copy of several of the same items and `docs/e2e-gate.md` repeats the passkey item. No runtime request starts this work; a maintainer edits the lists whenever a coverage gap changes. The release-gates doc is the intended owner, which is why repeating the gaps elsewhere creates a maintenance cost.
 
+```mermaid
+flowchart LR
+  A[Engineer checks the gate docs before a release] --> B[Gaps are recorded as lists in several Markdown docs]
+  B --> C[docs/release-gates.md owns the Uncovered by automation list]
+  C --> F[Mail OAuth seam, image-extraction stand-in, and physical passkeys stay manual]
+  B --> D[docs/integration-edge-gates.md copies several gaps and docs/e2e-gate.md repeats passkeys]
+  D --> E[Maintainer edits the same gap in several docs and the lists can drift]
+```
+
 ## Executive summary
 
 The integration-edge guide `docs/integration-edge-gates.md` cedes the ship-or-no-ship checklist to the release-gates doc but keeps its own "Uncovered by automation" list, which records gaps not covered by automated tests. The mail OAuth seam, the boundary of the mail OAuth integration, and the image-extraction stand-in, a test double for image extraction, appear in both lists. Passkeys appear in both plus the e2e gate `docs/e2e-gate.md`. A maintenance change to any one gap must be applied in several docs. The fix is to give the release-gates section sole ownership.

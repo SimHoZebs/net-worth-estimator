@@ -13,6 +13,16 @@ A leg is one side of the transfer. The matching predicate — a yes/no rule — 
 
 A second rule, the nettable-link predicate, nets a confirmed external outflow against an external inflow of equal rounded amounts so a row total counts the pair once instead of twice. An external leg is money moving across the boundary of the tracked account set rather than between two tracked accounts. That predicate lives in `backend/internal/domain/path.go` and `backend/internal/domain/flowgraph.go`, and the link validator checks it before writing a link. The detector's scoring of candidate pairs and the netters' side effects stay local to each path.
 
+```mermaid
+flowchart LR
+  A[You request an analysis or payment findings] --> B[Backend reads bank transaction facts as JSON: amount string, currency, posting timestamp]
+  B --> C[transfer.go detector pairs settled USD legs with opposite signs, different accounts, equal cents, and a gap of at most transferMatchWindowDays = 7]
+  C --> D[payment_transfers.go excludes the paired legs from payment evidence]
+  C --> E[When an owner confirms a pair, transfer_links.go validates with its own copy of the 7-day window]
+  D --> F[Analysis counts the transfer once instead of twice]
+  E --> G[The confirmed link is written]
+```
+
 ## Executive summary
 
 The rule for matching opposite transfer legs — settled, USD, opposite sign, different accounts, equal cents, within seven days — is implemented in three places: the transfer detector, the payment-stream exclusion path, and the SQLite link validator, which carries its own copy of the seven-day constant with a comment that it mirrors the detector. A second rule, the nettable-link predicate of an external outflow plus an external inflow with equal rounded amounts, is implemented again in both the path netter and the flow-graph netter.

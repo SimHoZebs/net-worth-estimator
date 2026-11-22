@@ -13,6 +13,15 @@ Each receipt row carries provenance, meaning a producer name and a version strin
 
 The duplicate is a second declaration of the same producer name and version as the constants `ReceiptProducer` and `ReceiptProducerVersion` in `backend/internal/gmail/receipts.go:30-37`. Production writes use the store helper; the Gmail constants were referenced only by the assertion in `backend/internal/gmail/receipts_test.go:231-232` that the two sources agreed. A version bump applied to the store helper but not to the Gmail constants, or the other way round, saves two different provenance values on receipts with no failing signal. The test is the only thing that would catch the mismatch, so it is a guard rather than a single source of truth.
 
+```mermaid
+flowchart LR
+  A[Scheduled Gmail scan worker fetches new messages] --> B[Detector classifies each as receipt, shipping notice, or other]
+  B --> C[Extractor pulls merchant, amount, and reference]
+  C --> D[store.ReceiptProvenanceForEmail writes gmail-receipt-email / v1 into the row]
+  D --> E[Receipt row saved to SQLite and reviewed on the receipts screen]
+  K[gmail constants ReceiptProducer and ReceiptProducerVersion] -. only an agreement test compares them .-> D
+```
+
 ## Executive summary
 
 The producer name and version string recorded on receipts exist in two places: as Gmail constants and as the return value of `store.ReceiptProvenanceForEmail()`. Production writes use the store function; the Gmail constants are referenced only by a test asserting the two agree. A version bump can therefore be half-applied with no signal. The recommended action is to delete the Gmail constants and have the test compare against the store function.

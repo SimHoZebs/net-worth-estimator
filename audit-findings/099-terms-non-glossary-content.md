@@ -17,6 +17,15 @@ A third section at `docs/TERMS.md:130-132` states the UI test policy together wi
 
 No browser request or parser is involved. The glossary workflow starts before the wording reaches a screen, and the glossary exists so one name is agreed in one place while the owning documents keep the detail.
 
+```mermaid
+flowchart LR
+  A[Maintainer reviews product copy against docs/TERMS.md] --> B[Glossary restates a fact owned elsewhere]
+  B --> C[Replay ordering duplicated from TECHNICAL_OVERVIEW.md Historical Replay and Checkpoints]
+  B --> D[Outlook placement duplicated from TECHNICAL_OVERVIEW.md 622]
+  B --> E[Test policy claims no route-name sweep exists]
+  E --> F[A route-name check lands and the negative claim is false]
+```
+
 ## Executive summary
 
 The glossary at `docs/TERMS.md` is the single home for the project's agreed words. Three of its sections are not term definitions. One restates the replay-ordering algorithm owned by `TECHNICAL_OVERVIEW.md` and implemented in `backend/internal/domain/prepare.go`; one duplicates the Analysis-versus-income-evidence distinction from that overview and `docs/TERMS.md`'s own sections while adding a single sentence about Outlook placement; one states test policy together with a negative claim that becomes false the moment a route-name check is added. The code currently matches the documented ordering, so these are drift risks rather than contradictions. Reduce each passage to a naming fact plus a link.

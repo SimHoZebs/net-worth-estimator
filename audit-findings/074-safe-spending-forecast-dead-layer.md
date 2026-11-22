@@ -11,6 +11,14 @@ The Safe Spending section of the Outlook page answers how much you can spend nex
 
 Before the server became the sole owner of the amounts, the client also summed windowed totals and re-expanded recurring schedules, meaning it turned a repeating schedule into its individual future occurrences, to forecast income. Those functions and the recurrence helpers they called stayed in the domain layer after the takeover. This is an internal path: no screen calls them, their only callers are their own tests, and a stale grooming inventory still describes callers that no longer exist. They matter because they offer a second way to compute the same income figure, which can disagree with the server's `expectedPay` after any change to recurrence rules.
 
+```mermaid
+flowchart LR
+  A[You open Outlook to view Safe Spending] --> B[Browser sends GET /v1/safe-spending-summary via useSafeSpendingSummary]
+  B --> C[API computes amounts from one evidence cut and paid or pending schedule state]
+  C --> D[JSON is displayed as cards, bills to cover, and expectedPay]
+  C -. second, uncalled path .-> E[Dead client helpers re-expand schedules into expectedMonthlyIncome]
+```
+
 ## Executive summary
 
 Safe Spending answers how much the user can spend. `safeSpending.ts` states the current rule: every amount comes from the server summary and only time windows stay on the client. Several pre-takeover windowed sums and forecasts survived with no production caller.

@@ -15,6 +15,16 @@ In these buttons the name changes with the state. The pin buttons switch `title`
 
 The repository already has the correct pattern in pattern review at `frontend/src/components/analysis/PatternReview.tsx:99-120`. Its Confirm and Not buttons keep fixed `aria-label` values, `Confirm {kind} for {title}` and `Not {kind} for {title}`, and let `aria-pressed` carry the state. That stable-name pattern is what the pin and reveal buttons should reuse.
 
+```mermaid
+flowchart LR
+  A[User presses a pin button on an evaluation or funding-gap card] --> B[Browser renders the button with a name and aria-pressed]
+  B --> C[Pin name flips between Pin name to Outlook and Unpin name from Outlook]
+  C --> D[When pinned the name says Unpin while aria-pressed is true]
+  D --> E[Assistive technology announces a name that contradicts the state]
+  E --> F[The user cannot tell whether the item is pinned]
+  B --> G[Sources Show token button flips between Show token and Hide token with the same conflict]
+```
+
 ## Executive summary
 
 The pin buttons and the token reveal button change `title` and `aria-label`, the control's accessible name, between "Pin" and "Unpin" or "Show token" and "Hide token" while also setting `aria-pressed`, the attribute that reports a toggle's on or off state. The announced name then asserts the opposite of the pressed state, so a user cannot tell whether the item is pinned. The repository already uses the correct stable-name pattern in pattern review at `frontend/src/components/analysis/PatternReview.tsx`. Keep one name and let `aria-pressed` carry the state.

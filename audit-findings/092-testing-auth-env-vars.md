@@ -11,6 +11,16 @@ Server startup is not a user screen. An operator starts the API with a set of en
 
 The session and read-only matrix in `TESTING.md` claims that the two unprefixed names `AUTH_TOKEN` and `AUTH_PROVIDER=none` make server startup fail. "Unprefixed" means the names lack the `NET_WORTH_ESTIMATOR_` prefix that the helper looks up. Because `FromEnv` calls the environment reader only on prefixed names, it never reads either unprefixed name, so setting them has no effect and the server starts normally. `AUTH_TOKEN` appears nowhere in application code. The real setting is the prefixed `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`, where only a value other than `better-auth` causes failure.
 
+```mermaid
+flowchart LR
+  A[Operator starts the API with env vars from TESTING.md] --> B{Which provider setting is present?}
+  B -->|AUTH_TOKEN and AUTH_PROVIDER=none| C[FromEnv reads only prefixed names and ignores both]
+  C --> D[Server starts normally]
+  B -->|NET_WORTH_ESTIMATOR_AUTH_PROVIDER set to none| E[FromEnv returns AUTH_PROVIDER must be better-auth]
+  E --> F[Server never starts and no result appears]
+  B -->|better-auth or empty| D
+```
+
 ## Executive summary
 
 The testing guide `TESTING.md` says that setting `AUTH_TOKEN` and `AUTH_PROVIDER=none` makes server startup fail. Neither name drives startup, because the identity configuration helper reads only prefixed names. `AUTH_TOKEN` appears nowhere in application code, and the real variable is `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`, where only a value other than `better-auth` causes failure. Setting the two names as written is ignored and the server starts normally. The claim is false and invites wrong deployment configuration, so it should be removed.

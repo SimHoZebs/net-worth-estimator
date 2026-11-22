@@ -17,6 +17,18 @@ On screen, `groupPatternReviews` in `frontend/src/domain/patternReview.ts` group
 
 The three status tabs are drawn by `TabsList`, a shared tab-strip component in `frontend/src/components/ui/tabs.tsx`. `TabsList` takes a boolean prop `scrollable`, an input that switches a layout behaviour on or off. Setting `scrollable` selects a class-variance recipe branch, a named preset style choice also called a variant that picks a different set of CSS classes, that makes the strip scroll sideways and reserves bottom padding for the selected underline and the keyboard focus ring, the outline the browser draws around the tab reached with the keyboard. The component exists so no consumer has to write its own overflow or clipping workarounds in page markup, and `docs/ui-components.md` records this as the contract for horizontal tab strips. The Pattern review strip in `frontend/src/components/analysis/PatternReview.tsx` is the only one of eight `TabsList` call sites that does not set `scrollable`.
 
+```mermaid
+flowchart LR
+  A[You open Sources page Analysis tab] --> B[Browser runs useAllAnalysisFindings fetch loop]
+  B --> C[listAnalysisFindings with cursor and limit 100 until nextCursor empty]
+  C --> D[Generated client parses JSON findings into AnalysisFinding records]
+  D --> E[groupPatternReviews and reviewTabFor fill Review, Saved, Dismissed tabs]
+  E --> F[Pattern review strip renders TabsList without scrollable]
+  F --> G{Viewport 360px?}
+  G -->|yes| H[Three tabs clip; selected underline and focus ring paint incompletely]
+  G -->|no| I[Three tabs fit with their counts]
+```
+
 ## Executive summary
 
 The pattern-review section on the Sources page's Analysis tab lets a user confirm or correct suggested payment purposes across three status tabs, rendered by the shared tab strip component (`TabsList`). That strip is the only one of eight `TabsList` consumers that does not set `scrollable`. At a narrow viewport the three tabs can clip, and there is no reserved paint space for the selected underline or focus ring. The owning recipe only handles overflow and underline spacing when the prop is set, and the guide at `docs/ui-components.md` records that contract. Add `scrollable` to that one tab strip.

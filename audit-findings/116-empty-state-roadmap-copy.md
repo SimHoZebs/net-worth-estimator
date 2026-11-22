@@ -13,6 +13,16 @@ On the Outlook workspace home, the browser loads the member's accounts and balan
 
 In both cases the data crossing the API boundary is the list that comes back empty: share records for the Inbox and accounts for Outlook. Neither path decodes a special format, so no parser is involved. An empty state is the message shown when a list has no items, and a roadmap statement is text that announces unbuilt features. Both passages are static copy written to orient a new member, but each one renders on every visit with no action taken and either repeats the controls or promises future work.
 
+```mermaid
+flowchart LR
+  A[Member opens Inbox and selects the pending tab] --> B[Browser loads the inbox share list from the API]
+  B --> C{List empty?}
+  C -->|yes| D["Empty state shows 'Nothing waiting' plus the split-requests roadmap and the header note"]
+  C -->|no| E[Share cards with Accept and Decline appear]
+  F[Member opens Outlook workspace home] --> G[Browser loads accounts; the list comes back empty]
+  G --> H["Empty state shows 'Your workspace is ready', the 'Add your first account' button, and the tutorial description"]
+```
+
 ## Executive summary
 
 Two empty states carry copy that does the wrong job. The Inbox pending empty state announces the unbuilt split-requests feature in its description, and the header note above the tabs restates the Accept and Decline buttons while duplicating both the declined empty state's description and the accepted empty state's description. The Outlook empty state adds a tutorial paragraph on top of a title and a button that already stage the single action. The buttons and per-card copy already explain what to do, so the extra text is noise. Remove the split-requests roadmap string, the header note, and the Outlook empty-state description.

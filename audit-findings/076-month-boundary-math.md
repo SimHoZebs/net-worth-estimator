@@ -13,6 +13,15 @@ That conversion has to land on the first and last day of a month even at year en
 
 The flow-window helpers `firstOfMonth` and `lastOfMonth` in `flowWindow.ts` instead repeated that UTC math with their own code, so month-end correctness lived in two files. Two more exports, `firstDayOfMonthIso` and `lastDayOfMonthIso`, existed only so the `flowWindow` test could assert those boundaries; no screen called them. Both helpers and both wrappers are internal to the frontend domain layer.
 
+```mermaid
+flowchart LR
+  A[You pick Last 3 months in the Cash flow date-range picker] --> B[Browser sends the cash-flow window request with start and end dates]
+  B --> C[API returns transactions in that window as JSON]
+  C --> D[flowWindow converts the preset to concrete month-boundary dates]
+  D --> E[firstOfMonth and lastOfMonth compute month ends with their own UTC math instead of clampMonth]
+  E --> F[The cash-flow diagram draws transactions for the computed window]
+```
+
 ## Executive summary
 
 Two frontend helpers compute the first and last day of a month with their own UTC math, duplicating the clamped-month formula that `clampMonth` already owns for `horizonDate`. Leap-year and month-end correctness is therefore maintained in two live files, and the `flowWindow` test pins its own copy instead of the shared one. Two more exports, `firstDayOfMonthIso` and `lastDayOfMonthIso`, exist only to serve that test.

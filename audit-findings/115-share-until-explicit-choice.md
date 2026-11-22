@@ -15,6 +15,16 @@ When the member activates "Turn on sharing", the component sends the save reques
 
 The "Share until" input is a native date input, which has no "no end" state of its own. The current design therefore expresses an open-ended share, meaning a share with no end date, by leaving the field empty: the draft holds an empty string, both requests send `endDate` as an empty string, and the preview sentence reads "with no end". The field label currently reads "Share until (empty for no end)" to explain that. No parser decodes the empty value; the empty text simply becomes an empty string at the API boundary.
 
+```mermaid
+flowchart LR
+  A[Member opens My sharing in a group detail view] --> B[Selects accounts and fills Share from and Share until]
+  B --> C["After 350 ms debounce, previewSharingPolicy POSTs account IDs and date strings with no enabled flag"]
+  C --> D[API returns transaction, member, and account/date counts only]
+  D --> E["Before sharing alert shows the count; empty Share until reads 'with no end'"]
+  E --> F[Activates Turn on sharing; setSharingPolicy PUTs enabled true plus the same accounts and dates]
+  F --> G[Saved policy changes what group members can see]
+```
+
 ## Executive summary
 
 Open-ended sharing is encoded in a label instead of in a control: the field reads "Share until (empty for no end)" and relies on a parenthetical note to explain that an empty value means no end date. The preview request already reports the same case as "with no end", so the label repeats a rule that the preview sentence already shows. The UI principles prefer an explicit choice, such as a "No end date" checkbox, over a sentence about leaving a field empty. Rename the label to "Share until" and add an explicit "No end date" choice that hides or disables the date input when selected, so the no-end state is shown by a control rather than by a note.

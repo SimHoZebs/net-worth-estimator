@@ -13,6 +13,15 @@ The glossary `docs/TERMS.md` in the repository's `docs/` directory is the normat
 
 In the audited guide, both definitions were restated in glossary-like wording, and the restated phrase "findings and explanations" had already drifted from the glossary's "findings with reasons and uncertainty". Two homes for the same terms guarantee further drift: the next glossary edit must be mirrored by hand in `docs/analyses.md`, and a missed mirror leaves two descriptions of the same words carrying different meanings. No browser request or parser is involved; this is a documentation workflow the reader starts before changing analysis behavior. What stays in the guide after the rewrite is the single line that states which terms this guide uses.
 
+```mermaid
+flowchart LR
+  A[Maintainer opens docs/analyses.md to change analysis behavior] --> B[Guide defines Analysis and Evaluation in glossary-like wording]
+  B --> C[Guide says findings and explanations]
+  C --> D{Matches glossary docs/TERMS.md?}
+  D -->|no| E[Glossary says findings with reasons and uncertainty and wins on disagreement]
+  E --> F[Next glossary edit must be mirrored by hand or meanings diverge]
+```
+
 ## Executive summary
 
 The Background Analysis guide `docs/analyses.md` defines Analysis and Evaluation in glossary-like wording, but the phrasing has already drifted from the glossary `docs/TERMS.md`. The guide says "findings and explanations" where the glossary says "findings with reasons and uncertainty". Two homes for the same terms guarantee further drift. Replace the two definitions with a pointer to the glossary's Evaluation and Analysis sections and keep only the doc-local line that states which terms the guide uses.

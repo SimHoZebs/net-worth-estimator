@@ -13,6 +13,17 @@ The preview request exists so the user can review the proposal without writing a
 
 The analyses guide, the Markdown file `docs/analyses.md` that a developer or reviewer reads to understand this flow, currently says the start is moved forward by one full interval past the latest movement to prevent duplication. The code does not advance the start. The preview builder sets the proposed rule's `StartDate` to `firstDay`, the oldest recorded movement's day, and builds `Upcoming` by advancing from `lastDay`, the latest recorded movement's day, six times. At creation the API claims every recorded movement onto its occurrence. Claim-at-creation is what prevents duplication, not the start date.
 
+```mermaid
+flowchart LR
+  A[User opens a recurring pattern on Analysis] --> B["Forecast plan dialog opens"]
+  B --> C["Browser sends GET /v1/analysis-findings/{id}/pattern-to-new-schedule-preview before approval"]
+  C --> D[API reads the confirmed finding and saved model rows behind its evidence]
+  D --> E[Preview shows StartDate firstDay, recorded occurrences, and Upcoming from lastDay six times]
+  E --> F{User approves?}
+  F -->|yes| G["POST /v1/analysis-findings/{id}/pattern-to-new-schedule creates the schedule and claims each recorded movement"]
+  F -->|no| H[No data written]
+```
+
 ## Executive summary
 
 The analyses guide `docs/analyses.md` explains how a schedule generated from a recurring pattern starts and claims recorded bank movements so approving the schedule never duplicates those facts. The guide currently says the schedule starts one full interval after the latest movement for that purpose, but the code sets the start date to the oldest movement while the `Upcoming` list advances from the latest movement. The source comment records the real mechanism: creation claims each recorded movement onto its occurrence, and `Upcoming` then lists six dates after the latest movement. The single fix is to correct the sentence in the guide.
