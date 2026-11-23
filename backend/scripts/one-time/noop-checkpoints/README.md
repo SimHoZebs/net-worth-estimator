@@ -26,11 +26,11 @@ candidate copy after a verified backup. See [the deployment SOP](../../../../dep
 The script opens only an explicit existing regular file. It processes all
 users with checkpoints in two phases: a read-only pass computes every
 deletable row, then deletions run per user through the tested store path.
-A model that cannot be replayed skips that user without deleting anything;
+A model whose recorded history cannot be applied skips that user without deleting anything;
 first observations, owner-authored rows, and forward observations carrying a
 changed available balance are always kept. Intermediate zero-delta rows are
 safe to remove in chronological order because setting the balance to its
-modeled value is a replay no-op. Repeated
+modeled value is a history-application no-op. Repeated
 execution deletes nothing further. A `--dry-run` flag reports deletable rows
 without deleting. Restore the backup to undo a completed prune. Do not use
 an older server with the new data.

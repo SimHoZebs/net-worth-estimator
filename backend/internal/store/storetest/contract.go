@@ -1105,7 +1105,7 @@ func testApplySyncRetainsBackdatedObservation(t *testing.T, newStore func(*testi
 		t.Fatalf("fresh apply = %+v, err %v", fresh, err)
 	}
 	// A late-arriving backdated observation is retained as its own
-	// instant-keyed row: replay orders it chronologically and the latest
+	// instant-keyed row: application orders it chronologically and the latest
 	// instant still wins, so current state never rolls back.
 	late, err := st.ApplySync(
 		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 5, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1785817200}},

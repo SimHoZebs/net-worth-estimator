@@ -11,7 +11,7 @@ import (
 // DeriveStatements reconstructs the full close history of every enabled credit
 // card from the card's closing-day cadence and recorded bank evidence. The
 // billed amount of a closed statement is the bank-observed balance at that
-// close, negated into debt; the open cycle is priced with the same replay
+// close, negated into debt; the open cycle is priced with the same history application
 // engine the forecast uses (cardStatementRows). A close with no observation in
 // its cycle stays unknown instead of being invented from a closing day or a
 // current balance. Payment terms supply due dates; a card without terms keeps
@@ -76,7 +76,7 @@ func DeriveStatements(model *types.FinancialModel, settings *types.SafeSpendingS
 
 		// The open cycle has no close observation yet. Price it with the
 		// forecast engine when a cycle observation is available, so an
-		// estimated statement is a replay estimate, never an invented fact.
+		// estimated statement is a history-application estimate, never an invented fact.
 		if _, ok := amounts[estimated]; !ok && lastClosed != "" {
 			estimate := estimateOpenCycle(st, card.ID, day, lastClosed, estimated, payoff, tracked)
 			if estimate != nil {
@@ -174,7 +174,7 @@ func closeDatesBetween(day int, first, last string) []string {
 	return dates
 }
 
-// estimateOpenCycle reuses the forecast's replay to price the current open
+// estimateOpenCycle reuses the forecast's history application to price the current open
 // cycle from the most recent closed statement. It never turns an estimate into
 // a closed statement.
 func estimateOpenCycle(st *cutState, cardID string, day int, lastClosed, estimated, payoff string, tracked map[string]bool) *float64 {

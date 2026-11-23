@@ -116,7 +116,7 @@ func grantBody(t *testing.T, transactionID, audienceType, audienceID string) str
 
 // testRequestKey mints one fresh client request ID per call. Bodies built
 // by grantBody and copyBody each carry their own key, so sequential
-// mutations execute as distinct requests; replay tests pass one key
+// mutations execute as distinct requests; retry tests pass one key
 // twice explicitly.
 func testRequestKey(t *testing.T) string {
 	t.Helper()

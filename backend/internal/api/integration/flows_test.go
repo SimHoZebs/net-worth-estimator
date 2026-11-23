@@ -130,7 +130,7 @@ func TestFlowsRequiresRange(t *testing.T) {
 
 // Settled history must surface as recorded money through the endpoint:
 // rows dated before the projection start emit no transaction events, so
-// only the settled replay can draw their edges. Each transaction appears
+// only settled history application can draw their edges. Each transaction appears
 // exactly once and the transfer counts once with its full amount.
 func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 	database := openAPIStore(t)

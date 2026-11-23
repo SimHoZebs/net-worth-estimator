@@ -187,7 +187,7 @@ class PaymentModelStore:
                                 raise ConflictError("feedback event payload changed")
                             continue
                         if checkpoint == cursor:
-                            raise ConflictError("replayed batch contains a new event")
+                            raise ConflictError("retry contains a new event for the same request key")
                         feats, label = features_from_request(item["request"]), item["action"] == "confirm"
                         pred = candidate.model.predict_one(feats)
                         candidate.drift.update(int(bool(pred) != label))

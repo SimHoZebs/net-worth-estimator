@@ -81,10 +81,10 @@ covered, leave the dependent value unknown and show the independently known
 amounts.
 
 The evidence cut is now. The summary uses the current plan and settings and
-does not accept a historical replay parameter.
+does not accept a recorded-history application parameter.
 
 Each selected cash account uses its effective display basis at that
-checkpoint. An explicit posted preference takes the replayed posted figure. The
+checkpoint. An explicit posted preference takes the applied posted figure. The
 configured or default available preference takes the bank-reported available
 figure when the checkpoint carries one; with no available field, posted is the
 only real figure and is the basis. The figure not chosen stays on the baseline

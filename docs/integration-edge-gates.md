@@ -50,7 +50,7 @@ old packs in place.
 | recurring | Monthly template with skipped month, amount drift, early actual | Phantom or missing occurrences corrupt forecasts; drift snapped back to template |
 | transfers | Legs days apart plus round-amount decoys | Wrong legs paired by amount; mismatched legs inflate inflow and outflow |
 | backdated | Transaction times months before posted times | Reordered history shifts balances, checkpoints, and intervals |
-| cursors | Stale sync and mail-scan cursors with newer rows present | Replays duplicate rows or resurrect dead ones |
+| cursors | Stale sync and mail-scan cursors with newer rows present | Reprocesses duplicate rows or resurrect dead ones |
 | missing-data | Outflow-only model, debt account with no terms | Missing income read as zero; unknown liabilities dropped from totals |
 | revocation | Shared, revoked, then re-shared rows | Revoked rows stay visible (consent leak) or re-grants stay dead |
 | invites | Expired, exhausted, and fresh single-use codes | Expired/used codes admit members without consent |
@@ -100,7 +100,7 @@ for `go test -count=N -race` repetition: green means hostile, not lucky.
 
 | Case | Real boundary crossed | Stand-in |
 | ---- | --------------------- | -------- |
-| Grant retry storm, 16 racers × 3 rounds: replay identical, key reuse 409 | Real SQLite, real router over real HTTP | Identity seam only |
+| Grant retry storm, 16 racers × 3 rounds: retry returns an identical outcome, key reuse 409 | Real SQLite, real router over real HTTP | Identity seam only |
 | Copy retry storm: one share, exactly one recipient row | Real SQLite, real router over real HTTP | Identity seam only |
 | Revocation mid-pagination / mid-copy-save / mid-inbox-decide | Real SQLite, real router over real HTTP | Identity seam only |
 | Void-marking mid-share | Real SQLite, real router over real HTTP | Identity seam only |

@@ -96,7 +96,7 @@ func cycleOutflow(event *types.TransactionEvent, accountIDs map[string]bool) flo
 //
 // Spend has two parts. Recorded spend covers enabled one-time outflows dated
 // in [cycleStart, projectionStart]: for a one-time transaction the yearly
-// realized bucket holds exactly its single replayed occurrence, so the
+// realized bucket holds exactly its single applied occurrence, so the
 // bucket is precisely attributable. A start-date occurrence already covered
 // by a transaction event (no checkpoint suppression) is skipped to avoid double
 // counting. Scheduled spend covers realized outflow in transaction events dated

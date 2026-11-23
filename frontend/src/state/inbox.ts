@@ -18,7 +18,7 @@ import { serverQueryClient } from "./serverQuery.ts";
  * flag. Mutations invalidate every inbox entry for the scope so tab
  * switches, the unread badge, and the sidebar count refresh together.
  * Mutations never retry: every inbox mutation is server-idempotent, so a
- * retry would only replay an already-recorded decision.
+ * retry would only return an already-recorded decision.
  */
 
 export const inboxKey = (

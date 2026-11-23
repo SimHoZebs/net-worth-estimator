@@ -59,7 +59,7 @@ func removeSharedRun(key string, run *sharedStochasticRun) {
 }
 
 // subscribe attaches a stream. A finished run needs outcome() instead.
-// Otherwise the caller replays the snapshot and listens until done or disconnect.
+// Otherwise the caller re-sends the snapshot and listens until done or disconnect.
 func (run *sharedStochasticRun) subscribe() (ch chan stochasticStreamEvent, snapshot stochasticStreamEvent, hasSnapshot bool, finished bool) {
 	run.mu.Lock()
 	defer run.mu.Unlock()

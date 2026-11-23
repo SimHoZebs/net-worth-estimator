@@ -31,7 +31,7 @@ func TestCashCheckpointFollowsEffectiveDisplayBasis(t *testing.T) {
 		assertMoney(t, s.CheckingAvailable, 1608.05)
 		assertMoney(t, s.CashAfterBills, 1608.05)
 
-		// Explicit posted uses the replayed posted figure, so a confirmed
+		// Explicit posted uses the applied posted figure, so a confirmed
 		// movement after the checkpoint moves cash without changing the
 		// observed evidence row.
 		income := payment("confirmed-income", 100, "2026-11-15T10:00:00Z")
@@ -145,7 +145,7 @@ func TestPostedBasisPricedHoldStaysNumericAndCountsOnce(t *testing.T) {
 			}
 			assertMoney(t, s.Baselines[0].PostedBalance, 1608.05)
 			if len(s.ConfirmedMovements) != 0 {
-				t.Fatalf("pending hold replayed as a confirmed movement %+v", s.ConfirmedMovements)
+				t.Fatalf("pending hold applied as a confirmed movement %+v", s.ConfirmedMovements)
 			}
 			if len(s.Bills) != 1 || s.Bills[0].Status != "pending" {
 				t.Fatalf("hold bill %+v", s.Bills)

@@ -4,7 +4,7 @@
 After an eval training run, produces a seed database containing ONLY the
 model row (warm weights, classification counts, generation, revision) with
 the events and checkpoints tables emptied and the drift counters reset, so a
-fresh deployment can boot from learned weights without replaying feedback.
+fresh deployment can boot from learned weights without reusing feedback.
 The canonical seed lives versioned at ml/seed.sqlite3 with provenance in
 docs/eval-datasets.md; regenerate it with the documented harness command
 rather than hand-editing it. The exported generation UUID is preserved

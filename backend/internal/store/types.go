@@ -501,7 +501,7 @@ type SharingAuditEvent struct {
 
 // SharingRevocation names one removed consent row: the owner-scoped
 // transaction plus the audience it no longer covers. It is the recorded
-// outcome of a revoke or exclusion-removal request, so retries replay it.
+// outcome of a revoke or exclusion-removal request, so retries return it.
 // It carries identities only, never transaction evidence.
 type SharingRevocation struct {
 	OwnerUserID   string `json:"ownerUserId"`

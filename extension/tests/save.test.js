@@ -53,7 +53,7 @@ test("unknown saves retry the same purchase UUID and recover duplicate-ID 409", 
   assert.equal((await captures.read()).pendingSave, undefined);
 });
 
-test("a different account cannot replay a pending purchase", async () => {
+test("a different account cannot retry a pending purchase", async () => {
   const { storage, captures, identity, model } = await fixture();
   await captures.change((state) => {
     state.pendingSave = { base: "https://app.test", resource: "users/other", payload: {} };

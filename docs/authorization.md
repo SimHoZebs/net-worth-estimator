@@ -207,7 +207,7 @@ Identities on one link (`store.SharingLink`):
   recipientUserId)` with `0x00` separators (`store.SharingLinkID`). One
   link per source-plus-recipient triple: repeat accepts return the
   existing recipient row instead of minting duplicates, so the link ID is
-  stable across refresh, revocation, re-grant, and retry replays. The
+  stable across refresh, revocation, re-grant, and retries. The
   `link_` prefix keeps links out of the row-ID registry shared by
   accounts, transactions, rules, and evaluations. A future scheme change must
   use a new namespace.
@@ -306,7 +306,7 @@ Every mutating consent, accept, and refresh request carries a
 client-generated UUID request ID (`requestId` over HTTP on the grant,
 exclusion, copy, and refresh routes; refresh mints a server key when
 none travels). The store records one outcome row per
-(actor, request ID): a retry replays the recorded outcome without
+(actor, request ID): a retry returns the recorded outcome without
 re-executing, a key reused for a different action or target fails with
 `ErrSharingConflict` (HTTP 409, no session-discovery code), and failed
 attempts never consume the key. A source revision landing mid-accept
@@ -316,7 +316,7 @@ each — consent kinds (`grant`, `revoke`, `exclude`, `unexclude`) with
 the request key in the detail payload, `copy-accepted` with the link
 and key, `link-refreshed` with the link, status, and key — carrying
 actor, action, target identities, and time only, never transaction
-evidence. Replays and heals append none. There is no audit read route.
+evidence. Retries and heals append none. There is no audit read route.
 Model replacement and scope clears drop the keys and user-touching
 audit rows the cleared user executed or owns, so a cleared scope
 restarts with an empty trace.

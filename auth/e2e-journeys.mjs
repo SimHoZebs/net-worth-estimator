@@ -588,7 +588,7 @@ export async function ownerLogout(ctx, ownerBundle) {
   const { origin } = ctx;
   const { owner, own, cookie } = ownerBundle;
   assert.equal((await api(owner, origin, own, "POST", "/v1/auth/logout")).status(), 200);
-  const replay = await fetch(`${origin}/v1/accounts`, {
+  const retry = await fetch(`${origin}/v1/accounts`, {
     method: "POST",
     headers: {
       Cookie: `${cookie.name}=${cookie.value}`,
@@ -597,7 +597,7 @@ export async function ownerLogout(ctx, ownerBundle) {
     },
     body: JSON.stringify({ name: "Captured cookie attempt", kind: "cash", enabled: true }),
   });
-  assert.equal(replay.status, 401);
+  assert.equal(retry.status, 401);
   const loggedOut = await session(owner, origin);
   assert.equal(loggedOut.authenticated, false);
   assert.equal(loggedOut.resource.id, actorResource(ctx.issuer, ctx.guestSubject));

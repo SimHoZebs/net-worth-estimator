@@ -117,8 +117,8 @@ type ProjectionPath struct {
 	} `json:"projectionStartTransactionState"`
 	ProjectionStartDate IsoDate `json:"projectionStartDate"`
 	ProjectionEndDate   IsoDate `json:"projectionEndDate"`
-	// HistoryCutInstant carries the replay cut for branch simulations so a
-	// continuation never repeats already-replayed occurrences. Never
+	// HistoryCutInstant carries the as-of cut for branch simulations so a
+	// continuation never repeats occurrences already applied. Never
 	// serialized: it is an execution guard, not result data.
 	HistoryCutInstant int64 `json:"-"`
 }

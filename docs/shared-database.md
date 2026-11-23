@@ -24,7 +24,7 @@ that scope. An empty or missing scope never selects a default private user.
 
 Schema migration records are global. Model metadata, sync state, settings,
 ordering, presets, identity registries, and projection caches are user-scoped.
-Application sessions, provider grants, and logout replay records remain global
+Application sessions, provider grants, and logout retry records remain global
 identity tables. Financial clear, refresh, and guest publication
 never replace those identity tables.
 

@@ -11,7 +11,7 @@ import (
 // Stable linked-transaction identities (FND-04). The link ID names one
 // source-owner transaction plus one recipient: it is deterministic so any
 // holder of the three immutable identities computes the same link without
-// a lookup, which also makes repeat accepts and retry replays resolve to
+// a lookup, which also makes repeat accepts and retries resolve to
 // the same link instead of minting duplicates. The `link_` prefix keeps
 // links out of the row-ID registry shared by accounts, transactions, rules,
 // and evaluations. The source revision is an opaque content hash of the

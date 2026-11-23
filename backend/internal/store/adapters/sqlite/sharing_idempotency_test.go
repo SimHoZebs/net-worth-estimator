@@ -1,6 +1,6 @@
 // Social-operation audit and idempotency (FND-05) on the landed GRP-05
 // shape: per-actor request keys with recorded outcomes and byte-identical
-// replay, conflict on key reuse across actions or targets, no key
+// retries, conflict on key reuse across actions or targets, no key
 // consumption by failed attempts, explicit concurrent-revision failures
 // including the double-accept race, total share/revoke ordering through
 // the audit sequence, and identity-only audit rows (actor, action,
@@ -72,7 +72,7 @@ func sharingRequestCount(t *testing.T, d *Database) int {
 
 // A grant retry with the same key returns the recorded grant verbatim
 // with one audit row carrying the request key and consent target.
-func TestSharingGrantReplayIdentical(t *testing.T) {
+func TestSharingGrantRetryIdentical(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
@@ -88,7 +88,7 @@ func TestSharingGrantReplayIdentical(t *testing.T) {
 		t.Fatal(err)
 	}
 	if first != second {
-		t.Fatalf("grant replay = %+v, want %+v", second, first)
+		t.Fatalf("grant retry = %+v, want %+v", second, first)
 	}
 	events := sharingAudit(t, d, alice, sharingTransactionA)
 	if len(events) != 1 {
@@ -126,7 +126,7 @@ func TestSharingKeyReuseAcrossActionsConflicts(t *testing.T) {
 	if _, err := d.GrantSharedTransaction(alice, sharingTransactionB, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("grant for other transaction with same key = %v, want conflict", err)
 	}
-	// Revoke and exclusion-removal replays match on their own actions.
+	// Revoke and exclusion-removal retries match on their own actions.
 	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, key); !errors.Is(err, store.ErrSharingConflict) {
 		t.Fatalf("revoke with grant key = %v, want conflict", err)
 	}
@@ -189,9 +189,9 @@ func TestSharingRejectedKeysConsumeNothing(t *testing.T) {
 	}
 }
 
-// Share, revoke, replay, and re-grant order totally through the audit
-// sequence: a revoke retry replays success instead of missing-grant.
-func TestSharingRevokeReplayAndOrdering(t *testing.T) {
+// Share, revoke, retry, and re-grant order totally through the audit
+// sequence: a revoke retry returns success instead of missing-grant.
+func TestSharingRevokeRetryAndOrdering(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
@@ -204,9 +204,9 @@ func TestSharingRevokeReplayAndOrdering(t *testing.T) {
 	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, revokeKey); err != nil {
 		t.Fatal(err)
 	}
-	// The revoke retry replays success, not the now-missing grant.
+	// The revoke retry returns success, not the now-missing grant.
 	if err := d.RevokeSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, revokeKey); err != nil {
-		t.Fatalf("revoke replay = %v, want nil", err)
+		t.Fatalf("revoke retry = %v, want nil", err)
 	}
 	if _, err := d.GrantSharedTransaction(alice, sharingTransactionA, store.SharingAudienceUser, bob, regrantKey); err != nil {
 		t.Fatal(err)
@@ -236,9 +236,9 @@ func TestSharingRevokeReplayAndOrdering(t *testing.T) {
 	}
 }
 
-// Accept retries replay the recorded copy; a distinct key for the same
-// triple converges on it with one audit row, and both keys replay after.
-func TestSharingAcceptReplayAndConverge(t *testing.T) {
+// Accept retries return the recorded copy; a distinct key for the same
+// triple converges on it with one audit row, and both keys return it after.
+func TestSharingAcceptRetryAndConverge(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, storeB := sharingUser(t, d, "bob")
@@ -252,12 +252,12 @@ func TestSharingAcceptReplayAndConverge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	replay, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key)
+	retry, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replay.ID != first.ID || replay.Name != first.Name {
-		t.Fatalf("accept replay = %+v, want %+v", replay, first)
+	if retry.ID != first.ID || retry.Name != first.Name {
+		t.Fatalf("accept retry = %+v, want %+v", retry, first)
 	}
 	converged, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, other)
 	if err != nil {
@@ -266,8 +266,8 @@ func TestSharingAcceptReplayAndConverge(t *testing.T) {
 	if converged.ID != first.ID {
 		t.Fatalf("distinct-key accept = %q, want winner %q", converged.ID, first.ID)
 	}
-	if replay, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, other); err != nil || replay.ID != first.ID {
-		t.Fatalf("converged key replay = %+v, %v, want %q", replay, err, first.ID)
+	if retry, err := d.CopySharedTransaction(alice, sharingTransactionA, bob, other); err != nil || retry.ID != first.ID {
+		t.Fatalf("converged key retry = %+v, %v, want %q", retry, err, first.ID)
 	}
 	var copies int
 	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_copies WHERE recipient_user_id = ? AND source_owner_id = ? AND source_transaction_id = ?`,
@@ -394,10 +394,10 @@ func TestSharingAcceptRecordsCurrentRevisionAfterOwnerEdit(t *testing.T) {
 	}
 }
 
-// Refresh retries replay the recorded outcome; a source edit moves the
+// Refresh retries return the recorded outcome; a source edit moves the
 // next refresh to source-changed with one audit row per distinct key,
 // each carrying link, status, and key.
-func TestSharingRefreshReplayAndStatuses(t *testing.T) {
+func TestSharingRefreshRetryAndStatuses(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
@@ -419,12 +419,12 @@ func TestSharingRefreshReplayAndStatuses(t *testing.T) {
 	if first.Status != store.SharingLinkCurrent {
 		t.Fatalf("refresh status = %q, want current", first.Status)
 	}
-	replay, err := d.RefreshSharingLink(bob, copied.ID, key)
+	retry, err := d.RefreshSharingLink(bob, copied.ID, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replay.Status != first.Status || replay.Link.RefreshedAt != first.Link.RefreshedAt {
-		t.Fatalf("refresh replay = %+v, want %+v", replay, first)
+	if retry.Status != first.Status || retry.Link.RefreshedAt != first.Link.RefreshedAt {
+		t.Fatalf("refresh retry = %+v, want %+v", retry, first)
 	}
 	edited := source
 	edited.Name = "Edited source"
@@ -464,7 +464,7 @@ func TestSharingRefreshReplayAndStatuses(t *testing.T) {
 
 // Concurrent refreshes with one shared key converge on the winner's
 // recorded outcome with one audit row: the key executes once and every
-// retry replays it.
+// retry returns it.
 func TestSharingConcurrentRefreshSameKeyConverges(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")

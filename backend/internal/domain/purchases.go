@@ -13,9 +13,9 @@ type scheduledPurchase struct {
 }
 
 // purchasesCandidateRequest rebuilds the purchases candidate simulation
-// request from the prepared base path. History already replayed through the
+// request from the prepared base path. Recorded history is already applied through the
 // cut instant, so candidates always include start-day events and rely on
-// the shared HistoryCutInstant to skip already-replayed occurrences.
+// the shared HistoryCutInstant to skip occurrences already applied.
 func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCarloSample) types.SimulationRequest {
 	model := path.EffectiveModel
 	var latestHistorical *types.ProjectionRow

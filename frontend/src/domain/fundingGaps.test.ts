@@ -102,7 +102,7 @@ describe("derive funding gaps", () => {
 		expect(gaps).toHaveLength(1);
 		expect(gaps[0]?.openingBalance).toBe(4550);
 		// The card filters on the recomputed summary: it must agree with the
-		// simulation instead of replaying the window's salary twice.
+		// simulation instead of applying the window's salary twice.
 		const summary = summarizeFundingGap(gaps[0]!);
 		expect(summary.available).toBe(6350);
 		expect(summary.shortfall).toBe(2650);

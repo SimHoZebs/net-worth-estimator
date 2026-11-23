@@ -6,7 +6,10 @@ export function checkpointInstant(checkpoint: BackendCheckpoint): number {
 	return checkpoint.observedAt;
 }
 
-/** Owner-authored rows win same-instant ties, mirroring the backend replay. */
+/**
+ * Owner-authored rows win same-instant ties, mirroring the backend's
+ * application of recorded history.
+ */
 function isOwnerCheckpoint(checkpoint: BackendCheckpoint): boolean {
 	const source = checkpoint.source ?? "";
 	return source === "" || source === "user";
@@ -16,8 +19,9 @@ function isOwnerCheckpoint(checkpoint: BackendCheckpoint): boolean {
  * Latest saved observation on or before a date. The day derives from the
  * instant only at this presentation boundary; there is no canonical Date.
  * At the same instant an owner row wins regardless of input order; rows
- * of equal authorship resolve to the later row, mirroring the backend
- * replay's stable overwrite. backend/internal/domain/chrono.go owns this
+ * of equal authorship resolve to the later row, mirroring the stable
+ * overwrite in the backend's recorded-history application.
+ * backend/internal/domain/chrono.go owns this
  * read-only selection policy. This helper never computes account balances.
  */
 export function latestCheckpoint(

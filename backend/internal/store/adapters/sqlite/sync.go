@@ -329,7 +329,7 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 // directives carry fully resolved lifecycle state; the store verifies
 // structural validity (keys present, non-user source, row existence) but
 // never interprets provider behavior. Backdated observations are retained
-// as distinct instant-keyed rows: chronological replay orders them and the
+// as distinct instant-keyed rows: chronological application orders them and the
 // latest instant still wins, so a late arrival never rolls current state
 // back. A same-instant sync row replaces idempotently; an owner row at the
 // same instant keeps precedence.

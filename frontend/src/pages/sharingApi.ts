@@ -66,7 +66,7 @@ interface GrantResponse {
 /**
  * One idempotency key per user-initiated share mutation. The caller mints
  * the key when the user acts and reuses that same key for every attempt of
- * that action; a new user action mints a new key. The audit port replays
+ * that action; a new user action mints a new key. The audit port returns
  * the recorded outcome for a repeated key and rejects key-less mutations.
  */
 export function mintShareRequestId(): string {

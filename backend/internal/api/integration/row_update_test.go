@@ -163,13 +163,13 @@ func TestCreateBodiesAcceptSemanticAmounts(t *testing.T) {
 		t.Fatalf("growth rate = %v, want 0.025", rate)
 	}
 
-	// A stored descriptor replays verbatim during model import.
-	replayed := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
+	// A stored descriptor is copied verbatim during model import.
+	imported := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
 		`{"name":"Imported","sourceAccountId":null,"destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"1+1"},"inputs":{}},"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-03-01","enabled":true}`)
-	replayedRow := decodeWriteResult[types.Schedule](t, replayed.Code, replayed.Body.Bytes())
-	expression, _ = replayedRow.Result.Amount.Config["expression"].(string)
+	importedRow := decodeWriteResult[types.Schedule](t, imported.Code, imported.Body.Bytes())
+	expression, _ = importedRow.Result.Amount.Config["expression"].(string)
 	if expression != "1+1" {
-		t.Fatalf("replayed expression = %q, want stored 1+1", expression)
+		t.Fatalf("imported expression = %q, want stored 1+1", expression)
 	}
 
 	// Growth on a one-time transaction is rejected rather than stored.

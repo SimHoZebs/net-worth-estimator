@@ -20,13 +20,13 @@ func TestEqualTimeTransactionExecutionDoesNotDependOnIdentity(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	_, before, _, err := replayHistoricalState(model, "2026-01-03")
+	_, before, _, err := applyHistoricalState(model, "2026-01-03")
 	if err != nil {
 		t.Fatal(err)
 	}
 	model.Transactions[0].ID = "01900000-0000-7000-8000-000000000001"
 	model.Transactions[1].ID = "01900000-0000-7000-8000-000000000002"
-	_, after, _, err := replayHistoricalState(model, "2026-01-03")
+	_, after, _, err := applyHistoricalState(model, "2026-01-03")
 	if err != nil {
 		t.Fatal(err)
 	}

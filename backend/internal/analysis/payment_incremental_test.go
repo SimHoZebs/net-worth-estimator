@@ -848,7 +848,7 @@ func countActiveKind(findings []types.AnalysisFinding, kind string) int {
 	return count
 }
 
-// TestIncrementalUpgradeRebuildsNewKinds replays the registry-upgrade gap: a
+// TestIncrementalUpgradeRebuildsNewKinds reruns the registry-upgrade gap: a
 // new classification ships while an idle owner's cache is stale from
 // unrelated churn, so the dirty-only update would never evaluate the new kind
 // on untouched streams. A recorded analyzer-version change forces one full

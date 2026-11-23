@@ -44,7 +44,7 @@ func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidation
 }
 
 // ValidateFinanceModel runs the pure finance subset used by ordinary
-// records, reads, and historical current-position replay. It excludes
+// records, reads, and historical current-position application. It excludes
 // every evaluation-owned check (instance identity, config shape, and
 // account references), so a broken forecast can never block finance
 // work. Finance writes use ValidateFinanceWriteChange instead, which

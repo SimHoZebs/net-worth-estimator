@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestBalanceAdjustmentsUseExactReplayWithoutForecast(t *testing.T) {
+func TestBalanceAdjustmentsUseExactHistoryApplicationWithoutForecast(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints[1].Balance = 850
 	model.Checkpoints[1].Source = "user"

@@ -29,7 +29,7 @@ type SimulationRequest struct {
 	EndDate                IsoDate           `json:"endDate"`
 	IncludeStartDateEvents bool              `json:"includeStartDateEvents"`
 	MonteCarloSample       *MonteCarloSample `json:"monteCarloSample,omitempty"`
-	// HistoryCutInstant is the single timestamp cut the replay used: start
+	// HistoryCutInstant is the single timestamp cut that history application used: start
 	// dates on or before it already executed and must not simulate again.
 	// Zero disables filtering (callers without an exact cut keep their
 	// date window).

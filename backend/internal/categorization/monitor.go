@@ -38,7 +38,7 @@ func DisagreeRate(assigned []AssignedLabel, decide func(Input) (string, bool)) f
 	return float64(disagree) / float64(len(assigned))
 }
 
-// keywordDecision replays the serving baseline for one input. The monitor
+// keywordDecision reproduces the serving baseline for one input. The monitor
 // compares owners against keywords, not the experimental learner: keywords
 // are the stable serving vocabulary, so drift here names labels worth
 // promoting or vocabulary worth reviewing.

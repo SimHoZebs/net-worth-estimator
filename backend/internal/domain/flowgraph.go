@@ -18,7 +18,7 @@ type flowEdgeKey struct {
 	movement string
 }
 
-// settledHistoryEvents replays in-window settled transactions as actual movements.
+// settledHistoryEvents applies in-window settled transactions as actual movements.
 // The projection emits no events for settled history, so each becomes one synthetic event.
 // Only manual transactions synthesize; rule templates stay event-driven.
 func settledHistoryEvents(model *types.FinancialModel, transactions []types.Transaction, ruleIDs map[string]bool, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) []types.TransactionEvent {
@@ -184,7 +184,7 @@ func BuildFlowGraphWithLinks(model *types.FinancialModel, events []types.Transac
 
 	reconciliation := types.FlowReconciliation{}
 	totals := types.FlowTotals{}
-	// Settled history replays through the same classification below, so
+	// Settled history is applied through the same classification below, so
 	// window totals, edges, and reconciliation agree by construction. The
 	// copy keeps the caller's slices untouched.
 	movements := make([]types.TransactionEvent, 0, len(events))

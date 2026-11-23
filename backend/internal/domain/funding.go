@@ -68,7 +68,7 @@ func availableAmountFromLimits(transaction *types.Transaction, balancesBefore ma
 // fulfillment evaluations, and purchase scheduling. It does not read evaluation
 // configuration, so a disabled or narrowly scoped check cannot hide a gap.
 //
-// Single-pass owner: it reconstructs pre-event balances and replays the
+// Single-pass owner: it reconstructs pre-event balances and applies the
 // cap ledger once, returning fulfillment inputs, binding constraints,
 // remaining cap, and display-ready available amount together. Display callers
 // format from this result without re-deriving balances, sort order, or caps.

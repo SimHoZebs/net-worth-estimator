@@ -33,8 +33,8 @@ Financial records are authoritative inputs. A projection consumes those inputs;
 it does not control account maintenance or access to recorded activity.
 
 - Account and transaction reads do not execute future simulation.
-- Current position shares chronological replay with the projection baseline.
-  Shared replay preserves the observed-versus-modeled balance contract without
+- Current position shares chronological application with the projection baseline.
+  Shared application preserves the observed-versus-modeled balance contract without
   requiring a forecast result.
 - Financial validation and forecast-evaluation validation have separate owners.
   Financial edits preserve legitimate references, while an unrelated invalid
@@ -50,7 +50,7 @@ it does not control account maintenance or access to recorded activity.
 - Evidence Analysis remains independent of sync and projection execution.
 
 This boundary uses the existing tables. It does not change account participation,
-balance constraints, stored amount descriptors, or historical replay arithmetic.
+balance constraints, stored amount descriptors, or recorded-history application arithmetic.
 Future transaction search and subscription Analysis can consume financial
 records without a new dependency on projection execution.
 
@@ -172,8 +172,8 @@ Resolution rules:
 - `overrides` are applied by `types.ApplyModelOverrides` to a new model value; stored state is unchanged.
 - What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
 - `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. Every request computes the complete result directly; the range only filters the response.
-- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the calendar-day end cut at the end of the start day.
-- `POST /v1/position` and `GET /v1/accounts/balances` accept the same cut as an `asOfDate` date or RFC 3339 instant (`asOf` query); all three agree at an identical cut because they share one chronological replay.
+- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history is applied through the instant, the start day's afternoon events simulate, and morning occurrences already applied are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the calendar-day end cut at the end of the start day.
+- `POST /v1/position` and `GET /v1/accounts/balances` accept the same cut as an `asOfDate` date or RFC 3339 instant (`asOf` query); all three agree at an identical cut because they share one chronological application.
 
 A successful response has `result` and `Projection-Source: computed`. Canonical requests assemble from stored rows when the state is clean and the settings plus evaluation tables match the built state; otherwise the request builds once and assembles, or computes directly for non-canonical inputs. The header does not guarantee successful completion; preparation and execution errors also report `computed`.
 
@@ -351,7 +351,7 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
   exclusion, removal, and accept, optionally for link refresh (which
   mints a server key when none travels), and at the store boundary for
   all six. The store records one outcome row per (actor, request ID):
-  a retry with the same key replays the recorded outcome byte-for-byte
+  a retry with the same key returns the recorded outcome byte-for-byte
   without re-executing, while a key reused for a different action or
   target fails with `store.ErrSharingConflict` (HTTP 409, no
   session-discovery code). Failed attempts never consume the key.
@@ -364,17 +364,17 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
   Accept and refresh commit in the documented statement order
   (link/provenance update, then audit, then key), so an interrupted
   request retries as a new execution converging to current rather than
-  replaying an unapplied outcome.
+  returning an unapplied outcome.
 - Committed mutations append one `sharing_audit` row carrying actor,
   action, target identities, link, outcome status, request ID, and time.
-  Replays and heals append none. There is no audit read route; see
+  Retries and heals append none. There is no audit read route; see
   [authorization](docs/authorization.md#social-operation-audit-and-idempotency) for the full audit contract. Audit payloads
   never carry transaction evidence (no amounts, names, accounts, memos,
-  or transaction content). Replays return the recorded result to its own
-  actor only; the accept replay is the recipient's own copy, never a
+  or transaction content). Retries return the recorded result to its own
+  actor only; the accept retry is the recipient's own copy, never a
   cross-user read.
 
-Concurrency coverage (QA-02) asserts idempotent replay plus share/revoke
+Concurrency coverage (QA-02) asserts idempotent retry plus share/revoke
 ordering at the store boundary.
 
 ## 4. Result Identity
@@ -416,7 +416,7 @@ posted time (when the bank posts it) and transaction time (when the money
 moves), both Unix seconds. Repetition is owned by recurrence rules, which
 expand into occurrences at projection time. A transaction with a `claim`
 (`scheduleId` plus `occurrenceDate`, both set manually) records the actual for
-one scheduled occurrence; history replays the actual and skips the generated
+one scheduled occurrence; history applies the actual and skips the generated
 occurrence.
 
 Transaction and rule behavior is selected only by source and destination presence:
@@ -498,25 +498,25 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 1. applies request overrides without mutating the input model;
 2. validates the effective model;
 3. validates `fallbackProjectionStartDate`;
-4. replays historical state;
+4. applies historical state;
 5. computes the clamped projection end date;
 6. creates one `types.SimulationRequest`.
 
-## 7. Historical Replay and Checkpoints
+## 7. Applying Recorded History and Checkpoints
 
 Historical preparation uses the same `TransitionRuntime` as projection execution.
 
 The as-of cut is a single instant: a `YYYY-MM-DD` date means the end of
 that UTC day (inclusive); an RFC 3339 timestamp means
 that exact instant. Only events and observations at or before the cut
-replay; everything after it is future. Observations after the projection
+are applied; everything after it is future. Observations after the projection
 start are invalid.
 
 - History is one sorted event list, one forward pass: each transaction at its
   effective instant (transactions at their stored Unix time including 00:00;
   rules at the day-close of their date) and each observation at its exact
   instant. No date-wide gates, no per-day phases, no identity-suppression
-  maps. Claimed rule occurrences never replay.
+  maps. Claimed rule occurrences are never applied.
 - Ties execute transactions before observations so a rule at 23:59:59 anchors
   before an observation at the same instant; owner observations execute
   last at the same instant. Daily snapshots sample the resulting state;
@@ -530,9 +530,9 @@ start are invalid.
   rules keep hypothetical funding clamps and caps; pending/void rows never
   move.
 - The simulation continues after the same cut instant, skipping
-  already-replayed occurrences so nothing executes twice.
+  already-applied occurrences so nothing executes twice.
 
-Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Replay still updates balances, latest realized transaction amounts, and annual-cap state for later projection and amount providers. `GET /v1/accounts/balances` and `POST /v1/position` report the same replay: adjusted modeled balances with the latest observation (balance plus timestamp) carried separately per account, never a folded latest checkpoint.
+Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Applying recorded history still updates balances, latest realized transaction amounts, and annual-cap state for later projection and amount providers. `GET /v1/accounts/balances` and `POST /v1/position` report the same applied result: adjusted modeled balances with the latest observation (balance plus timestamp) carried separately per account, never a folded latest checkpoint.
 
 `BuildProjectionPath` prefixes these historical observations with projected snapshots. `ProjectionRow.isHistorical` marks the boundary.
 
@@ -544,7 +544,7 @@ The kernel:
 
 1. creates a `TransitionRuntime` from the prepared model, state, date, and optional sampled rates;
 2. expands enabled occurrences through the projection window via the preprocessor (`ExpandProjectionSchedule`; history, candidates, and branch windows keep their own local expansion);
-3. sorts dates and same-date occurrences, skipping occurrences named in `SuppressedIdentities` (exact-cut history already replayed them);
+3. sorts dates and same-date occurrences, skipping occurrences named in `SuppressedIdentities` (exact-cut history already applied them);
 4. prepares each occurrence amount from snapshots without touching runtime state (`PrepareTransactionExecution`: scheduled, sampled, and model-value inputs resolve here);
 5. applies each prepared request through the shared transition path (`ApplyPreparedExecution`: constraint clamping, balance mutation, and ledger recording live here — the only place impossible states are handled);
 6. records every requested/realized transaction and ordered account deltas;
@@ -643,7 +643,7 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 
 ### Numeric precision
 
-`golden_test.go` compares numeric goldens with relative-scaled tolerance `1e-9 * max(max(abs(expected), abs(actual)), 1)` across deterministic projection, checkpoint replay, paycheck rule-chain resolution, and seeded stochastic bands, milestones, and evaluations. Tighten it only with matching evidence across all covered fixtures.
+`golden_test.go` compares numeric goldens with relative-scaled tolerance `1e-9 * max(max(abs(expected), abs(actual)), 1)` across deterministic projection, checkpoint application, paycheck rule-chain resolution, and seeded stochastic bands, milestones, and evaluations. Tighten it only with matching evidence across all covered fixtures.
 
 A non-null seed produces the established 31-bit linear-congruential sequence `(state * 1664525 + 1013904223)` computed in `float64`, reduced modulo `2^32` and masked with `0x7fffffff`; uniforms are `state / 0x7fffffff`. Sampling consumes two uniforms per variable annual rate with the established log-normal transform (see `sampler.go`).
 
@@ -725,7 +725,7 @@ the user correction overlay.
 
 `Runner.Sync` delegates to the ingest orchestrator with the SimpleFIN adapter. Until the workspace records its first successful sync, the orchestrator requests the previous 90 days. Later runs request a rolling 30 days, even after longer gaps or new bank connections. Both windows end at the current instant and include pending data, within the Bridge's 90-day request limit. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. The checkpoint also carries the Bridge's `available-balance` when present in the additive `checkpoint_available_balances` sidecar. The posted balance remains the sole net-worth authority; available balance is nullable evidence for safe-spending and card headroom. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at transaction time: the translation emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual transactions. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at transaction time: the translation emits them enabled with the event time normalized to the posted instant, and history application executes them through the same actual path as manual transactions. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
 
 One-off legacy interpretation, stated plainly: in databases written
 before this change, a disabled settled bank row does not distinguish the

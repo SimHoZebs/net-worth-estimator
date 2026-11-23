@@ -140,7 +140,7 @@ func pruneNoOpCheckpoints(st store.Store, before *types.FinancialModel, checkpoi
 	}
 	zero, err := domain.ZeroDeltaObservations(after, time.Unix(latest, 0).UTC().Format(time.RFC3339))
 	if err != nil {
-		// A model that cannot be replayed must not block sync. Keep the
+		// A model whose recorded history cannot be applied must not block sync. Keep the
 		// checkpoint rather than risk dropping evidence.
 		return 0, nil
 	}

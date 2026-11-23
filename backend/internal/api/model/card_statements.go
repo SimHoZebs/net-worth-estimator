@@ -95,7 +95,7 @@ func (s *handler) cardHasLiveAllocations(accountID string) (bool, error) {
 
 // Derived statements and their payment allocations are evidence. They never
 // enter the financial model, never mark the projection dirty, and never turn a
-// replay estimate into a confirmed statement. The payment transactions stay
+// history-application estimate into a confirmed statement. The payment transactions stay
 // cash transfers; an allocation only records which statement they settle.
 
 type cardStatementsOutput struct {

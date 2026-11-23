@@ -19,7 +19,7 @@ Category judgments share this deployment-wide learner as binary `category:<KEY>`
 
 `POST /state` also returns a `drift` object with `mode`, `pending`, `estimation` (current error-rate estimate), `width` (detector window size), and cumulative `warnings`/`detections` counts. A fired warning logs a warning line; a fired drift detection logs an error line. Reset and dismiss of a detector that is not pending return 409.
 
-The Go HTTP adapter owns orchestration; the service owns idempotency and persistence. SQLite commits model updates, event receipts, and the delivery cursor together, so lost responses cannot train twice. Conflicting replays return 409, invalid requests 400, and persistence or evaluation failures a logged 503.
+The Go HTTP adapter owns orchestration; the service owns idempotency and persistence. SQLite commits model updates, event receipts, and the delivery cursor together, so lost responses cannot train twice. Conflicting retries return 409, invalid requests 400, and persistence or evaluation failures a logged 503.
 
 ## Deployment
 

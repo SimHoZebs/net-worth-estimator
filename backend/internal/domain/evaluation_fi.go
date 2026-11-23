@@ -268,7 +268,7 @@ type transactionDisposition int
 const (
 	dispositionDisabled transactionDisposition = iota
 	dispositionObserveBasePath
-	dispositionReplayInBranch
+	dispositionApplyInBranch
 )
 
 func classifyTransactionDispositions(path *types.ProjectionPath, cashflowIDs, continuingIDs map[string]bool) map[string]transactionDisposition {
@@ -278,7 +278,7 @@ func classifyTransactionDispositions(path *types.ProjectionPath, cashflowIDs, co
 		case cashflowIDs[id]:
 			dispositions[id] = dispositionObserveBasePath
 		case continuingIDs[id]:
-			dispositions[id] = dispositionReplayInBranch
+			dispositions[id] = dispositionApplyInBranch
 		default:
 			dispositions[id] = dispositionDisabled
 		}
@@ -289,7 +289,7 @@ func classifyTransactionDispositions(path *types.ProjectionPath, cashflowIDs, co
 func initializeBranchSimulationState(balances map[string]float64, events []types.TransactionEvent, candidateDate IsoDate, startState *types.ProjectionPath) SimulationState {
 	// Deep-copy the prepared projection-start transaction ledger through the
 	// shared cloner (the same copy the purchases candidate rebuilds from),
-	// then replay base-path events up to the candidate date. Losses are
+	// then apply base-path events up to the candidate date. Losses are
 	// balance adjustments, not cap consumption: only non-negative
 	// realizations accrue against the annual cap.
 	state := CloneSimulationState(SimulationState{
@@ -346,7 +346,7 @@ func applyBranchTransactionEvents(events []branchEventGroup, baseRealizedByDateA
 				continue
 			}
 			if _, err := transitions.ExecuteTransaction(occurrence, group.date, false); err != nil {
-				return 0, fmt.Errorf("replay transaction %q on %s: %w", transaction.ID, group.date, err)
+				return 0, fmt.Errorf("apply transaction %q on %s: %w", transaction.ID, group.date, err)
 			}
 		}
 	}
@@ -535,7 +535,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 		balanceTrajectory            []map[string]any
 	}
 
-	// First replay/transition error is surfaced after the behavior loop as an
+	// First application/transition error is surfaced after the behavior loop as an
 	// evaluation diagnostic.
 	var branchErr error
 
@@ -877,7 +877,7 @@ var financialIndependenceDefinition = &SimulatorDefinition{Evaluator: Evaluator{
 	Type: types.EvaluationTypeFinancialIndependence,
 	Name: "Financial independence",
 
-	// Simulator: FI replays continuing transactions in branch transitions against
+	// Simulator: FI applies continuing transactions in branch transitions against
 	// the shared base path. Branch state only; never a fresh Prepare.
 
 	ValidateConfig: ValidateFIPlanConfig,

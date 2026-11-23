@@ -208,7 +208,7 @@ func statementAmount(t *testing.T, summary types.SafeSpendingSummary, accountID,
 	return nil
 }
 
-func TestClosedStatementReplaysChargesBetweenCheckpointAndClose(t *testing.T) {
+func TestClosedStatementAppliesChargesBetweenCheckpointAndClose(t *testing.T) {
 	model, settings := paydayFixture()
 	for i := range model.Checkpoints {
 		if model.Checkpoints[i].AccountID == "card-a" {
@@ -441,7 +441,7 @@ func TestExplicitSelectionRequiresDeclaredCreditCard(t *testing.T) {
 	}
 }
 
-func TestCardToCardTransferFollowsBalanceReplay(t *testing.T) {
+func TestCardToCardTransferFollowsBalanceApplication(t *testing.T) {
 	model, settings := paydayFixture()
 	// Two explicitly tracked declared credit cards. Their kind must not change
 	// which leg is a charge and which a payment.
@@ -465,7 +465,7 @@ func TestCardToCardTransferFollowsBalanceReplay(t *testing.T) {
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
 	// cashDelta takes 100 from the source balance and adds 100 to the
 	// destination. With debt = max(0, -balance) the source owes 200 and the
-	// destination is paid off, so both statements follow the replayed balances.
+	// destination is paid off, so both statements follow the applied balances.
 	assertMoney(t, statementAmount(t, summary, "cash-card-x", "closed", "2026-10-19"), 100)
 	assertMoney(t, statementAmount(t, summary, "cash-card-x", "estimated", "2026-11-19"), 100)
 	assertMoney(t, statementAmount(t, summary, "cash-card-y", "closed", "2026-10-19"), 0)
@@ -528,13 +528,13 @@ func TestIntercardTransferAppliesDatedLegsWithoutCashOutflow(t *testing.T) {
 	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 500)
 	assertMoney(t, statementAmount(t, summary, "card-a", "estimated", "2026-11-19"), 50)
 	assertMoney(t, statementAmount(t, summary, "card-b", "closed", "2026-10-19"), 100)
-	// Independent check against the replay: A's -500 balance falls to -550,
+	// Independent check against history application: A's -500 balance falls to -550,
 	// B's -150 rises to -100, and debt is max(0, -balance) on each card.
 	if got := statementTotal(t, summary, "card-a"); got != 550 {
-		t.Fatalf("card A payoff %v, want replayed debt 550", got)
+		t.Fatalf("card A payoff %v, want applied debt 550", got)
 	}
 	if got := statementTotal(t, summary, "card-b"); got != 100 {
-		t.Fatalf("card B payoff %v, want replayed debt 100", got)
+		t.Fatalf("card B payoff %v, want applied debt 100", got)
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 650)
@@ -566,17 +566,17 @@ func TestIntercardTransferAcrossDifferentCloseDates(t *testing.T) {
 		Enabled: true, Source: "user",
 	}}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	// The replay takes 50 from A (debt 550 on 11-19) and adds 50 to B (debt 50
+	// History application takes 50 from A (debt 550 on 11-19) and adds 50 to B (debt 50
 	// on 11-05). Both match max(0, -balance) after the transfer, and B has no
 	// estimated row because its next close is past payday.
 	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 500)
 	assertMoney(t, statementAmount(t, summary, "card-a", "estimated", "2026-11-19"), 50)
 	assertMoney(t, statementAmount(t, summary, "card-b", "closed", "2026-11-05"), 50)
 	if got := statementTotal(t, summary, "card-a"); got != 550 {
-		t.Fatalf("card A payoff %v, want replayed debt 550", got)
+		t.Fatalf("card A payoff %v, want applied debt 550", got)
 	}
 	if got := statementTotal(t, summary, "card-b"); got != 50 {
-		t.Fatalf("card B payoff %v, want replayed debt 50", got)
+		t.Fatalf("card B payoff %v, want applied debt 50", got)
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 600)

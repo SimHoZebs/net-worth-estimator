@@ -260,7 +260,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			notifySuccess("groups-notice", "Stopped sharing with everyone.");
 		} catch (cause) {
 			// Refresh every sharing view so the visible state matches the
-			// server and a retry replays from live rows, never a stale list.
+			// server and a retry re-reads from live rows, never a stale list.
 			void refreshSharingViewsFor(groupId);
 			const message = serverMessage(cause, "Sharing could not be stopped.");
 			notifyError("groups", message);

@@ -5,7 +5,7 @@ import "time"
 // DerivedStatement is one card statement reconstructed from the card's
 // closing-day cadence and recorded bank evidence. It is never owner-authored.
 // The opening balance is an observed checkpoint at the close; later closes are
-// replayed from posted activity. An unknown balance stays null instead of
+// applied from posted activity. An unknown balance stays null instead of
 // being invented from a closing day or a current balance.
 type DerivedStatement struct {
 	ID          string   `json:"id"`

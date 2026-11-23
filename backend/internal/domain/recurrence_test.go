@@ -21,7 +21,7 @@ func monthlyTestRecurrence() types.Recurrence {
 }
 
 // Claim linkage: a manual transaction records the actual for one scheduled rule
-// occurrence. History replays the actual and skips the generated occurrence,
+// occurrence. History application includes the actual and skips the generated occurrence,
 // so the balance takes one hit instead of two. Future occurrences are
 // unaffected.
 
@@ -102,7 +102,7 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 		t.Fatalf("checking after actual = %v, want 8050 (one hit, not two)", got)
 	}
 	buckets := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear
-	// Timestamp-only replay includes the start-day rule through the cut, so
+	// Timestamp-only application includes the start-day rule through the cut, so
 	// January plus March anchor in history; February stays claimed.
 	if buckets["rent"]["2026"] != 2000 {
 		t.Fatalf("rent bucket = %v, want 2000 (January plus March)", buckets["rent"]["2026"])
@@ -112,14 +112,14 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 	}
 }
 
-func TestUnclaimedOccurrenceReplaysNormally(t *testing.T) {
+func TestUnclaimedOccurrenceAppliesNormally(t *testing.T) {
 	model := claimTestModel()
 	model.Transactions[0].Claim = nil
 	path, _, err := ProjectRawFinancialModel(model, claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
-	// Both the scheduled February rent and the unlinked actual replay.
+	// Both the scheduled February rent and the unlinked actual are applied.
 	if got := historicalBalance(t, path, "2026-02-05", "checking"); got != 7050 {
 		t.Fatalf("checking without claim = %v, want 7050 (double count)", got)
 	}

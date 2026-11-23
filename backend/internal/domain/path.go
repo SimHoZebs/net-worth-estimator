@@ -95,7 +95,7 @@ func publicTransactionEvents(path *types.ProjectionPath) []types.TransactionEven
 		return nil
 	}
 	// Single-pass display: the shared assessment already reconstructed
-	// pre-event balances, replayed the cap ledger in sorted order, and derived
+	// pre-event balances, applied the cap ledger in sorted order, and derived
 	// fulfillment, binding constraints, remaining cap, and available amount.
 	// Formatting reads those results without re-deriving them.
 	evaluatedBySequence := make(map[int]evaluatedTransactionEvent, len(path.TransactionEvents))
@@ -325,8 +325,8 @@ func ProjectRawFinancialModelWithLinks(model *types.FinancialModel, settings *ty
 	return path, result, nil
 }
 
-// HistoricalProjectionRows replays history through the as-of cut and returns
-// unrounded historical rows plus the replayed initial balances. The unified
+// HistoricalProjectionRows applies recorded history through the as-of cut and returns
+// unrounded historical rows plus the applied initial balances. The unified
 // reader serves history live and projected dates from slices.
 func HistoricalProjectionRows(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides) ([]types.ProjectionRow, map[string]float64, error) {
 	prepared, err := orchestratedPrepare(model, settings, overrides, nil)

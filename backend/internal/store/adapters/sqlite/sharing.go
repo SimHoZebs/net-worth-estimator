@@ -167,7 +167,7 @@ func requireSharingAudienceExists(tx *sql.Tx, audienceType, audienceID string) e
 
 // GrantSharedTransaction records the owner's explicit share decision. The grant
 // and the conflicting-exclusion guard run in one transaction. requestID is
-// a client UUID: retries replay the recorded grant, and a reused key for a
+// a client UUID: retries return the recorded grant, and a reused key for a
 // different action fails as a conflict. Only committed grants append audit.
 func (d *Database) GrantSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) (store.SharingGrant, error) {
 	if !validSharingUserID(ownerID) || !validSharingTransactionID(transactionID) {
@@ -255,7 +255,7 @@ func (d *Database) GrantSharedTransaction(ownerID, transactionID, audienceType, 
 // RevokeSharedTransaction deletes one explicit grant. Later reads deny access
 // unless another independent valid grant survives. The delete and its audit
 // row commit together; revoking an absent grant reports not-found.
-// requestID carries the grant idempotency contract: a retry replays the
+// requestID carries the grant idempotency contract: a retry returns the
 // recorded revocation.
 func (d *Database) RevokeSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) error {
 	if !validSharingUserID(ownerID) || !validSharingTransactionID(transactionID) {
@@ -385,7 +385,7 @@ func (d *Database) ExcludeSharedTransaction(ownerID, transactionID, audienceType
 
 // RemoveSharedExclusion deletes one explicit exclusion. The delete and its
 // audit row commit together; removing an absent exclusion reports not-found.
-// requestID carries the grant idempotency contract: a retry replays the
+// requestID carries the grant idempotency contract: a retry returns the
 // recorded removal.
 func (d *Database) RemoveSharedExclusion(ownerID, transactionID, audienceType, audienceID, requestID string) error {
 	if !validSharingUserID(ownerID) || !validSharingTransactionID(transactionID) {
@@ -718,16 +718,16 @@ func (d *Database) healSharingCopyRace(ownerID, transactionID, requesterID, requ
 	}
 	if err := recordSharingRequest(d.db, requesterID, requestID, store.SharingAuditCopyAccepted, ownerID, transactionID, "", "", linkID, existing); err != nil {
 		if isUniqueViolation(err) {
-			return d.replaySharingCopy(requesterID, requestID, ownerID, transactionID, linkID)
+			return d.returnRecordedSharingCopy(requesterID, requestID, ownerID, transactionID, linkID)
 		}
 		return types.Transaction{}, err
 	}
 	return existing, nil
 }
 
-// replaySharingCopy re-reads a just-committed same-key outcome after a key
+// returnRecordedSharingCopy re-reads a just-committed same-key outcome after a key
 // collision: a concurrent request with the same key committed first.
-func (d *Database) replaySharingCopy(requesterID, requestID, ownerID, transactionID, linkID string) (types.Transaction, error) {
+func (d *Database) returnRecordedSharingCopy(requesterID, requestID, ownerID, transactionID, linkID string) (types.Transaction, error) {
 	recorded, err := lookupSharingRequest(d.db, requesterID, requestID)
 	if err != nil {
 		return types.Transaction{}, err
@@ -751,7 +751,7 @@ func (d *Database) replaySharingCopy(requesterID, requestID, ownerID, transactio
 // bank transaction. Copies are idempotent per source-plus-recipient triple: a
 // repeat accept returns the existing recipient row, with its edits intact,
 // and resolves to the same stable link (FND-04) instead of minting a
-// duplicate. requestID is a client UUID: retries with the same key replay
+// duplicate. requestID is a client UUID: retries with the same key return
 // the recorded copy. A source revision landing mid-accept fails with
 // ErrSharingConflict and rolls the copy back instead of recording a torn
 // link; a concurrent accept losing the link-identity race resolves to the
@@ -761,8 +761,8 @@ func (d *Database) CopySharedTransaction(ownerID, transactionID, requesterID, re
 		return types.Transaction{}, err
 	}
 	linkID := store.SharingLinkID(ownerID, transactionID, requesterID)
-	// Retry replay: the same key returns the recorded copy without
-	// re-executing; a reused key for a different action fails as conflict.
+	// Retry: the same key returns the recorded copy without re-executing;
+	// a reused key for a different action fails as conflict.
 	if recorded, err := lookupSharingRequest(d.db, requesterID, requestID); err == nil {
 		if err := matchSharingRequest(recorded, store.SharingAuditCopyAccepted, ownerID, transactionID, "", "", linkID); err != nil {
 			return types.Transaction{}, err
@@ -797,7 +797,7 @@ func (d *Database) CopySharedTransaction(ownerID, transactionID, requesterID, re
 	} else if ok {
 		if err := recordSharingRequest(d.db, requesterID, requestID, store.SharingAuditCopyAccepted, ownerID, transactionID, "", "", linkID, existing); err != nil {
 			if isUniqueViolation(err) {
-				return d.replaySharingCopy(requesterID, requestID, ownerID, transactionID, linkID)
+				return d.returnRecordedSharingCopy(requesterID, requestID, ownerID, transactionID, linkID)
 			}
 			return types.Transaction{}, err
 		}
@@ -894,9 +894,9 @@ func (d *Database) CopySharedTransaction(ownerID, transactionID, requesterID, re
 		if isUniqueViolation(err) {
 			// A concurrent same-key accept committed first with a full
 			// outcome: our rows are rolled back above and the winner's
-			// recording replays. The rollback must precede the replay
-			// read for the single-connection reason above.
-			return d.replaySharingCopy(requesterID, requestID, ownerID, transactionID, linkID)
+			// recorded outcome is returned. The rollback must precede the
+			// recorded-outcome read for the single-connection reason above.
+			return d.returnRecordedSharingCopy(requesterID, requestID, ownerID, transactionID, linkID)
 		}
 		return types.Transaction{}, err
 	}
@@ -933,7 +933,7 @@ func deleteSharingForTransaction(tx *userTx, transactionID string) error {
 // clearSharingForUser removes consent the user issued and provenance for
 // copies they received or sourced. Copies themselves are ordinary model rows
 // and clear with the model. Idempotency keys the user executed and audit
-// events touching the user go too: a stale replay must never resurrect a
+// events touching the user go too: a stale retry must never resurrect a
 // cleared grant, and a cleared scope restarts with an empty trace.
 func clearSharingForUser(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = :user_id`); err != nil {

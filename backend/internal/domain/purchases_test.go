@@ -171,7 +171,7 @@ func TestPurchaseDatesAndDisabledItems(t *testing.T) {
 	}
 }
 
-func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
+func TestPurchaseNeverAppliedAsHistory(t *testing.T) {
 	request := purchaseRequest(1000, plannedPurchase("old-wish", "2025-01-01", "500", 0))
 	model := types.FinancialModel{Accounts: request.Model.Accounts, Transactions: request.Model.Transactions, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
@@ -180,7 +180,7 @@ func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(prepared.Request.InitialState.LatestRealizedTransactionAmounts) != 0 {
-		t.Fatal("wish replayed in history")
+		t.Fatal("wish applied in recorded history")
 	}
 	run, err := simulatePurchases(prepared.Request)
 	if err != nil {

@@ -1,17 +1,17 @@
 // Social-operation idempotency and audit (FND-05). Every mutating social
 // request carries a client-generated UUID request ID. The store records one
 // outcome row per (actor, request ID) in sharing_requests: a retry with the
-// same key replays the recorded outcome without re-executing, while the
+// same key returns the recorded outcome without re-executing, while the
 // same key naming a different action or target fails with
 // ErrSharingConflict. Committed mutations also append one row to
 // sharing_audit carrying actor, action, target identities, and time only:
 // no amounts, names, accounts, memos, or transaction content ever enter audit
 // payloads. Recorded outcomes return to their own actor only: grant,
 // revocation, and refresh outcomes are identity-only, while an accept
-// replay returns the recipient's own copy. Outcomes are never exposed
+// retry returns the recipient's own copy. Outcomes are never exposed
 // cross-user and never appear in audit reads.
 //
-// Replay returns the recorded result verbatim, mirroring analysis feedback
+// Retry returns the recorded result verbatim, mirroring analysis feedback
 // request IDs: it confirms the request already completed, it does not
 // re-read current state. Callers read current state through their own
 // model scope and link refreshes.
@@ -29,7 +29,7 @@ import (
 
 // sharingRequestsSchemaStatements creates the idempotency-key table.
 // sharing_requests records one outcome row per (actor, request ID): a retry
-// with the same key replays outcome_json without re-executing, while the
+// with the same key returns outcome_json without re-executing, while the
 // same key naming a different action or target fails as a conflict. The
 // outcome carries only the identities the operation already returns, never
 // transaction evidence.
@@ -111,7 +111,7 @@ func matchSharingRequest(recorded sharingRequestOutcome, action, ownerID, transa
 	return nil
 }
 
-// decodeSharingResult replays a recorded outcome into its operation type.
+// decodeSharingResult decodes a recorded outcome into its operation type.
 func decodeSharingResult[T any](recorded sharingRequestOutcome) (T, error) {
 	var result T
 	if err := json.Unmarshal(recorded.Result, &result); err != nil {

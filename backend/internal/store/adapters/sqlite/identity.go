@@ -150,7 +150,7 @@ func (d *Database) ListGrants(issuer, subject string) ([]store.Grant, error) {
 	return out, rows.Err()
 }
 
-// RevokeGrants records logout and deletes grants. Replay records and grant
+// RevokeGrants records logout and deletes grants. Retry records and grant
 // deletion share a transaction. Retries cannot revoke a later login twice,
 // and a delayed callback cannot restore an older login.
 func (d *Database) RevokeGrants(issuer, subject, sid, jti string, lifetime time.Duration) error {

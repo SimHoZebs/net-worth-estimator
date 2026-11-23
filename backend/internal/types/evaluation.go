@@ -67,7 +67,7 @@ type CycleFulfillmentConfig struct {
 // WhatIfConfig carries hypothetical additions, disables, and modified copies
 // on top of saved state. A modified row is represented as a disable plus an
 // addition with the same identity. The simulator overlays this set in a branch
-// without mutating saved rows. Promote replays it as sequential row writes.
+// without mutating saved rows. Promote applies it as sequential row writes.
 type WhatIfConfig struct {
 	AddedAccounts          []Account     `json:"addedAccounts,omitempty"`
 	AddedTransactions      []Transaction `json:"addedTransactions,omitempty"`
@@ -121,8 +121,8 @@ type ProjectionRuntimeSettings struct {
 	HorizonYears                int              `json:"horizonYears"`
 	Evaluations                 EvaluationTables `json:"evaluations"`
 	// AsOfInstant is an optional exact cut (Unix seconds) refining the
-	// projection start date: history replays through this instant and the
-	// simulation suppresses the replayed start-day occurrences. It must
+	// projection start date: recorded history is applied through this instant and the
+	// simulation suppresses start-day occurrences already applied. It must
 	// fall on FallbackProjectionStartDate. Omitted means the
 	// day-close cut at the end of the start day.
 	AsOfInstant *int64 `json:"asOfInstant,omitempty"`

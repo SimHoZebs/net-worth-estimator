@@ -24,17 +24,17 @@ func (e *SimulationPreparationError) Error() string {
 	return message
 }
 
-func replayHistoricalState(model *types.FinancialModel, projectionStartDate string) (*SimulationState, []types.HistoricalObservationSnapshot, bool, error) {
-	replay, err := replayChronologicalHistory(model, projectionStartDate)
+func applyHistoricalState(model *types.FinancialModel, projectionStartDate string) (*SimulationState, []types.HistoricalObservationSnapshot, bool, error) {
+	applied, err := applyChronologicalHistory(model, projectionStartDate)
 	if err != nil {
 		return nil, nil, false, err
 	}
-	return replay.state, replay.snapshots, replay.includeStartDateEvents, nil
+	return applied.state, applied.snapshots, applied.includeStartDateEvents, nil
 }
 
-// historicalReplay is the chronological replay result shared by current
+// appliedHistory is the chronological application result shared by current
 // position and projection preparation: one calculation authority.
-type historicalReplay struct {
+type appliedHistory struct {
 	state                  *SimulationState
 	snapshots              []types.HistoricalObservationSnapshot
 	includeStartDateEvents bool
@@ -47,12 +47,12 @@ type historicalReplay struct {
 	zeroDeltaObservations map[ObservationKey]struct{}
 }
 
-// replayChronologicalHistory replays through the end of projectionStartDate.
-func replayChronologicalHistory(model *types.FinancialModel, projectionStartDate string) (*historicalReplay, error) {
-	return replayChronologicalHistoryAt(model, projectionStartDate, dayCloseUnix(projectionStartDate))
+// applyChronologicalHistory applies recorded history through the end of projectionStartDate.
+func applyChronologicalHistory(model *types.FinancialModel, projectionStartDate string) (*appliedHistory, error) {
+	return applyChronologicalHistoryAt(model, projectionStartDate, dayCloseUnix(projectionStartDate))
 }
 
-// historyEvent is the single unified replay input: either one transaction/rule
+// historyEvent is the single unified input for applying recorded history: either one transaction/rule
 // occurrence at its effective instant or one absolute observation. There
 // are no date-wide gates, no per-day phases, and no identity-suppression
 // maps: one sorted list, one forward pass.
@@ -65,8 +65,8 @@ type historyEvent struct {
 	seq           int
 }
 
-// replayChronologicalHistoryAt replays one sorted event stream through the
-// cut instant. Every event at or before cutInstant replays; everything
+// applyChronologicalHistoryAt applies one sorted event stream through the
+// cut instant. Every event at or before cutInstant is applied; everything
 // after is future. Observations SET their account balance; transactions CHANGE
 // balances; a later observation SETS again and records the
 // observed-vs-modeled discrepancy.
@@ -80,7 +80,7 @@ type historyEvent struct {
 //   - Each account anchors independently. Observations sort by instant, so
 //     arrival order never matters and a backdated observation cannot roll
 //     the latest state back.
-func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDate string, cutInstant int64) (*historicalReplay, error) {
+func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDate string, cutInstant int64) (*appliedHistory, error) {
 	for _, checkpoint := range model.Checkpoints {
 		day := FormatIsoDate(time.Unix(CheckpointInstant(checkpoint), 0).UTC())
 		if CompareIsoDates(day, projectionStartDate) > 0 {
@@ -95,7 +95,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 	}
 
 	// Lower bound for rule expansion: earliest observation day, else the
-	// start day itself so start-day movements still replay exactly once.
+	// start day itself so start-day movements are still applied exactly once.
 	earliestDay := projectionStartDate
 	for _, checkpoint := range model.Checkpoints {
 		day := FormatIsoDate(time.Unix(CheckpointInstant(checkpoint), 0).UTC())
@@ -135,7 +135,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 			}
 		}
 	}
-	// Manual transactions before the rule-expansion lower bound still replay:
+	// Manual transactions before the rule-expansion lower bound are still applied:
 	// history has no lower bound for confirmed actuals, only the cut.
 	for index := range model.Transactions {
 		transaction := &model.Transactions[index]
@@ -228,7 +228,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 			return &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
 				Severity: types.SeverityError,
 				Code:     "transaction.history.execution",
-				Message: fmt.Sprintf("Could not replay transaction '%s' on %s: %s",
+				Message: fmt.Sprintf("Could not apply transaction '%s' on %s: %s",
 					occurrence.Transaction.ID, date, message),
 				Path: occurrence.DocPath,
 			}}}
@@ -291,7 +291,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 	}
 	flushDay()
 
-	return &historicalReplay{
+	return &appliedHistory{
 		state:                  &transitions.State,
 		snapshots:              historicalSnapshots,
 		includeStartDateEvents: true,
@@ -306,7 +306,7 @@ type preparedPosition struct {
 	state                  *SimulationState
 	snapshots              []types.HistoricalObservationSnapshot
 	includeStartDateEvents bool
-	replay                 *historicalReplay
+	appliedHistory         *appliedHistory
 }
 
 func preparePosition(model *types.FinancialModel, startDate string, overrides types.ModelOverrides) (*preparedPosition, error) {
@@ -317,7 +317,7 @@ func preparePositionAt(model *types.FinancialModel, startDate string, cutInstant
 	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinancialModel)
 }
 
-// prepareFinancePositionAt replays history for ordinary finance reads
+// prepareFinancePositionAt applies recorded history for ordinary finance reads
 // (current position, account balances) using pure finance validation, so
 // no evaluation-owned check can block history.
 func prepareFinancePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
@@ -361,17 +361,17 @@ func preparePositionWithValidator(model *types.FinancialModel, startDate string,
 			Path:     []any{"fallbackProjectionStartDate"},
 		}}}
 	}
-	replay, err := replayChronologicalHistoryAt(&effectiveModel, startDate, cutInstant)
+	applied, err := applyChronologicalHistoryAt(&effectiveModel, startDate, cutInstant)
 	if err != nil {
 		return nil, err
 	}
 
-	return &preparedPosition{effectiveModel, replay.state, replay.snapshots, replay.includeStartDateEvents, replay}, nil
+	return &preparedPosition{effectiveModel, applied.state, applied.snapshots, applied.includeStartDateEvents, applied}, nil
 }
 
 // PrepareSimulationRequest resolves overrides, validation, history, and dates.
-// History replays through the cut instant and the simulation continues after
-// it, skipping already-replayed occurrences by the same cut so nothing
+// Recorded history is applied through the cut instant and the simulation continues after
+// it, skipping occurrences already applied by the same cut so nothing
 // executes twice.
 func PrepareSimulationRequest(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
 	if err := requireResimulationAllowed("PrepareSimulationRequest"); err != nil {

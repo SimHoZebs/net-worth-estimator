@@ -58,14 +58,14 @@ func TestTimestampedSameDayObservationAndLaterActual(t *testing.T) {
 func TestTimestampedLaterObservationAnchorsAgain(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints[1].Balance = 850
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := replay.state.Balances["checking"]; got != 850 {
+	if got := applied.state.Balances["checking"]; got != 850 {
 		t.Fatalf("adjusted balance = %v, want 850", got)
 	}
-	corrections := replay.snapshots[0].CheckpointCorrections
+	corrections := applied.snapshots[0].CheckpointCorrections
 	if len(corrections) != 2 {
 		t.Fatalf("two same-day observations must both anchor, got %+v", corrections)
 	}
@@ -166,14 +166,14 @@ func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := replay.state.Balances[account]; got != 850 {
+	if got := applied.state.Balances[account]; got != 850 {
 		t.Fatalf("latest-instant anchor must win regardless of arrival order, got %v", got)
 	}
-	corrections := replay.snapshots[0].CheckpointCorrections
+	corrections := applied.snapshots[0].CheckpointCorrections
 	if len(corrections) != 3 {
 		t.Fatalf("every stored observation anchors in instant order, got %+v", corrections)
 	}
@@ -193,11 +193,11 @@ func TestTimestampedTiePolicyTransactionsFirst(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
-	corrections := replay.snapshots[0].CheckpointCorrections
+	corrections := applied.snapshots[0].CheckpointCorrections
 	if len(corrections) != 1 {
 		t.Fatalf("expected one correction, got %+v", corrections)
 	}
@@ -218,11 +218,11 @@ func TestTimestampedOwnerWinsSameInstantOnly(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := replay.state.Balances[account]; got != 800 {
+	if got := applied.state.Balances[account]; got != 800 {
 		t.Fatalf("owner observation must win at the same instant, got %v", got)
 	}
 }
@@ -244,16 +244,16 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// A leg: 1000 - 50 executed, anchored back to 1000 by the bank.
-	if got := replay.state.Balances[a]; got != 1000 {
+	if got := applied.state.Balances[a]; got != 1000 {
 		t.Fatalf("account A balance = %v, want the bank anchor 1000", got)
 	}
 	// B leg: the destination effect stands with no later anchor.
-	if got := replay.state.Balances[b]; got != 250 {
+	if got := applied.state.Balances[b]; got != 250 {
 		t.Fatalf("account B balance = %v, want 250", got)
 	}
 }
@@ -262,7 +262,7 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 // lifecycle metadata, never independent execution gates. A lifecycle row
 // with Enabled true executes like any actual; with Enabled false it stays
 // out, as does an owner-disabled settled row. Holds both before the rows
-// (exact 10:00 cut) and after them (day-close cut), in history replay and
+// (exact 10:00 cut) and after them (day-close cut), in recorded-history application and
 // in the forward simulation.
 func TestEnabledAloneDecidesExecutionRegardlessOfLifecycle(t *testing.T) {
 	account := "checking"
@@ -394,7 +394,7 @@ func TestExactCutProjectionAgreesWithPositionAndAccountList(t *testing.T) {
 	}
 }
 
-func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
+func TestExactCutSuppressesAppliedMorningInSimulation(t *testing.T) {
 	account := "checking"
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
@@ -437,7 +437,7 @@ func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 		}
 	}
 	if counts["morning"] != 0 || counts["afternoon"] != 1 {
-		t.Fatalf("simulation must skip replayed morning and run afternoon once: %+v", counts)
+		t.Fatalf("simulation must skip morning already applied and run afternoon once: %+v", counts)
 	}
 }
 
@@ -463,22 +463,22 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 	model.Transactions = []types.Transaction{
 		{ID: "drain", Name: "Drain", SourceAccountID: &drain, Amount: expenseAmount("1500"), TransactionTime: unixAt(10, 10), PostedTime: unixAt(10, 10), Enabled: true, Source: "user"},
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// 1000 anchored, then 1500 recorded actual = -500 (actuals ignore the
 	// floor); the day-close rule requests 100 from below the floor and
 	// realizes nothing.
-	if got := replay.state.Balances[account]; got != -500 {
+	if got := applied.state.Balances[account]; got != -500 {
 		t.Fatalf("recorded actual must ignore the floor while the rule clamps: balance = %v, want -500", got)
 	}
-	if got := replay.state.RealizedTransactionAmountsByYear["payout"]["2026"]; got != 0 {
+	if got := applied.state.RealizedTransactionAmountsByYear["payout"]["2026"]; got != 0 {
 		t.Fatalf("clamped rule realized = %v, want 0", got)
 	}
 }
 
-// Settled bank actuals replay through the same actual path as manual
+// Settled bank actuals are applied through the same actual path as manual
 // actuals: a 09:00 observation plus an 11:00 settled import is 900 at a
 // noon cut, in position and projection baseline alike.
 func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
@@ -512,7 +512,7 @@ func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 }
 
 // A bank actual before the latest anchor is absorbed exactly once: the
-// later anchor overwrites without replaying the movement again.
+// later anchor overwrites without applying the movement again.
 func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 	account := "checking"
 	source := account
@@ -527,14 +527,14 @@ func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := replay.state.Balances[account]; got != 850 {
+	if got := applied.state.Balances[account]; got != 850 {
 		t.Fatalf("balance = %v, want 850 (later anchor absorbs the actual)", got)
 	}
-	corrections := replay.snapshots[0].CheckpointCorrections
+	corrections := applied.snapshots[0].CheckpointCorrections
 	if len(corrections) != 2 {
 		t.Fatalf("corrections = %+v, want both anchors recorded once", corrections)
 	}

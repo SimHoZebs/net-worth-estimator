@@ -57,7 +57,7 @@ type providerDefinition struct {
 	// volatileParams reports sampling parameters when the provider carries rate behavior.
 	// Nil means never volatile.
 	volatileParams func(args map[string]types.JsonValue) (annualRate, volatility float64, volatile bool)
-	// stateless reports that resolve needs no replay-time state.
+	// stateless reports that resolve needs no historical state.
 	// Custom plugins set it only for literal or deterministic inputs.
 	stateless bool
 }
@@ -241,7 +241,7 @@ var amountProviders = map[string]providerDefinition{
 		},
 		// Stateless descriptively: without a sampled rate, resolve
 		// returns the base annual rate divided by the frequency divisor
-		// (1 for one-time transactions), so no replay state is read.
+		// (1 for one-time transactions), so no historical state is read.
 		stateless: true,
 	},
 	// growth-factor resolves the compounding factor from rule start to occurrence date.
@@ -265,7 +265,7 @@ var amountProviders = map[string]providerDefinition{
 			return err
 		},
 		// Stateless descriptively: for one-time transactions RuleStartDate
-		// is empty and resolve returns 1, so no replay state is read.
+		// is empty and resolve returns 1, so no historical state is read.
 		stateless: true,
 	},
 	// terms-minimum resolves a payment-terms minimum: fixed or percent share, whichever is larger.
@@ -461,8 +461,8 @@ func CountVolatileRateInputs(amount types.TransactionAmountResolution) int {
 	return count
 }
 
-// AmountRequiresReplayState reports whether a descriptor reads replay-time state.
-func AmountRequiresReplayState(amount types.TransactionAmountResolution) bool {
+// AmountRequiresHistoricalState reports whether a descriptor reads historical state.
+func AmountRequiresHistoricalState(amount types.TransactionAmountResolution) bool {
 	for _, binding := range amount.Inputs {
 		if binding.Source == "literal" {
 			continue

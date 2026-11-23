@@ -27,7 +27,7 @@
 // the copy survives revocation.
 //
 // Every mutating social request carries a client-generated UUID request
-// ID (`requestId` in the JSON body): retries replay the recorded outcome
+// ID (`requestId` in the JSON body): retries return the recorded outcome
 // byte-for-byte, key reuse across actions fails with 409, and failed
 // attempts never consume the key. The refresh route accepts an optional
 // `requestId` body and mints a server key when none travels. Committed

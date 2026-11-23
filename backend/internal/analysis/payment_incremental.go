@@ -42,7 +42,7 @@ func AnalyzeIncrementalPayments(ctx context.Context, definitions []PaymentClassi
 // analyzeIncrementalPayments is the shared incremental worker. The exported
 // seam carries no resolver; definitions prepared with a ProviderResolver pass
 // it explicitly so recomputed streams match full Analyze exactly.
-// forceRebuild replays the full rebuild path after an analyzer-version change
+// forceRebuild runs the full rebuild path again after an analyzer-version change
 // even when the cache looks reusable, so new classifications materialize for
 // owners with no dirty facts.
 func analyzeIncrementalPayments(ctx context.Context, definitions []PaymentClassification, judge judgment.Evaluator, preparationErr error, input types.AnalysisSnapshot, dirty []store.AnalysisDirtyFact, cached []store.AnalysisPaymentStream, prior []types.AnalysisDetection, resolver ProviderResolver, forceRebuild bool) (IncrementalPaymentOutcome, error) {
@@ -616,7 +616,7 @@ func cachePaymentStream(stream *paymentStream, revision int64) store.AnalysisPay
 // paymentIncrementalDefinition is the prepared payments definition. Prepare
 // snapshots the stream cache, dirty facts, and prior active findings; Analyze
 // recomputes affected streams only; CompleteIncremental publishes per-stream.
-// forceRebuild replays the full rebuild path once after an analyzer-version
+// forceRebuild runs the full rebuild path again after an analyzer-version
 // change so new classifications materialize with no dirty facts.
 type paymentIncrementalDefinition struct {
 	base         PaymentPatterns

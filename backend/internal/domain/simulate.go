@@ -54,7 +54,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	}
 	sort.Slice(dates, func(i, j int) bool { return CompareIsoDates(dates[i], dates[j]) < 0 })
 
-	// The history cut skips already-replayed occurrences; purchases are exempt.
+	// The history cut skips occurrences already applied; purchases are exempt.
 	cut := request.HistoryCutInstant
 	for _, date := range dates {
 		occurrences := eventDates[date]

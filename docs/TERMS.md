@@ -23,8 +23,8 @@ A recorded account balance that corrects modeled history for that account.
 A check carries its exact observation time.
 
 Use **balance check**. Its date column is **balance**; its tab is "Balance checks".
-Replay ordering is owned in
-[Historical Replay and Checkpoints](../TECHNICAL_OVERVIEW.md#7-historical-replay-and-checkpoints).
+Recorded-history application order is owned in
+[Applying Recorded History and Checkpoints](../TECHNICAL_OVERVIEW.md#7-applying-recorded-history-and-checkpoints).
 
 - Only an owner-disabled row shows **Excluded from account**. A
   pending or void bank row is recorded bank evidence. Settled bank rows
@@ -39,13 +39,13 @@ Replay ordering is owned in
 Two computations over the same saved model. The **projection** is the single calculated path. The **range** is a percentile band across sampled scenarios.
 
 - **Scenario** names one sampled assumption set, as in "80% of 400 scenarios".
-- **What-if** names a simulator evaluation that branches from the projection to test hypothetical additions, disables, and modified copies without changing saved state. It is distinct from a sampled scenario. Promote replays it as sequential saves. Discard deletes the evaluation.
+- **What-if** names a simulator evaluation that branches from the projection to test hypothetical additions, disables, and modified copies without changing saved state. It is distinct from a sampled scenario. Promote applies it as sequential saves. Discard deletes the evaluation.
 
 ## D. Changes
 
 Base edits save immediately and invalidate affected calculations. Components request a new projection only when they need its result.
 
-Use **changes** only for a what-if evaluation that is not yet promoted. **Promote** replays it as sequential saves. **Discard** deletes the evaluation.
+Use **changes** only for a what-if evaluation that is not yet promoted. **Promote** applies it as sequential saves. **Discard** deletes the evaluation.
 
 - The saved result in a comparison is the **saved model**.
 
@@ -94,7 +94,7 @@ cash. The account kind does not establish which purchases have been imported.
 A **statement** is derived for each close in a card's history from its
 **statement closing day** and recorded bank evidence. The latest bank balance
 observed in that statement cycle, taken as debt, is the **statement balance**;
-posted activity after that observation is replayed from it. The open cycle is
+posted activity after that observation is applied from it. The open cycle is
 an estimate until it closes. A close with no observation is unknown, never
 zero and never a guess from a closing day or a current balance. Payment terms
 supply the **due date**; a card without terms has no known due date.

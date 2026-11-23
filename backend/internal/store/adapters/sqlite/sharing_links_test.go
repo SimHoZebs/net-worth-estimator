@@ -109,7 +109,7 @@ func TestSharingLinkIdentities(t *testing.T) {
 }
 
 // Repeat accepts resolve to the same copy and the same link instead of
-// minting duplicates: retry replays never manufacture extra rows.
+// minting duplicates: retries never manufacture extra rows.
 func TestSharingCopyIdempotent(t *testing.T) {
 	d := openSharingTestDB(t)
 	alice, storeA := sharingUser(t, d, "alice")

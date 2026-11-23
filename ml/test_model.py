@@ -106,7 +106,7 @@ class TestStore(unittest.TestCase):
         self.assertEqual(self.store._state.examples_seen, 1)
         self.assertEqual(self.store.state("alice")["cursor"], "001")
 
-    def test_lost_response_replay_is_durably_idempotent(self):
+    def test_lost_response_retry_is_durably_idempotent(self):
         self.store.observe("alice", "", "001", [feedback()])
         revision = self.store.state("alice")["revision"]
         self.store.close()

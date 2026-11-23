@@ -206,7 +206,7 @@ type cardActivity struct {
 }
 
 // transferLeg tells how one single-destination movement touches a card. It
-// follows cashDelta in the balance replay: the source balance falls by the
+// follows cashDelta in the balance application: the source balance falls by the
 // amount and the destination balance rises by it, so with debt = max(0,
 // -balance) the source owes more (a charge) and the destination owes less (a
 // payment). Each leg is dated on the card's own statement ledger.
@@ -274,7 +274,7 @@ func cardStatementRows(st *cutState, cardID string, closes []statementClose, tra
 	if !observed {
 		return nil, false, 0
 	}
-	// Opening balance is bank evidence at the close. Replaying to that instant
+	// Opening balance is bank evidence at the close. Applying history to that instant
 	// includes charges made after an earlier checkpoint.
 	bases := make([]float64, len(closes))
 	// A positive card balance is a credit against later charges.
@@ -364,7 +364,7 @@ func cardStatementRows(st *cutState, cardID string, closes []statementClose, tra
 			activities = append(activities, cardActivity{date: date, charge: amount})
 		case legPayment:
 			// The destination balance rises, so this card owes less. No cash
-			// movement is added: the replay already applied cashDelta once.
+			// movement is added: history application already applied cashDelta once.
 			activities = append(activities, cardActivity{date: date, payment: amount})
 		default:
 			if isPayment {

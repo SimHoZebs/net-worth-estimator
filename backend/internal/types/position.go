@@ -6,7 +6,7 @@ package types
 // that exact instant. Balance is the adjusted modeled balance at the cut;
 // ObservedBalance/ObservedAt carry the latest observation at or before it.
 // All public balances agree at an identical cut because they share one
-// chronological replay.
+// chronological application.
 type CurrentPosition struct {
 	AsOfDate IsoDate           `json:"asOfDate"`
 	NetWorth float64           `json:"netWorth"`
@@ -14,7 +14,7 @@ type CurrentPosition struct {
 }
 
 type PositionAccount struct {
-	// UnroundedBalance retains replay precision for composite-account editors.
+	// UnroundedBalance retains precision for recorded-history application in composite-account editors.
 	// Existing position output keeps its whole-dollar presentation contract.
 	UnroundedBalance float64 `json:"-"`
 	AccountID        string  `json:"accountId"`

@@ -28,7 +28,7 @@ func isSyncOwned(source string) bool {
 
 // isArchivedDebt hides a paid-off configured liability: an account with
 // payment terms whose latest observed balance at or before the viewed
-// date is effectively zero. The observed balance comes from the replay's
+// date is effectively zero. The observed balance comes from the history application's
 // selected observation, so same-day instant ordering agrees with the
 // current position. Terms, not account kind, select the set.
 func isArchivedDebt(terms map[string]types.PaymentTerms, account types.Account, observedBalance *float64) bool {
@@ -87,7 +87,7 @@ type accountBalancesOutput struct {
 }
 
 // listAccountBalances answers "what does each account hold as of this date".
-// Balances come from the same chronological replay as the current position
+// Balances come from the same chronological application as the current position
 // and projection baseline (one calculation authority): Balance is the
 // adjusted modeled balance at the end of AsOf, with the latest observation
 // and reconciliation state carried separately. It never folds the latest
@@ -229,7 +229,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 }
 
 // latestObservationDay returns the UTC day of the latest observation at
-// or before asOf, derived from the replay's selected observation so the
+// or before asOf, derived from the history application's selected observation so the
 // account list agrees with the current position at the same cut.
 func latestObservationDay(adjusted types.PositionAccount, asOf types.IsoDate) types.IsoDate {
 	if adjusted.ObservedAt == nil {

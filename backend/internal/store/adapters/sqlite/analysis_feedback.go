@@ -71,10 +71,10 @@ func applyAnalysisFeedback(tx *userTx, id string, input types.AnalysisFeedbackIn
 		actor = tx.userID
 	}
 	input.Actor = "" // The immutable event carries the verified actor separately.
-	var replayJSON string
-	err := tx.QueryRow(`SELECT payload_json FROM analysis_feedback WHERE request_id = ? AND user_id = :user_id`, input.RequestID).Scan(&replayJSON)
+	var recordedOutcomeJSON string
+	err := tx.QueryRow(`SELECT payload_json FROM analysis_feedback WHERE request_id = ? AND user_id = :user_id`, input.RequestID).Scan(&recordedOutcomeJSON)
 	if err == nil {
-		if err := json.Unmarshal([]byte(replayJSON), &feedback); err != nil {
+		if err := json.Unmarshal([]byte(recordedOutcomeJSON), &feedback); err != nil {
 			return feedback, err
 		}
 		if feedback.FindingID != id || feedback.Actor != actor || !reflect.DeepEqual(feedback.Request, input) {

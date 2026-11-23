@@ -126,7 +126,7 @@ func TestDynamicRecordedAmountsCannotBorrowLaterObservation(t *testing.T) {
 		t.Fatalf("dynamic amount guessed %+v", s)
 	}
 	// Once a later actual observation incorporates that transaction, it no
-	// longer requires replay to establish cash, but its amount remains unknown.
+	// longer requires history application to establish cash, but its amount remains unknown.
 	m.Checkpoints[0].ObservedAt = stamp("2026-11-15T10:00:00Z")
 	s = Build(m, nil, "2026-11-15", testEnd)
 	assertMoney(t, s.CashAfterBills, 1608.05)
@@ -340,7 +340,7 @@ func TestEarlierOutgoingHoldNeedsBankAvailableToKnowCash(t *testing.T) {
 			assertMoney(t, s.CashAfterBills, -216.58)
 
 			// A posted-only checkpoint has no available figure to embed the
-			// hold, so the replayed posted total stays the numeric cash basis.
+			// hold, so the applied posted total stays the numeric cash basis.
 			// The pending hold is not a posted movement and is not deducted
 			// twice; the dated bills carry the timing check once.
 			m.Checkpoints[0].AvailableBalance = nil

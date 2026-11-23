@@ -79,9 +79,9 @@ func TestAnalysisFeedbackHTTPContract(t *testing.T) {
 	if output.Feedback.Actor != "verified-subject" || output.Feedback.Review.Decision != "confirmed" {
 		t.Fatalf("event=%+v", output)
 	}
-	replay := request(handler, "POST", path, string(body))
-	if replay.Code != 200 || replay.Body.String() != res.Body.String() {
-		t.Fatalf("replay=%d %s", replay.Code, replay.Body.String())
+	retry := request(handler, "POST", path, string(body))
+	if retry.Code != 200 || retry.Body.String() != res.Body.String() {
+		t.Fatalf("retry=%d %s", retry.Code, retry.Body.String())
 	}
 	input.RequestID = uuid.NewString()
 	body, _ = json.Marshal(input)

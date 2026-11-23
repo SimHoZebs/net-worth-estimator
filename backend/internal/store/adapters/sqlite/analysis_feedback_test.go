@@ -28,7 +28,7 @@ func onlyFinding(t *testing.T, s *sqliteStore) types.AnalysisFinding {
 	return items[0]
 }
 
-func TestAnalysisFeedbackAuditReplayAndDuration(t *testing.T) {
+func TestAnalysisFeedbackAuditRetryAndDuration(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAnalysisEvidence(t, s)
 	finding := completeTestAnalysis(t, s, "v1")
@@ -38,9 +38,9 @@ func TestAnalysisFeedbackAuditReplayAndDuration(t *testing.T) {
 	if err != nil || confirmed.Revision != 1 || confirmed.Review.Decision != "confirmed" || confirmed.Actor != "verified-owner" || confirmed.AnalyzerVersion != "v1" || !reflect.DeepEqual(confirmed.Prediction, finding.AnalysisDetection) {
 		t.Fatalf("confirm=%+v err=%v", confirmed, err)
 	}
-	replay, err := s.ReviewAnalysisFinding(finding.ID, input)
-	if err != nil || !reflect.DeepEqual(confirmed, replay) {
-		t.Fatalf("replay=%+v err=%v", replay, err)
+	retry, err := s.ReviewAnalysisFinding(finding.ID, input)
+	if err != nil || !reflect.DeepEqual(confirmed, retry) {
+		t.Fatalf("retry=%+v err=%v", retry, err)
 	}
 	changed := input
 	changed.Action = "reject"
@@ -71,16 +71,16 @@ func TestAnalysisFeedbackAuditReplayAndDuration(t *testing.T) {
 	if err != nil || len(next) != 1 || next[0].ID != saved.ID {
 		t.Fatalf("cursor=%+v %v", next, err)
 	}
-	// Replayed confirmation returns its original event, not the later state.
-	replay, err = s.ReviewAnalysisFinding(finding.ID, confirmed.Request)
+	// Retried confirmation returns its original event, not the later state.
+	retry, err = s.ReviewAnalysisFinding(finding.ID, confirmed.Request)
 	if err == nil {
-		t.Fatal("actor-less replay should not impersonate the verified owner")
+		t.Fatal("actor-less retry should not impersonate the verified owner")
 	}
 	request := confirmed.Request
 	request.Actor = confirmed.Actor
-	replay, err = s.ReviewAnalysisFinding(finding.ID, request)
-	if err != nil || !reflect.DeepEqual(replay, confirmed) || onlyFinding(t, s).Review.Duration.Count != 6 {
-		t.Fatalf("old replay changed state: %+v %v", replay, err)
+	retry, err = s.ReviewAnalysisFinding(finding.ID, request)
+	if err != nil || !reflect.DeepEqual(retry, confirmed) || onlyFinding(t, s).Review.Duration.Count != 6 {
+		t.Fatalf("old retry changed state: %+v %v", retry, err)
 	}
 	after, _ := s.LoadModel()
 	if !reflect.DeepEqual(before, after) {

@@ -2,7 +2,7 @@
   "pack": "cursors",
   "version": 2,
   "concern": "Sync cursors far behind the newest rows: an old completion stamp and an old mail scan cursor with newer rows present.",
-  "breaksIfMishandled": "A stale cursor that replays from months ago duplicates rows or resurrects voided ones. Sync must resume exactly at the cursor and reconcile against current rows, never blindly re-insert.",
+  "breaksIfMishandled": "A stale cursor that reprocesses from months ago duplicates rows or resurrects voided ones. Sync must resume exactly at the cursor and reconcile against current rows, never blindly re-insert.",
   "seeds": [
     {
       "kind": "model",

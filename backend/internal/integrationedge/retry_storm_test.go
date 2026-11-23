@@ -17,7 +17,7 @@ func grantTriple(grant map[string]any) string {
 }
 
 // Double-spend via retry storms on every mutating share path. Retries with
-// one key must replay one outcome; one key reused across actions must fail;
+// one key must return one recorded outcome; one key reused across actions must fail;
 // concurrent storms must record exactly one row per key. Real SQLite store and real production routers over real HTTP; the only stand-in is identity (no OIDC round trip).
 // The storm loops three times: green means hostile, not lucky.
 func TestIntegrationEdgeGrantRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
@@ -52,12 +52,12 @@ func TestIntegrationEdgeGrantRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 			switch outcome := result.(type) {
 			case string:
 				if outcome != firstKey {
-					t.Fatalf("round %d replay granted a second row %q beside %q: double-share", round, outcome, firstKey)
+					t.Fatalf("round %d retry granted a second row %q beside %q: double-share", round, outcome, firstKey)
 				}
 			case *httptest.ResponseRecorder:
-				t.Fatalf("round %d replay status = %d, want the recorded grant again: %s", round, outcome.Code, outcome.Body.String())
+				t.Fatalf("round %d retry status = %d, want the recorded grant again: %s", round, outcome.Code, outcome.Body.String())
 			default:
-				t.Fatalf("round %d unexpected replay outcome %T (%v)", round, result, result)
+				t.Fatalf("round %d unexpected retry outcome %T (%v)", round, result, result)
 			}
 		}
 		// One key reused for a different transaction must fail, never grant.
@@ -77,7 +77,7 @@ func TestIntegrationEdgeGrantRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 	}
 }
 
-// Concurrent copy storms on one share: every retry replays the one copy,
+// Concurrent copy storms on one share: every retry returns the one copy,
 // and exactly one recipient row exists afterwards.
 func TestIntegrationEdgeCopyRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 	for round := 0; round < 3; round++ {

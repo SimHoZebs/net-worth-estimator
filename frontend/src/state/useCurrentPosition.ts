@@ -28,8 +28,8 @@ export function useCurrentPosition({
 	model?: FinancialModel | null;
 	enabled?: boolean;
 } = {}) {
-	// Position is backend-owned historical replay: it keys on the saved
-	// rows only, never on forecast evaluation preferences.
+	// Position is backend-owned application of recorded history: it keys on
+	// the saved rows only, never on forecast evaluation preferences.
 	const scope = useUserScope();
 	const rowActive = model === undefined && enabled && scope.status === "ready";
 	const client = serverQueryClient();

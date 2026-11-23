@@ -21,10 +21,10 @@ func ZeroDeltaObservations(model *types.FinancialModel, asOf string) (map[Observ
 	if err != nil {
 		return nil, err
 	}
-	return position.replay.zeroDeltaObservations, nil
+	return position.appliedHistory.zeroDeltaObservations, nil
 }
 
-// ResolveBalanceAdjustments uses the same finance-only replay as current
+// ResolveBalanceAdjustments uses the same finance-only history application as current
 // balances. No forecast evaluation or future simulation runs.
 func ResolveBalanceAdjustments(model *types.FinancialModel, asOf string) ([]types.BalanceAdjustment, error) {
 	instant, day, err := ParseAsOfCut(asOf)
@@ -38,8 +38,8 @@ func ResolveBalanceAdjustments(model *types.FinancialModel, asOf string) ([]type
 	// A zero-delta observation still applies to state and remains the
 	// account's latest observation, but it reconciles nothing, so it
 	// produces no adjustment row.
-	rows := make([]types.BalanceAdjustment, 0, len(position.replay.adjustments))
-	for _, row := range position.replay.adjustments {
+	rows := make([]types.BalanceAdjustment, 0, len(position.appliedHistory.adjustments))
+	for _, row := range position.appliedHistory.adjustments {
 		if row.Adjustment != 0 {
 			rows = append(rows, row)
 		}

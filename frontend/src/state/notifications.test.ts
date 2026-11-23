@@ -338,13 +338,13 @@ describe("notification policy", () => {
 		(onClose as () => void)();
 		expect(onDismiss).toHaveBeenCalledTimes(1);
 
-		const replay = vi.fn(() => new Promise<void>(() => {}));
+		const retry = vi.fn(() => new Promise<void>(() => {}));
 		notifyError("workspace", "Try again.", {
 			label: "Retry",
-			onAction: replay,
+			onAction: retry,
 		});
 		clickAction("workspace");
-		expect(replay).toHaveBeenCalledTimes(1);
+		expect(retry).toHaveBeenCalledTimes(1);
 
 		finish();
 		await settle();

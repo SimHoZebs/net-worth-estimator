@@ -40,7 +40,7 @@ func recordedByCut(t types.Transaction, cut int64) bool {
 }
 
 // cutState carries the evidence assembled during one BuildAtCut pass. The
-// helpers below advance it through checkpoint selection, confirmed replay,
+// helpers below advance it through checkpoint selection, confirmed-fact application,
 // baseline derivation and the final availability gate.
 type cutState struct {
 	s              *types.SafeSpendingSummary
@@ -60,7 +60,7 @@ func cashEvidence(model *types.FinancialModel, settings *types.SafeSpendingSetti
 	day := domain.FormatIsoDate(time.Unix(cut, 0))
 	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}}
 	st := &cutState{s: &s, model: model, settings: settings, latest: pickCheckpoints(model, cut), selected: map[string]bool{}, balances: map[string]float64{}, basis: map[string]types.DisplayBasis{}, cut: cut}
-	st.replayConfirmed()
+	st.applyConfirmedFacts()
 	st.deriveBaselines()
 	st.ctx.basis = st.basis
 	return st
@@ -92,9 +92,9 @@ func pickCheckpoints(model *types.FinancialModel, cut int64) map[string]types.Ch
 	return latest
 }
 
-// replayConfirmed resolves posted facts in instant order, maintaining the
+// applyConfirmedFacts resolves posted facts in instant order, maintaining the
 // observed balances that baselines and conditional amounts read afterward.
-func (st *cutState) replayConfirmed() {
+func (st *cutState) applyConfirmedFacts() {
 	st.s.SelectedAccountIDs = effectiveAccounts(st.model, st.settings, st.latest)
 	for _, id := range st.s.SelectedAccountIDs {
 		st.selected[id] = true
@@ -114,7 +114,7 @@ func (st *cutState) replayConfirmed() {
 		}
 		return a.ExecutionOrder < b.ExecutionOrder
 	})
-	// Recorded amounts resolve against observed facts only, never schedule replay.
+	// Recorded amounts resolve against observed facts only, never schedule application.
 	st.ctx = newAmounts(st.model, st.balances)
 	invalidate := func(tx types.Transaction, instant int64, cause string) {
 		for _, account := range st.model.Accounts {
@@ -192,7 +192,7 @@ func (st *cutState) deriveBaselines() {
 			st.basis[a.ID] = basis
 			b.Basis = string(basis)
 			b.Status = "available"
-			// Replay starts from the observed posted total and adds confirmed
+			// Application starts from the observed posted total and adds confirmed
 			// movements after it. Only an effective available figure adjusts
 			// that total by the bank-reported gap. On the posted basis,
 			// pending holds have not been deducted from starting cash.

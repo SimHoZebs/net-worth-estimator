@@ -350,7 +350,7 @@ match that lists all candidates ranked best-first for review.
   kind; `set-duration` requires a confirmed BNPL answer and a
   `duration` of `{count, unit}` with an integer count of 1–5200 and weeks or months.
   Duration means the total plan term, not remaining payments or a repayment schedule.
-  Writes require permission and a writable server. An exact request-ID replay
+  Writes require permission and a writable server. An exact request-ID retry
   returns the original event. Reuse with different data, or a changed run/review,
   returns 409. Yes/No also reject changed source inputs. Invalid answers return 422.
   Request IDs use canonical lowercase UUID spelling. Feedback events stay in

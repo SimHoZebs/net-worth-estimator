@@ -346,16 +346,16 @@
           id: "prepare",
           lane: 1,
           label: "Prepare",
-          kids: ["replay", "request"],
+          kids: ["apply", "request"],
           src: "domain.PrepareSimulationRequest",
         },
         {
-          id: "replay",
+          id: "apply",
           lane: 1,
           parent: "prepare",
-          label: "History replay",
+          label: "Apply recorded history",
           sub: "History into opening balances",
-          src: "domain.replayHistoricalState",
+          src: "domain.applyHistoricalState",
         },
         {
           id: "request",
@@ -420,7 +420,7 @@
         },
       ];
       const EDGES = [
-        // Phases follow one run: references validated, history replayed, request
+        // Phases follow one run: references validated, history applied, request
         // assembled, the per-occurrence execution loop, evaluation, readout.
         // Flows sharing a phase run together, not in sequence.
         { f: "transaction", t: "rule", l: "names schedule", phase: 1, src: "types.TransactionClaim" },
@@ -438,20 +438,20 @@
           phase: 1,
           src: "domain.EvaluationRegistry",
         },
-        { f: "account", t: "replay", l: "balances", phase: 2, src: "domain.InitAccountBalances" },
+        { f: "account", t: "apply", l: "balances", phase: 2, src: "domain.InitAccountBalances" },
         {
           f: "checkpoint",
-          t: "replay",
+          t: "apply",
           l: "corrections",
           phase: 2,
           src: "types.CheckpointCorrection",
         },
         {
           f: "transaction",
-          t: "replay",
+          t: "apply",
           l: "history actuals",
           phase: 2,
-          src: "domain.replayHistoricalState",
+          src: "domain.applyHistoricalState",
         },
         {
           f: "rule",
@@ -469,13 +469,13 @@
         },
         {
           f: "occurrence",
-          t: "replay",
+          t: "apply",
           l: "history instances",
           phase: 2,
           src: "domain.ResolveOccurrences",
         },
         {
-          f: "replay",
+          f: "apply",
           t: "request",
           l: "initial state",
           phase: 3,

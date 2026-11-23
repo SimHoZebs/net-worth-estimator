@@ -27,7 +27,7 @@ type DatedTransactionOccurrence struct {
 }
 
 // compareDatedTransactionOccurrences is the single strict ordering shared by
-// simulation, history replay, and the financial independence branch: one
+// simulation, recorded-history application, and the financial independence branch: one
 // definition so one edit changes all three. Negative means a sorts first;
 // zero means every ordered field ties (callers break it stably).
 func compareDatedTransactionOccurrences(a, b DatedTransactionOccurrence) int {
@@ -74,7 +74,7 @@ func compareDatedTransactionOccurrences(a, b DatedTransactionOccurrence) int {
 // by transaction time, then posted time, then explicit execution order.
 // Within rule instances it orders by rule priority, then declaration sequence. Accepted purchases
 // follow both, ordered by purchase priority then sequence. Simulate, history
-// replay, and the financial independence branch share this order so one edit
+// application, and the financial independence branch share this order so one edit
 // changes all three.
 func sortOccurrences(occurrences []DatedTransactionOccurrence) {
 	sort.SliceStable(occurrences, func(i, j int) bool {

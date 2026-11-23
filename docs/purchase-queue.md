@@ -19,7 +19,7 @@ Amounts cannot reference purchase IDs. This prevents
 established payments from depending on optional purchases.
 
 The earliest date sets the first eligible buy day.
-Planned purchases never replay in history or execute in the main projection.
+Planned purchases never apply in history or execute in the main projection.
 A purchase remains hypothetical until the owner removes it. The evaluation never
 places orders or writes generated transactions to the database.
 
@@ -88,7 +88,7 @@ Purchase candidate dates stay inside the evaluation branch. The frontend timelin
 projection schedule, not a guarantee or a range of purchase dates. Unfunded items
 have no invented date. A stale or failed forecast shows no current purchase date.
 
-Financial-independence branches do not replay or schedule planned purchases.
+Financial-independence branches do not apply or schedule planned purchases.
 
 Protection ends at the selected horizon. A longer horizon can defer a purchase
 that fits under a shorter one. The scheduler is deliberately greedy and uses

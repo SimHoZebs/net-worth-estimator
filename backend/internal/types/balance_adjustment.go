@@ -1,6 +1,6 @@
 package types
 
-// BalanceAdjustment is observation evidence from historical replay, not income
+// BalanceAdjustment is observation evidence from recorded-history application, not income
 // or spending. It retains the exact instant even for same-day observations.
 type BalanceAdjustment struct {
 	AccountID       string  `json:"accountId"`

@@ -266,7 +266,7 @@ type Database interface {
 	// source owner may grant; callers must pass the authenticated owner's
 	// own user ID. A grant for an audience with an active exclusion is
 	// rejected until the exclusion is removed. requestID is a
-	// client-generated UUID: a retry replays the recorded grant without
+	// client-generated UUID: a retry returns the recorded grant without
 	// re-executing, while a key reused for a different action or target
 	// fails with ErrSharingConflict. Failed attempts never consume the
 	// key. Every committed grant appends one sharing_audit row carrying
@@ -274,7 +274,7 @@ type Database interface {
 	GrantSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) (SharingGrant, error)
 	// RevokeSharedTransaction deletes one explicit grant. Subsequent reads deny
 	// access unless another independent valid grant survives. requestID
-	// carries the grant idempotency contract: a retry replays the recorded
+	// carries the grant idempotency contract: a retry returns the recorded
 	// revocation instead of reporting the now-missing grant.
 	RevokeSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) error
 	// ExcludeSharedTransaction records the owner's explicit exclusion of one
@@ -286,7 +286,7 @@ type Database interface {
 	// grant idempotency contract.
 	ExcludeSharedTransaction(ownerID, transactionID, audienceType, audienceID, requestID string) (SharingGrant, error)
 	// RemoveSharedExclusion deletes one explicit exclusion. requestID
-	// carries the grant idempotency contract: a retry replays the recorded
+	// carries the grant idempotency contract: a retry returns the recorded
 	// removal.
 	RemoveSharedExclusion(ownerID, transactionID, audienceType, audienceID, requestID string) error
 	// ListSharingGrants returns the owner's explicit grants and exclusions.
@@ -326,7 +326,7 @@ type Database interface {
 	// transaction. Copies are idempotent per source-plus-recipient triple:
 	// repeat accepts return the existing recipient row, with its edits
 	// intact, instead of minting duplicates. requestID is a
-	// client-generated UUID: retries with the same key replay the recorded
+	// client-generated UUID: retries with the same key return the recorded
 	// copy, while a key reused for a different action or target fails with
 	// ErrSharingConflict. A source revision landing mid-accept fails with
 	// ErrSharingConflict and rolls the copy back instead of recording a
@@ -352,7 +352,7 @@ type Database interface {
 	// live authorization and source state and records the outcome on the
 	// link row. It never writes the recipient's copy: recipient edits
 	// survive refresh, revocation, and source deletion alike. requestID is
-	// a client-generated UUID: a retry replays the recorded outcome, and
+	// a client-generated UUID: a retry returns the recorded outcome, and
 	// each committed refresh appends one link-refreshed audit row carrying
 	// the link, the outcome status, and the request key. See
 	// SharingLinkRefresh for the status contract.

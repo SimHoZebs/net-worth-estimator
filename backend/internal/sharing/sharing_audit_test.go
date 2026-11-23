@@ -1,8 +1,8 @@
 package sharing_test
 
 // Social-operation idempotency over HTTP (FND-05): mutating share routes
-// require a client request ID, retries replay byte-for-byte, and key reuse
-// across actions reports 409 without session discovery.
+// require a client request ID, retries return byte-identical outcomes, and key
+// reuse across actions reports 409 without session discovery.
 
 import (
 	"encoding/json"
@@ -57,8 +57,8 @@ func grantBodyBadKey(transactionID, audienceType, audienceID string) string {
 	return string(out)
 }
 
-// Grant and accept retries replay byte-identical bodies.
-func TestSharingHTTPReplayIdentical(t *testing.T) {
+// Grant and accept retries return byte-identical bodies.
+func TestSharingHTTPRetryIdentical(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
@@ -72,7 +72,7 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 	}
 	second := do(t, h, "POST", "/v1/shared/grants", "alice", body)
 	if second.Code != http.StatusCreated || second.Body.String() != first.Body.String() {
-		t.Fatalf("grant replay = %d (%s), want byte-identical 201", second.Code, second.Body.String())
+		t.Fatalf("grant retry = %d (%s), want byte-identical 201", second.Code, second.Body.String())
 	}
 	acceptKey := testRequestKey(t)
 	accept := copyBodyKey(resourceOf(alice), sharedTransactionID, acceptKey)
@@ -82,7 +82,7 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 	}
 	fourth := do(t, h, "POST", "/v1/shared/copies", "bob", accept)
 	if fourth.Code != http.StatusCreated || fourth.Body.String() != third.Body.String() {
-		t.Fatalf("accept replay = %d (%s), want byte-identical 201", fourth.Code, fourth.Body.String())
+		t.Fatalf("accept retry = %d (%s), want byte-identical 201", fourth.Code, fourth.Body.String())
 	}
 }
 
@@ -117,9 +117,9 @@ func TestSharingHTTPKeyReuseConflicts(t *testing.T) {
 	}
 }
 
-// Read-only mode rejects mutating share requests before any replay:
+// Read-only mode rejects mutating share requests before any retry:
 // even a retry of a committed key reports 403.
-func TestSharingHTTPReadOnlyRejectsReplay(t *testing.T) {
+func TestSharingHTTPReadOnlyRejectsRetry(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
 	bob := mustID(t, db, "bob")
@@ -139,7 +139,7 @@ func TestSharingHTTPReadOnlyRejectsReplay(t *testing.T) {
 		{"POST", "/v1/shared/copies", copyBodyKey(resourceOf(alice), sharedTransactionID, testRequestKey(t))},
 	} {
 		if w := do(t, ro, route.method, route.target, "alice", route.body); w.Code != http.StatusForbidden {
-			t.Fatalf("read-only replay %s %s = %d, want 403", route.method, route.target, w.Code)
+			t.Fatalf("read-only retry %s %s = %d, want 403", route.method, route.target, w.Code)
 		}
 	}
 }

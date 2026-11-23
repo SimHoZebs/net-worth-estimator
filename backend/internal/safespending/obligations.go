@@ -42,7 +42,7 @@ func newAmounts(model *types.FinancialModel, balances map[string]float64) *amoun
 // referenceContext reuses the context allocated in newAmounts but refreshes
 // both ID sets from the live evidence maps. Observed balances are dropped when
 // an unresolved movement invalidates them and recorded facts accumulate during
-// replay, so a context frozen at construction would validate against stale IDs.
+// history application, so a context frozen at construction would validate against stale IDs.
 func (a *amounts) referenceContext() *domain.AmountReferenceContext {
 	clear(a.refs.AccountIDs)
 	clear(a.refs.TransactionIDs)
@@ -311,7 +311,7 @@ func flagPossibleHoldOverlap(st *cutState) {
 }
 
 func (a *amounts) holdAmount(tx types.Transaction) *float64 {
-	// A hold has no replayed settlement amount. The end-of-cut provider
+	// A hold has no applied settlement amount. The end-of-cut provider
 	// context could contain a fact posted after the authorization.
 	for _, input := range tx.Amount.Inputs {
 		if input.Source != "literal" {

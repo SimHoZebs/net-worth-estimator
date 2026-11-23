@@ -113,7 +113,7 @@ func upgrade(path string, dryRun bool) (counts, error) {
 	}
 
 	// Phase one is read-only across every user, including provider
-	// lookups: a replay failure skips that user, and a lookup failure
+	// lookups: a history-application failure skips that user, and a lookup failure
 	// aborts before any deletion anywhere.
 	type pending struct {
 		userID string
@@ -193,7 +193,7 @@ func upgrade(path string, dryRun bool) (counts, error) {
 }
 
 // deletableKeys returns the forward sync-owned observations with an exact
-// zero delta. An error reports a replay failure: the caller skips that user
+// zero delta. An error reports a history-application failure: the caller skips that user
 // without deleting anything. First observations are always kept: they
 // establish coverage even when the opening balance already matches.
 func deletableKeys(model *types.FinancialModel) ([]deletable, error) {

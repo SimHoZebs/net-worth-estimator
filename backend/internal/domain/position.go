@@ -36,7 +36,7 @@ func ResolveCurrentPosition(model *types.FinancialModel, asOfDate string, overri
 			AccountID:        account.ID,
 			Balance:          roundCurrency(position.state.Balances[account.ID]),
 		}
-		if observed, ok := position.replay.latestObserved[account.ID]; ok {
+		if observed, ok := position.appliedHistory.latestObserved[account.ID]; ok {
 			observedBalance := observed.Balance
 			observedInstant := CheckpointInstant(observed)
 			row.ObservedBalance = &observedBalance

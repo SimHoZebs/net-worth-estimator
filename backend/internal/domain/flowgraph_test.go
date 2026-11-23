@@ -105,7 +105,7 @@ func TestFlowGraphSeparatesActualProjectedAndCountsTransferOnce(t *testing.T) {
 		t.Errorf("actual transfer = %v, want 400 counted once", transfer.Amount)
 	}
 	rent := findFlowEdge(t, graph, "checking", types.FlowNodeIDExternal, types.FlowKindOutflow, types.FlowMovementProjected)
-	// The January occurrence replays as history (start-day cut), so the
+	// The January occurrence is applied as recorded history (start-day cut), so the
 	// window holds February through December: 11 projected records.
 	if rent.Amount != 11*800 {
 		t.Errorf("projected outflow = %v, want %v", rent.Amount, 11*800)
@@ -223,7 +223,7 @@ func TestFlowGraphRejectsBadWindow(t *testing.T) {
 // settledHistoryTestModel mirrors the bank history that caught the empty
 // graph live: hundreds of settled rows across seven months, every one of
 // them dated before the projection start, so the projection emits no
-// transaction events at all and only the settled replay can draw actual
+// transaction events at all and only settled history application can draw actual
 // edges. Amounts are literal bank magnitudes; directions follow the
 // source/destination route.
 func settledHistoryTestModel() *types.FinancialModel {

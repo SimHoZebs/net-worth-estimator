@@ -21,7 +21,7 @@ not a runtime compatibility path. New empty databases need no upgrade.
    answers and IDs, ready judgments, and `/readyz` returning `ok`.
 
 The generic learner starts cold. Old immutable income feedback remains in the
-application audit but is not replayed as a fabricated new-contract answer.
+application audit but is not reused as a fabricated new-contract answer.
 New answers and corrections train the shared deployment learner. Roll back by
 stopping writers, restoring the verified application backup, pointing at the
 archived learner, and starting the previous image. Never roll back over newer

@@ -1391,7 +1391,7 @@ func (s *handler) readStochastic(model *types.FinancialModel, settings *types.Pr
 		return nil, false, err
 	}
 	// A date counts as historical when history already covers it: sample
-	// accumulation marks the first row seen per date, and history replays
+	// accumulation marks the first row seen per date, and recorded history is applied
 	// before projected dates simulate.
 	historical := map[string]bool{}
 	for _, row := range history {

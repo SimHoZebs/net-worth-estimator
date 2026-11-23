@@ -4,7 +4,7 @@ Status: backlog
 
 ## Goal
 
-Stop re-expanding account rules and replaying monthly branches inside every scenario for the seeded `Financial independence` goal (`public/configs/behavior/financial-independence.csv:2`).
+Stop re-expanding account rules and recomputing monthly branches inside every scenario for the seeded `Financial independence` goal (`public/configs/behavior/financial-independence.csv:2`).
 
 ## Scope
 
