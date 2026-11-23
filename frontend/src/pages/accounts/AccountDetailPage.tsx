@@ -84,11 +84,20 @@ export function AccountDetailView({
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const locked = readOnly || account.readOnly || isGroupedDisplay(account);
+	// A synced account's name is owner config, so the owner may rename it.
+	// Grouped loan displays stay locked, as does a shared workspace's view.
+	const nameEditable =
+		account.readOnly && !isGroupedDisplay(account) && !readOnly;
 	const adjustments = useAccountAdjustments(
 		account.id,
 		!isGroupedDisplay(account),
 	);
-	const edit = useAccountEdit(account, locked, adjustments.data ?? []);
+	const edit = useAccountEdit(
+		account,
+		locked,
+		adjustments.data ?? [],
+		nameEditable,
+	);
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
 		if (edit.saving) return;
@@ -214,15 +223,19 @@ export function AccountDetailView({
 						id={`${edit.formId}-name`}
 						aria-label="Account name"
 						name="name"
+						type="text"
+						inputMode="text"
+						enterKeyHint="done"
+						autoComplete="off"
 						required
 						maxLength={100}
 						value={edit.draft.name}
 						onChange={(event) =>
 							edit.update({ name: event.target.value }, "name")
 						}
-						readOnly={locked || edit.saving}
+						readOnly={(locked && !nameEditable) || edit.saving}
 						form={edit.formId}
-						className="min-w-0 flex-1 text-lg font-semibold"
+						className="min-w-0 flex-1 text-lg font-semibold max-sm:min-h-11"
 					/>
 				</div>
 				<form

@@ -52,10 +52,40 @@ function parseDay(raw: string): number | null {
 	return value !== null && Number.isInteger(value) ? value : null;
 }
 
+/**
+ * Fields a synced account keeps locked. Kind, display basis and a tracked
+ * card's closing day are owner config. The name joins them only where the
+ * owner may rename the account, never for grouped loans or shared workspaces.
+ */
+export function isSyncedFieldLocked(
+	field: AccountEditField,
+	nameEditable: boolean,
+): boolean {
+	if (field === "kind" || field === "display" || field === "closingDay")
+		return false;
+	return !(nameEditable && field === "name");
+}
+
+/**
+ * The name a synced save writes and whether it differs from the stored name.
+ * A blank edit reports as changed so submit rejects it with a validation
+ * message instead of silently discarding it.
+ */
+export function syncedNameDraft(
+	nameEditable: boolean,
+	draftName: string,
+	storedName: string,
+): { name: string; changed: boolean } {
+	if (!nameEditable) return { name: storedName, changed: false };
+	const name = draftName.trim();
+	return { name, changed: name !== storedName };
+}
+
 export function useAccountEdit(
 	account: Account,
 	readOnly: boolean,
 	adjustments: BalanceAdjustment[],
+	nameEditable = false,
 ) {
 	// Own the terms read so the card rows prefill from the authoritative row.
 	usePaymentTerms();
@@ -114,13 +144,8 @@ export function useAccountEdit(
 		// user-configured label, and changing it is the supported way to
 		// update the type there. Display basis and a tracked card's closing
 		// day are owner config too, so they stay editable wherever kind does.
-		if (
-			saving ||
-			(readOnly &&
-				field !== "kind" &&
-				field !== "display" &&
-				field !== "closingDay")
-		)
+		// The name joins them only on accounts the owner may rename.
+		if (saving || (readOnly && isSyncedFieldLocked(field, nameEditable)))
 			return;
 		edit.update(patch);
 		setActiveField(field);
@@ -153,10 +178,15 @@ export function useAccountEdit(
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving) return;
-		// Synced accounts lock bank-owned facts. Kind, display basis and a
-		// tracked card's closing day are owner config and ride along on save;
-		// the current bounds stay verbatim.
+		// Synced accounts lock bank-owned facts. Kind, display basis, a
+		// tracked card's closing day and an owner-editable name are owner
+		// config and ride along on save; the current bounds stay verbatim.
 		if (readOnly) {
+			const syncedName = syncedNameDraft(
+				nameEditable,
+				edit.value.name,
+				account.name,
+			);
 			const kindChanged = edit.value.kind !== account.kind;
 			const basisChanged =
 				(edit.value.displayBasis ?? "available") !==
@@ -164,8 +194,17 @@ export function useAccountEdit(
 			const closingChanged =
 				(edit.value.statementClosingDay ?? "") !==
 				String(account.statementClosingDay || DEFAULT_STATEMENT_CLOSING_DAY);
-			if (!kindChanged && !basisChanged && !closingChanged) {
+			if (
+				!kindChanged &&
+				!basisChanged &&
+				!closingChanged &&
+				!syncedName.changed
+			) {
 				reset();
+				return;
+			}
+			if (syncedName.changed && !syncedName.name) {
+				setError("Give the account a name.");
 				return;
 			}
 			const closingDay = closingChanged
@@ -200,7 +239,7 @@ export function useAccountEdit(
 			const ok = await persistSyncedAccountKind(
 				{
 					id: account.id,
-					name: account.name,
+					name: syncedName.name,
 					enabled: account.enabled,
 					color: account.color,
 				},
@@ -214,7 +253,7 @@ export function useAccountEdit(
 				setConfirmCancel(false);
 			} else {
 				setError(
-					"The account type could not be saved. Review the workspace notice and try again.",
+					"The account could not be saved. Review the workspace notice and try again.",
 				);
 			}
 			return;

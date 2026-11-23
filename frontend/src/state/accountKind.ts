@@ -67,7 +67,7 @@ export async function persistSyncedAccountKind(
 				...(color === undefined ? {} : { color }),
 			}),
 		refresh: refreshAccounts,
-		failureMessage: "The account type could not be saved.",
+		failureMessage: "The account could not be saved.",
 	});
 }
 
