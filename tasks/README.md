@@ -33,8 +33,6 @@ unbenchmarked invalidation rewrite.
 
 - Branding: `BRD-01.md`, `BRD-02.md`
 - Integrations: `INT-02.md`, `INT-04.md`
-- Recurring & financial health: `FIN-04.md`
-- Friends & shared expenses: `SOC-03.md`, `SOC-04C.md`
 - Groups & sharing: `GRP-01.md`
 - Quality & delivery: `QA-02.md`
 - Architecture validation (proposed, not in Notion): `PERF-01.md`

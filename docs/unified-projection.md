@@ -77,5 +77,3 @@ Evaluation Reader runs synchronously through the shared evaluation runtime (no w
 ## 6. Unified Read API
 
 ProjectionReader serves deterministic reads from stored rows plus live history. It serves seeded canonical stochastic reads from stored statistics plus live history. Non-canonical requests (request model, overrides, as-of cut, different settings, run count, or seed) compute directly through the existing kernels. Position plus balances keep their live replay and never touch slices. Route shapes stay unchanged; the reader owns every projection response behind them.
-
-`GET /v1/evaluations/status` is the passive status read (`private, no-store`). It reports `idle|queued|succeeded` derived from the existing projection manifest (`revision`, `published_revision`, `dirty_from`, fingerprinted `det_evaluations_json`, `projectionAvailable`); it never starts work.

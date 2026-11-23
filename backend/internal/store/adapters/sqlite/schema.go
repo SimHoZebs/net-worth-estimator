@@ -632,8 +632,65 @@ func schemaStatements() []string {
 			PRIMARY KEY(user_id, friend_user_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS friendships_account ON friendships(friend_user_id, user_id)`,
+		// Split and settlement tables are inert. Their DDL stays so fresh and
+		// existing databases keep the same shape, but no store method reads
+		// or writes them. The capability is gone from the Store contract.
+		`CREATE TABLE IF NOT EXISTS splits (
+			split_id TEXT NOT NULL,
+			version INTEGER NOT NULL CHECK (version >= 1),
+			source_owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			source_transaction_id TEXT NOT NULL,
+			source_revision TEXT NOT NULL DEFAULT '',
+			initiator_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			currency TEXT NOT NULL,
+			total_minor INTEGER NOT NULL CHECK (total_minor >= 0),
+			status TEXT NOT NULL CHECK (status IN ('proposed', 'accepted')),
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			PRIMARY KEY (split_id, version)
+		)`,
+		`CREATE INDEX IF NOT EXISTS splits_source ON splits(source_owner_id, source_transaction_id)`,
+		`CREATE TABLE IF NOT EXISTS split_allocations (
+			split_id TEXT NOT NULL,
+			version INTEGER NOT NULL,
+			position INTEGER NOT NULL,
+			participant_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+			accepted INTEGER NOT NULL DEFAULT 0 CHECK (accepted IN (0, 1)),
+			accepted_at INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (split_id, version, participant_id),
+			FOREIGN KEY (split_id, version) REFERENCES splits(split_id, version) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS split_allocations_participant ON split_allocations(participant_id)`,
+		`CREATE TABLE IF NOT EXISTS split_settlements (
+			settlement_id TEXT PRIMARY KEY,
+			split_id TEXT NOT NULL,
+			participant_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+			-- The linked owner carries a bare reference (no ON DELETE
+			-- action): a cascade to NULL would break the paired-NULL
+			-- CHECK below, and history must survive user deletes
+			-- rather than half-null the pair. Nothing deletes users
+			-- today; a delete of a referenced user fails closed.
+			linked_owner_id TEXT REFERENCES users(id),
+			linked_transaction_id TEXT,
+			actor_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			request_id TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			CHECK ((linked_owner_id IS NULL) = (linked_transaction_id IS NULL))
+		)`,
+		`CREATE INDEX IF NOT EXISTS split_settlements_split ON split_settlements(split_id, created_at, settlement_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS split_settlements_link ON split_settlements(linked_owner_id, linked_transaction_id)`,
+		`CREATE TABLE IF NOT EXISTS split_settlement_requests (
+			actor_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			request_id TEXT NOT NULL,
+			settlement_id TEXT NOT NULL REFERENCES split_settlements(settlement_id) ON DELETE CASCADE,
+			input_hash TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			PRIMARY KEY (actor_id, request_id)
+		)`,
 	}
-	return append(append(append(append(append(statements, sharingSchemaStatements()...), inboxSchemaStatements()...), sharingRequestsSchemaStatements()...), splitSchemaStatements()...), settlementSchemaStatements()...)
+	return append(append(append(statements, sharingSchemaStatements()...), inboxSchemaStatements()...), sharingRequestsSchemaStatements()...)
 }
 
 // seedAmountPresets is the factory default recipe list. It runs once on a
@@ -779,10 +836,6 @@ var requiredSchemaColumns = map[string]string{
 	"sharing_visibility":              "owner_user_id, transaction_id, group_id, policy_version, updated_at",
 	"sharing_audit":                   "id, owner_user_id, actor_user_id, kind, transaction_id, audience_type, audience_id, group_id, detail_json, created_at",
 	"sharing_requests":                "actor_user_id, request_id, action, owner_user_id, transaction_id, audience_type, audience_id, link_id, outcome_json, created_at",
-	"splits":                          "split_id, version, source_owner_id, source_transaction_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at",
-	"split_allocations":               "split_id, version, position, participant_id, amount_minor, accepted, accepted_at",
-	"split_settlements":               "settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_transaction_id, actor_id, request_id, created_at",
-	"split_settlement_requests":       "actor_id, request_id, settlement_id, input_hash, created_at",
 	"friendships":                     "user_id, friend_user_id, display_name, created_at",
 	"accounts":                        "user_id, id, position, name, kind, min_balance, max_balance, color, display_basis, statement_closing_day, enabled",
 	"account_displays":                "user_id, account_id, display_json",
@@ -877,10 +930,6 @@ func expectedSchemaTables() []string {
 		"sharing_visibility",
 		"sharing_audit",
 		"sharing_requests",
-		"splits",
-		"split_allocations",
-		"split_settlements",
-		"split_settlement_requests",
 		"friendships",
 		"accounts",
 		"checkpoints",

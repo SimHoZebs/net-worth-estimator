@@ -7,17 +7,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// advSplitInput builds a two-participant split over one real shared source
-// transaction. Splits authorize every participant against the live source, so
-// the source must exist and be shared; a random ID fails closed upstream.
-func advSplitInput(world *advWorld, sourceTransactionID string) store.SplitInput {
-	return store.SplitInput{
-		SourceOwnerID: world.owner, SourceTransactionID: sourceTransactionID,
-		InitiatorID: world.owner, Currency: "USD",
-		TotalMinor: 100, ParticipantIDs: []string{world.owner, world.second},
-	}
-}
-
 // advSeedBankPending inserts one enabled pending bank row through the real
 // sync apply path and returns the store-allocated row ID.
 func advSeedBankPending(t *testing.T, scoped store.Store, name, amount string, day int64, key string) string {
@@ -60,9 +49,4 @@ func advVoid(t *testing.T, scoped store.Store, rowID string) {
 	if summary.PendingDeleted != 1 {
 		t.Fatalf("void summary = %+v, want the single pending row flipped", summary)
 	}
-}
-
-// settlementInput records a one-minor-unit payoff by one participant.
-func settlementInput(splitID, participant string) store.SettlementInput {
-	return store.SettlementInput{SplitID: splitID, ParticipantID: participant, AmountMinor: 1}
 }

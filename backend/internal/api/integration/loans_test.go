@@ -95,43 +95,6 @@ func TestLoanInvalidCreationWritesNothing(t *testing.T) {
 	}
 }
 
-func TestLoanDeleteRemovesOwnedRows(t *testing.T) {
-	st := openAPIStore(t)
-	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {
-		t.Fatal(err)
-	}
-	h := New(st, Config{})
-	created := decodePlanEntrySave[types.Account](t, doRowRequest(t, h, http.MethodPost, "/v1/loans", loanBody))
-	deleted := decodePlanEntrySave[string](t, doRowRequest(t, h, http.MethodDelete, "/v1/loans/"+created.Result.ID, ""))
-	if !deleted.Saved {
-		t.Fatalf("delete = %+v", deleted)
-	}
-	model := assertSavedModelIdentity(t, st, deleted.Revision)
-	if len(model.Accounts) != 1 || len(model.Schedules) != 0 || len(model.Checkpoints) != 0 {
-		t.Fatalf("owned rows remain: %+v", model)
-	}
-}
-
-func TestLoanDeleteRejectsOrdinaryAccount(t *testing.T) {
-	st := openAPIStore(t)
-	ordinary, err := st.CreateAccount(types.Account{Name: "Checking", Kind: "cash", Enabled: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := New(st, Config{})
-	res := doRowRequest(t, h, http.MethodDelete, "/v1/loans/"+ordinary.ID, "")
-	if res.Code != http.StatusNotFound {
-		t.Fatalf("delete ordinary via loans status = %d, want 404: %s", res.Code, res.Body.String())
-	}
-	model, err := st.LoadModel()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if model == nil || len(model.Accounts) != 1 {
-		t.Fatalf("ordinary account must survive: %+v", model)
-	}
-}
-
 func TestLinkedLoanNameEditPreservesExactRuleAmounts(t *testing.T) {
 	st := openAPIStore(t)
 	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "cash", Enabled: true}); err != nil {

@@ -107,18 +107,6 @@ func TestAnalysisFeedbackHTTPContract(t *testing.T) {
 	if res := request(handler, "POST", "/v1/analysis-findings/missing/feedback", string(body)); res.Code != 404 {
 		t.Fatalf("missing=%d", res.Code)
 	}
-	res = request(handler, "GET", "/v1/analysis-feedback?findingId="+finding.ID+"&limit=1", "")
-	var history struct {
-		Feedback   []types.AnalysisFeedback `json:"feedback"`
-		NextCursor string                   `json:"nextCursor"`
-	}
-	if res.Code != 200 || res.Header().Get("Cache-Control") != "private, no-store" || json.Unmarshal(res.Body.Bytes(), &history) != nil || len(history.Feedback) != 1 || history.NextCursor == "" {
-		t.Fatalf("history=%d %s", res.Code, res.Body.String())
-	}
-	res = request(handler, "GET", "/v1/analysis-feedback?cursor="+history.NextCursor, "")
-	if res.Code != 200 || json.Unmarshal(res.Body.Bytes(), &history) != nil || len(history.Feedback) != 1 || history.Feedback[0].Request.Action != "set-duration" {
-		t.Fatalf("next=%d %s", res.Code, res.Body.String())
-	}
 	after, _ := scoped.LoadModel()
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("feedback changed financial model")

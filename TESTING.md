@@ -125,7 +125,7 @@ The release bar for the cross-feature journeys (QA-03) lives in [release gates](
 CGO_ENABLED=0 go -C backend test ./internal/api/integration/ -run 'TestQA03' -count=3
 ```
 
-Completeness journeys join them: one fixed synthetic ledger (`backend/testdata/integration/v1/ledger.json`, hand-computed numbers in its extras) proved present on every surface — diagram, list, recurring proposal, receipts, sharing, inbox, splits, health checks — with bank re-syncs adding nothing:
+Completeness journeys join them: one fixed synthetic ledger (`backend/testdata/integration/v1/ledger.json`, hand-computed numbers in its extras) proved present on every surface — diagram, list, recurring proposal, receipts, sharing, inbox — with bank re-syncs adding nothing:
 
 ```bash
 CGO_ENABLED=0 go -C backend test ./internal/integrationledger/ -count=3
@@ -213,10 +213,9 @@ CGO_ENABLED=0 go test ./internal/store/... -run 'TestStoreConformance|TestPurgeS
 CGO_ENABLED=0 go build ./...
 ```
 
-Race-detector suites for concurrent settlement and sharing retries:
+Race-detector suite for sharing retries:
 
 ```bash
-go -C backend test -race ./internal/store/adapters/sqlite/ -run 'TestSettlementConcurrent' -count=1
 go -C backend test -race ./internal/store/adapters/sqlite/ ./internal/sharing/ -run 'SharingDoubleAccept|SharingConcurrent' -count=1
 ```
 

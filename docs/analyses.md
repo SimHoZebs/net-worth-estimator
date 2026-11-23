@@ -353,10 +353,9 @@ match that lists all candidates ranked best-first for review.
   Writes require permission and a writable server. An exact request-ID replay
   returns the original event. Reuse with different data, or a changed run/review,
   returns 409. Yes/No also reject changed source inputs. Invalid answers return 422.
-  Request IDs use canonical lowercase UUID spelling.
-- `GET /v1/analysis-feedback` returns private, uncached, paginated events. It
-  accepts `findingId`, `cursor`, and `limit` (at most 100). No raw bank snapshots
-  or feedback leave the application for external training.
+  Request IDs use canonical lowercase UUID spelling. Feedback events stay in
+  the append-only store as private evidence; there is no read endpoint. No raw
+  bank snapshots or feedback leave the application for external training.
 
 Configuration's **Analysis** tab lists findings with reasons and uncertainty. Transaction
 lists batch-load flags. Transaction details ask only whether the payment is BNPL

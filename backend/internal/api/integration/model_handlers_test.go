@@ -423,41 +423,6 @@ func TestTransactionClaimOnPendingSeedPersists(t *testing.T) {
 	}
 }
 
-func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
-	database := openAPIStore(t)
-	seedBaseline(t, database)
-	handler := New(database, Config{})
-
-	deleted := httptest.NewRecorder()
-	handler.ServeHTTP(deleted, httptest.NewRequest(http.MethodDelete, "/v1/accounts/checking", nil))
-	if deleted.Code != http.StatusOK {
-		t.Fatalf("DELETE status = %d, body %s", deleted.Code, deleted.Body.String())
-	}
-	var payload struct {
-		Issues []types.ModelValidationIssue `json:"issues"`
-		Saved  bool                         `json:"saved"`
-	}
-	if err := json.Unmarshal(deleted.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode DELETE response: %v", err)
-	}
-	if payload.Saved || len(payload.Issues) == 0 {
-		t.Fatalf("dangling delete response = %+v", payload)
-	}
-	loaded, err := database.LoadModel()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	found := false
-	for _, account := range loaded.Accounts {
-		if account.ID == "checking" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatal("referenced account was deleted")
-	}
-}
-
 func TestDeterministicResponseIncludesTransactionEvents(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)

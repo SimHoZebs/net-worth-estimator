@@ -9,19 +9,53 @@
 package sqlite
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+// sharingKey mints a social-operation request key for sharing tests.
+func sharingKey(t *testing.T) string {
+	t.Helper()
+	id, err := uuid.NewV7()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id.String()
+}
+
+// sharingAudit reads committed audit rows directly from the table. The
+// store read path and HTTP audit route are gone; audit writes still land,
+// and this helper verifies them without reintroducing a public reader.
 func sharingAudit(t *testing.T, d *Database, owner, transaction string) []store.SharingAuditEvent {
 	t.Helper()
-	events, err := d.ListSharingAudit(owner, transaction)
+	rows, err := d.db.Query(`SELECT id, actor_user_id, kind, owner_user_id, transaction_id, audience_type, audience_id, group_id, detail_json, created_at
+		FROM sharing_audit WHERE owner_user_id = ? AND transaction_id = ? ORDER BY id`, owner, transaction)
 	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	events := []store.SharingAuditEvent{}
+	for rows.Next() {
+		var event store.SharingAuditEvent
+		var groupID, detail string
+		if err := rows.Scan(&event.Seq, &event.ActorUserID, &event.Action, &event.OwnerUserID, &event.TransactionID,
+			&event.Audience, &event.AudienceID, &groupID, &detail, &event.CreatedAt); err != nil {
+			t.Fatal(err)
+		}
+		var decoded shareAuditDetail
+		if err := json.Unmarshal([]byte(detail), &decoded); err == nil {
+			event.LinkID, event.Status, event.RequestID = decoded.Link, decoded.Status, decoded.RequestID
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
 	return events

@@ -38,7 +38,6 @@ export async function accountRequest(auth: Auth, config: Settings, request: Requ
     owner: "waypoint",
     name: user.username || user.id,
     displayName: user.name,
-    avatar: user.image || "",
   });
   if (request.method === "GET") return Response.json(profile());
   if (!identity.sid)
@@ -68,14 +67,12 @@ export async function accountRequest(auth: Auth, config: Settings, request: Requ
       headers,
       body: {
         ...(body.displayName === undefined ? {} : { name: body.displayName }),
-        ...(body.avatar === undefined ? {} : { image: body.avatar }),
       },
     });
     const updated = await ctx.internalAdapter.findUserById(user.id);
     return Response.json({
       ...profile(),
       displayName: updated?.name,
-      avatar: updated?.image || "",
     });
   } catch (error) {
     // Better Auth validation is safe to display. Internal errors remain private.

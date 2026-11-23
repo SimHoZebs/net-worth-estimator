@@ -12,7 +12,6 @@ import {
 	toDisplayAccounts,
 	toDisplayTransaction,
 } from "./accountDisplay.ts";
-import { toAccountCards } from "./accountCards.ts";
 import { accountTrendRows } from "./chart.ts";
 import { projectionFixture, transactionFixture } from "../mocks/projection.ts";
 import { accountTransactions } from "./accountActivity.ts";
@@ -98,9 +97,6 @@ describe("visible accounts", () => {
 		expect(grouped[1]).toBe(raw[2]);
 		expect(raw[0]!.balance).toBe(-1000);
 		expect(componentIds(grouped[0]!)).toEqual(["p", "i"]);
-		expect(
-			toAccountCards({ accounts: grouped, projection: null })[0]?.balance,
-		).toBe(1020);
 	});
 	it("keeps different observation times separate", () => {
 		const raw = fixture();

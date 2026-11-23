@@ -13,8 +13,7 @@ import (
 
 // TestSharingMigratedDatabaseFlows opens a migrated pre-sharing database
 // (setup validates it) and exercises the grant, copy with link identity,
-// inbox, policy, visibility, audit, idempotency-key, split, allocation,
-// settlement, and settlement-request tracks end to end.
+// inbox, policy, visibility, audit, and idempotency-key tracks end to end.
 func TestSharingMigratedDatabaseFlows(t *testing.T) {
 	path := os.Getenv("WAYPOINT_MIGRATED_DB")
 	if path == "" {
@@ -99,45 +98,12 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 		t.Fatal("shared list is empty")
 	}
 
-	events, err := d.ListSharingAudit(alice, transaction.ID)
-	if err != nil {
-		t.Fatalf("audit: %v", err)
-	}
+	events := sharingAudit(t, d, alice, transaction.ID)
 	seen := map[string]bool{}
 	for _, event := range events {
 		seen[event.Action] = true
 	}
 	if !seen["grant"] || !seen[store.SharingAuditCopyAccepted] {
 		t.Fatalf("audit actions = %v, want grant and copy-accepted", seen)
-	}
-
-	split := createSplit(t, d, splitInput(alice, transaction.ID, alice, alice, bob))
-	if split.Version != 1 || split.Status != store.SplitStatusProposed {
-		t.Fatalf("split = v%d %q, want v1 proposed", split.Version, split.Status)
-	}
-	if len(split.Allocations) != 2 {
-		t.Fatalf("allocations = %d, want 2", len(split.Allocations))
-	}
-	if after, err := d.AcceptSplit(alice, split.ID, 1, sharingKey(t)); err != nil {
-		t.Fatalf("split accept alice: %v", err)
-	} else if after.Status != store.SplitStatusProposed {
-		t.Fatalf("split status after one accept = %q, want proposed", after.Status)
-	}
-	if after, err := d.AcceptSplit(bob, split.ID, 1, sharingKey(t)); err != nil {
-		t.Fatalf("split accept bob: %v", err)
-	} else if after.Status != store.SplitStatusAccepted {
-		t.Fatalf("split status after every accept = %q, want accepted", after.Status)
-	}
-
-	recorded, err := d.RecordSettlement(alice, store.SettlementInput{SplitID: split.ID, ParticipantID: bob, AmountMinor: 100}, sharingKey(t))
-	if err != nil {
-		t.Fatalf("settlement: %v", err)
-	}
-	history, err := d.ListSettlements(alice, split.ID)
-	if err != nil {
-		t.Fatalf("settlement history: %v", err)
-	}
-	if len(history) != 1 || history[0].ID != recorded.ID {
-		t.Fatalf("settlement history = %+v, want the recorded settlement", history)
 	}
 }

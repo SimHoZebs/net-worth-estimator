@@ -23,4 +23,4 @@ lands; no APR field is to be added in the meantime.
   same claim/finding tables as other derived characteristics.
 
 Depends on: FND-01 (landed on branch), FIN-01 (landed on branch).
-Informs: FIN-03 high-interest check, FIN-04 presentation, FIN-05 explanation.
+Informs: FIN-03 high-interest check, FIN-05 explanation.

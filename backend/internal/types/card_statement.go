@@ -63,16 +63,6 @@ type StatementAllocation struct {
 	UpdatedAt     int64   `json:"updatedAt"`
 }
 
-// StatementAllocationEvent is one append-only audit entry for an allocation's
-// state changes. It carries identity, action, actor, and time, never evidence.
-type StatementAllocationEvent struct {
-	ID           int64  `json:"id"`
-	AllocationID string `json:"allocationId"`
-	Action       string `json:"action"`
-	Actor        string `json:"actor,omitempty"`
-	CreatedAt    int64  `json:"createdAt"`
-}
-
 // PaymentEvidence is one reason a posted payment is shown as a candidate for
 // a statement. It is advisory: the owner allocates explicitly, never by amount
 // alone.
@@ -103,14 +93,6 @@ type PaymentCandidate struct {
 type StatementPaymentSuggestion struct {
 	Read    StatementAllocationRead `json:"read"`
 	Payment PaymentCandidate        `json:"payment"`
-}
-
-// StatementPaymentSuggestionResult describes the current allocation state of
-// the canonical payment behind a suggestion list.
-type StatementPaymentSuggestionResult struct {
-	Status      string  `json:"status"` // "unallocated", "applied", or "dismissed"
-	StatementID string  `json:"statementId,omitempty"`
-	Amount      float64 `json:"amount,omitempty"`
 }
 
 // StatementAllocationRead pairs a derived statement with its allocations and

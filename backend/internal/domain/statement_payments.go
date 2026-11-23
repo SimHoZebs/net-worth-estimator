@@ -198,63 +198,6 @@ func ResolveCanonicalPaymentID(model *types.FinancialModel, links []types.Transf
 	return payment.ID
 }
 
-// StatementPaymentCandidates lists posted payments that could settle one
-// recorded statement. The result is advisory evidence only: a candidate is
-// never automatically claimed, and an amount match is never proof. Payments
-// posted before the recorded close are excluded.
-func StatementPaymentCandidates(model *types.FinancialModel, links []types.TransferLink, statement types.DerivedStatement, taken map[string]string) []types.PaymentCandidate {
-	candidates := []types.PaymentCandidate{}
-	if model == nil || statement.Balance == nil || len(statement.AccountID) == 0 {
-		return candidates
-	}
-	accounts := map[string]bool{statement.AccountID: true}
-	seen := map[string]bool{}
-	for _, tx := range model.Transactions {
-		payment := directPayment(model, tx, accounts)
-		if payment == nil {
-			continue
-		}
-		if candidate := paymentCandidate(statement, *payment, taken, *statement.Balance); candidate != nil {
-			candidates = append(candidates, *candidate)
-			seen[payment.ID] = true
-		}
-	}
-	// Confirmed transfer links can establish the same card identity from two
-	// synced legs that never carry both accounts on one row.
-	for _, link := range links {
-		first, firstOK := findModelTransaction(model, link.LegA)
-		second, secondOK := findModelTransaction(model, link.LegB)
-		if !firstOK || !secondOK {
-			continue
-		}
-		payment := linkedPayment(model, first, second, accounts)
-		if payment == nil || payment.CardAccountID != statement.AccountID || seen[payment.ID] {
-			continue
-		}
-		if candidate := paymentCandidate(statement, *payment, taken, *statement.Balance); candidate != nil {
-			candidates = append(candidates, *candidate)
-			seen[payment.ID] = true
-		}
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		a, b := candidates[i], candidates[j]
-		if (a.AllocatedToStatementID == nil) != (b.AllocatedToStatementID == nil) {
-			return a.AllocatedToStatementID == nil
-		}
-		if hasEvidence(a.Evidence, "amount-exact") != hasEvidence(b.Evidence, "amount-exact") {
-			return hasEvidence(a.Evidence, "amount-exact")
-		}
-		if abs(deref(a.DayGapToDue)) != abs(deref(b.DayGapToDue)) {
-			return abs(deref(a.DayGapToDue)) < abs(deref(b.DayGapToDue))
-		}
-		if a.PostedDate != b.PostedDate {
-			return a.PostedDate > b.PostedDate
-		}
-		return a.TransactionID < b.TransactionID
-	})
-	return candidates
-}
-
 // StatementPaymentSuggestions answers one payment's "which statement does
 // this settle" question in a single call. It resolves card identity from a
 // direct manual transfer or a confirmed transfer link, ranks every statement

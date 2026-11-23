@@ -146,23 +146,6 @@ func TestCardStatementsEndToEnd(t *testing.T) {
 		t.Fatalf("totals = %+v, want 0 allocated and 100.30 remaining", statement)
 	}
 
-	candidates := doRowRequest(t, handler, http.MethodGet, "/v1/card-statements/"+statement.Statement.ID+"/payment-candidates", "")
-	if candidates.Code != http.StatusOK {
-		t.Fatalf("candidates status = %d, body %s", candidates.Code, candidates.Body.String())
-	}
-	var candidatePayload struct {
-		Candidates []struct {
-			TransactionID string  `json:"transactionId"`
-			Amount        float64 `json:"amount"`
-		} `json:"candidates"`
-	}
-	if err := json.Unmarshal(candidates.Body.Bytes(), &candidatePayload); err != nil {
-		t.Fatalf("decode candidates: %v", err)
-	}
-	if len(candidatePayload.Candidates) != 1 || candidatePayload.Candidates[0].TransactionID != payment {
-		t.Fatalf("candidates = %+v, want the card payoff", candidatePayload)
-	}
-
 	suggestions := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/"+payment+"/statement-payment-suggestions", "")
 	if suggestions.Code != http.StatusOK {
 		t.Fatalf("suggestions status = %d, body %s", suggestions.Code, suggestions.Body.String())
@@ -178,9 +161,6 @@ func TestCardStatementsEndToEnd(t *testing.T) {
 		Current *struct {
 			ID string `json:"id"`
 		} `json:"current"`
-		Result struct {
-			Status string `json:"status"`
-		} `json:"result"`
 	}
 	if err := json.Unmarshal(suggestions.Body.Bytes(), &suggestionPayload); err != nil {
 		t.Fatalf("decode suggestions: %v", err)
@@ -188,8 +168,8 @@ func TestCardStatementsEndToEnd(t *testing.T) {
 	if len(suggestionPayload.Matches) != 1 || suggestionPayload.Matches[0].Read.Statement.ID != statement.Statement.ID {
 		t.Fatalf("suggestions = %+v, want one match for the statement", suggestionPayload)
 	}
-	if suggestionPayload.Result.Status != "unallocated" || suggestionPayload.Current != nil {
-		t.Fatalf("initial result = %+v", suggestionPayload)
+	if suggestionPayload.Current != nil {
+		t.Fatalf("initial suggestions = %+v", suggestionPayload)
 	}
 
 	// Apply a first partial payment. Integer-cent math must leave 60.20.
@@ -253,17 +233,6 @@ func TestCardStatementsValidationAndUndoReapply(t *testing.T) {
 	if dismiss.Code != http.StatusOK {
 		t.Fatalf("dismiss status = %d, body %s", dismiss.Code, dismiss.Body.String())
 	}
-	events := doRowRequest(t, handler, http.MethodGet, "/v1/statement-allocations/"+allocationID+"/events", "")
-	var eventPayload struct {
-		Events []struct{ Action string } `json:"events"`
-	}
-	if err := json.Unmarshal(events.Body.Bytes(), &eventPayload); err != nil {
-		t.Fatal(err)
-	}
-	if len(eventPayload.Events) != 2 {
-		t.Fatalf("events after dismiss = %+v, want created and dismissed", eventPayload.Events)
-	}
-
 	reapply := doRowRequest(t, handler, http.MethodPost, "/v1/card-statements/"+statementID+"/allocations",
 		`{"transactionId":"`+payment+`","amount":100.30,"evidence":"applied again"}`)
 	if reapply.Code != http.StatusOK {

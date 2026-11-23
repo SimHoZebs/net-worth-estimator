@@ -16,13 +16,6 @@ This is a planning export, not an implementation status report. The group-sharin
 - [INT-02 — Implement Gmail read-only connection](./INT-02.md) (Backlog)
 - [INT-04 — Match email receipt evidence to existing transactions](./INT-04.md) (Backlog)
 
-### Recurring & financial health
-- [FIN-04 — Build prioritized Financial Health page](./FIN-04.md) (Backlog)
-
-### Friends & shared expenses
-- [SOC-03 — Manually send a transaction with assigned amount](./SOC-03.md) (Backlog)
-- [SOC-04C — Build the split builder and sharing flow](./SOC-04C.md) (Backlog)
-
 ### Groups & sharing
 - [GRP-01 — Add group admission policy: friends-only or invite-link](./GRP-01.md) (Backlog)
 
@@ -125,83 +118,6 @@ Gmail is the first provider; review provider verification/privacy requirements b
 #### Implementation notes and boundaries
 
 Use existing private receipt attachments; do not assume bank coverage is complete.
-
-**Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.
-
----
-
-### FIN-04 — Build prioritized Financial Health page
-
-**Status:** Backlog  
-**Area:** Recurring & financial health  
-**Source:** [https://app.notion.com/p/40bee37bd02881c7bf62ffd3cc5cdf65](https://app.notion.com/p/40bee37bd02881c7bf62ffd3cc5cdf65)  
-**Depends on:** FIN-03 (complete)
-
-**User story:** As a user, I want the highest-risk financial-health issues displayed first.
-
-#### Acceptance criteria
-
-- [ ] Order failing and at-risk checks ahead of passing checks.
-- [ ] Display current, target and difference where computable.
-- [ ] Drill into records and calculations.
-- [ ] Distinguish insufficient data visually.
-- [ ] Refresh when relevant inputs change.
-
-#### Implementation notes and boundaries
-
-Do not require one composite financial-health score.
-
-**Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.
-
----
-
-### SOC-03 — Manually send a transaction with assigned amount
-
-**Status:** Backlog  
-**Area:** Friends & shared expenses  
-**Source:** [https://app.notion.com/p/40bee37bd02881c2a77ef6b7cb192bb5](https://app.notion.com/p/40bee37bd02881c2a77ef6b7cb192bb5)  
-**Depends on:** SOC-01 (complete), SOC-02 (complete), FND-03 (complete)
-
-**User story:** As a user, I want to send a friend an assigned share while showing the original total.
-
-#### Acceptance criteria
-
-- [ ] Pick source transaction and recipient.
-- [ ] Preview original total and assigned portion.
-- [ ] Recipient sees permitted source context and allocation.
-- [ ] Support accept, decline, view, and save as linked copy.
-- [ ] Validate permissions and assigned amount.
-- [ ] Retries cannot create duplicate shares.
-
-#### Implementation notes and boundaries
-
-Sending a share does not move money.
-
-**Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.
-
----
-
-### SOC-04C — Build the split builder and sharing flow
-
-**Status:** Backlog  
-**Area:** Friends & shared expenses  
-**Source:** [https://app.notion.com/p/40bee37bd02881e28788caa099fb6702](https://app.notion.com/p/40bee37bd02881e28788caa099fb6702)  
-**Depends on:** SOC-01 (complete), [SOC-03](./SOC-03.md), SOC-04A (complete), SOC-04B (complete)
-
-**User story:** As a user, I want to divide expenses among friends, starting with equal shares.
-
-#### Acceptance criteria
-
-- [ ] Select source transaction and participants.
-- [ ] Equal allocation default with manual overrides.
-- [ ] Immediate total validation.
-- [ ] Preview before sending.
-- [ ] Show request state per participant.
-- [ ] Successful requests appear in the inbox.
-
-#### Implementation notes and boundaries
-
-Compose transaction cards and friend selectors already available.
 
 **Scope:** Planning / not implemented in this export. Do not infer completed code from these checklists.
 

@@ -1,6 +1,5 @@
 // Package integrationedge is the integration edge-case suite: hostile cases
-// across sharing, splits, settlements, invites, and feeds instead of
-// walking the typical path.
+// across sharing, invites, and feeds instead of walking the typical path.
 //
 // Every test crosses at least one real boundary on a throwaway SQLite
 // database: the real store, and for handler tests the real production

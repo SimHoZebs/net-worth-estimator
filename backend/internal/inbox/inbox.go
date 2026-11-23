@@ -9,11 +9,6 @@
 // 404 (store.ErrNotFound) so shared data is not enumerable. Rejected
 // input reports 400 (store.ErrGroupInvalid, message safe to show), and
 // anything else reports 503 without leaking internals.
-//
-// Split requests (SOC-03 assigned shares, SOC-04C split builder) surface
-// through the same item envelope with kind "split-request" once those
-// producers land; this package serves the "share" kind. See the producer
-// contract in docs/authorization.md.
 package inbox
 
 import (

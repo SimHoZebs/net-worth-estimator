@@ -31,8 +31,7 @@
 // byte-for-byte, key reuse across actions fails with 409, and failed
 // attempts never consume the key. The refresh route accepts an optional
 // `requestId` body and mints a server key when none travels. Committed
-// mutations append one identity-only audit row each, readable by the
-// source owner at GET /v1/shared/audit; there is no audience-side read.
+// mutations append one identity-only audit row each; there is no read route.
 package sharing
 
 import (
@@ -80,7 +79,6 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/exclusions", h.serveExclusions)
 	mux.HandleFunc("/v1/shared/copies", h.serveCopies)
 	mux.HandleFunc("/v1/shared/copies/", h.serveCopyLink)
-	mux.HandleFunc("/v1/shared/audit", h.serveAudit)
 	mux.HandleFunc("/v1/shared/transactions", h.serveSharedList)
 	mux.HandleFunc("/v1/shared/transactions/", h.serveSharedRead)
 	mux.HandleFunc("/v1/shared/policies/", h.servePolicies)
@@ -282,35 +280,6 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", "POST, DELETE")
 		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
 	}
-}
-
-// serveAudit returns the committed cross-user changes for one of the
-// caller's own transactions in sequence order. The caller is always the
-// source owner: a cross-owner query returns an empty trace, never another
-// owner's history. Events carry actor, action, target identities, link,
-// outcome status, request key, and time only, never transaction evidence.
-func (h *Handler) serveAudit(w http.ResponseWriter, r *http.Request) {
-	owner, _, ok := h.caller(r)
-	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "Sign in to view sharing history.")
-		return
-	}
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", "GET")
-		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
-		return
-	}
-	transactionID := strings.TrimSpace(r.URL.Query().Get("transactionId"))
-	if transactionID == "" {
-		writeProblem(w, http.StatusBadRequest, "A transaction ID is required to view sharing history.")
-		return
-	}
-	events, err := h.db.ListSharingAudit(owner, transactionID)
-	if err != nil {
-		writeStoreError(w, err, "Sharing history not found.")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"audit": events})
 }
 
 func (h *Handler) serveSharedList(w http.ResponseWriter, r *http.Request) {

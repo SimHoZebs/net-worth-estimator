@@ -115,36 +115,6 @@
         ],
         "schedules": []
       }
-    },
-    {
-      "kind": "splitProbes",
-      "splitProbes": [
-        {
-          "currency": "JPY",
-          "participants": 3,
-          "totalMinor": 1000
-        },
-        {
-          "currency": "KWD",
-          "participants": 3,
-          "totalMinor": 2345
-        },
-        {
-          "currency": "USD",
-          "participants": 3,
-          "totalMinor": 1
-        },
-        {
-          "currency": "USD",
-          "participants": 7,
-          "totalMinor": 100
-        },
-        {
-          "currency": "BHD",
-          "participants": 4,
-          "totalMinor": 1555
-        }
-      ]
     }
   ]
 }

@@ -13,9 +13,7 @@ import (
 // evaluation (seeded through the low-level store, modeling invalid
 // config no public endpoint would accept) cannot block current-position,
 // balance, or transaction reads, nor unrelated finance writes. The
-// deterministic projection still reports the evaluation error, and
-// deleting an account a configured evaluation references still rejects
-// without changing data or revision.
+// deterministic projection still reports the evaluation error.
 
 func financeIndependenceIDs(t *testing.T, responseBody []byte) string {
 	t.Helper()
@@ -208,47 +206,16 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		}
 	}
 
-	// Deleting the referenced (otherwise unused) savings account still
-	// rejects without changing data or revision.
-	deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+savingsID, "")
-	if deleted.Code != http.StatusOK {
-		t.Fatalf("delete account status = %d, body %s", deleted.Code, deleted.Body.String())
-	}
-	var deletedPayload struct {
-		Saved    bool   `json:"saved"`
-		Revision string `json:"revision"`
-	}
-	if err := json.Unmarshal(deleted.Body.Bytes(), &deletedPayload); err != nil {
-		t.Fatalf("decode delete: %v", err)
-	}
-	if deletedPayload.Saved {
-		t.Fatal("deleting a referenced account must not persist")
-	}
-	if !financeHasIssueCode(deleted.Body.Bytes(), "evaluation.accountBalance.accountId.invalid") {
-		t.Fatalf("delete must report the new orphan, got %s", deleted.Body.String())
-	}
-	model, err := database.LoadModel()
-	if err != nil {
-		t.Fatalf("reload model: %v", err)
-	}
-	kept := false
-	for _, account := range model.Accounts {
-		if account.ID == savingsID {
-			kept = true
-		}
-	}
-	if !kept {
-		t.Fatal("rejected delete removed the account")
-	}
+	// The saved patches advance the model revision despite the invalid forecast.
 	after := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
+	if after.Code != http.StatusOK {
+		t.Fatalf("balances after patches = %d, body %s", after.Code, after.Body.String())
+	}
 	var afterPayload struct {
 		Revision string `json:"revision"`
 	}
 	if err := json.Unmarshal(after.Body.Bytes(), &afterPayload); err != nil {
 		t.Fatalf("decode balances: %v", err)
-	}
-	if afterPayload.Revision != deletedPayload.Revision {
-		t.Fatalf("rejected delete changed revision %q to %q", deletedPayload.Revision, afterPayload.Revision)
 	}
 	if afterPayload.Revision == revisionBefore {
 		t.Fatalf("expected the saved patches to advance revision from %q", revisionBefore)

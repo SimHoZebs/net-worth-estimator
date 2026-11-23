@@ -323,16 +323,6 @@
       }
     },
     {
-      "kind": "splitProbes",
-      "splitProbes": [
-        {
-          "currency": "JPY",
-          "participants": 3,
-          "totalMinor": 1000
-        }
-      ]
-    },
-    {
       "kind": "bankFeeds",
       "bankFeeds": [
         [

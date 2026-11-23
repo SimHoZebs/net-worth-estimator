@@ -80,11 +80,10 @@ already captured it. Where a hold or a balance cannot establish what has been
 covered, leave the dependent value unknown and show the independently known
 amounts.
 
-The default evidence cut is now. The summary API also accepts a historical
-`asOf` date or timestamp for replay. Replays use the current plan and settings
-but cannot use later checkpoints or posted activity as historical evidence.
+The evidence cut is now. The summary uses the current plan and settings and
+does not accept a historical replay parameter.
 
-Each selected cash account uses its effective display basis at that historical
+Each selected cash account uses its effective display basis at that
 checkpoint. An explicit posted preference takes the replayed posted figure. The
 configured or default available preference takes the bank-reported available
 figure when the checkpoint carries one; with no available field, posted is the

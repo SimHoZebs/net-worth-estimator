@@ -37,8 +37,7 @@ export function safeSpendingSummaryOptions(
 			getSafeSpendingSettings(scope),
 		],
 		queryFn: async ({ signal }) =>
-			(await getSafeSpendingSummary(undefined, { signal, cache: "no-store" }))
-				.data,
+			(await getSafeSpendingSummary({ signal, cache: "no-store" })).data,
 		staleTime: ({ state }) =>
 			nextUtcMidnight(state.dataUpdatedAt) - state.dataUpdatedAt,
 		refetchInterval: () => {

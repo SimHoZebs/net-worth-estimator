@@ -13,10 +13,6 @@ type settleCandidateRow struct {
 	Name                string  `json:"name"`
 	Amount              float64 `json:"amount"`
 	Date                string  `json:"date"`
-	DayGap              int     `json:"dayGap"`
-	AmountDeltaCents    int64   `json:"amountDeltaCents"`
-	DescriptorChanged   bool    `json:"descriptorChanged"`
-	Recommended         bool    `json:"recommended"`
 	ClaimScheduleID     *string `json:"claimScheduleId,omitempty"`
 	ClaimOccurrenceDate *string `json:"claimOccurrenceDate,omitempty"`
 }
@@ -62,16 +58,12 @@ func (s *handler) listSettleCandidates(_ context.Context, input *struct {
 	}
 	candidates := simplefin.SettleCandidates(*hold, bank)
 	rows := make([]settleCandidateRow, 0, len(candidates))
-	for index, candidate := range candidates {
+	for _, candidate := range candidates {
 		row := settleCandidateRow{
-			TransactionID:     candidate.Transaction.ID,
-			Name:              candidate.Transaction.Name,
-			Amount:            float64(candidate.Cents) / 100,
-			Date:              simplefin.SettleCandidateDate(candidate),
-			DayGap:            candidate.DayGapDays,
-			AmountDeltaCents:  candidate.AmountDeltaCents,
-			DescriptorChanged: candidate.DescriptorChanged,
-			Recommended:       index == 0,
+			TransactionID: candidate.Transaction.ID,
+			Name:          candidate.Transaction.Name,
+			Amount:        float64(candidate.Cents) / 100,
+			Date:          simplefin.SettleCandidateDate(candidate),
 		}
 		if candidate.Transaction.Claim != nil {
 			ruleID := candidate.Transaction.Claim.ScheduleID

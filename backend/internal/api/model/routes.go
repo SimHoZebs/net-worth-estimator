@@ -23,7 +23,6 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-summary", Method: "GET", Path: "/safe-spending-summary", Summary: "Read Safe Spending, upcoming payments, and next-cycle capacity"}, s.getSafeSpendingSummary)
 	huma.Register(api, huma.Operation{OperationID: "create-loan", Method: "POST", Path: "/loans", Summary: "Create one visible principal and interest loan atomically"}, s.createLoan)
 	huma.Register(api, huma.Operation{OperationID: "update-loan", Method: "PUT", Path: "/loans/{id}", Summary: "Update a loan and its managed rules atomically"}, s.updateLoan)
-	huma.Register(api, huma.Operation{OperationID: "delete-loan", Method: "DELETE", Path: "/loans/{id}", Summary: "Delete a loan and its managed rules atomically"}, s.deleteLoan)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/safe-spending-settings", Summary: "Load safe card spending settings"}, s.getSafeSpendingSettings)
 	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/safe-spending-settings", Summary: "Save safe card spending settings"}, s.setSafeSpendingSettings)
 	huma.Register(api, huma.Operation{
@@ -36,7 +35,6 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "list-balance-adjustments", Method: "GET", Path: "/accounts/{id}/balance-adjustments", Summary: "List dated balance adjustments without a forecast"}, s.listBalanceAdjustments)
 	huma.Register(api, huma.Operation{OperationID: "create-account", Method: "POST", Path: "/accounts", Summary: "Create one account"}, s.createAccount)
 	huma.Register(api, huma.Operation{OperationID: "update-account", Method: "PATCH", Path: "/accounts/{id}", Summary: "Replace one account"}, s.updateAccount)
-	huma.Register(api, huma.Operation{OperationID: "delete-account", Method: "DELETE", Path: "/accounts/{id}", Summary: "Delete one account"}, s.deleteAccount)
 	huma.Register(api, huma.Operation{OperationID: "move-account", Method: "POST", Path: "/accounts/reorder", Summary: "Move one account"}, s.moveAccount)
 	huma.Register(api, huma.Operation{OperationID: "list-transactions", Method: "GET", Path: "/transactions", Summary: "List recorded transactions touching an account"}, s.listTransactions)
 	huma.Register(api, huma.Operation{OperationID: "record-transaction", Method: "POST", Path: "/transactions", Summary: "Record one transaction"}, s.recordTransaction)
@@ -74,11 +72,9 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "save-payment-terms", Method: "POST", Path: "/payment-terms", Summary: "Upsert payment terms for one account"}, s.savePaymentTerms)
 	huma.Register(api, huma.Operation{OperationID: "delete-payment-terms", Method: "DELETE", Path: "/payment-terms/{accountId}", Summary: "Delete payment terms for one account"}, s.deletePaymentTerms)
 	huma.Register(api, huma.Operation{OperationID: "list-card-statements", Method: "GET", Path: "/card-statements", Summary: "List derived card statements and their payment allocations"}, s.listCardStatements)
-	huma.Register(api, huma.Operation{OperationID: "list-statement-payment-candidates", Method: "GET", Path: "/card-statements/{id}/payment-candidates", Summary: "List posted payments with advisory evidence for one derived statement"}, s.listPaymentCandidates)
 	huma.Register(api, huma.Operation{OperationID: "list-transaction-statement-payment-suggestions", Method: "GET", Path: "/transactions/{id}/statement-payment-suggestions", Summary: "List ranked statement suggestions for one posted payment"}, s.listTransactionStatementPaymentSuggestions)
 	huma.Register(api, huma.Operation{OperationID: "save-statement-allocation", Method: "POST", Path: "/card-statements/{id}/allocations", Summary: "Explicitly allocate one posted payment to a derived statement"}, s.saveStatementAllocation)
 	huma.Register(api, huma.Operation{OperationID: "set-statement-allocation-state", Method: "PATCH", Path: "/statement-allocations/{id}", Summary: "Dismiss or undo one statement allocation"}, s.setStatementAllocationState)
-	huma.Register(api, huma.Operation{OperationID: "list-statement-allocation-events", Method: "GET", Path: "/statement-allocations/{id}/events", Summary: "List the audit trail for one statement allocation"}, s.listStatementAllocationEvents)
 	huma.Register(api, huma.Operation{OperationID: "get-pinned-evaluations", Method: "GET", Path: "/pinned-evaluations", Summary: "List pinned evaluation instance IDs"}, s.getPinnedEvaluations)
 	huma.Register(api, huma.Operation{OperationID: "set-pinned-evaluations", Method: "PUT", Path: "/pinned-evaluations", Summary: "Replace pinned evaluation instance IDs"}, s.setPinnedEvaluations)
 	huma.Register(api, huma.Operation{

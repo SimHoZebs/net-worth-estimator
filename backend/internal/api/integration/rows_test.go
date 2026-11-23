@@ -54,14 +54,6 @@ func TestRowAccountEndToEnd(t *testing.T) {
 	if moved.Code != http.StatusOK {
 		t.Fatalf("move status = %d, body %s", moved.Code, moved.Body.String())
 	}
-	deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+createdPayload.Result.ID, "")
-	if deleted.Code != http.StatusOK {
-		t.Fatalf("delete status = %d, body %s", deleted.Code, deleted.Body.String())
-	}
-	again := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+createdPayload.Result.ID, "")
-	if again.Code != http.StatusNotFound {
-		t.Fatalf("second delete status = %d, want 404", again.Code)
-	}
 }
 
 func TestRowWriteValidationRejectsDanglingReference(t *testing.T) {
@@ -139,7 +131,6 @@ func TestWriteGuardCoversRowOperations(t *testing.T) {
 	}{
 		{http.MethodPost, "/v1/accounts", `{"name":"x"}`},
 		{http.MethodPatch, "/v1/accounts/x", `{"name":"x"}`},
-		{http.MethodDelete, "/v1/accounts/x", ""},
 		{http.MethodPost, "/v1/accounts/reorder", `{"id":"x"}`},
 		{http.MethodPost, "/v1/transactions", `{"name":"x"}`},
 		{http.MethodPost, "/v1/transactions/x/amend", `{"name":"x"}`},

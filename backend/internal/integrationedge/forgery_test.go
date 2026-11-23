@@ -75,33 +75,6 @@ func TestIntegrationEdgeForgedIDs_RealSQLite_RealHTTP(t *testing.T) {
 	if foreign.Code == http.StatusCreated {
 		t.Fatal("member granted another owner's row: authorization bypass")
 	}
-	// Split reads by an outsider: denied or absent, never the obligation.
-	outsider := world.guest
-	if outsider == "" {
-		outsider = forgedOwner
-	}
-	forgeSource := advMustTransaction(t, world.ownerSC, "Split source", "100.00", day)
-	if _, err := world.db.GrantSharedTransaction(world.owner, forgeSource, "group", world.groupID, advRequestID(t)); err != nil {
-		t.Fatal(err)
-	}
-	split, err := world.db.CreateSplit(world.owner, advSplitInput(world, forgeSource), advRequestID(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := world.db.GetSplit(outsider, split.ID); err == nil {
-		t.Fatal("outsider read a split obligation: leak")
-	}
-	// Settlement recording is documented as opaque until split-membership
-	// fencing lands: any provisioned user may record, but forged
-	// (nonexistent) actors fail and the obligation itself stays unreadable.
-	if world.guest != "" {
-		if _, err := world.db.RecordSettlement(world.guest, settlementInput(split.ID, world.owner), advRequestID(t)); err != nil {
-			t.Fatalf("provisioned outsider record rejected %v; contract says the split ID stays opaque until fencing", err)
-		}
-	}
-	if _, err := world.db.RecordSettlement(forgedOwner, settlementInput(split.ID, world.owner), advRequestID(t)); err == nil {
-		t.Fatal("nonexistent actor recorded a settlement: user-existence check bypassed")
-	}
 	// No forged attempt wrote anything: the recipient model stays empty.
 	model, err := world.secondSC.LoadModel()
 	if err != nil {

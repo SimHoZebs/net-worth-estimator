@@ -204,20 +204,3 @@ func appendAllocationEvent(tx *userTx, allocationID, action, actor string, creat
 		VALUES (?, ?, ?, ?, ?, :user_id)`, next, allocationID, action, actor, createdAt)
 	return err
 }
-
-func (s *sqliteStore) ListStatementAllocationEvents(allocationID string) ([]types.StatementAllocationEvent, error) {
-	rows, err := s.db.Query(`SELECT id, allocation_id, action, actor, created_at FROM statement_allocation_events WHERE allocation_id = ? AND user_id = :user_id ORDER BY id`, allocationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	events := []types.StatementAllocationEvent{}
-	for rows.Next() {
-		var event types.StatementAllocationEvent
-		if err := rows.Scan(&event.ID, &event.AllocationID, &event.Action, &event.Actor, &event.CreatedAt); err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-	return events, rows.Err()
-}

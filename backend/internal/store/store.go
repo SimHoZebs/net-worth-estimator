@@ -96,7 +96,6 @@ type Store interface {
 	// owner applies the payment again, preserving the row and its audit trail.
 	ReactivateStatementAllocation(id, statementID string, amount float64, evidence, actor string) (types.StatementAllocation, error)
 	SetStatementAllocationState(id, state, actor string) (types.StatementAllocation, error)
-	ListStatementAllocationEvents(allocationID string) ([]types.StatementAllocationEvent, error)
 	ListAmountPresets() ([]types.AmountPreset, error)
 	CreateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error)
 	UpdateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error)
@@ -260,10 +259,6 @@ type Database interface {
 	ListInvites(groupID, userID string) ([]GroupInvite, error)
 	RevokeInvite(groupID, inviteID, userID string) error
 	AcceptInvite(code, userID, displayName string) (Group, error)
-	ListFriends(userID, search string) ([]Friend, error)
-	GetFriend(userID, friendID string) (Friend, error)
-	AreFriends(userID, friendID string) (bool, error)
-	TouchFriendDisplay(userID, displayName string)
 	TouchMemberDisplay(userID, displayName string)
 	RemoveGroupMembershipsForUser(userID string) error
 	// GrantSharedTransaction records the owner's explicit decision to share one
@@ -415,88 +410,6 @@ type Database interface {
 	// member's stored policy plus the current audience size. Counts only:
 	// no amounts, payees, or row IDs leave the owner's scope.
 	PreviewSharingPolicy(ownerID, groupID string) (SharingPolicyPreview, error)
-	// ListSharingAudit returns the committed cross-user changes for one
-	// owner-scoped transaction in sequence order: consent rows (grant, revoke,
-	// exclude, unexclude), accepted-copy and link-refresh rows, and
-	// split-created, split-updated, and split-accepted rows. Callers must
-	// pass the source owner's own user ID: audit reads are owner-scoped
-	// like grant lists, with no audience-side read. Events carry actor,
-	// action, target identities, link, outcome status, request key, and
-	// time only, never transaction evidence. Link, status, and key decode
-	// from the audit detail payload; actions that name none leave them
-	// empty.
-	ListSharingAudit(ownerID, transactionID string) ([]SharingAuditEvent, error)
-	// CreateSplit persists version 1 of a split obligation dividing one
-	// shared transaction across its participants. The actor must be the
-	// initiator, and every participant (initiator included) must hold
-	// current shared-transaction access to the source; anything else fails
-	// closed without revealing who holds access. Shares come from
-	// domain.AllocateSplit over the caller's total, currency, participants,
-	// and overrides. requestID is a client-generated UUID: a retry with the
-	// same key replays the recorded split, while the same key naming a
-	// different action or target fails with ErrSharingConflict. One key
-	// creates one split per source transaction: a second, intentionally
-	// different split needs a fresh key. The recorded source revision names
-	// the source content the version divides. Split writes never touch
-	// transactions, checkpoints, or balances.
-	CreateSplit(actorID string, input SplitInput, requestID string) (Split, error)
-	// UpdateSplit appends a new version to a split with status proposed and
-	// reset acceptances; accepted shares only change through this explicit
-	// version step, never by silent edit. Only the initiator may revise,
-	// and expectedVersion must name the current version or the update fails
-	// with ErrSharingConflict. Every participant of the new version must
-	// hold current source access, and shares are recomputed by
-	// domain.AllocateSplit. requestID carries the CreateSplit idempotency
-	// contract against the split link; a replay additionally requires the
-	// caller's expected version to be the recorded version's predecessor,
-	// so a new attempt reusing a key conflicts instead of replaying stale
-	// history.
-	UpdateSplit(actorID, splitID string, expectedVersion int64, input SplitInput, requestID string) (Split, error)
-	// AcceptSplit records the actor's own acceptance of the current split
-	// version. The actor must be a participant of that version and
-	// expectedVersion must name the current version; accepting a
-	// superseded version fails with ErrSharingConflict. When every
-	// participant has accepted, the version's status becomes accepted.
-	// Acceptance writes no transactions, checkpoints, or balances: it moves no
-	// money. requestID carries the CreateSplit idempotency contract
-	// against the split link; a replay additionally requires the caller's
-	// expected version to equal the recorded version.
-	AcceptSplit(actorID, splitID string, expectedVersion int64, requestID string) (Split, error)
-	// GetSplit returns the latest version of one split. The requester must
-	// be the initiator or a participant of that version; anyone else
-	// receives ErrNotFound so split membership is not enumerable. Reads
-	// perform no live source authorization check: the split is the
-	// participants' own obligation record and survives source edits,
-	// revocation, and source deletion, mirroring accepted-copy provenance.
-	GetSplit(requesterID, splitID string) (Split, error)
-	// ListSplits returns the latest version of every split where the
-	// requester is initiator or participant, in stable order.
-	ListSplits(requesterID string) ([]Split, error)
-	// ListSplitVersions returns every version of one split in ascending
-	// version order, including superseded and accepted history. Access
-	// matches GetSplit.
-	ListSplitVersions(requesterID, splitID string) ([]Split, error)
-	// RecordSettlement appends one payoff record against one
-	// participant's share of one split (SOC-05). The actor and the
-	// participant must be provisioned users; the split ID must be a
-	// canonical UUID. The amount must be positive. An optional link to
-	// one real payment (owner plus transaction) must name both halves or
-	// neither, and one real payment backs at most one settlement, so a
-	// linked payment is never double-counted. requestID is a
-	// client-generated UUID: a retry with the same key replays the
-	// recorded settlement, while the same key naming a different
-	// settlement fails with ErrSettlementConflict. The write touches
-	// only settlement rows: it never writes transactions, checkpoints,
-	// accounts, or balances, so recording a settlement moves no money.
-	// Split-membership fencing (only current split participants may
-	// record and read) lands with the SOC-04B split reads; until then
-	// the split ID is opaque and any provisioned user may record.
-	RecordSettlement(actorID string, input SettlementInput, requestID string) (Settlement, error)
-	// ListSettlements returns the append-only settlement history for one
-	// split in record order. Unknown splits report an empty history.
-	// Split-membership fencing lands with the SOC-04B split reads;
-	// until then any provisioned user may read.
-	ListSettlements(requesterID, splitID string) ([]Settlement, error)
 	// PreviewSharingPolicyDraft counts the currently eligible transactions for
 	// unsaved preference values plus the current audience size, without
 	// persisting anything (GRP-04 consent preview). Counts are computed

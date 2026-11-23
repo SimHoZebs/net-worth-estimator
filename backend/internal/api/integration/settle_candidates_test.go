@@ -96,14 +96,10 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 	var payload struct {
 		TransactionID string `json:"transactionId"`
 		Candidates    []struct {
-			TransactionID     string  `json:"transactionId"`
-			Name              string  `json:"name"`
-			Amount            float64 `json:"amount"`
-			Date              string  `json:"date"`
-			DayGap            int     `json:"dayGap"`
-			AmountDeltaCents  int64   `json:"amountDeltaCents"`
-			DescriptorChanged bool    `json:"descriptorChanged"`
-			Recommended       bool    `json:"recommended"`
+			TransactionID string  `json:"transactionId"`
+			Name          string  `json:"name"`
+			Amount        float64 `json:"amount"`
+			Date          string  `json:"date"`
 		} `json:"candidates"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
@@ -116,11 +112,8 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 	if candidate.Name != "LYFT *STANDARD 10-30" || candidate.Amount != 81.22 {
 		t.Fatalf("candidate = %+v, want the posted Lyft charge", candidate)
 	}
-	if candidate.Date != "2026-11-01" || candidate.DayGap != 1 {
-		t.Fatalf("candidate date = %+v, want Nov 1 and one day", candidate)
-	}
-	if candidate.AmountDeltaCents != 628 || !candidate.DescriptorChanged || !candidate.Recommended {
-		t.Fatalf("candidate evidence = %+v, want delta 628, changed, recommended", candidate)
+	if candidate.Date != "2026-11-01" {
+		t.Fatalf("candidate date = %+v, want Nov 1", candidate)
 	}
 
 	notHold := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/"+settledID+"/settle-candidates", "")

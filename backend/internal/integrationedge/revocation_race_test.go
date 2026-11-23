@@ -127,10 +127,9 @@ func TestIntegrationEdgeRevocationMidInboxDecide_RealSQLite_RealHTTP(t *testing.
 	}
 }
 
-// Void-marking a row mid-share drops it from the feed and fails copies;
-// void-marking a split source keeps the split readable but the voided row
-// unshareable. Fail-closed throughout, never a 500.
-func TestIntegrationEdgeVoidMidShareAndSplit_RealSQLite_RealHTTP(t *testing.T) {
+// Void-marking a row mid-share drops it from the feed and fails copies.
+// Fail-closed throughout, never a 500.
+func TestIntegrationEdgeVoidMidShare_RealSQLite_RealHTTP(t *testing.T) {
 	world := advSetup(t)
 	if world.groupID == "" {
 		t.Skip("needs the group identity set")
@@ -138,10 +137,6 @@ func TestIntegrationEdgeVoidMidShareAndSplit_RealSQLite_RealHTTP(t *testing.T) {
 	day := int64(1781524800)
 	rowID := advSeedBankPending(t, world.ownerSC, "Void-share row", "40.00", day, "adv-void-1")
 	if _, err := world.db.GrantSharedTransaction(world.owner, rowID, "group", world.groupID, advRequestID(t)); err != nil {
-		t.Fatal(err)
-	}
-	split, err := world.db.CreateSplit(world.owner, advSplitInput(world, rowID), advRequestID(t))
-	if err != nil {
 		t.Fatal(err)
 	}
 	advVoid(t, world.ownerSC, rowID)
@@ -157,12 +152,5 @@ func TestIntegrationEdgeVoidMidShareAndSplit_RealSQLite_RealHTTP(t *testing.T) {
 		`{"owner":`+advQuote(advResource(world.owner))+`,"transactionId":`+advQuote(rowID)+`,"requestId":`+advQuote(advRequestID(t))+`}`)
 	if copy.Code != http.StatusNotFound {
 		t.Fatalf("copy-of-void status = %d, want 404: %s", copy.Code, copy.Body.String())
-	}
-	kept, err := world.db.GetSplit(world.owner, split.ID)
-	if err != nil {
-		t.Fatalf("split unreadable after its source voided: %v", err)
-	}
-	if kept.ID != split.ID {
-		t.Fatalf("split = %+v, want the recorded obligation to survive its voided source", kept)
 	}
 }

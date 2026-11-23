@@ -11,7 +11,6 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/friends"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
@@ -71,8 +70,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	}
 	// Social routes carry the same own-user permission checks and resource
 	// header as every other user route (enforced in identity.Wrap) plus
-	// existing membership in the groups/friends handler. Friendships never
-	// touch financial plans.
+	// existing membership in the groups handler.
 	groupHandler := groups.New(database, loginConfig.Issuer, groups.Config{
 		AllowedOrigins: apiConfig.AllowedOrigins,
 		ReadOnly:       apiConfig.ReadOnly,
@@ -94,16 +92,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		ReadOnly:       apiConfig.ReadOnly,
 	})
 	inboxRoutes := inboxHandler.Routes()
-	friendHandler := friends.New(database, loginConfig.Issuer, friends.Config{
-		AllowedOrigins: apiConfig.AllowedOrigins,
-		ReadOnly:       apiConfig.ReadOnly,
-	})
-	friendRoutes := friendHandler.Routes()
 	combined := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if identity.IsFriendRoute(r.URL.Path) {
-			friendRoutes.ServeHTTP(w, r)
-			return
-		}
 		if identity.IsGroupRoute(r.URL.Path) {
 			groupRoutes.ServeHTTP(w, r)
 			return

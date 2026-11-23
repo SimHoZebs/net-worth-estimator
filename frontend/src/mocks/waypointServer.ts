@@ -419,26 +419,21 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			}, row);
 		}
 		let match = path.match(/^\/v1\/accounts\/([^/]+)$/);
-		if (match) {
+		if (match && method === "PATCH") {
 			const [, id] = match;
-			if (method === "PATCH")
-				return write(() => {
-					current.accounts = (current.accounts as unknown[]).map((item) =>
-						(item as { id: string }).id === id
-							? { ...structuredClone(body), id }
-							: item,
-					) as typeof current.accounts;
-					upsertStubCheckpoint(
-						current,
-						(body as { balance?: number; observedAt?: number }).balance,
-						(body as { balance?: number; observedAt?: number }).observedAt,
-						id,
-					);
-				}, body);
-			current.accounts = (current.accounts as unknown[]).filter(
-				(item) => (item as { id: string }).id !== id,
-			) as typeof current.accounts;
-			return write(() => {}, undefined);
+			return write(() => {
+				current.accounts = (current.accounts as unknown[]).map((item) =>
+					(item as { id: string }).id === id
+						? { ...structuredClone(body), id }
+						: item,
+				) as typeof current.accounts;
+				upsertStubCheckpoint(
+					current,
+					(body as { balance?: number; observedAt?: number }).balance,
+					(body as { balance?: number; observedAt?: number }).observedAt,
+					id,
+				);
+			}, body);
 		}
 		if (path === "/v1/accounts/reorder" && method === "POST")
 			return write(() => {

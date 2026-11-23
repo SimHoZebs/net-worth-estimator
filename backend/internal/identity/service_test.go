@@ -192,7 +192,7 @@ func newIDP(t *testing.T) *testIDP {
 				return
 			}
 			respond(w, map[string]any{"subject": sub,
-				"owner": "waypoint", "name": "editor", "displayName": "Sam Lee", "avatar": "",
+				"owner": "waypoint", "name": "editor", "displayName": "Sam Lee",
 			})
 		default:
 			http.NotFound(w, r)

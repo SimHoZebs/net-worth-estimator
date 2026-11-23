@@ -142,9 +142,6 @@ func TestUnknownBalanceIsNeverSuggestedOrAllocated(t *testing.T) {
 	if StatementPaymentCandidate(model, nil, statement, "later", map[string]string{}) != nil {
 		t.Fatal("unknown statement should not produce a payment candidate")
 	}
-	if candidates := StatementPaymentCandidates(model, nil, statement, map[string]string{}); len(candidates) != 0 {
-		t.Fatalf("unknown statement should not list candidates: %+v", candidates)
-	}
 	if err := ValidateStatementAllocation(statement, "2026-02-01", "USD", 100.30, 100.30, 0); err == nil {
 		t.Fatal("allocation against an unknown balance should be rejected")
 	}

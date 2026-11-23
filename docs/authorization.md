@@ -83,18 +83,10 @@ Replacing that data requires another explicit publication.
 ## Friend relationships
 
 Accepted friendships live in the `friendships` table, keyed by stable
-issuer/subject user IDs in both directions. Discovery searches the
-caller's own accepted list by display-name substring; names are
-non-unique and carry no identity meaning. Unknown users and non-friends
-read 404 so friendships are not enumerable.
-
-Friendship is social only. It never grants financial data access: the
-friends handler touches no financial table, and every friend read passes
-the same own-user permission boundary as all other user routes. A later
-share layer must refuse new friend-only shares to removed
-recipients through the friendship predicate; that enforcement does not
-exist yet, and neither do the request lifecycle writes (send, accept,
-decline, remove).
+issuer/subject user IDs in both directions. The table is inert data: there
+is no friends handler, friend discovery, or friend read, and no
+friend-request lifecycle (send, accept, decline, remove). Friendship
+never grants financial data access.
 
 ## Browser isolation
 
@@ -187,7 +179,7 @@ policy) or through a direct share from one of the group's current
 members. Discovery reads the indexed references plus the explicit manual
 grants; `CheckSharedTransactionAccess` re-validates membership and policy
 version on every candidate with no index shortcut, so leaving or removal
-revokes source-original access immediately. Friend-specific (user),
+revokes source-original access immediately. Per-user,
 group, and wildcard exclusions deny the feed, the detail read, and the
 counts alike; pending transactions qualify exactly like posted ones. Date,
 member, and movement-direction filters narrow the authorized set for
@@ -246,7 +238,7 @@ intact as an ordinary row). Source-row deletion through the API drops the
 link with the source consent; recipient-side copy deletion
 drops only its own link.
 
-Dependents (SOC-02 recipient copies, SOC-04B splits, consent audit) should
+Dependents (SOC-02 recipient copies, consent audit) should
 key on `linkId` for idempotency and reference, compare `sourceRevision`
 for staleness, and re-check authorization at read time rather than
 caching link state.
@@ -284,14 +276,7 @@ Recipient rules:
 - Clearing the viewer's model resets their inbox state; currently shared
   transactions re-sight as new on the next list.
 
-Split-request producer contract (SOC-03 assigned shares, SOC-04C split
-requests): producers persist their own request rows — split persistence
-itself belongs to SOC-04B — and surface them through the same item
-envelope with kind `split-request`, carrying sender identity, one of the
-`pending`, `accepted`, `declined`, or `canceled` statuses, and an
-authorized-only preview. Inbox mutations stay idempotent under retry, and
-creation endpoints must take idempotency keys so retries cannot create
-duplicate requests.
+Inbox mutations stay idempotent under retry.
 
 SOC-02 HTTP contract (recipient scope, existing shapes only):
 
@@ -331,9 +316,7 @@ each — consent kinds (`grant`, `revoke`, `exclude`, `unexclude`) with
 the request key in the detail payload, `copy-accepted` with the link
 and key, `link-refreshed` with the link, status, and key — carrying
 actor, action, target identities, and time only, never transaction
-evidence. Replays and heals append none. The source owner reads one
-transaction's trace at `GET /v1/shared/audit?transactionId=<uuid>` as
-`{"audit": [...]}` in sequence order; there is no audience-side read.
+evidence. Replays and heals append none. There is no audit read route.
 Model replacement and scope clears drop the keys and user-touching
 audit rows the cleared user executed or owns, so a cleared scope
 restarts with an empty trace.
@@ -382,52 +365,12 @@ writes carry no request key and audit every PUT). Operator recovery uses
 `RebuildSharingIndex`, which re-derives one owner's slice from live rows
 in one transaction for current memberships only and never over-shares. Consumers (feed,
 consent UI): list results order by owner then transaction with the existing
-transaction shape; keyset pagination over the index and any audit read
-path belong to the consumer, not this path. Statement caution: the SQLite
+transaction shape; keyset pagination over the index belongs to the
+consumer, not this path. Statement caution: the SQLite
 driver binds arguments to placeholders sequentially by index and ignores
 `sql.Named` wrapping, so the auto-appended `:user_id` argument binds to
 whatever placeholder stands last — keep `:named` placeholders textually
 last or values silently misbind with no error.
-
-## Versioned splits (SOC-04B)
-
-A split divides one shared transaction across authorized participants as
-an obligation record stored independently of financial models
-(`splits` plus `split_allocations`, `store.Split`). Amounts are integer
-minor units computed by `domain.AllocateSplit` (SOC-04A); the store
-persists the computed shares verbatim and never invents them. Every
-revision appends a version row with status `proposed` and reset
-acceptances: accepted shares only change through an explicit new
-version, never by silent edit. Acceptance is per participant; the version
-turns `accepted` when every participant has accepted. Split writes never
-touch transactions, checkpoints, accounts, or balances, so acceptance moves
-no money.
-
-Split authorization rules:
-
-- Only the initiator may create or revise their split; anyone else fails
-  closed (`ErrGroupForbidden`).
-- Every participant (initiator included) must hold current
-  shared-transaction access to the source at creation and at each revision;
-  a participant without access fails the whole write as not-found, so
-  authorization never leaks who can see the source.
-- Reads are participant-scoped: the initiator or a participant of the
-  latest version may read the split and its version history; anyone else
-  receives not-found, so membership is not enumerable. Reads perform no
-  live source check: the split survives source edits, revocation, and
-  source deletion like accepted-copy provenance.
-- Revisions cannot move a split to another transaction, and participants
-  removed by a revision lose read access to the split.
-- Every mutation carries a client UUID request ID: retries replay the
-  recorded split, key reuse across split actions fails as a conflict,
-  and stale expected versions fail explicitly instead of forking
-  history. Split audit events (`split-created`, `split-updated`,
-  `split-accepted`) reuse the consent `sharing_audit` table with the
-  split link, resulting status, and request key in the detail payload,
-  and stay owner-scoped through `ListSharingAudit`, so there is no
-  audience-side split audit read.
-- Model replacement and scope clears drop splits touching the cleared
-  user, so a split never attaches to an unrelated new row.
 
 Embedded Go Casbin evaluates the model and stored policy rows.
 Use explicit permissions or `authzctl --role none` to revoke

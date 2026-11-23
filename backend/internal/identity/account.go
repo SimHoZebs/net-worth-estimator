@@ -107,8 +107,8 @@ func (s *Service) accountUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		failure(w, 400, "The account update is invalid.")
 		return
 	}
-	if input.DisplayName == nil && input.Avatar == nil {
-		failure(w, 400, "Nothing to update. Provide a display name or avatar.")
+	if input.DisplayName == nil {
+		failure(w, 400, "Nothing to update. Provide a display name.")
 		return
 	}
 	out, _, ok := s.accountCall(w, r, http.MethodPost, "", input)

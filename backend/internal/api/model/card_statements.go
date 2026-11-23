@@ -172,11 +172,10 @@ func (s *handler) listCardStatements(_ context.Context, input *struct {
 type statementPaymentSuggestionsOutput struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
-		TransactionID string                                 `json:"transactionId"`
-		Matches       []types.StatementPaymentSuggestion     `json:"matches"`
-		Current       *types.StatementAllocation             `json:"current,omitempty"`
-		Result        types.StatementPaymentSuggestionResult `json:"result"`
-		Revision      string                                 `json:"revision"`
+		TransactionID string                             `json:"transactionId"`
+		Matches       []types.StatementPaymentSuggestion `json:"matches"`
+		Current       *types.StatementAllocation         `json:"current,omitempty"`
+		Revision      string                             `json:"revision"`
 	} `json:"body"`
 }
 
@@ -201,7 +200,6 @@ func (s *handler) listTransactionStatementPaymentSuggestions(_ context.Context, 
 	}
 	matches, canonicalID := domain.StatementPaymentSuggestions(model, links, input.ID, reads, taken)
 	var current *types.StatementAllocation
-	result := types.StatementPaymentSuggestionResult{Status: "unallocated"}
 	all, err := s.store.ListStatementAllocations("")
 	if err != nil {
 		return nil, modelstate.WriteError(err)
@@ -210,12 +208,6 @@ func (s *handler) listTransactionStatementPaymentSuggestions(_ context.Context, 
 		if all[i].TransactionID == canonicalID {
 			copy := all[i]
 			current = &copy
-			result.Status = "applied"
-			result.StatementID = copy.StatementID
-			result.Amount = copy.Amount
-			if copy.State == "dismissed" {
-				result.Status = "dismissed"
-			}
 			break
 		}
 	}
@@ -225,47 +217,7 @@ func (s *handler) listTransactionStatementPaymentSuggestions(_ context.Context, 
 	}
 	output := &statementPaymentSuggestionsOutput{CacheControl: "private, no-store"}
 	output.Body.TransactionID, output.Body.Matches = input.ID, matches
-	output.Body.Current, output.Body.Result, output.Body.Revision = current, result, revision
-	return output, nil
-}
-
-type paymentCandidatesOutput struct {
-	CacheControl string `header:"Cache-Control"`
-	Body         struct {
-		StatementID string                   `json:"statementId"`
-		Candidates  []types.PaymentCandidate `json:"candidates"`
-		Revision    string                   `json:"revision"`
-	} `json:"body"`
-}
-
-func (s *handler) listPaymentCandidates(_ context.Context, input *struct {
-	ID string `path:"id"`
-}) (*paymentCandidatesOutput, error) {
-	model, statement, err := s.statementContext(input.ID)
-	if err != nil {
-		return nil, err
-	}
-	all, err := s.store.ListStatementAllocations("")
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	taken := make(map[string]string, len(all))
-	for _, allocation := range all {
-		if allocation.State == "confirmed" {
-			taken[allocation.TransactionID] = allocation.StatementID
-		}
-	}
-	links, err := s.store.ListTransferLinks()
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	candidates := domain.StatementPaymentCandidates(model, links, statement, taken)
-	revision, err := modelstate.CurrentRevision(s.store)
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	output := &paymentCandidatesOutput{CacheControl: "private, no-store"}
-	output.Body.StatementID, output.Body.Candidates, output.Body.Revision = statement.ID, candidates, revision
+	output.Body.Current, output.Body.Revision = current, revision
 	return output, nil
 }
 
@@ -398,24 +350,5 @@ func (s *handler) setStatementAllocationState(ctx context.Context, input *struct
 	}
 	output := &statementAllocationOutput{}
 	output.Body.Allocation, output.Body.Revision = allocation, revision
-	return output, nil
-}
-
-type statementAllocationEventsOutput struct {
-	CacheControl string `header:"Cache-Control"`
-	Body         struct {
-		Events []types.StatementAllocationEvent `json:"events"`
-	} `json:"body"`
-}
-
-func (s *handler) listStatementAllocationEvents(_ context.Context, input *struct {
-	ID string `path:"id"`
-}) (*statementAllocationEventsOutput, error) {
-	events, err := s.store.ListStatementAllocationEvents(input.ID)
-	if err != nil {
-		return nil, modelstate.WriteError(err)
-	}
-	output := &statementAllocationEventsOutput{CacheControl: "private, no-store"}
-	output.Body.Events = events
 	return output, nil
 }

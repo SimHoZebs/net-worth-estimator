@@ -1,9 +1,8 @@
 package sharing_test
 
 // Social-operation idempotency over HTTP (FND-05): mutating share routes
-// require a client request ID, retries replay byte-for-byte, key reuse
-// across actions reports 409 without session discovery, and the source
-// owner reads the identity-only audit trace at GET /v1/shared/audit.
+// require a client request ID, retries replay byte-for-byte, and key reuse
+// across actions reports 409 without session discovery.
 
 import (
 	"encoding/json"
@@ -12,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 // Mutating share routes reject missing or malformed request IDs with 400
@@ -59,8 +57,7 @@ func grantBodyBadKey(transactionID, audienceType, audienceID string) string {
 	return string(out)
 }
 
-// Grant and accept retries replay byte-identical bodies with one audit
-// row each.
+// Grant and accept retries replay byte-identical bodies.
 func TestSharingHTTPReplayIdentical(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
@@ -86,25 +83,6 @@ func TestSharingHTTPReplayIdentical(t *testing.T) {
 	fourth := do(t, h, "POST", "/v1/shared/copies", "bob", accept)
 	if fourth.Code != http.StatusCreated || fourth.Body.String() != third.Body.String() {
 		t.Fatalf("accept replay = %d (%s), want byte-identical 201", fourth.Code, fourth.Body.String())
-	}
-	w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", "")
-	if w.Code != http.StatusOK {
-		t.Fatalf("audit = %d (%s), want 200", w.Code, w.Body.String())
-	}
-	var out struct {
-		Audit []store.SharingAuditEvent `json:"audit"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-		t.Fatal(err)
-	}
-	if len(out.Audit) != 2 || out.Audit[0].Action != "grant" || out.Audit[1].Action != store.SharingAuditCopyAccepted {
-		t.Fatalf("audit = %+v, want grant then copy-accepted", out.Audit)
-	}
-	if out.Audit[0].RequestID != key || out.Audit[1].RequestID != acceptKey {
-		t.Fatalf("audit keys = %q/%q, want replay keys", out.Audit[0].RequestID, out.Audit[1].RequestID)
-	}
-	if out.Audit[1].LinkID == "" || out.Audit[1].ActorUserID == "" {
-		t.Fatalf("accept audit missing link or actor: %+v", out.Audit[1])
 	}
 }
 
@@ -139,54 +117,8 @@ func TestSharingHTTPKeyReuseConflicts(t *testing.T) {
 	}
 }
 
-// The audit read is owner-scoped: the source owner sees the trace,
-// another owner sees an empty list, anonymous callers fail, and the
-// transaction selector is required.
-func TestSharingHTTPAuditOwnerScoped(t *testing.T) {
-	h, db := testHandler(t, false)
-	_, storeA := mustUser(t, db, "alice")
-	bob := mustID(t, db, "bob")
-	mustUser(t, db, "carol")
-	mustTransaction(t, storeA, sharedTransactionID)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedTransactionID, "user", bob)); w.Code != http.StatusCreated {
-		t.Fatalf("grant = %d, want 201", w.Code)
-	}
-	w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", "")
-	if w.Code != http.StatusOK {
-		t.Fatalf("owner audit = %d (%s), want 200", w.Code, w.Body.String())
-	}
-	var out struct {
-		Audit []store.SharingAuditEvent `json:"audit"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-		t.Fatal(err)
-	}
-	if len(out.Audit) != 1 || out.Audit[0].Action != "grant" || out.Audit[0].RequestID == "" {
-		t.Fatalf("owner audit = %+v, want one keyed grant row", out.Audit)
-	}
-	for _, leak := range []string{"amount", "Checking", "expression", "receipt", "secret"} {
-		if strings.Contains(w.Body.String(), leak) {
-			t.Fatalf("audit payload leaks %q: %s", leak, w.Body.String())
-		}
-	}
-	// A different owner reads an empty trace, never another owner's.
-	if w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "carol", ""); w.Code != http.StatusOK ||
-		!strings.Contains(w.Body.String(), `"audit":[]`) {
-		t.Fatalf("cross-owner audit = %d (%s), want 200 with []", w.Code, w.Body.String())
-	}
-	if w := do(t, h, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "", ""); w.Code != http.StatusUnauthorized {
-		t.Fatalf("anonymous audit = %d, want 401", w.Code)
-	}
-	if w := do(t, h, "GET", "/v1/shared/audit", "alice", ""); w.Code != http.StatusBadRequest {
-		t.Fatalf("audit without transaction = %d, want 400", w.Code)
-	}
-	if w := do(t, h, "POST", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", ""); w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("audit POST = %d, want 405", w.Code)
-	}
-}
-
 // Read-only mode rejects mutating share requests before any replay:
-// even a retry of a committed key reports 403 while reads stay 200.
+// even a retry of a committed key reports 403.
 func TestSharingHTTPReadOnlyRejectsReplay(t *testing.T) {
 	h, db := testHandler(t, false)
 	alice, storeA := mustUser(t, db, "alice")
@@ -209,8 +141,5 @@ func TestSharingHTTPReadOnlyRejectsReplay(t *testing.T) {
 		if w := do(t, ro, route.method, route.target, "alice", route.body); w.Code != http.StatusForbidden {
 			t.Fatalf("read-only replay %s %s = %d, want 403", route.method, route.target, w.Code)
 		}
-	}
-	if w := do(t, ro, "GET", "/v1/shared/audit?transactionId="+sharedTransactionID, "alice", ""); w.Code != http.StatusOK {
-		t.Fatalf("read-only audit = %d, want 200", w.Code)
 	}
 }

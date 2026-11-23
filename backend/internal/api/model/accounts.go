@@ -229,54 +229,6 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	return &accountOutput{Body: writeResult[types.Account]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
-func (s *handler) deleteAccount(_ context.Context, input *struct {
-	ID string `path:"id"`
-}) (*struct {
-	Body struct {
-		DeletedID string                       `json:"deletedId"`
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Saved     bool                         `json:"saved"`
-		Revision  string                       `json:"revision"`
-	} `json:"body"`
-}, error) {
-	id := input.ID
-	_, issues, saved, revision, err := runFinanceRowWriteGuarded(s, func(model *types.FinancialModel) error {
-		if err := requireOrdinaryAccount(model, id); err != nil {
-			return err
-		}
-		if existing := findModelAccount(model, id); existing != nil && existing.Kind == types.AccountKindCreditCard {
-			live, err := s.cardHasLiveAllocations(id)
-			if err != nil {
-				return huma.Error500InternalServerError(err.Error())
-			}
-			if live {
-				return huma.Error409Conflict("This card still has confirmed statement allocations. Dismiss them before deleting the account.")
-			}
-		}
-		return nil
-	}, func(model *types.FinancialModel) {
-		model.Accounts = removeByID(model.Accounts, id, accountID)
-	}, func() (struct{}, error) {
-		return struct{}{}, s.store.DeleteAccount(id)
-	})
-	if err != nil {
-		return nil, err
-	}
-	output := &struct {
-		Body struct {
-			DeletedID string                       `json:"deletedId"`
-			Issues    []types.ModelValidationIssue `json:"issues"`
-			Saved     bool                         `json:"saved"`
-			Revision  string                       `json:"revision"`
-		} `json:"body"`
-	}{}
-	output.Body.DeletedID = id
-	output.Body.Issues = issues
-	output.Body.Saved = saved
-	output.Body.Revision = revision
-	return output, nil
-}
-
 func (s *handler) moveAccount(_ context.Context, input *reorderInput) (*modelstate.ReorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {

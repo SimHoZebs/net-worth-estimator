@@ -92,9 +92,8 @@ func auditSharingRaw(db sharingStorage, ownerID, actor, kind, transactionID, aud
 
 // shareAuditDetail carries the accepted-copy link, the link-refresh
 // outcome status, and the idempotency key inside the landed audit detail
-// payload. Split rows reuse the same shape for the split link, resulting
-// status, and request key. Actions that name none leave their fields
-// empty. It carries identities only, never transaction evidence.
+// payload. Actions that name none leave their fields empty. It carries
+// identities only, never transaction evidence.
 type shareAuditDetail struct {
 	Link      string `json:"link,omitempty"`
 	Status    string `json:"status,omitempty"`
@@ -104,7 +103,7 @@ type shareAuditDetail struct {
 // auditShareEvent appends one social-operation audit row through the
 // landed consent shape: actor, kind, owner-scoped target, and audience
 // columns for consent rows, with link, status, and request key inside the
-// detail payload decoded by ListSharingAudit.
+// detail payload.
 func auditShareEvent(db sharingStorage, ownerID, actor, kind, transactionID, audienceType, audienceID, linkID, status, requestID string) error {
 	detail, err := json.Marshal(shareAuditDetail{Link: linkID, Status: status, RequestID: requestID})
 	if err != nil {

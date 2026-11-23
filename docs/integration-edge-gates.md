@@ -31,7 +31,7 @@ Versioned synthetic datasets under `backend/testdata/integration/v1`, one
 concern per file. Synthetic by construction: no production rows, no real
 credentials, no real counterparties. A pack is an ordered sequence of seeds:
 a model seed, an optional safe-spending settings seed, and optional
-harness-specific seeds for sync state, sharing, invites, split probes, bank
+harness-specific seeds for sync state, sharing, invites, bank
 feeds, and ledger expectations. The loader applies the model and settings
 seeds and exposes the rest by kind. Every pack documents its concern and what
 breaks if mishandled; the loader refuses packs whose version envelope is not
@@ -70,8 +70,8 @@ Loading per harness:
   applies the model and settings seeds like the browser reseed) or
   `integrationfixtures.Model` plus the harness's own setup. The edge-case
   suite seeds `INTEGRATION_PACK` automatically when set. Harness-specific
-  seeds are read through the pack accessors (`BankFeeds`, `SplitProbes`,
-  `LedgerExpected`, `SyncState`, `SharingScript`, `InviteScript`).
+  seeds are read through the pack accessors (`BankFeeds`, `LedgerExpected`,
+  `SyncState`, `SharingScript`, `InviteScript`).
 - Browser harness (observed regression specs only):
   `INTEGRATION_PACK=<pack>` in the environment. The
   fixtureapi harness applies the pack's model and settings seeds on its own isolated ports and throwaway database; the
@@ -100,13 +100,10 @@ for `go test -count=N -race` repetition: green means hostile, not lucky.
 
 | Case | Real boundary crossed | Stand-in |
 | ---- | --------------------- | -------- |
-| Split remainder theft across USD/JPY/KWD/BHD/EUR, totals 0–100, 1–7 participants, 5-round loop | Real SQLite (allocation + persisted splits) | Identity seam only |
-| Split override mismatch (off-by-one rejected, exact stored) | Real SQLite | Identity seam only |
 | Grant retry storm, 16 racers × 3 rounds: replay identical, key reuse 409 | Real SQLite, real router over real HTTP | Identity seam only |
 | Copy retry storm: one share, exactly one recipient row | Real SQLite, real router over real HTTP | Identity seam only |
-| Split + settlement storm: one split row, linked payment settles once | Real SQLite | Identity seam only |
 | Revocation mid-pagination / mid-copy-save / mid-inbox-decide | Real SQLite, real router over real HTTP | Identity seam only |
-| Void-marking mid-share and mid-split | Real SQLite, real router over real HTTP | Identity seam only |
+| Void-marking mid-share | Real SQLite, real router over real HTTP | Identity seam only |
 | Forged owner/transaction/account/group IDs on every cross-user route | Real SQLite, real router over real HTTP | Identity seam only |
 | Membership removed mid-feed; policy narrowed to off; account deleted mid-policy; group deleted; model cleared | Real SQLite, real router over real HTTP | Identity seam only |
 | Single-use invite accept storm (exactly one wins) + spent-code retries | Real SQLite, real router over real HTTP | Identity seam only |
@@ -147,11 +144,6 @@ duo/full/group journeys run in the Go suite.
   the whole listed set row by row. A full 10k walk is correct but too slow
   for a gate, so the suite proves set-wide totals agreement at 10k and the
   exhaustive walk at 1k. Treat feed latency at scale as a product finding.
-- Settlement recording is intentionally opaque until split-membership
-  fencing lands: any provisioned user may record against a split ID, while
-  split reads stay fenced to initiator and participants. The forgery case
-  pins this contract. See the store interface notes on
-  `RecordSettlement`/`ListSettlements`.
 
 ## Uncovered by automation (never faked green)
 

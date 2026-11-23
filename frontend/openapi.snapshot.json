@@ -374,9 +374,6 @@
 						"readOnly": true,
 						"type": "string"
 					},
-					"avatar": {
-						"type": "string"
-					},
 					"displayName": {
 						"type": "string"
 					},
@@ -387,7 +384,7 @@
 						"type": "string"
 					}
 				},
-				"required": ["owner", "name", "displayName", "avatar"],
+				"required": ["owner", "name", "displayName"],
 				"type": "object"
 			},
 			"AccountProfileUpdate": {
@@ -400,9 +397,6 @@
 						],
 						"format": "uri",
 						"readOnly": true,
-						"type": "string"
-					},
-					"avatar": {
 						"type": "string"
 					},
 					"displayName": {
@@ -1452,37 +1446,6 @@
 				"required": ["asOfDate", "netWorth", "accounts"],
 				"type": "object"
 			},
-			"Delete-accountResponse": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/Delete-accountResponse.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"deletedId": {
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					},
-					"saved": {
-						"type": "boolean"
-					}
-				},
-				"required": ["deletedId", "issues", "saved", "revision"],
-				"type": "object"
-			},
 			"Delete-amount-presetResponse": {
 				"additionalProperties": false,
 				"properties": {
@@ -1921,41 +1884,6 @@
 					"accountBalance",
 					"transactionFulfillment",
 					"cycleFulfillment"
-				],
-				"type": "object"
-			},
-			"EvaluationStatus": {
-				"additionalProperties": false,
-				"properties": {
-					"currentRevision": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"dirtyFrom": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"fingerprint": {
-						"type": "string"
-					},
-					"projectionAvailable": {
-						"type": "boolean"
-					},
-					"publishedRevision": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"state": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"state",
-					"currentRevision",
-					"publishedRevision",
-					"dirtyFrom",
-					"fingerprint",
-					"projectionAvailable"
 				],
 				"type": "object"
 			},
@@ -2924,50 +2852,6 @@
 				"required": ["analyses"],
 				"type": "object"
 			},
-			"List-analysis-feedbackResponse": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/List-analysis-feedbackResponse.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"feedback": {
-						"items": {
-							"$ref": "#/components/schemas/AnalysisFeedback"
-						},
-						"type": ["array", "null"]
-					},
-					"nextCursor": {
-						"type": "string"
-					}
-				},
-				"required": ["feedback", "nextCursor"],
-				"type": "object"
-			},
-			"List-evaluations-statusResponse": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/List-evaluations-statusResponse.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"status": {
-						"$ref": "#/components/schemas/EvaluationStatus"
-					}
-				},
-				"required": ["status"],
-				"type": "object"
-			},
 			"List-planned-purchasesResponse": {
 				"additionalProperties": false,
 				"properties": {
@@ -3527,34 +3411,6 @@
 					"currency",
 					"evidence"
 				],
-				"type": "object"
-			},
-			"PaymentCandidatesOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/PaymentCandidatesOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"candidates": {
-						"items": {
-							"$ref": "#/components/schemas/PaymentCandidate"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					},
-					"statementId": {
-						"type": "string"
-					}
-				},
-				"required": ["statementId", "candidates", "revision"],
 				"type": "object"
 			},
 			"PaymentEvidence": {
@@ -5798,10 +5654,6 @@
 						"format": "double",
 						"type": "number"
 					},
-					"amountDeltaCents": {
-						"format": "int64",
-						"type": "integer"
-					},
 					"claimOccurrenceDate": {
 						"type": "string"
 					},
@@ -5811,33 +5663,14 @@
 					"date": {
 						"type": "string"
 					},
-					"dayGap": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"descriptorChanged": {
-						"type": "boolean"
-					},
 					"name": {
 						"type": "string"
-					},
-					"recommended": {
-						"type": "boolean"
 					},
 					"transactionId": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"transactionId",
-					"name",
-					"amount",
-					"date",
-					"dayGap",
-					"amountDeltaCents",
-					"descriptorChanged",
-					"recommended"
-				],
+				"required": ["transactionId", "name", "amount", "date"],
 				"type": "object"
 			},
 			"SettleCandidatesOutputBody": {
@@ -5912,52 +5745,6 @@
 					"createdAt",
 					"updatedAt"
 				],
-				"type": "object"
-			},
-			"StatementAllocationEvent": {
-				"additionalProperties": false,
-				"properties": {
-					"action": {
-						"type": "string"
-					},
-					"actor": {
-						"type": "string"
-					},
-					"allocationId": {
-						"type": "string"
-					},
-					"createdAt": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"id": {
-						"format": "int64",
-						"type": "integer"
-					}
-				},
-				"required": ["id", "allocationId", "action", "createdAt"],
-				"type": "object"
-			},
-			"StatementAllocationEventsOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/StatementAllocationEventsOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"events": {
-						"items": {
-							"$ref": "#/components/schemas/StatementAllocationEvent"
-						},
-						"type": ["array", "null"]
-					}
-				},
-				"required": ["events"],
 				"type": "object"
 			},
 			"StatementAllocationInputBody": {
@@ -6047,23 +5834,6 @@
 				"required": ["read", "payment"],
 				"type": "object"
 			},
-			"StatementPaymentSuggestionResult": {
-				"additionalProperties": false,
-				"properties": {
-					"amount": {
-						"format": "double",
-						"type": "number"
-					},
-					"statementId": {
-						"type": "string"
-					},
-					"status": {
-						"type": "string"
-					}
-				},
-				"required": ["status"],
-				"type": "object"
-			},
 			"StatementPaymentSuggestionsOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -6085,9 +5855,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"result": {
-						"$ref": "#/components/schemas/StatementPaymentSuggestionResult"
-					},
 					"revision": {
 						"type": "string"
 					},
@@ -6095,7 +5862,7 @@
 						"type": "string"
 					}
 				},
-				"required": ["transactionId", "matches", "result", "revision"],
+				"required": ["transactionId", "matches", "revision"],
 				"type": "object"
 			},
 			"StatusOutputBody": {
@@ -7262,35 +7029,6 @@
 				"required": ["value", "issues", "saved", "revision"],
 				"type": "object"
 			},
-			"WriteResultString": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/WriteResultString.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					},
-					"saved": {
-						"type": "boolean"
-					},
-					"value": {
-						"type": "string"
-					}
-				},
-				"required": ["value", "issues", "saved", "revision"],
-				"type": "object"
-			},
 			"WriteResultTransaction": {
 				"additionalProperties": false,
 				"properties": {
@@ -7447,42 +7185,6 @@
 			}
 		},
 		"/v1/accounts/{id}": {
-			"delete": {
-				"operationId": "delete-account",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/Delete-accountResponse"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Delete one account"
-			},
 			"patch": {
 				"operationId": "update-account",
 				"parameters": [
@@ -7815,73 +7517,6 @@
 					}
 				},
 				"summary": "Read background analysis status without starting work"
-			}
-		},
-		"/v1/analysis-feedback": {
-			"get": {
-				"operationId": "list-analysis-feedback",
-				"parameters": [
-					{
-						"explode": false,
-						"in": "query",
-						"name": "findingId",
-						"schema": {
-							"maxLength": 100,
-							"type": "string"
-						}
-					},
-					{
-						"explode": false,
-						"in": "query",
-						"name": "cursor",
-						"schema": {
-							"maxLength": 100,
-							"type": "string"
-						}
-					},
-					{
-						"explode": false,
-						"in": "query",
-						"name": "limit",
-						"schema": {
-							"default": 50,
-							"format": "int64",
-							"maximum": 100,
-							"minimum": 1,
-							"type": "integer"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/List-analysis-feedbackResponse"
-								}
-							}
-						},
-						"description": "OK",
-						"headers": {
-							"Cache-Control": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Read private labeled feedback with prediction provenance"
 			}
 		},
 		"/v1/analysis-findings": {
@@ -8527,51 +8162,6 @@
 				"summary": "Explicitly allocate one posted payment to a derived statement"
 			}
 		},
-		"/v1/card-statements/{id}/payment-candidates": {
-			"get": {
-				"operationId": "list-statement-payment-candidates",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/PaymentCandidatesOutputBody"
-								}
-							}
-						},
-						"description": "OK",
-						"headers": {
-							"Cache-Control": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List posted payments with advisory evidence for one derived statement"
-			}
-		},
 		"/v1/checkpoints": {
 			"delete": {
 				"operationId": "delete-checkpoint",
@@ -8787,41 +8377,6 @@
 					}
 				},
 				"summary": "Move one evaluation"
-			}
-		},
-		"/v1/evaluations/status": {
-			"get": {
-				"operationId": "list-evaluations-status",
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/List-evaluations-statusResponse"
-								}
-							}
-						},
-						"description": "OK",
-						"headers": {
-							"Cache-Control": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Read evaluation reader execution status without starting work"
 			}
 		},
 		"/v1/evaluations/summary": {
@@ -9379,42 +8934,6 @@
 			}
 		},
 		"/v1/loans/{id}": {
-			"delete": {
-				"operationId": "delete-loan",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/WriteResultString"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Delete a loan and its managed rules atomically"
-			},
 			"put": {
 				"operationId": "update-loan",
 				"parameters": [
@@ -10379,18 +9898,6 @@
 		"/v1/safe-spending-summary": {
 			"get": {
 				"operationId": "get-safe-spending-summary",
-				"parameters": [
-					{
-						"description": "Historical cut: YYYY-MM-DD (end of day) or RFC 3339 instant. Defaults to now.",
-						"explode": false,
-						"in": "query",
-						"name": "asOf",
-						"schema": {
-							"description": "Historical cut: YYYY-MM-DD (end of day) or RFC 3339 instant. Defaults to now.",
-							"type": "string"
-						}
-					}
-				],
 				"responses": {
 					"200": {
 						"content": {
@@ -10823,51 +10330,6 @@
 					}
 				},
 				"summary": "Dismiss or undo one statement allocation"
-			}
-		},
-		"/v1/statement-allocations/{id}/events": {
-			"get": {
-				"operationId": "list-statement-allocation-events",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/StatementAllocationEventsOutputBody"
-								}
-							}
-						},
-						"description": "OK",
-						"headers": {
-							"Cache-Control": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List the audit trail for one statement allocation"
 			}
 		},
 		"/v1/status": {

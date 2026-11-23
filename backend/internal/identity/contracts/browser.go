@@ -15,12 +15,10 @@ type AccountProfile struct {
 	Owner       string `json:"owner"`
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
-	Avatar      string `json:"avatar"`
 }
 
 type AccountProfileUpdate struct {
 	DisplayName *string `json:"displayName,omitempty"`
-	Avatar      *string `json:"avatar,omitempty"`
 }
 
 type AccountPasswordChange struct {

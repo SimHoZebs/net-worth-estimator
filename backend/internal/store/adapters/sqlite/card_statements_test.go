@@ -42,9 +42,9 @@ func TestStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 		t.Fatalf("allocation for payment = %+v, err %v", found, err)
 	}
 
-	events, err := s.ListStatementAllocationEvents(allocation.ID)
-	if err != nil || len(events) != 1 || events[0].Action != "created" {
-		t.Fatalf("events = %+v, err %v", events, err)
+	events := allocationAuditActions(t, s, allocation.ID)
+	if len(events) != 1 || events[0] != "created" {
+		t.Fatalf("audit actions = %v, want [created]", events)
 	}
 	// A repeated state change is idempotent and adds no audit row.
 	if _, err := s.SetStatementAllocationState(allocation.ID, "dismissed", "owner"); err != nil {
@@ -53,17 +53,17 @@ func TestStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 	if _, err := s.SetStatementAllocationState(allocation.ID, "dismissed", "owner"); err != nil {
 		t.Fatal(err)
 	}
-	events, err = s.ListStatementAllocationEvents(allocation.ID)
-	if err != nil || len(events) != 2 {
-		t.Fatalf("events after dismiss = %+v, err %v", events, err)
+	events = allocationAuditActions(t, s, allocation.ID)
+	if len(events) != 2 {
+		t.Fatalf("audit actions after dismiss = %v, want 2", events)
 	}
 
 	if _, err := s.ReactivateStatementAllocation(allocation.ID, statementID, 60.20, "again", "owner"); err != nil {
 		t.Fatalf("reactivate: %v", err)
 	}
-	events, err = s.ListStatementAllocationEvents(allocation.ID)
-	if err != nil || len(events) != 3 || events[2].Action != "confirmed" {
-		t.Fatalf("events after reapply = %+v, err %v", events, err)
+	events = allocationAuditActions(t, s, allocation.ID)
+	if len(events) != 3 || events[2] != "confirmed" {
+		t.Fatalf("audit actions after reapply = %v, want confirmed last", events)
 	}
 
 	allocations, err := s.ListStatementAllocations(statementID)
@@ -84,4 +84,28 @@ func TestStatementAllocationRejectsMalformedDerivedID(t *testing.T) {
 	if _, err := s.ReactivateStatementAllocation("missing", "not-a-derived-id", 1, "", ""); err == nil {
 		t.Fatal("reactivation with a malformed derived statement id should be rejected")
 	}
+}
+
+// allocationAuditActions reads the append-only audit table directly. The
+// allocation audit has no product read path, so the test verifies writes at
+// the store boundary rather than through a deleted endpoint.
+func allocationAuditActions(t *testing.T, s *sqliteStore, allocationID string) []string {
+	t.Helper()
+	rows, err := s.db.Query(`SELECT action FROM statement_allocation_events WHERE allocation_id = ? ORDER BY id`, allocationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	actions := []string{}
+	for rows.Next() {
+		var action string
+		if err := rows.Scan(&action); err != nil {
+			t.Fatal(err)
+		}
+		actions = append(actions, action)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return actions
 }

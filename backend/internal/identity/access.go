@@ -99,7 +99,6 @@ func IsGroupRoute(path string) bool {
 func IsSharingRoute(path string) bool {
 	return path == "/v1/shared/grants" || path == "/v1/shared/exclusions" ||
 		path == "/v1/shared/copies" || strings.HasPrefix(path, "/v1/shared/copies/") ||
-		path == "/v1/shared/audit" ||
 		path == "/v1/shared/transactions" ||
 		strings.HasPrefix(path, "/v1/shared/transactions/") ||
 		strings.HasPrefix(path, "/v1/shared/policies/") ||
@@ -119,13 +118,3 @@ func IsInboxRoute(path string) bool {
 
 // isGroupRoute is the internal alias used by the request pipeline.
 func isGroupRoute(path string) bool { return IsGroupRoute(path) }
-
-// IsFriendRoute reports social friend routes. Friend calls require the
-// standard own-user permission checks and resource header; friendship is
-// additionally enforced by the friends handler, and unknown or non-friend
-// reads report 404 so friendships are not enumerable. It matches exactly
-// the routes the friends handler serves so no future user route can hide
-// inside the friend path.
-func IsFriendRoute(path string) bool {
-	return path == "/v1/friends" || strings.HasPrefix(path, "/v1/friends/")
-}

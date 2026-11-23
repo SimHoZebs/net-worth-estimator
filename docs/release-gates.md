@@ -113,9 +113,6 @@ instead of restating them.
   review (confirm/correct with the original extraction preserved) and
   image-receipt transaction links are journey-tested; the matcher step is
   not, and must not be reported as covered.
-- Split-builder and manual-send flows: blocked on the undecided
-  friend-request lifecycle and the unbuilt send flow.
-- Friend-request lifecycle itself: open product decisions.
 - Real Google OAuth token exchange and message fetch: the automation
   seam is the fetch boundary; journeys name the fake fetcher and cover
   everything downstream (scan, triage, extraction evidence, review,
@@ -124,6 +121,5 @@ instead of restating them.
   say so in their names and cover the real upload, storage, review,
   and link paths around it.
 - Transaction-level currency: amounts are bare expressions with no currency
-  field. Zero-decimal coverage lives in the split probes (JPY 1000 over
-  3 allocates exactly 334/333/333); a yen-denominated transaction row is not
-  expressible and stays uncovered.
+  field. Zero-decimal allocation behavior has no dedicated probe; a
+  yen-denominated transaction row is not expressible and stays uncovered.

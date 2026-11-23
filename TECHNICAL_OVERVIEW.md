@@ -119,7 +119,7 @@ connection with a two-second deadline. See [the deployment contract](deploy/READ
 
 Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `model` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
 
-Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/transactions`, `/v1/schedules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{value, issues, saved, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/transactions/{id}/receipts`) and Analysis feedback (`/v1/analysis-findings...`, `/v1/analysis-feedback`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/transactions`, `/v1/schedules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{value, issues, saved, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/transactions/{id}/receipts`) and Analysis feedback writes (`/v1/analysis-findings...`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
 
 - Error-severity issues from the write's validation boundary prevent persistence.
   Ordinary finance writes validate financial records and protect existing valid
@@ -340,31 +340,6 @@ The `Projection-Source` header stays `computed` or `shared`; it does not
 carry a stored marker. See [unified projection](docs/unified-projection.md)
 for slice lifecycle, revision validity, and canonical bypass rules.
 
-### Split settlements
-
-Payoff against shared-expense obligations (SOC-05,
-`backend/internal/store/settlement.go`,
-`backend/internal/store/adapters/sqlite/settlements.go`, store-level
-only) is an append-only ledger kept separate from balances:
-`RecordSettlement` writes one `split_settlements` row plus one
-`split_settlement_requests` idempotency row and never touches
-transactions, checkpoints, accounts, or balances, so recording a
-settlement moves no money. Each record names one split, the
-participant whose obligation it reduces, a positive integer-minor-unit
-amount, and an optional link to one real payment; one real payment
-backs at most one settlement, so linked payments are never
-double-counted. Retries reuse a client-generated UUID request ID per
-(actor, key): replays return the recorded settlement, concurrent
-identical retries converge to one row, and a key reused for a
-different settlement fails with `store.ErrSettlementConflict`.
-Outstanding, partially-settled, and settled states are derived, never
-stored: `SummarizeSettlements` combines caller-supplied owed shares
-with the recorded history (each row counted once), and
-`SplitSettlementState` rolls the positions into one split state.
-Split-membership fencing for record and read access lands with the
-SOC-04B split reads, which also supply the owed shares; until then the
-split ID is opaque and any provisioned user may record or read.
-
 ### Social operations
 
 Cross-user transaction sharing (`backend/internal/sharing`, store consent
@@ -392,17 +367,15 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
   replaying an unapplied outcome.
 - Committed mutations append one `sharing_audit` row carrying actor,
   action, target identities, link, outcome status, request ID, and time.
-  Replays and heals append none. Owners read their transaction's trace at
-  `GET /v1/shared/audit`; see [authorization](docs/authorization.md#social-operation-audit-and-idempotency) for the full audit contract. Audit payloads
+  Replays and heals append none. There is no audit read route; see
+  [authorization](docs/authorization.md#social-operation-audit-and-idempotency) for the full audit contract. Audit payloads
   never carry transaction evidence (no amounts, names, accounts, memos,
   or transaction content). Replays return the recorded result to its own
   actor only; the accept replay is the recipient's own copy, never a
   cross-user read.
 
-Dependents reuse this shape: versioned splits (SOC-04B) close retry races
-with request IDs and fail concurrent revisions explicitly, and
-concurrency coverage (QA-02) asserts idempotent replay through these
-endpoints plus share/revoke ordering at the store boundary.
+Concurrency coverage (QA-02) asserts idempotent replay plus share/revoke
+ordering at the store boundary.
 
 ## 4. Result Identity
 

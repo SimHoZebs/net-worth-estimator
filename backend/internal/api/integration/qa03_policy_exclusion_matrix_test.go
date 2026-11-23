@@ -1,12 +1,10 @@
 package integration
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // QA-03 follow-up: every group interaction around the stale-feed fix.
@@ -27,25 +25,6 @@ const qa03MatrixDay = 1781524800 // 2026-06-15 12:00 UTC
 func qa03OwnerPlan(t *testing.T, social *qa03Social) http.Handler {
 	t.Helper()
 	return New(social.ownerSC, Config{})
-}
-
-func qa03DeleteOwnerAccount(t *testing.T, social *qa03Social, accountID string, wantPersisted bool) {
-	t.Helper()
-	var payload struct {
-		DeletedID string                       `json:"deletedId"`
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Saved     bool                         `json:"saved"`
-	}
-	response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/accounts/"+accountID, "")
-	if response.Code != http.StatusOK {
-		t.Fatalf("delete account %s = %d %s", accountID, response.Code, response.Body.String())
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload.Saved != wantPersisted {
-		t.Fatalf("delete account %s saved = %v, want %v (issues %+v)", accountID, payload.Saved, wantPersisted, payload.Issues)
-	}
 }
 
 func qa03MatrixFeed(t *testing.T, social *qa03Social, subject, groupID string) map[string]any {
@@ -174,88 +153,11 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 		t.Fatalf("disabled-policy read = %d, want 404", denied.Code)
 	}
 
-	// Enabling with zero accounts is rejected at the boundary with a
-	// plain reason; the kept-but-matching-nothing state below comes only
-	// from deleting every selected account.
+	// Enabling with zero accounts is rejected at the boundary with a plain reason.
 	rejected := qa03Serve(t, social.sharing.Routes(), http.MethodPut, "/v1/shared/policies/"+groupID, "qa03-owner",
 		qa03PolicyBody(true, `[]`, "2026-01-01", "2026-12-31"))
 	if rejected.Code != http.StatusBadRequest {
 		t.Fatalf("zero-account enable = %d, want 400", rejected.Code)
-	}
-
-	// Re-enable on checking, then delete a second account mid-policy: the
-	// feed follows to what remains without touching the survivor.
-	// Deleting an account its transactions still reference is refused first
-	// (fail-closed with the referencing row named); only the unused
-	// account deletes and strips the policy.
-	if _, err := social.ownerSC.CreateAccount(types.Account{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true}); err != nil {
-		t.Fatal(err)
-	}
-	savings := "savings"
-	savingsTransaction := "01900000-0000-7000-8000-0000000000e5"
-	if _, err := social.ownerSC.CreateTransaction(types.Transaction{
-		ID: savingsTransaction, Name: "Dues", SourceAccountID: &savings,
-		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "5.00"}, Inputs: map[string]types.AmountInputBinding{}},
-		PostedTime:      qa03MatrixDay,
-		TransactionTime: qa03MatrixDay,
-		Enabled:         true,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	qa03SetPolicy(t, social, "qa03-owner", groupID, qa03PolicyBody(true, `["checking","savings"]`, "2026-01-01", "2026-12-31"), http.StatusOK)
-	preview := qa03Decode(t, qa03Serve(t, social.sharing.Routes(), http.MethodPost, "/v1/shared/policies/"+groupID+"/preview", "qa03-owner",
-		qa03PolicyBody(true, `["checking","savings"]`, "2026-01-01", "2026-12-31")), http.StatusOK)
-	eligible, _ := preview["preview"].(map[string]any)["eligibleTransactions"].(float64)
-	if int(eligible) != 3 {
-		t.Fatalf("preview = %+v, want 3 eligible transactions", preview["preview"])
-	}
-	if got := qa03FeedCount(qa03MatrixFeed(t, social, "qa03-member", groupID)); got != 3 {
-		t.Fatalf("member feed = %d, want 3 across both accounts", got)
-	}
-	qa03DeleteOwnerAccount(t, social, "savings", false)
-	refused := qa03MatrixFeed(t, social, "qa03-member", groupID)
-	qa03FeedAgrees(t, refused)
-	if qa03FeedCount(refused) != 3 {
-		t.Fatalf("member feed = %+v, want 3 unchanged after the refused deletion", qa03FeedItemIDs(refused))
-	}
-
-	// With its transaction gone the account deletes, the policy strips to the
-	// survivor, and the feed follows.
-	if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+savingsTransaction, ""); response.Code != http.StatusOK {
-		t.Fatalf("delete transaction = %d %s", response.Code, response.Body.String())
-	}
-	qa03DeleteOwnerAccount(t, social, "savings", true)
-	after := qa03MatrixFeed(t, social, "qa03-member", groupID)
-	qa03FeedAgrees(t, after)
-	if qa03FeedCount(after) != 2 || qa03FeedHas(after, social.owner, savingsTransaction) {
-		t.Fatalf("member feed = %+v, want the 2 checking rows after the account deletion", qa03FeedItemIDs(after))
-	}
-	stored, err := social.db.GetSharingPolicy(social.owner, groupID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, id := range stored.AccountIDs {
-		if id == "savings" {
-			t.Fatalf("policy = %+v, want the deleted account stripped", stored)
-		}
-	}
-
-	// Deleting the last selected account keeps the enabled row with zero
-	// accounts, and it matches nothing.
-	for _, id := range []string{qa03SharedGroceries, qa03SharedFuel} {
-		if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+id, ""); response.Code != http.StatusOK {
-			t.Fatalf("delete transaction %s = %d %s", id, response.Code, response.Body.String())
-		}
-	}
-	qa03DeleteOwnerAccount(t, social, "checking", true)
-	stored, err = social.db.GetSharingPolicy(social.owner, groupID)
-	if err != nil || !stored.Enabled || len(stored.AccountIDs) != 0 {
-		t.Fatalf("policy = %+v err = %v, want the enabled zero-account row kept", stored, err)
-	}
-	empty := qa03MatrixFeed(t, social, "qa03-member", groupID)
-	qa03FeedAgrees(t, empty)
-	if qa03FeedCount(empty) != 0 {
-		t.Fatalf("member feed = %+v, want nothing matched", qa03FeedItemIDs(empty))
 	}
 }
 

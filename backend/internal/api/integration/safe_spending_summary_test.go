@@ -19,7 +19,7 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	const day = "2024-11-15"
+	day := time.Now().UTC().Format("2006-01-02")
 	midnight, _ := time.Parse("2006-01-02", day)
 	for i, subject := range []string{"alice", "bob"} {
 		t.Run(subject, func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 		handler := New(st, Config{ReadOnly: true})
-		response := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary?asOf="+day, "")
+		response := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary", "")
 		if response.Code != 200 {
 			t.Fatalf("%s: %d %s", subject, response.Code, response.Body.String())
 		}
@@ -103,24 +103,6 @@ func TestSafeSpendingSummaryHTTPAndUserIsolation(t *testing.T) {
 		if got.IncomeFunded == nil || got.SavingsAllowance == nil ||
 			*got.IncomeFunded-*got.SavingsAllowance != float64(25+i) {
 			t.Fatalf("%s did not use the tenant's savings goal: %+v", subject, got)
-		}
-		beforeObservation := midnight.Add(-2 * time.Second).Format(time.RFC3339)
-		historical := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary?asOf="+beforeObservation, "")
-		var then types.SafeSpendingSummary
-		if historical.Code != http.StatusOK {
-			t.Fatalf("%s historical summary: %d %s", subject, historical.Code, historical.Body.String())
-		}
-		if err := json.Unmarshal(historical.Body.Bytes(), &then); err != nil {
-			t.Fatal(err)
-		}
-		if then.CashAsOf != beforeObservation[:10] || then.CheckingAvailable != nil || then.SafeToSpend != nil {
-			t.Fatalf("%s historical summary used a later cash observation: %+v", subject, then)
-		}
-		for _, invalidCut := range []string{"not-a-date", time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")} {
-			invalid := doRowRequest(t, handler, http.MethodGet, "/v1/safe-spending-summary?asOf="+invalidCut, "")
-			if invalid.Code != http.StatusUnprocessableEntity {
-				t.Fatalf("%s invalid cut %q: %d %s", subject, invalidCut, invalid.Code, invalid.Body.String())
-			}
 		}
 	}
 }

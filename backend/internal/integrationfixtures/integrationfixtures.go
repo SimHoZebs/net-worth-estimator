@@ -4,8 +4,8 @@
 // synthetic by construction: no production rows, no real credentials, no
 // real counterparties. A pack is an ordered sequence of seeds. The loader
 // applies the model and safe-spending settings seeds; harness-specific seeds
-// (bank feeds, sharing scripts, invite scripts, split probes, sync state, and
-// ledger expectations) are exposed to the harnesses that drive those paths.
+// (bank feeds, sharing scripts, invite scripts, sync state, and ledger
+// expectations) are exposed to the harnesses that drive those paths.
 package integrationfixtures
 
 import (
@@ -60,7 +60,6 @@ const (
 	SeedKindSyncState      = "syncState"
 	SeedKindSharingScript  = "sharingScript"
 	SeedKindInviteScript   = "inviteScript"
-	SeedKindSplitProbes    = "splitProbes"
 	SeedKindBankFeeds      = "bankFeeds"
 	SeedKindLedgerExpected = "ledgerExpected"
 )
@@ -89,8 +88,6 @@ type Seed struct {
 	SharingScript []SharingStep `json:"sharingScript,omitempty"`
 	// InviteScript describes invites at their limits.
 	InviteScript []InviteStep `json:"inviteScript,omitempty"`
-	// SplitProbes are remainder-theft probes for the edge-case suite.
-	SplitProbes []SplitProbe `json:"splitProbes,omitempty"`
 	// BankFeeds is an ordered run of bank states for the completeness
 	// ledger: each feed applies through the real sync reconcile in order,
 	// so rows can settle, stay pending, vanish into voids, and re-sync
@@ -128,14 +125,6 @@ type SharingStep struct {
 type InviteStep struct {
 	MaxUses int    `json:"maxUses"`
 	State   string `json:"state"`
-}
-
-// SplitProbe is one remainder-theft probe: the total, currency, and
-// participant count the integration edge-case suite must divide exactly.
-type SplitProbe struct {
-	Currency     string `json:"currency"`
-	TotalMinor   int64  `json:"totalMinor"`
-	Participants int    `json:"participants"`
 }
 
 // BankRowSeed is one synthetic bank transaction for the lifecycle path.
@@ -232,10 +221,6 @@ func (s Seed) validate() error {
 	case SeedKindInviteScript:
 		if len(s.InviteScript) == 0 {
 			return fmt.Errorf("inviteScript seed has no steps")
-		}
-	case SeedKindSplitProbes:
-		if len(s.SplitProbes) == 0 {
-			return fmt.Errorf("splitProbes seed has no probes")
 		}
 	case SeedKindBankFeeds:
 		if len(s.BankFeeds) == 0 {
@@ -402,16 +387,6 @@ func (p Pack) InviteScript() []InviteStep {
 	for _, seed := range p.Seeds {
 		if seed.Kind == SeedKindInviteScript {
 			return seed.InviteScript
-		}
-	}
-	return nil
-}
-
-// SplitProbes returns the split probes seed, if present.
-func (p Pack) SplitProbes() []SplitProbe {
-	for _, seed := range p.Seeds {
-		if seed.Kind == SeedKindSplitProbes {
-			return seed.SplitProbes
 		}
 	}
 	return nil

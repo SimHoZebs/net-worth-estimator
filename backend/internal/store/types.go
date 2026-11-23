@@ -277,16 +277,6 @@ type GroupMember struct {
 	JoinedAt    int64  `json:"joinedAt"`
 }
 
-// Friend is one accepted friendship edge with a display snapshot.
-// Edges are directed: user A listing friends reads rows keyed by A, and a
-// complete friendship holds both directions. The request lifecycle that
-// writes these rows is not built yet; reads below never invent edges.
-type Friend struct {
-	AccountID   string `json:"accountId"`
-	DisplayName string `json:"displayName"`
-	CreatedAt   int64  `json:"createdAt"`
-}
-
 // GroupInvite is a redeemable invite. Code is returned once on create.
 type GroupInvite struct {
 	ID        string `json:"id"`
@@ -493,8 +483,7 @@ const (
 // Audience names the consent target for grant/revoke/exclude/unexclude
 // rows. Link, Status, and RequestID decode from the audit detail payload:
 // the accepted-copy link, the link-refresh outcome, and the idempotency
-// key that executed the mutation. Consent rows carry the key; split rows
-// carry link, status, and key. The event never carries transaction
+// key that executed the mutation. The event never carries transaction
 // evidence.
 type SharingAuditEvent struct {
 	Seq           int64  `json:"seq"`

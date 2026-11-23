@@ -2,12 +2,9 @@ package integrationedge
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 // grantTriple names one grant row by its natural key: owner, transaction,
@@ -19,10 +16,9 @@ func grantTriple(grant map[string]any) string {
 	return owner + "/" + transaction + "/" + audience
 }
 
-// Double-spend via retry storms on every mutating share, split, and
-// settlement path. Retries with one key must replay one outcome; one key
-// reused across actions must fail; concurrent storms must record exactly
-// one row per key and never double-count a linked payment. Real SQLite store and real production routers over real HTTP; the only stand-in is identity (no OIDC round trip).
+// Double-spend via retry storms on every mutating share path. Retries with
+// one key must replay one outcome; one key reused across actions must fail;
+// concurrent storms must record exactly one row per key. Real SQLite store and real production routers over real HTTP; the only stand-in is identity (no OIDC round trip).
 // The storm loops three times: green means hostile, not lucky.
 func TestIntegrationEdgeGrantRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 	for round := 0; round < 3; round++ {
@@ -129,102 +125,6 @@ func TestIntegrationEdgeCopyRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
 		}
 		if copies != 1 {
 			t.Fatalf("round %d recipient rows = %d, want exactly one copy", round, copies)
-		}
-	}
-}
-
-// Split and settlement retry storms at the store level, where those
-// mutations live. Same-key replays return the recorded row; concurrent
-// same-key storms record one row; one linked payment backs one settlement.
-func TestIntegrationEdgeSplitSettlementRetryStorm_RealSQLite_RealHTTP(t *testing.T) {
-	for round := 0; round < 3; round++ {
-		world := advSetup(t)
-		if advIdentitySet() == advSetSolo {
-			t.Skip("needs a second participant")
-		}
-		participants := []string{world.owner, world.second}
-		sourceRow := advMustTransaction(t, world.ownerSC, "Storm split source", "100.00", 1781524800)
-		if world.groupID != "" {
-			if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "group", world.groupID, advRequestID(t)); err != nil {
-				t.Fatal(err)
-			}
-		} else if _, err := world.db.GrantSharedTransaction(world.owner, sourceRow, "user", world.second, advRequestID(t)); err != nil {
-			t.Fatal(err)
-		}
-		newInput := func() store.SplitInput {
-			return store.SplitInput{
-				SourceOwnerID: world.owner, SourceTransactionID: sourceRow,
-				InitiatorID: world.owner, Currency: "USD",
-				TotalMinor: 100, ParticipantIDs: participants,
-			}
-		}
-		key := advRequestID(t)
-		first, err := world.db.CreateSplit(world.owner, newInput(), key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		results := advStorm(16, func(i int) any {
-			split, err := world.db.CreateSplit(world.owner, newInput(), key)
-			if err != nil {
-				return err
-			}
-			return split.ID
-		})
-		for _, result := range results {
-			switch outcome := result.(type) {
-			case string:
-				if outcome != first.ID {
-					t.Fatalf("round %d split replay minted %q beside %q", round, outcome, first.ID)
-				}
-			case error:
-				t.Fatalf("round %d split replay failed: %v", round, outcome)
-			}
-		}
-		splits, err := world.db.ListSplits(world.owner)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(splits) != 1 {
-			t.Fatalf("round %d splits = %d, want exactly one row", round, len(splits))
-		}
-		// The linked-payment double-spend: one real payment backs one
-		// settlement. The second record against the same payment fails.
-		day := int64(1781524800)
-		payRow := advMustTransaction(t, world.ownerSC, "Real payment", "60.00", day)
-		payKey := advRequestID(t)
-		settlement, err := world.db.RecordSettlement(world.owner, store.SettlementInput{
-			SplitID: first.ID, ParticipantID: world.second, AmountMinor: 60,
-			LinkedOwnerID: world.owner, LinkedTransactionID: payRow,
-		}, payKey)
-		if err != nil {
-			t.Fatal(err)
-		}
-		replay, err := world.db.RecordSettlement(world.owner, store.SettlementInput{
-			SplitID: first.ID, ParticipantID: world.second, AmountMinor: 60,
-			LinkedOwnerID: world.owner, LinkedTransactionID: payRow,
-		}, payKey)
-		if err != nil {
-			t.Fatalf("round %d settlement replay failed: %v", round, err)
-		}
-		if replay.ID != settlement.ID {
-			t.Fatalf("round %d settlement replay minted %q beside %q", round, replay.ID, settlement.ID)
-		}
-		_, err = world.db.RecordSettlement(world.owner, store.SettlementInput{
-			SplitID: first.ID, ParticipantID: world.second, AmountMinor: 60,
-			LinkedOwnerID: world.owner, LinkedTransactionID: payRow,
-		}, advRequestID(t))
-		if err == nil {
-			t.Fatalf("round %d same payment settled twice: double-spend recorded", round)
-		}
-		if !errors.Is(err, store.ErrSettlementConflict) && !errors.Is(err, store.ErrSharingConflict) {
-			t.Fatalf("round %d double-settle error = %v, want a conflict", round, err)
-		}
-		history, err := world.db.ListSettlements(world.owner, first.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(history) != 1 {
-			t.Fatalf("round %d settlements = %d, want the single recorded payment", round, len(history))
 		}
 	}
 }

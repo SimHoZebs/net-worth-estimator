@@ -48,11 +48,6 @@ func deleteModelRows(tx *userTx) error {
 	if err := clearSharingForUser(tx); err != nil {
 		return err
 	}
-	// Splits name source transactions by ID, so replacement drops them
-	// alongside consent: a split must never attach to an unrelated new row.
-	if err := clearSplitsForUser(tx); err != nil {
-		return err
-	}
 	return nil
 }
 
