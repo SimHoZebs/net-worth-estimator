@@ -26,7 +26,7 @@ The result is a contradictory row: a rejected strong BNPL finding shows "Likely 
 
 ## Recommended action
 
-Make `findingLabel` and `findingStatus` delegate to `findingStateLabel`, passing a finding with `kind` set to the display string `"BNPL"`. Keep the unanswered strong and moderate output "Likely BNPL" and "Possible BNPL" that the analyses documentation relies on. Decide two intentional wording differences during the change: the shared `label` style gives "Confirmed BNPL" where the badge says "BNPL", and the shared `status` style gives "Needs review" where the column says "Active".
+Make `findingLabel` and `findingStatus` delegate to `findingStateLabel`, passing a finding with `kind` set to the display string `"BNPL"`. Keep the badge as "BNPL" for confirmed findings and the column as "Active" for plain unanswered active rows with two local overrides, because those strings already read correctly. Keep "Likely BNPL" and "Possible BNPL" for unanswered strong and moderate findings, as the analyses documentation relies on them.
 
 ## Before and after
 

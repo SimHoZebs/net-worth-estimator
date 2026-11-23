@@ -32,7 +32,7 @@ The recommended action is to choose one close-pricing rule and have both surface
 
 ## Recommended action
 
-Choose one close-pricing rule and make both surfaces consume it: have `buildStatements` call `DeriveStatements` or extract the shared close-pricing routine. Keep `cardStatementRows` as the single replay engine for estimated cycles and keep the `card_statements` drop-and-rekey migration body until every target verifies. This is deletion of one derivation path, not extension of a framework.
+Make the observed-balance rule authoritative. Have `buildStatements` call `DeriveStatements` for closed cycles and delete its checkpoint-replay branch for those cycles, so the Safe Spending summary prices a closed statement the same way as the card statements API and transfer-pair analysis. Keep `cardStatementRows` as the replay engine only for estimated cycles, keep the `card_statements` drop-and-rekey migration body until every target verifies, and update the `DerivedStatement` documentation to describe the observed-balance rule. This deletes one derivation path rather than extending a framework.
 
 ## Before and after
 
