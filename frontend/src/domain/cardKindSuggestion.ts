@@ -1,7 +1,5 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import type { AccountKind } from "../api/contracts.ts";
-import { ACCOUNT_TYPE_LABELS } from "./accountKinds.ts";
-import { findingStateLabel } from "./paymentFindings.ts";
 
 /**
  * The proposed kind is the existing account kind, never a separate card
@@ -53,15 +51,4 @@ export function cardKindBasis(finding: AnalysisFinding): string[] {
 	return (finding.evidence ?? [])
 		.map((item) => item.reason?.trim() ?? "")
 		.filter(Boolean);
-}
-
-/** Pattern review chip wording, with the account kind label as its subject. */
-export function cardKindChipLabel(finding: AnalysisFinding): string {
-	return findingStateLabel(
-		{
-			...finding,
-			kind: ACCOUNT_TYPE_LABELS[CARD_KIND_SUGGESTION],
-		} as AnalysisFinding,
-		"chip",
-	);
 }

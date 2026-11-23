@@ -3,7 +3,6 @@ import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
 	CARD_KIND_SUGGESTION,
 	cardKindBasis,
-	cardKindChipLabel,
 	cardKindFinding,
 } from "./cardKindSuggestion.ts";
 
@@ -94,9 +93,5 @@ describe("card-kind suggestion", () => {
 			"The balance behaves like a debt.",
 		]);
 		expect(cardKindBasis(finding({ evidence: null }))).toEqual([]);
-	});
-
-	it("reuses pattern chip wording with the account kind label", () => {
-		expect(cardKindChipLabel(finding())).toBe("Credit card?");
 	});
 });
