@@ -160,12 +160,12 @@ func TestDynamicRunnerUsesStoredCredential(t *testing.T) {
 	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
 		t.Fatalf("store credential: %v", err)
 	}
-	runner := NewRunnerWithProvider(database, Config{}, func() (string, map[string]struct{}) {
+	runner := NewRunnerWithProvider(database, Config{}, func() string {
 		credential, err := database.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, nil)
 	if !runner.IsConfigured() {
 		t.Fatal("runner should be configured after storing credential")
@@ -177,8 +177,8 @@ func TestDynamicRunnerUsesStoredCredential(t *testing.T) {
 
 func TestFetchWithoutCredentialIsNotConfigured(t *testing.T) {
 	database := openRunnerStore(t)
-	runner := NewRunnerWithProvider(database, Config{}, func() (string, map[string]struct{}) {
-		return "", nil
+	runner := NewRunnerWithProvider(database, Config{}, func() string {
+		return ""
 	}, nil)
 	if runner.IsConfigured() {
 		t.Fatal("empty credential should not be configured")

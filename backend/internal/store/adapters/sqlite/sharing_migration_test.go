@@ -12,8 +12,8 @@ import (
 )
 
 // TestSharingMigratedDatabaseFlows opens a migrated pre-sharing database
-// (setup validates it) and exercises the grant, copy with link identity,
-// inbox, policy, visibility, audit, and idempotency-key tracks end to end.
+// (setup validates it) and exercises the grant, copy provenance, inbox,
+// policy, visibility, audit, and idempotency-key tracks end to end.
 func TestSharingMigratedDatabaseFlows(t *testing.T) {
 	path := os.Getenv("WAYPOINT_MIGRATED_DB")
 	if path == "" {
@@ -39,23 +39,8 @@ func TestSharingMigratedDatabaseFlows(t *testing.T) {
 		t.Fatalf("read: %v", err)
 	}
 
-	copied, err := d.CopySharedTransaction(alice, transaction.ID, bob, sharingKey(t))
-	if err != nil {
+	if _, err := d.CopySharedTransaction(alice, transaction.ID, bob, sharingKey(t)); err != nil {
 		t.Fatalf("copy: %v", err)
-	}
-	link, err := d.GetSharingLink(bob, copied.ID)
-	if err != nil {
-		t.Fatalf("link: %v", err)
-	}
-	if link.LinkID != store.SharingLinkID(alice, transaction.ID, bob) {
-		t.Fatalf("link = %q, want deterministic link identity", link.LinkID)
-	}
-	refreshed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
-	if err != nil {
-		t.Fatalf("refresh: %v", err)
-	}
-	if refreshed.Status != store.SharingLinkCurrent {
-		t.Fatalf("refresh status = %q, want current", refreshed.Status)
 	}
 
 	items, err := d.ListInboxItems(bob)

@@ -214,7 +214,7 @@ func consumeOrdered(
 	}
 	session.completedRuns++
 	batchComplete := session.completedRuns%stochasticProgressBatch == 0 || session.completedRuns == session.config.RunCount
-	progressSnapshot := session.progress(types.PhaseStochasticRuns)
+	progressSnapshot := session.progress()
 	var partialResult *types.StochasticProjectionResult
 	if batchComplete {
 		partialResult = session.flushBatchLocked()

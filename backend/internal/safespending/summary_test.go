@@ -131,7 +131,7 @@ func TestPendingAfterBaselineAndSettledHoldAreUncertain(t *testing.T) {
 	}
 }
 
-func TestExactObservationCutAndConfirmedMovements(t *testing.T) {
+func TestExactObservationCut(t *testing.T) {
 	m := baseModel()
 	m.Checkpoints[0].AvailableBalance = ptr(1608.05)
 	m.Accounts = append(m.Accounts, types.Account{ID: "savings", Kind: "cash", Enabled: true})
@@ -148,9 +148,6 @@ func TestExactObservationCutAndConfirmedMovements(t *testing.T) {
 	s := Build(m, &types.SafeSpendingSettings{SpendingAccountIDs: []string{"checking", "savings"}}, "2026-11-15", testEnd)
 	assertMoney(t, s.CheckingAvailable, 1845.05)
 	assertMoney(t, s.CashAfterBills, 1845.05)
-	if len(s.ConfirmedMovements) != 4 {
-		t.Fatalf("movements %+v", s.ConfirmedMovements)
-	}
 }
 
 func TestCashAtStartNeverUsesFutureBaselineAndDoesNotReconstructEarlierBills(t *testing.T) {
@@ -164,7 +161,7 @@ func TestCashAtStartNeverUsesFutureBaselineAndDoesNotReconstructEarlierBills(t *
 	m.Transactions = []types.Transaction{payment("october", 10, "2026-10-19T12:00:00Z")}
 	s = Build(m, nil, "2026-10-19", "2026-10-19")
 	assertMoney(t, s.CheckingAvailable, 790)
-	if len(s.ConfirmedMovements) != 1 || len(s.Bills) != 0 {
+	if len(s.Bills) != 0 {
 		t.Fatalf("historical evidence %+v", s)
 	}
 }
@@ -189,7 +186,7 @@ func TestMissingAvailableBalanceFallsBackToPostedBalance(t *testing.T) {
 	assertMoney(t, s.CheckingAvailable, 1595.05)
 	assertMoney(t, s.CashAfterBills, 1595.05)
 	assertMoney(t, s.OutstandingBillsTotal, 0)
-	if len(s.ConfirmedMovements) != 1 || len(s.Bills) != 1 || s.Bills[0].Status != "paid" {
+	if len(s.Bills) != 1 || s.Bills[0].Status != "paid" {
 		t.Fatalf("settlement %+v", s)
 	}
 	unresolved := baseModel()
@@ -226,7 +223,7 @@ func TestSelectionVoidsAndProjectedRows(t *testing.T) {
 	s = Build(m, &types.SafeSpendingSettings{TransactionIDs: []string{}}, "2026-11-15", testEnd)
 	assertMoney(t, s.OutstandingBillsTotal, 20)
 	s = Build(m, &types.SafeSpendingSettings{SpendingAccountIDs: []string{}}, "2026-11-15", testEnd)
-	if !slices.Equal(s.SelectedAccountIDs, []string{"checking"}) || s.CheckingAvailable == nil {
+	if s.CheckingAvailable == nil {
 		t.Fatalf("empty selection %+v", s)
 	}
 }

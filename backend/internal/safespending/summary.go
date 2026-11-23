@@ -58,7 +58,7 @@ type cutState struct {
 
 func cashEvidence(model *types.FinancialModel, settings *types.SafeSpendingSettings, cut int64) *cutState {
 	day := domain.FormatIsoDate(time.Unix(cut, 0))
-	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, ConfirmedMovements: []types.SafeSpendingMovement{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}}
+	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}}
 	st := &cutState{s: &s, model: model, settings: settings, latest: pickCheckpoints(model, cut), selected: map[string]bool{}, balances: map[string]float64{}, basis: map[string]types.DisplayBasis{}, cut: cut}
 	st.applyConfirmedFacts()
 	st.deriveBaselines()
@@ -95,8 +95,8 @@ func pickCheckpoints(model *types.FinancialModel, cut int64) map[string]types.Ch
 // applyConfirmedFacts resolves posted facts in instant order, maintaining the
 // observed balances that baselines and conditional amounts read afterward.
 func (st *cutState) applyConfirmedFacts() {
-	st.s.SelectedAccountIDs = effectiveAccounts(st.model, st.settings, st.latest)
-	for _, id := range st.s.SelectedAccountIDs {
+	selectedIDs := effectiveAccounts(st.model, st.settings, st.latest)
+	for _, id := range selectedIDs {
 		st.selected[id] = true
 	}
 	for id, cp := range st.latest {
@@ -164,9 +164,6 @@ func (st *cutState) applyConfirmedFacts() {
 			}
 			if _, known := st.balances[id]; known {
 				st.balances[id] += delta
-			}
-			if st.selected[id] {
-				st.s.ConfirmedMovements = append(st.s.ConfirmedMovements, types.SafeSpendingMovement{TransactionID: tx.ID, AccountID: id, Name: tx.Name, PostedAt: tx.PostedTime, EffectiveAt: instant, Amount: *money(delta)})
 			}
 		}
 	}

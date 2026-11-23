@@ -13,12 +13,10 @@ type TransactionOrigin struct {
 	TransactionID string `json:"transactionId"`
 }
 
-// TransactionFulfillment is the per-event assessment shared by public evidence
-// and configured transaction-fulfillment evaluations. Destination limits do not
-// count as unfulfilled funding.
+// TransactionFulfillment is the per-event unfulfilled assessment shared by
+// public evidence and configured transaction-fulfillment evaluations.
 type TransactionFulfillment struct {
-	UnfulfilledAmount        float64 `json:"unfulfilledAmount"`
-	DestinationLimitedAmount float64 `json:"destinationLimitedAmount"`
+	UnfulfilledAmount float64 `json:"unfulfilledAmount"`
 }
 
 type TransactionEvent struct {

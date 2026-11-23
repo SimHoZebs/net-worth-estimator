@@ -102,7 +102,6 @@ func computeCycleBudget(st *cutState, incomes []paydayForecast, reserves []state
 	cycle.at(scope.payoff).debit(outsideHorizonDebt)
 	// IncomeFunded and the after-goal amount do not depend on cash evidence.
 	st.s.IncomeFunded = cycle.net()
-	st.s.AdditionalSavings = st.s.IncomeFunded
 	if st.s.IncomeFunded != nil {
 		st.s.SavingsAllowance = money(*st.s.IncomeFunded - st.settings.SavingsTarget)
 	}

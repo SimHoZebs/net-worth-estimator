@@ -592,30 +592,14 @@ func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.Eva
 			if err != nil {
 				return err
 			}
-			events, err := json.Marshal(det.Events)
-			if err != nil {
-				return err
-			}
-			dates, err := json.Marshal(det.Dates)
-			if err != nil {
-				return err
-			}
-			transactions, err := json.Marshal(det.Transactions)
-			if err != nil {
-				return err
-			}
 			output.RequestedAmount = &det.RequestedAmount
 			output.RealizedAmount = &det.RealizedAmount
-			output.DestinationLimitedAmount = &det.DestinationLimitedAmount
 			output.UnfulfilledAmount = &det.UnfulfilledAmount
 			output.CompletionRate = &det.CompletionRate
 			if det.FirstUnderfulfilledDate != nil {
 				date := string(*det.FirstUnderfulfilledDate)
 				output.FirstUnderfulfilledDate = &date
 			}
-			output.EventsJSON = string(events)
-			output.DatesJSON = string(dates)
-			output.TransactionsJSON = string(transactions)
 		}
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[fulfillmentProbabilistic](envelope.Probabilistic)
@@ -914,9 +898,8 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		if row.HasDeterministic {
 			envelope.Deterministic = map[string]any{
 				"requestedAmount": optFloat(row.RequestedAmount), "realizedAmount": optFloat(row.RealizedAmount),
-				"destinationLimitedAmount": optFloat(row.DestinationLimitedAmount), "unfulfilledAmount": optFloat(row.UnfulfilledAmount),
-				"completionRate": optFloat(row.CompletionRate), "firstUnderfulfilledDate": optString(row.FirstUnderfulfilledDate),
-				"events": json.RawMessage(row.EventsJSON), "dates": json.RawMessage(row.DatesJSON), "transactions": json.RawMessage(row.TransactionsJSON),
+				"unfulfilledAmount": optFloat(row.UnfulfilledAmount),
+				"completionRate":    optFloat(row.CompletionRate), "firstUnderfulfilledDate": optString(row.FirstUnderfulfilledDate),
 			}
 		}
 		if row.HasProbabilistic {
@@ -1233,7 +1216,7 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 	if err := s.store.DeleteMonteCarloStatistics(ids); err != nil {
 		return nil, err
 	}
-	if err := s.writeNetWorthStatistics(slices, samples, state.TrialCount, state.ProjectionStart); err != nil {
+	if err := s.writeNetWorthStatistics(slices, samples, state.ProjectionStart); err != nil {
 		return nil, err
 	}
 	evalJSON, err := canonicalEvalJSON(&settings.Evaluations)
@@ -1261,7 +1244,7 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 }
 
 // writeNetWorthStatistics persists portfolio bands per projected date.
-func (s *handler) writeNetWorthStatistics(slices []types.ProjectionSlice, samples map[string][]float64, runCount int, projectionStart string) error {
+func (s *handler) writeNetWorthStatistics(slices []types.ProjectionSlice, samples map[string][]float64, projectionStart string) error {
 	if len(slices) == 0 {
 		return fmt.Errorf("no slices for statistics")
 	}
@@ -1274,7 +1257,7 @@ func (s *handler) writeNetWorthStatistics(slices []types.ProjectionSlice, sample
 		if sliceID == "" {
 			continue
 		}
-		bySlice[sliceID] = append(bySlice[sliceID], summarizeSamples(sliceID, date, values, runCount))
+		bySlice[sliceID] = append(bySlice[sliceID], summarizeSamples(sliceID, date, values))
 	}
 	for _, stats := range bySlice {
 		if err := s.store.SaveMonteCarloStatistics(stats); err != nil {
@@ -1284,24 +1267,9 @@ func (s *handler) writeNetWorthStatistics(slices []types.ProjectionSlice, sample
 	return nil
 }
 
-func summarizeSamples(sliceID, date string, values []float64, runCount int) types.MonteCarloStatistic {
+func summarizeSamples(sliceID, date string, values []float64) types.MonteCarloStatistic {
 	sorted := append([]float64{}, values...)
 	sort.Float64s(sorted)
-	mean := 0.0
-	below := 0
-	for _, value := range sorted {
-		mean += value
-		if value < 0 {
-			below++
-		}
-	}
-	mean /= math.Max(1, float64(len(sorted)))
-	variance := 0.0
-	for _, value := range sorted {
-		gap := value - mean
-		variance += gap * gap
-	}
-	variance /= math.Max(1, float64(len(sorted)))
 	quantile := func(p float64) float64 {
 		if len(sorted) == 0 {
 			return 0
@@ -1315,18 +1283,13 @@ func summarizeSamples(sliceID, date string, values []float64, runCount int) type
 		return sorted[low] + (rank-float64(low))*(sorted[high]-sorted[low])
 	}
 	return types.MonteCarloStatistic{
-		ProjectionSliceID:    sliceID,
-		AsOfAt:               midnightRFC3339(date),
-		SampleCount:          runCount,
-		Mean:                 mean,
-		Median:               quantile(0.5),
-		P10:                  quantile(0.10),
-		P25:                  quantile(0.25),
-		P50:                  quantile(0.5),
-		P75:                  quantile(0.75),
-		P90:                  quantile(0.90),
-		StdDev:               math.Sqrt(variance),
-		ProbabilityBelowZero: float64(below) / math.Max(1, float64(len(sorted))),
+		ProjectionSliceID: sliceID,
+		AsOfAt:            midnightRFC3339(date),
+		P10:               quantile(0.10),
+		P25:               quantile(0.25),
+		P50:               quantile(0.5),
+		P75:               quantile(0.75),
+		P90:               quantile(0.90),
 	}
 }
 

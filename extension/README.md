@@ -43,7 +43,7 @@ Configure a Chat Completions base URL, model ID, and your own API key. The provi
 - App refresh credentials persist in `chrome.storage.local`, restricted to trusted extension contexts. Access tokens and AI keys use `chrome.storage.session`. Nothing uses browser sync, and merchant content scripts cannot read either store.
 - Local extension storage is not an encrypted OS keychain. Protect your browser profile; a compromised profile can expose credentials and captured drafts. **Disconnect** removes local app credentials but does not revoke copied tokens; revoke compromised credentials through your identity-provider account page.
 - Website logout and extension disconnect are separate sessions. The extension requests app/provider host access only after settings confirmation, and product pages use `activeTab` rather than permanent access to all browsing history.
-- Source URL, timestamp, price text, variant, and field provenance stay local. Raw HTML and AI page context never enter the backend.
+- Source URL, price text, variant, and field provenance stay local. Raw HTML and AI page context never enter the backend.
 
 The backend extension transport admits POSTs only to the planned-purchase and device-auth routes from valid Chromium extension origins, drops cookies and the extension origin before the usual middleware, and preserves Fetch Metadata and all bearer, resource, and permission checks. Requests with an extension origin outside the allowed POST routes are rejected. No CORS permissions or purchase-only OAuth scope are added.
 

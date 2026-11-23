@@ -119,7 +119,7 @@ connection with a two-second deadline. See [the deployment contract](deploy/READ
 
 Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `model` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
 
-Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/transactions`, `/v1/schedules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{value, issues, saved, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/transactions/{id}/receipts`) and Analysis feedback writes (`/v1/analysis-findings...`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/transactions`, `/v1/schedules`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{value, issues, saved, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/transactions/{id}/receipts`) and Analysis feedback writes (`/v1/analysis-findings...`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
 
 - Error-severity issues from the write's validation boundary prevent persistence.
   Ordinary finance writes validate financial records and protect existing valid
@@ -129,7 +129,6 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 - A rejected request changes nothing.
 - The `source` field on checkpoint and transaction inputs is not trusted. The store recomputes ownership.
 - Omitted row IDs are server-generated UUIDv7, unique across accounts, transactions, rules, and evaluations via the `entity_ids` registry (duplicate IDs return 409).
-- Positions are server-managed: creates append, `POST .../reorder` moves one row before another (or to the end).
 
 ### Status
 
@@ -222,7 +221,7 @@ An unseeded run never uses stored rows. Its context follows the request, so disc
 
 ### SimpleFIN trigger
 
-`POST /v1/sync/simplefin` calls `simplefin.Runner.Trigger` and returns `simplefin.Summary` counts.
+`POST /v1/sync/simplefin` calls `simplefin.Runner.Trigger`.
 
 | Condition                                       | Status |
 | ----------------------------------------------- | ------ |
@@ -308,7 +307,7 @@ The authenticated user router initializes a blank private workspace on first aut
 
 ### Row writes and ownership
 
-Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the model replacement path used by fixture packs and tests. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, schedule starts and endings, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
+Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the model replacement path used by fixture packs and tests. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, schedule starts and endings, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
@@ -346,11 +345,9 @@ Cross-user transaction sharing (`backend/internal/sharing`, store consent
 methods, `docs/authorization.md`) is retry-safe and traceable:
 
 - Every mutating social request (grant, revoke, exclusion, removal,
-  accept, link refresh) carries a client-generated UUID request ID in
-  canonical lowercase form: over HTTP (`requestId`) for grant, revoke,
-  exclusion, removal, and accept, optionally for link refresh (which
-  mints a server key when none travels), and at the store boundary for
-  all six. The store records one outcome row per (actor, request ID):
+  accept) carries a client-generated UUID request ID in
+  canonical lowercase form: over HTTP (`requestId`) and at the store
+  boundary for all five. The store records one outcome row per (actor, request ID):
   a retry with the same key returns the recorded outcome byte-for-byte
   without re-executing, while a key reused for a different action or
   target fails with `store.ErrSharingConflict` (HTTP 409, no
@@ -361,7 +358,7 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
   race resolve to the winner's copy instead of leaking a uniqueness
   error. The four consent mutations each run in one transaction on the
   store's single connection, so grant/revoke/exclude ordering is total.
-  Accept and refresh commit in the documented statement order
+  Accept commits in the documented statement order
   (link/provenance update, then audit, then key), so an interrupted
   request retries as a new execution converging to current rather than
   returning an unapplied outcome.
@@ -590,7 +587,7 @@ The kernel:
 
 An evaluator failure is isolated to that instance as an error diagnostic. Other configured instances continue.
 
-Transaction fulfillment and public transaction evidence share the per-event assessment in `evaluateTransactionEvents`. Public `transactionEvents[].fulfillment` reports unfulfilled and destination-limited amounts, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
+Transaction fulfillment and public transaction evidence share the per-event assessment in `evaluateTransactionEvents`. Public `transactionEvents[].fulfillment` reports the unfulfilled amount, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
 
 Outlook renders only saved evaluation pins, using the same compact evaluation card components as the Evaluations page. Net-worth and account-balance targets have no automatic preview or fallback selection. Funding gaps has no separate always-visible panel. Pins control Outlook visibility; unpinning does not disable an evaluation. Threshold cards show the first-crossing date, current amount, target, and scenario result directly, without an evidence dialog. The shared Funding gaps card's cash-flow inspector follows the evaluation's configured transaction selection.
 
@@ -718,9 +715,9 @@ the user correction overlay.
 - The Bridge key is connected per user through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
 - Account links live in the `account_links` table. Bridge identity is the connection-scoped key `sf2.<conn_id>.<account_id>`, not a bare account ID. Sync uses current keys without a runtime migration check. Offline key conversion remains available through `simplefin-v2-keys`.
 - The client sends SimpleFIN protocol version 2 and rejects a response without both `errlist` and `connections`. General and authentication errors fail the run, except the verified `gen.api` notices for the 90-day cap and 45-day recommendation. Those notices accompany usable data and remain visible while the database accepts the data. Connection and account errors exclude only the affected rows, so an incomplete snapshot never voids healthy pending holds. The last condition is stored on the provider connection row and exposed as `syncError` on `/v1/status`; a clean success clears it. Structured response logs record requested dates, connection/account/transaction counts, and notice codes before error classification. Applied-sync logs record provisioning and row-change counts. Neither log contains credentials, balances, account names, or transaction details.
-- Card selection is stored per user in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
-- Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
-- The synced-account list offers one account-mapping action: `POST /v1/sync/simplefin/accounts/{bridgeAccountId}/supersede` retires one manual account in favor of the synced account already linked to that bridge account. The synced account keeps its link and bank facts. The manual account's list slot, name, color, kind, balance limits, payment terms, recurrence routes, planned-purchase funding, safe-spending selections, card selections, evaluation references, and sharing-policy account selections move to it. The manual account, its owner transactions, and its checkpoints are deleted. A manual account that already carries bank checkpoints or bank transactions is rejected, as is a stale bridge link. The candidate is validated before commit; a rejected candidate returns issues with `saved: false` and changes nothing.
+- Bank mirroring covers every mapped account, independent of safe-spending account selection.
+- Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking. Disaster recovery is a database backup: links live in `account_links` beside the data.
+- The synced-account list offers one account-mapping action: `POST /v1/sync/simplefin/accounts/{bridgeAccountId}/supersede` retires one manual account in favor of the synced account already linked to that bridge account. The synced account keeps its link and bank facts. The manual account's list slot, name, color, kind, balance limits, payment terms, recurrence routes, planned-purchase funding, safe-spending selections, evaluation references, and sharing-policy account selections move to it. The manual account, its owner transactions, and its checkpoints are deleted. A manual account that already carries bank checkpoints or bank transactions is rejected, as is a stale bridge link. The candidate is validated before commit; a rejected candidate returns issues with `saved: false` and changes nothing.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
 `Runner.Sync` delegates to the ingest orchestrator with the SimpleFIN adapter. Until the workspace records its first successful sync, the orchestrator requests the previous 90 days. Later runs request a rolling 30 days, even after longer gaps or new bank connections. Both windows end at the current instant and include pending data, within the Bridge's 90-day request limit. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. The checkpoint also carries the Bridge's `available-balance` when present in the additive `checkpoint_available_balances` sidecar. The posted balance remains the sole net-worth authority; available balance is nullable evidence for safe-spending and card headroom. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
@@ -738,6 +735,6 @@ cost of the repair, and operator release notes should call it out.
 Post-upgrade owner disables remain honored: the script only converts
 legacy date-shaped databases and only verifies already-converted ones,
 so a repeat run never re-enables an explicit disable. Delete-plus-
-tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. The settlement matcher reads merchant behavior classes from `backend/internal/simplefin/profiles.json`. `GET /v1/transactions/{id}/settle-candidates` exposes the same ranked candidates to the browser, so the frontend keeps no matching rule. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
+tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. The settlement matcher reads merchant behavior classes from `backend/internal/simplefin/profiles.json`. `GET /v1/transactions/{id}/settle-candidates` exposes the same ranked candidates to the browser, so the frontend keeps no matching rule.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.

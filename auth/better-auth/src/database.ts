@@ -56,16 +56,6 @@ export async function verifyIdentity(db: IdentityDatabase, issuer: string, clien
     throw new Error("Identity database does not match the configured issuer and client");
 }
 
-export async function disabledUser(db: IdentityDatabase, userId: string) {
-  const row =
-    db instanceof Database
-      ? (db.query("SELECT disabled FROM user WHERE id = ?").get(userId) as {
-          disabled: boolean | number;
-        } | null)
-      : (await db.query('SELECT disabled FROM "user" WHERE id = $1', [userId])).rows[0];
-  return !row || !!row.disabled;
-}
-
 export async function revokeSessionTokens(db: IdentityDatabase, sessionId: string) {
   if (db instanceof Database) {
     db.transaction(() => {

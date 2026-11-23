@@ -31,7 +31,7 @@ export async function accountRequest(auth: Auth, config: Settings, request: Requ
     model: "user",
     where: [{ field: "id", value: identity.sub }],
   });
-  if (!user || user.disabled)
+  if (!user)
     return Response.json({ error: "The account is no longer active." }, { status: 401 });
   const profile = () => ({
     subject: user.id,

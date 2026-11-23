@@ -94,9 +94,6 @@ func TestCashCutUsesCanonicalTransactionInstantNotPostedMetadata(t *testing.T) {
 	m.Transactions = []types.Transaction{before, at, after, fallback}
 	s := Build(m, nil, "2026-11-15", testEnd)
 	assertMoney(t, s.CashAfterBills, 1538.05)
-	if len(s.ConfirmedMovements) != 2 || s.ConfirmedMovements[0].TransactionID != "after" || s.ConfirmedMovements[0].EffectiveAt != after.TransactionTime || s.ConfirmedMovements[1].TransactionID != "fallback" {
-		t.Fatalf("movements %+v", s.ConfirmedMovements)
-	}
 }
 
 func TestSameInstantExecutionOrderForKnownRecordedAmountDependencies(t *testing.T) {
@@ -110,9 +107,6 @@ func TestSameInstantExecutionOrderForKnownRecordedAmountDependencies(t *testing.
 	m.Transactions = []types.Transaction{second, first}
 	s := Build(m, nil, "2026-11-15", testEnd)
 	assertMoney(t, s.CashAfterBills, 1578.05)
-	if len(s.ConfirmedMovements) != 2 || s.ConfirmedMovements[0].TransactionID != "first" || s.ConfirmedMovements[1].TransactionID != "second" {
-		t.Fatalf("execution order %+v", s)
-	}
 }
 
 func TestDynamicRecordedAmountsCannotBorrowLaterObservation(t *testing.T) {
@@ -130,9 +124,6 @@ func TestDynamicRecordedAmountsCannotBorrowLaterObservation(t *testing.T) {
 	m.Checkpoints[0].ObservedAt = stamp("2026-11-15T10:00:00Z")
 	s = Build(m, nil, "2026-11-15", testEnd)
 	assertMoney(t, s.CashAfterBills, 1608.05)
-	if len(s.ConfirmedMovements) != 0 {
-		t.Fatal("reconstructed old dynamic actual")
-	}
 }
 
 func TestRequestedBillSurvivesSimulatedPartialRealizationAndExactClaimReplacesWholeOccurrence(t *testing.T) {
@@ -222,9 +213,6 @@ func TestInclusiveArbitraryWindowAndCashCutStayIndependent(t *testing.T) {
 	assertMoney(t, s.CheckingAvailable, 1244.43)
 	assertMoney(t, s.OutstandingBillsTotal, 50)
 	assertMoney(t, s.CashAfterBills, 1194.43)
-	if len(s.ConfirmedMovements) != 0 {
-		t.Fatalf("window payments leaked into start cash %+v", s)
-	}
 	if s.Start != "2026-11-15" || s.End != "2026-11-18" || len(s.Bills) != 2 || s.Bills[0].Date != s.Start || s.Bills[1].Date != s.End {
 		t.Fatalf("window %+v", s)
 	}
@@ -247,7 +235,7 @@ func TestExplicitFactualCutExcludesPreauthoredFutureTodayObservationsAndMovement
 	assertMoney(t, s.CheckingAvailable, 220)
 	assertMoney(t, s.OutstandingBillsTotal, 0)
 	assertMoney(t, s.CashAfterBills, 220)
-	if len(s.Baselines) != 1 || *s.Baselines[0].ObservedAt != stamp("2026-11-15T09:00:00Z") || len(s.ConfirmedMovements) != 1 || s.ConfirmedMovements[0].TransactionID != "confirmed-income" {
+	if len(s.Baselines) != 1 || *s.Baselines[0].ObservedAt != stamp("2026-11-15T09:00:00Z") {
 		t.Fatalf("future authored fact leaked %+v", s)
 	}
 }
@@ -332,7 +320,7 @@ func TestEarlierOutgoingHoldNeedsBankAvailableToKnowCash(t *testing.T) {
 			m.Transactions = []types.Transaction{hold}
 			m.Schedules = []types.Schedule{bill("due-one", "2026-11-15", 711.12), bill("due-two", "2026-11-15", 98.92), bill("future", "2026-11-16", 650.97)}
 			s := Build(m, nil, "2026-11-15", testEnd)
-			if s.Status != "available" || len(s.Reasons) != 0 || len(s.ConfirmedMovements) != 0 || len(s.Bills) != 3 {
+			if s.Status != "available" || len(s.Reasons) != 0 || len(s.Bills) != 3 {
 				t.Fatalf("observed cash invalidated or old hold deducted twice %+v", s)
 			}
 			assertMoney(t, s.CheckingAvailable, 1244.43)
@@ -345,7 +333,7 @@ func TestEarlierOutgoingHoldNeedsBankAvailableToKnowCash(t *testing.T) {
 			// twice; the dated bills carry the timing check once.
 			m.Checkpoints[0].AvailableBalance = nil
 			s = Build(m, nil, "2026-11-15", testEnd)
-			if s.Status != "available" || len(s.Reasons) != 0 || len(s.Bills) != 3 || len(s.ConfirmedMovements) != 0 {
+			if s.Status != "available" || len(s.Reasons) != 0 || len(s.Bills) != 3 {
 				t.Fatalf("posted-only checkpoint invalidated the numeric cash basis %+v", s)
 			}
 			if len(s.Baselines) != 1 || s.Baselines[0].Basis != "posted" || s.Baselines[0].Status != "available" || s.Baselines[0].AvailableBalance != nil || len(s.Baselines[0].Reasons) != 0 {

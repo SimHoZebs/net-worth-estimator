@@ -100,18 +100,12 @@ func testSyncCredentialConformance(t *testing.T, newStore func(*testing.T) store
 	if err != nil || credential.Configured() {
 		t.Fatalf("default credential = %+v, err %v", credential, err)
 	}
-	if _, err := database.SetSyncCards([]string{"prime_card"}); err != nil {
-		t.Fatalf("set cards: %v", err)
-	}
 	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
 		t.Fatalf("set credential: %v", err)
 	}
 	loaded, err := database.GetSyncCredential()
 	if err != nil || !loaded.Configured() || loaded.BridgeHost != "bridge.example" {
 		t.Fatalf("loaded = %+v, err %v", loaded, err)
-	}
-	if len(loaded.CardAccounts) != 1 || loaded.CardAccounts[0] != "prime_card" {
-		t.Fatalf("cards after credential set = %+v", loaded.CardAccounts)
 	}
 	if err := database.ClearSyncCredential(); err != nil {
 		t.Fatalf("clear credential: %v", err)
@@ -120,18 +114,12 @@ func testSyncCredentialConformance(t *testing.T, newStore func(*testing.T) store
 	if err != nil || cleared.Configured() {
 		t.Fatalf("cleared = %+v, err %v", cleared, err)
 	}
-	if cards, err := database.GetSyncCards(); err != nil || len(cards) != 1 || cards[0] != "prime_card" {
-		t.Fatalf("cards after disconnect = %+v, err %v, want [prime_card]", cards, err)
-	}
 	if err := database.Clear(); err != nil {
 		t.Fatalf("clear: %v", err)
 	}
 	after, err := database.GetSyncCredential()
 	if err != nil || after.Configured() {
 		t.Fatalf("credential after Clear = %+v, err %v", after, err)
-	}
-	if cards, err := database.GetSyncCards(); err != nil || len(cards) != 0 {
-		t.Fatalf("cards after Clear = %+v, err %v, want forgotten", cards, err)
 	}
 }
 

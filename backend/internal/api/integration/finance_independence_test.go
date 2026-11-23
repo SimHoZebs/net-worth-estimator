@@ -56,9 +56,8 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	savingsID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
 		`{"name":"Savings","kind":"cash","enabled":true}`).Body.Bytes())
 
-	if response := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"`+checkingID+`","Balance":1000,"observedAt":1773133200}`); response.Code != http.StatusOK {
-		t.Fatalf("save checkpoint status = %d, body %s", response.Code, response.Body.String())
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: checkingID, Balance: 1000, Source: store.SourceUser, ObservedAt: 1773133200}); err != nil {
+		t.Fatalf("seed checkpoint: %v", err)
 	}
 	transactionID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+checkingID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","enabled":true}`).Body.Bytes())

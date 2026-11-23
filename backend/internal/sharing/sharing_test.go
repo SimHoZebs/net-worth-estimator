@@ -173,8 +173,6 @@ func TestSharingHTTPRequiresAuthentication(t *testing.T) {
 		{"GET", "/v1/shared/transactions", ""},
 		{"GET", "/v1/shared/transactions/users/abc/" + sharedTransactionID, ""},
 		{"POST", "/v1/shared/copies", `{"owner":"users/abc"}`},
-		{"GET", "/v1/shared/copies/" + sharedTransactionID + "/link", ""},
-		{"POST", "/v1/shared/copies/" + sharedTransactionID + "/refresh", ""},
 		{"GET", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1", ""},
 		{"PUT", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1", `{"enabled":false}`},
 		{"POST", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1/preview", `{"accountIds":[]}`},
@@ -538,7 +536,6 @@ func TestSharingHTTPReadOnlyRejectsWrites(t *testing.T) {
 		{"DELETE", "/v1/shared/grants", grantBody(t, sharedTransactionID, "user", mustID(t, db, "bob"))},
 		{"POST", "/v1/shared/exclusions", grantBody(t, sharedTransactionID, "all", "")},
 		{"POST", "/v1/shared/copies", `{"owner":"` + resourceOf(alice) + `","transactionId":"` + sharedTransactionID + `"}`},
-		{"POST", "/v1/shared/copies/" + sharedTransactionID + "/refresh", ""},
 	} {
 		if w := do(t, ro, route.method, route.target, "bob", route.body); w.Code != http.StatusForbidden {
 			t.Fatalf("read-only %s %s = %d, want 403", route.method, route.target, w.Code)

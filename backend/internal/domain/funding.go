@@ -29,8 +29,7 @@ type evaluatedTransactionEvent struct {
 
 func (evaluated evaluatedTransactionEvent) fulfillment() types.TransactionFulfillment {
 	return types.TransactionFulfillment{
-		UnfulfilledAmount:        roundCurrency(evaluated.unfulfilled),
-		DestinationLimitedAmount: roundCurrency(evaluated.destinationLimited),
+		UnfulfilledAmount: roundCurrency(evaluated.unfulfilled),
 	}
 }
 

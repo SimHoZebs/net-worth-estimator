@@ -25,8 +25,4 @@ type CategoryStore interface {
 	// (empty for the head); rows at or below it are excluded. The source,
 	// not the store, applies quarantine and latest-per-transaction-wins.
 	ListCategoryFeedback(after string, limit int) ([]types.CategoryFeedback, error)
-	// ListRecentUserCategories returns transactions whose current intent is
-	// a user assignment, newest first, with bank evidence joined. It bounds
-	// the disagree monitor sample; it never trains the learner directly.
-	ListRecentUserCategories(limit int) ([]types.UserCategoryLabel, error)
 }

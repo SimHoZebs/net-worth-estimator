@@ -47,8 +47,7 @@ signup request. There is no separate account-creation CLI or privileged path.
 
 Provision application storage and the configured anonymous guest workspace before
 API startup. Guest workspace provisioning is separate from human account signup.
-An existing disabled guest identity can retain its subject. No deployment creates
-a provider account for it:
+No deployment creates a provider account for it:
 
 ```bash
 go -C backend run ./cmd/setupdb --db /private/application.db

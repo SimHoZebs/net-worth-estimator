@@ -2,7 +2,6 @@ import { expect, request, test, type APIRequestContext } from "./base.ts";
 import { FIXTURE_API } from "./fixture.ts";
 
 const CARD_ID = "synthetic-synced-card";
-const BRIDGE_ID = "sf2.synthetic.card";
 const DERIVED_CARD_ID = "synthetic-derived-card";
 
 // The bank owns observed data, while the owner sets the closing day.
@@ -45,11 +44,6 @@ async function seedTrackedCard(api: APIRequestContext) {
 		},
 	);
 	expect(observed.ok(), await observed.text()).toBe(true);
-	const linked = await api.put(
-		`${FIXTURE_API}/v1/sync/simplefin/accounts/${BRIDGE_ID}`,
-		{ data: { modelAccountId: CARD_ID } },
-	);
-	expect(linked.ok(), await linked.text()).toBe(true);
 	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
 			accountIds: [CARD_ID],

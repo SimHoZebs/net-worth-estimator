@@ -91,33 +91,6 @@ func TestPlanEntrySaveReusesStoredSnapshot(t *testing.T) {
 	}
 }
 
-func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
-	database := openAPIStore(t)
-	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash}); err != nil {
-		t.Fatalf("seed account: %v", err)
-	}
-	if _, err := database.ApplySync([]store.SyncCheckpoint{
-		{AccountID: "checking", Balance: 10, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1785974399},
-		{AccountID: "checking", Balance: 20, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1786060799},
-	}, nil); err != nil {
-		t.Fatalf("seed synced balance checks: %v", err)
-	}
-	handler := New(database, Config{})
-	saved := decodePlanEntrySave[types.Checkpoint](t, doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"checking","Balance":30,"source":"banksync","observedAt":1785974399}`))
-	if !saved.Saved || saved.Result.Source != store.SourceUser || saved.Result.Balance != 30 {
-		t.Fatalf("owner balance check = %+v", saved)
-	}
-	model := assertSavedModelIdentity(t, database, saved.Revision)
-	if len(model.Checkpoints) != 2 || !reflect.DeepEqual(model.Checkpoints[0], saved.Result) ||
-		model.Checkpoints[1].Source != store.SourceBankSync || model.Checkpoints[1].Balance != 20 {
-		t.Fatalf("balance-check ownership/key changed: %+v", model.Checkpoints)
-	}
-	if len(saved.Issues) != 0 {
-		t.Fatalf("balance-check issues = %+v", saved.Issues)
-	}
-}
-
 func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -126,8 +99,6 @@ func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 		path   string
 		body   string
 	}{
-		{"uninitialized", false, http.MethodPost, "/v1/checkpoints", `{"AccountId":"ghost","Balance":10,"observedAt":1785974399}`},
-		{"invalid creation", true, http.MethodPost, "/v1/checkpoints", `{"AccountId":"ghost","Balance":10,"observedAt":1785974399}`},
 		{"invalid update", true, http.MethodPatch, "/v1/accounts/checking", `{"name":"Invalid","kind":"cash","minBalance":10,"maxBalance":5,"enabled":true}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -150,58 +121,5 @@ func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 				t.Fatal("rejected save changed stored content")
 			}
 		})
-	}
-}
-
-func TestAccountLinkWritesKeepIdentityLookup(t *testing.T) {
-	database := openAPIStore(t)
-	// Links do not use whole-plan validation, even if stored content has errors.
-	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: "unknown"}); err != nil {
-		t.Fatalf("seed account: %v", err)
-	}
-	model, err := database.LoadModel()
-	if err != nil || !hasErrorIssues(domainValidate(model)) {
-		t.Fatalf("seed must have validation errors: model %+v, error %v", model, err)
-	}
-	handler := New(database, Config{})
-	linked := doRowRequest(t, handler, http.MethodPut, "/v1/sync/simplefin/accounts/bridge-1", `{"modelAccountId":"checking"}`)
-	if linked.Code != http.StatusOK {
-		t.Fatalf("link status = %d, body %s", linked.Code, linked.Body.String())
-	}
-	var saved struct {
-		Link     store.AccountLink `json:"link"`
-		Revision string            `json:"revision"`
-	}
-	if err := json.Unmarshal(linked.Body.Bytes(), &saved); err != nil {
-		t.Fatalf("decode link: %v", err)
-	}
-	if saved.Link.ModelAccountID != "checking" || saved.Link.Origin != store.LinkOriginManual {
-		t.Fatalf("link = %+v", saved)
-	}
-	assertSavedModelIdentity(t, database, saved.Revision)
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(linked.Body.Bytes(), &fields); err != nil {
-		t.Fatalf("decode link fields: %v", err)
-	}
-	for _, field := range []string{"result", "issues", "saved"} {
-		if _, exists := fields[field]; exists {
-			t.Fatalf("link response must retain its distinct shape: %s", linked.Body.String())
-		}
-	}
-
-	unlinked := doRowRequest(t, handler, http.MethodDelete, "/v1/sync/simplefin/accounts/bridge-1", "")
-	if unlinked.Code != http.StatusOK {
-		t.Fatalf("unlink status = %d, body %s", unlinked.Code, unlinked.Body.String())
-	}
-	var deleted struct {
-		Revision string `json:"revision"`
-	}
-	if err := json.Unmarshal(unlinked.Body.Bytes(), &deleted); err != nil {
-		t.Fatalf("decode unlink: %v", err)
-	}
-	assertSavedModelIdentity(t, database, deleted.Revision)
-	links, err := database.ListAccountLinks()
-	if err != nil || len(links) != 0 {
-		t.Fatalf("links after delete = %+v, error %v", links, err)
 	}
 }

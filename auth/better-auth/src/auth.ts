@@ -3,7 +3,7 @@ import { bearer, jwt, username } from "better-auth/plugins";
 import { oauthProvider, oauthDeviceAuthorization } from "@better-auth/oauth-provider";
 import { passkey } from "@better-auth/passkey";
 import type { Settings } from "./config";
-import { disabledUser, revokeSessionTokens, type IdentityDatabase } from "./database";
+import { revokeSessionTokens, type IdentityDatabase } from "./database";
 
 export function createAuth(config: Settings, database: IdentityDatabase, provisioning = false) {
   return betterAuth({
@@ -23,11 +23,6 @@ export function createAuth(config: Settings, database: IdentityDatabase, provisi
         verify: ({ password, hash }) => Bun.password.verify(password, hash, "bcrypt"),
       },
     },
-    user: {
-      additionalFields: {
-        disabled: { type: "boolean", defaultValue: false, input: false },
-      },
-    },
     session: { expiresIn: 30 * 24 * 3600, cookieCache: { enabled: false } },
     rateLimit: { enabled: true, storage: "database" },
     advanced: {
@@ -38,18 +33,6 @@ export function createAuth(config: Settings, database: IdentityDatabase, provisi
     },
     databaseHooks: {
       session: {
-        create: {
-          before: async (session, hook) => {
-            // Use the provider's transaction-aware adapter during signup. A second
-            // PostgreSQL connection cannot see the uncommitted new user.
-            if (hook) {
-              const user = (await hook.context.internalAdapter.findUserById(session.userId)) as {
-                disabled?: boolean;
-              } | null;
-              if (!user || user.disabled) return false;
-            } else if (await disabledUser(database, session.userId)) return false;
-          },
-        },
         delete: {
           before: async (session) => {
             // Waypoint logout revokes offline access too. Otherwise ON DELETE SET

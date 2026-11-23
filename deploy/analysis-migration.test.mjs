@@ -80,7 +80,7 @@ async function seedFinalRows(db, owner) {
 }
 const analysisSnapshot = async (db) => sql(db, `SELECT user_id, transaction_id, facts_json FROM transaction_source_facts ORDER BY 1, 2;
   SELECT user_id, revision FROM analysis_inputs ORDER BY 1;
-  SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs ORDER BY 1, 2;
+  SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem FROM analysis_runs ORDER BY 1, 2;
   SELECT user_id, id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
   SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;
   SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY 1, 2;`);
@@ -343,7 +343,7 @@ for backup in /tmp/*.analysis-backup.*/before.db; do
   test "$(stat -c %a "$backup")" = 600
 done
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO transaction_source_facts(user_id,transaction_id,facts_json) VALUES ('$owner','settled-a','{}');
-  INSERT INTO analysis_runs(user_id,id,type,version,input_revision,state,started_at,completed_at,lease_until,problem,input_json) VALUES ('$owner','run-1','bnpl','v1',1,'complete',100,200,0,'','{}');
+  INSERT INTO analysis_runs(user_id,id,type,version,input_revision,state,started_at,completed_at,lease_until,problem) VALUES ('$owner','run-1','bnpl','v1',1,'complete',100,200,0,'');
   INSERT INTO analysis_findings(user_id,id,analysis_type,transaction_id,kind,detection_json,run_id,first_detected_at,last_checked_at,status,dismissed,review_json,feedback_revision) VALUES ('$owner','f-1','bnpl','settled-a','bnpl','{}','run-1',100,150,'active',0,'null',0);
   INSERT INTO analysis_feedback(user_id,id,request_id,finding_id,run_id,created_at,payload_json) VALUES ('$owner','fb-1','req-1','f-1','run-1',160,'{}');"
 revision="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" "SELECT revision FROM analysis_inputs WHERE user_id = '$owner';")"

@@ -63,8 +63,7 @@ type sharingStorage interface {
 // sharingRequestOutcome is the stored envelope for one (actor, request ID).
 // Result carries the operation's recorded return value: a SharingGrant for
 // grants and exclusions, a SharingRevocation for revokes and
-// exclusion removals, a Transaction for accepts, a SharingLinkRefresh for
-// refreshes.
+// exclusion removals, and a Transaction for accepts.
 type sharingRequestOutcome struct {
 	Action        string          `json:"action"`
 	OwnerUserID   string          `json:"ownerUserId"`

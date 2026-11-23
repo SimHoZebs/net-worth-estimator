@@ -18,7 +18,6 @@ describe("payment classifications", () => {
 			patternId: "shared",
 			currency: "USD",
 			typicalAmount: "1800",
-			annualizedEstimate: "21600",
 		},
 	} as AnalysisFinding;
 	it("keeps assessments separate from operational status", () => {

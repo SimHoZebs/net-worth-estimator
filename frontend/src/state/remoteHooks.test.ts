@@ -1363,11 +1363,9 @@ describe("remote projection mapping and SSE", () => {
 	it("calls deterministic and POST-SSE projections and maps partial then result events", async () => {
 		const stochastic = stochasticFixture();
 		const progress = {
-			phase: "stochastic-runs",
 			completedRuns: 2,
 			totalRuns: 4,
 			fraction: 0.5,
-			evaluationWorkloads: [],
 		};
 		const stream = `event: progress\ndata: ${JSON.stringify({ progress })}\n\nevent: partial\ndata: ${JSON.stringify({ progress, partial: stochastic })}\n\nevent: result\ndata: ${JSON.stringify({ result: stochastic })}\n\n`;
 		const seen: { url: string; init?: RequestInit }[] = [];

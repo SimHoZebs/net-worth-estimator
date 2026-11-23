@@ -36,15 +36,12 @@ func sharingSchemaStatements() []string {
 			CHECK ((audience_type = 'all' AND audience_id = '' AND intent = 'excluded') OR (audience_type IN ('user', 'group') AND audience_id <> ''))
 		)`,
 		`CREATE INDEX IF NOT EXISTS sharing_grants_grantee ON sharing_grants(audience_type, audience_id, intent)`,
-		// sharing_copies records provenance plus the stable linked-transaction
-		// representation (FND-04) for recipient-owned copies. The copy itself
-		// is an ordinary transaction in the recipient's model: revocation never
-		// rewrites or erases it. One row binds the immutable identities of a
-		// link: the source transaction (source_owner_id, source_transaction_id),
-		// the stable link_id, the source_revision observed at the last
-		// authorized copy or refresh, the recipient owner (recipient_user_id,
-		// copy_transaction_id), and the authorizing sharing-grant identifiers
-		// (grant audience type/id plus the access reason).
+		// sharing_copies records the immutable tuple behind accept idempotency:
+		// the recipient owner (recipient_user_id, copy_transaction_id) and the
+		// source transaction (source_owner_id, source_transaction_id). The copy
+		// itself is an ordinary transaction in the recipient's model:
+		// revocation never rewrites or erases it. The remaining columns hold
+		// the copy identity and the grant identifiers observed at accept time.
 		`CREATE TABLE IF NOT EXISTS sharing_copies (
 			recipient_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			copy_transaction_id TEXT NOT NULL,

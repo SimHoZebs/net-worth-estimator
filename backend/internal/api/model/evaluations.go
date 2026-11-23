@@ -90,26 +90,3 @@ func (s *handler) deleteEvaluation(_ context.Context, input *struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }
-
-func (s *handler) moveEvaluation(_ context.Context, input *struct {
-	Body struct {
-		Type       string `json:"type"`
-		InstanceID string `json:"instanceId"`
-		BeforeID   string `json:"beforeId,omitempty"`
-	} `json:"body"`
-}) (*modelstate.ReorderOutput, error) {
-	evalType, instanceID, beforeID := input.Body.Type, input.Body.InstanceID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
-		if slice := evalSlice(model, evalType); slice != nil {
-			*slice = moveBeforeID(*slice, instanceID, beforeID, instanceIDOf)
-		}
-	}, func() (struct{}, error) {
-		return struct{}{}, s.store.MoveEvaluation(evalType, instanceID, beforeID)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &modelstate.ReorderOutput{Body: struct {
-		Revision string `json:"revision"`
-	}{Revision: revision}}, nil
-}

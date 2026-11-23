@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -83,8 +82,8 @@ func TestSyncTriggerRunsAndGuardsInterval(t *testing.T) {
 			t.Fatalf("seed link: %v", err)
 		}
 	}
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
-		return bridge.URL, map[string]struct{}{"prime_card": {}}
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
+		return bridge.URL
 	}, bridge.Client())
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -98,17 +97,6 @@ func TestSyncTriggerRunsAndGuardsInterval(t *testing.T) {
 	first := trigger()
 	if first.Code != http.StatusOK {
 		t.Fatalf("first trigger status = %d, body %s", first.Code, first.Body.String())
-	}
-	var summary struct {
-		CheckpointsInserted int            `json:"checkpointsInserted"`
-		PendingInserted     int            `json:"pendingInserted"`
-		Skipped             map[string]int `json:"skipped"`
-	}
-	if err := json.Unmarshal(first.Body.Bytes(), &summary); err != nil {
-		t.Fatalf("decode summary: %v", err)
-	}
-	if summary.CheckpointsInserted != 2 || summary.PendingInserted != 1 {
-		t.Fatalf("summary = %+v", summary)
 	}
 
 	second := trigger()

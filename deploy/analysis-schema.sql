@@ -17,7 +17,7 @@ CREATE TABLE analysis_runs (
   id TEXT NOT NULL, type TEXT NOT NULL, version TEXT NOT NULL,
   input_revision INTEGER NOT NULL, state TEXT NOT NULL,
   started_at INTEGER NOT NULL, completed_at INTEGER NOT NULL DEFAULT 0,
-  lease_until INTEGER NOT NULL, problem TEXT NOT NULL DEFAULT '', input_json TEXT NOT NULL,
+  lease_until INTEGER NOT NULL, problem TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(user_id, id)
 );
 CREATE INDEX analysis_runs_latest ON analysis_runs(user_id, type, started_at DESC, id DESC);

@@ -124,22 +124,8 @@ export function handler(auth: Auth, config: Settings) {
           for (const cookie of result.headers.getSetCookie())
             response.headers.append("Set-Cookie", cookie);
         } else response = new Response("Forbidden", { status: 403 });
-      } else if (url.pathname.startsWith("/api/auth/")) {
-        response = await auth.handler(request);
-        if (url.pathname === "/api/auth/oauth2/introspect" && response.ok) {
-          const result = await response.json();
-          if (result.active && result.sub) {
-            const ctx = await auth.$context;
-            const user = await ctx.adapter.findOne<typeof auth.$Infer.Session.user>({
-              model: "user",
-              where: [{ field: "id", value: result.sub }],
-            });
-            if (!user || user.disabled) {
-              response = Response.json({ active: false });
-            } else response = Response.json(result);
-          } else response = Response.json(result);
-        }
-      } else response = new Response("Not found", { status: 404 });
+      } else if (url.pathname.startsWith("/api/auth/")) response = await auth.handler(request);
+      else response = new Response("Not found", { status: 404 });
     } catch (error) {
       // Omit messages and request queries: provider errors can embed credentials.
       console.error(

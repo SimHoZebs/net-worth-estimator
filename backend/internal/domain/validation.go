@@ -644,20 +644,6 @@ func formatBound(value float64) string {
 	return fmt.Sprintf("%v", value)
 }
 
-// SummarizeValidationIssues separates errors and warnings and reports validity.
-func SummarizeValidationIssues(issues []types.ModelValidationIssue) (errors, warnings []types.ModelValidationIssue, isValid bool) {
-	errors = []types.ModelValidationIssue{}
-	warnings = []types.ModelValidationIssue{}
-	for _, issue := range issues {
-		if issue.Severity == types.SeverityError {
-			errors = append(errors, issue)
-		} else if issue.Severity == types.SeverityWarning {
-			warnings = append(warnings, issue)
-		}
-	}
-	return errors, warnings, len(errors) == 0
-}
-
 func joinAccountKinds() string {
 	names := make([]string, 0, len(types.AccountKinds()))
 	for _, kind := range types.AccountKinds() {

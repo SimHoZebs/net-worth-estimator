@@ -140,7 +140,7 @@ test("retry rejections retain an earlier uncertain-save record", async () => {
   assert.ok((await captures.read()).pendingSave);
 });
 
-test("existing model/status reads expose only eligible account labels to the panel", async () => {
+test("model reads expose only eligible account labels to the panel", async () => {
   const { model } = await fixture();
   model.model.accounts.push(
     { id: "debt", kind: "debt", enabled: true },
@@ -148,11 +148,23 @@ test("existing model/status reads expose only eligible account labels to the pan
     { id: "archived", kind: "cash", enabled: true, archived: true },
   );
   model.model.accounts[0].balance = "PRIVATE_BALANCE";
-  const loaded = await loadModel(
-    { api: async (path) => (path === "/v1/status" ? { readOnly: true } : model) },
-    "users/owner",
-  );
+  const loaded = await loadModel({ api: async () => model }, "users/owner");
   assert.deepEqual(loaded.accounts, [{ id: "cash", name: "Cash" }]);
-  assert.equal(loaded.readOnly, true);
+  assert.deepEqual(Object.keys(loaded), ["accounts", "purchases"]);
   assert.doesNotMatch(JSON.stringify(loaded), /PRIVATE_BALANCE/);
+});
+
+test("a read-only account still blocks saving before any write", async () => {
+  const { storage, captures, identity, model } = await fixture();
+  let writes = 0;
+  const connection = {
+    identity: async () => identity,
+    api: async (path) => {
+      if (path === "/v1/financial-model") return model;
+      if (path === "/v1/status") return { readOnly: true };
+      writes++;
+    },
+  };
+  await assert.rejects(createPurchaseSaver(connection, captures, storage)(), /read-only/);
+  assert.equal(writes, 0);
 });

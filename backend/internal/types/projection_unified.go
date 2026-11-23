@@ -50,20 +50,15 @@ type ProjectionSlice struct {
 
 // MonteCarloStatistic is one per account per instant band summary.
 type MonteCarloStatistic struct {
-	ID                   string  `json:"id"`
-	ProjectionSliceID    string  `json:"projectionSliceId"`
-	AccountID            string  `json:"accountId"`
-	AsOfAt               string  `json:"asOfAt"`
-	SampleCount          int     `json:"sampleCount"`
-	Mean                 float64 `json:"mean"`
-	Median               float64 `json:"median"`
-	P10                  float64 `json:"p10"`
-	P25                  float64 `json:"p25"`
-	P50                  float64 `json:"p50"`
-	P75                  float64 `json:"p75"`
-	P90                  float64 `json:"p90"`
-	StdDev               float64 `json:"stdDev"`
-	ProbabilityBelowZero float64 `json:"probabilityBelowZero"`
+	ID                string  `json:"id"`
+	ProjectionSliceID string  `json:"projectionSliceId"`
+	AccountID         string  `json:"accountId"`
+	AsOfAt            string  `json:"asOfAt"`
+	P10               float64 `json:"p10"`
+	P25               float64 `json:"p25"`
+	P50               float64 `json:"p50"`
+	P75               float64 `json:"p75"`
+	P90               float64 `json:"p90"`
 }
 
 // EvaluationOutputBase carries the envelope identity every stored output
@@ -109,23 +104,19 @@ type AccountBalanceOutput struct {
 // JSON so served bytes match the computed envelopes exactly.
 type TransactionFulfillmentOutput struct {
 	EvaluationOutputBase
-	RequestedAmount          *float64 `json:"requestedAmount"`
-	RealizedAmount           *float64 `json:"realizedAmount"`
-	DestinationLimitedAmount *float64 `json:"destinationLimitedAmount"`
-	UnfulfilledAmount        *float64 `json:"unfulfilledAmount"`
-	CompletionRate           *float64 `json:"completionRate"`
-	FirstUnderfulfilledDate  *string  `json:"firstUnderfulfilledDate"`
-	EventsJSON               string   `json:"eventsJson"`
-	DatesJSON                string   `json:"datesJson"`
-	TransactionsJSON         string   `json:"transactionsJson"`
-	ProbRunCount             *int     `json:"probRunCount"`
-	ProbFulfilledCount       *int     `json:"probFulfilledCount"`
-	ProbFullProbability      *float64 `json:"probFullProbability"`
-	ProbUnfulfilledP10       *float64 `json:"probUnfulfilledP10"`
-	ProbUnfulfilledP25       *float64 `json:"probUnfulfilledP25"`
-	ProbUnfulfilledP50       *float64 `json:"probUnfulfilledP50"`
-	ProbUnfulfilledP75       *float64 `json:"probUnfulfilledP75"`
-	ProbUnfulfilledP90       *float64 `json:"probUnfulfilledP90"`
+	RequestedAmount         *float64 `json:"requestedAmount"`
+	RealizedAmount          *float64 `json:"realizedAmount"`
+	UnfulfilledAmount       *float64 `json:"unfulfilledAmount"`
+	CompletionRate          *float64 `json:"completionRate"`
+	FirstUnderfulfilledDate *string  `json:"firstUnderfulfilledDate"`
+	ProbRunCount            *int     `json:"probRunCount"`
+	ProbFulfilledCount      *int     `json:"probFulfilledCount"`
+	ProbFullProbability     *float64 `json:"probFullProbability"`
+	ProbUnfulfilledP10      *float64 `json:"probUnfulfilledP10"`
+	ProbUnfulfilledP25      *float64 `json:"probUnfulfilledP25"`
+	ProbUnfulfilledP50      *float64 `json:"probUnfulfilledP50"`
+	ProbUnfulfilledP75      *float64 `json:"probUnfulfilledP75"`
+	ProbUnfulfilledP90      *float64 `json:"probUnfulfilledP90"`
 }
 
 // CycleFulfillmentOutput is one stored cycle-fulfillment result.

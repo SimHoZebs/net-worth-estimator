@@ -18,14 +18,13 @@ func TestNovemberCashFundingAndNextCycleAreSeparate(t *testing.T) {
 	assertMoney(t, statementAmount(t, s, "card-b", "estimated", "2026-11-19"), 2615.01)
 	assertMoney(t, s.ExpectedPay, 7449.65)
 	assertMoney(t, s.StatementReserve, 2890.56)
-	assertMoney(t, s.SpendableCash, 300.92)
+	assertMoney(t, s.PrePaydayRoom, 300.92)
 	assertMoney(t, s.SafeToSpend, 300.92)
 	assertMoney(t, s.NextCycleIncome, 3395)
 	if s.CycleFundingPayday == nil || *s.CycleFundingPayday != "2026-11-30" {
 		t.Fatalf("cycle funding payday = %v, want 2026-11-30", s.CycleFundingPayday)
 	}
 	assertMoney(t, s.IncomeFunded, 4559.09)
-	assertMoney(t, s.AdditionalSavings, 4559.09)
 	assertMoney(t, s.SavingsAllowance, 4059.09)
 	assertMoney(t, s.FundingRoom, 4951.09)
 	assertMoney(t, s.NextCycleCarryover, 4951.09)
@@ -42,13 +41,11 @@ func TestSavingsTargetOnlyChangesTheAfterGoalAmount(t *testing.T) {
 		name string
 		get  func(*types.SafeSpendingSummary) *float64
 	}{
-		{"cash cushion", func(s *types.SafeSpendingSummary) *float64 { return s.SpendableCash }},
 		{"pre-payday room", func(s *types.SafeSpendingSummary) *float64 { return s.PrePaydayRoom }},
 		{"post-income room", func(s *types.SafeSpendingSummary) *float64 { return s.PostIncomeRoom }},
 		{"safe to spend", func(s *types.SafeSpendingSummary) *float64 { return s.SafeToSpend }},
 		{"with cash cushion", func(s *types.SafeSpendingSummary) *float64 { return s.FundingRoom }},
 		{"without cash cushion", func(s *types.SafeSpendingSummary) *float64 { return s.IncomeFunded }},
-		{"additional savings", func(s *types.SafeSpendingSummary) *float64 { return s.AdditionalSavings }},
 		{"next cycle carryover", func(s *types.SafeSpendingSummary) *float64 { return s.NextCycleCarryover }},
 		{"next cycle budget", func(s *types.SafeSpendingSummary) *float64 { return s.NextCycleDiscretionary }},
 	} {
@@ -60,7 +57,7 @@ func TestSavingsTargetOnlyChangesTheAfterGoalAmount(t *testing.T) {
 	assertMoney(t, before.SavingsAllowance, 4059.09)
 	assertMoney(t, after.SavingsAllowance, 3659.09)
 	assertMoney(t, before.FundingRoom, 4951.09)
-	assertMoney(t, before.SpendableCash, 300.92)
+	assertMoney(t, before.PrePaydayRoom, 300.92)
 	assertMoney(t, before.SafeToSpend, 300.92)
 }
 
@@ -105,7 +102,7 @@ func TestCurrentCycleCardPurchaseAfterItsCloseConsumesCarryoverOnce(t *testing.T
 	s = BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-18"))
 	assertMoney(t, s.SafeToSpend, 230)
 	assertMoney(t, s.NextCycleCarryover, 4284.65)
-	assertMoney(t, s.AdditionalSavings, 3892.65)
+	assertMoney(t, s.IncomeFunded, 3892.65)
 }
 
 func TestConfiguredPayoffDoesNotMoveScheduledIncome(t *testing.T) {
@@ -118,7 +115,7 @@ func TestConfiguredPayoffDoesNotMoveScheduledIncome(t *testing.T) {
 		t.Fatalf("payoff %q, payday %v", s.PayoffDate, s.Payday)
 	}
 	assertMoney(t, s.CardPayoffCapacity, 500)
-	assertMoney(t, s.SpendableCash, -400)
+	assertMoney(t, s.PrePaydayRoom, -400)
 	assertMoney(t, s.IncomeFunded, 400)
 	assertMoney(t, s.FundingRoom, 900)
 	assertMoney(t, s.PaymentRoom, -150)
@@ -177,7 +174,7 @@ func TestFallbackAndGlobalCycleClampIndependently(t *testing.T) {
 		s.PayoffDate != "2028-02-29" || s.Payday == nil || *s.Payday != "2028-02-29" || s.ExpectedPay != nil {
 		t.Fatalf("unexpected dates and income forecast: %+v", s)
 	}
-	assertMoney(t, s.SpendableCash, 900)
+	assertMoney(t, s.PrePaydayRoom, 900)
 }
 
 func TestStatementClosingOnPayoffAndLatePostingBelongToFollowingPayoff(t *testing.T) {

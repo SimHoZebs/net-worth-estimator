@@ -72,7 +72,6 @@
       "netWorthThreshold": [],
       "transactionFulfillment": []
     },
-    "transactions": [],
     "schedules": [
       {
         "amount": {
@@ -2505,11 +2504,7 @@
           "status": "satisfied",
           "deterministic": {
             "completionRate": 1,
-            "dates": [],
-            "destinationLimitedAmount": 0,
-            "events": [],
             "firstUnderfulfilledDate": null,
-            "transactions": [],
             "realizedAmount": 69600,
             "requestedAmount": 69600,
             "unfulfilledAmount": 0

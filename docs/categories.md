@@ -192,17 +192,6 @@ implement the setter, so they never train. The source owner is
 the same deployment-wide learner, and sharing one would interleave two
 unrelated event-ID streams under one checkpoint.
 
-## Disagree monitor
-
-Each tick samples up to 20 newest user-assigned rows with evidence joined
-(`ListRecentUserCategories`) and compares them with the keyword baseline.
-`DisagreeRate` is the fraction the baseline would not reproduce; an
-abstention counts as disagreement, since an unanswerable row is coverage the
-labels could teach. On samples of at least 10 with a rate above 0.30 the
-worker warn-logs. The signal names when to promote matured labels into
-training or to review the serving vocabulary. Monitoring never fails the
-tick: an unreadable sample logs and classification proceeds.
-
 ## Promotion loop
 
 Matured labels promote through the existing seed recipe, not through a live
@@ -210,7 +199,7 @@ write path:
 
 1. Export matured journal labels (quarantined, latest-per-transaction).
 2. Train a candidate model off-deployment.
-3. Verify the gates (quarantine, supersession, disagree rate).
+3. Verify the gates (quarantine, supersession).
 4. Seed swap with a backup of the replaced database, pointing at the
    existing recipe (`ml/eval/seed_export.py`, canonical seed
    `ml/seed.sqlite3`, provenance as documented in `ml/README.md`).

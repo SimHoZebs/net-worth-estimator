@@ -31,7 +31,6 @@ function payment(
 			patternId: "payroll",
 			currency: "USD",
 			typicalAmount: "2000.00",
-			annualizedEstimate: "24000.00",
 		},
 		evidence: [{ code: "income", reason: "test", transactionIds: [id] }],
 		...overrides,

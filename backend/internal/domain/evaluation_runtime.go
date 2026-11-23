@@ -586,43 +586,6 @@ func (r *instanceRuntime) finalize(ctx *EvaluationFinalizeContext) {
 	r.probabilistic = result
 }
 
-func (r *instanceRuntime) workloadProgress(completedRuns, totalRuns int) *types.StochasticEvaluationWorkload {
-	if r.workloadPlan == nil {
-		return nil
-	}
-	var measurement *EvaluationWorkloadMeasurement
-	if r.accumulator != nil && !r.stochasticFailed && r.definition.Base().MeasureStochasticWork != nil {
-		measurement = r.definition.Base().MeasureStochasticWork(r.accumulator)
-	}
-	completedUnits := completedRuns * r.workloadPlan.UnitsPerRun
-	if measurement != nil {
-		completedUnits = measurement.UnitsCompleted
-	}
-	workload := &types.StochasticEvaluationWorkload{
-		Type:           r.evaluationType,
-		InstanceID:     r.instanceID,
-		Name:           r.name,
-		CompletedUnits: completedUnits,
-		TotalUnits:     totalRuns * r.workloadPlan.UnitsPerRun,
-		UnitLabel:      r.workloadPlan.UnitLabel,
-		UnitAction:     r.workloadPlan.UnitAction,
-	}
-	if r.workloadPlan.IntensiveUnitLabel != "" {
-		workload.IntensiveUnitLabel = r.workloadPlan.IntensiveUnitLabel
-	}
-	if r.workloadPlan.IntensiveUnitAction != "" {
-		workload.IntensiveUnitAction = r.workloadPlan.IntensiveUnitAction
-	}
-	if measurement != nil {
-		intensive := measurement.IntensiveUnitsCompleted
-		workload.IntensiveUnitsCompleted = &intensive
-	}
-	if r.workloadPlan.Description != "" {
-		workload.Description = r.workloadPlan.Description
-	}
-	return workload
-}
-
 func (r *instanceRuntime) envelope() types.EvaluationResultEnvelope {
 	status := types.StatusIndeterminate
 	if r.hasErrors() {
@@ -776,17 +739,6 @@ func (s *EvaluationRuntimeSet) Finalize(ctx *EvaluationFinalizeContext) {
 	for _, runtimeInstance := range s.runtimes {
 		runtimeInstance.finalize(ctx)
 	}
-}
-
-// WorkloadProgress returns progress entries for workload-planned evaluators.
-func (s *EvaluationRuntimeSet) WorkloadProgress(completedRuns, totalRuns int) []types.StochasticEvaluationWorkload {
-	out := []types.StochasticEvaluationWorkload{}
-	for _, runtimeInstance := range s.runtimes {
-		if progress := runtimeInstance.workloadProgress(completedRuns, totalRuns); progress != nil {
-			out = append(out, *progress)
-		}
-	}
-	return out
 }
 
 // Result collects envelopes into ordered result tables.

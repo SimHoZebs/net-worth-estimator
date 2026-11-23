@@ -240,7 +240,7 @@ func TestPartialSyncDoesNotVoidExcludedPendingHold(t *testing.T) {
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return first, nil
 	}
-	if _, err := runner.Sync(context.Background()); err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	bank, err := database.LoadBankTransactions()
@@ -256,12 +256,12 @@ func TestPartialSyncDoesNotVoidExcludedPendingHold(t *testing.T) {
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return second, nil
 	}
-	summary, err := runner.Sync(context.Background())
-	if err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if !summary.Partial || len(summary.Errors) != 1 || summary.PendingDeleted != 0 {
-		t.Fatalf("partial summary = %+v", summary)
+	notice, err := database.GetSyncError()
+	if err != nil || notice == nil || notice.Code != "con.auth" || notice.Scope != "connection" {
+		t.Fatalf("partial sync notice = %+v, err %v", notice, err)
 	}
 	bank, err = database.LoadBankTransactions()
 	if err != nil || len(bank) != 1 || !bank[0].Transaction.Pending {

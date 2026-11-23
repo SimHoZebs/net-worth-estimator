@@ -69,8 +69,6 @@ import type {
 	Schedule as GeneratedSchedule,
 	StatusOutputBody as GeneratedStatusOutputBody,
 	StochasticConfig as GeneratedStochasticConfig,
-	SyncCardsInputBody as GeneratedSyncCardsInputBody,
-	SyncCardsOutputBody as GeneratedSyncCardsOutputBody,
 	SyncCredentialBody as GeneratedSyncCredentialBody,
 	SyncCredentialInputBody as GeneratedSyncCredentialInputBody,
 	SyncError as GeneratedSyncError,
@@ -472,32 +470,10 @@ export interface StochasticBandRow {
 	netWorth: PercentileBands;
 }
 
-export type StochasticProgressPhase =
-	| "preparing"
-	| "deterministic-evaluations"
-	| "stochastic-runs"
-	| string;
-
-export interface StochasticEvaluationWorkload {
-	type: string;
-	instanceId: string;
-	name: string;
-	completedUnits: number;
-	totalUnits: number;
-	unitLabel: string;
-	unitAction: string;
-	intensiveUnitsCompleted?: number;
-	intensiveUnitLabel?: string;
-	intensiveUnitAction?: string;
-	description?: string;
-}
-
 export interface StochasticProgress {
-	phase: StochasticProgressPhase;
 	completedRuns: number;
 	totalRuns: number;
 	fraction: number;
-	evaluationWorkloads: StochasticEvaluationWorkload[];
 }
 
 export interface StochasticProjectionResult {
@@ -526,8 +502,6 @@ export type StatusResponse = ServerStatus;
 export type SyncError = GeneratedSyncError;
 export type SyncCredentialStatus = GeneratedSyncCredentialBody;
 export type SyncCredentialConnectRequest = GeneratedSyncCredentialInputBody;
-export type SyncCardsResponse = GeneratedSyncCardsOutputBody;
-export type SyncCardsRequest = GeneratedSyncCardsInputBody;
 export type PinnedEvaluationsResponse = GeneratedPinnedEvaluationsOutputBody;
 export type PinnedEvaluationsRequest = GeneratedPinnedEvaluationsInputBody;
 

@@ -144,9 +144,6 @@ func TestPostedBasisPricedHoldStaysNumericAndCountsOnce(t *testing.T) {
 				assertMoney(t, s.Baselines[0].AvailableBalance, *tc.available)
 			}
 			assertMoney(t, s.Baselines[0].PostedBalance, 1608.05)
-			if len(s.ConfirmedMovements) != 0 {
-				t.Fatalf("pending hold applied as a confirmed movement %+v", s.ConfirmedMovements)
-			}
 			if len(s.Bills) != 1 || s.Bills[0].Status != "pending" {
 				t.Fatalf("hold bill %+v", s.Bills)
 			}

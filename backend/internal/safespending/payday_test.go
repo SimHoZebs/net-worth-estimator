@@ -471,11 +471,6 @@ func TestCardToCardTransferFollowsBalanceApplication(t *testing.T) {
 	assertMoney(t, statementAmount(t, summary, "cash-card-y", "closed", "2026-10-19"), 0)
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 200)
-	for _, movement := range summary.ConfirmedMovements {
-		if movement.TransactionID == "card-to-card" {
-			t.Fatalf("intercard transfer recorded as a cash movement %+v", movement)
-		}
-	}
 }
 
 func statementTotal(t *testing.T, summary types.SafeSpendingSummary, accountID string) float64 {
@@ -539,11 +534,6 @@ func TestIntercardTransferAppliesDatedLegsWithoutCashOutflow(t *testing.T) {
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 650)
 	assertMoney(t, summary.PrePaydayRoom, 650)
-	for _, movement := range summary.ConfirmedMovements {
-		if movement.TransactionID == "transfer" {
-			t.Fatalf("intercard transfer deducted cash twice %+v", summary.ConfirmedMovements)
-		}
-	}
 	if slices.Contains(summary.Reasons, ReasonStatementBalanceUnavailable) || slices.Contains(summary.Reasons, ReasonStatementEstimateUnavailable) {
 		t.Fatalf("precise transfer produced an estimate reason %+v", summary.Reasons)
 	}
@@ -715,7 +705,7 @@ func TestNoIncomeKeepsDatedObligationsButNoAllowance(t *testing.T) {
 		t.Fatalf("missing payday invented an allowance %+v", summary)
 	}
 	assertMoney(t, summary.PrePaydayBills, 250)
-	assertMoney(t, summary.SpendableCash, 650)
+	assertMoney(t, summary.PrePaydayRoom, 650)
 	if !slices.Contains(summary.Reasons, ReasonPaydayUnavailable) {
 		t.Fatalf("missing reason %+v", summary.Reasons)
 	}

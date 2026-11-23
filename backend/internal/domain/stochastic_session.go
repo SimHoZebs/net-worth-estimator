@@ -152,11 +152,9 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 	session.progressUpdateRuns = GetStochasticProgressUpdateRunInterval(session.config.RunCount)
 	if onProgress != nil {
 		onProgress(types.StochasticProgress{
-			Phase:               types.PhasePreparing,
-			CompletedRuns:       0,
-			TotalRuns:           session.config.RunCount,
-			Fraction:            0,
-			EvaluationWorkloads: []types.StochasticEvaluationWorkload{},
+			CompletedRuns: 0,
+			TotalRuns:     session.config.RunCount,
+			Fraction:      0,
 		}, nil)
 	}
 	session.sampler = NewStochasticSampler(session.config.Seed)
@@ -191,7 +189,7 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 		DetailLevel: "summary",
 	})
 	if onProgress != nil {
-		onProgress(session.progress(types.PhaseDeterministicEvaluations), nil)
+		onProgress(session.progress(), nil)
 	}
 	session.runtimes.EvaluateDeterministic(&EvaluationContext{
 		Path:        path,
@@ -200,7 +198,7 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 	})
 	session.runtimes.StartStochastic()
 	if onProgress != nil {
-		onProgress(session.progress(types.PhaseStochasticRuns), nil)
+		onProgress(session.progress(), nil)
 	}
 	session.deterministic.Evaluations = session.runtimes.Result().Evaluations
 	session.sortedDates = make([]string, len(session.deterministic.Timeline.Rows))
@@ -216,14 +214,12 @@ func (s *stochasticSession) createSample() *types.MonteCarloSample {
 	}
 }
 
-func (s *stochasticSession) progress(phase types.StochasticProgressPhase) types.StochasticProgress {
+func (s *stochasticSession) progress() types.StochasticProgress {
 	fraction := float64(s.completedRuns) / float64(s.config.RunCount)
 	return types.StochasticProgress{
-		Phase:               phase,
-		CompletedRuns:       s.completedRuns,
-		TotalRuns:           s.config.RunCount,
-		Fraction:            fraction,
-		EvaluationWorkloads: s.runtimes.WorkloadProgress(s.completedRuns, s.config.RunCount),
+		CompletedRuns: s.completedRuns,
+		TotalRuns:     s.config.RunCount,
+		Fraction:      fraction,
 	}
 }
 

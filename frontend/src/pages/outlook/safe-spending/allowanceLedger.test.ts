@@ -16,7 +16,6 @@ function summary(
 		cardPayoffCapacity: null,
 		prePaydayRoom: 450,
 		postIncomeRoom: 200,
-		postPaydayBalance: 400,
 		paymentRoom: 350,
 		safeToSpend: 200,
 		...overrides,

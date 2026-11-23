@@ -180,7 +180,7 @@ check_target() {
   sqlite3 -readonly "$1" '
     SELECT user_id, transaction_id, facts_json FROM transaction_source_facts LIMIT 0;
     SELECT user_id, revision FROM analysis_inputs LIMIT 0;
-    SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs LIMIT 0;
+    SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem FROM analysis_runs LIMIT 0;
     SELECT user_id, id, analysis_type, transaction_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings LIMIT 0;
     SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback LIMIT 0;' || return 1
   test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_transaction_lifecycle','analysis_transaction_sim_lifecycle');")" -ge 4 || return 1
@@ -241,7 +241,7 @@ check_projection() {
     SELECT user_id, id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json FROM projection_states LIMIT 0;
     SELECT user_id, id, projection_state_id, from_at, to_at, built_revision, status FROM projection_slices LIMIT 0;
     SELECT user_id, projection_slice_id, date, payload FROM projection_rows LIMIT 0;
-    SELECT user_id, id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p25, p50, p75, p90, std_dev, probability_below_zero FROM monte_carlo_statistics LIMIT 0;
+    SELECT user_id, id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90 FROM monte_carlo_statistics LIMIT 0;
     SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM net_worth_threshold_outputs LIMIT 0;
     SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM account_balance_outputs LIMIT 0;
     SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, destination_limited_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, events_json, dates_json, transactions_json, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90 FROM transaction_fulfillment_outputs LIMIT 0;
@@ -1737,16 +1737,11 @@ CREATE TABLE IF NOT EXISTS monte_carlo_statistics (
 			projection_slice_id TEXT NOT NULL,
 			account_id TEXT NOT NULL,
 			as_of_at TEXT NOT NULL,
-			sample_count INTEGER NOT NULL DEFAULT 0,
-			mean REAL NOT NULL DEFAULT 0,
-			median REAL NOT NULL DEFAULT 0,
 			p10 REAL NOT NULL DEFAULT 0,
 			p25 REAL NOT NULL DEFAULT 0,
 			p50 REAL NOT NULL DEFAULT 0,
 			p75 REAL NOT NULL DEFAULT 0,
 			p90 REAL NOT NULL DEFAULT 0,
-			std_dev REAL NOT NULL DEFAULT 0,
-			probability_below_zero REAL NOT NULL DEFAULT 0,
 			PRIMARY KEY(user_id, id)
 		);
 CREATE INDEX IF NOT EXISTS monte_carlo_statistics_slice ON monte_carlo_statistics(user_id, projection_slice_id, account_id, as_of_at);

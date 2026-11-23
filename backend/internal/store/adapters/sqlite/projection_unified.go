@@ -227,7 +227,7 @@ func (s *sqliteStore) DeleteProjectionSlicesFrom(fromAt int64) error {
 
 // ListMonteCarloStatistics returns statistics for one slice.
 func (s *sqliteStore) ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error) {
-	rows, err := s.db.Query(`SELECT id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p25, p50, p75, p90, std_dev, probability_below_zero FROM monte_carlo_statistics WHERE projection_slice_id = ? AND user_id = :user_id ORDER BY account_id, as_of_at`, sliceID)
+	rows, err := s.db.Query(`SELECT id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90 FROM monte_carlo_statistics WHERE projection_slice_id = ? AND user_id = :user_id ORDER BY account_id, as_of_at`, sliceID)
 	if err != nil {
 		return nil, fmt.Errorf("list statistics: %w", err)
 	}
@@ -235,7 +235,7 @@ func (s *sqliteStore) ListMonteCarloStatistics(sliceID string) ([]types.MonteCar
 	out := []types.MonteCarloStatistic{}
 	for rows.Next() {
 		var st types.MonteCarloStatistic
-		if err := rows.Scan(&st.ID, &st.ProjectionSliceID, &st.AccountID, &st.AsOfAt, &st.SampleCount, &st.Mean, &st.Median, &st.P10, &st.P25, &st.P50, &st.P75, &st.P90, &st.StdDev, &st.ProbabilityBelowZero); err != nil {
+		if err := rows.Scan(&st.ID, &st.ProjectionSliceID, &st.AccountID, &st.AsOfAt, &st.P10, &st.P25, &st.P50, &st.P75, &st.P90); err != nil {
 			return nil, fmt.Errorf("scan statistic: %w", err)
 		}
 		out = append(out, st)
@@ -259,10 +259,10 @@ func (s *sqliteStore) SaveMonteCarloStatistics(stats []types.MonteCarloStatistic
 			}
 			id = newID.String()
 		}
-		if _, err := s.db.Exec(`INSERT INTO monte_carlo_statistics (id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p25, p50, p75, p90, std_dev, probability_below_zero, user_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)
-			ON CONFLICT(user_id, id) DO UPDATE SET projection_slice_id = excluded.projection_slice_id, account_id = excluded.account_id, as_of_at = excluded.as_of_at, sample_count = excluded.sample_count, mean = excluded.mean, median = excluded.median, p10 = excluded.p10, p25 = excluded.p25, p50 = excluded.p50, p75 = excluded.p75, p90 = excluded.p90, std_dev = excluded.std_dev, probability_below_zero = excluded.probability_below_zero`,
-			id, st.ProjectionSliceID, st.AccountID, st.AsOfAt, st.SampleCount, st.Mean, st.Median, st.P10, st.P25, st.P50, st.P75, st.P90, st.StdDev, st.ProbabilityBelowZero); err != nil {
+		if _, err := s.db.Exec(`INSERT INTO monte_carlo_statistics (id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90, user_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)
+			ON CONFLICT(user_id, id) DO UPDATE SET projection_slice_id = excluded.projection_slice_id, account_id = excluded.account_id, as_of_at = excluded.as_of_at, p10 = excluded.p10, p25 = excluded.p25, p50 = excluded.p50, p75 = excluded.p75, p90 = excluded.p90`,
+			id, st.ProjectionSliceID, st.AccountID, st.AsOfAt, st.P10, st.P25, st.P50, st.P75, st.P90); err != nil {
 			return fmt.Errorf("save statistic: %w", err)
 		}
 	}

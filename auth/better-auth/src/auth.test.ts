@@ -141,24 +141,6 @@ test("real provider: signup, OIDC PKCE, introspection, refresh, account and revo
     );
     expect(profile.status).toBe(200);
     expect((await profile.json()).subject).toBe(bootstrap.subject);
-    const context = await auth.$context;
-    await context.adapter.update({
-      model: "user",
-      where: [{ field: "id", value: bootstrap.subject }],
-      update: { disabled: true },
-    });
-    const disabled = await (
-      await exchange(
-        { token: tokens.access_token, token_type_hint: "access_token" },
-        "/api/auth/oauth2/introspect",
-      )
-    ).json();
-    expect(disabled.active).toBe(false);
-    await context.adapter.update({
-      model: "user",
-      where: [{ field: "id", value: bootstrap.subject }],
-      update: { disabled: false },
-    });
     const updated = await request("/waypoint/account", {
       ...json({ displayName: "Updated owner" }),
       headers: { ...json({}).headers, authorization: `Bearer ${tokens.access_token}` },

@@ -49,30 +49,12 @@ func TestCasbinPersistedDecisions(t *testing.T) {
 	if err != nil || !owner.Allows(Read) || owner.Allows(Write) {
 		t.Fatalf("external update cached: %+v %v", owner, err)
 	}
-	// Explicit subject deny overrides the role's allow through Casbin.
-	if _, err := c.db.Exec("INSERT INTO authorization_policies VALUES(?, 'users/*', ?, 'deny')", ActorKey(config.Issuer, "owner"), Read); err != nil {
-		t.Fatal(err)
-	}
-	owner, err = c.Resolve(ctx, "owner")
-	if err != nil || owner.Allows(Read) || !owner.Allows(Project) {
-		t.Fatalf("deny precedence: %+v %v", owner, err)
-	}
 	if err := other.SetRole(config.GuestSubject, "member"); err != nil {
 		t.Fatal(err)
 	}
 	guest, err = c.Resolve(ctx, config.GuestSubject)
 	if err != nil || !guest.Allows(Write) {
 		t.Fatalf("guest permissions were hard-coded: %+v %v", guest, err)
-	}
-	if err := c.SetPermissions("owner", []string{Read}); err != nil {
-		t.Fatal(err)
-	}
-	if err := c.SetRole("owner", "none"); err != nil {
-		t.Fatal(err)
-	}
-	owner, err = c.Resolve(ctx, "owner")
-	if err != nil || len(owner.Permissions) != 0 {
-		t.Fatalf("role revocation retained explicit grants: %+v %v", owner, err)
 	}
 }
 

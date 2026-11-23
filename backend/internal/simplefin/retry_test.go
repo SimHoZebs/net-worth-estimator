@@ -41,7 +41,7 @@ func TestFetchRetrySucceedsAfterTimeout(t *testing.T) {
 		}
 		return &AccountSet{}, nil
 	}
-	if _, err := runner.Sync(context.Background()); err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatalf("sync after retries: %v", err)
 	}
 	if calls != 3 {
@@ -70,7 +70,7 @@ func TestFetchRetryExhaustsBudget(t *testing.T) {
 		calls++
 		return nil, timeoutFetchError()
 	}
-	if _, err := runner.Sync(context.Background()); err == nil {
+	if err := runner.Sync(context.Background()); err == nil {
 		t.Fatal("expected exhausted retry to fail")
 	}
 	if calls != DefaultFetchMaxAttempts {
@@ -104,7 +104,7 @@ func TestFetchDoesNotRetryPermanentErrors(t *testing.T) {
 				calls++
 				return nil, fetchErr
 			}
-			if _, err := runner.Sync(context.Background()); err == nil {
+			if err := runner.Sync(context.Background()); err == nil {
 				t.Fatal("expected permanent failure to fail")
 			}
 			if calls != 1 {
@@ -130,7 +130,7 @@ func TestFetchRetriesServerErrors(t *testing.T) {
 		}
 		return &AccountSet{}, nil
 	}
-	if _, err := runner.Sync(context.Background()); err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatalf("sync after 5xx retry: %v", err)
 	}
 	if calls != 2 {
@@ -152,7 +152,7 @@ func TestFetchRetryStopsWhenCallerCancels(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := runner.Sync(ctx); err == nil {
+	if err := runner.Sync(ctx); err == nil {
 		t.Fatal("expected canceled retry to fail")
 	}
 	if calls != 1 {
@@ -177,7 +177,7 @@ func TestFetchDoesNotCountUnconfigured(t *testing.T) {
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return nil, &NotConfiguredError{}
 	}
-	if _, err := runner.Sync(context.Background()); err == nil {
+	if err := runner.Sync(context.Background()); err == nil {
 		t.Fatal("expected unconfigured sync to fail")
 	}
 	if used, _ := runner.QuotaUsage(); used != 0 {
@@ -201,7 +201,7 @@ func TestQuotaUsageCountsBridgeHits(t *testing.T) {
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return nil, timeoutFetchError()
 	}
-	_, _ = runner.Sync(context.Background())
+	_ = runner.Sync(context.Background())
 	// Default policy retries timeouts: 3 attempts, one sync.
 	if used, _ := runner.QuotaUsage(); used != 3 {
 		t.Fatalf("quota after failed sync = %d, want 3", used)
@@ -216,10 +216,10 @@ func TestQuotaUsageCountsBridgeHits(t *testing.T) {
 		calls++
 		return &AccountSet{}, nil
 	}
-	if _, err := throttled.Trigger(context.Background()); err != nil {
+	if err := throttled.Trigger(context.Background()); err != nil {
 		t.Fatalf("first trigger: %v", err)
 	}
-	if _, err := throttled.Trigger(context.Background()); err == nil {
+	if err := throttled.Trigger(context.Background()); err == nil {
 		t.Fatal("expected throttled trigger to be refused")
 	}
 	if calls != 1 {

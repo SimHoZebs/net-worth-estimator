@@ -1,4 +1,4 @@
-"""River learner runs, ordering, experiment arms, drift probes, and the seed recipe for the training harness."""
+"""River learner runs, ordering, experiment arms, and the seed recipe for the training harness."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from scoring import decision_accuracy
 
 
 class LearnerRun:
-    """Thin timing/drift wrapper around the stable PaymentModelStore API."""
+    """Thin timing wrapper around the stable PaymentModelStore API."""
 
     def __init__(self, keep: bool = False) -> None:
         # Imported lazily so fixture building and Go scoring work even when
@@ -32,9 +32,6 @@ class LearnerRun:
         self._dir = Path(tempfile.mkdtemp(prefix="eval-ml-"))
         self._keep = keep
         os.environ["ML_MODEL_PATH"] = str(self._dir / "model.sqlite3")
-        # Respect a pre-set mode (the seed recipe opts into manual); every
-        # other caller gets today's auto behavior.
-        os.environ.setdefault("ML_DRIFT_MODE", "auto")
         self.store = PaymentModelStore()
         self.train_ms: list[float] = []
         self.eval_ms: list[float] = []
@@ -48,14 +45,6 @@ class LearnerRun:
     @property
     def db_path(self) -> Path:
         return self._dir / "model.sqlite3"
-
-    def drift(self, owner: str) -> dict:
-        return self.store.state(owner)["drift"]
-
-    def dismiss(self) -> dict:
-        """Operator-equivalent dismiss for recipe use: restart only the
-        ADWIN window, keep weights and counts."""
-        return self.store.dismiss_drift()
 
     def evaluate_timed(self, requests: list[dict]) -> list[dict]:
         started = time.perf_counter()
@@ -73,21 +62,12 @@ class LearnerRun:
         run_id: str,
         probe_requests: list[dict] | None = None,
         probe_actions: list[str] | None = None,
-        dismiss_trips: bool = False,
     ) -> list[dict]:
         """Feed items in <=200 batches; optionally score a probe set per batch.
 
-        The trajectory records (batch, probe accuracy, cumulative detections)
-        so learning-curve movement can be separated from real drift trips.
-        With dismiss_trips, a manual-mode drift trip dismisses the detector
-        (weights kept) and retries the batch once instead of aborting; if
-        the retried batch trips again, it is halved and each half retried
-        the same way, down to 25 events — a shift inside one transport
-        batch must not abort a fixed-label curriculum, and no event is
-        ever skipped. Any other failure, or a trip on a <=25 span, raises.
+        The trajectory records (batch, probe accuracy, decisive rate) so
+        learning-curve movement can be read as batches arrive.
         """
-        from model import ConflictError
-
         trajectory = []
         if not items:
             return trajectory
@@ -114,41 +94,7 @@ class LearnerRun:
             after, cursor = cursor, feedback[-1]["eventId"]
             started = time.perf_counter()
             try:
-                try:
-                    self.store.observe(owner, after, cursor, feedback)
-                except ConflictError as exc:
-                    if not (
-                        dismiss_trips and "drift detected" in str(exc)
-                    ):
-                        raise
-                    print(
-                        f"eval: drift trip on batch {start // 200}, "
-                        f"dismissing detector and retrying",
-                        flush=True,
-                    )
-                    self.dismiss()
-                    try:
-                        self.store.observe(owner, after, cursor, feedback)
-                    except ConflictError as retry_exc:
-                        if "drift detected" not in str(retry_exc):
-                            raise
-                        if end - start <= 25:
-                            raise
-                        print(
-                            f"eval: batch {start // 200} tripped again, "
-                            f"splitting {end - start} events",
-                            flush=True,
-                        )
-                        self.dismiss()
-                        mid = start + (end - start) // 2
-                        spans.insert(0, (mid, end))
-                        spans.insert(0, (start, mid))
-                        # The tripping batch committed nothing, so the
-                        # checkpoint still precedes it; rewind the cursor
-                        # and the event counter past its uncommitted events.
-                        cursor = after
-                        self._event_count[owner] -= len(feedback)
-                        continue
+                self.store.observe(owner, after, cursor, feedback)
             finally:
                 self.train_ms.append(
                     (time.perf_counter() - started) * 1000 / max(1, len(feedback))
@@ -162,7 +108,6 @@ class LearnerRun:
                         "events": self._event_count[owner],
                         "probe_accuracy": acc["accuracy"],
                         "decisive_rate": acc["decisive_rate"],
-                        "detections": self.drift(owner)["detections"],
                     }
                 )
         return trajectory
@@ -225,14 +170,12 @@ def run_arm(
         actions = [action for _, action in ordered]
         # The learner bounds one evaluate call; large arms score in chunks.
         pre = decision_accuracy(_evaluate_all(learner, requests), actions)
-        drift_before = learner.drift(owner)
         probe_requests = requests[:100]
         probe_actions = actions[:100]
         trajectory = learner.observe_batches(
             owner, ordered, run_id=f"{name}-run",
             probe_requests=probe_requests, probe_actions=probe_actions,
         )
-        drift_after = learner.drift(owner)
         post = decision_accuracy(_evaluate_all(learner, requests), actions)
         peak_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
         train = sorted(learner.train_ms)
@@ -245,10 +188,6 @@ def run_arm(
             "pre": pre,
             "post": post,
             "lift": post["accuracy"] - pre["accuracy"],
-            "drift_before": drift_before,
-            "drift_after": drift_after,
-            "trips": drift_after["detections"] - drift_before["detections"],
-            "warnings": drift_after["warnings"] - drift_before["warnings"],
             "train_per_event_ms": {
                 "median": pct(train, 0.5),
                 "p90": pct(train, 0.9),
@@ -266,53 +205,6 @@ def run_arm(
         learner.close()
 
 
-def run_shift_probe(ordered: list[tuple[dict, str]]) -> dict:
-    """Synthetic abrupt-shift probe: agree, then contradict, on a fresh store.
-
-    Feeds flipped labels after convergence so the ADWIN trip path and its
-    accuracy cost are exercised even when the real-label arms stay quiet.
-    Labels here are synthetic by construction, never dataset evidence.
-    """
-    learner = LearnerRun()
-    owner = "eval-shift-probe"
-    try:
-        n = len(ordered)
-        if n < 10:
-            return {"skipped": f"only {n} events, need >= 10"}
-        agree = ordered[: 3 * n // 5]
-        held_out = ordered[3 * n // 5 : 4 * n // 5] or ordered[3 * n // 5 :]
-        flipped = [
-            (request, "reject" if action == "confirm" else "confirm")
-            for request, action in ordered[3 * n // 5 :]
-        ]
-        probe_requests = [request for request, _ in held_out]
-        probe_actions = [action for _, action in held_out]
-        learner.observe_batches(owner, agree, run_id="probe-agree")
-        before = decision_accuracy(
-            learner.evaluate_timed(probe_requests), probe_actions
-        )
-        drift_mid = learner.drift(owner)
-        learner.observe_batches(owner, flipped, run_id="probe-flip")
-        after = decision_accuracy(
-            learner.evaluate_timed(probe_requests), probe_actions
-        )
-        drift_end = learner.drift(owner)
-        return {
-            "agree_events": len(agree),
-            "flip_events": len(flipped),
-            "probe_requests": len(held_out),
-            "accuracy_before_flip": before["accuracy"],
-            "accuracy_after_flip": after["accuracy"],
-            "accuracy_delta": after["accuracy"] - before["accuracy"],
-            "detections_during_flip": (
-                drift_end["detections"] - drift_mid["detections"]
-            ),
-            "warnings_during_flip": drift_end["warnings"] - drift_mid["warnings"],
-        }
-    finally:
-        learner.close()
-
-
 def run_seed_recipe(
     ordered_lists: list[tuple[str, list[tuple[dict, str]]]],
     seed_path: Path,
@@ -320,12 +212,11 @@ def run_seed_recipe(
     cat_ordered_lists: list[tuple[str, list[tuple[dict, str]]]] = (),
     min_per_kind: int = 50,
 ) -> dict:
-    """Canonical seed recipe: concatenated sources, manual drift mode.
+    """Canonical seed recipe: concatenated sources.
 
     Trains every source's interleaved payment baseline order in sequence,
     then every source's interleaved category order (HF descriptors, then
-    MoneyData timelines, then mitul descriptors), dismissing the detector
-    and retrying on drift trips so one shift never wipes the seed. Exports a database with ONLY
+    MoneyData timelines, then mitul descriptors). Exports a database with ONLY
     the model row and fails loudly unless every payment classifier kind
     and every mapped category kind clears the coverage minimum — a seed
     that leaves a kind cold is worse than no seed. HOME_IMPROVEMENT and
@@ -335,8 +226,6 @@ def run_seed_recipe(
     """
     from seed_export import export_seed, verify_seed
 
-    previous_mode = os.environ.get("ML_DRIFT_MODE")
-    os.environ["ML_DRIFT_MODE"] = "manual"
     ordered: list[tuple[dict, str]] = []
     for _, items in ordered_lists:
         ordered.extend(items)
@@ -345,12 +234,8 @@ def run_seed_recipe(
         cat_ordered.extend(items)
     learner = LearnerRun(keep=True)
     try:
-        learner.observe_batches(
-            "eval-seed", ordered, run_id="seed-run", dismiss_trips=True
-        )
-        learner.observe_batches(
-            "eval-seed", cat_ordered, run_id="seed-cat-run", dismiss_trips=True
-        )
+        learner.observe_batches("eval-seed", ordered, run_id="seed-run")
+        learner.observe_batches("eval-seed", cat_ordered, run_id="seed-cat-run")
         counts = _model_counts(learner.db_path)
         short = {
             k: counts.get(k, 0)
@@ -380,7 +265,7 @@ def run_seed_recipe(
         with open(probe_path, "w") as handle:
             json.dump(
                 {
-                    "recipe": "multi-source baseline findings, manual mode",
+                    "recipe": "multi-source baseline findings",
                     "requests": probe_requests,
                     "decisions": [j.get("decision") for j in in_memory],
                 },
@@ -388,9 +273,8 @@ def run_seed_recipe(
             )
         info = export_seed(learner.db_path, seed_path)
         verification = verify_seed(seed_path, probe_path)
-        drift = learner.drift("eval-seed")
         return {
-            "recipe": "multi-source baseline findings, manual mode",
+            "recipe": "multi-source baseline findings",
             "events": len(ordered) + len(cat_ordered),
             "payment_events": len(ordered),
             "category_events": len(cat_ordered),
@@ -400,13 +284,8 @@ def run_seed_recipe(
             "probe_path": str(probe_path),
             "probe_requests": len(probe_requests),
             "verification": verification,
-            "drift_at_export": drift,
         }
     finally:
-        if previous_mode is None:
-            os.environ.pop("ML_DRIFT_MODE", None)
-        else:
-            os.environ["ML_DRIFT_MODE"] = previous_mode
         learner.close()
         shutil.rmtree(learner._dir, ignore_errors=True)
 

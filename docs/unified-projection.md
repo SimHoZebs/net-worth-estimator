@@ -24,7 +24,7 @@ Rendered visuals live in `docs/diagrams/` (`.mmd` sources plus Pele-generated `.
 - Actual rows carry null `projection_slice_id`. Projected rows carry non null `projection_slice_id` plus the public event as JSON.
 - Each evaluation persists in its own typed table per state and kind: net worth threshold, account balance, transaction fulfillment, cycle fulfillment, planned purchases, financial independence, and what-if. Scalar and date results are typed columns; variable-length evidence stays verbatim JSON so served bytes match computed output. Empty evaluation tables need no rows.
 - Trial checkpoints never persist. Only baseline checkpoints plus per-date net worth statistics persist. History bands are applied live; statistics cover projected dates only.
-- Evaluation and pinned-evaluation writes do not dirty the projection. The reader serves their outputs from stored rows plus live tables. Account moves (position order only) skip dirty marking. New empty accounts skip dirty marking.
+- Evaluation and pinned-evaluation writes do not dirty the projection. The reader serves their outputs from stored rows plus live tables. New empty accounts skip dirty marking.
 - Sync plans dirty from their earliest checkpoint or directive date inside the store, so direct `ApplySyncPlan` callers invalidate exactly like the ingest orchestrator.
 - Every projection request computes the full window directly on a miss. Compute is full-window; persistence is suffix-only. A kernel resume that simulates only the suffix can land later without changing the read contract.
 - Unseeded stochastic requests always compute fresh draws. Only seeded canonical requests use stored statistics.
@@ -44,7 +44,7 @@ Notes:
 - TRANSACTION uses source plus destination keys. One null means inflow or outflow. Both present means transfer.
 - Source decides fact versus output. Lifecycle state decides pending versus void versus settled.
 - CHECKPOINT rows are facts and SETS their balance. No generated checkpoints persist: timeline rows already carry projected balances, and position plus balances apply live history.
-- MONTE_CARLO_STATISTIC stores portfolio net worth bands per date with an empty account id. Per-account bands arrive when the sampler tracks them. Percentile columns p25, p50, p75 complement p10, median, p90.
+- MONTE_CARLO_STATISTIC stores portfolio net worth bands per date with an empty account id. Per-account bands arrive when the sampler tracks them. Percentile columns are p10, p25, p50, p75, and p90.
 - Generated TRANSACTION rows live in transactions with source `projected` and the public event as JSON. Every model, sync, and analysis read filters them out by null slice. Row writes never set a slice.
 - Evaluations, payment terms, planned purchases, and presets persist in their own tables and enter the build as usual. Typed evaluation outputs persist per state and kind in one table per evaluation.
 
@@ -63,7 +63,7 @@ The state, slice, and output ERD is in [`diagrams/incremental-slices.mmd`](diagr
 Rules:
 
 - Each write sets Unix `dirty_from` and bumps revision. Zero means clean. Creates use the new row's instant, checkpoints use their instant, sync plans use their earliest date. Updates, deletes, moves, conversions, claims, accounts, and payment terms dirty from projection start: no read precedes the mark, so an early date is never missed.
-- Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. New empty accounts and empty sync runs do not dirty either.
+- Evaluation writes, pins, presets, links, and safe-spending settings do not dirty. New empty accounts and empty sync runs do not dirty either.
 - Find first invalid slice means the first slice with `to_at` at or after `dirty_from`.
 - Recompute suffix means delete suffix rows, rewrite the suffix manifest, persist the suffix, adopt the prefix, refresh evaluation outputs, and publish. Prefix inputs are identical by definition of the dirty date, so adoption is exact.
 - Readers serve only when the state is clean, slices cover the window at the current revision, evaluation tables match the built tables, and stored outputs are current.

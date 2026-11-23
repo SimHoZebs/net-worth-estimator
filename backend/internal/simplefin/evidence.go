@@ -21,7 +21,7 @@ func transactionFacts(transaction Transaction, currency string) *types.Transacti
 	if transaction.TransactedAt != nil {
 		facts.OccurredAt = *transaction.TransactedAt
 	}
-	for _, key := range []string{"category", "merchant_name", "payment_product", "order_reference"} {
+	for _, key := range []string{"category", "merchant_name", "payment_product"} {
 		var value string
 		if json.Unmarshal(transaction.Extra[key], &value) == nil && len(value) <= 500 {
 			facts.Metadata[key] = value

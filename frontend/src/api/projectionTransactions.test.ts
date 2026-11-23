@@ -43,7 +43,7 @@ function event(overrides: Partial<TransactionEvent> = {}): TransactionEvent {
 		accountDeltas: [{ accountId: "checking", delta: -100 }],
 		bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
 		availableAmount: 100,
-		fulfillment: { unfulfilledAmount: 100, destinationLimitedAmount: 0 },
+		fulfillment: { unfulfilledAmount: 100 },
 		...overrides,
 	};
 }
@@ -59,7 +59,7 @@ describe("projection transaction evidence", () => {
 			fromId: "checking",
 			available: 100,
 			constraintTypes: ["source-floor"],
-			fulfillment: { unfulfilledAmount: 100, destinationLimitedAmount: 0 },
+			fulfillment: { unfulfilledAmount: 100 },
 		});
 		const gaps = deriveFundingGaps({
 			accounts: financialModelFixture.accounts,
@@ -78,7 +78,7 @@ describe("projection transaction evidence", () => {
 					bindingConstraints: [
 						{ type: "destination-ceiling", accountIds: ["loan"] },
 					],
-					fulfillment: { unfulfilledAmount: 0, destinationLimitedAmount: 100 },
+					fulfillment: { unfulfilledAmount: 0 },
 				}),
 			]),
 			null,

@@ -5,7 +5,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -227,19 +226,4 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 		return nil, err
 	}
 	return &accountOutput{Body: writeResult[types.Account]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
-}
-
-func (s *handler) moveAccount(_ context.Context, input *reorderInput) (*modelstate.ReorderOutput, error) {
-	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Accounts = moveBeforeID(model.Accounts, id, beforeID, accountID)
-	}, func() (struct{}, error) {
-		return struct{}{}, s.store.MoveAccount(id, beforeID)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &modelstate.ReorderOutput{Body: struct {
-		Revision string `json:"revision"`
-	}{Revision: revision}}, nil
 }

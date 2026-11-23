@@ -74,34 +74,10 @@ type StochasticConfig struct {
 	Seed     *int64 `json:"seed"` // nil = unseeded (fresh random draw)
 }
 
-type StochasticProgressPhase string
-
-const (
-	PhasePreparing                StochasticProgressPhase = "preparing"
-	PhaseDeterministicEvaluations StochasticProgressPhase = "deterministic-evaluations"
-	PhaseStochasticRuns           StochasticProgressPhase = "stochastic-runs"
-)
-
-type StochasticEvaluationWorkload struct {
-	Type                    string `json:"type"`
-	InstanceID              string `json:"instanceId"`
-	Name                    string `json:"name"`
-	CompletedUnits          int    `json:"completedUnits"`
-	TotalUnits              int    `json:"totalUnits"`
-	UnitLabel               string `json:"unitLabel"`
-	UnitAction              string `json:"unitAction"`
-	IntensiveUnitsCompleted *int   `json:"intensiveUnitsCompleted,omitempty"`
-	IntensiveUnitLabel      string `json:"intensiveUnitLabel,omitempty"`
-	IntensiveUnitAction     string `json:"intensiveUnitAction,omitempty"`
-	Description             string `json:"description,omitempty"`
-}
-
 type StochasticProgress struct {
-	Phase               StochasticProgressPhase        `json:"phase"`
-	CompletedRuns       int                            `json:"completedRuns"`
-	TotalRuns           int                            `json:"totalRuns"`
-	Fraction            float64                        `json:"fraction"`
-	EvaluationWorkloads []StochasticEvaluationWorkload `json:"evaluationWorkloads"`
+	CompletedRuns int     `json:"completedRuns"`
+	TotalRuns     int     `json:"totalRuns"`
+	Fraction      float64 `json:"fraction"`
 }
 
 type PercentileBands struct {

@@ -226,11 +226,10 @@ func (s *sqliteStore) SaveTransactionFulfillmentOutputs(stateID, kind string, ou
 		return fmt.Errorf("clear fulfillment outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO transaction_fulfillment_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, destination_limited_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, events_json, dates_json, transactions_json, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90, user_id)
+		if _, err := s.db.Exec(`INSERT INTO transaction_fulfillment_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
-			nullFloatPtr(output.RequestedAmount), nullFloatPtr(output.RealizedAmount), nullFloatPtr(output.DestinationLimitedAmount), nullFloatPtr(output.UnfulfilledAmount), nullFloatPtr(output.CompletionRate), nullStringPtr(output.FirstUnderfulfilledDate),
-			orJSON(output.EventsJSON, "[]"), orJSON(output.DatesJSON, "[]"), orJSON(output.TransactionsJSON, "[]"),
+			nullFloatPtr(output.RequestedAmount), nullFloatPtr(output.RealizedAmount), nullFloatPtr(output.UnfulfilledAmount), nullFloatPtr(output.CompletionRate), nullStringPtr(output.FirstUnderfulfilledDate),
 			nullIntPtr(output.ProbRunCount), nullIntPtr(output.ProbFulfilledCount), nullFloatPtr(output.ProbFullProbability),
 			nullFloatPtr(output.ProbUnfulfilledP10), nullFloatPtr(output.ProbUnfulfilledP25), nullFloatPtr(output.ProbUnfulfilledP50), nullFloatPtr(output.ProbUnfulfilledP75), nullFloatPtr(output.ProbUnfulfilledP90)); err != nil {
 			return fmt.Errorf("save fulfillment output: %w", err)
@@ -242,7 +241,7 @@ func (s *sqliteStore) SaveTransactionFulfillmentOutputs(stateID, kind string, ou
 // ListTransactionFulfillmentOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListTransactionFulfillmentOutputs(stateID, kind string) ([]types.TransactionFulfillmentOutput, error) {
 	out := []types.TransactionFulfillmentOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, destination_limited_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, events_json, dates_json, transactions_json, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90 FROM transaction_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90 FROM transaction_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list fulfillment outputs: %w", err)
 	}
@@ -250,17 +249,16 @@ func (s *sqliteStore) ListTransactionFulfillmentOutputs(stateID, kind string) ([
 	for rows.Next() {
 		var output types.TransactionFulfillmentOutput
 		var base evalBaseRow
-		var requested, realized, destLimited, unfulfilled, completion, probProb, p10, p25, p50, p75, p90 sql.NullFloat64
+		var requested, realized, unfulfilled, completion, probProb, p10, p25, p50, p75, p90 sql.NullFloat64
 		var firstUnderfulfilled sql.NullString
 		var runCount, fulfilledCount sql.NullInt64
-		scan := append(base.pointers(), &requested, &realized, &destLimited, &unfulfilled, &completion, &firstUnderfulfilled, &output.EventsJSON, &output.DatesJSON, &output.TransactionsJSON, &runCount, &fulfilledCount, &probProb, &p10, &p25, &p50, &p75, &p90)
+		scan := append(base.pointers(), &requested, &realized, &unfulfilled, &completion, &firstUnderfulfilled, &runCount, &fulfilledCount, &probProb, &p10, &p25, &p50, &p75, &p90)
 		if err := rows.Scan(scan...); err != nil {
 			return nil, fmt.Errorf("scan fulfillment output: %w", err)
 		}
 		base.fill(&output.EvaluationOutputBase)
 		output.RequestedAmount = floatPtrOf(requested)
 		output.RealizedAmount = floatPtrOf(realized)
-		output.DestinationLimitedAmount = floatPtrOf(destLimited)
 		output.UnfulfilledAmount = floatPtrOf(unfulfilled)
 		output.CompletionRate = floatPtrOf(completion)
 		output.FirstUnderfulfilledDate = stringPtrOf(firstUnderfulfilled)

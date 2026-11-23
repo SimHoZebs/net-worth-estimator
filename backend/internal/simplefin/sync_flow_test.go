@@ -349,20 +349,19 @@ func TestFirstSyncImportsCheckpointAndSettledTogether(t *testing.T) {
 			t.Fatalf("%s: 12:00 position = %v, want 900 (09:00 anchor 1000 minus 11:00 actual)", sync, got)
 		}
 	}
-	first, err := runner.Sync(context.Background())
-	if err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
-	if first.AccountsProvisioned != 1 || first.CheckpointsInserted != 1 || first.SettledInserted != 1 {
-		t.Fatalf("first sync = %+v, want 1 provisioned + 1 checkpoint + 1 settled", first)
+	applied, err := database.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(applied.Accounts) != 1 || len(applied.Checkpoints) != 1 {
+		t.Fatalf("first sync applied = %+v, want 1 provisioned account + 1 checkpoint", applied)
 	}
 	assertPosition("first sync")
-	second, err := runner.Sync(context.Background())
-	if err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatalf("second sync: %v", err)
-	}
-	if second.SettledInserted != 0 {
-		t.Fatalf("second sync duplicated the settled row: %+v", second)
 	}
 	assertPosition("second sync")
 }

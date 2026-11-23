@@ -732,23 +732,15 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       throw new Error(`unknown seed pack ${pack}`);
     });
     const model = JSON.parse(raw).model ?? {};
-    // The API path covers accounts, checkpoints, transactions, and rules. A
-    // pack carrying evaluations, payment terms, or planned purchases needs
-    // the Go import path instead, so fail loudly instead of half-seeding.
+    // The API path covers accounts, transactions, and rules. A pack carrying
+    // evaluations, payment terms, or planned purchases needs the Go import path
+    // instead, so fail loudly instead of half-seeding.
     const evaluations = model.evaluations ?? {};
     const hasEvaluations = Object.values(evaluations).some((rows) => (rows ?? []).length > 0);
     if (hasEvaluations || (model.paymentTerms ?? []).length > 0 || (model.plannedPurchases ?? []).length > 0) {
       throw new Error(`seed pack ${pack} needs the Go import path (unsupported sections present)`);
     }
     for (const account of model.accounts ?? []) await createAccount(account);
-    for (const checkpoint of model.checkpoints ?? []) {
-      const response = await api(owner, origin, own, "POST", "/v1/checkpoints", {
-        accountId: checkpoint.AccountId ?? checkpoint.accountId,
-        balance: checkpoint.Balance ?? checkpoint.balance,
-        observedAt: checkpoint.observedAt,
-      });
-      assert.equal(response.status(), 200, `seed checkpoint: ${await response.text()}`);
-    }
     for (const transaction of model.transactions ?? []) await createTransaction(transaction);
     for (const rule of model.schedules ?? []) await createRule(rule);
   }
@@ -778,19 +770,11 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       "Seed refund",
     ];
     const next = seededStream(seed);
-    const day = 86400;
     for (let i = 0; i < accounts; i++) {
       const accountId = `seed-acct-${seed}-${String(i).padStart(4, "0")}`;
       let accountName = `${names[i % names.length]} ${String(i).padStart(2, "0")}`;
       if (i % 8 === 7) accountName = `${accountName} ${"\u00e9".repeat(40)}`;
       await createAccount({ id: accountId, name: accountName, kind: "cash", enabled: true });
-      await api(owner, origin, own, "POST", "/v1/checkpoints", {
-        accountId,
-        balance: 1000 + Math.floor(next() * 9000),
-        observedAt: Date.UTC(2026, 0, 1, 12, 0, 0) / 1000 + i * day,
-      }).then(async (response) => {
-        assert.equal(response.status(), 200, `seed checkpoint ${accountId}: ${await response.text()}`);
-      });
       for (let j = 0; j < perAccount; j++) {
         const stamp = bulkDay(next, i + j);
         await createTransaction({

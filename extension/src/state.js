@@ -60,10 +60,7 @@ export class CaptureState {
     return this.change((state) => {
       if (state.pendingSave || state.saved?.id === state.draft.id || state.draft.id !== draftID)
         return;
-      if (sourceUrl) {
-        state.draft.sourceUrl = sourceUrl;
-        state.draft.capturedAt = new Date().toISOString();
-      }
+      if (sourceUrl) state.draft.sourceUrl = sourceUrl;
       delete state.captureProblem;
       if (values.priceMethod === "picker" && !values.cost)
         state.captureProblem =

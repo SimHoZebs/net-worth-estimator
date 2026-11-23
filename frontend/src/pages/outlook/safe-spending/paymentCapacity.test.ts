@@ -15,7 +15,6 @@ const summary = (
 		cardPayoffCapacity: 610.03,
 		prePaydayRoom: 210.03,
 		postIncomeRoom: null,
-		postPaydayBalance: null,
 		paymentRoom: null,
 		...overrides,
 	});

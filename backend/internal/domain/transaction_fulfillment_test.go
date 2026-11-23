@@ -18,13 +18,12 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 		destinationLimit bool
 		missingSource    bool
 		unfulfilled      float64
-		destination      float64
 	}{
 		{name: "fully funded", requested: 200, realized: 200, endingBalance: 300},
 		{name: "partial payment", requested: 200, realized: 100, unfulfilled: 100},
 		{name: "protected balance", requested: 200, realized: 100, endingBalance: 400, floor: 400, unfulfilled: 100},
 		{name: "annual limit", requested: 200, realized: 100, endingBalance: 900, capped: true, unfulfilled: 100},
-		{name: "destination ceiling", requested: 200, realized: 100, endingBalance: 900, destinationLimit: true, destination: 100},
+		{name: "destination ceiling", requested: 200, realized: 100, endingBalance: 900, destinationLimit: true},
 		{name: "missing source", requested: 200, missingSource: true, unfulfilled: 200},
 		{name: "below reportable threshold", requested: 100.49, realized: 100},
 		{name: "exact reportable threshold", requested: 100.25, realized: 99.75, unfulfilled: 1},
@@ -70,27 +69,15 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 				TransactionEvents: []types.TransactionEvent{event},
 			}
 			public := publicTransactionEvents(path)[0]
-			evaluation := EvaluateTransactionFulfillment(path, types.TransactionFulfillmentConfig{}, true)
+			evaluation := EvaluateTransactionFulfillment(path, types.TransactionFulfillmentConfig{})
 			if public.Fulfillment == nil {
 				t.Fatal("public event has no fulfillment assessment")
 			}
-			if public.Fulfillment.UnfulfilledAmount != tc.unfulfilled || public.Fulfillment.DestinationLimitedAmount != tc.destination {
-				t.Fatalf("fulfillment = %+v, want unfulfilled %v destination-limited %v", public.Fulfillment, tc.unfulfilled, tc.destination)
+			if public.Fulfillment.UnfulfilledAmount != tc.unfulfilled {
+				t.Fatalf("unfulfilled = %v, want %v", public.Fulfillment.UnfulfilledAmount, tc.unfulfilled)
 			}
-			if len(evaluation.Events) != 1 {
-				t.Fatalf("evaluation events = %+v", evaluation.Events)
-			}
-			detail := evaluation.Events[0]
-			if public.Fulfillment.UnfulfilledAmount != detail.UnfulfilledAmount || public.Fulfillment.DestinationLimitedAmount != detail.DestinationLimitedAmount {
-				t.Fatalf("public fulfillment %+v differs from evaluation %+v", public.Fulfillment, detail)
-			}
-			if len(public.BindingConstraints) != len(detail.BindingConstraints) {
-				t.Fatalf("public constraints %+v differ from evaluation %+v", public.BindingConstraints, detail.BindingConstraints)
-			}
-			for index := range public.BindingConstraints {
-				if !reflect.DeepEqual(public.BindingConstraints[index], detail.BindingConstraints[index]) {
-					t.Fatalf("public constraints %+v differ from evaluation %+v", public.BindingConstraints, detail.BindingConstraints)
-				}
+			if public.Fulfillment.UnfulfilledAmount != evaluation.UnfulfilledAmount {
+				t.Fatalf("public fulfillment %+v differs from evaluation %+v", public.Fulfillment, evaluation)
 			}
 			if path.TransactionEvents[0].Fulfillment != nil {
 				t.Fatal("public adaptation mutated the evaluator-facing path")

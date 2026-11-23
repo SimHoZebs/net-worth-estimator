@@ -461,23 +461,6 @@ func CountVolatileRateInputs(amount types.TransactionAmountResolution) int {
 	return count
 }
 
-// AmountRequiresHistoricalState reports whether a descriptor reads historical state.
-func AmountRequiresHistoricalState(amount types.TransactionAmountResolution) bool {
-	for _, binding := range amount.Inputs {
-		if binding.Source == "literal" {
-			continue
-		}
-		if binding.Source != "provider" {
-			return true
-		}
-		def, ok := amountProviders[binding.Provider]
-		if !ok || !def.stateless {
-			return true
-		}
-	}
-	return false
-}
-
 type resolverDefinition struct {
 	name string
 	// Description is human-readable help surfaced by the discovery endpoint.

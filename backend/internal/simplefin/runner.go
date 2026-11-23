@@ -22,24 +22,6 @@ func rateLimitedCause(err error) *RateLimitedError {
 	return rateLimited
 }
 
-// Summary describes one sync run for logs and the trigger endpoint.
-type Summary struct {
-	CheckpointsInserted int            `json:"checkpointsInserted"`
-	CheckpointsUpdated  int            `json:"checkpointsUpdated"`
-	CheckpointsSkipped  int            `json:"checkpointsSkipped"`
-	PendingDeleted      int            `json:"pendingDeleted"`
-	PendingInserted     int            `json:"pendingInserted"`
-	PendingUpdated      int            `json:"pendingUpdated"`
-	SettledConverted    int            `json:"settledConverted"`
-	SettledInserted     int            `json:"settledInserted"`
-	AccountsProvisioned int            `json:"accountsProvisioned"`
-	Skipped             map[string]int `json:"skipped"`
-	// Partial is true when at least one connection or account was
-	// excluded by a structured Bridge error while other rows applied.
-	Partial bool            `json:"partial"`
-	Errors  []ingest.Notice `json:"errors,omitempty"`
-}
-
 // MinTriggerInterval is the default spacing for successful manual trigger
 // runs. The Bridge expects 24 requests or fewer per day with quotas
 // replenished throughout the day; scheduled runs every 6 hours plus one
@@ -76,10 +58,9 @@ func (e *NotConfiguredError) Error() string {
 }
 
 // CredentialProvider resolves the current per-plan Bridge credential from
-// the database: the access URL plus the card selection. Connecting,
-// rotating, or disconnecting a key takes effect on the next run with no
-// restart.
-type CredentialProvider func() (accessURL string, cards map[string]struct{})
+// the database. Connecting, rotating, or disconnecting a key takes effect on
+// the next run with no restart.
+type CredentialProvider func() string
 
 // Runner orchestrates fetch, map, and apply. The zero value is unusable;
 // construct with NewRunner.
@@ -143,7 +124,7 @@ func NewRunner(database store.Store, config Config, client *Client) *Runner {
 	var provider CredentialProvider
 	if client != nil {
 		accessURL := client.AccessURL
-		provider = func() (string, map[string]struct{}) { return accessURL, nil }
+		provider = func() string { return accessURL }
 	}
 	runner := &Runner{store: database, config: config, credential: provider, now: time.Now, sleep: sleepContext}
 	if client != nil {
@@ -171,20 +152,20 @@ func NewRunnerWithProvider(database store.Store, config Config, provider Credent
 // fetchWithCredential resolves the current access URL at call time so a
 // newly connected key takes effect without a restart.
 func (r *Runner) fetchWithCredential(ctx context.Context, start, end time.Time) (*AccountSet, error) {
-	accessURL, _ := r.resolveCredential()
+	accessURL := r.resolveCredential()
 	if accessURL == "" {
 		return nil, &NotConfiguredError{}
 	}
 	return (&Client{AccessURL: accessURL, HTTPClient: r.httpClient}).Fetch(ctx, start, end)
 }
 
-// resolveCredential returns the current access URL and card set from the
-// provider, or empty values when no provider is set.
-func (r *Runner) resolveCredential() (string, map[string]struct{}) {
+// resolveCredential returns the current access URL from the provider, or
+// empty when no provider is set.
+func (r *Runner) resolveCredential() string {
 	if r.credential != nil {
 		return r.credential()
 	}
-	return "", nil
+	return ""
 }
 
 // IsConfigured reports whether a Bridge credential is available.
@@ -192,7 +173,7 @@ func (r *Runner) IsConfigured() bool {
 	if r == nil {
 		return false
 	}
-	accessURL, _ := r.resolveCredential()
+	accessURL := r.resolveCredential()
 	return accessURL != "" && r.store != nil
 }
 
@@ -201,7 +182,7 @@ func (r *Runner) BridgeHost() string {
 	if r == nil {
 		return ""
 	}
-	accessURL, _ := r.resolveCredential()
+	accessURL := r.resolveCredential()
 	return BridgeHost(accessURL)
 }
 
@@ -211,21 +192,21 @@ func (r *Runner) BridgeHost() string {
 // with Trigger so a scheduled run and a manual trigger never hit the Bridge
 // concurrently, and it honors the post-429 blackout without touching the
 // Bridge.
-func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
+func (r *Runner) Sync(ctx context.Context) error {
 	r.mu.Lock()
 	if r.inFlight {
 		r.mu.Unlock()
-		return nil, &InProgressError{}
+		return &InProgressError{}
 	}
 	if now := r.now(); now.Before(r.limitedUntil) {
 		retryAfter := r.limitedUntil.Sub(now)
 		r.mu.Unlock()
-		return nil, &TooSoonError{RetryAfter: retryAfter}
+		return &TooSoonError{RetryAfter: retryAfter}
 	}
 	r.inFlight = true
 	r.mu.Unlock()
 
-	summary, err := r.fetchAndApply(ctx)
+	err := r.fetchAndApply(ctx)
 
 	r.mu.Lock()
 	r.inFlight = false
@@ -233,27 +214,27 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 		wait := r.rateLimitWait(rateLimited)
 		r.limitedUntil = r.now().Add(wait)
 		r.mu.Unlock()
-		return nil, &TooSoonError{RetryAfter: wait}
+		return &TooSoonError{RetryAfter: wait}
 	}
 	r.mu.Unlock()
-	return summary, err
+	return err
 }
 
 // fetchAndApply runs one Bridge fetch through the provider-neutral ingest
 // orchestrator with no guard checks. Callers own singleflight and blackout
 // handling.
-func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
+func (r *Runner) fetchAndApply(ctx context.Context) error {
 	out, err := ingest.Sync(ctx, r.store, bridgeAdapter{runner: r}, r.now())
 	if err != nil {
 		condition := syncErrorFromError(err, r.now())
 		r.recordSyncError(condition)
 		slog.WarnContext(ctx, "simplefin sync failed", "code", condition.Code)
-		return nil, err
+		return err
 	}
 	// Stamp successful runs so /v1/status can report the last
 	// sync time. Failed runs return above unstamped and stay retryable.
 	if err := r.store.SetLastSyncTime(r.now().UTC().Format(time.RFC3339)); err != nil {
-		return nil, fmt.Errorf("record sync time: %w", err)
+		return fmt.Errorf("record sync time: %w", err)
 	}
 	if len(out.Notices) > 0 {
 		first := out.Notices[0]
@@ -289,20 +270,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		"settled_inserted", out.Applied.SettledInserted,
 		"settled_converted", out.Applied.SettledConverted,
 		"notices", len(out.Notices), "skipped", skipped)
-	return &Summary{
-		CheckpointsInserted: out.Applied.CheckpointsInserted,
-		CheckpointsUpdated:  out.Applied.CheckpointsUpdated,
-		CheckpointsSkipped:  out.Applied.CheckpointsSkipped,
-		PendingDeleted:      out.Applied.PendingDeleted,
-		PendingInserted:     out.Applied.PendingInserted,
-		PendingUpdated:      out.Applied.PendingUpdated,
-		SettledConverted:    out.Applied.SettledConverted,
-		SettledInserted:     out.Applied.SettledInserted,
-		AccountsProvisioned: out.Provisioned,
-		Skipped:             skipped,
-		Partial:             len(out.Notices) > 0,
-		Errors:              out.Notices,
-	}, nil
+	return nil
 }
 
 // Trigger runs fetchAndApply unless a sync is in flight, a trigger ran
@@ -310,44 +278,44 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 // active. The success guard stamps only successful runs so a generic failed
 // attempt stays retryable; upstream 429s instead arm the blackout and return
 // TooSoon so the frontend backs off without another Bridge hit.
-func (r *Runner) Trigger(ctx context.Context) (*Summary, error) {
+func (r *Runner) Trigger(ctx context.Context) error {
 	r.mu.Lock()
 	if r.inFlight {
 		r.mu.Unlock()
-		return nil, &InProgressError{}
+		return &InProgressError{}
 	}
 	now := r.now()
 	if now.Before(r.limitedUntil) {
 		retryAfter := r.limitedUntil.Sub(now)
 		r.mu.Unlock()
-		return nil, &TooSoonError{RetryAfter: retryAfter}
+		return &TooSoonError{RetryAfter: retryAfter}
 	}
 	interval := r.effectiveTriggerInterval()
 	if !r.lastTrigger.IsZero() && now.Sub(r.lastTrigger) < interval {
 		retryAfter := interval - now.Sub(r.lastTrigger)
 		r.mu.Unlock()
-		return nil, &TooSoonError{RetryAfter: retryAfter}
+		return &TooSoonError{RetryAfter: retryAfter}
 	}
 	r.inFlight = true
 	r.mu.Unlock()
 
-	summary, err := r.fetchAndApply(ctx)
+	err := r.fetchAndApply(ctx)
 
 	r.mu.Lock()
 	r.inFlight = false
 	if err == nil {
 		r.lastTrigger = r.now()
 		r.mu.Unlock()
-		return summary, nil
+		return nil
 	}
 	if rateLimited := rateLimitedCause(err); rateLimited != nil {
 		wait := r.rateLimitWait(rateLimited)
 		r.limitedUntil = r.now().Add(wait)
 		r.mu.Unlock()
-		return nil, &TooSoonError{RetryAfter: wait}
+		return &TooSoonError{RetryAfter: wait}
 	}
 	r.mu.Unlock()
-	return nil, err
+	return err
 }
 
 // recordSyncError stores the display-only condition. A persistence failure

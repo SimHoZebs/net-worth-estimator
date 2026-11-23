@@ -15,7 +15,7 @@ import (
 )
 
 type syncOutput struct {
-	Body simplefin.Summary
+	Body struct{}
 }
 
 // retryAfterHeader converts a wait duration to a Retry-After header value,
@@ -40,7 +40,7 @@ func (s *handler) triggerSync(ctx context.Context, _ *struct{}) (*syncOutput, er
 	if s.runner == nil || !s.runner.IsConfigured() {
 		return nil, huma.Error503ServiceUnavailable("simplefin sync is not configured")
 	}
-	summary, err := s.runner.Trigger(ctx)
+	err := s.runner.Trigger(ctx)
 	if err != nil {
 		var notConfigured *simplefin.NotConfiguredError
 		if errors.As(err, &notConfigured) {
@@ -76,7 +76,7 @@ func (s *handler) triggerSync(ctx context.Context, _ *struct{}) (*syncOutput, er
 		}
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	return &syncOutput{Body: *summary}, nil
+	return &syncOutput{}, nil
 }
 
 type syncCredentialBody struct {
@@ -98,18 +98,6 @@ type syncCredentialInput struct {
 		SetupToken string `json:"setupToken,omitempty"`
 		// AccessURL is an already-claimed Bridge Access URL paste fallback.
 		AccessURL string `json:"accessUrl,omitempty"`
-	}
-}
-
-type syncCardsOutput struct {
-	Body struct {
-		Cards []string `json:"cards"`
-	}
-}
-
-type syncCardsInput struct {
-	Body struct {
-		Cards []string `json:"cards"`
 	}
 }
 
@@ -170,10 +158,10 @@ func (s *handler) connectSyncCredential(ctx context.Context, input *syncCredenti
 	// throttle is not overridden. Best-effort: a throttled or failed sync
 	// never fails the connect itself. The calling user's runner runs it.
 	if wasInitial && s.runner != nil {
-		if summary, err := s.runner.Sync(ctx); err != nil {
+		if err := s.runner.Sync(ctx); err != nil {
 			log.Printf("simplefin initial sync failed: %v", err)
 		} else {
-			log.Printf("simplefin initial sync: %+v", summary)
+			log.Printf("simplefin initial sync completed")
 		}
 	}
 	return &syncCredentialOutput{Body: syncCredentialBody{Configured: true, BridgeHost: stored.BridgeHost, UpdatedAt: stored.UpdatedAt}}, nil
@@ -184,60 +172,4 @@ func (s *handler) disconnectSyncCredential(_ context.Context, _ *struct{}) (*syn
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	return &syncCredentialOutput{Body: syncCredentialBody{Configured: false}}, nil
-}
-
-func (s *handler) getSyncCards(_ context.Context, _ *struct{}) (*syncCardsOutput, error) {
-	cards, err := s.store.GetSyncCards()
-	if err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	}
-	if cards == nil {
-		cards = []string{}
-	}
-	output := &syncCardsOutput{}
-	output.Body.Cards = cards
-	return output, nil
-}
-
-func (s *handler) setSyncCards(_ context.Context, input *syncCardsInput) (*syncCardsOutput, error) {
-	cards := input.Body.Cards
-	if cards == nil {
-		cards = []string{}
-	}
-	seen := map[string]struct{}{}
-	cleaned := make([]string, 0, len(cards))
-	for _, id := range cards {
-		trimmed := strings.TrimSpace(id)
-		if trimmed == "" {
-			return nil, huma.Error400BadRequest("card account IDs must not be blank")
-		}
-		if _, dup := seen[trimmed]; dup {
-			return nil, huma.Error400BadRequest("duplicate card account ID: " + trimmed)
-		}
-		seen[trimmed] = struct{}{}
-		cleaned = append(cleaned, trimmed)
-	}
-	if model, err := s.store.LoadModel(); err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	} else if model != nil && len(cleaned) > 0 {
-		known := map[string]struct{}{}
-		for _, account := range model.Accounts {
-			known[account.ID] = struct{}{}
-		}
-		for _, id := range cleaned {
-			if _, ok := known[id]; !ok {
-				return nil, huma.Error422UnprocessableEntity("unknown account: " + id)
-			}
-		}
-	}
-	stored, err := s.store.SetSyncCards(cleaned)
-	if err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	}
-	output := &syncCardsOutput{}
-	output.Body.Cards = stored
-	if output.Body.Cards == nil {
-		output.Body.Cards = []string{}
-	}
-	return output, nil
 }

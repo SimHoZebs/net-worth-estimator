@@ -53,7 +53,6 @@ export function transactionFixture(
 				0,
 				(overrides.requested ?? 9000) - (overrides.realized ?? 6350),
 			),
-			destinationLimitedAmount: 0,
 		},
 		...overrides,
 	};
@@ -96,7 +95,6 @@ function event(
 		constraint,
 		fulfillment: {
 			unfulfilledAmount: Math.max(0, requested - realized),
-			destinationLimitedAmount: 0,
 		},
 		accountDeltas: [
 			...(fromId ? [{ accountId: fromId, delta: -realized }] : []),

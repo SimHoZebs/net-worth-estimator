@@ -66,11 +66,7 @@ func (s *sqliteStore) ClaimAnalysis(kind, version string) (types.AnalysisRun, ty
 		return run, input, false, err
 	}
 	run = types.AnalysisRun{ID: id, Type: kind, Version: version, InputRevision: revision, State: "running", StartedAt: now}
-	inputJSON, err := json.Marshal(input)
-	if err != nil {
-		return run, input, false, err
-	}
-	if _, err := tx.Exec(`INSERT INTO analysis_runs(id, type, version, input_revision, state, started_at, lease_until, input_json, user_id) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, :user_id)`, id, kind, version, revision, now, now+60, string(inputJSON)); err != nil {
+	if _, err := tx.Exec(`INSERT INTO analysis_runs(id, type, version, input_revision, state, started_at, lease_until, user_id) VALUES (?, ?, ?, ?, 'running', ?, ?, :user_id)`, id, kind, version, revision, now, now+60); err != nil {
 		return run, input, false, err
 	}
 	return run, input, true, tx.Commit()

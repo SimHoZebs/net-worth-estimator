@@ -32,7 +32,7 @@ candidate, exclusion and required signals, and whether an unmarked stream is a c
 It is immutable domain policy, not a feature vector or a required algorithm.
 The detector does not encode model features. Requests are batched at 100.
 One observation is valid evidence. Without established repetition, cadence is
-empty and `annualizedEstimate` is omitted. A recurrence-dependent definition
+empty. A recurrence-dependent definition
 records `regular-cadence` in the immutable question's `requiredSignals`.
 
 `patternId` identifies the owner/account/source/currency/direction/descriptive-stream/cadence

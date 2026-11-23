@@ -19,7 +19,6 @@ const render = (savingsTarget = 500, overrides = {}) =>
 				fundingRoom: 896.44,
 				incomeFunded: 595.52,
 				savingsAllowance: 95.52,
-				additionalSavings: 595.52,
 				...overrides,
 			})}
 			savingsTarget={savingsTarget}
@@ -104,7 +103,6 @@ describe("safe spending cycle budget", () => {
 			fundingRoom: 0,
 			incomeFunded: 0,
 			savingsAllowance: 0,
-			additionalSavings: 0,
 		});
 		for (const testId of [
 			"with-cash-cushion",
@@ -122,7 +120,6 @@ describe("safe spending cycle budget", () => {
 			fundingRoom: -110,
 			incomeFunded: -110,
 			savingsAllowance: -610,
-			additionalSavings: -110,
 			nextCycleDiscretionary: -80,
 			nextCycleIncome: -180,
 			nextCycleCarryover: 100,

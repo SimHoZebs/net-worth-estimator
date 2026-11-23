@@ -130,12 +130,8 @@ describe("derive funding gaps", () => {
 
 	it.each([
 		{
-			name: "destination ceiling",
-			fulfillment: { unfulfilledAmount: 0, destinationLimitedAmount: 2650 },
-		},
-		{
 			name: "nonreportable residual",
-			fulfillment: { unfulfilledAmount: 0, destinationLimitedAmount: 0 },
+			fulfillment: { unfulfilledAmount: 0 },
 		},
 		{ name: "missing assessment", fulfillment: undefined },
 	])("does not invent a funding gap for $name", ({ fulfillment }) => {
@@ -159,7 +155,7 @@ describe("derive funding gaps", () => {
 					requested: 100,
 					realized: 100,
 					available: 100,
-					fulfillment: { unfulfilledAmount: 1, destinationLimitedAmount: 0 },
+					fulfillment: { unfulfilledAmount: 1 },
 				}),
 			],
 		});

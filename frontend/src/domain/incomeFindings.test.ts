@@ -21,7 +21,6 @@ const finding = {
 		patternId: "checking-payroll",
 		currency: "USD",
 		typicalAmount: "2000.00",
-		annualizedEstimate: "52000.00",
 	},
 	evidence: [{ code: "income.main-inflow:annualized", reason: "annualized" }],
 } as AnalysisFinding;

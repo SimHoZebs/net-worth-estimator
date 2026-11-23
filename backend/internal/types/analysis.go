@@ -51,11 +51,12 @@ type AnalysisDetection struct {
 
 // AnalysisPaymentPattern is the source-currency summary of one detected pattern.
 // Display amounts remain separate from external assessment results.
+// AnnualizedEstimate is internal-only ranking input; json:"-" keeps it off the wire.
 type AnalysisPaymentPattern struct {
 	PatternID          string `json:"patternId"`
 	Currency           string `json:"currency"`
 	TypicalAmount      string `json:"typicalAmount"`
-	AnnualizedEstimate string `json:"annualizedEstimate"`
+	AnnualizedEstimate string `json:"-"`
 }
 
 type AnalysisRun struct {

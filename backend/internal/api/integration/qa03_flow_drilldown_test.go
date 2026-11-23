@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -75,9 +76,8 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 
 	checking := qa03CreateRow(t, handler, "/v1/accounts", `{"name":"Checking","kind":"cash","enabled":true}`)
 	savings := qa03CreateRow(t, handler, "/v1/accounts", `{"name":"Savings","kind":"cash","enabled":true}`)
-	if response := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"`+checking+`","Balance":5000,"observedAt":1774958400}`); response.Code != http.StatusOK {
-		t.Fatalf("checkpoint = %d %s", response.Code, response.Body.String())
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: checking, Balance: 5000, Source: store.SourceUser, ObservedAt: 1774958400}); err != nil {
+		t.Fatalf("seed checkpoint: %v", err)
 	}
 
 	// One inflow, one outflow, one account-to-account transfer in June, and

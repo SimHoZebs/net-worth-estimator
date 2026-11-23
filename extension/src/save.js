@@ -16,8 +16,11 @@ export function createPurchaseSaver(connection, captures, storage) {
   async function perform() {
     const identity = await connection.identity();
     const resource = identity.resource.id;
-    const model = await loadModel(connection, resource);
-    if (model.readOnly || !identity.resource.permissions.includes("user:write"))
+    const [model, status] = await Promise.all([
+      loadModel(connection, resource),
+      connection.api("/v1/status", undefined, resource),
+    ]);
+    if (status.readOnly || !identity.resource.permissions.includes("user:write"))
       throw new Error("This account is read-only. Your draft remains available.");
     const { connection: connected } = await storage.local.get("connection");
     if (!connected) throw new Error("Reconnect before saving this purchase.");

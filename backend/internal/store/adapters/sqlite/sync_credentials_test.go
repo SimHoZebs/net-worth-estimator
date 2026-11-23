@@ -15,9 +15,6 @@ func TestSyncCredentialDefaultsEmpty(t *testing.T) {
 	if credential.Configured() || credential.AccessURL != "" || credential.BridgeHost != "" || credential.UpdatedAt != "" {
 		t.Fatalf("default credential = %+v, want empty", credential)
 	}
-	if cards, err := database.GetSyncCards(); err != nil || len(cards) != 0 {
-		t.Fatalf("default cards = %+v, err %v", cards, err)
-	}
 }
 
 func TestSyncCredentialRoundTrip(t *testing.T) {
@@ -38,11 +35,8 @@ func TestSyncCredentialRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSyncCredentialRotationPreservesCards(t *testing.T) {
+func TestSyncCredentialRotation(t *testing.T) {
 	database := openTestStore(t)
-	if _, err := database.SetSyncCards([]string{"prime_card"}); err != nil {
-		t.Fatalf("set cards: %v", err)
-	}
 	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
 		t.Fatalf("set credential: %v", err)
 	}
@@ -52,10 +46,6 @@ func TestSyncCredentialRotationPreservesCards(t *testing.T) {
 	}
 	if rotated.AccessURL != "https://other:secret@bridge.example/simplefin" {
 		t.Fatalf("rotated access URL = %q", rotated.AccessURL)
-	}
-	cards, err := database.GetSyncCards()
-	if err != nil || len(cards) != 1 || cards[0] != "prime_card" {
-		t.Fatalf("cards after rotation = %+v, err %v", cards, err)
 	}
 }
 
@@ -76,13 +66,10 @@ func TestSyncCredentialEmptySetDisconnects(t *testing.T) {
 	}
 }
 
-func TestSyncCredentialClearKeepsCards(t *testing.T) {
+func TestSyncCredentialClear(t *testing.T) {
 	database := openTestStore(t)
 	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
 		t.Fatalf("set credential: %v", err)
-	}
-	if _, err := database.SetSyncCards([]string{"prime_card"}); err != nil {
-		t.Fatalf("set cards: %v", err)
 	}
 	if err := database.ClearSyncCredential(); err != nil {
 		t.Fatalf("clear credential: %v", err)
@@ -93,45 +80,6 @@ func TestSyncCredentialClearKeepsCards(t *testing.T) {
 	}
 	if credential.Configured() || credential.AccessURL != "" || credential.BridgeHost != "" || credential.UpdatedAt != "" {
 		t.Fatalf("cleared = %+v, want empty secret fields", credential)
-	}
-	cards, err := database.GetSyncCards()
-	if err != nil || len(cards) != 1 || cards[0] != "prime_card" {
-		t.Fatalf("cards after clear = %+v, err %v, want [prime_card]", cards, err)
-	}
-}
-
-func TestSyncCardsPreserveCredential(t *testing.T) {
-	database := openTestStore(t)
-	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
-		t.Fatalf("set credential: %v", err)
-	}
-	if _, err := database.SetSyncCards([]string{"checking"}); err != nil {
-		t.Fatalf("set cards: %v", err)
-	}
-	credential, err := database.GetSyncCredential()
-	if err != nil {
-		t.Fatalf("get credential: %v", err)
-	}
-	if !credential.Configured() || len(credential.CardAccounts) != 1 || credential.CardAccounts[0] != "checking" {
-		t.Fatalf("credential after card edit = %+v", credential)
-	}
-}
-
-func TestSyncCardsRoundTrip(t *testing.T) {
-	database := openTestStore(t)
-	stored, err := database.SetSyncCards([]string{"prime_card", "checking"})
-	if err != nil {
-		t.Fatalf("set cards: %v", err)
-	}
-	if len(stored) != 2 {
-		t.Fatalf("stored = %+v", stored)
-	}
-	loaded, err := database.GetSyncCards()
-	if err != nil {
-		t.Fatalf("get cards: %v", err)
-	}
-	if len(loaded) != 2 || loaded[0] != "prime_card" || loaded[1] != "checking" {
-		t.Fatalf("loaded = %+v", loaded)
 	}
 }
 
@@ -169,9 +117,6 @@ func TestSyncCredentialIsolatedBetweenPlans(t *testing.T) {
 	if _, err := planA.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := planA.SetSyncCards([]string{"prime_card"}); err != nil {
-		t.Fatal(err)
-	}
 	if other, err := planB.GetSyncCredential(); err != nil || other.Configured() {
 		t.Fatalf("plan B credential = %+v, err %v, want empty", other, err)
 	}
@@ -186,8 +131,5 @@ func TestSyncCredentialIsolatedBetweenPlans(t *testing.T) {
 	}
 	if cleared, err := planA.GetSyncCredential(); err != nil || cleared.Configured() {
 		t.Fatalf("plan A credential after Clear = %+v, err %v", cleared, err)
-	}
-	if cards, err := planA.GetSyncCards(); err != nil || len(cards) != 0 {
-		t.Fatalf("plan A cards after Clear = %+v, err %v, want forgotten", cards, err)
 	}
 }

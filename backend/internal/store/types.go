@@ -82,10 +82,9 @@ type SyncError struct {
 // SyncCredential is the stored per-plan SimpleFIN credential. AccessURL is
 // a secret and must never leave the server in API payloads or logs.
 type SyncCredential struct {
-	AccessURL    string `json:"-"`
-	BridgeHost   string
-	UpdatedAt    string
-	CardAccounts []string
+	AccessURL  string `json:"-"`
+	BridgeHost string
+	UpdatedAt  string
 }
 
 // Configured reports whether a Bridge key is connected.
@@ -381,54 +380,6 @@ type SharedTransactionRef struct {
 	Transaction types.Transaction `json:"transaction"`
 }
 
-// Linked-transaction representation (FND-04). A SharingLink binds one
-// source-owner transaction to one recipient-owned private copy through
-// immutable identities: the source transaction ID (SourceOwnerID plus
-// SourceTransactionID), the stable LinkID, the SourceRevision observed at the
-// last authorized refresh, the recipient owner (RecipientUserID plus
-// CopyTransactionID), and the sharing-grant identifiers (GrantAudience,
-// GrantAudienceID, GrantReason) that authorized the link. The copy itself
-// stays an ordinary recipient-owned transaction: recipient edits never
-// propagate to the source, and refresh never rewrites the copy.
-type SharingLink struct {
-	LinkID              string `json:"linkId"`
-	SourceOwnerID       string `json:"sourceOwnerId"`
-	SourceTransactionID string `json:"sourceTransactionId"`
-	SourceRevision      string `json:"sourceRevision"`
-	RecipientUserID     string `json:"recipientUserId"`
-	CopyTransactionID   string `json:"copyTransactionId"`
-	GrantAudience       string `json:"grantAudienceType"`
-	GrantAudienceID     string `json:"grantAudienceId"`
-	GrantReason         string `json:"grantReason"`
-	CopiedAt            int64  `json:"copiedAt"`
-	RefreshedAt         int64  `json:"refreshedAt"`
-}
-
-// Refresh outcomes for a sharing link. "current" means the recipient is
-// still authorized and the source matches the recorded revision.
-// "source-changed" means the recipient is still authorized but the source
-// content moved on: the link records the new revision while the
-// recipient's copy keeps its own edits. "unauthorized" means the grant
-// was revoked, excluded, or membership ended: the copy and its edits stay
-// intact but source changes are no longer visible. "source-gone" means
-// the source row no longer exists: the copy stays intact as an ordinary
-// row while the link keeps its last recorded revision.
-const (
-	SharingLinkCurrent      = "current"
-	SharingLinkSourceChange = "source-changed"
-	SharingLinkUnauthorized = "unauthorized"
-	SharingLinkSourceGone   = "source-gone"
-)
-
-// SharingLinkRefresh is the result of re-checking one link against live
-// authorization and source state. It never carries edited copy content:
-// callers read the copy through their own model scope.
-type SharingLinkRefresh struct {
-	Link                  SharingLink `json:"link"`
-	Status                string      `json:"status"`
-	CurrentSourceRevision string      `json:"currentSourceRevision,omitempty"`
-}
-
 // Inbox item kinds (FND-03). "share" items arrive through FND-02 grants and
 // are derived from the ListSharedTransactions primitive. "split-request" is the
 // producer contract for SOC-03 (assigned shares) and SOC-04C (split
@@ -470,21 +421,17 @@ type InboxShareItem struct {
 	Transaction       *types.Transaction `json:"transaction,omitempty"`
 }
 
-// Social audit actions for accepted copies and link refreshes. Consent
-// actions reuse the landed sharing_audit kinds ('grant', 'revoke',
-// 'exclude', 'unexclude'); splits reuse their own hyphenated kinds.
-const (
-	SharingAuditCopyAccepted  = "copy-accepted"
-	SharingAuditLinkRefreshed = "link-refreshed"
-)
+// Social audit action for accepted copies. Consent actions reuse the landed
+// sharing_audit kinds ('grant', 'revoke', 'exclude', 'unexclude'); splits
+// reuse their own hyphenated kinds.
+const SharingAuditCopyAccepted = "copy-accepted"
 
 // SharingAuditEvent is one committed cross-user change: who acted, what
 // they did, which owner-scoped transaction it targets, and when.
 // Audience names the consent target for grant/revoke/exclude/unexclude
 // rows. Link, Status, and RequestID decode from the audit detail payload:
-// the accepted-copy link, the link-refresh outcome, and the idempotency
-// key that executed the mutation. The event never carries transaction
-// evidence.
+// the accepted-copy link, the outcome, and the idempotency key that
+// executed the mutation. The event never carries transaction evidence.
 type SharingAuditEvent struct {
 	Seq           int64  `json:"seq"`
 	ActorUserID   string `json:"actorUserId"`

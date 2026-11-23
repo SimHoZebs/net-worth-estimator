@@ -483,7 +483,6 @@ test("the dated allowance and protected obligations come from the server", async
 			payday: PAYDAY,
 			expectedPay: 400,
 			checkingAvailable: 1244.43,
-			selectedAccountIds: ["evidence-checking"],
 		});
 		expect(summary).not.toHaveProperty("start");
 		expect(summary).not.toHaveProperty("end");

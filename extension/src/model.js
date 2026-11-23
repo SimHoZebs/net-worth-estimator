@@ -1,16 +1,12 @@
 // Use the same reads as the app. Keep the financial model in worker memory,
 // never in page context, AI requests, or persistent extension storage.
 export async function loadModel(connection, resource) {
-  const [response, status] = await Promise.all([
-    connection.api("/v1/financial-model", undefined, resource),
-    connection.api("/v1/status", undefined, resource),
-  ]);
+  const response = await connection.api("/v1/financial-model", undefined, resource);
   return {
     accounts: (response.model?.accounts ?? [])
       .filter((account) => account.enabled && !account.archived && account.kind !== "debt")
       .map(({ id, name }) => ({ id, name })),
     purchases: response.model?.plannedPurchases ?? [],
-    readOnly: status.readOnly,
   };
 }
 

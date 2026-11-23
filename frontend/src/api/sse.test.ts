@@ -2,11 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { parseSSE, SSEParser } from "./sse.ts";
 
 const progress = {
-	phase: "stochastic-runs",
 	completedRuns: 2,
 	totalRuns: 4,
 	fraction: 0.5,
-	evaluationWorkloads: [],
 } as const;
 const result = {
 	config: { runCount: 4, seed: 7 },

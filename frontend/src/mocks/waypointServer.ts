@@ -435,13 +435,6 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				);
 			}, body);
 		}
-		if (path === "/v1/accounts/reorder" && method === "POST")
-			return write(() => {
-				moveIn(current.accounts as { id?: string; instanceId?: string }[])(
-					(body as { id: string }).id,
-					(body as { beforeId: string | null }).beforeId ?? null,
-				);
-			}, undefined);
 		if (path === "/v1/transactions" && method === "POST")
 			return write(() => {
 				const row = structuredClone(body) as Record<string, unknown>;
@@ -538,18 +531,6 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					},
 				) as typeof current.transactions;
 			}, body);
-		}
-		const moveTransactionMatch = path.match(
-			/^\/v1\/transactions\/([^/]+)\/move$/,
-		);
-		if (moveTransactionMatch && method === "POST") {
-			const [, id] = moveTransactionMatch;
-			return write(() => {
-				moveIn(current.transactions as { id?: string; instanceId?: string }[])(
-					id!,
-					(body as { beforeId: string | null }).beforeId ?? null,
-				);
-			}, undefined);
 		}
 		const startMatch = path.match(/^\/v1\/transactions\/([^/]+)\/schedule$/);
 		if (startMatch && method === "POST") {
@@ -736,38 +717,6 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				(current.transactions as unknown[]).push(transaction);
 			}, undefined);
 		}
-		if (path === "/v1/checkpoints" && method === "POST") {
-			const checkpoint = structuredClone(body);
-			const same = (item: unknown) => {
-				const row = item as Record<string, unknown>;
-				const next = checkpoint as unknown as Record<string, unknown>;
-				return (
-					row.AccountId === next.AccountId && row.observedAt === next.observedAt
-				);
-			};
-			return write(() => {
-				current.checkpoints = [
-					...(current.checkpoints as unknown[]).filter((item) => !same(item)),
-					checkpoint,
-				] as typeof current.checkpoints;
-			}, body);
-		}
-		if (path.startsWith("/v1/checkpoints?") && method === "DELETE") {
-			const query = new URL(path, "http://localhost").searchParams;
-			const accountId = query.get("accountId") ?? "";
-			const observedAt = Number(query.get("observedAt") ?? "");
-			return write(() => {
-				current.checkpoints = (current.checkpoints as unknown[]).filter(
-					(item) =>
-						!(
-							(item as unknown as Record<string, unknown>).AccountId ===
-								accountId &&
-							(item as unknown as Record<string, unknown>).observedAt ===
-								observedAt
-						),
-				) as typeof current.checkpoints;
-			}, undefined);
-		}
 		const { type: evaluationType, ...evaluationRow } = (body ?? {}) as {
 			type?: string;
 			[key: string]: unknown;
@@ -816,14 +765,6 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				}
 			}, undefined);
 		}
-		if (path === "/v1/evaluations/reorder" && method === "POST")
-			return write(() => {
-				if (typeof evaluationType === "string")
-					moveIn(evalRows(evaluationType))(
-						(body as { instanceId: string }).instanceId,
-						(body as { beforeId: string | null }).beforeId ?? null,
-					);
-			}, undefined);
 		if (path === "/v1/payment-terms" && method === "POST") {
 			const terms = structuredClone(body) as Record<string, unknown>;
 			return write(() => {

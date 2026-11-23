@@ -63,8 +63,8 @@ func TestDeterministicFulfillmentOmitsDetailArrays(t *testing.T) {
 		}
 	}
 	for _, key := range []string{"events", "dates", "transactions"} {
-		if items, ok := detail[key].([]any); !ok || len(items) != 0 {
-			t.Errorf("fulfillment %q has %d entries, want empty", key, len(items))
+		if _, ok := detail[key]; ok {
+			t.Errorf("fulfillment detail array %q is still serialized", key)
 		}
 	}
 }

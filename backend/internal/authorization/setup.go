@@ -84,36 +84,3 @@ func (c *Client) SetRole(subject, role string) error {
 	}
 	return tx.Commit()
 }
-
-// SetPermissions installs an explicit assignment. A persistent none role
-// prevents first-access defaults from replacing an administrator's choice.
-func (c *Client) SetPermissions(subject string, permissions []string) error {
-	if !validSubject(subject) {
-		return errors.New("invalid authorization subject")
-	}
-	for _, action := range permissions {
-		if action != Read && action != Project && action != Write {
-			return errors.New("unknown authorization action")
-		}
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	tx, err := c.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	actor := ActorKey(c.config.Issuer, subject)
-	if _, err := tx.Exec("INSERT INTO authorization_subjects VALUES(?, 'none') ON CONFLICT(actor) DO UPDATE SET role='none'", actor); err != nil {
-		return err
-	}
-	if _, err := tx.Exec("DELETE FROM authorization_policies WHERE subject=?", actor); err != nil {
-		return err
-	}
-	for _, action := range permissions {
-		if _, err := tx.Exec("INSERT OR IGNORE INTO authorization_policies VALUES(?, 'users/*', ?, 'allow')", actor, action); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
-}

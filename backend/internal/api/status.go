@@ -12,9 +12,8 @@ type statusOutput struct {
 		ReadOnly bool `json:"readOnly"`
 		// HasModel reports whether this user has canonical rows. It is a cheap
 		// presence check, not a model read.
-		HasModel       bool   `json:"hasModel"`
-		SyncConfigured bool   `json:"syncConfigured"`
-		SyncHost       string `json:"syncHost,omitempty"`
+		HasModel       bool `json:"hasModel"`
+		SyncConfigured bool `json:"syncConfigured"`
 		// LastSyncAt is the last successful sync completion time (RFC3339
 		// UTC), omitted when no sync has completed yet.
 		LastSyncAt string `json:"lastSyncAt,omitempty"`
@@ -45,13 +44,6 @@ func registerStatus(api huma.API, st store.Store, config Config) {
 		}
 		output.Body.HasModel = hasModel
 		output.Body.SyncConfigured = config.SyncRunner.IsConfigured()
-		if output.Body.SyncConfigured {
-			if host := config.SyncRunner.BridgeHost(); host != "" {
-				output.Body.SyncHost = host
-			} else if credential, err := st.GetSyncCredential(); err == nil && credential.BridgeHost != "" {
-				output.Body.SyncHost = credential.BridgeHost
-			}
-		}
 		lastSync, err := st.GetLastSyncTime()
 		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())

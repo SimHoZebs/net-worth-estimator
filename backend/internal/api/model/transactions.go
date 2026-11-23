@@ -484,23 +484,3 @@ func (s *handler) deleteTransaction(_ context.Context, input *struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }
-
-func (s *handler) moveTransaction(_ context.Context, input *struct {
-	ID   string `path:"id"`
-	Body struct {
-		BeforeID string `json:"beforeId,omitempty"`
-	} `json:"body"`
-}) (*modelstate.ReorderOutput, error) {
-	id, beforeID := input.ID, input.Body.BeforeID
-	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Transactions = moveBeforeID(model.Transactions, id, beforeID, transactionID)
-	}, func() (struct{}, error) {
-		return struct{}{}, s.store.MoveTransaction(id, beforeID)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &modelstate.ReorderOutput{Body: struct {
-		Revision string `json:"revision"`
-	}{Revision: revision}}, nil
-}

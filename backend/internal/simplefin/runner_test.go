@@ -56,12 +56,16 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 			{ID: "bridge-new", ConnID: testConnID, Name: "New Savings", Currency: "USD", Balance: "10.00"},
 		}}, nil
 	}
-	summary, err := runner.Sync(context.Background())
+	err := runner.Sync(context.Background())
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	if summary.AccountsProvisioned != 1 || summary.CheckpointsInserted != 2 {
-		t.Fatalf("summary = %+v, want 1 provisioned + 2 checkpoints", summary)
+	model, err := database.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.Checkpoints) != 2 {
+		t.Fatalf("checkpoints = %d, want 2", len(model.Checkpoints))
 	}
 	links, err := database.ListAccountLinks()
 	if err != nil || len(links) != 3 {
@@ -97,18 +101,9 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 				}}},
 		}}, nil
 	}
-	summary, err := runner.Sync(context.Background())
+	err := runner.Sync(context.Background())
 	if err != nil {
 		t.Fatalf("sync: %v", err)
-	}
-	if summary.Skipped["linked-account-missing"] != 1 {
-		t.Fatalf("summary = %+v, want 1 stale skip", summary)
-	}
-	if _, ok := summary.Skipped["unmapped-account"]; ok {
-		t.Fatalf("stale account double-counted as unmapped: %+v", summary.Skipped)
-	}
-	if summary.CheckpointsInserted != 0 || summary.SettledInserted != 0 || summary.PendingInserted != 0 || summary.AccountsProvisioned != 0 {
-		t.Fatalf("summary = %+v, want no checkpoint/transaction writes or provisioning", summary)
 	}
 	model, err := database.LoadModel()
 	if err != nil {
@@ -131,10 +126,10 @@ func TestTriggerGuardsInterval(t *testing.T) {
 		return &AccountSet{}, nil
 	}
 
-	if _, err := runner.Trigger(context.Background()); err != nil {
+	if err := runner.Trigger(context.Background()); err != nil {
 		t.Fatalf("first trigger: %v", err)
 	}
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected second trigger to be refused")
 	} else if _, ok := err.(*TooSoonError); !ok {
 		t.Fatalf("second trigger error = %T, want TooSoonError", err)
@@ -156,10 +151,10 @@ func TestTriggerRetriesAfterFailure(t *testing.T) {
 		return &AccountSet{}, nil
 	}
 
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected first trigger to fail")
 	}
-	if _, err := runner.Trigger(context.Background()); err != nil {
+	if err := runner.Trigger(context.Background()); err != nil {
 		t.Fatalf("retry after failure: %v", err)
 	}
 	if calls != 2 {
@@ -184,11 +179,11 @@ func TestTriggerRefusesConcurrentRun(t *testing.T) {
 
 	firstDone := make(chan error, 1)
 	go func() {
-		_, err := runner.Trigger(context.Background())
+		err := runner.Trigger(context.Background())
 		firstDone <- err
 	}()
 	<-entered
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected concurrent trigger to be refused")
 	} else if _, ok := err.(*InProgressError); !ok {
 		t.Fatalf("concurrent trigger error = %T, want InProgressError", err)
@@ -205,7 +200,7 @@ func TestSyncRecordsLastSyncTime(t *testing.T) {
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{}, nil
 	}
-	if _, err := runner.Sync(context.Background()); err != nil {
+	if err := runner.Sync(context.Background()); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 	stamped, err := database.GetLastSyncTime()
@@ -223,7 +218,7 @@ func TestFailedSyncsDoNotRecordSyncTime(t *testing.T) {
 	failedRunner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return nil, errBridgeDown
 	}
-	if _, err := failedRunner.Sync(context.Background()); err == nil {
+	if err := failedRunner.Sync(context.Background()); err == nil {
 		t.Fatal("expected failed sync to fail")
 	}
 	if got, err := failedStore.GetLastSyncTime(); err != nil || got != "" {
@@ -255,7 +250,7 @@ func TestTriggerHonorsConfiguredInterval(t *testing.T) {
 		calls++
 		return &AccountSet{}, nil
 	}
-	if _, err := runner.Trigger(context.Background()); err != nil {
+	if err := runner.Trigger(context.Background()); err != nil {
 		t.Fatalf("first trigger: %v", err)
 	}
 	start := time.Now()
@@ -265,7 +260,7 @@ func TestTriggerHonorsConfiguredInterval(t *testing.T) {
 	runner.mu.Lock()
 	runner.lastTrigger = start
 	runner.mu.Unlock()
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected configured interval to refuse second trigger")
 	} else {
 		var tooSoon *TooSoonError
@@ -295,7 +290,7 @@ func TestTriggerBacksOffAfterBridgeRateLimit(t *testing.T) {
 		}
 		return &AccountSet{}, nil
 	}
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected rate-limited trigger to fail")
 	} else {
 		var tooSoon *TooSoonError
@@ -303,7 +298,7 @@ func TestTriggerBacksOffAfterBridgeRateLimit(t *testing.T) {
 			t.Fatalf("rate-limited error = %T, want TooSoonError", err)
 		}
 	}
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected blackout to refuse second trigger without a fetch")
 	} else if _, ok := err.(*TooSoonError); !ok {
 		// errors.As unwraps huma-style wrappers; direct type assert keeps
@@ -317,7 +312,7 @@ func TestTriggerBacksOffAfterBridgeRateLimit(t *testing.T) {
 		t.Fatalf("fetch calls = %d, want 1 during blackout", calls)
 	}
 	time.Sleep(250 * time.Millisecond)
-	if _, err := runner.Trigger(context.Background()); err != nil {
+	if err := runner.Trigger(context.Background()); err != nil {
 		t.Fatalf("trigger after cooldown: %v", err)
 	}
 	if calls != 2 {
@@ -341,11 +336,11 @@ func TestSyncSharesSingleflightWithTrigger(t *testing.T) {
 	}
 	firstDone := make(chan error, 1)
 	go func() {
-		_, err := runner.Trigger(context.Background())
+		err := runner.Trigger(context.Background())
 		firstDone <- err
 	}()
 	<-entered
-	if _, err := runner.Sync(context.Background()); err == nil {
+	if err := runner.Sync(context.Background()); err == nil {
 		t.Fatal("expected scheduler Sync during manual Trigger to be refused")
 	} else if _, ok := err.(*InProgressError); !ok {
 		t.Fatalf("concurrent Sync error = %T, want InProgressError", err)
@@ -367,10 +362,10 @@ func TestSyncHonorsRateLimitBlackout(t *testing.T) {
 		calls++
 		return nil, &RateLimitedError{Message: "too many requests"}
 	}
-	if _, err := runner.Trigger(context.Background()); err == nil {
+	if err := runner.Trigger(context.Background()); err == nil {
 		t.Fatal("expected rate-limited trigger to fail")
 	}
-	if _, err := runner.Sync(context.Background()); err == nil {
+	if err := runner.Sync(context.Background()); err == nil {
 		t.Fatal("expected scheduler Sync during blackout to be refused")
 	} else {
 		var tooSoon *TooSoonError

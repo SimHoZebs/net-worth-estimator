@@ -44,25 +44,22 @@ func TestSyncAppliesDataWithRangeNotices(t *testing.T) {
 			client := v2Bridge(t, rangeNoticeBody(t, []ProtocolError{{Code: "gen.api", Msg: message}}), http.StatusOK)
 			database := openRunnerStore(t)
 			runner := NewRunner(database, Config{}, client)
-			summary, err := runner.Sync(context.Background())
+			err := runner.Sync(context.Background())
 			if err != nil {
 				t.Fatal(err)
-			}
-			if summary.AccountsProvisioned != 1 || summary.CheckpointsInserted != 1 || summary.SettledInserted != 1 {
-				t.Fatalf("summary = %+v", summary)
 			}
 			rows, err := database.LoadBankTransactions()
 			if err != nil || len(rows) != 1 {
 				t.Fatalf("stored transactions = %v, err %v", len(rows), err)
 			}
 			notice, err := database.GetSyncError()
-			if err != nil || notice == nil || notice.Message != message || !summary.Partial || len(summary.Errors) != 1 {
-				t.Fatalf("notice = %+v, summary = %+v, err %v", notice, summary, err)
+			if err != nil || notice == nil || notice.Message != message {
+				t.Fatalf("notice = %+v, err %v", notice, err)
 			}
 			if last, err := database.GetLastSyncTime(); err != nil || last == "" {
 				t.Fatalf("successful sync timestamp = %q, err %v", last, err)
 			}
-			for _, want := range []string{`"msg":"simplefin response"`, `"accounts":1`, `"transactions":1`, `"notices":1`, `"msg":"simplefin sync applied"`, `"settled_inserted":1`} {
+			for _, want := range []string{`"msg":"simplefin response"`, `"accounts":1`, `"transactions":1`, `"notices":1`, `"msg":"simplefin sync applied"`, `"accounts_provisioned":1`, `"checkpoints_inserted":1`, `"settled_inserted":1`} {
 				if !strings.Contains(logs.String(), want) {
 					t.Errorf("missing log field %s: %s", want, logs.String())
 				}
@@ -140,12 +137,9 @@ func TestRangeNoticeDoesNotHideScopedSyncFailure(t *testing.T) {
 			}), http.StatusOK)
 			database := openRunnerStore(t)
 			runner := NewRunner(database, Config{}, client)
-			summary, err := runner.Sync(context.Background())
+			err := runner.Sync(context.Background())
 			if err != nil {
 				t.Fatal(err)
-			}
-			if summary.AccountsProvisioned != 0 || summary.CheckpointsInserted != 0 || summary.SettledInserted != 0 || len(summary.Errors) != 2 {
-				t.Fatalf("affected account was applied or notices lost: %+v", summary)
 			}
 			rows, err := database.LoadBankTransactions()
 			if err != nil || len(rows) != 0 {

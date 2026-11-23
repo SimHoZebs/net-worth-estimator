@@ -46,10 +46,8 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	if rule.Code != http.StatusOK {
 		t.Fatalf("create rule status = %d, body %s", rule.Code, rule.Body.String())
 	}
-	checkpoint := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"`+accountID+`","Balance":100,"observedAt":1769903999}`)
-	if checkpoint.Code != http.StatusOK {
-		t.Fatalf("save checkpoint status = %d, body %s", checkpoint.Code, checkpoint.Body.String())
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: accountID, Balance: 100, Source: store.SourceUser, ObservedAt: 1769903999}); err != nil {
+		t.Fatalf("seed checkpoint: %v", err)
 	}
 	evaluation := doRowRequest(t, handler, http.MethodPost, "/v1/evaluations",
 		`{"type":"netWorthThreshold","name":"Reach target","enabled":true,"config":{"target":500}}`)
@@ -437,10 +435,8 @@ func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
 	accountID := accountPayload.Result.ID
 
 	// 09:00 observed 1000 by instant; an 11:00 manual actual of -100 follows.
-	observed := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"`+accountID+`","Balance":1000,"observedAt":1773133200}`)
-	if observed.Code != http.StatusOK {
-		t.Fatalf("save checkpoint status = %d, body %s", observed.Code, observed.Body.String())
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: accountID, Balance: 1000, Source: store.SourceUser, ObservedAt: 1773133200}); err != nil {
+		t.Fatalf("seed checkpoint: %v", err)
 	}
 	spent := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","time":"11:00","enabled":true}`)
@@ -518,10 +514,8 @@ func TestExactCutPositionAndAccountListAgree(t *testing.T) {
 	}
 	accountID := accountPayload.Result.ID
 
-	observed := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"`+accountID+`","Balance":1000,"observedAt":1773133200}`)
-	if observed.Code != http.StatusOK {
-		t.Fatalf("save checkpoint status = %d, body %s", observed.Code, observed.Body.String())
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: accountID, Balance: 1000, Source: store.SourceUser, ObservedAt: 1773133200}); err != nil {
+		t.Fatalf("seed checkpoint: %v", err)
 	}
 	spent := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
 		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","time":"11:00","enabled":true}`)
@@ -688,10 +682,8 @@ func TestAccountListArchivedDebtUsesExactObservation(t *testing.T) {
 		{{"2026-03-10", -50.0, evening}, {"2026-03-10", 0.0, morning}},
 	} {
 		for _, row := range order {
-			saved := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-				`{"AccountId":"`+ids["debt"]+`","Balance":`+jsonNumber(row.balance)+`,"observedAt":`+jsonNumber(float64(row.instant))+`}`)
-			if saved.Code != http.StatusOK {
-				t.Fatalf("save checkpoint status = %d, body %s", saved.Code, saved.Body.String())
+			if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: ids["debt"], Balance: row.balance, Source: store.SourceUser, ObservedAt: row.instant}); err != nil {
+				t.Fatalf("seed checkpoint: %v", err)
 			}
 		}
 		balances := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
@@ -747,21 +739,11 @@ func TestAccountListArchivedDebtUsesExactObservation(t *testing.T) {
 			}
 		}
 		// Reset the debt account's observations for the next input order.
-		deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/checkpoints?accountId="+ids["debt"]+"&observedAt="+jsonNumber(float64(morning)), "")
-		if deleted.Code != http.StatusOK {
-			t.Fatalf("delete checkpoints status = %d, body %s", deleted.Code, deleted.Body.String())
+		if err := database.DeleteCheckpointAt(ids["debt"], morning); err != nil {
+			t.Fatalf("delete morning checkpoint: %v", err)
 		}
-		deleted = doRowRequest(t, handler, http.MethodDelete, "/v1/checkpoints?accountId="+ids["debt"]+"&observedAt="+jsonNumber(float64(evening)), "")
-		if deleted.Code != http.StatusOK {
-			t.Fatalf("delete checkpoints status = %d, body %s", deleted.Code, deleted.Body.String())
+		if err := database.DeleteCheckpointAt(ids["debt"], evening); err != nil {
+			t.Fatalf("delete evening checkpoint: %v", err)
 		}
 	}
-}
-
-func jsonNumber(value float64) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		panic(err)
-	}
-	return string(encoded)
 }

@@ -50,8 +50,8 @@ func newSyncManager(database *sqlite.Database, getenv func(string) string) (*syn
 }
 
 // RunnerFor returns the runner for one user's scoped store, creating it on
-// first use. The credential and card selection stay in that user's database
-// rows; the provider can be rotated without rebuilding the runner.
+// first use. The credential stays in that user's database rows; the provider
+// can be rotated without rebuilding the runner.
 func (m *syncManager) RunnerFor(userID string, scoped store.Store) *simplefin.Runner {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -87,46 +87,27 @@ func (m *syncManager) syncUser(ctx context.Context, userID string) {
 	if !runner.IsConfigured() {
 		return
 	}
-	summary, err := runner.Sync(ctx)
+	err = runner.Sync(ctx)
 	if err != nil {
 		slog.Error("simplefin scheduled sync failed", "component", "simplefin", "user_id", userID, "error", err)
 		return
 	}
-	slog.Info("simplefin scheduled sync", "component", "simplefin", "user_id", userID,
-		"checkpoints_inserted", summary.CheckpointsInserted,
-		"checkpoints_updated", summary.CheckpointsUpdated,
-		"checkpoints_skipped", summary.CheckpointsSkipped,
-		"pending_deleted", summary.PendingDeleted,
-		"pending_inserted", summary.PendingInserted,
-		"pending_updated", summary.PendingUpdated,
-		"settled_converted", summary.SettledConverted,
-		"settled_inserted", summary.SettledInserted,
-		"accounts_provisioned", summary.AccountsProvisioned,
-		"skipped", summary.Skipped)
+	slog.Info("simplefin scheduled sync succeeded", "component", "simplefin", "user_id", userID)
 }
 
-// newDynamicRunner builds a runner whose credential and card selection
-// resolve per run from the user's stored BYOK rows, so connecting,
-// rotating, or disconnecting a key takes effect without a restart.
+// newDynamicRunner builds a runner whose credential resolves per run from
+// the user's stored BYOK rows, so connecting, rotating, or disconnecting a
+// key takes effect without a restart.
 func newDynamicRunner(scoped store.Store, config simplefin.Config) *simplefin.Runner {
-	provider := func() (string, map[string]struct{}) {
+	provider := func() string {
 		stored, err := scoped.GetSyncCredential()
 		if err != nil {
 			// A transient store failure must not trigger a Bridge fetch
 			// with an empty key; report unconfigured until the next run.
 			slog.Error("simplefin credential read failed", "component", "simplefin", "error", err)
-			return "", nil
+			return ""
 		}
-		if stored.AccessURL == "" {
-			return "", nil
-		}
-		cards := map[string]struct{}{}
-		for _, id := range stored.CardAccounts {
-			if id != "" {
-				cards[id] = struct{}{}
-			}
-		}
-		return stored.AccessURL, cards
+		return stored.AccessURL
 	}
 	return simplefin.NewRunnerWithProvider(scoped, config, provider, nil)
 }

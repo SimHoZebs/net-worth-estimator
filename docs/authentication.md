@@ -29,7 +29,7 @@ Auth's CSRF checks and database-backed rate limits. Passwords use bcrypt. Signup
 collects only username and password. The username supplies the initial display name.
 Internal `users.invalid` email
 addresses satisfy the provider schema without a mail dependency. They are not
-recovery addresses. Clients cannot assign the provider's disabled flag.
+recovery addresses.
 
 Rate limits use the socket address on direct deployments. An operator can select
 an ingress-owned client-IP header only when the ingress replaces client values on

@@ -153,8 +153,8 @@ human queue. The feature never selects an algorithm or interprets a probability.
   are excluded by marker. Pending, void, zero, invalid, and undated rows
   never form patterns.
 - Each occurrence carries its own finding. Its evidence lists every
-  occurrence in the pattern plus the estimated cadence, typical source
-  amount, and annualized estimate, so the basis is inspectable from one row.
+  occurrence in the pattern plus the estimated cadence and typical source
+  amount, so the basis is inspectable from one row.
   Pattern review, including tabs, rows, chips, dialogs, and the answer
   lifecycle, follows [payment-patterns.md](payment-patterns.md).
 - The highest candidate with established repetition is marked `income.main-inflow:annualized`
@@ -207,7 +207,7 @@ or UI code. In-process adapters implement the same Provider port. See
 [the provider contract](judgment-providers.md) for replacement and privacy rules.
 
 The supplied implementation is the River service in `ml`. It alone
-owns scaling, probability thresholds, example counts, drift detection, and one
+owns scaling, probability thresholds, example counts, and one
 shared online-learning model per deployment. Those details are absent from the
 application contract. See `ml/README.md` for its private storage and
 deployment requirements.

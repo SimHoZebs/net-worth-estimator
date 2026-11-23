@@ -112,8 +112,6 @@ type Store interface {
 	GetSyncCredential() (SyncCredential, error)
 	SetSyncCredential(accessURL, bridgeHost string) (SyncCredential, error)
 	ClearSyncCredential() error
-	GetSyncCards() ([]string, error)
-	SetSyncCards(cards []string) ([]string, error)
 	GetLastSyncTime() (string, error)
 	SetLastSyncTime(completedAt string) error
 	// SetSyncError records the last sync condition worth showing. A
@@ -330,33 +328,13 @@ type Database interface {
 	// copy, while a key reused for a different action or target fails with
 	// ErrSharingConflict. A source revision landing mid-accept fails with
 	// ErrSharingConflict and rolls the copy back instead of recording a
-	// torn link; a concurrent accept losing the link-identity race resolves
-	// to the winner's copy. Every copy records its
-	// stable link identity (FND-04) and appends one copy-accepted audit row
-	// carrying the link and the request key. Later revocation never rewrites or
-	// erases the copy. Source-original writes by another member stay
-	// deferred (no such path exists).
+	// torn provenance row; a concurrent accept losing the identity race
+	// resolves to the winner's copy. Every copy records the recipient,
+	// source owner, source transaction, and copy transaction tuple and
+	// appends one copy-accepted audit row carrying the request key. Later
+	// revocation never rewrites or erases the copy. Source-original writes
+	// by another member stay deferred (no such path exists).
 	CopySharedTransaction(ownerID, transactionID, requesterID, requestID string) (types.Transaction, error)
-	// GetSharingLink resolves the stable link for one of the recipient's
-	// own copies. It reports ErrNotFound for unknown copies, copies owned
-	// by another recipient, and malformed IDs, so link memory is never
-	// enumerable across users. It performs no source authorization check:
-	// the link is the recipient's own provenance.
-	GetSharingLink(recipientID, copyTransactionID string) (SharingLink, error)
-	// GetSharingLinkByID resolves one of the recipient's links by its
-	// stable link ID, for callers that hold links (group feeds, splits,
-	// audit) rather than copy row IDs. Scope and failure behavior match
-	// GetSharingLink.
-	GetSharingLinkByID(linkID, recipientID string) (SharingLink, error)
-	// RefreshSharingLink re-checks one of the recipient's links against
-	// live authorization and source state and records the outcome on the
-	// link row. It never writes the recipient's copy: recipient edits
-	// survive refresh, revocation, and source deletion alike. requestID is
-	// a client-generated UUID: a retry returns the recorded outcome, and
-	// each committed refresh appends one link-refreshed audit row carrying
-	// the link, the outcome status, and the request key. See
-	// SharingLinkRefresh for the status contract.
-	RefreshSharingLink(recipientID, copyTransactionID, requestID string) (SharingLinkRefresh, error)
 	// WithdrawUserGrant deletes a direct user-audience grant addressed to
 	// the recipient themselves. It is the recipient's own refusal path: it
 	// never touches grants addressed to anyone else or group-audience

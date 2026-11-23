@@ -78,7 +78,6 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/grants", h.serveGrants)
 	mux.HandleFunc("/v1/shared/exclusions", h.serveExclusions)
 	mux.HandleFunc("/v1/shared/copies", h.serveCopies)
-	mux.HandleFunc("/v1/shared/copies/", h.serveCopyLink)
 	mux.HandleFunc("/v1/shared/transactions", h.serveSharedList)
 	mux.HandleFunc("/v1/shared/transactions/", h.serveSharedRead)
 	mux.HandleFunc("/v1/shared/policies/", h.servePolicies)
@@ -482,81 +481,6 @@ func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"transaction": copied})
-}
-
-// serveCopyLink serves one recipient-owned copy's link provenance. The
-// link is the recipient's own memory: resolving it performs no source
-// authorization check, so it stays readable after revocation. Refresh
-// re-checks live authorization and records the outcome on the link row;
-// it never writes the copy, so recipient edits survive every outcome
-// and source changes surface only while authorized. Refresh mutates the
-// link row, so it obeys the read-only kill switch; the link read does
-// not. Unknown, foreign, and malformed copy IDs all report 404 so link
-// memory is never enumerable across users.
-func (h *Handler) serveCopyLink(w http.ResponseWriter, r *http.Request) {
-	recipient, _, ok := h.caller(r)
-	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "Sign in to view shared transactions.")
-		return
-	}
-	rest := strings.TrimPrefix(r.URL.Path, "/v1/shared/copies/")
-	copyID, action, found := strings.Cut(rest, "/")
-	if !found || copyID == "" || action == "" || strings.Contains(action, "/") {
-		writeProblem(w, http.StatusNotFound, "Shared transaction link not found.")
-		return
-	}
-	switch action {
-	case "link":
-		if r.Method != http.MethodGet {
-			w.Header().Set("Allow", "GET")
-			writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
-			return
-		}
-		link, err := h.db.GetSharingLink(recipient, copyID)
-		if err != nil {
-			writeStoreError(w, err, "Shared transaction link not found.")
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"link": link})
-	case "refresh":
-		if r.Method != http.MethodPost {
-			w.Header().Set("Allow", "POST")
-			writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
-			return
-		}
-		if h.locked(w, r) {
-			return
-		}
-		body, err := readBody(w, r, 1<<16)
-		if err != nil {
-			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
-			return
-		}
-		// Refresh accepts an optional client request ID for idempotent
-		// retry; callers without one execute under a fresh server key.
-		requestID := ""
-		if strings.TrimSpace(string(body)) != "" {
-			var input struct {
-				RequestID string `json:"requestId"`
-			}
-			if err := json.Unmarshal(body, &input); err != nil {
-				writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
-				return
-			}
-			requestID = strings.TrimSpace(input.RequestID)
-		}
-		if requestID == "" {
-			requestID = uuid.NewString()
-		}
-		refreshed, err := h.db.RefreshSharingLink(recipient, copyID, requestID)
-		if err != nil {
-			writeStoreError(w, err, "Shared transaction link not found.")
-			return
-		}
-		writeJSON(w, http.StatusOK, refreshed)
-	default:
-		writeProblem(w, http.StatusNotFound, "Shared transaction link not found.")
-	}
 }
 
 // serveGroupFeed serves one group's shared transaction feed (GRP-03): the

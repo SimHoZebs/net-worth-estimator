@@ -36,10 +36,6 @@ func claimState(model *types.FinancialModel, cut int64) claimStateResult {
 
 // incomeRules is the single selection of recurring inflows into selected cash.
 func incomeRules(st *cutState, model *types.FinancialModel, settings *types.SafeSpendingSettings) []types.Schedule {
-	cash := map[string]bool{}
-	for _, id := range st.s.SelectedAccountIDs {
-		cash[id] = true
-	}
 	selected := map[string]bool{}
 	for _, id := range settings.IncomeScheduleIDs {
 		selected[id] = true
@@ -49,7 +45,7 @@ func incomeRules(st *cutState, model *types.FinancialModel, settings *types.Safe
 		if !rule.Enabled || !selected[rule.ID] || rule.SourceAccountID != nil {
 			continue
 		}
-		if !slices.ContainsFunc(rule.Destinations, func(id string) bool { return cash[id] }) {
+		if !slices.ContainsFunc(rule.Destinations, func(id string) bool { return st.selected[id] }) {
 			continue
 		}
 		rules = append(rules, rule)

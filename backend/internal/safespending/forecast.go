@@ -110,12 +110,12 @@ func computeForecast(st *cutState, incomes []paydayForecast, incomeScheduleKnown
 
 	cashBeforeIncome, _ := timeline.checkpoint(s.CheckingAvailable, beforeIncome)
 	if cashBeforeIncome != nil {
-		s.SpendableCash = money(*cashBeforeIncome)
-		s.PrePaydayRoom = s.SpendableCash
+		s.PrePaydayRoom = money(*cashBeforeIncome)
 	}
-	s.PostPaydayBalance, s.PaymentRoom = timeline.checkpoint(s.CheckingAvailable, payoff)
-	if s.PostPaydayBalance != nil {
-		s.PostIncomeRoom = s.PostPaydayBalance
+	postPaydayBalance, paymentRoom := timeline.checkpoint(s.CheckingAvailable, payoff)
+	s.PaymentRoom = paymentRoom
+	if postPaydayBalance != nil {
+		s.PostIncomeRoom = postPaydayBalance
 	} else {
 		s.PostIncomeRoom = nil
 		s.PaymentRoom = nil // The exact payoff checkpoint is still unknown.

@@ -3,8 +3,8 @@
 
 After an eval training run, produces a seed database containing ONLY the
 model row (warm weights, classification counts, generation, revision) with
-the events and checkpoints tables emptied and the drift counters reset, so a
-fresh deployment can boot from learned weights without reusing feedback.
+the events and checkpoints tables emptied, so a fresh deployment can boot
+from learned weights without reusing feedback.
 The canonical seed lives versioned at ml/seed.sqlite3 with provenance in
 docs/eval-datasets.md; regenerate it with the documented harness command
 rather than hand-editing it. The exported generation UUID is preserved
@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import pickle
 import shutil
 import sqlite3
@@ -57,14 +56,11 @@ SCHEMA = (
     "CREATE TABLE IF NOT EXISTS events "
     "(owner TEXT NOT NULL, event_id TEXT NOT NULL, fingerprint TEXT NOT NULL, "
     "PRIMARY KEY(owner, event_id))",
-    "CREATE TABLE IF NOT EXISTS drift "
-    "(id INTEGER PRIMARY KEY CHECK(id=1), pending INTEGER NOT NULL, "
-    "warnings INTEGER NOT NULL, detections INTEGER NOT NULL)",
 )
 
 
 def export_seed(src: Path, dest: Path) -> dict:
-    """Copy the model row; empty events/checkpoints; reset drift counters."""
+    """Copy the model row and leave events/checkpoints empty."""
     with sqlite3.connect(src) as db:
         row = db.execute(
             "SELECT generation, revision, state FROM model WHERE id=1"
@@ -83,7 +79,6 @@ def export_seed(src: Path, dest: Path) -> dict:
                 "INSERT INTO model VALUES (1, ?, ?, ?)",
                 (generation, revision, state),
             )
-            db.execute("INSERT INTO drift VALUES (1, 0, 0, 0)")
     info = pickle.loads(state)
     return {
         "path": str(dest),
@@ -107,7 +102,6 @@ def verify_seed(seed: Path, probe: Path) -> dict:
         copy = Path(tmp) / "seed-copy.sqlite3"
         shutil.copy(seed, copy)
         os.environ["ML_MODEL_PATH"] = str(copy)
-        os.environ["ML_DRIFT_MODE"] = "auto"
         from model import PaymentModelStore
 
         store = PaymentModelStore()

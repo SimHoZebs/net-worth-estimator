@@ -82,9 +82,6 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		if err := supersedeSafeSpending(tx, manualID, syncedID, deletedTransactionSet, deletedRuleSet); err != nil {
 			return err
 		}
-		if err := supersedeSyncCards(tx, manualID, syncedID); err != nil {
-			return err
-		}
 		if err := replaceSharingPolicyAccount(tx, manualID, syncedID); err != nil {
 			return err
 		}

@@ -49,7 +49,6 @@ export async function setup(config: Settings, user: Signup) {
       send,
     );
     const ctx = await auth.$context;
-    await ctx.internalAdapter.updateUser(guest.subject, { disabled: true });
     await ctx.internalAdapter.deleteUserSessions(account.subject);
     await ctx.internalAdapter.deleteUserSessions(guest.subject);
     return {

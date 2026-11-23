@@ -47,7 +47,7 @@ func TestCycleWithoutIncomeLeavesFundingPaydayAndAmountsUnknown(t *testing.T) {
 		t.Fatalf("missing income synthesized a cycle amount: %v %v %v",
 			s.IncomeFunded, s.SavingsAllowance, s.FundingRoom)
 	}
-	if s.SpendableCash == nil {
+	if s.PrePaydayRoom == nil {
 		t.Fatal("missing income erased the independently known cash checkpoint")
 	}
 }
@@ -94,7 +94,7 @@ func TestMissingPayoffKeepsCashTotalsAndProvenZero(t *testing.T) {
 	if s.PrePaydayBills == nil {
 		t.Fatal("missing payoff erased the recurring total")
 	}
-	assertMoney(t, s.SpendableCash, 0)
+	assertMoney(t, s.PrePaydayRoom, 0)
 }
 
 func TestLinkedSettlementReducesCycleBudgetOnce(t *testing.T) {

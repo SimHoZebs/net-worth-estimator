@@ -50,10 +50,6 @@ func TestRowAccountEndToEnd(t *testing.T) {
 	if updated.Code != http.StatusOK {
 		t.Fatalf("update status = %d, body %s", updated.Code, updated.Body.String())
 	}
-	moved := doRowRequest(t, handler, http.MethodPost, "/v1/accounts/reorder", `{"id":"`+createdPayload.Result.ID+`"}`)
-	if moved.Code != http.StatusOK {
-		t.Fatalf("move status = %d, body %s", moved.Code, moved.Body.String())
-	}
 }
 
 func TestRowWriteValidationRejectsDanglingReference(t *testing.T) {
@@ -77,49 +73,6 @@ func TestRowWriteValidationRejectsDanglingReference(t *testing.T) {
 	}
 }
 
-func TestLinkEndpointsEndToEnd(t *testing.T) {
-	database := openAPIStore(t)
-	handler := New(database, Config{})
-
-	list := doRowRequest(t, handler, http.MethodGet, "/v1/sync/simplefin/accounts", "")
-	if list.Code != http.StatusOK {
-		t.Fatalf("list status = %d", list.Code)
-	}
-	saved := doRowRequest(t, handler, http.MethodPut, "/v1/sync/simplefin/accounts/bridge-1", `{"modelAccountId":"ghost"}`)
-	if saved.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("link missing account status = %d, want 422, body %s", saved.Code, saved.Body.String())
-	}
-	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"id":"checking","name":"Checking","kind":"cash","enabled":true}`)
-	if created.Code != http.StatusOK {
-		t.Fatalf("create account status = %d", created.Code)
-	}
-	linked := doRowRequest(t, handler, http.MethodPut, "/v1/sync/simplefin/accounts/bridge-1", `{"modelAccountId":"checking"}`)
-	if linked.Code != http.StatusOK {
-		t.Fatalf("link status = %d, body %s", linked.Code, linked.Body.String())
-	}
-	after := doRowRequest(t, handler, http.MethodGet, "/v1/sync/simplefin/accounts", "")
-	var listed struct {
-		Links []struct {
-			BridgeAccountID string `json:"bridgeAccountId"`
-			ModelAccountID  string `json:"modelAccountId"`
-		} `json:"links"`
-	}
-	if err := json.Unmarshal(after.Body.Bytes(), &listed); err != nil {
-		t.Fatalf("decode list: %v", err)
-	}
-	if len(listed.Links) != 1 || listed.Links[0].ModelAccountID != "checking" {
-		t.Fatalf("links = %+v", listed)
-	}
-	unlinked := doRowRequest(t, handler, http.MethodDelete, "/v1/sync/simplefin/accounts/bridge-1", "")
-	if unlinked.Code != http.StatusOK {
-		t.Fatalf("unlink status = %d", unlinked.Code)
-	}
-	missing := doRowRequest(t, handler, http.MethodDelete, "/v1/sync/simplefin/accounts/bridge-1", "")
-	if missing.Code != http.StatusNotFound {
-		t.Fatalf("second unlink status = %d, want 404", missing.Code)
-	}
-}
-
 func TestWriteGuardCoversRowOperations(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{ReadOnly: true})
@@ -131,22 +84,17 @@ func TestWriteGuardCoversRowOperations(t *testing.T) {
 	}{
 		{http.MethodPost, "/v1/accounts", `{"name":"x"}`},
 		{http.MethodPatch, "/v1/accounts/x", `{"name":"x"}`},
-		{http.MethodPost, "/v1/accounts/reorder", `{"id":"x"}`},
 		{http.MethodPost, "/v1/transactions", `{"name":"x"}`},
 		{http.MethodPost, "/v1/transactions/x/amend", `{"name":"x"}`},
 		{http.MethodDelete, "/v1/transactions/x", ""},
-		{http.MethodPost, "/v1/transactions/x/move", `{"id":"x"}`},
 		{http.MethodPost, "/v1/transactions/x/claim", `{"scheduleId":"x","occurrenceDate":"2026-01-01"}`},
 		{http.MethodPost, "/v1/schedules", `{"name":"x"}`},
 		{http.MethodPost, "/v1/schedules/x/amend", `{"name":"x"}`},
 		{http.MethodDelete, "/v1/schedules/x", ""},
 		{http.MethodPost, "/v1/schedules/x/move", `{"id":"x"}`},
-		{http.MethodPost, "/v1/checkpoints", `{"accountId":"x","balance":1,"observedAt":1767311999}`},
-		{http.MethodDelete, "/v1/checkpoints?accountId=x&observedAt=1767311999", ""},
 		{http.MethodPost, "/v1/evaluations", `{"type":"netWorthThreshold","name":"x"}`},
 		{http.MethodPatch, "/v1/evaluations/x", `{"type":"netWorthThreshold","name":"x"}`},
 		{http.MethodDelete, "/v1/evaluations/x", ""},
-		{http.MethodPost, "/v1/evaluations/reorder", `{"type":"netWorthThreshold","instanceId":"x"}`},
 		{http.MethodPost, "/v1/amount-presets", `{}`},
 		{http.MethodPatch, "/v1/amount-presets/x", `{}`},
 		{http.MethodDelete, "/v1/amount-presets/x", ""},
@@ -154,8 +102,6 @@ func TestWriteGuardCoversRowOperations(t *testing.T) {
 		{http.MethodPost, "/v1/payment-terms", `{"accountId":"x"}`},
 		{http.MethodDelete, "/v1/payment-terms/x", ""},
 		{http.MethodPost, "/v1/sync/simplefin", ""},
-		{http.MethodPut, "/v1/sync/simplefin/accounts/x", `{"modelAccountId":"y"}`},
-		{http.MethodDelete, "/v1/sync/simplefin/accounts/x", ""},
 	} {
 		response := doRowRequest(t, handler, guarded.method, guarded.path, guarded.body)
 		if response.Code != http.StatusForbidden {

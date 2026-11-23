@@ -39,20 +39,6 @@ func Register(api huma.API, st store.Store, runner *simplefin.Runner) {
 		Path:        "/credential",
 		Summary:     "Disconnect the SimpleFIN key",
 	}, s.disconnectSyncCredential)
-	huma.Register(api, huma.Operation{
-		OperationID: "get-sync-cards",
-		Method:      "GET",
-		Path:        "/cards",
-		Summary:     "List user-scoped SimpleFIN card accounts",
-	}, s.getSyncCards)
-	huma.Register(api, huma.Operation{
-		OperationID: "set-sync-cards",
-		Method:      "PUT",
-		Path:        "/cards",
-		Summary:     "Replace user-scoped SimpleFIN card accounts",
-	}, s.setSyncCards)
 	huma.Register(api, huma.Operation{OperationID: "list-account-links", Method: "GET", Path: "/accounts", Summary: "List bridge-to-model account links"}, s.listAccountLinks)
-	huma.Register(api, huma.Operation{OperationID: "save-account-link", Method: "PUT", Path: "/accounts/{bridgeAccountId}", Summary: "Link one bridge account"}, s.saveAccountLink)
-	huma.Register(api, huma.Operation{OperationID: "delete-account-link", Method: "DELETE", Path: "/accounts/{bridgeAccountId}", Summary: "Unlink one bridge account"}, s.deleteAccountLink)
 	huma.Register(api, huma.Operation{OperationID: "supersede-simplefin-account", Method: "POST", Path: "/accounts/{bridgeAccountId}/supersede", Summary: "Replace a manual account with a linked synced account"}, s.supersedeAccount)
 }

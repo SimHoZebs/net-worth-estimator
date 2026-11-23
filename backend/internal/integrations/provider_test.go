@@ -54,12 +54,12 @@ func openUserStore(t *testing.T, database *sqlite.Database, issuer, subject stri
 }
 
 func credentialProvider(userStore store.Store) simplefin.CredentialProvider {
-	return func() (string, map[string]struct{}) {
+	return func() string {
 		credential, err := userStore.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}
 }
 

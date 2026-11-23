@@ -3,7 +3,6 @@ package categorization
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -62,7 +61,6 @@ func (w *Worker) RunOnce(ctx context.Context) error {
 }
 
 func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) error {
-	w.observeDisagreement(user, scoped)
 	if setter, ok := w.classifier.(FeedbackSetter); ok {
 		// Training delivery rides the existing session-open path: the
 		// next Classify opens with the user's matured journal rows, and
@@ -95,43 +93,6 @@ func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) e
 		}
 	}
 	return nil
-}
-
-// observeDisagreement samples the owner's recent labels against the
-// keyword baseline and warns when they systematically diverge. Monitoring
-// never fails the tick: an unreadable sample logs and classification
-// proceeds.
-func (w *Worker) observeDisagreement(user string, scoped store.Store) {
-	sampled, rate, err := disagreementRate(scoped)
-	if err != nil {
-		slog.Warn("category disagreement sample unreadable", "user", user, "error", err)
-		return
-	}
-	if sampled < disagreeMinSamples {
-		return
-	}
-	if rate > disagreeWarnThreshold {
-		slog.Warn("category labels disagree with keyword baseline", "user", user, "rate", rate, "samples", sampled)
-	}
-}
-
-// disagreementRate compares up to recentUserLabelSample newest user labels
-// with the keyword baseline. It reports the sample size and the rate so
-// the threshold decision stays testable without log capture.
-func disagreementRate(scoped store.Store) (int, float64, error) {
-	labels, err := scoped.ListRecentUserCategories(recentUserLabelSample)
-	if err != nil {
-		return 0, 0, err
-	}
-	assigned := make([]AssignedLabel, len(labels))
-	for index, label := range labels {
-		assigned[index] = AssignedLabel{
-			TransactionID: label.TransactionID,
-			Category:      label.Category,
-			Input:         Input{TransactionID: label.TransactionID, Name: label.Name, Direction: label.Direction, Facts: label.Facts},
-		}
-	}
-	return len(assigned), DisagreeRate(assigned, keywordDecision), nil
 }
 
 // Start owns its goroutine and waits for it on stop.

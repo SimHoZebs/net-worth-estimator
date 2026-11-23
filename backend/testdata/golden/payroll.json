@@ -69,7 +69,6 @@
       "netWorthThreshold": [],
       "transactionFulfillment": []
     },
-    "transactions": [],
     "schedules": [
       {
         "id": "salary-gross",
@@ -291,11 +290,7 @@
         {
           "deterministic": {
             "completionRate": 1,
-            "dates": [],
-            "destinationLimitedAmount": 0,
-            "events": [],
             "firstUnderfulfilledDate": null,
-            "transactions": [],
             "realizedAmount": 0,
             "requestedAmount": 0,
             "unfulfilledAmount": 0

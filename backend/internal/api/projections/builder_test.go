@@ -76,19 +76,12 @@ func TestCanonicalEvalJSONStable(t *testing.T) {
 }
 
 func TestSummarizeSamples(t *testing.T) {
-	stat := summarizeSamples("s", "2026-06-01", []float64{100, 200, 300}, 3)
-	if stat.Median != 200 || stat.P10 != 120 || stat.P90 != 280 {
-		t.Fatalf("quantiles wrong: %+v", stat)
+	stat := summarizeSamples("s", "2026-06-01", []float64{100, 200, 300})
+	if stat.ProjectionSliceID != "s" || stat.AsOfAt != midnightRFC3339("2026-06-01") {
+		t.Fatalf("stat identity wrong: %+v", stat)
 	}
-	if stat.Mean != 200 || stat.SampleCount != 3 {
-		t.Fatalf("mean/count wrong: %+v", stat)
-	}
-	if stat.ProbabilityBelowZero != 0 {
-		t.Fatalf("below-zero wrong: %+v", stat)
-	}
-	neg := summarizeSamples("s", "2026-06-01", []float64{-50, 50}, 2)
-	if neg.ProbabilityBelowZero != 0.5 {
-		t.Fatalf("below-zero fraction wrong: %+v", neg)
+	if stat.P10 != 120 || stat.P25 != 150 || stat.P50 != 200 || stat.P75 != 250 || stat.P90 != 280 {
+		t.Fatalf("quantile bands wrong: %+v", stat)
 	}
 }
 
@@ -178,8 +171,5 @@ func TestFulfillmentOutcome(t *testing.T) {
 	}
 	if fulfillmentOutcome(&types.TransactionFulfillment{UnfulfilledAmount: 10}) != "unfulfilled" {
 		t.Fatal("positive unfulfilled must report unfulfilled")
-	}
-	if fulfillmentOutcome(&types.TransactionFulfillment{DestinationLimitedAmount: 5}) != "fulfilled" {
-		t.Fatal("destination limits are not unfulfilled funding")
 	}
 }

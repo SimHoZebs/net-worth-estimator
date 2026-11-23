@@ -82,8 +82,8 @@ func TestStatusReportsSyncConfigurationAndLastSync(t *testing.T) {
 		t.Fatalf("status = %v, want no lastSyncAt before any sync", unconfigured)
 	}
 
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
-		return "https://user:pass@bridge.example/simplefin", nil
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
+		return "https://user:pass@bridge.example/simplefin"
 	}, nil)
 	configured := New(database, Config{SyncRunner: runner})
 	if err := database.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
@@ -136,8 +136,8 @@ func TestStatusReportsSyncQuota(t *testing.T) {
 		_, _ = w.Write([]byte(`{"errlist":[],"connections":[],"accounts":[]}`))
 	}))
 	t.Cleanup(bridge.Close)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
-		return bridge.URL, nil
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
+		return bridge.URL
 	}, bridge.Client())
 	triggered := New(database, Config{SyncRunner: runner})
 	trigger := httptest.NewRecorder()
@@ -253,52 +253,6 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 	}
 	if created.Revision != afterPayload.Revision {
 		t.Fatalf("revision = %q, saved revision = %q", created.Revision, afterPayload.Revision)
-	}
-}
-
-func TestRowWriteRejectsInvalidRow(t *testing.T) {
-	database := openAPIStore(t)
-	seedBaseline(t, database)
-	handler := New(database, Config{})
-
-	before := httptest.NewRecorder()
-	handler.ServeHTTP(before, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	var beforePayload struct {
-		Model json.RawMessage `json:"model"`
-	}
-	if err := json.Unmarshal(before.Body.Bytes(), &beforePayload); err != nil {
-		t.Fatalf("decode GET response: %v", err)
-	}
-
-	// A checkpoint for an unknown account fails validation: nothing persists.
-	post := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/checkpoints", bytes.NewReader([]byte(`{"accountId":"ghost","balance":10,"observedAt":1785974399}`)))
-	request.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(post, request)
-	if post.Code != http.StatusOK {
-		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
-	}
-	var rejected struct {
-		Issues []types.ModelValidationIssue `json:"issues"`
-		Saved  bool                         `json:"saved"`
-	}
-	if err := json.Unmarshal(post.Body.Bytes(), &rejected); err != nil {
-		t.Fatalf("decode POST response: %v", err)
-	}
-	if rejected.Saved || len(rejected.Issues) == 0 {
-		t.Fatalf("invalid write response = %+v", rejected)
-	}
-
-	after := httptest.NewRecorder()
-	handler.ServeHTTP(after, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	var afterPayload struct {
-		Model json.RawMessage `json:"model"`
-	}
-	if err := json.Unmarshal(after.Body.Bytes(), &afterPayload); err != nil {
-		t.Fatalf("decode verify response: %v", err)
-	}
-	if string(afterPayload.Model) != string(beforePayload.Model) {
-		t.Fatalf("rejected write changed stored model")
 	}
 }
 

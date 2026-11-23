@@ -22,7 +22,7 @@ p = sub, obj, act, eft
 [role_definition]
 g = _, _
 [policy_effect]
-e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
+e = some(where (p.eft == allow))
 [matchers]
 m = g(r.sub, p.sub) && r.sub == r.owner && keyMatch(r.obj, p.obj) && r.act == p.act
 `

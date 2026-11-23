@@ -37,7 +37,7 @@ verified owner. There is no first-login claim of existing data.
 The application stores role assignments and action/resource rules in
 `NET_WORTH_ESTIMATOR_AUTHZ_DB`. Subjects use the stable issuer/subject actor key,
 never mutable usernames. Each decision loads persisted policy without a positive
-decision cache. Explicit denial overrides allows. An explicit none assignment
+decision cache. An explicit none assignment
 blocks automatic re-enrollment after revocation. Identity verification rejects
 inactive users before authorization. Browser fields never supply an owner or role.
 Missing or incompatible policy state stops startup without schema repair.
@@ -199,7 +199,7 @@ an ordinary recipient-owned transaction; the link is its provenance, not a
 shared-transaction response DTO (reads still return the existing
 transaction shape only).
 
-Identities on one link (`store.SharingLink`):
+Identities on one share link:
 
 - Source transaction ID: `sourceOwnerId` plus `sourceTransactionId`.
 - Link ID: `link_` plus 64 lowercase hex characters, derived as
@@ -207,12 +207,12 @@ Identities on one link (`store.SharingLink`):
   recipientUserId)` with `0x00` separators (`store.SharingLinkID`). One
   link per source-plus-recipient triple: repeat accepts return the
   existing recipient row instead of minting duplicates, so the link ID is
-  stable across refresh, revocation, re-grant, and retries. The
+  stable across revocation, re-grant, and retries. The
   `link_` prefix keeps links out of the row-ID registry shared by
   accounts, transactions, rules, and evaluations. A future scheme change must
   use a new namespace.
 - Source revision: opaque hex content hash of the source transaction snapshot
-  observed at the last authorized copy or refresh
+  observed at the authorized copy
   (`store.SharingSourceRevision`). Compare revisions for staleness; never
   parse them.
 - Recipient owner: `recipientUserId` plus `copyTransactionId`.
@@ -224,19 +224,6 @@ Identities on one link (`store.SharingLink`):
 `CopySharedTransaction` records the link at accept time and is idempotent per
 triple. Copies are always owner-authored with no bank sync key, so
 accepting a share never manufactures a duplicate bank transaction.
-
-`RefreshSharingLink` re-checks live authorization and source state and
-records the outcome on the link row. It never writes the recipient's
-copy, so recipient edits survive every outcome. Statuses: `current`
-(authorized, revision matches), `source-changed` (authorized, link
-records the new revision while the copy keeps its edits),
-`unauthorized` (revoked, excluded, or membership ended; exposes no
-source content, not even the revision), `source-gone` (defensive: the
-source row is missing while the link survives, which `DeleteTransaction`
-never produces itself since it drops links with consent; the copy stays
-intact as an ordinary row). Source-row deletion through the API drops the
-link with the source consent; recipient-side copy deletion
-drops only its own link.
 
 Dependents (SOC-02 recipient copies, consent audit) should
 key on `linkId` for idempotency and reference, compare `sourceRevision`
@@ -286,26 +273,12 @@ SOC-02 HTTP contract (recipient scope, existing shapes only):
   no bank sync key); repeat accepts return the existing row with its
   edits intact. Recipient edits to the copy never reach the source, and
   there is still no path that edits another member's original (405).
-- `GET /v1/shared/copies/{copyId}/link` returns `{"link": <SharingLink>}`
-  with the deterministic link ID, source and recipient identities,
-  observed source revision, and authorizing grant. It is the recipient's
-  own provenance, so it stays readable after revocation.
-- `POST /v1/shared/copies/{copyId}/refresh` returns the
-  `SharingLinkRefresh` value (`link`, `status`, and `currentSourceRevision`
-  only while authorized). Statuses are `current`, `source-changed`,
-  `unauthorized`, and `source-gone`. Refresh records on the link row and
-  obeys the read-only kill switch; it never writes the copy. It accepts
-  an optional `requestId` body for idempotent retry and mints a server
-  key when none travels; each committed refresh appends one
-  `link-refreshed` audit row carrying the link, the outcome status, and
-  the key.
 
 ## Social-operation audit and idempotency
 
-Every mutating consent, accept, and refresh request carries a
+Every mutating consent and accept request carries a
 client-generated UUID request ID (`requestId` over HTTP on the grant,
-exclusion, copy, and refresh routes; refresh mints a server key when
-none travels). The store records one outcome row per
+exclusion, and copy routes). The store records one outcome row per
 (actor, request ID): a retry returns the recorded outcome without
 re-executing, a key reused for a different action or target fails with
 `ErrSharingConflict` (HTTP 409, no session-discovery code), and failed
@@ -314,7 +287,7 @@ fails explicitly and rolls the copy back; concurrent accepts resolve to
 the winner's copy. Committed mutations append one `sharing_audit` row
 each — consent kinds (`grant`, `revoke`, `exclude`, `unexclude`) with
 the request key in the detail payload, `copy-accepted` with the link
-and key, `link-refreshed` with the link, status, and key — carrying
+and key — carrying
 actor, action, target identities, and time only, never transaction
 evidence. Retries and heals append none. There is no audit read route.
 Model replacement and scope clears drop the keys and user-touching
@@ -373,7 +346,7 @@ whatever placeholder stands last — keep `:named` placeholders textually
 last or values silently misbind with no error.
 
 Embedded Go Casbin evaluates the model and stored policy rows.
-Use explicit permissions or `authzctl --role none` to revoke
+Use `authzctl --role none` to revoke
 access. Do not treat application-sign-in approval or UI enable flags as an
 additional resource-security boundary.
 
@@ -404,8 +377,7 @@ Semantics:
   on the target resource as the target's identity, and grants exactly the
   actions the target's own grants allow. A member target yields all three
   actions; a viewer guest target yields read and project only.
-- Provider login disablement and policy revocation are separate operations.
-  To exclude a target from this branch too, persist a none assignment in Casbin.
+- To exclude a target from this branch, persist a none assignment in Casbin.
 - The synthesized principal is the target, so every handler serves the
   target's own partition; resource headers, model ownership, and SimpleFIN
   credential attachment all follow the target.
@@ -422,8 +394,7 @@ Tooling for agents, for the two access shapes:
   then call any `/v1` route with `Authorization: Bearer <token>` and the
   target `Waypoint-Resource` header, e.g.
   `curl -s -H "Authorization: Bearer $NWE_ADMIN_TOKEN" -H "Waypoint-Resource: users/<64hex>" "$API/v1/status"`.
-- Raw data: the read-only CLIs in `backend/cmd` (for example `syncaudit`)
-  read a database file directly and work unchanged.
+- Raw data: the read-only CLIs in `backend/cmd` read a database file directly and work unchanged.
 
 Structured logging (the debugging surface this shares with the branch): the
 server emits single-line JSON to stdout via slog. One line per request:

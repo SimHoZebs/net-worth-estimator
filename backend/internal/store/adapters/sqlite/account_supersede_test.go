@@ -95,9 +95,6 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed safe spending: %v", err)
 	}
-	if _, err := scoped.SetSyncCards([]string{"manual", "savings"}); err != nil {
-		t.Fatalf("seed sync cards: %v", err)
-	}
 	group := sharingGroup(t, d, "alice", "Club")
 	first, err := d.SetSharingPolicy(alice, group, store.SharingPolicyInput{
 		Enabled: true, AccountIDs: []string{"manual", "savings"}, StartDate: "2026-01-01",
@@ -199,10 +196,6 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}
 	if settings.CycleStartDay != 3 || settings.PaydayDay != 27 || settings.SavingsTarget != 224.50 {
 		t.Fatalf("safe spending user settings changed: %+v", settings)
-	}
-	cards, err := scoped.GetSyncCards()
-	if err != nil || len(cards) != 2 || cards[0] != "synced" || cards[1] != "savings" {
-		t.Fatalf("sync cards did not move: %v, err %v", cards, err)
 	}
 	policy, err := d.GetSharingPolicy(alice, group)
 	if err != nil {

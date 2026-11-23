@@ -50,7 +50,6 @@ async function publicState() {
       ? {
           name: identity.user?.name || identity.user?.subject || "Your account",
           resource: identity.resource.id,
-          canWrite: identity.resource.permissions.includes("user:write"),
         }
       : null,
     pendingLogin: pendingLogin
@@ -68,7 +67,7 @@ async function loadConnection() {
     if (state.financialScope !== scope && !state.pendingSave) state.draft.fromId = "";
     state.financialScope = scope;
   });
-  return { ...(await publicState()), accounts: model.accounts, readOnly: model.readOnly };
+  return { ...(await publicState()), accounts: model.accounts };
 }
 
 async function activePage() {

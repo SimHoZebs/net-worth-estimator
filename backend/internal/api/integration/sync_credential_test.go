@@ -9,17 +9,16 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 func TestSyncCredentialConnectAndStatus(t *testing.T) {
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, err := database.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, nil)
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -67,17 +66,16 @@ func TestSyncCredentialConnectAndStatus(t *testing.T) {
 		t.Fatal("connect response leaked the secret")
 	}
 
-	// Status now reports configured with host.
+	// Status now reports the connection as configured.
 	configured := httptest.NewRecorder()
 	handler.ServeHTTP(configured, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
 	var statusPayload struct {
-		SyncConfigured bool   `json:"syncConfigured"`
-		SyncHost       string `json:"syncHost"`
+		SyncConfigured bool `json:"syncConfigured"`
 	}
 	if err := json.Unmarshal(configured.Body.Bytes(), &statusPayload); err != nil {
 		t.Fatalf("decode status: %v", err)
 	}
-	if !statusPayload.SyncConfigured || statusPayload.SyncHost != "bridge.example" {
+	if !statusPayload.SyncConfigured {
 		t.Fatalf("status = %+v", statusPayload)
 	}
 
@@ -106,9 +104,9 @@ func TestSyncCredentialConnectAndStatus(t *testing.T) {
 
 func TestSyncCredentialRejectsBadInput(t *testing.T) {
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, _ := database.GetSyncCredential()
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, nil)
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -128,47 +126,6 @@ func TestSyncCredentialRejectsBadInput(t *testing.T) {
 	}
 }
 
-func TestSyncCardsValidation(t *testing.T) {
-	database := openAPIStore(t)
-	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
-		t.Fatalf("seed account: %v", err)
-	}
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
-		credential, _ := database.GetSyncCredential()
-		return credential.AccessURL, nil
-	}, nil)
-	handler := New(database, Config{SyncRunner: runner})
-
-	// Unknown account is 422 when a model exists.
-	bad := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/v1/sync/simplefin/cards", bytes.NewReader([]byte(`{"cards":["ghost"]}`)))
-	request.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(bad, request)
-	if bad.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("unknown card status = %d, want 422, body %s", bad.Code, bad.Body.String())
-	}
-
-	good := httptest.NewRecorder()
-	goodRequest := httptest.NewRequest(http.MethodPut, "/v1/sync/simplefin/cards", bytes.NewReader([]byte(`{"cards":["checking"]}`)))
-	goodRequest.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(good, goodRequest)
-	if good.Code != http.StatusOK {
-		t.Fatalf("set cards status = %d, body %s", good.Code, good.Body.String())
-	}
-
-	get := httptest.NewRecorder()
-	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/sync/simplefin/cards", nil))
-	var payload struct {
-		Cards []string `json:"cards"`
-	}
-	if err := json.Unmarshal(get.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode cards: %v", err)
-	}
-	if len(payload.Cards) != 1 || payload.Cards[0] != "checking" {
-		t.Fatalf("cards = %+v", payload)
-	}
-}
-
 func TestSyncCredentialReadOnlyPolicy(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{ReadOnly: true})
@@ -179,7 +136,6 @@ func TestSyncCredentialReadOnlyPolicy(t *testing.T) {
 	}{
 		{http.MethodPost, "/v1/sync/simplefin/credential", `{"accessUrl":"https://user:pass@bridge.example/simplefin"}`},
 		{http.MethodDelete, "/v1/sync/simplefin/credential", ""},
-		{http.MethodPut, "/v1/sync/simplefin/cards", `{"cards":[]}`},
 	} {
 		var reader *bytes.Reader
 		if test.body != "" {
@@ -219,12 +175,12 @@ func TestSyncCredentialInitialConnectForcesOneSync(t *testing.T) {
 	t.Cleanup(bridge.Close)
 
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, err := database.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, bridge.Client())
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -268,12 +224,12 @@ func TestSyncCredentialRotationDoesNotResync(t *testing.T) {
 	t.Cleanup(bridge.Close)
 
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, err := database.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, bridge.Client())
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -303,12 +259,12 @@ func TestSyncCredentialInitialSyncHonorsBlackout(t *testing.T) {
 	t.Cleanup(bridge.Close)
 
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, err := database.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, bridge.Client())
 	handler := New(database, Config{SyncRunner: runner})
 

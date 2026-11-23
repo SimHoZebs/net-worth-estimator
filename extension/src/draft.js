@@ -43,7 +43,6 @@ export function newDraft() {
     fromId: "",
     startDate: localDate(),
     sourceUrl: "",
-    capturedAt: new Date().toISOString(),
     priceText: "",
     variant: "",
     nameMethod: "manual",

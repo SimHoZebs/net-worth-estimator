@@ -3,8 +3,8 @@
 Proves the payment-pattern pipeline on public data: descriptor rows from a
 real labeled dataset are normalized through the existing Go backend
 (grouping, recurrence, signals, classifications), scored against dataset
-labels, used to train the River learner, and subjected to drift-diagnosis
-arms. Timing measurements substantiate the online-learner volume claim.
+labels, and used to train the River learner. Timing measurements substantiate
+the online-learner volume claim.
 
 ## Dataset
 
@@ -80,7 +80,6 @@ eval time into `ml/eval/.cache/` (gitignored) and reuses it on later runs.
 | Amounts | Synthesized: plausible per-category bases (documented in `backend/cmd/testing/evalharness/main.go`), deterministic ±5% jitter inside detector tolerance |
 | Provider alias table | Derived from the dataset's own merchant strings (first-token heuristic mirroring `NormalizedMerchantKey`); hit rate is reported so mismatch is visible |
 | Bank-category metadata | Dataset label reused as the bank-category stand-in (drives source-income/source-rent hints; see the `signal_support` split) |
-| Shift-probe contradict labels | Synthetic by construction (flipped), never dataset evidence |
 
 Reproducible: fixed seeds, no wall-clock dependence. Default run samples
 ≈5,000 rows (4,998 after stratified per-category rounding, seed 7);
@@ -108,10 +107,9 @@ uv run --with pyarrow --with pandas --with openpyxl eval/harness.py \
 Seed export (canonical recipe: per-source interleaved payment baseline
 orders — mitul excluded, its single occurrences carry no recurrence signal —
 followed by per-source interleaved category orders: HF, then MoneyData, then
-mitul; manual drift mode with dismiss-and-retry, fixed seeds) trains a kept store, then
+mitul; fixed seeds) trains a kept store, then
 writes a seed database containing ONLY the model row (warm weights,
-counts, generation, revision) with events/checkpoints emptied and drift
-counters reset. Export fails loudly unless every payment classifier kind
+counts, generation, revision) with events/checkpoints emptied. Export fails loudly unless every payment classifier kind
 and every mapped category kind clears its coverage minimum (50 examples;
 HOME_IMPROVEMENT and GOVERNMENT_AND_NON_PROFIT stay exempt by policy — the
 mitul arm warms them, but they remain baseline until production feedback).
@@ -132,8 +130,7 @@ series and runs `PaymentPatterns{}.Analyze` nil-resolver plus
 `.WithProviders` with a `MapProviderResolver`, and emits one
 `categorization.CategoryJudgmentRequests` set per descriptor for the
 category arm, (4) Python scores deterministic output vs labels, trains
-throwaway `PaymentModelStore` instances (`ML_MODEL_PATH` under `/tmp`,
-`ML_DRIFT_MODE=auto`),
+throwaway `PaymentModelStore` instances (`ML_MODEL_PATH` under `/tmp`),
 (5) optionally exports a verified seed DB (`--export-seed`), and
 (6) writes `ml/eval/.cache/report.json` plus a stdout summary. The harness
 touches only `PaymentModelStore.state/evaluate/observe` (stable API).
@@ -161,8 +158,8 @@ touches only `PaymentModelStore.state/evaluate/observe` (stable API).
   candidate). A support→candidate policy demotion shows up as a
   strong→moderate migration with recall unchanged.
 - `learner.<arm>`: strict accuracy before/after training on the same
-  requests (`uncertain` counts as wrong), lift, ADWIN trips/warnings, and
-  per-event train/eval latency (median/p90) with peak RSS. `pre` is the
+  requests (`uncertain` counts as wrong), lift, and per-event train/eval
+  latency (median/p90) with peak RSS. `pre` is the
   cold-start baseline (decisive domain rules); small post-training volumes
   typically show a negative strict lift because the undertrained model
   hedges `uncertain` — watch `decisive_rate` recover as event volume grows
@@ -175,31 +172,19 @@ touches only `PaymentModelStore.state/evaluate/observe` (stable API).
   category (MoneyData unmapped rows).
 - `category_learner.<arm>`: strict accuracy before/after training on the
   same category requests (`confirm` the expected kind, `reject` other
-  emitted kinds for the same transaction), lift, trips, and per-event
+  emitted kinds for the same transaction), lift, and per-event
   latency. Small volumes show the same negative strict lift as the payment
   arms while the undertrained model hedges `uncertain`; watch
   `decisive_rate` recover as event volume grows.
-- `shift_probe`: synthetic abrupt label flip after convergence; shows the
-  detector actually trips and what the accuracy cost looks like.
 - `seed`: always `null` in the persisted report; the combined export summary (path, revision, counts, `verification.identical`) is printed to stdout by `--export-seed`.
 
-## Drift-diagnosis guide
+## Interpreting results
 
-Map observed outcomes to verdicts:
-
-- **Accuracy drop on new data + ADWIN trips up**: real shift. The error
-  process moved; reset/retrain is justified.
-- **Trips up, accuracy flat**: oversensitive detector. The error process
-  did not move; consider raising ADWIN `delta` or dismissing, not
-  retraining.
-- **Low accuracy, no trips**: features/model unsuitable. The learner
-  never saw a learnable error signal; fix signals or features (e.g. alias
-  coverage, descriptor gaps), not the detector.
 - **Provider arm >> descriptor arm on utility/insurance**: alias-catalog
   gap. Extend provider resolution rather than tuning the model.
 - **Misses concentrated on short merchants** (e.g. `PG&E` normalizes to
   no grouping token): stream-identity limit in `NormalizedMerchantKey`, an
-  unsuitable-workload boundary, not drift.
+  unsuitable-workload boundary.
 - **Recall misses with no request at all**: streams the detector never
   emitted never reach the learner; training only corrects emitted
   decisions, it cannot invent coverage.

@@ -1073,9 +1073,6 @@
 			"AnalysisPaymentPattern": {
 				"additionalProperties": false,
 				"properties": {
-					"annualizedEstimate": {
-						"type": "string"
-					},
 					"currency": {
 						"type": "string"
 					},
@@ -1086,12 +1083,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"patternId",
-					"currency",
-					"typicalAmount",
-					"annualizedEstimate"
-				],
+				"required": ["patternId", "currency", "typicalAmount"],
 				"type": "object"
 			},
 			"AnalysisReview": {
@@ -1269,13 +1261,6 @@
 			"Checkpoint": {
 				"additionalProperties": false,
 				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/Checkpoint.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
 					"AccountId": {
 						"type": "string"
 					},
@@ -2793,43 +2778,6 @@
 				"required": ["links"],
 				"type": "object"
 			},
-			"LinkOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/LinkOutputBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"link": {
-						"$ref": "#/components/schemas/AccountLink"
-					},
-					"revision": {
-						"type": "string"
-					}
-				},
-				"required": ["link", "revision"],
-				"type": "object"
-			},
-			"LinkPutInputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/LinkPutInputBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"modelAccountId": {
-						"type": "string"
-					}
-				},
-				"required": ["modelAccountId"],
-				"type": "object"
-			},
 			"List-analysesResponse": {
 				"additionalProperties": false,
 				"properties": {
@@ -3137,31 +3085,6 @@
 				"required": ["movedId"],
 				"type": "object"
 			},
-			"Move-evaluationRequest": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/Move-evaluationRequest.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"beforeId": {
-						"type": "string"
-					},
-					"instanceId": {
-						"type": "string"
-					},
-					"type": {
-						"type": "string"
-					}
-				},
-				"required": ["type", "instanceId"],
-				"type": "object"
-			},
 			"Move-scheduleRequest": {
 				"additionalProperties": false,
 				"properties": {
@@ -3178,46 +3101,6 @@
 						"type": "string"
 					}
 				},
-				"type": "object"
-			},
-			"Move-transactionRequest": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/Move-transactionRequest.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"beforeId": {
-						"type": "string"
-					}
-				},
-				"type": "object"
-			},
-			"Notice": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"code": {
-						"type": "string"
-					},
-					"connectionId": {
-						"type": "string"
-					},
-					"message": {
-						"type": "string"
-					},
-					"scope": {
-						"type": "string"
-					}
-				},
-				"required": ["code", "message", "scope"],
 				"type": "object"
 			},
 			"PatternDatedAmount": {
@@ -4591,41 +4474,6 @@
 				],
 				"type": "object"
 			},
-			"SafeSpendingMovement": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"amount": {
-						"format": "double",
-						"type": "number"
-					},
-					"effectiveAt": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"name": {
-						"type": "string"
-					},
-					"postedAt": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"transactionId": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"transactionId",
-					"accountId",
-					"name",
-					"postedAt",
-					"effectiveAt",
-					"amount"
-				],
-				"type": "object"
-			},
 			"SafeSpendingOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -4737,10 +4585,6 @@
 						"readOnly": true,
 						"type": "string"
 					},
-					"additionalSavings": {
-						"format": "double",
-						"type": ["number", "null"]
-					},
 					"baselines": {
 						"items": {
 							"$ref": "#/components/schemas/SafeSpendingBaseline"
@@ -4764,12 +4608,6 @@
 					"checkingAvailable": {
 						"format": "double",
 						"type": ["number", "null"]
-					},
-					"confirmedMovements": {
-						"items": {
-							"$ref": "#/components/schemas/SafeSpendingMovement"
-						},
-						"type": ["array", "null"]
 					},
 					"cycleFundingPayday": {
 						"description": "Paycheck funding the active spending cycle; Payday stays the actual next income",
@@ -4840,10 +4678,6 @@
 						"format": "double",
 						"type": ["number", "null"]
 					},
-					"postPaydayBalance": {
-						"format": "double",
-						"type": ["number", "null"]
-					},
 					"prePaydayBills": {
 						"format": "double",
 						"type": ["number", "null"]
@@ -4866,16 +4700,6 @@
 						"type": ["number", "null"]
 					},
 					"savingsAllowance": {
-						"format": "double",
-						"type": ["number", "null"]
-					},
-					"selectedAccountIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"spendableCash": {
 						"format": "double",
 						"type": ["number", "null"]
 					},
@@ -4903,10 +4727,8 @@
 					"cashAsOf",
 					"status",
 					"reasons",
-					"selectedAccountIds",
 					"baselines",
 					"checkingAvailable",
-					"confirmedMovements",
 					"bills",
 					"payday",
 					"cycleFundingPayday",
@@ -4917,17 +4739,14 @@
 					"statementReserve",
 					"prePaydayRoom",
 					"postIncomeRoom",
-					"postPaydayBalance",
 					"paymentRoom",
 					"cardPayoffCapacity",
 					"cycleReset",
 					"daysUntilReset",
 					"nextCycleEnd",
-					"spendableCash",
 					"incomeFunded",
 					"savingsAllowance",
 					"forecastCashRoom",
-					"additionalSavings",
 					"fundingRoom",
 					"nextCycleIncome",
 					"nextCycleCarryover",
@@ -5890,9 +5709,6 @@
 					"syncError": {
 						"$ref": "#/components/schemas/SyncError"
 					},
-					"syncHost": {
-						"type": "string"
-					},
 					"syncQuotaLimit": {
 						"format": "int64",
 						"type": "integer"
@@ -5952,84 +5768,6 @@
 				"required": ["settings", "config"],
 				"type": "object"
 			},
-			"Summary": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/Summary.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"accountsProvisioned": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"checkpointsInserted": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"checkpointsSkipped": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"checkpointsUpdated": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"errors": {
-						"items": {
-							"$ref": "#/components/schemas/Notice"
-						},
-						"type": ["array", "null"]
-					},
-					"partial": {
-						"type": "boolean"
-					},
-					"pendingDeleted": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"pendingInserted": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"pendingUpdated": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"settledConverted": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"settledInserted": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"skipped": {
-						"additionalProperties": {
-							"format": "int64",
-							"type": "integer"
-						},
-						"type": "object"
-					}
-				},
-				"required": [
-					"checkpointsInserted",
-					"checkpointsUpdated",
-					"checkpointsSkipped",
-					"pendingDeleted",
-					"pendingInserted",
-					"pendingUpdated",
-					"settledConverted",
-					"settledInserted",
-					"accountsProvisioned",
-					"skipped",
-					"partial"
-				],
-				"type": "object"
-			},
 			"SupersedeInputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -6085,48 +5823,6 @@
 					"saved",
 					"revision"
 				],
-				"type": "object"
-			},
-			"SyncCardsInputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/SyncCardsInputBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"cards": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					}
-				},
-				"required": ["cards"],
-				"type": "object"
-			},
-			"SyncCardsOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/SyncCardsOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"cards": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					}
-				},
-				"required": ["cards"],
 				"type": "object"
 			},
 			"SyncCredentialBody": {
@@ -6196,6 +5892,19 @@
 					}
 				},
 				"required": ["code", "message"],
+				"type": "object"
+			},
+			"SyncOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/SyncOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					}
+				},
 				"type": "object"
 			},
 			"TermsBody": {
@@ -6598,16 +6307,12 @@
 			"TransactionFulfillment": {
 				"additionalProperties": false,
 				"properties": {
-					"destinationLimitedAmount": {
-						"format": "double",
-						"type": "number"
-					},
 					"unfulfilledAmount": {
 						"format": "double",
 						"type": "number"
 					}
 				},
-				"required": ["unfulfilledAmount", "destinationLimitedAmount"],
+				"required": ["unfulfilledAmount"],
 				"type": "object"
 			},
 			"TransactionListOutputBody": {
@@ -6874,37 +6579,6 @@
 				"required": ["value", "issues", "saved", "revision"],
 				"type": "object"
 			},
-			"WriteResultCheckpoint": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/WriteResultCheckpoint.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					},
-					"saved": {
-						"type": "boolean"
-					},
-					"value": {
-						"$ref": "#/components/schemas/Checkpoint"
-					}
-				},
-				"required": ["value", "issues", "saved", "revision"],
-				"type": "object"
-			},
 			"WriteResultEvaluationUpdate": {
 				"additionalProperties": false,
 				"properties": {
@@ -7144,44 +6818,6 @@
 					}
 				},
 				"summary": "List accounts with balances as of a date"
-			}
-		},
-		"/v1/accounts/reorder": {
-			"post": {
-				"operationId": "move-account",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/ReorderInputBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Move one account"
 			}
 		},
 		"/v1/accounts/{id}": {
@@ -8163,51 +7799,6 @@
 			}
 		},
 		"/v1/checkpoints": {
-			"delete": {
-				"operationId": "delete-checkpoint",
-				"parameters": [
-					{
-						"explode": false,
-						"in": "query",
-						"name": "accountId",
-						"schema": {
-							"type": "string"
-						}
-					},
-					{
-						"explode": false,
-						"in": "query",
-						"name": "observedAt",
-						"schema": {
-							"format": "int64",
-							"type": "integer"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Delete one balance checkpoint"
-			},
 			"get": {
 				"operationId": "list-checkpoints",
 				"parameters": [
@@ -8265,42 +7856,6 @@
 					}
 				},
 				"summary": "List balance checkpoints for an account and window"
-			},
-			"post": {
-				"operationId": "save-checkpoint",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/Checkpoint"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/WriteResultCheckpoint"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Upsert one balance checkpoint"
 			}
 		},
 		"/v1/evaluations": {
@@ -8339,44 +7894,6 @@
 					}
 				},
 				"summary": "Create one evaluation"
-			}
-		},
-		"/v1/evaluations/reorder": {
-			"post": {
-				"operationId": "move-evaluation",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/Move-evaluationRequest"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Move one evaluation"
 			}
 		},
 		"/v1/evaluations/summary": {
@@ -10368,7 +9885,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/Summary"
+									"$ref": "#/components/schemas/SyncOutputBody"
 								}
 							}
 						},
@@ -10414,90 +9931,6 @@
 					}
 				},
 				"summary": "List bridge-to-model account links"
-			}
-		},
-		"/v1/sync/simplefin/accounts/{bridgeAccountId}": {
-			"delete": {
-				"operationId": "delete-account-link",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "bridgeAccountId",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Unlink one bridge account"
-			},
-			"put": {
-				"operationId": "save-account-link",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "bridgeAccountId",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/LinkPutInputBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/LinkOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Link one bridge account"
 			}
 		},
 		"/v1/sync/simplefin/accounts/{bridgeAccountId}/supersede": {
@@ -10546,70 +9979,6 @@
 					}
 				},
 				"summary": "Replace a manual account with a linked synced account"
-			}
-		},
-		"/v1/sync/simplefin/cards": {
-			"get": {
-				"operationId": "get-sync-cards",
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/SyncCardsOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List user-scoped SimpleFIN card accounts"
-			},
-			"put": {
-				"operationId": "set-sync-cards",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/SyncCardsInputBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/SyncCardsOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Replace user-scoped SimpleFIN card accounts"
 			}
 		},
 		"/v1/sync/simplefin/credential": {
@@ -10986,54 +10355,6 @@
 					}
 				},
 				"summary": "Record which schedule occurrence a transaction fulfils"
-			}
-		},
-		"/v1/transactions/{id}/move": {
-			"post": {
-				"operationId": "move-transaction",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/Move-transactionRequest"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Move one transaction in same-day execution order"
 			}
 		},
 		"/v1/transactions/{id}/receipts": {

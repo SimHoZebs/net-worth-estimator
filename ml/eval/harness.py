@@ -5,9 +5,8 @@ Proves the pipeline on public data: downloads a labeled bank-descriptor
 dataset, normalizes rows through the existing Go backend (grouping,
 recurrence, signals, classifications), scores deterministic output against
 dataset labels, trains the River learner (PaymentModelStore.state/evaluate/
-observe only) to measure lift, runs experiment arms that isolate drift
-diagnosis, and measures per-event train/eval latency plus peak RSS to
-substantiate the online-learner volume claim.
+observe only) to measure lift, and measures per-event train/eval latency plus
+peak RSS to substantiate the online-learner volume claim.
 
 Reads and writes only; never modifies model.py or server.py.
 Run with the repo toolchain from the ml directory, e.g.::
@@ -54,7 +53,6 @@ from training import (
     order_requests,
     run_arm,
     run_seed_recipe,
-    run_shift_probe,
 )
 
 CACHE_DIR = EVAL_DIR / ".cache"
@@ -149,16 +147,6 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
             requests, expected_by_request(requests, expected_by_stem), order
         )
         learner_arms[name] = run_arm(f"{tag}-{name}", requests, ordered)
-    probe_ordered = order_requests(
-        findings_by_request(output["findings"]["baseline"]),
-        expected_by_request(
-            findings_by_request(output["findings"]["baseline"]),
-            expected_by_stem,
-        ),
-        "interleaved",
-    )
-    probe = run_shift_probe(probe_ordered)
-
     seed_ordered = order_requests(
         findings_by_request(output["findings"]["baseline"]),
         expected_by_request(
@@ -204,7 +192,6 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
         "signal_support": support,
         "learner": learner_arms,
         "category_learner": cat_learner_arms,
-        "shift_probe": probe,
         "seed": None,
     }
     report_path = args.report or (cache / f"report{suffix}.json")
@@ -261,15 +248,14 @@ def main() -> None:
              "category_events": seed["category_events"],
              "coverage_counts": seed["coverage_counts"],
              "category_coverage_counts": seed["category_coverage_counts"],
-             "verification": seed["verification"],
-             "drift_at_export": seed["drift_at_export"]}, indent=2))
+             "verification": seed["verification"]}, indent=2))
 
 
 def print_learner_arm(name: str, arm: dict) -> None:
     print(
         f"  {name:18s} events={arm['events']} "
         f"pre={arm['pre']['accuracy']:.4f} post={arm['post']['accuracy']:.4f} "
-        f"lift={arm['lift']:+.4f} trips={arm['trips']} warnings={arm['warnings']} "
+        f"lift={arm['lift']:+.4f} "
         f"train_ms/event med={arm['train_per_event_ms']['median']:.3f} "
         f"p90={arm['train_per_event_ms']['p90']:.3f} "
         f"eval_ms/event med={arm['eval_per_event_ms']['median']:.3f} "
@@ -282,9 +268,9 @@ def print_learner_arm(name: str, arm: dict) -> None:
         f"decisive={arm['post']['decisive_rate']:.3f}"
     )
     print(
-        f"    trajectory(batch:probe_acc/decisive/detections): "
+        f"    trajectory(batch:probe_acc/decisive): "
         + " ".join(
-            f"{t['batch']}:{t['probe_accuracy']:.3f}/{t['decisive_rate']:.3f}/{t['detections']}"
+            f"{t['batch']}:{t['probe_accuracy']:.3f}/{t['decisive_rate']:.3f}"
             for t in arm.get("trajectory", [])
         )
     )
@@ -367,22 +353,6 @@ def print_summary(report: dict) -> None:
     print("\n## Category learner arms (confirm expected kind, reject other emitted kinds)")
     for name, arm in report["category_learner"].items():
         print_learner_arm(name, arm)
-    probe = report["shift_probe"]
-    if "skipped" in probe:
-        print(f"\n## Synthetic shift probe skipped: {probe['skipped']}")
-        return
-    print(
-        "\n## Synthetic shift probe (labels flipped after convergence; not dataset evidence)"
-    )
-    print(
-        f"  agree={probe['agree_events']} flip={probe['flip_events']} "
-        f"probe={probe['probe_requests']} "
-        f"acc_before={probe['accuracy_before_flip']:.4f} "
-        f"acc_after={probe['accuracy_after_flip']:.4f} "
-        f"delta={probe['accuracy_delta']:+.4f} "
-        f"detections={probe['detections_during_flip']} "
-        f"warnings={probe['warnings_during_flip']}"
-    )
     seed = report.get("seed")
     if seed:
         print("\n## Seed export (canonical recipe: baseline findings, interleaved)")
@@ -392,8 +362,7 @@ def print_summary(report: dict) -> None:
               f"counts={seed['export']['classification_counts']}")
         print(f"  probe={seed['probe_requests']} "
               f"verify_identical={seed['verification']['identical']} "
-              f"matched={seed['verification']['matched']}/{seed['verification']['probe_requests']} "
-              f"drift_at_export={seed['drift_at_export']}")
+              f"matched={seed['verification']['matched']}/{seed['verification']['probe_requests']}")
 
 
 if __name__ == "__main__":

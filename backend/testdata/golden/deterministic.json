@@ -974,13 +974,9 @@
           "deterministic": {
             "requestedAmount": 2350,
             "realizedAmount": 2350,
-            "destinationLimitedAmount": 0,
             "unfulfilledAmount": 0,
             "completionRate": 1,
-            "firstUnderfulfilledDate": null,
-            "events": [],
-            "dates": [],
-            "transactions": []
+            "firstUnderfulfilledDate": null
           },
           "probabilistic": null,
           "diagnostics": []

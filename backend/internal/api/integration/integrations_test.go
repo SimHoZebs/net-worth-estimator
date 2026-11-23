@@ -48,12 +48,12 @@ func simplefinEntry(t *testing.T, providers []integrationEntry) integrationEntry
 
 func TestListIntegrationsReflectsSimpleFINConnection(t *testing.T) {
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, err := database.GetSyncCredential()
 		if err != nil {
-			return "", nil
+			return ""
 		}
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, nil)
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -101,9 +101,9 @@ func TestListIntegrationsReflectsSimpleFINConnection(t *testing.T) {
 
 func TestListIntegrationsReportsLastSync(t *testing.T) {
 	database := openAPIStore(t)
-	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() string {
 		credential, _ := database.GetSyncCredential()
-		return credential.AccessURL, nil
+		return credential.AccessURL
 	}, nil)
 	handler := New(database, Config{SyncRunner: runner})
 

@@ -266,7 +266,7 @@ curl -fsS "$BASE_URL/v1/financial-model" \
   | jq '{accounts: (.model.accounts | length), transactions: (.model.transactions | length), checkpoints: (.model.checkpoints | length), issues}'
 ```
 
-Expect `/healthz` to return `ok`; `/v1/status` to report `readOnly`, `hasModel`, `syncConfigured`, `syncHost`, `syncQuotaUsed`, `syncQuotaLimit`, `lastSyncAt` when present, and `syncError` when present; the model response to return 200 with an array `issues`. Warning-severity issues may be present, but a projection must not run with error-severity issues.
+Expect `/healthz` to return `ok`; `/v1/status` to report `readOnly`, `hasModel`, `syncConfigured`, `syncQuotaUsed`, `syncQuotaLimit`, `lastSyncAt` when present, and `syncError` when present; the model response to return 200 with an array `issues`. Warning-severity issues may be present, but a projection must not run with error-severity issues.
 
 `POST /v1/position` accepts `{ "asOfDate": "YYYY-MM-DD", "model": ... }`. The model is optional and defaults to the scoped stored model. It returns `result: { asOfDate, netWorth, accounts: [{ accountId, balance }] }` from historical preparation without a future simulation. It requires `user:project`, permits projection without write permission, and stores no additional history. Model or date errors return HTTP 200 with `issues` and `error`, without `result`.
 
@@ -383,13 +383,13 @@ curl -fsS -X POST "$BASE_URL/v1/sync/simplefin/credential" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-Then select card accounts and trigger, and inspect counts:
+Then trigger a sync:
 
 ```bash
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .
 ```
 
-The response reports `checkpointsInserted`, `pendingInserted`, and `accountsProvisioned`. Link a bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. `bridgeAccountId` is the connection-scoped key `sf2.<conn_id>.<account_id>`. Restart the server to clear the in-memory trigger stamp, trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the guard stamps successful runs only. When the Bridge reports `available-balance`, the account balance row exposes `availableBalance` separately from the posted `balance`.
+Restart the server to clear the in-memory trigger stamp, trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the guard stamps successful runs only. When the Bridge reports `available-balance`, the account balance row exposes `availableBalance` separately from the posted `balance`.
 
 Guard tests belong in Go:
 

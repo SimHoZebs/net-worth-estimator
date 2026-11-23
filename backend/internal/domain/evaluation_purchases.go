@@ -37,17 +37,6 @@ func (r *PlannedPurchasesPathResult) ToJSON() types.JsonValue {
 
 func (r *PlannedPurchasesPathResult) firstReached() *string { return r.FirstReachedDate }
 
-// NumericValue exposes the funded count for numeric envelope consumers.
-func (r *PlannedPurchasesPathResult) NumericValue() float64 {
-	funded := 0.0
-	for _, purchase := range r.Purchases {
-		if purchase.Date != nil {
-			funded++
-		}
-	}
-	return funded
-}
-
 func evaluatePlannedPurchases(ctx *EvaluationContext, _ any) (PathResult, error) {
 	// Reuse the shared path: rebuild the candidate simulation request from
 	// the already-prepared effective model and the caller's Monte Carlo
