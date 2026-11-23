@@ -1,9 +1,7 @@
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import { Check, X } from "lucide-react";
 import { ACCOUNT_TYPE_LABELS } from "../../domain/accountKinds.ts";
-import {
-	CARD_KIND_SUGGESTION,
-	cardKindBasis,
-} from "../../domain/cardKindSuggestion.ts";
+import { CARD_KIND_SUGGESTION } from "../../domain/cardKindSuggestion.ts";
 import { Button } from "@/components/ui/button.tsx";
 
 /**
@@ -23,7 +21,6 @@ export function focusAccountKindPicker(formId: string): boolean {
  * until the owner changes it in the picker and saves through the account form.
  */
 export function CardKindSuggestion({
-	finding,
 	readOnly,
 	busy,
 	onReview,
@@ -36,7 +33,6 @@ export function CardKindSuggestion({
 	onDismiss: () => void;
 }) {
 	const label = ACCOUNT_TYPE_LABELS[CARD_KIND_SUGGESTION];
-	const basis = cardKindBasis(finding);
 	const locked = readOnly || busy;
 	return (
 		<section
@@ -46,24 +42,25 @@ export function CardKindSuggestion({
 			<h3 className="m-0 text-base leading-snug font-semibold">
 				Should this account be {label}?
 			</h3>
-			{basis.length > 0 && (
-				<ul className="m-0 grid gap-1 pl-0 list-none text-sm leading-snug text-muted-foreground">
-					{basis.map((reason, index) => (
-						<li key={`${finding.id}-${index}`}>{reason}</li>
-					))}
-				</ul>
-			)}
 			<div className="flex flex-wrap items-center gap-2">
-				<Button type="button" disabled={locked} onClick={onReview}>
-					Review account type
+				<Button
+					type="button"
+					size="icon-xs"
+					aria-label="Review account type"
+					disabled={locked}
+					onClick={onReview}
+				>
+					<Check aria-hidden="true" />
 				</Button>
 				<Button
 					type="button"
 					variant="ghost"
+					size="icon-xs"
+					aria-label="Dismiss suggestion"
 					disabled={locked}
 					onClick={onDismiss}
 				>
-					Dismiss
+					<X aria-hidden="true" />
 				</Button>
 			</div>
 		</section>

@@ -45,10 +45,3 @@ export function cardKindFinding(
 			finding.review?.decision !== "rejected",
 	);
 }
-
-/** The plain-language evidence reasons are the basis shown to the owner. */
-export function cardKindBasis(finding: AnalysisFinding): string[] {
-	return (finding.evidence ?? [])
-		.map((item) => item.reason?.trim() ?? "")
-		.filter(Boolean);
-}

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import {
-	CARD_KIND_SUGGESTION,
-	cardKindBasis,
-	cardKindFinding,
-} from "./cardKindSuggestion.ts";
+import { CARD_KIND_SUGGESTION, cardKindFinding } from "./cardKindSuggestion.ts";
 
 function finding(
 	overrides: Partial<AnalysisFinding> & { accountId?: string } = {},
@@ -85,13 +81,5 @@ describe("card-kind suggestion", () => {
 				"cash",
 			),
 		).toBeUndefined();
-	});
-
-	it("shows the evidence reasons as the basis", () => {
-		expect(cardKindBasis(finding())).toEqual([
-			"The issuer appears in the card provider list.",
-			"The balance behaves like a debt.",
-		]);
-		expect(cardKindBasis(finding({ evidence: null }))).toEqual([]);
 	});
 });

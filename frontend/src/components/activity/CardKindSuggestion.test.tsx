@@ -52,24 +52,40 @@ function renderCard(overrides: { readOnly?: boolean; busy?: boolean } = {}) {
 }
 
 describe("card-kind suggestion card", () => {
-	it("shows the heading and the account kind basis without changing anything", () => {
+	it("asks whether the account is the proposed kind", () => {
 		const { onReview, onDismiss } = renderCard();
 		expect(
-			screen.getByText("Should this account be Credit card?"),
+			screen.getByRole("heading", {
+				name: "Should this account be Credit card?",
+			}),
 		).toBeTruthy();
 		expect(
-			screen.getByText(/issuer name matches a card provider/i),
+			screen.getByRole("region", { name: "Account type suggestion" }),
 		).toBeTruthy();
 		expect(onReview).not.toHaveBeenCalled();
 		expect(onDismiss).not.toHaveBeenCalled();
 	});
 
-	it("offers review in the kind editor and dismiss as separate actions", () => {
+	it("exposes the yes and no icon actions by accessible name", () => {
+		renderCard();
+		const review = screen.getByRole("button", {
+			name: "Review account type",
+		});
+		const dismiss = screen.getByRole("button", {
+			name: "Dismiss suggestion",
+		});
+		expect(review.querySelector("svg")).toBeTruthy();
+		expect(review.textContent).toBe("");
+		expect(dismiss.querySelector("svg")).toBeTruthy();
+		expect(dismiss.textContent).toBe("");
+	});
+
+	it("reviews the account type on yes and dismisses on no", () => {
 		const { onReview, onDismiss } = renderCard();
 		fireEvent.click(
 			screen.getByRole("button", { name: "Review account type" }),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+		fireEvent.click(screen.getByRole("button", { name: "Dismiss suggestion" }));
 		expect(onReview).toHaveBeenCalledTimes(1);
 		expect(onDismiss).toHaveBeenCalledTimes(1);
 	});
@@ -84,13 +100,36 @@ describe("card-kind suggestion card", () => {
 			).disabled,
 		).toBe(true);
 		expect(
-			(screen.getByRole("button", { name: "Dismiss" }) as HTMLButtonElement)
-				.disabled,
+			(
+				screen.getByRole("button", {
+					name: "Dismiss suggestion",
+				}) as HTMLButtonElement
+			).disabled,
 		).toBe(true);
 		fireEvent.click(
 			screen.getByRole("button", { name: "Review account type" }),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+		fireEvent.click(screen.getByRole("button", { name: "Dismiss suggestion" }));
+		expect(onReview).not.toHaveBeenCalled();
+		expect(onDismiss).not.toHaveBeenCalled();
+	});
+
+	it("locks both actions while busy", () => {
+		const { onReview, onDismiss } = renderCard({ busy: true });
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Review account type",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Dismiss suggestion",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
 		expect(onReview).not.toHaveBeenCalled();
 		expect(onDismiss).not.toHaveBeenCalled();
 	});
