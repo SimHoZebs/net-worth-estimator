@@ -31,8 +31,7 @@ export async function accountRequest(auth: Auth, config: Settings, request: Requ
     model: "user",
     where: [{ field: "id", value: identity.sub }],
   });
-  if (!user)
-    return Response.json({ error: "The account is no longer active." }, { status: 401 });
+  if (!user) return Response.json({ error: "The account is no longer active." }, { status: 401 });
   const profile = () => ({
     subject: user.id,
     owner: "waypoint",
@@ -65,9 +64,7 @@ export async function accountRequest(auth: Auth, config: Settings, request: Requ
     }
     await auth.api.updateUser({
       headers,
-      body: {
-        ...(body.displayName === undefined ? {} : { name: body.displayName }),
-      },
+      body: body.displayName === undefined ? {} : { name: body.displayName },
     });
     const updated = await ctx.internalAdapter.findUserById(user.id);
     return Response.json({
