@@ -25,6 +25,12 @@ func (s *sqliteStore) ListAnalysisFindings(filter types.AnalysisFindingFilter) (
 			args = append(args, id)
 		}
 	}
+	if len(filter.AccountIDs) > 0 {
+		query += ` AND json_extract(f.detection_json, '$.accountId') IN (` + strings.TrimSuffix(strings.Repeat("?,", len(filter.AccountIDs)), ",") + `)`
+		for _, id := range filter.AccountIDs {
+			args = append(args, id)
+		}
+	}
 	query += ` AND f.user_id = :user_id ORDER BY f.id LIMIT ` + strconv.Itoa(limit)
 	rows, err := s.db.Query(query, args...)
 	if err != nil {

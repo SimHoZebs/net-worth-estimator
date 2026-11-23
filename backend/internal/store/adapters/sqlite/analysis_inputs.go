@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -62,19 +64,99 @@ func loadAnalysisSnapshot(tx *userTx, revision int64) (types.AnalysisSnapshot, e
 	if err != nil {
 		return result, err
 	}
-	defer rows.Close()
+	bridges := map[string]bool{}
+	extraTypes := map[string]string{}
 	for rows.Next() {
 		var item types.AnalysisTransaction
 		var raw string
 		if err := rows.Scan(&item.TransactionID, &item.AccountID, &item.SourceProvider, &item.Pending, &item.Void, &raw); err != nil {
+			rows.Close()
 			return result, err
 		}
 		if err := json.Unmarshal([]byte(raw), &item.Facts); err != nil {
+			rows.Close()
 			return result, fmt.Errorf("decode transaction evidence: %w", err)
+		}
+		if item.AccountID != "" {
+			bridges[item.AccountID] = true
+			if hint := strings.TrimSpace(item.Facts.Metadata["account_type"]); hint != "" {
+				extraTypes[item.AccountID] = hint
+			}
 		}
 		result.Transactions = append(result.Transactions, item)
 	}
-	return result, rows.Err()
+	rowErr := rows.Err()
+	rows.Close()
+	if rowErr != nil {
+		return result, rowErr
+	}
+	accounts, err := loadAnalysisAccounts(tx, bridges, extraTypes)
+	if err != nil {
+		return result, err
+	}
+	result.Accounts = accounts
+	return result, nil
+}
+
+// loadAnalysisAccounts collects account-level evidence for the bridge accounts
+// that own the snapshot's transactions. It reads the existing account link,
+// account, and checkpoint tables; it introduces no analysis-owned storage. The
+// bridge type hint rides on the already allowlisted transaction fact metadata.
+func loadAnalysisAccounts(tx *userTx, bridges map[string]bool, extraTypes map[string]string) ([]types.AnalysisAccount, error) {
+	result := []types.AnalysisAccount{}
+	if len(bridges) == 0 {
+		return result, nil
+	}
+	rows, err := tx.Query(`SELECT l.bridge_account_id, l.model_account_id, l.bridge_name, l.institution, COALESCE(a.kind, '')
+		FROM account_links l LEFT JOIN accounts a ON a.user_id = l.user_id AND a.id = l.model_account_id
+		WHERE l.user_id = :user_id ORDER BY l.bridge_account_id`)
+	if err != nil {
+		return result, err
+	}
+	for rows.Next() {
+		var account types.AnalysisAccount
+		if err := rows.Scan(&account.AccountID, &account.LinkedID, &account.Name, &account.Institution, &account.Kind); err != nil {
+			rows.Close()
+			return result, err
+		}
+		if !bridges[account.AccountID] {
+			continue
+		}
+		account.ExtraType = extraTypes[account.AccountID]
+		result = append(result, account)
+	}
+	rowErr := rows.Err()
+	rows.Close()
+	if rowErr != nil {
+		return result, rowErr
+	}
+	// A negative posted balance paired with a positive available balance is
+	// the bridge's credit-card shape: an amount owed with remaining credit.
+	debtRows, err := tx.Query(`SELECT DISTINCT l.bridge_account_id FROM checkpoints c
+		JOIN account_links l ON l.user_id = c.user_id AND l.model_account_id = c.model_account_id
+		JOIN checkpoint_available_balances b ON b.user_id = c.user_id AND b.model_account_id = c.model_account_id AND b.observed_at = c.observed_at
+		WHERE c.user_id = :user_id AND c.source = '` + store.SourceBankSync + `' AND c.balance < 0 AND b.available_balance > 0`)
+	if err != nil {
+		return result, err
+	}
+	debtLike := map[string]bool{}
+	for debtRows.Next() {
+		var bridgeID string
+		if err := debtRows.Scan(&bridgeID); err != nil {
+			debtRows.Close()
+			return result, err
+		}
+		debtLike[bridgeID] = true
+	}
+	debtErr := debtRows.Err()
+	debtRows.Close()
+	if debtErr != nil {
+		return result, debtErr
+	}
+	for i := range result {
+		result[i].DebtLike = debtLike[result[i].AccountID]
+	}
+	return result, nil
 }
 
 // ListAnalysisUsers discovers saved input revisions without a request or sync hook.

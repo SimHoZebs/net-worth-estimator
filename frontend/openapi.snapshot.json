@@ -694,6 +694,9 @@
 			"AnalysisDetection": {
 				"additionalProperties": false,
 				"properties": {
+					"accountId": {
+						"type": "string"
+					},
 					"evidence": {
 						"items": {
 							"$ref": "#/components/schemas/AnalysisEvidence"
@@ -885,6 +888,9 @@
 			"AnalysisFinding": {
 				"additionalProperties": false,
 				"properties": {
+					"accountId": {
+						"type": "string"
+					},
 					"analysisType": {
 						"type": "string"
 					},
@@ -7166,6 +7172,17 @@
 						"name": "transactionIds",
 						"schema": {
 							"description": "Comma-separated saved transaction UUIDs, at most 200",
+							"maxLength": 7500,
+							"type": "string"
+						}
+					},
+					{
+						"description": "Comma-separated linked account IDs for account-scoped findings such as card-kind, at most 200",
+						"explode": false,
+						"in": "query",
+						"name": "accountIds",
+						"schema": {
+							"description": "Comma-separated linked account IDs for account-scoped findings such as card-kind, at most 200",
 							"maxLength": 7500,
 							"type": "string"
 						}

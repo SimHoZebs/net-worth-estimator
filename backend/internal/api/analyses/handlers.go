@@ -79,6 +79,7 @@ func (s *handler) listAnalyses(_ context.Context, _ *struct{}) (*struct {
 
 type listAnalysisFindingsInput struct {
 	TransactionIDs string `query:"transactionIds" maxLength:"7500" doc:"Comma-separated saved transaction UUIDs, at most 200"`
+	AccountIDs     string `query:"accountIds" maxLength:"7500" doc:"Comma-separated linked account IDs for account-scoped findings such as card-kind, at most 200"`
 	Cursor         string `query:"cursor" maxLength:"100"`
 	Limit          int    `query:"limit" default:"50" minimum:"1" maximum:"100"`
 }
@@ -97,6 +98,12 @@ func (s *handler) listAnalysisFindings(_ context.Context, input *listAnalysisFin
 		filter.TransactionIDs = strings.Split(input.TransactionIDs, ",")
 		if len(filter.TransactionIDs) > 200 {
 			return nil, huma.Error422UnprocessableEntity("At most 200 transaction IDs are allowed")
+		}
+	}
+	if input.AccountIDs != "" {
+		filter.AccountIDs = strings.Split(input.AccountIDs, ",")
+		if len(filter.AccountIDs) > 200 {
+			return nil, huma.Error422UnprocessableEntity("At most 200 account IDs are allowed")
 		}
 	}
 	items, err := s.store.ListAnalysisFindings(filter)

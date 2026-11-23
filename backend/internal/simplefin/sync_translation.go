@@ -200,7 +200,7 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 			transaction := store.SyncTransaction{
 				ProviderAccountID: bridgeID,
 				TransactionID:     transaction.ID,
-				Facts:             transactionFacts(transaction, account.Currency),
+				Facts:             transactionFacts(transaction, account.Currency, accountTypeHint(account)),
 				Transaction: types.Transaction{
 					Name:   truncateLabel(transaction.Description),
 					Source: store.SourceBankSync,

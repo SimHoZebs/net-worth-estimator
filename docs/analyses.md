@@ -94,6 +94,38 @@ imported transactions, create debt accounts, change account values, or change
 projection identities. A future model-editing action requires explicit review
 and save.
 
+## Card-kind suggestion
+
+Card-kind is an account-scoped suggestion, not a financial-model mutation. After
+a sync changes bank evidence, the worker rechecks and may suggest that an account
+should be declared a credit card. The declared kind stays authoritative: nothing
+auto-changes it, and an account already declared `credit_card` gets no suggestion.
+
+- Signals are considered in this order: the bridge's own account type hint, a
+  known card issuer name, and debt-like balance behavior. The type hint is
+  allowlisted source metadata from the bridge account's free-form `type`, never
+  a label we infer. Issuer names come from a catalog of normalized merchant keys,
+  following the BNPL provider catalog pattern, matched against the bridge account
+  name and institution. Debt-like balance behavior is a bank-reported negative
+  posted balance paired with a positive available credit figure.
+- A name alone never decides. At least one non-name signal, the bridge type hint
+  or debt-like balance, is required before a finding is emitted. Both non-name
+  signals together make a **strong** suggestion; either one alone is **moderate**.
+  An issuer name only adds to the stated basis.
+- There is one finding per candidate account. Its evidence carries plain-language
+  reasons and the bank transaction IDs behind them, and it carries the linked
+  model account ID in `accountId`. It anchors to one of the account's bank
+  transactions so it reuses the existing `analysis_findings` row identity.
+- The detector reuses the shared lifecycle and tables: sync bumps the evidence
+  revision, the worker claims and publishes, and claim, supersede, stale,
+  withdraw, dismissal, feedback, and run retention behave like every other
+  analysis type. No scheduler, broker, kind mutation endpoint, or new persistence
+  is introduced.
+- `GET /v1/analysis-findings` exposes the suggestion through `accountId`. Its
+  optional `accountIds` filter looks up account-scoped findings without a second
+  endpoint. Confirm saves through the existing account kind write in the account
+  editor; dismiss goes through the existing finding dismiss and feedback writes.
+
 ## Recurring first release
 
 Recurring means repeated payments and deposits with an approximately regular

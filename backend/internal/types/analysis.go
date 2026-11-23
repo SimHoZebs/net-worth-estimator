@@ -23,10 +23,36 @@ type AnalysisTransaction struct {
 	Facts          TransactionFacts `json:"facts"`
 }
 
+// AnalysisAccount is the account-level evidence attached to one bridge
+// account that owns analyzed transactions. It carries only signals used to
+// decide whether an account-kind suggestion is worth surfacing. The declared
+// kind stays authoritative; analysis never writes it.
+type AnalysisAccount struct {
+	// AccountID is the bridge account ID that also appears on the account's
+	// analyzed transactions.
+	AccountID string `json:"accountId"`
+	// LinkedID is the model account ID from the account link. It is the ID the
+	// owner sees in the account editor and empty when the bridge account has
+	// no surviving link.
+	LinkedID string `json:"linkedId,omitempty"`
+	Name     string `json:"name"`
+	// Institution is the bridge organization name, a name signal only.
+	Institution string `json:"institution"`
+	// Kind is the declared account kind, read from the saved model.
+	Kind string `json:"kind"`
+	// ExtraType is the bridge's own account type hint. It is a source-supplied
+	// type, not a name, and never overrides the declared kind.
+	ExtraType string `json:"extraType"`
+	// DebtLike reports debt-like balance behavior observed from bank balance
+	// evidence. It is a non-name signal.
+	DebtLike bool `json:"debtLike"`
+}
+
 type AnalysisSnapshot struct {
 	Revision     int64
 	UserID       string
 	Transactions []AnalysisTransaction
+	Accounts     []AnalysisAccount
 }
 
 type AnalysisEvidence struct {
@@ -36,8 +62,12 @@ type AnalysisEvidence struct {
 }
 
 type AnalysisDetection struct {
-	StreamID      string                  `json:"streamId,omitempty"`
-	TransactionID string                  `json:"transactionId"`
+	StreamID      string `json:"streamId,omitempty"`
+	TransactionID string `json:"transactionId"`
+	// AccountID is optional. Transaction findings leave it empty. Account-kind
+	// suggestions carry the linked model account ID so the existing findings
+	// read can expose the linkage without a second endpoint.
+	AccountID     string                  `json:"accountId,omitempty"`
 	Kind          string                  `json:"kind"`
 	Provider      string                  `json:"provider"`
 	Product       string                  `json:"product"`
@@ -88,8 +118,12 @@ type AnalysisFinding struct {
 
 type AnalysisFindingFilter struct {
 	TransactionIDs []string
-	Cursor         string
-	Limit          int
+	// AccountIDs selects findings whose optional accountId matches. It exists
+	// for account-scoped findings such as card-kind and leaves transaction
+	// findings untouched.
+	AccountIDs []string
+	Cursor     string
+	Limit      int
 }
 
 // TransferLink is one user-confirmed transfer pair: two settled bank

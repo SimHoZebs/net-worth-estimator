@@ -35,6 +35,11 @@ import { AccountDetails } from "../../components/activity/AccountDetails.tsx";
 import { AccountStatements } from "../../components/activity/AccountStatements.tsx";
 import { LoanDetails } from "../../components/activity/LoanDetails.tsx";
 import {
+	CardKindSuggestion,
+	focusAccountKindPicker,
+} from "../../components/activity/CardKindSuggestion.tsx";
+import { useCardKindSuggestion } from "../../state/cardKindSuggestion.ts";
+import {
 	accountBalanceHeaderData,
 	componentIds,
 	isGroupedDisplay,
@@ -98,6 +103,7 @@ export function AccountDetailView({
 		adjustments.data ?? [],
 		nameEditable,
 	);
+	const kindSuggestion = useCardKindSuggestion(account.id, account.kind);
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
 		if (edit.saving) return;
@@ -116,6 +122,12 @@ export function AccountDetailView({
 			return;
 		}
 		onClose();
+	};
+	const reviewKindSuggestion = () => {
+		if (edit.saving) return;
+		// Review lands on the existing picker with the current kind intact.
+		// Saving the chosen kind stays with the account form below.
+		focusAccountKindPicker(edit.formId);
 	};
 	const breadcrumbSlot = useBreadcrumbSlot();
 	const breadcrumb = (
@@ -340,6 +352,15 @@ export function AccountDetailView({
 					)}
 				</TabsContent>
 				<TabsContent value="details" className="flex min-w-0 flex-col gap-4">
+					{kindSuggestion.finding && (
+						<CardKindSuggestion
+							finding={kindSuggestion.finding}
+							readOnly={locked}
+							busy={kindSuggestion.dismissing}
+							onReview={reviewKindSuggestion}
+							onDismiss={() => void kindSuggestion.dismiss()}
+						/>
+					)}
 					{isGroupedDisplay(account) ? (
 						<LoanDetails
 							account={account}

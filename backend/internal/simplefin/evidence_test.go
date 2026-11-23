@@ -10,6 +10,32 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+func TestBridgeAccountTypeHintIsAllowlistedMetadata(t *testing.T) {
+	var transaction Transaction
+	if err := json.Unmarshal([]byte(`{"id":"one","description":"CARD PURCHASE","amount":"-25","posted":1785628800,"extra":{"type":"credit_card","account_id":"private-id"}}`), &transaction); err != nil {
+		t.Fatal(err)
+	}
+	account := Account{ID: "bank", ConnID: testConnID, Currency: "USD", Balance: "-25", Transactions: []Transaction{transaction}, Extra: map[string]json.RawMessage{
+		"type":       json.RawMessage(`"credit_card"`),
+		"account_id": json.RawMessage(`"private-account-id"`),
+	}}
+	translation, err := Translate(&AccountSet{Accounts: []Account{account}}, map[string]string{testAccountKey("bank"): "checking"}, time.Unix(1785628800, 0))
+	if err != nil || len(translation.Settled) != 1 {
+		t.Fatalf("translation=%+v err=%v", translation, err)
+	}
+	metadata := translation.Settled[0].Facts.Metadata
+	if metadata[accountTypeMetadata] != "credit_card" {
+		t.Fatalf("metadata=%+v", metadata)
+	}
+	for _, secret := range []string{"private-account-id", "account_id"} {
+		for _, value := range metadata {
+			if value == secret {
+				t.Fatalf("unallowlisted bridge extra retained: %+v", metadata)
+			}
+		}
+	}
+}
+
 func TestEvidencePreservesFullSourceAndRefreshesKnownSettledKeys(t *testing.T) {
 	var transaction Transaction
 	if err := json.Unmarshal([]byte(`{"id":"one","description":"`+strings.Repeat("x", 100)+` KLARNA PAY IN 4","amount":"-25","posted":1785628800,"payee":"Klarna","memo":"Installment","extra":{"payment_product":"pay-in-four","secret":"do not retain","category":{"unrecognized":true}}}`), &transaction); err != nil {
