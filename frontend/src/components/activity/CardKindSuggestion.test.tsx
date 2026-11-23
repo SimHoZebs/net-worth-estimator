@@ -52,17 +52,13 @@ function renderCard(overrides: { readOnly?: boolean; busy?: boolean } = {}) {
 }
 
 describe("card-kind suggestion card", () => {
-	it("shows the basis and the account kind label without changing anything", () => {
+	it("shows the heading and the account kind basis without changing anything", () => {
 		const { onReview, onDismiss } = renderCard();
 		expect(
 			screen.getByText("Should this account be Credit card?"),
 		).toBeTruthy();
-		expect(screen.getByText("Credit card?")).toBeTruthy();
 		expect(
 			screen.getByText(/issuer name matches a card provider/i),
-		).toBeTruthy();
-		expect(
-			screen.getByText(/a suggestion never changes your account type/i),
 		).toBeTruthy();
 		expect(onReview).not.toHaveBeenCalled();
 		expect(onDismiss).not.toHaveBeenCalled();

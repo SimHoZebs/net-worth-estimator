@@ -1,13 +1,9 @@
-import { Info } from "lucide-react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { ACCOUNT_TYPE_LABELS } from "../../domain/accountKinds.ts";
 import {
 	CARD_KIND_SUGGESTION,
 	cardKindBasis,
-	cardKindChipLabel,
 } from "../../domain/cardKindSuggestion.ts";
-import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
 /**
@@ -47,23 +43,15 @@ export function CardKindSuggestion({
 			aria-label="Account type suggestion"
 			className="grid gap-3 rounded-lg border border-border p-4"
 		>
-			<div className="flex flex-wrap items-center gap-2">
-				<Badge variant="secondary">{cardKindChipLabel(finding)}</Badge>
-				<h3 className="m-0 text-base leading-snug font-semibold">
-					Should this account be {label}?
-				</h3>
-			</div>
+			<h3 className="m-0 text-base leading-snug font-semibold">
+				Should this account be {label}?
+			</h3>
 			{basis.length > 0 && (
-				<Alert>
-					<Info size={15} aria-hidden="true" />
-					<AlertDescription>
-						<ul className="m-0 grid gap-1 pl-0 list-none">
-							{basis.map((reason, index) => (
-								<li key={`${finding.id}-${index}`}>{reason}</li>
-							))}
-						</ul>
-					</AlertDescription>
-				</Alert>
+				<ul className="m-0 grid gap-1 pl-0 list-none text-sm leading-snug text-muted-foreground">
+					{basis.map((reason, index) => (
+						<li key={`${finding.id}-${index}`}>{reason}</li>
+					))}
+				</ul>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
 				<Button type="button" disabled={locked} onClick={onReview}>
@@ -78,10 +66,6 @@ export function CardKindSuggestion({
 					Dismiss
 				</Button>
 			</div>
-			<p className="m-0 text-xs leading-relaxed text-muted-foreground">
-				A suggestion never changes your account type. Your current type stays
-				until you choose one and save it.
-			</p>
 		</section>
 	);
 }
