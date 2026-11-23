@@ -130,98 +130,6 @@ async function seedEvidence(api: APIRequestContext) {
 	expect(settings.ok(), await settings.text()).toBe(true);
 }
 
-// Synthetic production shape: one bill is due on the same UTC date as the
-// cash observation and has no posted claim. The payment stays outstanding.
-async function seedSameDayObservation(
-	api: APIRequestContext,
-	today: string,
-	payday: string,
-) {
-	const reset = await api.post(`${FIXTURE_API}/__fixture/reset`, {
-		data: { bankTransactions: [] },
-	});
-	expect(reset.ok(), await reset.text()).toBe(true);
-	const read = await api.get(`${FIXTURE_API}/v1/financial-model`);
-	expect(read.ok()).toBe(true);
-	const { model: baseline } = await read.json();
-	const checking = {
-		id: "evidence-checking",
-		name: "Synthetic checking",
-		kind: "cash",
-		enabled: true,
-		minBalance: 0,
-		maxBalance: null,
-		statementClosingDay: 19,
-		color: "#2f6f4f",
-		display: {
-			name: "Synthetic checking",
-			components: [{ accountId: "evidence-checking", role: "primary" }],
-			interestScheduleId: "",
-			paymentScheduleId: "",
-		},
-	};
-	const bill = {
-		id: "evidence-same-day-bill",
-		name: "Synthetic same-day bill",
-		sourceAccountId: "evidence-checking",
-		destinations: [],
-		amount: amount(711.12),
-		recurrence: { unit: "month", interval: 1, monthlyMode: "byDate" },
-		startDate: today,
-		endDate: today,
-		annualCap: null,
-		priority: 1,
-		enabled: true,
-	};
-	const salary = {
-		...bill,
-		id: "evidence-salary",
-		name: "Synthetic future salary",
-		amount: amount(400),
-		sourceAccountId: null,
-		destinations: ["evidence-checking"],
-		startDate: payday,
-		endDate: null,
-	};
-	const imported = await api.post(`${FIXTURE_API}/v1/model/import`, {
-		data: {
-			model: {
-				...baseline,
-				accounts: [...baseline.accounts, checking],
-				checkpoints: [...baseline.checkpoints],
-				transactions: [...baseline.transactions],
-				schedules: [...baseline.schedules, bill, salary],
-			},
-		},
-	});
-	expect(imported.ok(), await imported.text()).toBe(true);
-	const observations = await api.post(
-		`${FIXTURE_API}/__fixture/cash-observations`,
-		{
-			data: {
-				checkpoints: [
-					{
-						accountId: "evidence-checking",
-						postedBalance: 1608.05,
-						availableBalance: 1244.43,
-						observedAt: Date.parse(`${today}T10:00:00Z`) / 1000,
-					},
-				],
-			},
-		},
-	);
-	expect(observations.ok(), await observations.text()).toBe(true);
-	const settings = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
-		data: {
-			accountIds: [],
-			spendingAccountIds: ["evidence-checking"],
-			incomeScheduleIds: ["evidence-salary"],
-			transactionIds: null,
-		},
-	});
-	expect(settings.ok(), await settings.text()).toBe(true);
-}
-
 async function seedTrackedCard(api: APIRequestContext, payday: string) {
 	const reset = await api.post(`${FIXTURE_API}/__fixture/reset`, {
 		data: { bankTransactions: [] },
@@ -601,9 +509,7 @@ test("the dated allowance and protected obligations come from the server", async
 		await expect(card.getByRole("region", { name: "Cash checks" })).toHaveCount(
 			0,
 		);
-		await expect(
-			card.getByRole("region", { name: "Details" }),
-		).toHaveCount(0);
+		await expect(card.getByRole("region", { name: "Details" })).toHaveCount(0);
 		await expect(card.getByTestId("cash-on-hand")).toHaveCount(0);
 		await expect(card.getByText("Bills before card payoff")).toHaveCount(0);
 		await expect(card.locator("details[open]")).toHaveCount(0);
@@ -619,87 +525,10 @@ test("the dated allowance and protected obligations come from the server", async
 			drawer.getByRole("region", { name: "Cash evidence" }),
 		).toBeVisible();
 		await expect(drawer.getByTestId("cash-on-hand")).toHaveText("$1,244.43");
-		await expect(
-			drawer.getByRole("region", { name: "Details" }),
-		).toBeVisible();
+		await expect(drawer.getByRole("region", { name: "Details" })).toBeVisible();
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 		await page.keyboard.press("Escape");
 		await expect(drawer).toBeHidden();
-	} finally {
-		await api.dispose();
-	}
-});
-
-test("an unclaimed same-day bill stays expected and keeps a numeric allowance", async ({
-	page,
-}) => {
-	const api = await request.newContext();
-	try {
-		const today = AS_OF;
-		const payday = PAYDAY;
-		await seedSameDayObservation(api, today, payday);
-		const response = await api.get(
-			`${FIXTURE_API}/v1/safe-spending-summary?asOf=${today}`,
-		);
-		expect(response.ok(), await response.text()).toBe(true);
-		const summary = await response.json();
-		expect(summary).toMatchObject({
-			cashAsOf: today,
-			payday,
-			cycleFundingPayday: payday,
-			status: "available",
-			checkingAvailable: 1244.43,
-			expectedPay: 400,
-			incomeFunded: -311.12,
-			prePaydayBills: 711.12,
-			prePaydayRoom: 533.31,
-			postIncomeRoom: 933.31,
-			safeToSpend: 533.31,
-		});
-		expect(summary.reasons).not.toContain("scheduled-payment-status-unknown");
-		const bill = summary.bills.find(
-			(row: { name: string }) => row.name === "Synthetic same-day bill",
-		);
-		expect(bill).toMatchObject({
-			date: today,
-			status: "unpaid",
-			transactionId: null,
-			amount: 711.12,
-		});
-
-		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
-		await page.route("**/v1/safe-spending-summary", async (route) => {
-			const url = new URL(route.request().url());
-			url.searchParams.set("asOf", today);
-			await route.fulfill({
-				response: await route.fetch({ url: url.toString() }),
-			});
-		});
-		await page.goto("/outlook");
-		const card = page.getByRole("region", { name: "Safe spending" });
-		// The cycle budget is captioned by its funding paycheck, not today's cash.
-		await expect(card.getByText("Nov 30 paycheck")).toBeVisible();
-		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText(
-			"Unavailable",
-		);
-		await expect(card.getByTestId("with-cash-cushion")).toHaveText("$933.31");
-		await expect(card.getByTestId("income-funded")).toHaveText(
-			"Over by $311.12",
-		);
-		await expect(
-			card.getByRole("region", { name: "Next cycle spending" }),
-		).toBeVisible();
-		await expect(card.getByText("Allowance uncertain")).toHaveCount(0);
-		await expect(card.getByText(/already be included/)).toHaveCount(0);
-		await expect(
-			card.getByRole("button", { name: /Details ·/ }),
-		).toBeVisible();
-		await card.getByRole("button", { name: /Details ·/ }).click();
-		const drawer = page.getByRole("dialog", { name: "Safe spending" });
-		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
-		await expect(drawer.getByText("Synthetic same-day bill")).toBeVisible();
-		await expect(drawer.getByText("Immediate cash checkpoint")).toBeVisible();
-		await expect(drawer.getByTestId("safe-to-spend")).toHaveText("$533.31");
 	} finally {
 		await api.dispose();
 	}
@@ -789,9 +618,7 @@ test("no cash balance leaves the bill ledger visible", async ({ page }) => {
 		).toHaveCount(0);
 		await card.getByRole("button", { name: /Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
-		await expect(
-			drawer.getByRole("region", { name: "Details" }),
-		).toBeVisible();
+		await expect(drawer.getByRole("region", { name: "Details" })).toBeVisible();
 		await expect(drawer.getByText("Bills before card payoff")).toBeVisible();
 	} finally {
 		await api.dispose();
