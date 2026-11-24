@@ -91,31 +91,76 @@ async function expectIconNavigation(sidebar: Locator, inboxName = "Inbox") {
 	}
 }
 
-async function expectCollapsedNavigationGeometry(sidebar: Locator) {
-	for (const name of ["Accounts", "Configs"]) {
-		const link = sidebar.getByRole("link", { name, exact: true });
-		await expect
-			.poll(() =>
-				link.evaluate((element) => {
-					const button = element.getBoundingClientRect();
-					const icon = element.querySelector("svg")?.getBoundingClientRect();
-					return {
-						width: button.width,
-						height: button.height,
-						padding: getComputedStyle(element).padding,
-						iconFits: Boolean(
-							icon &&
-							icon.width === 20 &&
-							icon.height === 20 &&
-							icon.left >= button.left &&
-							icon.top >= button.top &&
-							icon.right <= button.right &&
-							icon.bottom <= button.bottom,
-						),
-					};
-				}),
-			)
-			.toEqual({ width: 32, height: 32, padding: "0px", iconFits: true });
+type NavigationGeometry = {
+	width: number;
+	height: number;
+	top: number;
+	padding: string;
+	iconWidth: number;
+	iconHeight: number;
+	iconOffsetX: number;
+	iconOffsetY: number;
+};
+
+async function readNavigationGeometry(
+	sidebar: Locator,
+	inboxName = "Inbox",
+): Promise<NavigationGeometry[]> {
+	return Promise.all(
+		NAV_LABELS.map(async (name) => {
+			const link = sidebar.getByRole("link", {
+				name: name === "Inbox" ? inboxName : name,
+				exact: true,
+			});
+			return link.evaluate((element) => {
+				const button = element.getBoundingClientRect();
+				const icon = element.querySelector("svg")?.getBoundingClientRect();
+				return {
+					width: button.width,
+					height: button.height,
+					top: button.top,
+					padding: getComputedStyle(element).padding,
+					iconWidth: icon?.width ?? -1,
+					iconHeight: icon?.height ?? -1,
+					iconOffsetX: icon ? icon.left - button.left : -1,
+					iconOffsetY: icon ? icon.top - button.top : -1,
+				};
+			});
+		}),
+	);
+}
+
+function navigationRowGaps(geometry: NavigationGeometry[]) {
+	const mainNavigation = geometry.slice(0, -1);
+	return mainNavigation
+		.slice(1)
+		.map((row, index) => row.top - mainNavigation[index].top);
+}
+
+function expectNavigationGeometryPreserved(
+	expanded: NavigationGeometry[],
+	collapsed: NavigationGeometry[],
+) {
+	expect(expanded).toHaveLength(NAV_LABELS.length);
+	expect(collapsed).toHaveLength(NAV_LABELS.length);
+	expect(collapsed[0]?.top).toBe(expanded[0]?.top);
+	expect(navigationRowGaps(collapsed)).toEqual(navigationRowGaps(expanded));
+
+	for (const [index, row] of collapsed.entries()) {
+		const expandedRow = expanded[index];
+		expect(expandedRow).toBeDefined();
+		if (!expandedRow) continue;
+		expect(row.width).toBeGreaterThanOrEqual(47);
+		expect(row.width).toBeLessThanOrEqual(48);
+		expect(row.height).toBe(48);
+		expect(row.height).toBe(expandedRow.height);
+		expect(row.padding).toBe("8px");
+		expect(row.iconWidth).toBe(20);
+		expect(row.iconHeight).toBe(20);
+		expect(row.iconWidth).toBe(expandedRow.iconWidth);
+		expect(row.iconHeight).toBe(expandedRow.iconHeight);
+		expect(row.iconOffsetX + row.iconWidth / 2).toBeCloseTo(row.width / 2, 1);
+		expect(row.iconOffsetY).toBe(14);
 	}
 }
 
@@ -123,8 +168,12 @@ async function expectSidebarLabelVisibility(
 	sidebar: Locator,
 	visible: boolean,
 ) {
-	const wordmark = sidebar
-		.getByRole("link", { name: "Waypoint home", exact: true })
+	const brandLink = sidebar.getByRole("link", {
+		name: "Waypoint home",
+		exact: true,
+		includeHidden: true,
+	});
+	const wordmark = brandLink
 		.locator("span")
 		.filter({ hasText: /^waypoint\.$/ });
 	const themeButton = sidebar.getByRole("button", { name: /^Theme: / });
@@ -146,6 +195,9 @@ async function expectSidebarLabelVisibility(
 		themeLabel,
 		syncStatus,
 	];
+
+	if (visible) await expect(brandLink).toBeVisible();
+	else await expect(brandLink).toBeHidden();
 
 	for (const label of labels) {
 		if (visible) await expect(label).toBeVisible();
@@ -183,6 +235,10 @@ test("desktop navigation collapses to accessible icons and expands again", async
 	});
 	await expect(inboxLink).toHaveAccessibleName("Inbox, 1 unread");
 	await expect(inboxLink.getByText("Inbox", { exact: true })).toBeVisible();
+	const expandedNavigation = await readNavigationGeometry(
+		sidebar,
+		"Inbox, 1 unread",
+	);
 
 	await closeNavigation.click();
 	await expectDesktopGeometry(page, 48);
@@ -200,7 +256,11 @@ test("desktop navigation collapses to accessible icons and expands again", async
 	await expectIconNavigation(sidebar, "Inbox, 1 unread");
 	await expect(inboxLink).toHaveAccessibleName("Inbox, 1 unread");
 	await expect(inboxLink.getByText("Inbox", { exact: true })).toBeHidden();
-	await expectCollapsedNavigationGeometry(sidebar);
+	const collapsedNavigation = await readNavigationGeometry(
+		sidebar,
+		"Inbox, 1 unread",
+	);
+	expectNavigationGeometryPreserved(expandedNavigation, collapsedNavigation);
 
 	const accounts = sidebar.getByRole("link", {
 		name: "Accounts",

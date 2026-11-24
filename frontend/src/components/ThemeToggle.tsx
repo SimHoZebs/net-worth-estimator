@@ -17,7 +17,7 @@ export function ThemeToggle() {
 			type="button"
 			variant="ghost"
 			size="default"
-			className="w-full justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+			className="w-full justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:self-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
 			onClick={cycle}
 			title="Switch theme (system, light, dark)"
 			aria-label={`Theme: ${LABEL[preference]}`}

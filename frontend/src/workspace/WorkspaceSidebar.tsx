@@ -46,7 +46,7 @@ function WorkspaceNavLink({
 			tooltip={tooltip}
 			aria-label={accessibleName}
 			aria-current={active ? "page" : undefined}
-			className="h-12 text-base [&>svg]:size-5"
+			className="h-12 text-base group-data-[collapsible=icon]:justify-center [&>svg]:size-5"
 			onClick={(event) => {
 				// Plain clicks close the mobile sheet; modifier and middle
 				// clicks keep the native new-tab behavior.
@@ -87,8 +87,10 @@ export function WorkspaceSidebar({
 	return (
 		<Sidebar collapsible="icon" className="print:hidden">
 			<SidebarHeader>
-				<div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col">
-					<Brand />
+				<div className="flex items-center justify-between gap-2">
+					<div className="group-data-[collapsible=icon]:hidden">
+						<Brand />
+					</div>
 					<SidebarMenuButton
 						size="default"
 						tooltip={navigationToggleLabel}
@@ -116,7 +118,7 @@ export function WorkspaceSidebar({
 				</div>
 			</SidebarHeader>
 			<SidebarContent>
-				<SidebarGroup>
+				<SidebarGroup className="group-data-[collapsible=icon]:px-0">
 					<SidebarGroupContent>
 						<nav aria-label="Main navigation">
 							<SidebarMenu>
@@ -152,7 +154,7 @@ export function WorkspaceSidebar({
 					</SidebarGroupContent>
 				</SidebarGroup>
 			</SidebarContent>
-			<SidebarFooter>
+			<SidebarFooter className="group-data-[collapsible=icon]:px-0">
 				<SidebarMenu>
 					<SidebarMenuItem>
 						<WorkspaceNavLink
