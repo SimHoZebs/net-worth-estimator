@@ -5,7 +5,10 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { BreadcrumbSlotProvider } from "./breadcrumbSlot.tsx";
+import {
+	BreadcrumbSlotProvider,
+	useBreadcrumbSlotTarget,
+} from "./breadcrumbSlot.tsx";
 import { useHorizontalSwipe } from "./useHorizontalSwipe.ts";
 
 /** Opens the existing mobile navigation sheet from a rightward swipe. The
@@ -17,6 +20,12 @@ function SidebarSwipeOpener() {
 		onSwipeRight: () => setOpenMobile(true),
 	});
 	return null;
+}
+
+function DesktopBreadcrumbSlot() {
+	const slot = useBreadcrumbSlotTarget("atLeastMd");
+	if (!slot) return null;
+	return <div ref={slot} className="mb-2 empty:hidden print:hidden" />;
 }
 
 export function WorkspaceLayout({
@@ -45,6 +54,7 @@ export function WorkspaceLayout({
 						id="main-content"
 						className="mx-auto w-full max-w-7xl flex-1 px-5 py-6 sm:px-6 md:py-8 xl:px-8 print:p-0"
 					>
+						<DesktopBreadcrumbSlot />
 						{children}
 					</div>
 					<NotificationCenter />
