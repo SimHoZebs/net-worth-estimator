@@ -1,3 +1,4 @@
+import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Account } from "../../domain/model.ts";
@@ -64,6 +65,40 @@ function displayValue(html: string) {
 			)?.[1] ?? "",
 	};
 }
+
+function renderDetails(kind: "account" | "loan") {
+	const row = account({
+		availableBalance: 1244.43,
+		kind: kind === "loan" ? "debt" : "cash",
+	});
+	if (kind === "loan") {
+		render(<LoanDetails account={row} readOnly={false} onEdit={() => {}} />);
+		return;
+	}
+	render(<AccountDetails account={row} edit={editStub()} readOnly={false} />);
+}
+
+describe("details balance rows", () => {
+	it.each(["account", "loan"] as const)(
+		"renders every %s balance with uniform details-row styling",
+		(kind) => {
+			renderDetails(kind);
+			for (const text of ["$798", "$1,244"]) {
+				const value = screen.getByText(text);
+				expect(value.className).toContain(
+					"text-sm font-medium tabular-nums text-foreground",
+				);
+				expect(value.className).not.toContain("text-lg");
+				expect(value.className).not.toContain("font-normal");
+				expect(value.className).not.toContain("font-semibold");
+				expect(value.className).not.toContain("text-muted-foreground");
+			}
+			const synced = screen.getByText("Jan 31, 2026");
+			expect(synced.tagName).toBe("TIME");
+			expect(synced.getAttribute("datetime")).toBe("2026-01-31");
+		},
+	);
+});
 
 describe("display value selector gating", () => {
 	it("locks the details selector to the only figure and leaves the draft alone", () => {

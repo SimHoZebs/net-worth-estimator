@@ -264,13 +264,7 @@ export function AccountDetails({
 			key: entry.label,
 			node: (
 				<SettingRow label={entry.label}>
-					<span
-						className={
-							entry.emphasized
-								? "text-lg font-semibold tabular-nums text-foreground"
-								: "text-sm tabular-nums text-muted-foreground"
-						}
-					>
+					<span className="text-sm font-medium tabular-nums text-foreground">
 						{money(entry.value)}
 					</span>
 				</SettingRow>

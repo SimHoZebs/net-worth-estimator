@@ -82,13 +82,7 @@ export function LoanDetails({
 								</ItemTitle>
 							</ItemContent>
 							<ItemContent className="min-w-0 items-end">
-								<span
-									className={
-										entry.emphasized
-											? "text-lg font-semibold tabular-nums text-foreground"
-											: "text-sm tabular-nums text-muted-foreground"
-									}
-								>
+								<span className="text-sm font-medium tabular-nums text-foreground">
 									{money(entry.value)}
 								</span>
 							</ItemContent>
