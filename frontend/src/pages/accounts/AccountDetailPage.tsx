@@ -225,7 +225,7 @@ export function AccountDetailView({
 	return (
 		<section
 			aria-label="Account details"
-			className="grid min-w-0 gap-6 [&>*]:min-w-0"
+			className="grid min-w-0 gap-6 [&>*]:min-w-0 max-sm:pb-[calc(4rem_+_env(safe-area-inset-bottom))]"
 		>
 			{breadcrumbSlot ? createPortal(breadcrumb, breadcrumbSlot) : null}
 			<div className="flex flex-wrap items-start justify-between gap-4">
@@ -393,7 +393,13 @@ export function AccountDetailView({
 					Saving…
 				</p>
 			)}
-			<div className="sticky bottom-0 z-(--z-local) mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card py-3">
+			{/* Below `sm` the bar is a viewport-level surface, outside the
+			    scrolling account content. The section reserves matching bottom
+			    padding so the last row can scroll fully above it. */}
+			<div
+				data-account-action-bar
+				className="sticky bottom-0 z-(--z-local) mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card py-3 max-sm:fixed max-sm:inset-x-0 max-sm:mt-0 max-sm:px-5 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+			>
 				<Button type="button" variant="secondary" onClick={requestClose}>
 					Cancel
 				</Button>
