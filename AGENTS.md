@@ -44,6 +44,7 @@
 - When given a task, delegate the implementation work to one or more backgrounded subagents and function mainly as orchestrator and auditor.
 - Give every subagent an implementation brief with the intended behavior, relevant paths and reusable components, constraints and non-goals, acceptance criteria, verification steps, and edit/commit/push boundaries. Do not delegate by simply forwarding the user's request.
 - Split independent workstreams across parallel backgrounded subagents under a single orchestrator that owns the branch.
+- Implementation subagents must complete their assigned work directly and must not summon additional subagents. Only the orchestrator may split or delegate workstreams.
 - Retain final ownership of audit verification and shipment and remain the final entity that ships the change.
 
 ## Start and verify
