@@ -75,6 +75,49 @@ func TestStatementAllocationIsExclusiveAndAudited(t *testing.T) {
 	}
 }
 
+func TestStatementAllocationClear(t *testing.T) {
+	s := openSQLiteStore(t)
+	seedAccount(t, s, "checking")
+	transactionID, err := newRowID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateTransaction(types.Transaction{ID: transactionID, Name: "Payment", Enabled: true}); err != nil {
+		t.Fatalf("create payment: %v", err)
+	}
+	statementID := types.DerivedStatementID("card", "2026-01-31")
+	allocation, err := s.SaveStatementAllocation(types.StatementAllocation{
+		StatementID: statementID, TransactionID: transactionID,
+		Amount: 60.20, Evidence: "test", Actor: "owner",
+	})
+	if err != nil {
+		t.Fatalf("save allocation: %v", err)
+	}
+	if _, err := s.SetStatementAllocationState(allocation.ID, "dismissed", "owner"); err != nil {
+		t.Fatalf("dismiss allocation: %v", err)
+	}
+	if _, err := s.ReactivateStatementAllocation(allocation.ID, statementID, 60.20, "again", "owner"); err != nil {
+		t.Fatalf("reactivate allocation: %v", err)
+	}
+	events := allocationAuditActions(t, s, allocation.ID)
+	if len(events) != 3 || events[0] != "created" || events[1] != "dismissed" || events[2] != "confirmed" {
+		t.Fatalf("audit actions = %v, want [created dismissed confirmed]", events)
+	}
+
+	if err := s.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	for _, table := range []string{"statement_allocations", "statement_allocation_events", "transactions", "accounts"} {
+		var count int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM ` + table + ` WHERE user_id = :user_id`).Scan(&count); err != nil {
+			t.Fatalf("count %s rows: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("%s rows after clear = %d, want 0", table, count)
+		}
+	}
+}
+
 func TestStatementAllocationRejectsMalformedDerivedID(t *testing.T) {
 	s := openSQLiteStore(t)
 	bad := types.StatementAllocation{StatementID: "not-a-derived-id", TransactionID: "tx", Amount: 1}

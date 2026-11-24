@@ -28,6 +28,12 @@ func deleteModelRows(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE user_id = :user_id`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM statement_allocation_events WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM statement_allocations WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM transactions WHERE user_id = :user_id`); err != nil {
 		return err
 	}
