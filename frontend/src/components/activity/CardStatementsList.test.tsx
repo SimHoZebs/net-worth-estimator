@@ -22,9 +22,19 @@ function statement(
 describe("derived card statements list", () => {
 	it("shows the close, billed amount, remaining, status, and due date when known", () => {
 		render(<CardStatementsList statements={[statement()]} state="ready" />);
-		expect(screen.getByText("Oct 19, 2026 statement")).toBeTruthy();
+		expect(
+			screen.getByRole("region", { name: "Card statements" }),
+		).toBeTruthy();
+		expect(
+			screen.queryByRole("heading", { name: "Card statements" }),
+		).toBeNull();
+		expect(screen.getByRole("table")).toBeTruthy();
+		expect(screen.getByText("Card statement")).toBeTruthy();
+		expect(screen.getAllByText("Oct 19, 2026")).toHaveLength(2);
 		expect(screen.getByText("Due Nov 10, 2026 · $125.55 billed")).toBeTruthy();
-		expect(screen.getByText("$125.55 remaining · Open")).toBeTruthy();
+		expect(screen.getByText("$125.55 remaining")).toBeTruthy();
+		expect(screen.getByText("Open")).toBeTruthy();
+		expect(screen.queryByRole("button")).toBeNull();
 	});
 
 	it("states unknown amounts, due date, and status explicitly", () => {
@@ -45,7 +55,9 @@ describe("derived card statements list", () => {
 		expect(
 			screen.getByText("Due date unknown · Billed amount unknown"),
 		).toBeTruthy();
-		expect(screen.getByText("Remaining unknown · Status unknown")).toBeTruthy();
+		expect(screen.getByText("Remaining unknown")).toBeTruthy();
+		expect(screen.getByText("Status unknown")).toBeTruthy();
+		expect(screen.queryByRole("button")).toBeNull();
 	});
 
 	it("shows loading, empty, and error states", () => {

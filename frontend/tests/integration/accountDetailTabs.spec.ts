@@ -67,10 +67,12 @@ test("card detail renders Card statements in a Statements tab before Details", a
 		});
 		await expect(cardStatements).toBeVisible();
 		await expect(
-			cardStatements.getByText("Jan 31, 2026 statement"),
+			cardStatements.getByText("Card statement").first(),
 		).toBeVisible();
+		await expect(cardStatements.getByText("Jan 31, 2026")).toHaveCount(2);
+		await expect(cardStatements.getByText("$125.55 remaining")).toBeVisible();
 		await expect(
-			cardStatements.getByText("$125.55 remaining · Open"),
+			cardStatements.getByText("Open", { exact: true }),
 		).toBeVisible();
 
 		await details.click();

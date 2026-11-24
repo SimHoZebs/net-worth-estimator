@@ -135,13 +135,13 @@ test("a derived statement is only paid after applying the transaction, and undo 
 		await page.goto(`/accounts/${DERIVED_CARD_ID}`);
 		await page.getByRole("tab", { name: "Statements" }).click();
 		const statements = page.getByRole("region", { name: "Card statements" });
-		await expect(statements.getByText("Jan 31, 2026 statement")).toBeVisible();
+		await expect(statements.getByText("Card statement").first()).toBeVisible();
+		await expect(statements.getByText("Jan 31, 2026")).toHaveCount(2);
 		await expect(
 			statements.getByText("Due Feb 20, 2026 · $125.55 billed"),
 		).toBeVisible();
-		await expect(
-			statements.getByText("$125.55 remaining · Open"),
-		).toBeVisible();
+		await expect(statements.getByText("$125.55 remaining")).toBeVisible();
+		await expect(statements.getByText("Open", { exact: true })).toBeVisible();
 
 		await page.goto("/transactions");
 		await page
@@ -164,9 +164,8 @@ test("a derived statement is only paid after applying the transaction, and undo 
 		).toBeVisible();
 		await page.goto(`/accounts/${DERIVED_CARD_ID}`);
 		await page.getByRole("tab", { name: "Statements" }).click();
-		await expect(
-			statements.getByText("$125.55 remaining · Open"),
-		).toBeVisible();
+		await expect(statements.getByText("$125.55 remaining")).toBeVisible();
+		await expect(statements.getByText("Open", { exact: true })).toBeVisible();
 	} finally {
 		await api.dispose();
 	}
