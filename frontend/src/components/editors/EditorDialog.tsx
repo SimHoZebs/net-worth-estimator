@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { FieldError } from "@/components/ui/field.tsx";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogFooter,
 	DialogHeader,
@@ -128,20 +129,25 @@ export function EditorDialog({
 				if (!open) guard.requestClose(onClose);
 			}}
 		>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
-				<DialogHeader>
+			<DialogContent
+				fullScreenOnMobile
+				className="overflow-hidden sm:max-h-[calc(100dvh-2rem)] sm:max-w-3xl"
+			>
+				<DialogHeader className="max-sm:p-4 max-sm:pr-12">
 					<DialogTitle>{title}</DialogTitle>
 				</DialogHeader>
 				<form
-					className="flex min-h-0 flex-col gap-4"
+					className="flex min-h-0 flex-1 flex-col"
 					onSubmit={(event) => {
 						event.preventDefault();
 						onSubmit();
 					}}
 				>
-					{children}
-					{error ? <FieldError>{error}</FieldError> : null}
-					<DialogFooter>
+					<DialogBody className="flex flex-col gap-4 max-sm:px-4 max-sm:pb-4">
+						{children}
+						{error ? <FieldError>{error}</FieldError> : null}
+					</DialogBody>
+					<DialogFooter className="max-sm:mx-0 max-sm:mb-0 max-sm:rounded-none max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
 						<Button
 							type="button"
 							variant="outline"

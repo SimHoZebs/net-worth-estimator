@@ -7,17 +7,13 @@ import { refreshAccounts } from "../../state/workspaceResources.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldError, FieldTitle } from "@/components/ui/field.tsx";
-import { DialogFooter } from "@/components/ui/dialog.tsx";
-import { DiscardConfirm, useDiscardGuard } from "./EditorDialog.tsx";
 import { MoneyField } from "./editorFields.tsx";
 
 /** Row-first account editor. Saves straight to the server; no draft involved. */
 export function OrdinaryAccountEditor({
 	item,
 	onSaved,
-	onClose,
 	formId,
 	name,
 	kind,
@@ -25,10 +21,10 @@ export function OrdinaryAccountEditor({
 	dirtyOutside = false,
 	onDirtyChange,
 	onSavingChange,
+	onSaveDisabledChange,
 }: {
 	item: Account | null;
 	onSaved: () => void;
-	onClose: () => void;
 	formId: string;
 	name: string;
 	kind: Account["kind"];
@@ -36,6 +32,7 @@ export function OrdinaryAccountEditor({
 	dirtyOutside?: boolean;
 	onDirtyChange?: (dirty: boolean) => void;
 	onSavingChange: (saving: boolean) => void;
+	onSaveDisabledChange?: (disabled: boolean) => void;
 }) {
 	const [balance, setBalance] = useState(String(item?.balance ?? 0));
 	const [minBalance, setMinBalance] = useState(String(item?.minBalance ?? 0));
@@ -61,13 +58,15 @@ export function OrdinaryAccountEditor({
 				? ""
 				: String(item.maxBalance));
 	const dirty = ownDirty || dirtyOutside;
-	const guard = useDiscardGuard({ dirty, busy: saving });
-	useEffect(() => {
-		onDirtyChange?.(ownDirty);
-	}, [ownDirty, onDirtyChange]);
 
 	const readOnly = item?.readOnly ?? false;
 	const locked = readOnly || saving;
+	useEffect(() => {
+		onDirtyChange?.(ownDirty);
+	}, [ownDirty, onDirtyChange]);
+	useEffect(() => {
+		onSaveDisabledChange?.(locked || !dirty);
+	}, [locked, dirty, onSaveDisabledChange]);
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
@@ -194,24 +193,7 @@ export function OrdinaryAccountEditor({
 					</Field>
 				</fieldset>
 				{error ? <FieldError>{error}</FieldError> : null}
-				<DialogFooter>
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => guard.requestClose(onClose)}
-					>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={saving || readOnly || !dirty}>
-						{saving ? "Saving…" : item ? "Save account" : "Add account"}
-					</Button>
-				</DialogFooter>
 			</form>
-			<DiscardConfirm
-				open={guard.confirming}
-				onContinue={guard.dismissConfirm}
-				onDiscard={onClose}
-			/>
 		</>
 	);
 }

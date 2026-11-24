@@ -11,11 +11,8 @@ import {
 } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { DialogFooter } from "@/components/ui/dialog.tsx";
 import { FieldError, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { DiscardConfirm, useDiscardGuard } from "./EditorDialog.tsx";
 import { EditorField, EditorSelect, MoneyField } from "./editorFields.tsx";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
@@ -52,20 +49,25 @@ const frequencyOptions = frequencies.map((frequency) => ({
 
 type LoanEditorProps = {
 	item: Account | null;
-	onClose: () => void;
 	onSaved: () => void;
 	formId: string;
 	name: string;
 	enabled: boolean;
-	dirtyOutside?: boolean;
 	onDirtyChange?: (dirty: boolean) => void;
 	onSavingChange: (saving: boolean) => void;
+	onSaveDisabledChange?: (disabled: boolean) => void;
 };
 
 export function LoanEditor(props: LoanEditorProps) {
-	const { item } = props;
+	const { item, onSaveDisabledChange } = props;
 	const schedules = useSchedules();
 	const accounts = useSavedAccounts();
+	const waiting =
+		!accounts || (item && (schedules.isPending || schedules.isError));
+	// No form exists while terms load, so the shared footer cannot submit.
+	useEffect(() => {
+		if (waiting) onSaveDisabledChange?.(true);
+	}, [waiting, onSaveDisabledChange]);
 	if (!accounts || (item && schedules.isPending))
 		return <p role="status">Loading loan terms…</p>;
 	if (item && schedules.isError)
@@ -87,14 +89,13 @@ function LoanForm({
 	item,
 	accounts,
 	schedules,
-	onClose,
 	onSaved,
 	formId,
 	name,
 	enabled,
-	dirtyOutside = false,
 	onDirtyChange,
 	onSavingChange,
+	onSaveDisabledChange,
 }: LoanEditorProps & {
 	accounts: Account[];
 	schedules: NonNullable<ReturnType<typeof useSchedules>["data"]>["schedules"];
@@ -161,12 +162,13 @@ function LoanForm({
 	const interestStartId = useId();
 	const paymentStartId = useId();
 	const ownDirty = JSON.stringify(values) !== JSON.stringify(baseline);
-	const dirty = ownDirty || dirtyOutside;
-	const guard = useDiscardGuard({ dirty, busy: saving });
 	useEffect(() => {
 		onDirtyChange?.(ownDirty);
 	}, [ownDirty, onDirtyChange]);
 	const locked = saving || item?.readOnly;
+	useEffect(() => {
+		onSaveDisabledChange?.(Boolean(locked));
+	}, [locked, onSaveDisabledChange]);
 	const change = <K extends keyof typeof values>(
 		key: K,
 		value: (typeof values)[K],
@@ -367,23 +369,6 @@ function LoanForm({
 				</fieldset>
 			</fieldset>
 			{error ? <FieldError>{error}</FieldError> : null}
-			<DialogFooter>
-				<Button
-					type="button"
-					variant="outline"
-					onClick={() => guard.requestClose(onClose)}
-				>
-					Cancel
-				</Button>
-				<Button type="submit" disabled={saving || item?.readOnly}>
-					{saving ? "Saving…" : item ? "Save account" : "Add account"}
-				</Button>
-			</DialogFooter>
-			<DiscardConfirm
-				open={guard.confirming}
-				onContinue={guard.dismissConfirm}
-				onDiscard={onClose}
-			/>
 		</form>
 	);
 }

@@ -42,17 +42,24 @@ function DialogContent({
 	className,
 	children,
 	showCloseButton = true,
+	fullScreenOnMobile = false,
 	...props
 }: DialogPrimitive.Popup.Props & {
 	showCloseButton?: boolean;
+	/** Full-viewport surface below `sm`; the centered modal stays at `sm` up. */
+	fullScreenOnMobile?: boolean;
 }) {
 	return (
 		<DialogPortal>
 			<DialogOverlay />
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
+				data-full-screen-mobile={fullScreenOnMobile ? "" : undefined}
 				className={cn(
-					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+					"fixed z-50 bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+					fullScreenOnMobile
+						? "flex flex-col inset-0 h-dvh w-screen max-w-none gap-0 rounded-none p-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-auto sm:w-full sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:gap-4 sm:rounded-xl sm:p-4"
+						: "grid top-1/2 left-1/2 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl p-4 sm:max-w-sm",
 					className,
 				)}
 				{...props}
@@ -83,6 +90,20 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 		<div
 			data-slot="dialog-header"
 			className={cn("flex flex-col gap-2", className)}
+			{...props}
+		/>
+	);
+}
+
+/** The scrolling half of an editor dialog; its footer stays a sibling. */
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+	return (
+		<div
+			data-slot="dialog-body"
+			className={cn(
+				"min-h-0 flex-1 overflow-y-auto overscroll-contain",
+				className,
+			)}
 			{...props}
 		/>
 	);
@@ -146,6 +167,7 @@ function DialogDescription({
 
 export {
 	Dialog,
+	DialogBody,
 	DialogClose,
 	DialogContent,
 	DialogDescription,
