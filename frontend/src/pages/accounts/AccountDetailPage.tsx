@@ -222,6 +222,10 @@ export function AccountDetailView({
 			),
 		[accountRules, transactions, account, startDate],
 	);
+	// Card statements own a dedicated tab for eligible cards. Grouped loan
+	// displays and every other kind keep the original three-tab layout.
+	const showStatementsTab =
+		account.kind === "credit_card" && !isGroupedDisplay(account);
 	return (
 		<section
 			aria-label="Account details"
@@ -290,8 +294,13 @@ export function AccountDetailView({
 						Recurring
 						<Badge variant="secondary">{recurring.length}</Badge>
 					</TabsTrigger>
+					{showStatementsTab && (
+						<TabsTrigger value="statements" className="flex-none">
+							Statements
+						</TabsTrigger>
+					)}
 					<TabsTrigger value="details" className="flex-none">
-						Account details
+						Details
 					</TabsTrigger>
 				</TabsList>
 				<TabsContent
@@ -351,6 +360,17 @@ export function AccountDetailView({
 						/>
 					)}
 				</TabsContent>
+				{showStatementsTab && (
+					<TabsContent
+						value="statements"
+						className="flex min-w-0 flex-col gap-4"
+					>
+						<AccountStatements
+							key={`statements-${account.id}`}
+							accountId={account.id}
+						/>
+					</TabsContent>
+				)}
 				<TabsContent value="details" className="flex min-w-0 flex-col gap-4">
 					{kindSuggestion.finding && (
 						<CardKindSuggestion
@@ -373,12 +393,6 @@ export function AccountDetailView({
 							account={account}
 							edit={edit}
 							readOnly={readOnly}
-						/>
-					)}
-					{account.kind === "credit_card" && !isGroupedDisplay(account) && (
-						<AccountStatements
-							key={`statements-${account.id}`}
-							accountId={account.id}
 						/>
 					)}
 				</TabsContent>

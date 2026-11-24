@@ -98,7 +98,7 @@ test("a synced credit card saves its closing day through the real API", async ({
 	try {
 		await seedTrackedCard(api);
 		await page.goto(`/accounts/${CARD_ID}`);
-		await page.getByRole("tab", { name: "Account details" }).click();
+		await page.getByRole("tab", { name: "Details" }).click();
 		const closing = page.getByLabel(/Statement closing day of the month/i);
 		await expect(closing).toBeVisible();
 		expect(await closing.getAttribute("readonly")).toBeNull();
@@ -133,7 +133,7 @@ test("a derived statement is only paid after applying the transaction, and undo 
 		await seedDerivedCard(api);
 
 		await page.goto(`/accounts/${DERIVED_CARD_ID}`);
-		await page.getByRole("tab", { name: "Account details" }).click();
+		await page.getByRole("tab", { name: "Statements" }).click();
 		const statements = page.getByRole("region", { name: "Card statements" });
 		await expect(statements.getByText("Jan 31, 2026 statement")).toBeVisible();
 		await expect(
@@ -163,7 +163,7 @@ test("a derived statement is only paid after applying the transaction, and undo 
 			page.getByRole("button", { name: "Review 1 suggestion" }),
 		).toBeVisible();
 		await page.goto(`/accounts/${DERIVED_CARD_ID}`);
-		await page.getByRole("tab", { name: "Account details" }).click();
+		await page.getByRole("tab", { name: "Statements" }).click();
 		await expect(
 			statements.getByText("$125.55 remaining · Open"),
 		).toBeVisible();
