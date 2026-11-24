@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-// The demo command sets the clock to the pack's anchor date so the dated
-// allowance and its protected obligations read against the seeded evidence.
+// The demo command sets the clock to the pack's anchor date so the payment
+// window and its recorded activity read against the seeded evidence.
 const anchor = process.env.DEMO_ANCHOR ?? new Date().toISOString().slice(0, 10);
 
 test("seeded account demo", async ({ page }) => {
@@ -18,17 +18,14 @@ test("seeded account demo", async ({ page }) => {
 			page.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
 	}
-	await page.getByRole("button", { name: /Details ·/ }).click();
+	await page.getByRole("button", { name: /^Transactions/ }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(
-		drawer.getByRole("region", { name: "Cash checks" }),
+		drawer.getByRole("heading", { name: "Spending this cycle" }),
 	).toBeVisible();
 	await expect(
-		drawer.getByRole("region", { name: "Cash evidence" }),
-	).toBeVisible();
-	await expect(
-		drawer.getByRole("region", { name: "Details" }),
-	).toBeVisible();
+		drawer.getByRole("tab", { name: /Transactions/ }),
+	).toHaveAttribute("aria-selected", "true");
 	// Keep the headed browser open until the developer stops the command.
 	const exitAfter = Number(process.env.DEMO_EXIT_AFTER_MS ?? 0);
 	if (exitAfter > 0) await page.waitForTimeout(exitAfter);

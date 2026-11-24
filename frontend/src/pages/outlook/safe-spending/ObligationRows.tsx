@@ -1,9 +1,6 @@
 import { amountText } from "./amountText.ts";
 import { budgetDate } from "./budgetDisplay.tsx";
-import type {
-	ObligationRow,
-	ObligationSection,
-} from "./safeSpendingDetailModel.ts";
+import type { ObligationRow } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function ObligationRows({
@@ -45,37 +42,5 @@ export function ObligationRows({
 			})}
 		</ul>
 		// oxlint-enable jsx-a11y/no-redundant-roles
-	);
-}
-
-export function SafeSpendingObligationLedger({
-	sections,
-}: {
-	sections: ObligationSection[];
-}) {
-	return (
-		<section
-			className="grid content-start gap-4"
-			aria-label={labels.obligationLedger}
-		>
-			<h3 className="m-0 text-sm font-semibold">{labels.obligationLedger}</h3>
-			{sections.map((section) => (
-				<div key={section.title} className="grid content-start gap-2">
-					<div className="flex items-center justify-between gap-3">
-						<h4 className="m-0 text-sm text-muted-foreground">
-							{section.title}
-						</h4>
-						<strong className="text-sm tabular-nums">
-							{amountText(section.total, labels.unavailable)}
-						</strong>
-					</div>
-					{section.rows.length === 0 ? (
-						<p className="m-0 text-xs text-muted-foreground">None.</p>
-					) : (
-						<ObligationRows label={section.title} rows={section.rows} />
-					)}
-				</div>
-			))}
-		</section>
 	);
 }

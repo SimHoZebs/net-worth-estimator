@@ -74,7 +74,7 @@ export function useWorkspaceOverlays() {
 		if (target.kind === "transaction" && search.detail !== undefined) {
 			navigation.open(
 				safeSpendingDetailSearch(
-					search.tab ?? "ledger",
+					search.tab ?? "transactions",
 					target.item?.id ?? "new",
 				),
 			);
@@ -90,7 +90,7 @@ export function useWorkspaceOverlays() {
 	};
 	const closeEditor = () => {
 		if (search.detail !== undefined && search.editTransaction !== undefined) {
-			navigation.close(safeSpendingDetailSearch(search.tab ?? "ledger"));
+			navigation.close(safeSpendingDetailSearch(search.tab ?? "transactions"));
 			return;
 		}
 		if (returnTo) {

@@ -115,18 +115,18 @@ describe("validateWorkspaceSearch", () => {
 			detail: "safe-spending",
 		});
 		expect(
-			validateWorkspaceSearch({ detail: "safe-spending", tab: "ledger" }),
-		).toEqual({ ...empty, detail: "safe-spending", tab: "ledger" });
+			validateWorkspaceSearch({ detail: "safe-spending", tab: "transactions" }),
+		).toEqual({ ...empty, detail: "safe-spending", tab: "transactions" });
 		expect(
 			validateWorkspaceSearch({
 				detail: "safe-spending",
-				tab: "ledger",
+				tab: "transactions",
 				editTransaction: "invest",
 			}),
 		).toEqual({
 			...empty,
 			detail: "safe-spending",
-			tab: "ledger",
+			tab: "transactions",
 			editTransaction: "invest",
 		});
 		expect(
@@ -177,9 +177,10 @@ describe("validateWorkspaceSearch", () => {
 			{ evidence: "position", id: "checking" },
 			{ editor: "transaction" },
 			{ id: "checking" },
-			{ tab: "ledger" },
+			{ tab: "transactions" },
 			{ detail: "safe-spending", tab: "cycle" },
 			{ detail: "safe-spending", tab: "last-cycle" },
+			{ detail: "safe-spending", tab: "ledger" },
 			{ editTransaction: "invest" },
 			{ evidence: "position", editor: "transaction", id: "invest" },
 			{ evidence: "bogus" },
@@ -208,7 +209,7 @@ describe("validateWorkspaceSearch", () => {
 	test("parameters must belong to the selected overlay", () => {
 		for (const search of [
 			{ evidence: "position", id: "checking" },
-			{ evidence: "position", tab: "ledger" },
+			{ evidence: "position", tab: "transactions" },
 			{ editor: "account", id: "new", editTransaction: "invest" },
 			{ detail: "safe-spending", id: "checking" },
 			{ editor: "account", id: "" },

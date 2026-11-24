@@ -2,36 +2,32 @@ import { dateLabel } from "../../../domain/format.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 
 export const SAFE_SPENDING_DETAIL_TABS = [
-	{ id: "ledger", label: "Obligations", view: "ledger" },
+	{ id: "transactions", label: "Transactions", view: "transactions" },
 	{ id: "configure", label: "Configure", view: "configure" },
 ] as const;
 
 export type SafeSpendingDetailTab =
 	(typeof SAFE_SPENDING_DETAIL_TABS)[number]["id"];
-export type SafeSpendingLedgerTab = "ledger";
+export type SafeSpendingTransactionsTab = "transactions";
 
-export function isSafeSpendingLedgerTab(
+export function isSafeSpendingTransactionsTab(
 	tab: SafeSpendingDetailTab,
-): tab is SafeSpendingLedgerTab {
+): tab is SafeSpendingTransactionsTab {
 	return SAFE_SPENDING_DETAIL_TABS.some(
-		(item) => item.id === tab && item.view === "ledger",
+		(item) => item.id === tab && item.view === "transactions",
 	);
 }
 
-/** The next income date is independent from the configured card payoff date. */
-export function allowanceCaption({
-	payday,
-	cashAsOf,
+/** The server owns both ends of the recorded payment window. */
+export function paymentPeriodCaption({
+	start,
+	end,
 }: {
-	payday: string | null;
-	cashAsOf: string;
+	start: string;
+	end: string;
 }): string {
-	return payday
-		? `Next income · ${dateLabel(payday, true)}`
-		: `As of ${dateLabel(cashAsOf, true)}`;
+	return `${dateLabel(start, true)} – ${dateLabel(end, true)}`;
 }
-
-export type EvidenceStatus = "available" | "uncertain" | "missing";
 
 export interface ObligationRow {
 	id: string;
@@ -40,45 +36,6 @@ export interface ObligationRow {
 	amount: number | null;
 	/** Status wording for estimated statement rows. */
 	detail: string | null;
-}
-
-export interface ObligationSection {
-	title: string;
-	/** Server-owned total for this part of the protected ledger. */
-	total: number | null;
-	rows: ObligationRow[];
-}
-
-export interface DatedAllowance {
-	cashAsOf: string;
-	payday: string | null;
-	status: EvidenceStatus;
-	prePaydayRoom: number | null;
-	postIncomeRoom: number | null;
-	paymentRoom: number | null;
-	expectedPay: number | null;
-}
-
-export interface AllowanceEvidence {
-	status: EvidenceStatus;
-	checkingAvailable: number | null;
-	cashAsOf: string;
-	baselines: {
-		accountId: string;
-		accountName: string;
-		basis: string;
-		status: string;
-		amount: number | null;
-	}[];
-}
-
-export interface AllowanceLedger {
-	allowance: DatedAllowance;
-	sections: ObligationSection[];
-	evidence: AllowanceEvidence;
-	/** Server-owned obligation totals combined for the one-line preview summary. */
-	protectedTotal: number | null;
-	obligationCount: number;
 }
 
 export interface SafeSpendingConfigHints extends Pick<

@@ -130,7 +130,7 @@ export function resolveOverlay(
 		}
 	}
 	if (search.detail !== undefined) {
-		const tab = search.tab ?? "ledger";
+		const tab = search.tab ?? "transactions";
 		const editKey = search.editTransaction;
 		if (editKey === undefined)
 			return ready({ kind: "safeSpendingDetail", tab, edit: null });

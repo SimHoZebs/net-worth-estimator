@@ -184,15 +184,13 @@ test("an unknown cycle funding payday stays undated without hiding payment or in
 	await expect(
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
-	await card.getByRole("button", { name: /Details ·/ }).click();
+	await card.getByRole("button", { name: /^Transactions/ }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
-	await expect(drawer.getByText("Next income · Nov 28, 2026")).toBeVisible();
+	await expect(drawer.getByText("Oct 31, 2026 – Nov 30, 2026")).toBeVisible();
 	await expect(
-		drawer.getByRole("region", { name: "Cash checks" }),
+		drawer.getByRole("heading", { name: "Spending this cycle" }),
 	).toBeVisible();
-	await expect(
-		drawer.getByText(/Payment capacity|Payments covered/),
-	).toBeVisible();
+	await expect(drawer.getByText("No spending this cycle yet.")).toBeVisible();
 });
 
 test("missing and negative amounts leave independently known evidence visible", async ({
@@ -223,12 +221,12 @@ test("missing and negative amounts leave independently known evidence visible", 
 	);
 	await expect(card.getByTestId("paid-by-payday")).toHaveText("$175.00");
 	await expect(card.getByTestId("unpaid-by-payday")).toHaveText("Unavailable");
-	await expect(card.getByRole("img", { name: /^Payment progress: / })).toHaveCount(
-		0,
-	);
-	await expect(card.getByRole("img", { name: /^Next cycle funding: / })).toHaveCount(
-		0,
-	);
+	await expect(
+		card.getByRole("img", { name: /^Payment progress: / }),
+	).toHaveCount(0);
+	await expect(
+		card.getByRole("img", { name: /^Next cycle funding: / }),
+	).toHaveCount(0);
 	await expect(card.getByTestId("discretionary-next-cycle")).toHaveText(
 		"Over by $80.00",
 	);

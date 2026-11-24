@@ -2,13 +2,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { amountText } from "./amountText.ts";
 import { BudgetAmount, BudgetMetric } from "./budgetDisplay.tsx";
-import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 describe("safe spending amount text", () => {
 	it("uses Unavailable for a missing amount and never a dash", () => {
 		expect(amountText(null)).toBe("Unavailable");
 		expect(amountText(undefined)).toBe("Unavailable");
-		expect(amountText(null, labels.cashUnverified)).toBe("Cash unverified");
+		expect(amountText(null, "Cash unverified")).toBe("Cash unverified");
 		expect(amountText(null)).not.toContain("—");
 	});
 
@@ -24,9 +23,9 @@ describe("safe spending budget amount", () => {
 
 	it("shows the row status when the amount is unknown", () => {
 		expect(render({ value: null })).toContain("Unavailable");
-		expect(
-			render({ value: null, missingText: labels.paycheckUnknown }),
-		).toContain("Paycheck unknown");
+		expect(render({ value: null, missingText: "Paycheck unknown" })).toContain(
+			"Paycheck unknown",
+		);
 		expect(render({ value: null })).not.toContain("—");
 	});
 

@@ -24,7 +24,7 @@ async function seedCardCharge(): Promise<void> {
 				{
 					id: "01900000-0000-7000-8000-000000000099",
 					name: "Sheet parity charge",
-					sourceAccountId: "loan",
+					sourceAccountId: "checking",
 					destinations: [],
 					amount: {
 						resolver: "expression",
@@ -198,39 +198,47 @@ test("safe spending and transaction sheets share the canonical shell", async ({
 	);
 	await page.keyboard.press("Escape");
 	await expect(configure).not.toBeVisible();
-	// The one-line protected summary opens the ledger drawer from the same
-	// card: same bounding width, same slot policy, same close placement.
-	await card.getByRole("button", { name: /Details ·/ }).click();
-	const ledger = page.locator('[data-slot="sheet-content"]').first();
-	await expect(ledger).toBeVisible();
+	// The card's transaction action opens the same canonical shell, with the
+	// shared transaction detail stacked above it.
+	await card.getByRole("button", { name: /^Transactions/ }).click();
+	const drawer = page.locator('[data-slot="sheet-content"]').first();
+	await expect(drawer).toBeVisible();
 	await expect(
-		ledger.getByRole("region", { name: "Details" }),
+		drawer.getByRole("heading", { name: "Spending this cycle" }),
 	).toBeVisible();
-	await expect(
-		ledger.getByRole("region", { name: "Cash checks" }),
-	).toBeVisible();
-	await expect(
-		ledger.getByRole("region", { name: "Cash evidence" }),
-	).toBeVisible();
-	const ledgerBox = await ledger.boundingBox();
-	expect(ledgerBox).not.toBeNull();
-	expect(ledgerBox!.width).toBe(configureBox!.width);
-	const ledgerHeader = ledger.locator(':scope > [data-slot="sheet-header"]');
-	const ledgerBody = ledger.locator(':scope > [data-slot="sheet-body"]');
-	await expect(ledgerHeader).toHaveCount(1);
-	await expect(ledgerBody).toHaveCount(1);
-	const ledgerTitle = ledger.locator(':scope [data-slot="sheet-title"]');
-	const ledgerClose = ledger.getByRole("button", {
+	const drawerBox = await drawer.boundingBox();
+	expect(drawerBox).not.toBeNull();
+	expect(drawerBox!.width).toBe(configureBox!.width);
+	const drawerHeader = drawer.locator(':scope > [data-slot="sheet-header"]');
+	const drawerBody = drawer.locator(':scope > [data-slot="sheet-body"]');
+	await expect(drawerHeader).toHaveCount(1);
+	await expect(drawerBody).toHaveCount(1);
+	const drawerTitle = drawer.locator(':scope [data-slot="sheet-title"]');
+	const drawerClose = drawer.getByRole("button", {
 		name: "Close",
 		exact: true,
 	});
-	const ledgerTitleBox = await ledgerTitle.boundingBox();
-	const ledgerCloseBox = await ledgerClose.boundingBox();
-	expect(ledgerTitleBox!.x + ledgerTitleBox!.width).toBeLessThanOrEqual(
-		ledgerCloseBox!.x + 1,
+	const drawerTitleBox = await drawerTitle.boundingBox();
+	const drawerCloseBox = await drawerClose.boundingBox();
+	expect(drawerTitleBox!.x + drawerTitleBox!.width).toBeLessThanOrEqual(
+		drawerCloseBox!.x + 1,
 	);
+	const charge = drawer.getByRole("button", {
+		name: /^View Sheet parity charge /,
+	});
+	await charge.click();
+	const sheets = page.locator('[data-slot="sheet-content"]');
+	await expect(sheets).toHaveCount(2);
+	const nestedDetail = sheets.nth(1);
+	await expect(nestedDetail).toBeVisible();
+	const nestedDetailBox = await nestedDetail.boundingBox();
+	expect(nestedDetailBox!.width).toBe(drawerBox!.width);
 	await page.keyboard.press("Escape");
-	await expect(ledger).not.toBeVisible();
+	await expect(nestedDetail).not.toBeVisible();
+	await expect(drawer).toBeVisible();
+	await expect(charge).toBeFocused();
+	await page.keyboard.press("Escape");
+	await expect(drawer).not.toBeVisible();
 	// A transaction detail opened from its own page uses the same shell.
 	const { sheet: detail } = await openTransactionDetail(page);
 	const detailBox = await detail.boundingBox();

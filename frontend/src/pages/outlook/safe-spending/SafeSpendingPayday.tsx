@@ -1,13 +1,24 @@
+import type { SafeSpendingBill } from "@/api/generated/model/safeSpendingBill.ts";
 import type { SafeSpendingSummary } from "@/api/generated/model/safeSpendingSummary.ts";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
 import { exactMoney } from "@/domain/format.ts";
-import { billRow } from "./allowanceLedger.ts";
 import {
 	budgetDate,
 	BudgetMetric,
 	firstBudgetShare,
 } from "./budgetDisplay.tsx";
-import { ObligationRows } from "./SafeSpendingObligationLedger.tsx";
+import { ObligationRows } from "./ObligationRows.tsx";
+import type { ObligationRow } from "./safeSpendingDetailModel.ts";
+
+function billRow(bill: SafeSpendingBill): ObligationRow {
+	return {
+		id: bill.id,
+		name: bill.name,
+		date: bill.actualDate || bill.date,
+		amount: bill.amount,
+		detail: null,
+	};
+}
 
 export function SafeSpendingPayday({
 	summary,

@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
-import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
 	Card,
@@ -10,25 +10,31 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card.tsx";
-import { useSavedAccounts, useSavedSchedules } from "@/state/savedState.ts";
+import {
+	useSavedAccounts,
+	useSavedSchedules,
+	useSavedTransactions,
+} from "@/state/savedState.ts";
 import { scheduleToDisplay } from "@/domain/transactionRows.ts";
+import {
+	DEFAULT_TRANSACTION_ORDER,
+	type TransactionOrder,
+} from "@/domain/transactionSort.ts";
+import { useTransferLinks } from "@/state/analyses.ts";
+import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
 import {
-	allowanceCaption,
-	isSafeSpendingLedgerTab,
+	isSafeSpendingTransactionsTab,
+	paymentPeriodCaption,
 	type SafeSpendingDetailTab,
 } from "./safeSpendingDetailModel.ts";
 import { useSafeSpendingSettings } from "@/state/useSafeSpendingSettings.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
-import { SafeSpendingCashEvidence } from "./SafeSpendingCashEvidence.tsx";
-import { SafeSpendingObligationLedger } from "./SafeSpendingObligationLedger.tsx";
 import { SafeSpendingBudget } from "./SafeSpendingBudget.tsx";
-import { buildAllowanceLedger } from "./allowanceLedger.ts";
-import { capacityText, paymentCapacity } from "./paymentCapacity.ts";
-import { amountText } from "./amountText.ts";
-import { BudgetAmount } from "./budgetDisplay.tsx";
+import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
+import { buildSafeSpendingActivity } from "./safeSpendingActivity.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
 
 function SafeSpendingCardHeader({ action }: { action?: React.ReactNode }) {
@@ -59,14 +65,24 @@ export function SafeSpendingPreview({
 	onTabChange: (tab: SafeSpendingDetailTab) => void;
 }) {
 	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
 	const savedRules = useSavedSchedules();
 	const settingsState = useSafeSpendingSettings();
 	const { updateSettings, ...settings } = settingsState;
 	const summary = useSafeSpendingSummary();
+	const readOnly = useUserReadOnly();
+	const transferLinks = useTransferLinks();
+	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
+		DEFAULT_TRANSACTION_ORDER,
+	);
 
 	const rules = useMemo(
 		() => (savedRules ?? []).map(scheduleToDisplay),
 		[savedRules],
+	);
+	const savedRows = useMemo(
+		() => [...(transactions ?? []), ...rules],
+		[transactions, rules],
 	);
 	const selections = useSafeSpendingSelections({
 		accounts: accounts ?? [],
@@ -76,18 +92,38 @@ export function SafeSpendingPreview({
 		displayToday: summary.data?.cashAsOf ?? "",
 		updateSettings,
 	});
-	const ledger = useMemo(
-		() => (summary.data ? buildAllowanceLedger(summary.data) : undefined),
-		[summary.data],
+	const activity = useMemo(
+		() =>
+			summary.data &&
+			accounts !== null &&
+			transactions !== null &&
+			transferLinks.data !== undefined &&
+			!transferLinks.isError
+				? buildSafeSpendingActivity({
+						accounts,
+						transactions,
+						trackedIds: selections.trackedIds,
+						spendingIds: selections.spendingIds,
+						summary: summary.data,
+						transferLinks: transferLinks.data.links ?? [],
+						order: transactionOrder,
+					})
+				: undefined,
+		[
+			summary.data,
+			accounts,
+			transactions,
+			selections.trackedIds,
+			selections.spendingIds,
+			transferLinks.data,
+			transferLinks.isError,
+			transactionOrder,
+		],
 	);
-	const capacity = useMemo(
-		() => (summary.data ? paymentCapacity(summary.data) : null),
-		[summary.data],
-	);
-	const caption = ledger
-		? allowanceCaption({
-				payday: ledger.allowance.payday,
-				cashAsOf: ledger.allowance.cashAsOf,
+	const caption = summary.data
+		? paymentPeriodCaption({
+				start: summary.data.paymentPeriodStart,
+				end: summary.data.payoffDate,
 			})
 		: undefined;
 
@@ -120,7 +156,7 @@ export function SafeSpendingPreview({
 					}
 				/>
 				<CardContent className="grid content-start gap-4">
-					{summary.isError && !ledger ? (
+					{summary.isError && !activity ? (
 						<Alert variant="destructive" aria-label="Safe spending evidence">
 							<AlertDescription>
 								Safe spending evidence could not be loaded.
@@ -129,10 +165,7 @@ export function SafeSpendingPreview({
 								Retry evidence
 							</Button>
 						</Alert>
-					) : !ledger ||
-					  !summary.data ||
-					  summary.isPending ||
-					  settingsState.pending ? (
+					) : !summary.data || summary.isPending || settingsState.pending ? (
 						<div aria-busy="true">
 							<Skeleton className="h-32 w-full" />
 						</div>
@@ -145,12 +178,10 @@ export function SafeSpendingPreview({
 							<Button
 								variant="link"
 								className="justify-start gap-1 p-0 text-sm"
-								onClick={() => onDetail("ledger")}
+								disabled={!activity}
+								onClick={() => onDetail("transactions")}
 							>
-								{labels.protectedSummary} ·{" "}
-								{amountText(ledger.protectedTotal, labels.unavailable)} ·{" "}
-								{ledger.obligationCount}{" "}
-								{ledger.obligationCount === 1 ? "item" : "items"}
+								Transactions{activity ? ` · ${activity.count}` : ""}
 								<ChevronRight size={14} aria-hidden="true" />
 							</Button>
 						</>
@@ -161,95 +192,48 @@ export function SafeSpendingPreview({
 				<SafeSpendingDetailShell
 					tab={detail}
 					onTabChange={onTabChange}
-					counts={{ ledger: ledger?.obligationCount }}
+					counts={{ transactions: activity?.count }}
 					caption={caption}
 					onClose={() => onDetail(null)}
 				>
-					{isSafeSpendingLedgerTab(detail) && ledger && summary.data && (
-						<div className="grid content-start gap-5">
-							<section
-								className="grid content-start gap-2"
-								aria-label="Cash checks"
+					{isSafeSpendingTransactionsTab(detail) &&
+						(transferLinks.isError ? (
+							<Alert
+								variant="destructive"
+								aria-label="Safe spending transactions"
 							>
-								<h3 className="m-0 text-sm font-semibold">
-									{labels.cashChecks}
-								</h3>
-								<dl className="m-0 grid gap-2 text-sm">
-									<div className="flex justify-between gap-3">
-										<dt className="text-muted-foreground">
-											{labels.beforePayday}
-										</dt>
-										<dd className="m-0 tabular-nums">
-											<BudgetAmount
-												value={ledger.allowance.prePaydayRoom}
-												missingText={labels.cashUnverified}
-												describeShortfall={(amount) => `Short by ${amount}`}
-											/>
-										</dd>
-									</div>
-									<div className="flex justify-between gap-3">
-										<dt className="text-muted-foreground">
-											{labels.afterPaydayPay}
-										</dt>
-										<dd className="m-0 tabular-nums">
-											<BudgetAmount
-												value={ledger.allowance.postIncomeRoom}
-												missingText={labels.cashUnverified}
-												describeShortfall={(amount) => `Short by ${amount}`}
-											/>
-										</dd>
-									</div>
-									<div className="flex justify-between gap-3">
-										<dt className="text-muted-foreground">
-											{capacity ? "Payment capacity" : labels.paymentCovered}
-										</dt>
-										<dd className="m-0 tabular-nums">
-											{capacity ? (
-												capacityText(capacity)
-											) : (
-												<BudgetAmount
-													value={ledger.allowance.paymentRoom}
-													missingText={labels.unavailable}
-													describeShortfall={(amount) => `Short by ${amount}`}
-												/>
-											)}
-										</dd>
-									</div>
-									<div className="flex justify-between gap-3">
-										<dt className="text-muted-foreground">
-											{labels.immediateCashCheck}
-										</dt>
-										<dd className="m-0 tabular-nums">
-											<BudgetAmount
-												value={summary.data?.safeToSpend}
-												testId="safe-to-spend"
-												missingText={labels.cashUnverified}
-												describeShortfall={(amount) => `Short by ${amount}`}
-											/>
-										</dd>
-									</div>
-									<div className="flex justify-between gap-3">
-										<dt className="text-muted-foreground">
-											{labels.expectedPay}
-										</dt>
-										<dd className="m-0 tabular-nums">
-											<BudgetAmount
-												value={ledger.allowance.expectedPay}
-												missingText={labels.paycheckUnknown}
-											/>
-										</dd>
-									</div>
-								</dl>
-							</section>
-							<SafeSpendingCashEvidence
-								evidence={ledger.evidence}
-								pending={summary.isPending}
-								error={summary.isError}
-								onRetry={() => void summary.refetch()}
+								<AlertTitle>Transactions unavailable</AlertTitle>
+								<AlertDescription>
+									Transactions could not be loaded. The Safe Spending budget is
+									still available.
+								</AlertDescription>
+								<Button
+									variant="link"
+									disabled={transferLinks.isFetching}
+									onClick={() => void transferLinks.refetch()}
+								>
+									Retry transactions
+								</Button>
+							</Alert>
+						) : !activity || !summary.data ? (
+							<div className="grid content-start gap-3" aria-busy="true">
+								<Skeleton className="h-32 w-full" />
+								<p role="status" className="m-0 text-sm text-muted-foreground">
+									Loading transactions…
+								</p>
+							</div>
+						) : (
+							<SafeSpendingCyclePanel
+								key={detail}
+								activity={activity}
+								summary={summary.data}
+								accounts={accounts ?? []}
+								transactions={savedRows}
+								readOnly={readOnly}
+								transactionOrder={transactionOrder}
+								onTransactionOrderChange={setTransactionOrder}
 							/>
-							<SafeSpendingObligationLedger sections={ledger.sections} />
-						</div>
-					)}
+						))}
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel
 							config={{

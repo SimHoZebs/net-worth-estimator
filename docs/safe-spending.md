@@ -16,7 +16,7 @@ Outlook card displays them without treating a checking balance as an allowance.
 A statement is assigned to the next applicable payoff after closing.
 
 Monthly days that do not exist in a given month fall on its last day. Dates in
-the ledger use UTC.
+the payment window use UTC.
 
 Existing saved settings need the [offline migration](../deploy/MIGRATIONS.md)
 before the updated API reads them. The migration fills missing settings and
@@ -49,14 +49,43 @@ window is flagged as a possible overlap. It does not change the forecast or
 payment status without reconciliation.
 
 The payment bar and bill details cover non-card cash bills through the displayed
-payoff date. Card payoffs and repayments owned by a single tracked card belong to
-the "Credit card payoffs" section in the detail drawer through statementReserve,
-not the bar.
+payoff date. Card payoffs and repayments owned by a single tracked card are
+summarized separately by the server's `statementReserve`, not shown as cash bills
+in the bar.
 A missing statement estimate does not make the bar unknown. A split card transfer
 that cannot be allocated to one tracked card stays in the bar and bill details so
 its deduction is not lost. Card repayments remain forecast inputs even though
 they are not displayed as bills. A posted repayment reduces that statement's
 unpaid amount; the bank movement is not a second expense.
+
+## Transactions drawer
+
+The Safe Spending **Transactions** drawer is recorded activity for the server's
+payment window, from `paymentPeriodStart` through `payoffDate`, capped at the full
+`cashAsOf` UTC day. The summary exposes that date, not an exact evidence instant,
+so later same-day rows are included and next-day instants are excluded. Its
+caption shows the full server-owned window. The card action and the tab show the
+number of visible transaction rows once activity is ready.
+
+**Spending this cycle** combines non-transfer spending from selected tracked cards
+and selected cash accounts. Refunds remain spending credits, income is omitted,
+and pending rows are included. Void holds, deliberately disabled or excluded
+rows, scheduled obligations, and rows outside the window are omitted. **Spent**
+and the per-card figures aggregate these same rows. A calculated amount keeps
+the affected total unknown instead of turning it into zero. These figures explain
+recorded activity only; they do not recreate the Safe Spending allowance or its
+threshold crossings.
+
+**Cash payments this cycle** lists outgoing recorded transfers from selected cash
+accounts. Explicit account routing or a confirmed transfer link identifies a
+transfer; names alone do not. Overlapping account selections and both legs of a
+confirmed transfer are shown once, with the recorded transfer total and window
+in the section subtitle. Scheduled bills and card payoff estimates stay in the
+main Bills and payments explanation rather than appearing as pseudo-transactions.
+
+Rows use the shared transaction indicators and open the shared transaction detail
+sheet. Closing that detail returns to Transactions, and Escape closes one sheet
+at a time.
 
 ## Reviewing card payments
 
