@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { PanelLeftClose, Settings } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
@@ -16,7 +16,6 @@ import {
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarRail,
 	useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { useServerStatus } from "../state/workspaceResources.ts";
@@ -27,10 +26,16 @@ import { pagePaths, pages, type Page } from "./navigation.ts";
 function WorkspaceNavLink({
 	to,
 	active,
+	label,
+	accessibleName = label,
+	tooltip = label,
 	children,
 }: {
 	to: (typeof pagePaths)[Page];
 	active: boolean;
+	label: string;
+	accessibleName?: string;
+	tooltip?: string;
 	children: ReactNode;
 }) {
 	const { setOpenMobile } = useSidebar();
@@ -38,7 +43,10 @@ function WorkspaceNavLink({
 		<SidebarMenuButton
 			isActive={active}
 			size="lg"
-			className="min-h-12 h-auto text-base [&>svg]:size-5"
+			tooltip={tooltip}
+			aria-label={accessibleName}
+			aria-current={active ? "page" : undefined}
+			className="h-12 text-base [&>svg]:size-5"
 			onClick={(event) => {
 				// Plain clicks close the mobile sheet; modifier and middle
 				// clicks keep the native new-tab behavior.
@@ -72,12 +80,29 @@ export function WorkspaceSidebar({
 	// The inbox badge reflects persisted unread state; a failed load hides
 	// the badge instead of blocking navigation.
 	const unreadCount = useInboxUnreadCount().data ?? 0;
-	const { setOpenMobile } = useSidebar();
+	const inboxAccessibleName =
+		unreadCount > 0 ? `Inbox, ${unreadCount} unread` : "Inbox";
+	const { open, setOpen, setOpenMobile } = useSidebar();
+	const navigationToggleLabel = open ? "Close navigation" : "Open navigation";
 	return (
-		<Sidebar className="print:hidden">
+		<Sidebar collapsible="icon" className="print:hidden">
 			<SidebarHeader>
-				<div className="flex items-center justify-between">
+				<div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col">
 					<Brand />
+					<SidebarMenuButton
+						size="default"
+						tooltip={navigationToggleLabel}
+						aria-label={navigationToggleLabel}
+						aria-expanded={open}
+						className="hidden shrink-0 md:flex md:w-auto"
+						onClick={() => setOpen(!open)}
+					>
+						{open ? (
+							<PanelLeftClose aria-hidden="true" />
+						) : (
+							<PanelLeftOpen aria-hidden="true" />
+						)}
+					</SidebarMenuButton>
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -102,9 +127,18 @@ export function WorkspaceSidebar({
 											<WorkspaceNavLink
 												to={pagePaths[item.id]}
 												active={page === item.id}
+												label={item.label}
+												accessibleName={
+													item.id === "inbox" ? inboxAccessibleName : undefined
+												}
+												tooltip={
+													item.id === "inbox" ? inboxAccessibleName : undefined
+												}
 											>
 												<item.icon aria-hidden="true" />
-												<span>{item.label}</span>
+												<span className="group-data-[collapsible=icon]:hidden">
+													{item.label}
+												</span>
 											</WorkspaceNavLink>
 											{item.id === "inbox" && unreadCount > 0 && (
 												<SidebarMenuBadge aria-label={`${unreadCount} unread`}>
@@ -124,14 +158,17 @@ export function WorkspaceSidebar({
 						<WorkspaceNavLink
 							to={pagePaths.sources}
 							active={page === "sources"}
+							label="Configs"
 						>
 							<Settings aria-hidden="true" />
-							<span>Configs</span>
+							<span className="group-data-[collapsible=icon]:hidden">
+								Configs
+							</span>
 						</WorkspaceNavLink>
 					</SidebarMenuItem>
 				</SidebarMenu>
 				<ThemeToggle />
-				<div className="px-2 pt-1 pb-2 text-xs leading-relaxed text-muted-foreground">
+				<div className="px-2 pt-1 pb-2 text-xs leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">
 					{pending ? (
 						<Skeleton className="h-3 w-28" />
 					) : (
@@ -139,7 +176,6 @@ export function WorkspaceSidebar({
 					)}
 				</div>
 			</SidebarFooter>
-			<SidebarRail />
 		</Sidebar>
 	);
 }

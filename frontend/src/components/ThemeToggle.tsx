@@ -17,14 +17,16 @@ export function ThemeToggle() {
 			type="button"
 			variant="ghost"
 			size="default"
-			className="w-full justify-start"
+			className="w-full justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
 			onClick={cycle}
 			title="Switch theme (system, light, dark)"
 			aria-label={`Theme: ${LABEL[preference]}`}
 			aria-description="Activate to switch between system, light, and dark themes."
 		>
 			<Icon aria-hidden="true" />
-			<span>Theme: {LABEL[preference]}</span>
+			<span className="group-data-[collapsible=icon]:hidden">
+				Theme: {LABEL[preference]}
+			</span>
 		</Button>
 	);
 }

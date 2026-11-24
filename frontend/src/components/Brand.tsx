@@ -19,7 +19,7 @@ export function Brand() {
 					<path d={brandPath} />
 				</svg>
 			</span>
-			<span>
+			<span className="group-data-[collapsible=icon]:hidden">
 				waypoint<span className="text-primary">.</span>
 			</span>
 		</Link>
