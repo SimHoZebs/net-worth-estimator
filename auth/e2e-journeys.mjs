@@ -172,6 +172,81 @@ export async function ownerSignIn(ctx) {
   return { owner, page, own, cookie };
 }
 
+// Returning to Outlook reuses the fresh cached summary instead of blanking the
+// card and starting another summary request on every mount.
+export async function safeSpendingReturnKeepsCache(ctx, ownerBundle) {
+  const { origin } = ctx;
+  const { page } = ownerBundle;
+  const today = new Date();
+  const noon = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 12);
+  const summaryUrl = "**/v1/safe-spending-summary";
+  let cachedResponse;
+  const warmSummary = async (route) => {
+    const response = await route.fetch();
+    if (response.ok()) cachedResponse = response;
+    await route.fulfill({ response });
+  };
+  await page.clock.setFixedTime(noon);
+  try {
+    await page.route(summaryUrl, warmSummary);
+    try {
+      await page.goto(`${origin}/outlook`);
+      const card = page.getByRole("region", { name: "Safe spending", exact: true });
+      await expect(card).toBeVisible();
+      await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
+      await expect(
+        card.getByRole("heading", { name: "Cycle budget", exact: true }),
+      ).toBeVisible();
+      assert.ok(cachedResponse, "Outlook must load the initial safe spending summary");
+    } finally {
+      await page.unroute(summaryUrl, warmSummary);
+    }
+
+    let delayedSummaryRequests = 0;
+    const delaySummary = async (route) => {
+      delayedSummaryRequests += 1;
+      await new Promise((done) => setTimeout(done, 1_500));
+      await route.fulfill({ response: cachedResponse });
+    };
+    await page.route(summaryUrl, delaySummary);
+    try {
+      const navigation = page.getByRole("navigation", { name: "Main navigation" });
+      await navigation.getByRole("link", { name: "Accounts", exact: true }).click();
+      await page.waitForURL((url) => url.pathname === "/accounts");
+      await expect(
+        page.getByRole("heading", { name: "Accounts and starting balances", exact: true }),
+      ).toBeVisible();
+
+      const remountRequest = page
+        .waitForRequest(summaryUrl, { timeout: 750 })
+        .then(
+          () => true,
+          () => false,
+        );
+      await navigation.getByRole("link", { name: "Outlook", exact: true }).click();
+      await page.waitForURL((url) => url.pathname === "/outlook");
+      const card = page.getByRole("region", { name: "Safe spending", exact: true });
+      await expect(card).toBeVisible({ timeout: 750 });
+      await expect(card.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 750 });
+      await expect(
+        card.getByRole("heading", { name: "Cycle budget", exact: true }),
+      ).toBeVisible({ timeout: 750 });
+      assert.equal(
+        await remountRequest,
+        false,
+        "returning to Outlook must not refetch the safe spending summary",
+      );
+      assert.equal(delayedSummaryRequests, 0, "the remount must not trigger a delayed summary request");
+      console.log("e2e: returning to Outlook keeps cached safe spending content PASS");
+    } finally {
+      await page.unroute(summaryUrl, delaySummary);
+    }
+  } finally {
+    await page.clock.setSystemTime(Date.now());
+    await page.clock.resume();
+  }
+}
+
 // Anonymous traffic resolves to the provisioned guest scope: reads and
 // projections allowed, writes denied, stale scopes rejected.
 export async function guestReads(ctx, ownerBundle) {

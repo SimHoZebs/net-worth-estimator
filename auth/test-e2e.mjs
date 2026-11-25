@@ -54,6 +54,7 @@ import {
   ownerLogout,
   ownerSignIn,
   receiptUpload,
+  safeSpendingReturnKeepsCache,
   saveTraces,
   secondUserSignup,
   seedExtraData,
@@ -385,6 +386,7 @@ try {
   }
 
   const ownerBundle = await journey("isolation", () => ownerSignIn(journeyCtx));
+  if (ownerBundle) await journey("isolation", () => safeSpendingReturnKeepsCache(journeyCtx, ownerBundle));
   if (ownerBundle) await journey("isolation", () => passkeyJourneys(journeyCtx, ownerBundle));
   if (ownerBundle) {
     // Publish the owner's data into the provisioned guest scope, mirroring
