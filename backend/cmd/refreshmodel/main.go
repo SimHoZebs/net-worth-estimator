@@ -23,7 +23,7 @@ import (
 // tables fail closed so a schema extension cannot silently leave stale rows.
 var financialTables = []string{
 	"account_displays",
-	"accounts", "checkpoints", "checkpoint_available_balances", "transactions", "transaction_sim", "transaction_claims", "transaction_sync_keys", "suppressed_sync_keys", "transaction_categories",
+	"accounts", "checkpoints", "checkpoint_available_balances", "transactions", "transaction_sim", "transaction_claims", "transaction_provisional_postings", "transaction_sync_keys", "suppressed_sync_keys", "transaction_categories",
 	"statement_allocations", "statement_allocation_events",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"model_metadata", "payment_terms", "entity_ids",
