@@ -184,7 +184,7 @@ test("an unknown cycle funding payday stays undated without hiding payment or in
 	await expect(
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
-	await card.getByRole("button", { name: /^Transactions/ }).click();
+	await card.getByRole("button", { name: /^Details ·/ }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(drawer.getByText("Oct 31, 2026 – Nov 30, 2026")).toBeVisible();
 	await expect(

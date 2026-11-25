@@ -1,5 +1,6 @@
 export const SAFE_SPENDING_LABELS = {
 	title: "Safe spending",
+	protectedSummary: "Details",
 	cashAccounts: "Cash accounts",
 	cycleBudget: "Cycle budget",
 	withCashCushion: "With cash cushion",

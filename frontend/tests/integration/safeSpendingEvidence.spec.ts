@@ -511,7 +511,7 @@ test("an explicitly tracked card keeps its statement payoff", async ({
 		await expect(
 			card.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
-		await card.getByRole("button", { name: /^Transactions/ }).click();
+		await card.getByRole("button", { name: /^Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("heading", { name: "Spending this cycle" }),
@@ -566,8 +566,17 @@ test("the dated allowance and recorded transactions come from the server", async
 		await expect(card.getByTestId("cash-on-hand")).toHaveCount(0);
 		await expect(card.getByText("Bills before card payoff")).toHaveCount(0);
 		await expect(card.locator("details[open]")).toHaveCount(0);
+		const previewAction = card.getByRole("button", {
+			name: /^Details ·/,
+		});
+		await expect(previewAction).toHaveText(
+			/^Details · \$[\d,.]+ · \d+ items?$/,
+		);
+		await expect(
+			card.getByRole("button", { name: /^Transactions/ }),
+		).toHaveCount(0);
 
-		await card.getByRole("button", { name: /Transactions · 1/ }).click();
+		await previewAction.click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("tab", { name: /Transactions/ }),
@@ -621,13 +630,14 @@ test("transactions wait for confirmed links without blocking the budget", async 
 		});
 		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
 		await page.goto("/outlook?detail=safe-spending&tab=transactions");
-		await expect(page.getByTestId("with-cash-cushion")).toBeVisible();
-		const action = page
-			.locator("button")
-			.filter({ hasText: /^Transactions$/ })
-			.first();
-		await expect(action).toBeDisabled();
-		await expect(action).toHaveText("Transactions");
+		// The modal drawer makes the background card inert, so assert its
+		// rendered state through DOM locators rather than the accessibility tree.
+		const card = page.locator('[role="region"][aria-label="Safe spending"]');
+		await expect(card.getByTestId("with-cash-cushion")).toBeVisible();
+		const action = card.locator("button").filter({ hasText: /^Details ·/ });
+		await expect(action).toBeVisible();
+		await expect(action).toBeEnabled();
+		await expect(action).toHaveText(/^Details ·/);
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(drawer.getByText("Loading transactions…")).toBeVisible();
 		await expect(drawer.getByText("Spent", { exact: true })).toHaveCount(0);
@@ -687,13 +697,12 @@ test("failed transaction links keep the budget usable and retry in the drawer", 
 		});
 		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
 		await page.goto("/outlook");
-		await expect(page.getByTestId("with-cash-cushion")).toBeVisible();
-		const action = page.getByRole("button", {
-			name: "Transactions",
-			exact: true,
-		});
-		await expect(action).toBeDisabled();
-		await expect(action).toHaveText("Transactions");
+		const card = page.getByRole("region", { name: "Safe spending" });
+		await expect(card.getByTestId("with-cash-cushion")).toBeVisible();
+		const action = card.getByRole("button", { name: /^Details ·/ });
+		await expect(action).toBeVisible();
+		await expect(action).toBeEnabled();
+		await expect(action).toHaveText(/^Details ·/);
 		await page.goto("/outlook?detail=safe-spending&tab=transactions");
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		const alert = drawer.getByRole("alert", {
@@ -732,9 +741,11 @@ test("changing included bills refreshes the dated allowance without reloading", 
 		await page.goto("/outlook");
 		await (await initialResponse).json();
 		const card = page.getByRole("region", { name: "Safe spending" });
-		const nextCycle = card.getByTestId("discretionary-next-cycle");
-		await expect(nextCycle).toBeVisible();
-		const initialSummary = await nextCycle.textContent();
+		const protectedSummary = card.getByRole("button", {
+			name: /^Details ·/,
+		});
+		await expect(protectedSummary).toBeVisible();
+		const initialSummary = await protectedSummary.textContent();
 
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
@@ -752,7 +763,7 @@ test("changing included bills refreshes the dated allowance without reloading", 
 		await expect(bill).toHaveAttribute("aria-pressed", "false");
 		await page.keyboard.press("Escape");
 		await expect(drawer).toBeHidden();
-		await expect(nextCycle).not.toHaveText(initialSummary!, {
+		await expect(protectedSummary).not.toHaveText(initialSummary!, {
 			timeout: 15_000,
 		});
 	} finally {
@@ -803,7 +814,7 @@ test("no cash balance leaves recorded transactions visible", async ({
 		await expect(
 			card.getByText("pending-obligation-coverage-unknown"),
 		).toHaveCount(0);
-		await card.getByRole("button", { name: /^Transactions/ }).click();
+		await card.getByRole("button", { name: /^Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("heading", { name: "Spending this cycle" }),
@@ -843,8 +854,11 @@ test("a failed summary request stays retryable in the preview without data", asy
 			card.getByText("Safe spending evidence could not be loaded."),
 		).toBeVisible();
 		await expect(card.getByTestId("with-cash-cushion")).toHaveCount(0);
+		const previewAction = card.getByRole("button", { name: /^Details ·/ });
+		await expect(previewAction).toHaveCount(0);
 		await card.getByRole("button", { name: "Retry evidence" }).click();
 		await expect(card.getByTestId("with-cash-cushion")).toBeVisible();
+		await expect(previewAction).toBeVisible();
 		expect(attempts).toBeGreaterThanOrEqual(2);
 	} finally {
 		await api.dispose();
@@ -877,7 +891,7 @@ test("a linked transaction confirms its bill and keeps a numeric allowance", asy
 		await expect(card.getByTestId("with-cash-cushion")).not.toHaveText(
 			"Unavailable",
 		);
-		await card.getByRole("button", { name: /^Transactions/ }).click();
+		await card.getByRole("button", { name: /^Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(
 			drawer.getByRole("heading", { name: "Spending this cycle" }),
@@ -916,7 +930,7 @@ test("shows a missing future checkpoint when statement amounts are unknown", asy
 		await expect(card.getByTestId("with-cash-cushion")).toHaveText(
 			"Unavailable",
 		);
-		await card.getByRole("button", { name: /^Transactions/ }).click();
+		await card.getByRole("button", { name: /^Details ·/ }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		await expect(drawer.getByText("No spending this cycle yet.")).toBeVisible();
 		await expect(

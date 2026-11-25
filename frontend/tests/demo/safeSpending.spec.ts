@@ -18,7 +18,7 @@ test("seeded account demo", async ({ page }) => {
 			page.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
 	}
-	await page.getByRole("button", { name: /^Transactions/ }).click();
+	await page.getByRole("button", { name: /^Details ·/ }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(
 		drawer.getByRole("heading", { name: "Spending this cycle" }),
