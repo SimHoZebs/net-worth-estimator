@@ -1388,14 +1388,24 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.equal(workflow.triggers[0].spec.token, "INJECT_PRIVATE_WEBHOOK_TOKEN");
   const steps = workflow.spec.spec.steps;
   assert.deepEqual(steps.map((step) => step.ref), [
-    "identity-backup", "await-api-writers", "stop-api-writers", "deploy-maintenance-image",
+    "await-api-writers", "stop-api-writers", "stage-images-and-backup",
     "deploy-identity-image", "await-api-container", "verify-maintenance", "migrate",
     "clear-maintenance", "start-api",
   ]);
   // Project workflows reject team templates at runtime. Project workflow
   // templates remain allowed, so only the team kind is forbidden.
   assert.ok(steps.every((step) => step.kind !== "RunTemplate" || step.spec.templateType !== "template"));
-  const [backup, awaitWriters, stopApi, deployApi, deployIdentity, awaitContainer, verifyMaintenance, migrate, clearMaintenance, startApi] = steps;
+  const [awaitWriters, stopApi, stageParallel, deployIdentity, awaitContainer, verifyMaintenance, migrate, clearMaintenance, startApi] = steps;
+  // The identity backup and API image deploy touch different resources
+  // (identity addon vs API service), so they run in parallel. The identity
+  // image still deploys after the backup completes, preserving restore.
+  assert.equal(stageParallel.kind, "Workflow");
+  assert.equal(stageParallel.spec.type, "parallel");
+  assert.deepEqual(stageParallel.spec.steps.map((step) => step.ref), [
+    "identity-backup", "deploy-maintenance-image",
+  ]);
+  const [backup, deployApi] = stageParallel.spec.steps;
+  assert.equal(backup.kind, "AddonBackup");
   assert.equal(backup.condition, "success");
   assert.equal(backup.spec.backupType, "dump");
   assert.equal(awaitWriters.kind, "Condition");
@@ -1418,10 +1428,12 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
     assert.equal(step.spec.spec.data.user, "10001");
     assert.equal(step.spec.spec.data.group, "10001");
   }
-  // The API image lands before the identity image so the API container is
-  // already settled when the migration attaches to it.
+  // The API maintenance image and identity backup run in parallel, then the
+  // identity image lands before verification so the API container is
+  // already settled when the migration attaches to it. Backup stays before
+  // identity deploy to preserve restore.
   assert.ok(
-    steps.findIndex((step) => step.ref === "deploy-maintenance-image") <
+    steps.findIndex((step) => step.ref === "stage-images-and-backup") <
       steps.findIndex((step) => step.ref === "deploy-identity-image"),
   );
   assert.ok(

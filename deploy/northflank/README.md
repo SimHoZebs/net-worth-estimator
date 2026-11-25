@@ -85,8 +85,10 @@ any manual migration. The migration runs inside that single
 container on the real volume. Only a zero exit removes the marker and restarts
 the API. For a marker-aware image, a failed step leaves the marker in place, so
 the maintenance answer survives retries; any other target keeps answering
-`ok`. The identity image deploy runs after the API image deploy, so
-the API container is already settled when the migration attaches to it.
+`ok`. The identity backup and API image deploy run in parallel because
+they touch different resources (identity addon vs API service); the identity
+image still deploys after that parallel block, so the backup completes first
+and the API container is already settled when the migration attaches to it.
 
 If the service is not running before a release, restart it before requesting
 the release so the marker execute action has a container to reach.

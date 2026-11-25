@@ -17,12 +17,6 @@
       "type": "sequential",
       "steps": [
         {
-          "kind": "AddonBackup",
-          "ref": "identity-backup",
-          "condition": "success",
-          "spec": { "addonId": "${args.IDENTITY_DATABASE_ADDON_ID}", "backupType": "dump" }
-        },
-        {
           "kind": "Condition",
           "ref": "await-api-writers",
           "spec": {
@@ -52,14 +46,29 @@
           }
         },
         {
-          "kind": "Release",
-          "ref": "deploy-maintenance-image",
-          "condition": "running",
-          "timeoutDuration": 600,
+          "kind": "Workflow",
+          "ref": "stage-images-and-backup",
           "spec": {
-            "type": "registry",
-            "origin": { "imagePath": "${args.API_IMAGE}" },
-            "target": { "id": "nwe-api", "type": "service" }
+            "type": "parallel",
+            "steps": [
+              {
+                "kind": "AddonBackup",
+                "ref": "identity-backup",
+                "condition": "success",
+                "spec": { "addonId": "${args.IDENTITY_DATABASE_ADDON_ID}", "backupType": "dump" }
+              },
+              {
+                "kind": "Release",
+                "ref": "deploy-maintenance-image",
+                "condition": "running",
+                "timeoutDuration": 600,
+                "spec": {
+                  "type": "registry",
+                  "origin": { "imagePath": "${args.API_IMAGE}" },
+                  "target": { "id": "nwe-api", "type": "service" }
+                }
+              }
+            ]
           }
         },
         {
