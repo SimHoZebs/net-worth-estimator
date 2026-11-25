@@ -49,6 +49,7 @@
 
 ## Start and verify
 
+- Set an expiry of at most 6 hours for any command, job, automation, or process whose runtime cannot be predicted.
 - Run the narrowest local check for what you touched and fix from the hosted run. Do not run every suite locally before each push.
 - Every branch push triggers the `Tests` workflow. Watch the run for your exact commit before landing. A documentation-only push keeps the workflow green with the test jobs skipped by conditional, so branch protection is satisfied but no images are published and no Northflank or Vercel release is requested. Mixed changes run every gate, and manual dispatch always runs every gate. Documentation means Markdown anywhere and the diagram assets under `docs/`; executable files such as `docs/diagrams/build-page.ts`, workflows, and configuration stay code. `scripts/ci-changed-paths.sh` resolves the first-push, PR, and force-push ranges, `scripts/ci-code-gate.mjs` owns the doc decision, and `scripts/ci-code-gate.test.mjs` plus `scripts/ci-changed-paths.test.mjs` cover them:
 
