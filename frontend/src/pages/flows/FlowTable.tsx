@@ -17,8 +17,8 @@ import {
 import { dateLabel, money } from "../../domain/format.ts";
 
 /** Accessible text/table alternative: the same visible edges as rows with
- * exact amounts, plus window totals, unmatched and unobserved money, and
- * coverage. This view — not the diagram — is the source of exact values. */
+ * exact amounts, plus window totals, unmatched money and coverage. This view —
+ * not the diagram — is the source of exact values. */
 export function FlowTable({
 	graph,
 	visible,
@@ -105,16 +105,6 @@ export function FlowTable({
 						{graph.reconciliation.unmatchedEvents === 1
 							? "transaction"
 							: "transactions"}
-						).
-					</li>
-				)}
-				{totals.unobserved !== 0 && (
-					<li>
-						{money(Math.abs(totals.unobserved))} asserted by balance checks with
-						no contributing transaction ({graph.reconciliation.correctionsCount}{" "}
-						{graph.reconciliation.correctionsCount === 1
-							? "correction"
-							: "corrections"}
 						).
 					</li>
 				)}

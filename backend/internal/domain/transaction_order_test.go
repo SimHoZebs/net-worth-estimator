@@ -31,14 +31,11 @@ func TestEqualTimeTransactionExecutionDoesNotDependOnIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(before, after) {
-		t.Fatal("identity replacement changed checkpoint corrections")
+		t.Fatal("identity replacement changed historical balances")
 	}
-	correction := after[len(after)-1].CheckpointCorrections[0]
-	// Historical actuals execute at their recorded amounts without
-	// hypothetical funding clamps (forecasts retain clamps): the outflow
-	// moves 10 even from an empty account, then the inflow returns it.
-	if correction.ModeledBalance != 0 || correction.Adjustment != 10 {
-		t.Fatalf("equal-time execution order changed: %+v", correction)
+	// The final checkpoint resets the account to its authoritative total.
+	if got := after[len(after)-1].Balances[account]; got != 10 {
+		t.Fatalf("final checkpoint reset = %v, want 10", got)
 	}
 	// Projection execution shares history's ordering, even if display position differs.
 	resolved := ResolveOccurrences(nil, model.Transactions, "2026-01-02", "2026-01-02", true)

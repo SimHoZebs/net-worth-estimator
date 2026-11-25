@@ -2,7 +2,7 @@ import { queryOptions, useIsMutating, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { getSafeSpendingSummary } from "@/api/generated/endpoints.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
-import { isoDate, shiftDate, utcDate } from "@/domain/format.ts";
+import { nextUtcMidnight } from "@/domain/format.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import { useUserScope } from "./useUserScope.ts";
 import {
@@ -15,11 +15,6 @@ import {
 	useSchedules,
 	userResourceKey,
 } from "./workspaceResources.ts";
-
-function nextUtcMidnight(timestamp: number): number {
-	const tomorrow = shiftDate({ date: isoDate(new Date(timestamp)), days: 1 });
-	return utcDate(tomorrow).setUTCHours(0);
-}
 
 /**
  * One coherent read of the server-owned before-payday summary. The endpoint

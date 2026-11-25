@@ -61,10 +61,12 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 		sorted := make([]DatedTransactionOccurrence, len(occurrences))
 		copy(sorted, occurrences)
 		sortOccurrences(sorted)
+		allSuppressed := len(sorted) > 0
 		for _, occurrence := range sorted {
 			if cut > 0 && occurrence.Purchase == nil && EffectiveOccurrenceInstant(occurrence, date) <= cut {
 				continue
 			}
+			allSuppressed = false
 			transition, err := transitions.ExecuteTransaction(occurrence, date, false)
 			if err != nil {
 				return types.SimulationRun{}, err
@@ -84,6 +86,11 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 			}
 			transactionAttempts = append(transactionAttempts, event)
 			transactionSequence++
+		}
+		// History already owns this date; a second snapshot would duplicate
+		// the boundary row without applying a movement.
+		if allSuppressed {
+			continue
 		}
 		balances := SnapshotBalances(transitions.State.Balances)
 		snapshots = append(snapshots, types.SimulationSnapshot{Date: date, Balances: balances})

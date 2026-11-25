@@ -131,7 +131,6 @@ export function graphFixture(): FlowGraph {
 			},
 		],
 		unmatched: [],
-		unobserved: [],
 		coverage: {
 			observedAccounts: ["checking", "savings"],
 			unobservedAccounts: [],
@@ -140,7 +139,6 @@ export function graphFixture(): FlowGraph {
 			actual: { inflow: 5000, outflow: 300, transfer: 1003 },
 			projected: { inflow: 200, outflow: 0, transfer: 0 },
 			unmatched: 0,
-			unobserved: 0,
 		},
 		reconciliation: {
 			windowEvents: 6,
@@ -152,8 +150,6 @@ export function graphFixture(): FlowGraph {
 			edgesInflow: 5200,
 			edgesOutflow: 300,
 			edgesTransfer: 1003,
-			correctionsCount: 0,
-			unobservedSum: 0,
 			reconciled: true,
 		},
 	};

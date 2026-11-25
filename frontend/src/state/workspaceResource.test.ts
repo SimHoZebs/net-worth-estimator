@@ -6,9 +6,9 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
+	balancesQueryKey,
 	getAccountBalances,
 	statusOptions,
-	userResourceKey,
 } from "./workspaceResources.ts";
 import {
 	cancelResourceQueries,
@@ -50,7 +50,7 @@ it("retains completed Query data during verification without exposing it under p
 	expect(
 		serverQueryClient().getQueryData<{
 			revision: string | null;
-		}>([...userResourceKey("balances", scope), "latest"]),
+		}>(balancesQueryKey(scope)),
 	).toMatchObject({ revision });
 });
 
@@ -81,10 +81,9 @@ it("does not publish a retired user's late status result", async () => {
 	owner("users/b");
 	const revision = setServerModelFixture(undefined, { revision: "b" });
 	finish(
-		new Response(
-			JSON.stringify({ readOnly: false, hasModel: true }),
-			{ headers: headers() },
-		),
+		new Response(JSON.stringify({ readOnly: false, hasModel: true }), {
+			headers: headers(),
+		}),
 	);
 	await old;
 	expect(getAccountBalances()?.revision).toBe(revision);

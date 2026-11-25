@@ -35,7 +35,6 @@ import type {
 	AmountInputBinding as GeneratedAmountInputBinding,
 	AmountPreset as GeneratedAmountPreset,
 	Checkpoint as GeneratedCheckpoint,
-	CheckpointCorrection as GeneratedCheckpointCorrection,
 	CurrentPosition as GeneratedCurrentPosition,
 	DeterministicOutputBody as GeneratedDeterministicOutputBody,
 	EvaluationDiagnostic as GeneratedEvaluationDiagnostic,
@@ -345,18 +344,13 @@ export type ModelValidationIssue = Omit<
 };
 
 export type AccountDelta = GeneratedAccountDelta;
-export type CheckpointCorrection = GeneratedCheckpointCorrection;
 
 export type AccountSnapshot = Omit<GeneratedAccountSnapshot, "impacts"> & {
 	impacts: AccountDelta[];
 };
 
-export type ProjectionRow = Omit<
-	GeneratedProjectionRow,
-	"accountSnapshots" | "checkpointCorrections"
-> & {
+export type ProjectionRow = Omit<GeneratedProjectionRow, "accountSnapshots"> & {
 	accountSnapshots: AccountSnapshot[];
-	checkpointCorrections: CheckpointCorrection[];
 };
 
 export type ProjectionAccountSummary = GeneratedProjectionAccountSummary;
@@ -909,7 +903,6 @@ export function normalizeProjectionResult(
 				externalInflowAmount: row.externalInflowAmount,
 				externalOutflowAmount: row.externalOutflowAmount,
 				internalTransferAmount: row.internalTransferAmount,
-				checkpointCorrections: row.checkpointCorrections ?? [],
 			})),
 		},
 		accountSummaries: result.accountSummaries ?? [],

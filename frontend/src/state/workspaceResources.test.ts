@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
+import { todayIso } from "../domain/format.ts";
 import {
+	balancesOptions,
+	balancesQueryKey,
 	checkpointsOptions,
 	getAccountBalances,
 	getCheckpoints,
@@ -18,7 +21,7 @@ import {
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
 import { fixtureModel } from "../mocks/model.ts";
-import { stubTestServer } from "../mocks/waypointServer.ts";
+import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
 
 beforeEach(() => {
 	acceptTestResource();
@@ -31,6 +34,89 @@ afterEach(() => {
 });
 
 describe("direct Query ownership", () => {
+	it("keys default balances to today and requests that UTC date", async () => {
+		const server = stubTestServer();
+		const options = balancesOptions();
+		expect(options.queryKey).toEqual(balancesQueryKey());
+		expect(options.queryKey.at(-1)).toBe(todayIso());
+		await serverQueryClient().fetchQuery(options);
+		const balanceCalls = server.fetcher.mock.calls.filter(([url]) =>
+			String(url).startsWith("/v1/accounts/balances"),
+		);
+		expect(balanceCalls).toHaveLength(1);
+		const url = new URL(String(balanceCalls[0]![0]), "http://localhost");
+		expect(url.searchParams.get("asOf")).toBe(todayIso());
+	});
+
+	it("expires current-date balances at UTC midnight", async () => {
+		const server = stubTestServer();
+		const fetcher = server.fetcher;
+		const cache = serverQueryClient();
+		const options = balancesOptions();
+		const updatedAt = Date.parse("2026-11-25T23:59:58Z");
+		cache.setQueryData(
+			options.queryKey,
+			{ accounts: [], asOf: "2026-11-25", revision: "current" },
+			{ updatedAt },
+		);
+		const now = vi.spyOn(Date, "now").mockReturnValue(updatedAt + 1_000);
+		try {
+			await cache.fetchQuery(options);
+			expect(fetcher).not.toHaveBeenCalled();
+			now.mockReturnValue(updatedAt + 2_000);
+			await cache.fetchQuery(options);
+			expect(fetcher).toHaveBeenCalledOnce();
+		} finally {
+			now.mockRestore();
+		}
+	});
+
+	it("keeps explicit historical balance cuts deterministic", async () => {
+		const server = stubTestServer();
+		const options = balancesOptions(getUserScope(), "2026-01-31");
+		await serverQueryClient().fetchQuery(options);
+		await serverQueryClient().fetchQuery(options);
+		expect(options.queryKey.at(-1)).toBe("2026-01-31");
+		expect(
+			server.fetcher.mock.calls.filter(([url]) =>
+				String(url).startsWith("/v1/accounts/balances"),
+			),
+		).toHaveLength(1);
+	});
+
+	it("primes current balance rows with actual-only replay", () => {
+		const model = modelFixture();
+		model.checkpoints = [
+			{
+				AccountId: "cash",
+				Balance: 100,
+				observedAt: Date.parse("2026-01-01T10:00:00Z") / 1000,
+			},
+		];
+		model.transactions = [
+			{
+				id: "actual",
+				name: "Actual",
+				sourceAccountId: "cash",
+				destinations: null,
+				amount: { resolver: "expression", config: { expression: "25" } },
+				postedTime: Date.parse("2026-01-02T10:00:00Z") / 1000,
+				transactionTime: Date.parse("2026-01-02T10:00:00Z") / 1000,
+				enabled: true,
+				source: "user",
+				pending: false,
+				void: false,
+			} as (typeof model.transactions)[number],
+		];
+		setServerModelFixture(undefined, { model });
+		expect(
+			getAccountBalances()?.accounts.find((row) => row.id === "cash"),
+		).toMatchObject({
+			balance: 75,
+			observedBalance: 100,
+		});
+	});
+
 	it("does not refetch cached workspace data on remount", async () => {
 		const server = stubTestServer();
 		server.setRevision("current");

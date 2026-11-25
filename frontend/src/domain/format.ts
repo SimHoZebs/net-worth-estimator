@@ -36,6 +36,10 @@ export const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 export const isoDate = (value: Date) => value.toISOString().slice(0, 10);
 /** Real calendar day in UTC. Display dates anchor on this, never on stale data. */
 export const todayIso = () => isoDate(new Date());
+export function nextUtcMidnight(timestamp: number): number {
+	const tomorrow = shiftDate({ date: isoDate(new Date(timestamp)), days: 1 });
+	return utcDate(tomorrow).setUTCHours(0);
+}
 export function shiftDate({ date, days }: { date: string; days: number }) {
 	const value = new Date(`${date}T12:00:00Z`);
 	value.setUTCDate(value.getUTCDate() + days);

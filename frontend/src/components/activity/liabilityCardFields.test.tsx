@@ -50,8 +50,8 @@ function edit(kind: Account["kind"]): AccountEdit {
 		setConfirmCancel: vi.fn(),
 		observedAt: null,
 		setObservedAt: vi.fn(),
-		previousBalance: undefined,
-		previous: {} as AccountEdit["previous"],
+		balanceAtTime: undefined,
+		balanceAtTimeQuery: {} as AccountEdit["balanceAtTimeQuery"],
 		saveBlocked: false,
 	} as unknown as AccountEdit;
 }

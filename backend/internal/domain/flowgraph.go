@@ -274,25 +274,6 @@ func BuildFlowGraphWithLinks(model *types.FinancialModel, events []types.Transac
 
 	netConfirmedTransferPairs(transactionByID, edges, nodes, &totals, &reconciliation, links)
 
-	for _, row := range rows {
-		if CompareIsoDates(string(row.Date), startDate) < 0 || CompareIsoDates(string(row.Date), endDate) > 0 {
-			continue
-		}
-		for _, correction := range row.CheckpointCorrections {
-			reconciliation.CorrectionsCount++
-			adjustment := roundCurrency(correction.Adjustment)
-			totals.Unobserved = roundCurrency(totals.Unobserved + adjustment)
-			graph.Unobserved = append(graph.Unobserved, types.FlowUnobservedCorrection{
-				AccountID:       correction.AccountID,
-				Date:            row.Date,
-				ObservedBalance: roundCurrency(correction.ObservedBalance),
-				ModeledBalance:  roundCurrency(correction.ModeledBalance),
-				Adjustment:      adjustment,
-			})
-		}
-	}
-	reconciliation.UnobservedSum = totals.Unobserved
-
 	graph.Totals = totals
 
 	edgeList := make([]types.FlowEdge, 0, len(edges))
@@ -336,15 +317,6 @@ func BuildFlowGraphWithLinks(model *types.FinancialModel, events []types.Transac
 	})
 	if graph.Unmatched == nil {
 		graph.Unmatched = []types.FlowUnmatchedEvent{}
-	}
-	sort.Slice(graph.Unobserved, func(i, j int) bool {
-		if graph.Unobserved[i].Date != graph.Unobserved[j].Date {
-			return graph.Unobserved[i].Date < graph.Unobserved[j].Date
-		}
-		return graph.Unobserved[i].AccountID < graph.Unobserved[j].AccountID
-	})
-	if graph.Unobserved == nil {
-		graph.Unobserved = []types.FlowUnobservedCorrection{}
 	}
 
 	// Coverage: an enabled account is observed when a checkpoint exists at or before window end.

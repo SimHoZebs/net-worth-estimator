@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useRouter } from "@tanstack/react-router";
-import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
 import { useAccountEdit } from "../../components/activity/useAccountEdit.ts";
 import { AccountBalanceValue } from "../../components/activity/AccountBalanceValue.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -48,7 +47,6 @@ import {
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
 import { Transactions } from "../../components/activity/Transactions.tsx";
 import { AccountBalances } from "./AccountBalances.tsx";
-import { BalanceHistory } from "./BalanceHistory.tsx";
 import {
 	Tabs,
 	TabsContent,
@@ -93,16 +91,7 @@ export function AccountDetailView({
 	// Grouped loan displays stay locked, as does a shared workspace's view.
 	const nameEditable =
 		account.readOnly && !isGroupedDisplay(account) && !readOnly;
-	const adjustments = useAccountAdjustments(
-		account.id,
-		!isGroupedDisplay(account),
-	);
-	const edit = useAccountEdit(
-		account,
-		locked,
-		adjustments.data ?? [],
-		nameEditable,
-	);
+	const edit = useAccountEdit(account, locked, nameEditable);
 	const kindSuggestion = useCardKindSuggestion(account.id, account.kind);
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
@@ -166,9 +155,6 @@ export function AccountDetailView({
 		forecast.base instanceof Error || forecast.base === null
 			? null
 			: forecast.base;
-	// Balance adjustments are checkpoint reconciliation, not transactions,
-	// so they stay out of the transaction list and render in balance
-	// history instead.
 	const occurrences = useMemo(
 		() =>
 			accountTransactions({
@@ -325,14 +311,6 @@ export function AccountDetailView({
 							retry: forecast.retryProjection,
 						}}
 					/>
-					{!isGroupedDisplay(account) && (
-						<BalanceHistory
-							adjustments={adjustments.data ?? []}
-							isPending={adjustments.isPending}
-							isError={adjustments.isError}
-							onRetry={() => void adjustments.refetch()}
-						/>
-					)}
 				</TabsContent>
 				<TabsContent value="recurring" className="flex min-w-0 flex-col gap-4">
 					{rulesQuery.isPending ? (

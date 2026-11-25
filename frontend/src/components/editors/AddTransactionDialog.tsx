@@ -8,10 +8,7 @@ import {
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
 import { useClaimOccurrenceOptions } from "../../state/scheduleOccurrences.ts";
-import {
-	useSavedAccounts,
-	useSavedStartDate,
-} from "../../state/savedState.ts";
+import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import {
 	combineDayTime,

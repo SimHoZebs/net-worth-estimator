@@ -9,6 +9,7 @@ import {
 	useSafeSpendingSummary,
 } from "./useSafeSpendingSummary.ts";
 import {
+	balancesQueryKey,
 	refreshAccounts,
 	refreshTransactions,
 	userResourceKey,
@@ -47,7 +48,7 @@ describe("safe spending summary query", () => {
 		const revision = "synthetic";
 		const options = safeSpendingSummaryOptions([revision, revision, revision]);
 		const cache = serverQueryClient();
-		cache.setQueryData([...userResourceKey("balances"), "latest"], {
+		cache.setQueryData(balancesQueryKey(), {
 			accounts: [],
 			asOf: "2026-11-17",
 			revision,

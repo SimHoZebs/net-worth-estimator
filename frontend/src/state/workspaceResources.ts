@@ -27,6 +27,7 @@ import type { AmountPreset as GeneratedAmountPreset } from "@/api/generated/mode
 import type { EvaluationInstanceInterface } from "@/api/generated/model/evaluationInstanceInterface.ts";
 import type { PlannedPurchase as GeneratedPlannedPurchase } from "@/api/generated/model/plannedPurchase.ts";
 import { ApiHttpError } from "@/api/http.ts";
+import { nextUtcMidnight, todayIso } from "@/domain/format.ts";
 import {
 	type AmountPreset,
 	type BackendPlannedPurchase,
@@ -301,13 +302,22 @@ export interface EvaluationSummary {
 	revision: string | null;
 }
 
+export function balancesQueryKey(scope = getUserScope(), asOf?: string) {
+	return [...userResourceKey("balances", scope), asOf ?? todayIso()] as const;
+}
+
 export function balancesOptions(scope = getUserScope(), asOf?: string) {
+	const currentDate = asOf ?? todayIso();
 	return queryOptions({
 		...defaults,
-		queryKey: [...userResourceKey("balances", scope), asOf ?? "latest"],
+		queryKey: balancesQueryKey(scope, asOf),
+		staleTime: (query: { state: { dataUpdatedAt: number } }) =>
+			asOf === undefined
+				? nextUtcMidnight(query.state.dataUpdatedAt) - query.state.dataUpdatedAt
+				: Infinity,
 		queryFn: async ({ signal }): Promise<AccountBalances> => {
 			const result = (
-				await listAccountBalances(asOf ? { asOf } : undefined, { signal })
+				await listAccountBalances({ asOf: currentDate }, { signal })
 			).data;
 			assertCurrentScope(scope, signal, USER_CHANGED);
 			return {
@@ -433,10 +443,7 @@ export function useAccountBalances(options: { asOf?: string } = {}) {
 
 export function getAccountBalances(scope = getUserScope()) {
 	return scope.status === "ready"
-		? serverQueryClient().getQueryData<AccountBalances>([
-				...userResourceKey("balances", scope),
-				"latest",
-			])
+		? serverQueryClient().getQueryData<AccountBalances>(balancesQueryKey(scope))
 		: undefined;
 }
 

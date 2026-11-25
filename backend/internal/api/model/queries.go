@@ -64,7 +64,8 @@ type accountBalanceRow struct {
 	// Currency is the bridge account currency from the sync link.
 	Currency *string `json:"currency,omitempty"`
 	// ObservedBalance is the latest observation at or before AsOf,
-	// separate from the adjusted modeled Balance. Nil when unobserved.
+	// separate from the current Balance after later recorded actuals.
+	// Nil when unobserved.
 	ObservedBalance *float64 `json:"observedBalance,omitempty"`
 	// ObservedAt is the required observation instant (Unix).
 	ObservedAt *int64 `json:"observedAt,omitempty"`
@@ -87,13 +88,11 @@ type accountBalancesOutput struct {
 }
 
 // listAccountBalances answers "what does each account hold as of this date".
-// Balances come from the same chronological application as the current position
-// and projection baseline (one calculation authority): Balance is the
-// adjusted modeled balance at the end of AsOf, with the latest observation
-// and reconciliation state carried separately. It never folds the latest
-// checkpoint as the balance.
+// Balance is the latest applicable checkpoint plus later recorded actuals at
+// the end of AsOf. The latest observed total and its timestamp travel
+// separately; unclaimed schedule occurrences do not change current balance.
 func (s *handler) listAccountBalances(_ context.Context, input *struct {
-	AsOf string `query:"asOf" doc:"Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today"`
+	AsOf string `query:"asOf" doc:"Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to today's UTC date"`
 }) (*accountBalancesOutput, error) {
 	model, err := s.store.LoadModel()
 	if err != nil {
@@ -103,20 +102,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	asOf := types.IsoDate(input.AsOf)
-	rawCut := string(asOf)
-	if model != nil && rawCut == "" {
-		var latest int64
-		for _, checkpoint := range model.Checkpoints {
-			if checkpoint.ObservedAt > latest {
-				latest = checkpoint.ObservedAt
-			}
-		}
-		if latest > 0 {
-			asOf = types.IsoDate(time.Unix(latest, 0).UTC().Format("2006-01-02"))
-			rawCut = string(asOf)
-		}
-	}
+	rawCut := input.AsOf
 	if rawCut == "" {
 		rawCut = time.Now().UTC().Format("2006-01-02")
 	}

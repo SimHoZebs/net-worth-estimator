@@ -15,8 +15,7 @@
 			try {
 				var stored = "system";
 				var raw = localStorage.getItem("waypoint-theme");
-				if (raw === "light" || raw === "dark" || raw === "system")
-					stored = raw;
+				if (raw === "light" || raw === "dark" || raw === "system") stored = raw;
 				var dark =
 					stored === "dark" ||
 					(stored === "system" &&
@@ -30,10 +29,7 @@
 					);
 				var themeColor = document.getElementById("theme-color");
 				if (themeColor)
-					themeColor.setAttribute(
-						"content",
-						dark ? "#0c0a09" : "#ffffff",
-					);
+					themeColor.setAttribute("content", dark ? "#0c0a09" : "#ffffff");
 			} catch (e) {
 				var fallback = document.getElementById("color-scheme");
 				if (fallback) fallback.setAttribute("content", "light dark");

@@ -56,9 +56,8 @@ type SimulationRun struct {
 }
 
 type HistoricalObservationSnapshot struct {
-	Date                  IsoDate                `json:"date"`
-	Balances              map[string]float64     `json:"balances"`
-	CheckpointCorrections []CheckpointCorrection `json:"checkpointCorrections,omitempty"`
+	Date     IsoDate            `json:"date"`
+	Balances map[string]float64 `json:"balances"`
 }
 
 type PreparedProjection struct {

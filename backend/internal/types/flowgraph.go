@@ -90,18 +90,6 @@ type FlowUnmatchedEvent struct {
 	RealizedAmount float64 `json:"realizedAmount"`
 }
 
-// FlowUnobservedCorrection is a balance-check correction inside the window:
-// money the observations assert without any contributing transaction.
-// Model SETs balance; transactions CHANGE it, so a nonzero adjustment is flow
-// with no observed path.
-type FlowUnobservedCorrection struct {
-	AccountID       string  `json:"accountId"`
-	Date            IsoDate `json:"date"`
-	ObservedBalance float64 `json:"observedBalance"`
-	ModeledBalance  float64 `json:"modeledBalance"`
-	Adjustment      float64 `json:"adjustment"`
-}
-
 // FlowCoverage indicates incomplete institution coverage: enabled accounts
 // with no balance observation at or before the window end have unobserved
 // starting state, so their flow is partial.
@@ -118,12 +106,11 @@ type FlowClassTotals struct {
 	Transfer float64 `json:"transfer"`
 }
 
-// FlowTotals splits edge totals by movement plus the out-of-edge buckets.
+// FlowTotals splits edge totals by movement plus unmatched events.
 type FlowTotals struct {
-	Actual     FlowClassTotals `json:"actual"`
-	Projected  FlowClassTotals `json:"projected"`
-	Unmatched  float64         `json:"unmatched"`
-	Unobserved float64         `json:"unobserved"`
+	Actual    FlowClassTotals `json:"actual"`
+	Projected FlowClassTotals `json:"projected"`
+	Unmatched float64         `json:"unmatched"`
 }
 
 // FlowReconciliation lets a renderer verify edge totals against the source
@@ -141,20 +128,17 @@ type FlowReconciliation struct {
 	EdgesInflow      float64 `json:"edgesInflow"`
 	EdgesOutflow     float64 `json:"edgesOutflow"`
 	EdgesTransfer    float64 `json:"edgesTransfer"`
-	CorrectionsCount int     `json:"correctionsCount"`
-	UnobservedSum    float64 `json:"unobservedSum"`
 	Reconciled       bool    `json:"reconciled"`
 }
 
 // FlowGraph is the complete window contract.
 type FlowGraph struct {
-	StartDate      IsoDate                    `json:"startDate"`
-	EndDate        IsoDate                    `json:"endDate"`
-	Nodes          []FlowNode                 `json:"nodes"`
-	Edges          []FlowEdge                 `json:"edges"`
-	Unmatched      []FlowUnmatchedEvent       `json:"unmatched"`
-	Unobserved     []FlowUnobservedCorrection `json:"unobserved"`
-	Coverage       FlowCoverage               `json:"coverage"`
-	Totals         FlowTotals                 `json:"totals"`
-	Reconciliation FlowReconciliation         `json:"reconciliation"`
+	StartDate      IsoDate              `json:"startDate"`
+	EndDate        IsoDate              `json:"endDate"`
+	Nodes          []FlowNode           `json:"nodes"`
+	Edges          []FlowEdge           `json:"edges"`
+	Unmatched      []FlowUnmatchedEvent `json:"unmatched"`
+	Coverage       FlowCoverage         `json:"coverage"`
+	Totals         FlowTotals           `json:"totals"`
+	Reconciliation FlowReconciliation   `json:"reconciliation"`
 }

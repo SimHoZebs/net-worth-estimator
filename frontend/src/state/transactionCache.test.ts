@@ -24,11 +24,13 @@ function editCachedEvaluations(
 	serverQueryClient().setQueryData(key, { ...cached, evaluations });
 }
 
-function editCachedRows(edit: (rows: {
-	checkpoints: { AccountId: string; Balance: number; observedAt: number }[];
-	schedules: { id: string }[];
-	transactions: { id: string }[];
-}) => void) {
+function editCachedRows(
+	edit: (rows: {
+		checkpoints: { AccountId: string; Balance: number; observedAt: number }[];
+		schedules: { id: string }[];
+		transactions: { id: string }[];
+	}) => void,
+) {
 	const checkpointsKey = [...userResourceKey("checkpoints"), "", "", ""];
 	const schedulesKey = [...userResourceKey("rules"), ""];
 	const transactionsKey = [...userResourceKey("transactions"), ""];

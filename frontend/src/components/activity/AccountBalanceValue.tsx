@@ -1,10 +1,13 @@
 import { isLiability } from "../../domain/accountKinds.ts";
 import type { AccountEdit } from "./useAccountEdit.ts";
-import { exactMoney } from "../../domain/format.ts";
-import { parseDisplayNumber } from "../editors/formValues.ts";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@/components/ui/field.tsx";
 import {
 	InputGroup,
 	InputGroupAddon,
@@ -18,7 +21,20 @@ export function AccountBalanceValue({
 	edit: AccountEdit;
 	readOnly: boolean;
 }) {
-	const amount = parseDisplayNumber(edit.draft.balance);
+	const loading =
+		edit.balanceAtTimeQuery.isFetching || edit.balanceAtTimeQuery.isPending;
+	const failed = edit.balanceAtTimeQuery.isError;
+	const timeId = `${edit.formId}-time`;
+	const helpId = `${timeId}-help`;
+	const loadingId = `${timeId}-loading`;
+	const errorId = `${timeId}-error`;
+	const describedBy = [
+		helpId,
+		loading ? loadingId : null,
+		failed ? errorId : null,
+	]
+		.filter(Boolean)
+		.join(" ");
 	return (
 		<div className="flex min-w-0 flex-col items-start gap-2 pt-1 pb-2 md:items-end">
 			<Field orientation="vertical" className="w-full md:items-end">
@@ -58,12 +74,17 @@ export function AccountBalanceValue({
 				</InputGroup>
 			</Field>
 			{edit.observedAt !== null && (
-				<Field orientation="vertical" className="md:items-end">
-					<FieldLabel htmlFor={`${edit.formId}-time`}>
-						Adjustment time (UTC)
-					</FieldLabel>
+				<Field
+					orientation="vertical"
+					className="md:items-end"
+					data-invalid={failed ? "true" : undefined}
+				>
+					<FieldLabel htmlFor={timeId}>Balance time (UTC)</FieldLabel>
+					<FieldDescription id={helpId} className="m-0 text-xs md:text-right">
+						Transactions after this time update this balance.
+					</FieldDescription>
 					<Input
-						id={`${edit.formId}-time`}
+						id={timeId}
 						type="datetime-local"
 						step="1"
 						name="observedAt"
@@ -71,37 +92,32 @@ export function AccountBalanceValue({
 						readOnly={readOnly || edit.saving}
 						value={edit.observedAt}
 						onChange={(event) => edit.setObservedAt(event.target.value)}
+						aria-describedby={describedBy}
+						aria-invalid={failed ? true : undefined}
+						aria-busy={loading || undefined}
 					/>
-					{edit.previous.isFetching || edit.previous.isPending ? (
-						<p
-							role="status"
-							className="m-0 text-xs text-muted-foreground md:text-right"
+					{loading && (
+						<FieldDescription
+							id={loadingId}
+							className="m-0 text-xs md:text-right"
 						>
 							Loading balance at this time…
-						</p>
-					) : edit.previous.isError ? (
-						<p role="alert" className="m-0 text-sm text-destructive">
-							The balance could not be loaded.{" "}
+						</FieldDescription>
+					)}
+					{failed && (
+						<FieldError className="m-0 text-sm md:text-right">
+							<span id={errorId}>
+								The balance at this time could not be loaded.
+							</span>{" "}
 							<Button
 								type="button"
 								variant="link"
-								onClick={() => void edit.previous.refetch()}
+								onClick={() => void edit.balanceAtTimeQuery.refetch()}
 							>
 								Retry balance
 							</Button>
-						</p>
-					) : (
-						<p className="m-0 text-xs text-muted-foreground md:text-right">
-							Previous balance {exactMoney(edit.previousBalance!)}.{" "}
-							{amount !== null && (
-								<>Adjustment {exactMoney(amount - edit.previousBalance!)}.</>
-							)}
-						</p>
+						</FieldError>
 					)}
-					<p className="m-0 text-xs text-muted-foreground md:text-right">
-						Recorded in Balance history as a balance adjustment, not income or
-						spending.
-					</p>
 				</Field>
 			)}
 		</div>

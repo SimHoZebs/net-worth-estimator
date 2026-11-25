@@ -38,16 +38,22 @@ import {
 } from "./serverQuery.ts";
 import { toast } from "../components/ui/toast.tsx";
 import {
+	projectionRequest,
 	projectionResultToLocal,
 	stochasticResultToLocal,
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
+import {
+	normalizedEvaluations,
+	projectionSourceFromModel,
+} from "./projectionSource.ts";
 import { useUserScope } from "./useUserScope.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 import { useSavedAccounts } from "./savedState.ts";
 import {
 	useServerStatus,
 	useAmountPresets,
+	balancesQueryKey,
 	getAccountBalances,
 	presetsOptions,
 	statusOptions,
@@ -306,7 +312,6 @@ function projectionFixture(): ProjectionResult {
 					externalInflowAmount: 0,
 					externalOutflowAmount: 0,
 					internalTransferAmount: 0,
-					checkpointCorrections: [],
 				},
 				{
 					date: "2026-02-01",
@@ -329,7 +334,6 @@ function projectionFixture(): ProjectionResult {
 					externalInflowAmount: 100,
 					externalOutflowAmount: 0,
 					internalTransferAmount: 0,
-					checkpointCorrections: [],
 				},
 			],
 		},
@@ -861,6 +865,36 @@ describe("remote workspace state", () => {
 });
 
 describe("remote projection mapping and SSE", () => {
+	it("uses explicit projection starts while defaulting the production fallback to today", () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date("2026-11-25T12:00:00Z"));
+		const rows = {
+			evaluations: normalizedEvaluations(undefined),
+			checkpoints: [
+				{
+					AccountId: "cash",
+					Balance: 100,
+					observedAt: 1793492400,
+				},
+			],
+			schedules: [],
+			transactions: [],
+		};
+		expect(
+			projectionRequest({ ...rows, startDate: "2026-02-01" }, 2).settings
+				.fallbackProjectionStartDate,
+		).toBe("2026-02-01");
+		expect(
+			projectionRequest(rows, 2).settings.fallbackProjectionStartDate,
+		).toBe("2026-11-25");
+		const override = projectionSourceFromModel(modelFixture());
+		expect(override?.startDate).toBe("2026-01-31");
+		expect(
+			projectionRequest(override!, 2).settings.fallbackProjectionStartDate,
+		).toBe("2026-01-31");
+		vi.useRealTimers();
+	});
+
 	it("maps server rows, transaction events, totals, and threshold dates to the local projection", () => {
 		const model = modelFixture();
 		const result = projectionFixture();
@@ -1949,10 +1983,7 @@ describe("saved-state resource scope", () => {
 			"B cash",
 		);
 		expect(
-			serverQueryClient().getQueryData([
-				...userResourceKey("balances", first.scope),
-				"latest",
-			]),
+			serverQueryClient().getQueryData(balancesQueryKey(first.scope)),
 		).toBeUndefined();
 		second.rendered.unmount();
 		const sample = await mount(GUEST_USER_ID, "Cash");

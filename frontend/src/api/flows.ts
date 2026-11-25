@@ -9,7 +9,6 @@ import type {
 	FlowSourceRecord as GeneratedFlowSourceRecord,
 	FlowTotals as GeneratedFlowTotals,
 	FlowUnmatchedEvent as GeneratedFlowUnmatchedEvent,
-	FlowUnobservedCorrection as GeneratedFlowUnobservedCorrection,
 } from "./generated/model/index.ts";
 
 /**
@@ -46,7 +45,6 @@ export type FlowEdge = Omit<
 };
 
 export type FlowUnmatchedEvent = GeneratedFlowUnmatchedEvent;
-export type FlowUnobservedCorrection = GeneratedFlowUnobservedCorrection;
 
 export type FlowCoverage = Omit<
 	GeneratedFlowCoverage,
@@ -62,12 +60,11 @@ export type FlowReconciliation = GeneratedFlowReconciliation;
 
 export type FlowGraph = Omit<
 	GeneratedFlowGraph,
-	"nodes" | "edges" | "unmatched" | "unobserved" | "coverage"
+	"nodes" | "edges" | "unmatched" | "coverage"
 > & {
 	nodes: FlowNode[];
 	edges: FlowEdge[];
 	unmatched: FlowUnmatchedEvent[];
-	unobserved: FlowUnobservedCorrection[];
 	coverage: FlowCoverage;
 };
 
@@ -77,7 +74,6 @@ const REQUIRED_GRAPH_KEYS = [
 	"nodes",
 	"edges",
 	"unmatched",
-	"unobserved",
 	"coverage",
 	"totals",
 	"reconciliation",
@@ -169,18 +165,6 @@ function readUnmatched(value: Record<string, unknown>): FlowUnmatchedEvent {
 	};
 }
 
-function readUnobserved(
-	value: Record<string, unknown>,
-): FlowUnobservedCorrection {
-	return {
-		accountId: requiredString(value, "accountId"),
-		date: requiredString(value, "date"),
-		observedBalance: requiredNumber(value, "observedBalance"),
-		modeledBalance: requiredNumber(value, "modeledBalance"),
-		adjustment: requiredNumber(value, "adjustment"),
-	};
-}
-
 function readClassTotals(value: unknown): FlowClassTotals {
 	if (!isRecord(value)) throw invalid("totals class must be an object");
 	return {
@@ -196,7 +180,6 @@ function readTotals(value: unknown): FlowTotals {
 		actual: readClassTotals(value.actual),
 		projected: readClassTotals(value.projected),
 		unmatched: requiredNumber(value, "unmatched"),
-		unobserved: requiredNumber(value, "unobserved"),
 	};
 }
 
@@ -212,8 +195,6 @@ function readReconciliation(value: unknown): FlowReconciliation {
 		edgesInflow: requiredNumber(value, "edgesInflow"),
 		edgesOutflow: requiredNumber(value, "edgesOutflow"),
 		edgesTransfer: requiredNumber(value, "edgesTransfer"),
-		correctionsCount: requiredNumber(value, "correctionsCount"),
-		unobservedSum: requiredNumber(value, "unobservedSum"),
 		reconciled: requiredBoolean(value, "reconciled"),
 	};
 }
@@ -263,7 +244,6 @@ export function readFlowGraph(value: unknown): FlowGraph {
 		nodes: rowArray(value, "nodes").map(readNode),
 		edges: rowArray(value, "edges").map(readEdge),
 		unmatched: rowArray(value, "unmatched").map(readUnmatched),
-		unobserved: rowArray(value, "unobserved").map(readUnobserved),
 		coverage: readCoverage(value.coverage),
 		totals: readTotals(value.totals),
 		reconciliation: readReconciliation(value.reconciliation),

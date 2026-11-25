@@ -112,7 +112,7 @@ func TestUpgradeDeletesForwardNoOps(t *testing.T) {
 		}
 	}
 	if seen[at(8)] != 150.4 {
-		t.Fatalf("sub-dollar correction must survive: %+v", seen)
+		t.Fatalf("sub-dollar balance change must survive: %+v", seen)
 	}
 
 	again, err := upgrade(path, false)

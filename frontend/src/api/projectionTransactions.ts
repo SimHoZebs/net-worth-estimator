@@ -92,8 +92,7 @@ export function projectionTransactions(
 	const startCheckpoint =
 		options?.startCheckpoint ??
 		model?.checkpoints?.some(
-			(checkpoint) =>
-				isoDateFromEpochSeconds(checkpoint.observedAt) === start,
+			(checkpoint) => isoDateFromEpochSeconds(checkpoint.observedAt) === start,
 		) ??
 		false;
 	const sources = transactionSourceIndex(model);

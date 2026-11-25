@@ -9,9 +9,9 @@ import { currentPositionQueryKey, serverQueryClient } from "./serverQuery.ts";
 import { projectionModelKey } from "./projectionKeys.ts";
 import {
 	projectionStartDate,
-	projectionStartDateFromRows,
 	savedRowFingerprint,
 } from "./projectionSource.ts";
+import { todayIso } from "../domain/format.ts";
 import {
 	balancesOptions,
 	checkpointsOptions,
@@ -94,22 +94,13 @@ export function useCurrentPosition({
 			hasOverride ? projectionModelKey(baseModel) : rowRevision || "pending",
 		[hasOverride, baseModel, rowRevision],
 	);
-	const asOfDate = useMemo(() => {
-		if (hasOverride) return baseModel ? projectionStartDate(baseModel) : "";
-		if (!rowDataReady) return "";
-		return projectionStartDateFromRows({
-			checkpoints: checkpoints.data!.checkpoints,
-			schedules: schedules.data!.schedules,
-			transactions: transactions.data!.transactions,
-		});
-	}, [
-		hasOverride,
-		baseModel,
-		rowDataReady,
-		checkpoints.data,
-		schedules.data,
-		transactions.data,
-	]);
+	const asOfDate = hasOverride
+		? baseModel
+			? projectionStartDate(baseModel)
+			: ""
+		: rowDataReady
+			? todayIso()
+			: "";
 	const hasBase = hasOverride ? baseModel !== null : rowDataReady;
 	const rowsError = hasOverride
 		? null

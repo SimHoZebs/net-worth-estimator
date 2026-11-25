@@ -5,6 +5,8 @@ import type {
 	ServerStatus,
 } from "../api/index.ts";
 import { isLiability } from "../domain/accountKinds.ts";
+import { isoDate, todayIso } from "../domain/format.ts";
+import { literalAmountOf } from "../domain/transactionRows.ts";
 import { ok } from "./fetch.ts";
 import { transactionResponse } from "./transactionResponse.ts";
 
@@ -72,6 +74,102 @@ export function modelFixture(): FinancialModel {
 		],
 		paymentTerms: [],
 	};
+}
+
+/** Current balance rows at one exact cut: the latest applicable checkpoint
+ * plus later recorded actuals. Schedule occurrences stay projection-only. */
+export function balanceRowsAt(model: FinancialModel, cut = todayIso()) {
+	const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(cut);
+	const cutInstant = Math.floor(
+		Date.parse(dateOnly ? `${cut}T23:59:59Z` : cut) / 1000,
+	);
+	if (!Number.isFinite(cutInstant))
+		throw new Error("as-of cut must be a valid date or timestamp");
+	const asOf = isoDate(new Date(cutInstant * 1000));
+	if (dateOnly && asOf !== cut)
+		throw new Error("as-of cut must be a valid date or timestamp");
+	const balances = new Map<string, number>();
+	const latestByAccount = new Map<
+		string,
+		FinancialModel["checkpoints"][number]
+	>();
+	for (const checkpoint of model.checkpoints) {
+		if (checkpoint.observedAt > cutInstant) continue;
+		const latest = latestByAccount.get(checkpoint.AccountId);
+		if (!latest || checkpoint.observedAt >= latest.observedAt)
+			latestByAccount.set(checkpoint.AccountId, checkpoint);
+	}
+	for (const account of model.accounts)
+		balances.set(account.id, latestByAccount.get(account.id)?.Balance ?? 0);
+	for (const transaction of model.transactions) {
+		if (!transaction.enabled) continue;
+		const instant =
+			transaction.transactionTime > 0
+				? transaction.transactionTime
+				: transaction.postedTime;
+		if (instant <= 0 || instant > cutInstant) continue;
+		const amount = literalAmountOf(transaction.amount);
+		if (amount === null) continue;
+		const destinations = transaction.destinations ?? [];
+		if (amount < 0 && !transaction.sourceAccountId) {
+			let remainingLoss = -amount;
+			for (const destination of destinations) {
+				if (remainingLoss <= 0) break;
+				const latest = latestByAccount.get(destination);
+				if (latest && instant <= latest.observedAt) continue;
+				balances.set(
+					destination,
+					(balances.get(destination) ?? 0) - remainingLoss,
+				);
+				remainingLoss = 0;
+			}
+			continue;
+		}
+		if (transaction.sourceAccountId) {
+			const latest = latestByAccount.get(transaction.sourceAccountId);
+			if (!latest || instant > latest.observedAt)
+				balances.set(
+					transaction.sourceAccountId,
+					(balances.get(transaction.sourceAccountId) ?? 0) - amount,
+				);
+		}
+		let remaining = amount;
+		for (const destination of destinations) {
+			if (remaining <= 0) break;
+			const latest = latestByAccount.get(destination);
+			if (latest && instant <= latest.observedAt) continue;
+			balances.set(destination, (balances.get(destination) ?? 0) + remaining);
+			remaining = 0;
+		}
+	}
+	const accounts = model.accounts.map((account) => {
+		const latest = latestByAccount.get(account.id);
+		const observedBalance = latest?.Balance ?? null;
+		const balance = Math.round((balances.get(account.id) ?? 0) * 100) / 100;
+		const syncOwned = model.checkpoints.some(
+			(row) =>
+				row.AccountId === account.id &&
+				typeof row.source === "string" &&
+				row.source !== "" &&
+				row.source !== "user",
+		);
+		return {
+			...account,
+			balance,
+			observedOn: latest ? isoDate(new Date(latest.observedAt * 1000)) : asOf,
+			hasCheckpoint: latest !== undefined,
+			archived:
+				isLiability(account) &&
+				observedBalance !== null &&
+				Math.abs(observedBalance) < 0.005,
+			syncOwned,
+			readOnly: syncOwned,
+			observedBalance,
+			observedAt: latest?.observedAt ?? null,
+			availableBalance: latest?.availableBalance ?? null,
+		};
+	});
+	return { accounts, asOf };
 }
 
 export type PutCallback = (
@@ -237,66 +335,22 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			});
 		}
 		if (route === "/v1/accounts/balances" && method === "GET") {
-			const checkpoints = current.checkpoints as unknown as Record<
-				string,
-				unknown
-			>[];
-			let asOf = query.get("asOf") ?? "";
-			if (!asOf) {
-				let latest = 0;
-				for (const row of checkpoints) {
-					const instant = row.observedAt as number;
-					if (instant > latest) latest = instant;
-				}
-				asOf = latest
-					? new Date(latest * 1000).toISOString().slice(0, 10)
-					: new Date().toISOString().slice(0, 10);
-			}
-			const accounts = (
-				current.accounts as unknown as Record<string, unknown>[]
-			).map((account) => {
-				let latest: Record<string, unknown> | null = null;
-				let latestInstant = -1;
-				for (const row of checkpoints) {
-					const day = new Date((row.observedAt as number) * 1000)
-						.toISOString()
-						.slice(0, 10);
-					if (row.AccountId !== account.id || day > asOf) continue;
-					const instant = row.observedAt as number;
-					if (latest === null || instant >= latestInstant) {
-						latest = row;
-						latestInstant = instant;
-					}
-				}
-				// With fixture data the adjusted balance equals the latest observation.
-				const balance = latest ? (latest.Balance as number) : 0;
-				const syncOwned = checkpoints.some(
-					(row) =>
-						row.AccountId === account.id &&
-						typeof row.source === "string" &&
-						row.source !== "" &&
-						row.source !== "user",
+			try {
+				return ok({
+					...balanceRowsAt(current, query.get("asOf") || undefined),
+					revision: narrowRevision,
+				});
+			} catch (error) {
+				return new Response(
+					JSON.stringify({
+						detail:
+							error instanceof Error
+								? error.message
+								: "as-of cut must be a valid date or timestamp",
+					}),
+					{ status: 422, headers: { "content-type": "application/json" } },
 				);
-				return {
-					...account,
-					balance,
-					observedOn: latest
-						? new Date((latest.observedAt as number) * 1000)
-								.toISOString()
-								.slice(0, 10)
-						: asOf,
-					hasCheckpoint: latest !== null,
-					archived:
-						isLiability({ kind: account.kind }) &&
-						latest !== null &&
-						Math.abs(balance) < 0.005,
-					syncOwned,
-					readOnly: syncOwned,
-					observedBalance: latest ? latest.Balance : null,
-					observedAt: latest ? latestInstant : null,
-				};
-			});
-			return ok({ accounts, asOf, revision: narrowRevision });
+			}
 		}
 		if (route === "/v1/transactions" && method === "GET") {
 			const accountId = query.get("accountId") ?? "";

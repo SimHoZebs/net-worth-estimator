@@ -7,10 +7,10 @@ import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 // validates forecast evaluation configuration.
 // asOfDate is a "YYYY-MM-DD" date (inclusive end of that UTC day) or an RFC 3339 timestamp for an
 // exact cut: only events and observations at or before the cut apply, so
-// an 11:00 actual never affects a 10:00 balance. Balances are the adjusted
-// modeled balances at the cut, with the latest observation and its
-// timestamp carried per account, identical to the projection baseline at
-// the same cut.
+// an 11:00 actual never affects a 10:00 balance. Balances replay recorded
+// actuals only: the latest applicable checkpoint plus later transaction
+// effects. The latest observation and its timestamp travel separately,
+// identical to the projection baseline at the same cut.
 func ResolveCurrentPosition(model *types.FinancialModel, asOfDate string, overrides types.ModelOverrides) (*types.CurrentPosition, error) {
 	cutInstant, cutDay, err := ParseAsOfCut(asOfDate)
 	if err != nil {

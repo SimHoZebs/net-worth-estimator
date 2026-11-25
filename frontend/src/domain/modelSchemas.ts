@@ -57,8 +57,8 @@ export const accountSchema = z.object({
 	syncedName: z.string().trim().max(100).optional(),
 	// Bridge account currency from the sync link, e.g. USD.
 	currency: z.string().trim().max(16).optional(),
-	// Latest observation at or before the viewed date, separate from the
-	// adjusted modeled balance above. Missing means unobserved.
+	// Latest posted account total at or before the viewed date. The current
+	// balance above includes transaction effects after that observation.
 	observedBalance: z
 		.number()
 		.finite()

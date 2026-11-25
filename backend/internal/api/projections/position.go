@@ -2,6 +2,7 @@ package projections
 
 import (
 	"context"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
@@ -10,7 +11,7 @@ import (
 
 type positionRequestBody struct {
 	Model    *types.FinancialModel `json:"model,omitempty"`
-	AsOfDate string                `json:"asOfDate"`
+	AsOfDate string                `json:"asOfDate,omitempty" doc:"Cut YYYY-MM-DD or RFC 3339 instant; defaults to today's UTC date"`
 }
 
 type positionOutput struct {
@@ -26,7 +27,11 @@ func (s *handler) currentPosition(ctx context.Context, input *struct{ Body posit
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	result, err := domain.ResolveCurrentPosition(model, input.Body.AsOfDate, types.ModelOverrides{})
+	asOfDate := input.Body.AsOfDate
+	if asOfDate == "" {
+		asOfDate = time.Now().UTC().Format("2006-01-02")
+	}
+	result, err := domain.ResolveCurrentPosition(model, asOfDate, types.ModelOverrides{})
 	output := &positionOutput{}
 	if err != nil {
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {

@@ -409,19 +409,12 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 ### Transaction and recurrence-rule structure
 
 Transactions are single timed transactions: one record of money moved, carrying
-transaction time (the canonical occurred and display time) and posted time (when
-a bank settlement applies), both Unix seconds. A non-owner-authored bank row
-with positive posted time applies and groups by that posted instant. Owner-authored
-rows, including an empty source, remain transaction-time ordered with posted time
-as fallback; pending bank rows without a posted time also use transaction time.
-Claiming a pending bank hold without a posted date clears pending, enables the
-occurrence, and copies transaction time to posted time with an internal
-provisional marker. The first real bank posting or an owner save confirms the
-posted instant and clears that marker. Repetition is owned by recurrence rules,
-which expand into occurrences at
-projection time. A transaction with a `claim` (`scheduleId` plus
-`occurrenceDate`, both set manually) records the actual for one scheduled
-occurrence; history applies the actual and skips the generated occurrence.
+posted time (when the bank posts it) and transaction time (when the money
+moves), both Unix seconds. Repetition is owned by recurrence rules, which
+expand into occurrences at projection time. A transaction with a `claim`
+(`scheduleId` plus `occurrenceDate`, both set manually) records the actual for
+one scheduled occurrence; history applies the actual and skips the generated
+occurrence.
 
 Transaction and rule behavior is selected only by source and destination presence:
 
@@ -433,10 +426,10 @@ Transaction and rule behavior is selected only by source and destination presenc
 
 `enabled` controls participation. One-time transactions carry posted and
 transaction Unix times and always execute before scheduled rule
-occurrences on the same day, ordered by application instant, then raw
-transaction time, posted time, execution order, and declaration sequence. Rules
-carry `priority`, which orders rule occurrences after all one-time transactions
-on the same day; declaration sequence breaks priority ties.
+occurrences on the same day, ordered by transaction time, then posted
+time, then ID. Rules carry `priority`, which orders rule occurrences
+after all one-time transactions on the same day; declaration sequence breaks
+priority ties.
 
 A rule occurrence executes exactly on its scheduled date. Schedules use 365-day years, 52-week years, and clamped calendar-month/year addition.
 
@@ -508,38 +501,60 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 
 ## 7. Applying Recorded History and Checkpoints
 
-Historical preparation uses the same `TransitionRuntime` as projection execution.
+Historical preparation uses the same chronological `TransitionRuntime` as
+projection execution with two explicit history modes. Current mode replays
+checkpoints and recorded actual transactions only and supplies historical
+snapshots plus balance authority. Modeled mode also replays schedule occurrences
+solely to supply transaction ledgers, latest-realized amounts, and annual-cap
+state. Both modes use one sorted event list and one forward pass; neither uses
+per-account cutoff filtering.
 
 The as-of cut is a single instant: a `YYYY-MM-DD` date means the end of
-that UTC day (inclusive); an RFC 3339 timestamp means
-that exact instant. Only events and observations at or before the cut
-are applied; everything after it is future. Observations after the projection
-start are invalid.
+that UTC day (inclusive); an RFC 3339 timestamp means that exact instant.
+Only events and observations at or before the cut are applied; everything
+after it is future. Projection preparation rejects observations after its
+start; finance reads ignore them without mutating the model.
 
-- History is one sorted event list, one forward pass: each transaction at its
-  effective instant (bank rows with positive posted time at that posted instant;
-  owner rows and pending bank rows without one at transaction time; rules at the
-  day-close of their date) and each observation at its exact instant. No date-wide
-  gates, no per-day phases, no identity-suppression maps. Claimed rule occurrences
-  are never applied.
-- Ties execute transactions before observations so a rule at 23:59:59 anchors
-  before an observation at the same instant; owner observations execute
-  last at the same instant. Daily snapshots sample the resulting state;
-  they are not alternative execution phases.
-- Observations SET their account balance; transactions CHANGE balances; a
-  later observation SETS again and records the observed-vs-modeled
-  discrepancy as a checkpoint correction. Each anchor is per-account and
-  absolute. Observations sort by instant, so arrival order never matters
-  and a backdated observation cannot roll the latest state back.
-- Confirmed one-time actuals move their recorded amount. Generated modeled
-  rules keep hypothetical funding clamps and caps; pending/void rows never
-  move.
-- The simulation continues after the same cut instant, skipping
-  already-applied occurrences so nothing executes twice.
+- Transactions execute at their stored Unix time, including 00:00. Modeled
+  rule occurrences execute at the day-close of their date. Claimed rule
+  occurrences are never applied.
+- Transactions execute before observations on a tie; owner observations
+  execute last at the same instant. Daily snapshots sample the resulting
+  state; they are not alternative execution phases.
+- A checkpoint authoritatively SETS its account total. Later recorded actuals
+  CHANGE that total. Observations sort by instant, so arrival order never
+  matters and a backdated observation cannot roll the latest state back.
+  No previous balance, adjustment, or checkpoint correction is derived.
+- Confirmed one-time actuals move their recorded amount. Modeled rules keep
+  hypothetical funding clamps and caps; pending/void rows stay out through
+  `Enabled`.
+- The simulation continues after the same cut instant, skipping occurrences
+  already represented in history so nothing executes twice.
 
-Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Applying recorded history still updates balances, latest realized transaction amounts, and annual-cap state for later projection and amount providers. `GET /v1/accounts/balances` and `POST /v1/position` report the same applied result: adjusted modeled balances with the latest observation (balance plus timestamp) carried separately per account, never a folded latest checkpoint.
+`ResolveCurrentPosition`, `GET /v1/accounts/balances`, and no-op checkpoint
+pruning use current mode. Current balance is therefore the latest applicable
+checkpoint plus later recorded actuals, starting from zero when no checkpoint
+applies, while `ObservedBalance` and `ObservedAt` retain the latest observed
+total separately. The account-list
+cut defaults to today's UTC date, and an omitted position cut does the same.
 
-`BuildProjectionPath` prefixes these historical observations with projected snapshots. `ProjectionRow.isHistorical` marks the boundary.
+`PrepareSimulationRequest` applies overrides and validation once, computes
+the actual-only balance baseline and historical snapshots, and separately
+retains modeled latest-realized and annual-cap ledgers. Projection starting
+balances, historical rows, and `Summary.CurrentNetWorth` use the actual-only
+replay, so the timeline converges to the current baseline without a jump.
+Projected rows continue from it. If no projected row exists, ending balances
+and final net worth remain the current baseline. Future schedule expansion,
+amount providers, and evaluations keep their chronological behavior and
+receive the modeled transaction ledgers.
+
+No-op pruning compares each raw checkpoint balance with the current-mode
+balance immediately before its reset, within float tolerance. Scheduled
+guesses do not make a bank checkpoint look redundant, and changed available
+balance remains separate evidence that keeps the row.
+
+`BuildProjectionPath` prefixes actual-only historical observations with projected
+snapshots. `ProjectionRow.isHistorical` marks the boundary.
 
 ## 8. Deterministic Kernel
 
@@ -730,7 +745,7 @@ the user correction overlay.
 
 `Runner.Sync` delegates to the ingest orchestrator with the SimpleFIN adapter. Until the workspace records its first successful sync, the orchestrator requests the previous 90 days. Later runs request a rolling 30 days, even after longer gaps or new bank connections. Both windows end at the current instant and include pending data, within the Bridge's 90-day request limit. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. The checkpoint also carries the Bridge's `available-balance` when present in the additive `checkpoint_available_balances` sidecar. The posted balance remains the sole net-worth authority; available balance is nullable evidence for safe-spending and card headroom. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at their application instant: the translation emits them enabled, positive posted time governs bank balance history and projection chronology, and transaction time remains the canonical occurred and display time. History application executes them through the same actual path as owner transactions. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances. A claimed pending hold becomes an enabled occurrence with a provisional posted instant copied from occurred time; the sparse `transaction_provisional_postings` satellite records that state explicitly. One real same-key posting clears the marker and applies the final values even when its posted instant equals occurred time. Pending refreshes preserve the marker, and an owner save clears it.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at transaction time: the translation emits them enabled with the event time normalized to the posted instant, and history application executes them through the same actual path as manual transactions. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
 
 One-off legacy interpretation, stated plainly: in databases written
 before this change, a disabled settled bank row does not distinguish the

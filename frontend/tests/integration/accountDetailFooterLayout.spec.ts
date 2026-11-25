@@ -1,9 +1,9 @@
 import { expect, test, type Locator, type Page } from "./base.ts";
 
 // The account page used a sticky footer inside the document scroll, so on a
-// phone it covered the last balance-history row. Mobile now pins the footer
-// to the viewport as a parent-level surface while the page reserves matching
-// scroll space; desktop keeps its original sticky inline bar.
+// phone it covered the last activity row. Mobile now pins the footer to the
+// viewport as a parent-level surface while the page reserves matching scroll
+// space; desktop keeps its original sticky inline bar.
 const ACTION_BAR = "[data-account-action-bar]";
 
 async function openAccount(page: Page, path = "/accounts/checking") {
@@ -76,19 +76,19 @@ test.describe("account detail mobile action bar", () => {
 		await assertMobileGeometry(page, await openAccount(page));
 	});
 
-	test("scrolls the last balance-history row fully above the bar", async ({
+	test("scrolls the last activity row fully above the bar", async ({
 		page,
 	}) => {
 		const bar = await openAccount(page);
-		const history = page.locator('section[aria-label="Balance history"]');
-		await expect(history).toBeVisible();
+		const activity = page.locator('[data-slot="tabs-content"]').first();
+		await expect(activity).toBeVisible();
 		const before = await bar.boundingBox();
 		expect(await scrollToBottom(page)).toBeGreaterThan(0);
 		const after = await bar.boundingBox();
 		expect(after!.y).toBeCloseTo(before!.y, 0);
-		const historyBox = await history.boundingBox();
-		expect(historyBox).not.toBeNull();
-		expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(
+		const activityBox = await activity.boundingBox();
+		expect(activityBox).not.toBeNull();
+		expect(activityBox!.y + activityBox!.height).toBeLessThanOrEqual(
 			after!.y + 1,
 		);
 	});
@@ -137,12 +137,12 @@ test.describe("account detail narrow mobile action bar", () => {
 	}) => {
 		const bar = await openAccount(page);
 		await assertMobileGeometry(page, bar);
-		const history = page.locator('section[aria-label="Balance history"]');
-		await expect(history).toBeVisible();
+		const activity = page.locator('[data-slot="tabs-content"]').first();
+		await expect(activity).toBeVisible();
 		expect(await scrollToBottom(page)).toBeGreaterThan(0);
 		const barBox = await bar.boundingBox();
-		const historyBox = await history.boundingBox();
-		expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(
+		const activityBox = await activity.boundingBox();
+		expect(activityBox!.y + activityBox!.height).toBeLessThanOrEqual(
 			barBox!.y + 1,
 		);
 	});
@@ -165,10 +165,10 @@ test.describe("account detail long transaction list", () => {
 		expect(await scrollToBottom(page)).toBeGreaterThan(0);
 		const after = await bar.boundingBox();
 		expect(after!.y).toBeCloseTo(before.y, 0);
-		const history = page.locator('section[aria-label="Balance history"]');
-		const historyBox = await history.boundingBox();
-		expect(historyBox).not.toBeNull();
-		expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(
+		const activity = page.locator('[data-slot="tabs-content"]').first();
+		const activityBox = await activity.boundingBox();
+		expect(activityBox).not.toBeNull();
+		expect(activityBox!.y + activityBox!.height).toBeLessThanOrEqual(
 			after!.y + 1,
 		);
 	});

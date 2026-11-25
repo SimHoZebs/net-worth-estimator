@@ -20,10 +20,16 @@ Use **transaction** for a recorded movement. The saved model's "Transactions" ta
 
 ## B. Balance check
 
-A recorded account balance that corrects modeled history for that account.
-A check carries its exact observation time.
+A recorded account total that authoritatively resets that account at its
+exact observation time. Several checks per account per day survive. A later
+check replaces the earlier total at its own instant; arrival order does not
+change chronology.
 
 Use **balance check**. Its date column is **balance**; its tab is "Balance checks".
+**Observed total** is the latest checkpoint balance at the requested cut.
+**Current balance** is that observed total plus later recorded actual
+transactions. Unclaimed scheduled guesses do not change current balance.
+Source identifies provenance and idempotency, not balance mathematics.
 Recorded-history application order is owned in
 [Applying Recorded History and Checkpoints](../TECHNICAL_OVERVIEW.md#7-applying-recorded-history-and-checkpoints).
 

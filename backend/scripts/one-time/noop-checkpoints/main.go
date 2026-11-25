@@ -1,7 +1,7 @@
 // This standalone, one-time operator script removes historical forward
-// bank checkpoints whose posted balance matches the modeled balance at their
-// instant. Such a checkpoint sets the balance to the value it already has,
-// so it reconciles nothing and need not occupy a row. The runtime sync path
+// bank checkpoints whose posted balance matches the recorded-actual balance
+// at their instant. Such a checkpoint sets the balance to the value it already
+// has and need not occupy a row. Scheduled guesses do not participate. The runtime sync path
 // already skips these rows for new observations; this tool prunes rows that
 // predate that guard. Neither the server nor setupdb calls it.
 package main
@@ -192,8 +192,8 @@ func upgrade(path string, dryRun bool) (counts, error) {
 	return result, nil
 }
 
-// deletableKeys returns the forward sync-owned observations with an exact
-// zero delta. An error reports a history-application failure: the caller skips that user
+// deletableKeys returns forward sync-owned observations whose raw balance
+// exactly matches the recorded-actual balance before their reset. An error reports a history-application failure: the caller skips that user
 // without deleting anything. First observations are always kept: they
 // establish coverage even when the opening balance already matches.
 func deletableKeys(model *types.FinancialModel) ([]deletable, error) {
@@ -206,7 +206,7 @@ func deletableKeys(model *types.FinancialModel) ([]deletable, error) {
 	if latest <= 0 {
 		return nil, nil
 	}
-	zero, err := domain.ZeroDeltaObservations(model, time.Unix(latest, 0).UTC().Format(time.RFC3339))
+	noop, err := domain.NoopCheckpointKeys(model, time.Unix(latest, 0).UTC().Format(time.RFC3339))
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func deletableKeys(model *types.FinancialModel) ([]deletable, error) {
 				continue
 			}
 			key := domain.ObservationKey{AccountID: checkpoint.AccountID, ObservedAt: checkpoint.ObservedAt}
-			if _, ok := zero[key]; !ok {
+			if _, ok := noop[key]; !ok {
 				continue
 			}
 			prev := list[i-1]

@@ -23,7 +23,12 @@ export function transactionRemovalNeedsProjectionRefresh(id: string): boolean {
 	const checkpoints = getCheckpoints()?.checkpoints ?? null;
 	const schedules = getScheduleList()?.schedules ?? null;
 	const transactions = getTransactionList()?.transactions ?? null;
-	if (!summary || checkpoints === null || schedules === null || transactions === null)
+	if (
+		!summary ||
+		checkpoints === null ||
+		schedules === null ||
+		transactions === null
+	)
 		return true;
 	const evaluations = summary.evaluations;
 	for (const evaluation of evaluations.transactionFulfillment) {

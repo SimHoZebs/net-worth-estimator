@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -86,8 +87,8 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(balanceRows[0], &balance); err != nil {
 		t.Fatalf("decode balance row: %v", err)
 	}
-	if balance.Balance != 110 || balance.ObservedOn != "2026-01-31" || !balance.HasCheckpoint || balance.Archived {
-		t.Fatalf("balance row = %+v, want 110 on 2026-01-31 (start-day rule in history), checked, active", balance)
+	if balance.Balance != 100 || balance.ObservedOn != "2026-01-31" || !balance.HasCheckpoint || balance.Archived {
+		t.Fatalf("balance row = %+v, want current 100 on 2026-01-31 (start-day schedule omitted), checked, active", balance)
 	}
 
 	transactions := get("/v1/transactions?accountId=" + accountID)
@@ -416,7 +417,7 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 
 func ptr(s string) *string { return &s }
 
-func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
+func TestAccountBalancesReportCurrentSeparatelyFromObserved(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 
@@ -463,13 +464,81 @@ func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
 	}
 	row := payload.Accounts[0]
 	if row.Balance != 900 {
-		t.Fatalf("adjusted balance = %v, want 900 (must not fold the latest checkpoint)", row.Balance)
+		t.Fatalf("current balance = %v, want 900 (checkpoint plus later actual)", row.Balance)
 	}
 	if row.ObservedBalance == nil || *row.ObservedBalance != 1000 {
 		t.Fatalf("observed balance = %+v, want 1000 separately", row.ObservedBalance)
 	}
 	if row.ObservedAt == nil || *row.ObservedAt != 1773133200 {
 		t.Fatalf("observed timestamp = %+v, want the exact instant", row.ObservedAt)
+	}
+}
+
+func TestCurrentReadsDefaultToTodayWithActualsAndNoScheduledGuesses(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	todayISO := today.Format("2006-01-02")
+	checkpointAt := today.Add(-12 * time.Hour).Unix()
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 1000, Source: store.SourceUser, ObservedAt: checkpointAt}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.CreateTransaction(types.Transaction{
+		ID: "01900000-0000-7000-8000-000000000041", Name: "Today actual", SourceAccountID: ptr("checking"),
+		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}, Inputs: map[string]types.AmountInputBinding{}},
+		TransactionTime: today.Unix(), PostedTime: today.Unix(), Enabled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.CreateSchedule(types.Schedule{
+		ID: "01900000-0000-7000-8000-000000000042", Name: "Today guess", SourceAccountID: ptr("checking"),
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "75"}, Inputs: map[string]types.AmountInputBinding{}},
+		Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+		StartDate:  todayISO, Enabled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	balances := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances", "")
+	if balances.Code != http.StatusOK {
+		t.Fatalf("default balances status = %d, body %s", balances.Code, balances.Body.String())
+	}
+	var payload struct {
+		AsOf     string `json:"asOf"`
+		Accounts []struct {
+			Balance         float64  `json:"balance"`
+			ObservedBalance *float64 `json:"observedBalance"`
+			ObservedAt      *int64   `json:"observedAt"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal(balances.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	nextISO := today.AddDate(0, 0, 1).Format("2006-01-02")
+	if (payload.AsOf != todayISO && payload.AsOf != nextISO) || len(payload.Accounts) != 1 {
+		t.Fatalf("default balances = %+v, want today's one-account read", payload)
+	}
+	row := payload.Accounts[0]
+	if row.Balance != 900 || row.ObservedBalance == nil || *row.ObservedBalance != 1000 || row.ObservedAt == nil || *row.ObservedAt != checkpointAt {
+		t.Fatalf("default balance row = %+v, want current 900 and observed 1000", row)
+	}
+
+	position := doRowRequest(t, handler, http.MethodPost, "/v1/position", `{}`)
+	if position.Code != http.StatusOK {
+		t.Fatalf("default position status = %d, body %s", position.Code, position.Body.String())
+	}
+	var positionPayload struct {
+		Result *types.CurrentPosition `json:"result"`
+	}
+	if err := json.Unmarshal(position.Body.Bytes(), &positionPayload); err != nil {
+		t.Fatal(err)
+	}
+	if positionPayload.Result == nil || positionPayload.Result.AsOfDate != payload.AsOf || len(positionPayload.Result.Accounts) != 1 || positionPayload.Result.Accounts[0].Balance != 900 {
+		t.Fatalf("default position = %+v, want the same actual-only current cut as balances", positionPayload.Result)
 	}
 }
 

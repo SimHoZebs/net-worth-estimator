@@ -1,9 +1,9 @@
 # One-time no-op checkpoint prune
 
 This standalone script removes historical forward bank checkpoints whose
-posted balance matches the modeled balance at their instant. Such a
-checkpoint sets the balance to the value it already has, so it reconciles
-nothing and need not occupy a row. The runtime sync path already skips these
+posted balance matches the recorded-actual balance at their instant. Such a
+checkpoint sets the balance to the value it already has and need not occupy a
+row. Unclaimed scheduled guesses do not participate in the comparison. The runtime sync path already skips these
 rows for new observations; this tool prunes rows that predate that guard.
 It has no imports from the server runtime path. The server and `setupdb`
 never invoke it.
@@ -30,7 +30,7 @@ A model whose recorded history cannot be applied skips that user without deletin
 first observations, owner-authored rows, and forward observations carrying a
 changed available balance are always kept. Intermediate zero-delta rows are
 safe to remove in chronological order because setting the balance to its
-modeled value is a history-application no-op. Repeated
+recorded-actual value is a history-application no-op. Repeated
 execution deletes nothing further. A `--dry-run` flag reports deletable rows
 without deleting. Restore the backup to undo a completed prune. Do not use
 an older server with the new data.

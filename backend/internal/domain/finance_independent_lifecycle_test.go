@@ -97,7 +97,7 @@ func TestCurrentPositionIndependentOfEveryEvaluationOwnedCheck(t *testing.T) {
 			t.Fatalf("%s: current position must not fail, got %v", name, err)
 		}
 		if got := position.Accounts[0].Balance; got != 900 {
-			t.Fatalf("%s: adjusted balance = %v, want 900", name, got)
+			t.Fatalf("%s: current balance = %v, want 900", name, got)
 		}
 	}
 }

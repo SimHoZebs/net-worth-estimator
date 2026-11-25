@@ -49,6 +49,22 @@ func flowsBody(t *testing.T, r *projectionRange) []byte {
 	return raw
 }
 
+func assertExactJSONKeys(t *testing.T, raw json.RawMessage, want ...string) {
+	t.Helper()
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil {
+		t.Fatal(err)
+	}
+	if len(object) != len(want) {
+		t.Fatalf("JSON keys = %+v, want exactly %v", object, want)
+	}
+	for _, key := range want {
+		if _, ok := object[key]; !ok {
+			t.Fatalf("JSON keys = %+v, missing %q", object, key)
+		}
+	}
+}
+
 func decodeFlowGraph(t *testing.T, response *httptest.ResponseRecorder) *types.FlowGraph {
 	t.Helper()
 	if response.Code != http.StatusOK {
@@ -68,13 +84,28 @@ func decodeFlowGraph(t *testing.T, response *httptest.ResponseRecorder) *types.F
 
 // The flows endpoint exposes the VIS-01 graph contract over the same
 // simulation as the deterministic projection: directed edges with source
-// records, unmatched and unobserved buckets, coverage, and reconciled
-// totals.
+// records, unmatched events, coverage, and reconciled totals.
 func TestFlowsGraphReconcilesWithSourceRecords(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 
-	graph := decodeFlowGraph(t, flowsRequest(t, handler, flowsBody(t, fullSpanRange())))
+	response := flowsRequest(t, handler, flowsBody(t, fullSpanRange()))
+	graph := decodeFlowGraph(t, response)
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	assertExactJSONKeys(t, envelope["graph"], "startDate", "endDate", "nodes", "edges", "unmatched", "coverage", "totals", "reconciliation")
+	var graphPayload map[string]json.RawMessage
+	if err := json.Unmarshal(envelope["graph"], &graphPayload); err != nil {
+		t.Fatal(err)
+	}
+	assertExactJSONKeys(t, graphPayload["totals"], "actual", "projected", "unmatched")
+	assertExactJSONKeys(t, graphPayload["reconciliation"],
+		"windowEvents", "classifiedEvents", "unmatchedEvents",
+		"eventsInflow", "eventsOutflow", "eventsTransfer",
+		"edgesInflow", "edgesOutflow", "edgesTransfer", "reconciled",
+	)
 	if len(graph.Edges) == 0 {
 		t.Fatal("flows graph has no edges")
 	}
@@ -109,8 +140,8 @@ func TestFlowsGraphReconcilesWithSourceRecords(t *testing.T) {
 		reconciliation.EdgesTransfer != graph.Totals.Actual.Transfer+graph.Totals.Projected.Transfer {
 		t.Errorf("totals %+v disagree with reconciliation %+v", graph.Totals, reconciliation)
 	}
-	if graph.Unmatched == nil || graph.Unobserved == nil {
-		t.Error("graph must always carry unmatched and unobserved arrays")
+	if graph.Unmatched == nil {
+		t.Error("graph must always carry the unmatched array")
 	}
 }
 

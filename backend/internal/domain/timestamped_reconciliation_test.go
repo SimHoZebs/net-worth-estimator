@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func TestTimestampedSameDayObservationAndLaterActual(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := position.Accounts[0].Balance; got != 900 {
-		t.Fatalf("adjusted balance = %v, want 900 (09:00 observed 1000, 11:00 actual -100)", got)
+		t.Fatalf("current balance = %v, want 900 (09:00 observed 1000, 11:00 actual -100)", got)
 	}
 	// At noon the 15:00 observation is still future: the observed side
 	// carries the 09:00 anchor, separate from the adjusted 900.
@@ -53,8 +54,8 @@ func TestTimestampedSameDayObservationAndLaterActual(t *testing.T) {
 	}
 }
 
-// Later 15:00 observation 850 anchors again with a -50 correction and no
-// provisional layer.
+// Later 15:00 observation 850 resets the account again with no provisional
+// layer or derived reconciliation row.
 func TestTimestampedLaterObservationAnchorsAgain(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints[1].Balance = 850
@@ -63,14 +64,13 @@ func TestTimestampedLaterObservationAnchorsAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := applied.state.Balances["checking"]; got != 850 {
-		t.Fatalf("adjusted balance = %v, want 850", got)
+		t.Fatalf("balance = %v, want 850", got)
 	}
-	corrections := applied.snapshots[0].CheckpointCorrections
-	if len(corrections) != 2 {
-		t.Fatalf("two same-day observations must both anchor, got %+v", corrections)
+	if len(applied.snapshots) != 1 || applied.snapshots[0].Balances["checking"] != 850 {
+		t.Fatalf("daily snapshot must sample the final reset: %+v", applied.snapshots)
 	}
-	if corrections[1].ModeledBalance != 900 || corrections[1].Adjustment != -50 {
-		t.Fatalf("later observation must record observed-vs-modeled diff, got %+v", corrections[1])
+	if observed := applied.latestObserved["checking"]; observed.Balance != 850 || observed.ObservedAt != unixAt(10, 15) {
+		t.Fatalf("latest observation = %+v, want the 15:00 reset", observed)
 	}
 }
 
@@ -173,9 +173,11 @@ func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 	if got := applied.state.Balances[account]; got != 850 {
 		t.Fatalf("latest-instant anchor must win regardless of arrival order, got %v", got)
 	}
-	corrections := applied.snapshots[0].CheckpointCorrections
-	if len(corrections) != 3 {
-		t.Fatalf("every stored observation anchors in instant order, got %+v", corrections)
+	if len(applied.snapshots) != 1 || applied.snapshots[0].Balances[account] != 850 {
+		t.Fatalf("stale arrival must not change the final daily snapshot: %+v", applied.snapshots)
+	}
+	if observed := applied.latestObserved[account]; observed.ObservedAt != unixAt(10, 15) || observed.Balance != 850 {
+		t.Fatalf("latest observation = %+v, want the 15:00 reset", observed)
 	}
 }
 
@@ -197,12 +199,11 @@ func TestTimestampedTiePolicyTransactionsFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	corrections := applied.snapshots[0].CheckpointCorrections
-	if len(corrections) != 1 {
-		t.Fatalf("expected one correction, got %+v", corrections)
+	if got := applied.state.Balances[account]; got != 1000 {
+		t.Fatalf("observation at t must reset after the tied transaction: got %v, want 1000", got)
 	}
-	if corrections[0].ModeledBalance != -100 || corrections[0].Adjustment != 1100 {
-		t.Fatalf("observation at t must include events at t (transactions first): %+v", corrections[0])
+	if observed := applied.latestObserved[account]; observed.ObservedAt != instant || observed.Balance != 1000 {
+		t.Fatalf("latest observation = %+v, want the tied reset", observed)
 	}
 }
 
@@ -321,7 +322,7 @@ func TestEnabledAloneDecidesExecutionRegardlessOfLifecycle(t *testing.T) {
 	}
 }
 
-func TestPositionAndProjectionBaselineAgree(t *testing.T) {
+func TestPositionAndProjectionBaselineShareActualOnlyReset(t *testing.T) {
 	account := "checking"
 	model := observerFixture()
 	position, err := ResolveCurrentPosition(model, "2026-03-10", types.ModelOverrides{})
@@ -534,12 +535,8 @@ func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 	if got := applied.state.Balances[account]; got != 850 {
 		t.Fatalf("balance = %v, want 850 (later anchor absorbs the actual)", got)
 	}
-	corrections := applied.snapshots[0].CheckpointCorrections
-	if len(corrections) != 2 {
-		t.Fatalf("corrections = %+v, want both anchors recorded once", corrections)
-	}
-	if corrections[1].ModeledBalance != 900 || corrections[1].Adjustment != -50 {
-		t.Fatalf("later anchor must absorb the 11:00 actual exactly once: %+v", corrections[1])
+	if observed := applied.latestObserved[account]; observed.ObservedAt != unixAt(10, 15) || observed.Balance != 850 {
+		t.Fatalf("later reset must absorb the 11:00 actual exactly once: %+v", observed)
 	}
 }
 
@@ -595,5 +592,236 @@ func TestImportedTransferLegsAnchorIndependently(t *testing.T) {
 	}
 	if balances[a] != 950 || balances[b] != 200 {
 		t.Fatalf("balances = %+v, want checking 950 and savings 200 (independent anchors)", balances)
+	}
+}
+
+func TestCheckpointMismatchProducesNoDerivedSnapshotFields(t *testing.T) {
+	account := "checking"
+	model := &types.FinancialModel{
+		Accounts: []types.Account{cashAccount(account)},
+		Checkpoints: []types.Checkpoint{{
+			AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9),
+		}},
+		Transactions: []types.Transaction{{
+			ID: "before-reset", Name: "Before reset", SourceAccountID: &account,
+			Amount: expenseAmount("100"), TransactionTime: unixAt(10, 8), PostedTime: unixAt(10, 8), Enabled: true,
+		}},
+		Evaluations: types.EmptyEvaluationTables(),
+	}
+	applied, err := applyChronologicalHistory(model, "2026-03-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := applied.state.Balances[account]; got != 1000 {
+		t.Fatalf("checkpoint reset = %v, want 1000", got)
+	}
+	raw, err := json.Marshal(applied.snapshots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshots []map[string]any
+	if err := json.Unmarshal(raw, &snapshots); err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshots) != 1 || len(snapshots[0]) != 2 {
+		t.Fatalf("historical snapshot must carry only date and balances: %s", raw)
+	}
+}
+
+func TestCheckpointSourceDoesNotChangeResetSemantics(t *testing.T) {
+	for _, source := range []string{"user", "banksync"} {
+		t.Run(source, func(t *testing.T) {
+			account := "checking"
+			model := &types.FinancialModel{
+				Accounts: []types.Account{cashAccount(account)},
+				Checkpoints: []types.Checkpoint{{
+					AccountID: account, Balance: 1000, Source: source, ObservedAt: unixAt(10, 9),
+				}},
+				Transactions: []types.Transaction{
+					{ID: "before", Name: "Before", SourceAccountID: &account, Amount: expenseAmount("25"), TransactionTime: unixAt(10, 8), PostedTime: unixAt(10, 8), Enabled: true},
+					{ID: "after", Name: "After", SourceAccountID: &account, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true},
+				},
+				Evaluations: types.EmptyEvaluationTables(),
+			}
+			position, err := ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if position.Accounts[0].Balance != 950 || position.Accounts[0].ObservedBalance == nil || *position.Accounts[0].ObservedBalance != 1000 {
+				t.Fatalf("current position = %+v, want current 950 and observed 1000", position.Accounts[0])
+			}
+			prepared, err := PrepareSimulationRequest(model, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1}, types.ModelOverrides{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if prepared.Request.InitialState.Balances[account] != 950 {
+				t.Fatalf("projection baseline = %v, want 950", prepared.Request.InitialState.Balances[account])
+			}
+		})
+	}
+}
+
+func TestScheduledBillAfterCheckpointDoesNotMoveCurrentButProjectsLater(t *testing.T) {
+	account := "checking"
+	cap := 150.0
+	end := "2026-12-31"
+	model := &types.FinancialModel{
+		Accounts: []types.Account{cashAccount(account)},
+		Checkpoints: []types.Checkpoint{{
+			AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9),
+		}},
+		Schedules: []types.Schedule{{
+			ID: "bill", Name: "Bill", SourceAccountID: &account, Amount: expenseAmount("100"),
+			Recurrence: monthlyTestRecurrence(), StartDate: "2026-03-11", EndDate: &end, AnnualCap: &cap, Enabled: true,
+		}},
+		Evaluations: types.EmptyEvaluationTables(),
+	}
+	position, err := ResolveCurrentPosition(model, "2026-03-12", types.ModelOverrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if position.Accounts[0].Balance != 1000 {
+		t.Fatalf("scheduled guess moved current balance to %v, want 1000", position.Accounts[0].Balance)
+	}
+	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-12", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables()}
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.Request.InitialState.Balances[account] != 1000 {
+		t.Fatalf("projection baseline = %v, want actual-only 1000", prepared.Request.InitialState.Balances[account])
+	}
+	path, result, err := ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := historicalBalance(t, path, "2026-03-10", account); got != 1000 {
+		t.Fatalf("actual-only historical checkpoint = %v, want 1000", got)
+	}
+	if hasHistoricalRow(path, "2026-03-11") {
+		t.Fatal("scheduled guess must not create a historical balance row")
+	}
+	var lastHistorical *types.ProjectionRow
+	for index := range path.Rows {
+		if path.Rows[index].IsHistorical {
+			lastHistorical = &path.Rows[index]
+		}
+	}
+	if lastHistorical == nil || lastHistorical.Date != "2026-03-10" || lastHistorical.NetWorth != prepared.Request.InitialState.Balances[account] {
+		t.Fatalf("historical timeline must converge to the actual-only baseline: %+v", lastHistorical)
+	}
+	if got := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear["bill"]["2026"]; got != 100 {
+		t.Fatalf("historical schedule cap ledger = %v, want 100", got)
+	}
+	if result.Summary.CurrentNetWorth != 1000 || result.AccountSummaries[0].StartingBalance != 1000 {
+		t.Fatalf("projection current summary = %+v, want actual-only 1000", result.Summary)
+	}
+	futureMoves := 0
+	for _, event := range result.TransactionEvents {
+		if event.Origin.TransactionID != "bill" || event.RealizedAmount == 0 {
+			continue
+		}
+		futureMoves++
+		if event.Date != "2026-04-11" || event.RealizedAmount != 50 {
+			t.Fatalf("future scheduled bill = %+v, want 50 on 2026-04-11 after the historical cap", event)
+		}
+	}
+	if futureMoves != 1 || result.Summary.FinalNetWorth != 950 {
+		t.Fatalf("future moves = %d, final = %v, want one move and 950", futureMoves, result.Summary.FinalNetWorth)
+	}
+}
+
+func TestRecordedActualAfterCheckpointMovesCurrentAndProjectionOnce(t *testing.T) {
+	account := "checking"
+	model := &types.FinancialModel{
+		Accounts: []types.Account{cashAccount(account)},
+		Checkpoints: []types.Checkpoint{{
+			AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9),
+		}},
+		Transactions: []types.Transaction{{
+			ID: "actual", Name: "Actual", SourceAccountID: &account, Amount: expenseAmount("100"),
+			TransactionTime: unixAt(11, 11), PostedTime: unixAt(11, 11), Enabled: true, Source: "banksync",
+		}},
+		Evaluations: types.EmptyEvaluationTables(),
+	}
+	position, err := ResolveCurrentPosition(model, "2026-03-12", types.ModelOverrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if position.Accounts[0].Balance != 900 {
+		t.Fatalf("current balance = %v, want 900", position.Accounts[0].Balance)
+	}
+	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-12", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables()}
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.Request.InitialState.Balances[account] != 900 {
+		t.Fatalf("projection baseline = %v, want 900", prepared.Request.InitialState.Balances[account])
+	}
+	_, result, err := ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Summary.CurrentNetWorth != 900 || result.Summary.FinalNetWorth != 900 {
+		t.Fatalf("projection summary = %+v, want 900/900", result.Summary)
+	}
+	if len(result.TransactionEvents) != 0 {
+		t.Fatalf("recorded actual must not repeat in future simulation: %+v", result.TransactionEvents)
+	}
+}
+
+func TestProjectionStartDateControlsActualOnlyCurrentSummary(t *testing.T) {
+	account := "checking"
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	checkpointAt := today.Add(-12 * time.Hour)
+	actualAt := today.Unix()
+	model := &types.FinancialModel{
+		Accounts: []types.Account{cashAccount(account)},
+		Checkpoints: []types.Checkpoint{{
+			AccountID: account, Balance: 1000, Source: "user", ObservedAt: checkpointAt.Unix(),
+		}},
+		Transactions: []types.Transaction{{
+			ID: "today-actual", Name: "Today actual", SourceAccountID: &account, Amount: expenseAmount("100"),
+			TransactionTime: actualAt, PostedTime: actualAt, Enabled: true,
+		}},
+		Evaluations: types.EmptyEvaluationTables(),
+	}
+	for _, test := range []struct {
+		name    string
+		start   string
+		current float64
+		actuals int
+	}{
+		{name: "checkpoint day", start: FormatIsoDate(checkpointAt), current: 1000, actuals: 1},
+		{name: "today", start: FormatIsoDate(today), current: 900, actuals: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: test.start, HorizonYears: 1, Evaluations: types.EmptyEvaluationTables()}
+			prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if prepared.Request.InitialState.Balances[account] != test.current {
+				t.Fatalf("baseline = %v, want %v", prepared.Request.InitialState.Balances[account], test.current)
+			}
+			_, result, err := ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Summary.CurrentNetWorth != test.current {
+				t.Fatalf("current summary = %v, want %v", result.Summary.CurrentNetWorth, test.current)
+			}
+			actuals := 0
+			for _, event := range result.TransactionEvents {
+				if event.Origin.TransactionID == "today-actual" {
+					actuals++
+				}
+			}
+			if actuals != test.actuals {
+				t.Fatalf("future actual executions = %d, want %d", actuals, test.actuals)
+			}
+		})
 	}
 }

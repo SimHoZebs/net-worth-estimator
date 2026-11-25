@@ -56,8 +56,17 @@ func StochasticNetWorthSamples(
 	if err != nil {
 		return nil, nil, err
 	}
+	historicalDates := make(map[string]bool)
+	for _, row := range session.deterministicPath.Rows {
+		if row.IsHistorical {
+			historicalDates[row.Date] = true
+		}
+	}
 	samples := make(map[string][]float64, len(session.sortedValuesByDate))
 	for date, values := range session.sortedValuesByDate {
+		if historicalDates[date] {
+			continue
+		}
 		copied := make([]float64, len(values))
 		copy(copied, values)
 		samples[date] = copied

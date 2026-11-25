@@ -1178,67 +1178,6 @@
 				"required": ["type", "version", "state", "currentRevision"],
 				"type": "object"
 			},
-			"BalanceAdjustment": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"adjustment": {
-						"format": "double",
-						"type": "number"
-					},
-					"balance": {
-						"format": "double",
-						"type": "number"
-					},
-					"observedAt": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"previousBalance": {
-						"format": "double",
-						"type": "number"
-					},
-					"source": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"accountId",
-					"observedAt",
-					"previousBalance",
-					"balance",
-					"adjustment",
-					"source"
-				],
-				"type": "object"
-			},
-			"BalanceAdjustmentsOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/BalanceAdjustmentsOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"adjustments": {
-						"items": {
-							"$ref": "#/components/schemas/BalanceAdjustment"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					}
-				},
-				"required": ["adjustments", "revision"],
-				"type": "object"
-			},
 			"CardStatementsOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -1287,33 +1226,6 @@
 					}
 				},
 				"required": ["AccountId", "Balance", "observedAt"],
-				"type": "object"
-			},
-			"CheckpointCorrection": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"adjustment": {
-						"format": "double",
-						"type": "number"
-					},
-					"modeledBalance": {
-						"format": "double",
-						"type": "number"
-					},
-					"observedBalance": {
-						"format": "double",
-						"type": "number"
-					}
-				},
-				"required": [
-					"accountId",
-					"observedBalance",
-					"modeledBalance",
-					"adjustment"
-				],
 				"type": "object"
 			},
 			"CheckpointListOutputBody": {
@@ -2181,12 +2093,6 @@
 							"$ref": "#/components/schemas/FlowUnmatchedEvent"
 						},
 						"type": ["array", "null"]
-					},
-					"unobserved": {
-						"items": {
-							"$ref": "#/components/schemas/FlowUnobservedCorrection"
-						},
-						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -2195,7 +2101,6 @@
 					"nodes",
 					"edges",
 					"unmatched",
-					"unobserved",
 					"coverage",
 					"totals",
 					"reconciliation"
@@ -2236,10 +2141,6 @@
 						"format": "int64",
 						"type": "integer"
 					},
-					"correctionsCount": {
-						"format": "int64",
-						"type": "integer"
-					},
 					"edgesInflow": {
 						"format": "double",
 						"type": "number"
@@ -2271,10 +2172,6 @@
 						"format": "int64",
 						"type": "integer"
 					},
-					"unobservedSum": {
-						"format": "double",
-						"type": "number"
-					},
 					"windowEvents": {
 						"format": "int64",
 						"type": "integer"
@@ -2290,8 +2187,6 @@
 					"edgesInflow",
 					"edgesOutflow",
 					"edgesTransfer",
-					"correctionsCount",
-					"unobservedSum",
 					"reconciled"
 				],
 				"type": "object"
@@ -2339,13 +2234,9 @@
 					"unmatched": {
 						"format": "double",
 						"type": "number"
-					},
-					"unobserved": {
-						"format": "double",
-						"type": "number"
 					}
 				},
-				"required": ["actual", "projected", "unmatched", "unobserved"],
+				"required": ["actual", "projected", "unmatched"],
 				"type": "object"
 			},
 			"FlowUnmatchedEvent": {
@@ -2367,37 +2258,6 @@
 					}
 				},
 				"required": ["transactionId", "date", "sequence", "realizedAmount"],
-				"type": "object"
-			},
-			"FlowUnobservedCorrection": {
-				"additionalProperties": false,
-				"properties": {
-					"accountId": {
-						"type": "string"
-					},
-					"adjustment": {
-						"format": "double",
-						"type": "number"
-					},
-					"date": {
-						"type": "string"
-					},
-					"modeledBalance": {
-						"format": "double",
-						"type": "number"
-					},
-					"observedBalance": {
-						"format": "double",
-						"type": "number"
-					}
-				},
-				"required": [
-					"accountId",
-					"date",
-					"observedBalance",
-					"modeledBalance",
-					"adjustment"
-				],
 				"type": "object"
 			},
 			"FlowsOutputBody": {
@@ -3534,13 +3394,13 @@
 						"type": "string"
 					},
 					"asOfDate": {
+						"description": "Cut YYYY-MM-DD or RFC 3339 instant; defaults to today's UTC date",
 						"type": "string"
 					},
 					"model": {
 						"$ref": "#/components/schemas/FinancialModel"
 					}
 				},
-				"required": ["asOfDate"],
 				"type": "object"
 			},
 			"PresetListOutputBody": {
@@ -3830,12 +3690,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"checkpointCorrections": {
-						"items": {
-							"$ref": "#/components/schemas/CheckpointCorrection"
-						},
-						"type": ["array", "null"]
-					},
 					"date": {
 						"type": "string"
 					},
@@ -3866,8 +3720,7 @@
 					"accountSnapshots",
 					"externalInflowAmount",
 					"externalOutflowAmount",
-					"internalTransferAmount",
-					"checkpointCorrections"
+					"internalTransferAmount"
 				],
 				"type": "object"
 			},
@@ -6805,12 +6658,12 @@
 				"operationId": "list-account-balances",
 				"parameters": [
 					{
-						"description": "Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today",
+						"description": "Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to today's UTC date",
 						"explode": false,
 						"in": "query",
 						"name": "asOf",
 						"schema": {
-							"description": "Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today",
+							"description": "Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to today's UTC date",
 							"type": "string"
 						}
 					}
@@ -6886,44 +6739,6 @@
 					}
 				},
 				"summary": "Replace one account"
-			}
-		},
-		"/v1/accounts/{id}/balance-adjustments": {
-			"get": {
-				"operationId": "list-balance-adjustments",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/BalanceAdjustmentsOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List dated balance adjustments without a forecast"
 			}
 		},
 		"/v1/amount-presets": {

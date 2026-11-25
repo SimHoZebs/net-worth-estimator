@@ -194,6 +194,52 @@ func TestSyncSkipsForwardNoOpCheckpoints(t *testing.T) {
 	}
 }
 
+func TestSyncKeepsCheckpointThatResetsScheduledGuess(t *testing.T) {
+	st := openIngestStore(t)
+	seedIngestLink(t, st, "bridge-checking", "checking")
+	if _, err := st.CreateSchedule(types.Schedule{
+		ID: "guessed-income", Name: "Guessed income", Destinations: []string{"checking"},
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		Recurrence: types.Recurrence{Unit: types.RecurrenceDay, Interval: 1},
+		StartDate:  "2026-08-02", Enabled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	checkpoints := []store.SyncCheckpoint{}
+	adapter := &fakeAdapter{
+		snapshot:    fakeSnapshot{bridges: []string{"bridge-checking"}},
+		provisions:  []store.SyncProvision{{BridgeID: "bridge-checking", Name: "Checking", Currency: "USD"}},
+		checkpoints: func(map[string]string) []store.SyncCheckpoint { return checkpoints },
+		skipped:     map[string]int{},
+	}
+	now := time.Date(2026, time.August, 4, 0, 0, 0, 0, time.UTC)
+	syncAt := func(balance float64, day int) Result {
+		t.Helper()
+		checkpoints = []store.SyncCheckpoint{{
+			AccountID: "checking", Balance: balance, Source: store.SourceBankSync,
+			Provider: "fake", ObservedAt: time.Date(2026, time.August, day, 12, 0, 0, 0, time.UTC).Unix(),
+		}}
+		out, err := Sync(context.Background(), st, adapter, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if out := syncAt(100, 1); out.Applied.CheckpointsInserted != 1 {
+		t.Fatalf("first checkpoint = %+v", out.Applied)
+	}
+	if out := syncAt(110, 3); out.Applied.CheckpointsInserted != 1 || out.Applied.CheckpointsSkipped != 0 {
+		t.Fatalf("checkpoint resetting the actual-only balance must be kept: %+v", out.Applied)
+	}
+	model, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.Checkpoints) != 2 || model.Checkpoints[1].Balance != 110 {
+		t.Fatalf("checkpoint history = %+v, want both authoritative resets", model.Checkpoints)
+	}
+}
+
 func TestSyncKeepsFirstZeroObservation(t *testing.T) {
 	st := openIngestStore(t)
 	seedIngestLink(t, st, "bridge-empty", "empty")

@@ -1,7 +1,9 @@
 import type { ServerStatus } from "../api/index.ts";
 import type { FinancialModel } from "../api/contracts.ts";
+import { todayIso } from "../domain/format.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
 import {
+	balancesQueryKey,
 	getAccountBalances,
 	userResourceKey,
 } from "../state/workspaceResources.ts";
@@ -11,6 +13,7 @@ import {
 } from "./financialModel.ts";
 import { fixtureModel } from "./model.ts";
 import { transactionResponse } from "./transactionResponse.ts";
+import { balanceRowsAt } from "./waypointServer.ts";
 
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
@@ -49,14 +52,11 @@ export function setServerModelFixture(
 			syncQuotaUsed: 0,
 			syncQuotaLimit: 0,
 		});
-		serverQueryClient().setQueryData(
-			[...userResourceKey("balances"), "latest"],
-			{
-				accounts: [],
-				asOf: data.startDate,
-				revision,
-			},
-		);
+		serverQueryClient().setQueryData(balancesQueryKey(), {
+			accounts: [],
+			asOf: todayIso(),
+			revision,
+		});
 		serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {
 			schedules: [],
 			revision,
@@ -90,30 +90,23 @@ export function setServerModelFixture(
 		return revision;
 	}
 	const model = effectiveModel;
-	// Balances derive from the model accounts so raw bounds (sentinels) survive.
-	const checkpointByAccount = new Map(
-		model.checkpoints.map((checkpoint) => [checkpoint.AccountId, checkpoint]),
-	);
-	serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
-		accounts: model.accounts.map((account) => {
-			const checkpoint = checkpointByAccount.get(account.id);
-			// Preserve display-fixture balance-check flags when data supplied them.
-			const displayAccount = data.accounts.find((row) => row.id === account.id);
+	const current = balanceRowsAt(model);
+	serverQueryClient().setQueryData(balancesQueryKey(), {
+		accounts: current.accounts.map((row) => {
+			// Preserve display-fixture ownership and balance-check flags while
+			// balances follow the same actual-only replay as the HTTP fake.
+			const displayAccount = data.accounts.find(
+				(account) => account.id === row.id,
+			);
 			return {
-				...account,
-				balance: checkpoint
-					? checkpoint.Balance
-					: (displayAccount?.balance ?? 0),
-				observedOn: data.startDate,
-				hasCheckpoint: displayAccount?.balanceCheck ?? checkpoint !== undefined,
-				archived: displayAccount?.archived ?? false,
-				syncOwned: displayAccount?.readOnly ?? false,
-				readOnly: displayAccount?.readOnly ?? false,
-				observedBalance: checkpoint ? checkpoint.Balance : null,
-				observedAt: checkpoint ? checkpoint.observedAt : null,
+				...row,
+				hasCheckpoint: displayAccount?.balanceCheck ?? row.hasCheckpoint,
+				archived: displayAccount?.archived ?? row.archived,
+				syncOwned: displayAccount?.readOnly ?? row.syncOwned,
+				readOnly: displayAccount?.readOnly ?? row.readOnly,
 			};
 		}),
-		asOf: data.startDate,
+		asOf: current.asOf,
 		revision,
 	});
 	serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {
@@ -155,12 +148,9 @@ export function setServerModelFixture(
 export function setServerRevisionFixture(revision: string) {
 	const cached = getAccountBalances();
 	if (cached) {
-		serverQueryClient().setQueryData(
-			[...userResourceKey("balances"), "latest"],
-			{
-				...cached,
-				revision,
-			},
-		);
+		serverQueryClient().setQueryData(balancesQueryKey(), {
+			...cached,
+			revision,
+		});
 	} else setServerModelFixture(financialModelFixture, { revision });
 }

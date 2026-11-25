@@ -112,10 +112,11 @@ func Sync(ctx context.Context, st store.Store, adapter Adapter, now time.Time) (
 }
 
 // pruneNoOpCheckpoints removes forward bank observations whose posted balance
-// matches the modeled balance at their instant. Such a checkpoint sets the
-// balance to the value it already has, so it reconciles nothing and need not
-// occupy a row. First observations, same-instant refreshes, and backdated
-// observations are kept: they establish coverage or anchor history. A forward
+// matches the recorded-actual balance at their instant. Such a checkpoint sets
+// the balance to the value it already has and need not occupy a row. Scheduled
+// guesses do not participate in this comparison. First observations,
+// same-instant refreshes, and backdated observations are kept: they establish
+// coverage or anchor history. A forward
 // observation that carries a changed available balance is also kept because
 // that figure is separate evidence.
 func pruneNoOpCheckpoints(st store.Store, before *types.FinancialModel, checkpoints []store.SyncCheckpoint) (int, error) {
@@ -138,7 +139,7 @@ func pruneNoOpCheckpoints(st store.Store, before *types.FinancialModel, checkpoi
 	if latest <= 0 {
 		return 0, nil
 	}
-	zero, err := domain.ZeroDeltaObservations(after, time.Unix(latest, 0).UTC().Format(time.RFC3339))
+	noop, err := domain.NoopCheckpointKeys(after, time.Unix(latest, 0).UTC().Format(time.RFC3339))
 	if err != nil {
 		// A model whose recorded history cannot be applied must not block sync. Keep the
 		// checkpoint rather than risk dropping evidence.
@@ -182,7 +183,7 @@ func pruneNoOpCheckpoints(st store.Store, before *types.FinancialModel, checkpoi
 			}
 			continue
 		}
-		if _, isZero := zero[key]; !isZero {
+		if _, isNoop := noop[key]; !isNoop {
 			if present {
 				latestByAccount[checkpoint.AccountID] = stored
 			}

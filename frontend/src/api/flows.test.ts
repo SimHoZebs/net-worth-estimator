@@ -58,13 +58,11 @@ function graph(): FlowGraph {
 			},
 		],
 		unmatched: [],
-		unobserved: [],
 		coverage: { observedAccounts: ["checking"], unobservedAccounts: [] },
 		totals: {
 			actual: { inflow: 100, outflow: 40, transfer: 0 },
 			projected: { inflow: 0, outflow: 0, transfer: 0 },
 			unmatched: 0,
-			unobserved: 0,
 		},
 		reconciliation: {
 			windowEvents: 2,
@@ -76,8 +74,6 @@ function graph(): FlowGraph {
 			edgesInflow: 100,
 			edgesOutflow: 40,
 			edgesTransfer: 0,
-			correctionsCount: 0,
-			unobservedSum: 0,
 			reconciled: true,
 		},
 	};
@@ -104,7 +100,6 @@ describe("isFlowGraph", () => {
 			...payload,
 			edges: null,
 			unmatched: null,
-			unobserved: null,
 			coverage: { observedAccounts: null, unobservedAccounts: null },
 		};
 		expect(isFlowGraph(nullable)).toBe(true);
@@ -112,9 +107,15 @@ describe("isFlowGraph", () => {
 			...payload,
 			edges: [],
 			unmatched: [],
-			unobserved: [],
 			coverage: { observedAccounts: [], unobservedAccounts: [] },
 		});
+	});
+
+	it("accepts graphs without correction fields and keeps unmatched and coverage", () => {
+		const result = readFlowGraph(graph());
+		expect(result).not.toHaveProperty("unobserved");
+		expect(result.unmatched).toHaveLength(0);
+		expect(result.coverage.unobservedAccounts).toEqual([]);
 	});
 
 	it("rejects a payload missing the contract keys", () => {

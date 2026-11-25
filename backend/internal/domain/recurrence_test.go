@@ -21,8 +21,8 @@ func monthlyTestRecurrence() types.Recurrence {
 }
 
 // Claim linkage: a manual transaction records the actual for one scheduled rule
-// occurrence. History application includes the actual and skips the generated occurrence,
-// so the balance takes one hit instead of two. Future occurrences are
+// occurrence. Actual-only history includes the transaction, while the modeled
+// ledger skips the generated claimed occurrence. Future occurrences are
 // unaffected.
 
 func claimTestModel() *types.FinancialModel {
@@ -91,19 +91,30 @@ func historicalBalance(t *testing.T, path *types.ProjectionPath, date, accountID
 	return 0
 }
 
+func hasHistoricalRow(path *types.ProjectionPath, date string) bool {
+	for _, row := range path.Rows {
+		if row.IsHistorical && row.Date == date {
+			return true
+		}
+	}
+	return false
+}
+
 func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
-	path, _, err := ProjectRawFinancialModel(claimTestModel(), claimTestSettings(), types.EmptyModelOverrides(), nil)
+	path, result, err := ProjectRawFinancialModel(claimTestModel(), claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
-	// January scheduled rent (1000) plus the February actual (950).
-	// The February scheduled occurrence is skipped.
-	if got := historicalBalance(t, path, "2026-02-05", "checking"); got != 8050 {
-		t.Fatalf("checking after actual = %v, want 8050 (one hit, not two)", got)
+	// Only the recorded February actual changes the historical balance.
+	if got := historicalBalance(t, path, "2026-02-05", "checking"); got != 9050 {
+		t.Fatalf("checking after actual = %v, want 9050", got)
+	}
+	if result.Summary.CurrentNetWorth != 9050 {
+		t.Fatalf("current summary = %v, want the actual-only 9050", result.Summary.CurrentNetWorth)
 	}
 	buckets := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear
-	// Timestamp-only application includes the start-day rule through the cut, so
-	// January plus March anchor in history; February stays claimed.
+	// Modeled ledger replay still includes January plus March; February stays
+	// claimed and does not enter the rule's cap evidence.
 	if buckets["rent"]["2026"] != 2000 {
 		t.Fatalf("rent bucket = %v, want 2000 (January plus March)", buckets["rent"]["2026"])
 	}
@@ -112,33 +123,50 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 	}
 }
 
-func TestUnclaimedOccurrenceAppliesNormally(t *testing.T) {
+func TestUnclaimedScheduledOccurrenceStaysOutOfActualOnlyHistory(t *testing.T) {
 	model := claimTestModel()
 	model.Transactions[0].Claim = nil
-	path, _, err := ProjectRawFinancialModel(model, claimTestSettings(), types.EmptyModelOverrides(), nil)
+	path, result, err := ProjectRawFinancialModel(model, claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
-	// Both the scheduled February rent and the unlinked actual are applied.
-	if got := historicalBalance(t, path, "2026-02-05", "checking"); got != 7050 {
-		t.Fatalf("checking without claim = %v, want 7050 (double count)", got)
+	if got := historicalBalance(t, path, "2026-02-05", "checking"); got != 9050 {
+		t.Fatalf("checking without claim = %v, want only the actual at 9050", got)
+	}
+	if result.Summary.CurrentNetWorth != 9050 {
+		t.Fatalf("current summary = %v, want 9050", result.Summary.CurrentNetWorth)
+	}
+	if got := path.ProjectionStartTransactionState.RealizedTransactionAmountsByYear["rent"]["2026"]; got != 3000 {
+		t.Fatalf("modeled rent ledger = %v, want January plus February plus March", got)
 	}
 }
 
 func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
-	path, _, err := ProjectRawFinancialModel(claimTestModel(), claimTestSettings(), types.EmptyModelOverrides(), nil)
+	path, result, err := ProjectRawFinancialModel(claimTestModel(), claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
-	// Timestamp-only history includes the start-day rule through the cut, so
-	// March anchors in history rather than simulating as future.
-	if got := historicalBalance(t, path, "2026-03-01", "checking"); got != 7050 {
-		t.Fatalf("March history = %v, want 7050 (Jan plus Feb actual plus March)", got)
+	if hasHistoricalRow(path, "2026-03-01") {
+		t.Fatal("scheduled March guess must not create an actual-only historical row")
 	}
+	if result.Summary.CurrentNetWorth != 9050 {
+		t.Fatalf("current summary = %v, want 9050", result.Summary.CurrentNetWorth)
+	}
+	futureMarch := false
+	futureApril := false
 	for _, event := range path.TransactionEvents {
-		if event.Origin.TransactionID == "rent" && event.Date == "2026-03-01" {
-			t.Fatalf("March rent must not simulate twice (already in history)")
+		if event.Origin.TransactionID != "rent" {
+			continue
 		}
+		if event.Date == "2026-03-01" {
+			futureMarch = true
+		}
+		if event.Date == "2026-04-01" {
+			futureApril = true
+		}
+	}
+	if futureMarch || !futureApril {
+		t.Fatalf("future rent events = March:%v April:%v, want only April", futureMarch, futureApril)
 	}
 }
 

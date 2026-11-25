@@ -3,6 +3,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FinancialModel } from "../api/contracts.ts";
+import type { TransactionRow } from "../api/generated/model/transactionRow.ts";
 import {
 	acceptUserScope,
 	canonicalApiBaseUrl,
@@ -10,11 +11,19 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { useCurrentPosition } from "./useCurrentPosition.ts";
+import { serverQueryClient } from "./serverQuery.ts";
+import {
+	balancesQueryKey,
+	checkpointsOptions,
+	schedulesOptions,
+	transactionsOptions,
+} from "./workspaceResources.ts";
 
 afterEach(() => {
 	cleanup();
 	suspendUserScope();
 	vi.unstubAllGlobals();
+	vi.useRealTimers();
 });
 
 function model(balance = 100): FinancialModel {
@@ -158,6 +167,60 @@ it("does not request a disabled position", () => {
 	);
 	expect(hook.result.current.status).toBe("disabled");
 	expect(calls).toHaveLength(0);
+});
+
+it("requests today for row-backed current position so later actuals are included", async () => {
+	setup();
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(new Date("2026-11-25T12:00:00Z"));
+	const cache = serverQueryClient();
+	cache.setQueryData(balancesQueryKey(), {
+		accounts: [],
+		asOf: "2026-11-25",
+		revision: "rows",
+	});
+	cache.setQueryData(checkpointsOptions().queryKey, {
+		checkpoints: [{ AccountId: "cash", Balance: 100, observedAt: 1793492400 }],
+		revision: "rows",
+	});
+	cache.setQueryData(schedulesOptions().queryKey, {
+		schedules: [],
+		revision: "rows",
+	});
+	cache.setQueryData(transactionsOptions().queryKey, {
+		transactions: [
+			{ id: "later-actual", startDate: "2026-11-20" } as TransactionRow,
+		],
+		revision: "rows",
+	});
+	const bodies: unknown[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body ?? "{}")));
+			const headers = new Headers({ "content-type": "application/json" });
+			const resource = getUserScope().resource?.id;
+			if (resource) headers.set("Waypoint-Resource", resource);
+			return new Response(
+				JSON.stringify({
+					result: {
+						asOfDate: "2026-11-25",
+						netWorth: 125,
+						accounts: [{ accountId: "cash", balance: 125 }],
+					},
+				}),
+				{ headers },
+			);
+		}),
+	);
+	const hook = renderHook(() => useCurrentPosition(), { wrapper });
+	await waitFor(() => expect(hook.result.current.status).toBe("success"));
+	expect(bodies).toEqual([{ asOfDate: "2026-11-25" }]);
+	expect(hook.result.current.data).toEqual({
+		asOfDate: "2026-11-25",
+		netWorth: 125,
+		accounts: [{ accountId: "cash", balance: 125 }],
+	});
 });
 
 it("requests the saved model", async () => {

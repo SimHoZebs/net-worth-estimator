@@ -14,7 +14,7 @@ Simulation adds a further question: if we continue with the saved model, where d
 
 Accounts, recorded transactions, balance checks, and ordinary edits have their own lifecycle. They remain available when a forecast is absent, pending, or failed. Only components that need future outcomes depend on simulation. Evidence Analysis runs independently from both bank sync and simulation.
 
-Account names and balances are editable in the account view, not duplicated in settings. A balance edit records a dated balance observation. The adjustment appears as a reconciliation showing the previous balance, the new balance, and the signed difference; it never counts as income or spending, and it uses recorded history without a forecast.
+Account names and balances are editable in the account view, not duplicated in settings. A balance edit records a checkpoint at its exact observation time. The checkpoint authoritatively resets that account total. Current balance is the latest applicable checkpoint plus later recorded actual transactions; with no checkpoint it starts from zero and applies recorded actuals. Unclaimed scheduled guesses do not change it. The product creates no adjustment or correction record from the difference between a checkpoint and replayed history.
 
 The product turns financial records and assumptions into a defensible decision. It should help the user move from description to understanding to action without requiring the user to operate the calculation machinery or manage a spreadsheet.
 
@@ -89,8 +89,8 @@ The product must make these concepts understandable without specialist documenta
 | Concept                     | Meaning                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Recorded**                | A balance or transaction explicitly supplied by a source or recorded as a balance check. It is evidence of a point-in-time state, not a promise about the future.                                                                                                                                                                                 |
-| **Balance check**           | A recorded account balance with its exact observation time. Several checks per account per day survive. Observations set balances; transactions change balances. |
-| **Observed vs adjusted**    | The latest observation at the as-of cut (with its timestamp) is separate from the adjusted modeled balance. Anchor corrections show the observed-vs-modeled difference. |
+| **Balance check**           | A recorded account total with its exact observation time. Several checks per account per day survive. A checkpoint authoritatively resets its account; later recorded actuals change that total. |
+| **Observed vs current**     | The latest observed total at the as-of cut, with its timestamp, is separate from current balance after later recorded actuals. Source identifies provenance and never changes the reset mathematics. |
 | **Planned transaction**        | An expected transaction into, out of, or between accounts.                                                                                                                                                                                                                                                                                        |
 | **Account rule**            | A recurring or constrained transaction associated with an account.                                                                                                                                                                                                                                                                                |
 | **Saved model**             | The saved collection of accounts, transactions, balance checks, assumptions, source information, and goal definitions. The base projection runs only off this saved state.                                                                                                                                                                         |
@@ -110,9 +110,9 @@ The product must make these concepts understandable without specialist documenta
 The product must establish:
 
 - current net worth;
-- account-level balances and identities, with the latest observation
-  (balance plus timestamp) reported separately from the adjusted modeled
-  balance;
+- account-level balances and identities, with the latest observed total
+  (balance plus timestamp) reported separately from current balance after
+  later recorded actuals;
 - which values are recorded, modeled, planned, deliberately excluded, or inferred;
 - the balance-check and source coverage behind the baseline;
 - source freshness; and
@@ -421,8 +421,10 @@ The product does not settle the following questions:
 - What future audiences, currencies, household structures, or privacy requirements should shape the product?
 - Which interaction architecture best minimizes interpretation effort while preserving the product contracts above?
 
-The recorded-vs-modeled question above is settled: the product reports the
-latest observation (balance plus timestamp) separately from the adjusted
-modeled balance, with the anchor correction between them shown.
+The observed-vs-current question above is settled: the product reports the
+latest observed total and timestamp separately from current balance. A
+checkpoint resets its account; later recorded actuals apply once in
+chronological order. No previous-balance reconstruction, adjustment, or
+checkpoint correction is product data.
 
 Until these decisions are made, the product should prefer explicit labels, conservative claims, reversible actions, and freedom from structural assumptions.

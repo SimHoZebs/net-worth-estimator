@@ -6,8 +6,7 @@ import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshAccounts } from "../../state/workspaceResources.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import { Field, FieldError, FieldTitle } from "@/components/ui/field.tsx";
+import { FieldError } from "@/components/ui/field.tsx";
 import { MoneyField } from "./editorFields.tsx";
 
 /** Row-first account editor. Saves straight to the server; no draft involved. */
@@ -187,10 +186,6 @@ export function OrdinaryAccountEditor({
 						placeholder="No ceiling"
 						disabled={locked}
 					/>
-					<Field className="col-span-full">
-						<FieldTitle>Source</FieldTitle>
-						<Badge variant="outline">{item?.source ?? "Manual entry"}</Badge>
-					</Field>
 				</fieldset>
 				{error ? <FieldError>{error}</FieldError> : null}
 			</form>

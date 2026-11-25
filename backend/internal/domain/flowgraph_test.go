@@ -136,11 +136,12 @@ func TestFlowGraphSeparatesActualProjectedAndCountsTransferOnce(t *testing.T) {
 	}
 }
 
-// Unknown origins and balance-check corrections stay visible outside the
-// edge set, and accounts without observations are flagged as incomplete
-// coverage.
-func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
+// Unknown origins stay visible outside the edge set. Checkpoint resets are
+// balance state, not money movement, and accounts without observations are
+// flagged as incomplete coverage.
+func TestFlowGraphExposesUnmatchedAndCoverageWithoutResetFlows(t *testing.T) {
 	model := flowTestModel()
+	model.Transactions = model.Transactions[:1]
 	events := []types.TransactionEvent{
 		{
 			Date: "2026-02-15", Sequence: 0,
@@ -157,14 +158,10 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 			RequestedAmount: 50, RealizedAmount: 50,
 		},
 	}
-	rows := []types.ProjectionRow{
-		{
-			Date: "2026-02-20", IsHistorical: true,
-			CheckpointCorrections: []types.CheckpointCorrection{
-				{AccountID: "checking", ObservedBalance: 1100, ModeledBalance: 1000, Adjustment: 100},
-			},
-		},
-	}
+	rows := []types.ProjectionRow{{
+		Date: "2026-02-20", IsHistorical: true,
+		AccountSnapshots: []types.AccountSnapshot{{AccountID: "checking", Date: "2026-02-20", Balance: 1100, Impacts: []types.AccountDelta{}}},
+	}}
 	graph, err := BuildFlowGraph(model, events, rows, "2026-01-01", "2026-12-31")
 	if err != nil {
 		t.Fatalf("build flow graph: %v", err)
@@ -176,11 +173,8 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 	if graph.Totals.Unmatched != 50 {
 		t.Errorf("unmatched total = %v, want 50", graph.Totals.Unmatched)
 	}
-	if len(graph.Unobserved) != 1 || graph.Unobserved[0].Adjustment != 100 {
-		t.Errorf("unobserved = %+v, want the 100 correction", graph.Unobserved)
-	}
-	if graph.Totals.Unobserved != 100 {
-		t.Errorf("unobserved total = %v, want 100", graph.Totals.Unobserved)
+	if len(graph.Edges) != 1 || graph.Edges[0].Amount != 1000 {
+		t.Errorf("edges = %+v, want only the 1000 paycheck flow", graph.Edges)
 	}
 	// No checkpoints exist, so every enabled account is uncovered.
 	if len(graph.Coverage.UnobservedAccounts) != 3 {
@@ -207,6 +201,9 @@ func TestFlowGraphExposesUnmatchedUnobservedAndCoverage(t *testing.T) {
 	}
 	if len(observed.Coverage.ObservedAccounts) != 1 || observed.Coverage.ObservedAccounts[0] != "checking" {
 		t.Errorf("coverage = %+v, want checking observed", observed.Coverage)
+	}
+	if len(observed.Coverage.UnobservedAccounts) != 2 {
+		t.Errorf("coverage = %+v, want two unobserved accounts", observed.Coverage)
 	}
 }
 

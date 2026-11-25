@@ -37,16 +37,17 @@ function OutlookContent() {
 	const balances = useAccountBalances();
 	const writeBlocked = useUserReadOnly();
 	const balancesFailed = balances.isError || balances.isRefetchError;
-	const balancesError = balancesFailed && balances.error ? (
-		<Alert variant="destructive" aria-label="Outlook account balances">
-			<AlertDescription>
-				Account balances could not be loaded. {balances.error.message}
-			</AlertDescription>
-			<Button variant="link" onClick={() => void balances.refetch()}>
-				Retry
-			</Button>
-		</Alert>
-	) : null;
+	const balancesError =
+		balancesFailed && balances.error ? (
+			<Alert variant="destructive" aria-label="Outlook account balances">
+				<AlertDescription>
+					Account balances could not be loaded. {balances.error.message}
+				</AlertDescription>
+				<Button variant="link" onClick={() => void balances.refetch()}>
+					Retry
+				</Button>
+			</Alert>
+		) : null;
 	// A failed prerequisite is not pending. Keep cached content on refresh
 	// failures, but do not leave disabled forecasts skeletonizing on first load.
 	if (balancesError && !balances.data) return balancesError;

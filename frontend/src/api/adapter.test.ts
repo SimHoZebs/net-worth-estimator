@@ -61,7 +61,7 @@ describe("balance rows to display accounts", () => {
 		).toBe("credit_card");
 	});
 
-	it("keeps the observation separate from the adjusted server balance", () => {
+	it("keeps the posted observation separate from the current server balance", () => {
 		expect(
 			balanceRowToDisplay(
 				balanceRow({

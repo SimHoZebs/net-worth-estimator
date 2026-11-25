@@ -2,26 +2,25 @@ import { useId, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
 	deletePaymentTerms,
-	listAccountBalances,
 	savePaymentTerms,
 	updateAccount,
 } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
 import type { AccountKind } from "../../api/contracts.ts";
 import { isLiability } from "../../domain/accountKinds.ts";
-import type { BalanceAdjustment } from "@/api/generated/model/balanceAdjustment.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
 import { accountUpdateBody } from "../editors/accountFields.ts";
 import {
+	balancesOptions,
 	getAccountBalances,
 	getPaymentTermsForAccount,
+	refreshAccounts,
 	refreshPaymentTerms,
 	usePaymentTerms,
 } from "../../state/workspaceResources.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { refreshAccountAdjustments } from "../../state/accountAdjustments.ts";
 import {
 	persistSyncedAccountKind,
 	syncedKindError,
@@ -84,7 +83,6 @@ export function syncedNameDraft(
 export function useAccountEdit(
 	account: Account,
 	readOnly: boolean,
-	adjustments: BalanceAdjustment[],
 	nameEditable = false,
 ) {
 	// Own the terms read so the card rows prefill from the authoritative row.
@@ -119,25 +117,20 @@ export function useAccountEdit(
 	const formId = useId();
 	const scope = getUserScope();
 	const instant = observedAt === null ? NaN : Date.parse(`${observedAt}Z`);
-	const previous = useQuery({
-		queryKey: ["balance-adjustment-preview", scope.key, account.id, observedAt],
-		enabled: observedAt !== null && Number.isFinite(instant),
-		retry: false,
-		queryFn: async ({ signal }) => {
-			const result = await listAccountBalances(
-				{ asOf: new Date(instant).toISOString() },
-				{ signal },
-			);
-			if (scope !== getUserScope()) throw new Error("The active user changed.");
-			const row = result.data.accounts?.find((row) => row.id === account.id);
+	const balanceTime =
+		observedAt !== null && Number.isFinite(instant)
+			? new Date(instant).toISOString()
+			: null;
+	const balanceAtTimeQuery = useQuery({
+		...balancesOptions(scope, balanceTime ?? undefined),
+		enabled: balanceTime !== null,
+		select: (result) => {
+			const row = result.accounts.find((row) => row.id === account.id);
 			if (!row) throw new Error("The account is no longer available.");
 			return row.balance;
 		},
 	});
-	const existing = adjustments.find(
-		(row) => row.observedAt === Math.floor(instant / 1000),
-	);
-	const previousBalance = existing?.previousBalance ?? previous.data;
+	const balanceAtTime = balanceAtTimeQuery.data;
 	useBeforeUnload(edit.dirty || saving);
 	const update = (patch: Partial<typeof source>, field: AccountEditField) => {
 		// The kind selector stays available on synced accounts: kind is a
@@ -344,15 +337,14 @@ export function useAccountEdit(
 		if (
 			observedAt !== null &&
 			(!Number.isFinite(instant) ||
-				previousBalance === undefined ||
-				previous.isFetching ||
-				previous.isError)
+				balanceAtTime === undefined ||
+				balanceAtTimeQuery.isFetching ||
+				balanceAtTimeQuery.isError)
 		) {
-			setError("Load the balance at the adjustment time before saving.");
+			setError("Load the balance at the selected time before saving.");
 			return;
 		}
-		const moved =
-			observedAt !== null && balance !== (existing?.balance ?? previousBalance);
+		const moved = observedAt !== null && balance !== balanceAtTime;
 		if (!edit.dirty && !moved) {
 			reset();
 			return;
@@ -395,7 +387,7 @@ export function useAccountEdit(
 				});
 			},
 			refresh: async () => {
-				await refreshAccountAdjustments();
+				await refreshAccounts();
 				if (cardTerms) await refreshPaymentTerms();
 			},
 			failureMessage: "The account could not be saved.",
@@ -426,15 +418,16 @@ export function useAccountEdit(
 				setConfirmCancel(false);
 			}
 		},
-		previousBalance,
-		previous,
+		balanceAtTime,
+		balanceAtTimeQuery,
 		saveBlocked:
 			saving ||
 			(observedAt !== null &&
 				(!Number.isFinite(instant) ||
-					previous.isFetching ||
-					previous.isPending ||
-					previous.isError)),
+					balanceAtTime === undefined ||
+					balanceAtTimeQuery.isFetching ||
+					balanceAtTimeQuery.isPending ||
+					balanceAtTimeQuery.isError)),
 	};
 }
 

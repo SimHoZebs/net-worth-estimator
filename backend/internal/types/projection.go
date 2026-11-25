@@ -42,14 +42,13 @@ type AccountSnapshot struct {
 }
 
 type ProjectionRow struct {
-	Date                   IsoDate                `json:"date"`
-	IsHistorical           bool                   `json:"isHistorical"`
-	NetWorth               float64                `json:"netWorth"`
-	AccountSnapshots       []AccountSnapshot      `json:"accountSnapshots"`
-	ExternalInflowAmount   float64                `json:"externalInflowAmount"`
-	ExternalOutflowAmount  float64                `json:"externalOutflowAmount"`
-	InternalTransferAmount float64                `json:"internalTransferAmount"`
-	CheckpointCorrections  []CheckpointCorrection `json:"checkpointCorrections"`
+	Date                   IsoDate           `json:"date"`
+	IsHistorical           bool              `json:"isHistorical"`
+	NetWorth               float64           `json:"netWorth"`
+	AccountSnapshots       []AccountSnapshot `json:"accountSnapshots"`
+	ExternalInflowAmount   float64           `json:"externalInflowAmount"`
+	ExternalOutflowAmount  float64           `json:"externalOutflowAmount"`
+	InternalTransferAmount float64           `json:"internalTransferAmount"`
 }
 
 type ProjectionAccountSummary struct {

@@ -6,7 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestCurrentPositionMatchesProjection(t *testing.T) {
+func TestCurrentPositionMatchesActualOnlyProjectionBaseline(t *testing.T) {
 	for _, name := range []string{"deterministic.json", "checkpoints.json", "payroll.json"} {
 		t.Run(name, func(t *testing.T) {
 			fixture := loadGolden(t, name)

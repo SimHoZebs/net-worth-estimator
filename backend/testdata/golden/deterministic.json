@@ -277,8 +277,7 @@
         ],
         "externalInflowAmount": 0,
         "externalOutflowAmount": 0,
-        "internalTransferAmount": 0,
-        "checkpointCorrections": []
+        "internalTransferAmount": 0
       },
       {
         "date": "2026-02-05",
@@ -311,8 +310,7 @@
         ],
         "externalInflowAmount": 1000,
         "externalOutflowAmount": 0,
-        "internalTransferAmount": 0,
-        "checkpointCorrections": []
+        "internalTransferAmount": 0
       },
       {
         "date": "2026-02-06",
@@ -345,8 +343,7 @@
         ],
         "externalInflowAmount": 0,
         "externalOutflowAmount": 200,
-        "internalTransferAmount": 0,
-        "checkpointCorrections": []
+        "internalTransferAmount": 0
       },
       {
         "date": "2026-02-10",
@@ -384,8 +381,7 @@
         ],
         "externalInflowAmount": 0,
         "externalOutflowAmount": 0,
-        "internalTransferAmount": 900,
-        "checkpointCorrections": []
+        "internalTransferAmount": 900
       },
       {
         "date": "2026-02-20",
@@ -423,8 +419,7 @@
         ],
         "externalInflowAmount": 0,
         "externalOutflowAmount": 0,
-        "internalTransferAmount": 250,
-        "checkpointCorrections": []
+        "internalTransferAmount": 250
       }
     ],
     "transactionEvents": [
@@ -761,8 +756,7 @@
           ],
           "externalInflowAmount": 0,
           "externalOutflowAmount": 0,
-          "internalTransferAmount": 0,
-          "checkpointCorrections": []
+          "internalTransferAmount": 0
         },
         {
           "date": "2026-02-05",
@@ -795,8 +789,7 @@
           ],
           "externalInflowAmount": 1000,
           "externalOutflowAmount": 0,
-          "internalTransferAmount": 0,
-          "checkpointCorrections": []
+          "internalTransferAmount": 0
         },
         {
           "date": "2026-02-06",
@@ -829,8 +822,7 @@
           ],
           "externalInflowAmount": 0,
           "externalOutflowAmount": 200,
-          "internalTransferAmount": 0,
-          "checkpointCorrections": []
+          "internalTransferAmount": 0
         },
         {
           "date": "2026-02-10",
@@ -868,8 +860,7 @@
           ],
           "externalInflowAmount": 0,
           "externalOutflowAmount": 0,
-          "internalTransferAmount": 900,
-          "checkpointCorrections": []
+          "internalTransferAmount": 900
         },
         {
           "date": "2026-02-20",
@@ -907,8 +898,7 @@
           ],
           "externalInflowAmount": 0,
           "externalOutflowAmount": 0,
-          "internalTransferAmount": 250,
-          "checkpointCorrections": []
+          "internalTransferAmount": 250
         }
       ]
     },

@@ -39,12 +39,11 @@ type appliedHistory struct {
 	snapshots              []types.HistoricalObservationSnapshot
 	includeStartDateEvents bool
 	latestObserved         map[string]types.Checkpoint
-	adjustments            []types.BalanceAdjustment
-	// zeroDeltaObservations holds observations whose raw balance matched the
-	// modeled balance at their instant (within float tolerance). The rounded
-	// adjustment list is a display view; persistence decisions use this exact
-	// set so a sub-dollar correction is never mistaken for a no-op.
-	zeroDeltaObservations map[ObservationKey]struct{}
+	// noopCheckpointKeys holds observations whose raw balance matched the
+	// balance immediately before their reset (within float tolerance).
+	// Persistence uses this exact set so a sub-dollar balance change is never
+	// mistaken for a no-op.
+	noopCheckpointKeys map[ObservationKey]struct{}
 }
 
 // applyChronologicalHistory applies recorded history through the end of projectionStartDate.
@@ -68,8 +67,7 @@ type historyEvent struct {
 // applyChronologicalHistoryAt applies one sorted event stream through the
 // cut instant. Every event at or before cutInstant is applied; everything
 // after is future. Observations SET their account balance; transactions CHANGE
-// balances; a later observation SETS again and records the
-// observed-vs-modeled discrepancy.
+// balances; a later observation SETS that account again.
 //
 //   - Recurrence instances take effect at the day-close instant of their
 //     date, so a rule at 23:59:59 executes BEFORE an observation at the
@@ -81,6 +79,14 @@ type historyEvent struct {
 //     arrival order never matters and a backdated observation cannot roll
 //     the latest state back.
 func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDate string, cutInstant int64) (*appliedHistory, error) {
+	return applyChronologicalHistoryAtMode(model, projectionStartDate, cutInstant, true)
+}
+
+// applyChronologicalHistoryAtMode replays one sorted event stream. Modeled
+// history includes schedule occurrences for timeline evidence and transaction
+// ledgers. Current history omits them so only recorded actuals move the
+// authoritative balance after a checkpoint.
+func applyChronologicalHistoryAtMode(model *types.FinancialModel, projectionStartDate string, cutInstant int64, includeScheduleOccurrences bool) (*appliedHistory, error) {
 	for _, checkpoint := range model.Checkpoints {
 		day := FormatIsoDate(time.Unix(CheckpointInstant(checkpoint), 0).UTC())
 		if CompareIsoDates(day, projectionStartDate) > 0 {
@@ -103,8 +109,12 @@ func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDat
 			earliestDay = day
 		}
 	}
+	schedules := model.Schedules
+	if !includeScheduleOccurrences {
+		schedules = nil
+	}
 	var history ResolvedOccurrences
-	history = ResolveOccurrences(model.Schedules, model.Transactions, earliestDay, projectionStartDate, true)
+	history = ResolveOccurrences(schedules, model.Transactions, earliestDay, projectionStartDate, true)
 
 	events := []historyEvent{}
 	seq := 0
@@ -210,8 +220,7 @@ func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDat
 	}, projectionStartDate, nil)
 
 	latestObserved := map[string]types.Checkpoint{}
-	adjustments := []types.BalanceAdjustment{}
-	zeroDeltaObservations := map[ObservationKey]struct{}{}
+	noopCheckpointKeys := map[ObservationKey]struct{}{}
 	historicalSnapshots := []types.HistoricalObservationSnapshot{}
 	executeOccurrence := func(occurrence DatedTransactionOccurrence, date string, historicalActual bool) error {
 		_, execErr := transitions.ExecuteTransaction(occurrence, date, historicalActual)
@@ -239,7 +248,6 @@ func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDat
 	// One forward pass over the sorted stream. Daily snapshots sample the
 	// running state: each calendar day flushes once when the next day
 	// begins (and once at the end), so rows stay samples, not phases.
-	var checkpointCorrections []types.CheckpointCorrection
 	currentDay := ""
 	flushDay := func() {
 		if currentDay == "" {
@@ -248,10 +256,6 @@ func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDat
 		snapshot := types.HistoricalObservationSnapshot{
 			Date:     currentDay,
 			Balances: SnapshotBalances(transitions.State.Balances),
-		}
-		if len(checkpointCorrections) > 0 {
-			snapshot.CheckpointCorrections = checkpointCorrections
-			checkpointCorrections = nil
 		}
 		historicalSnapshots = append(historicalSnapshots, snapshot)
 	}
@@ -264,23 +268,9 @@ func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDat
 			observation := event.checkpoint
 			modeledBalance := transitions.State.Balances[observation.AccountID]
 			if math.Abs(observation.Balance-modeledBalance) < 1e-9 {
-				zeroDeltaObservations[ObservationKey{AccountID: observation.AccountID, ObservedAt: observation.ObservedAt}] = struct{}{}
+				noopCheckpointKeys[ObservationKey{AccountID: observation.AccountID, ObservedAt: observation.ObservedAt}] = struct{}{}
 			}
-			adjustments = append(adjustments, types.BalanceAdjustment{
-				AccountID:       observation.AccountID,
-				ObservedAt:      observation.ObservedAt,
-				PreviousBalance: roundCurrency(modeledBalance),
-				Balance:         roundCurrency(observation.Balance),
-				Adjustment:      roundCurrency(observation.Balance - modeledBalance),
-				Source:          observation.Source,
-			})
 			transitions.State.Balances[observation.AccountID] = observation.Balance
-			checkpointCorrections = append(checkpointCorrections, types.CheckpointCorrection{
-				AccountID:       observation.AccountID,
-				ObservedBalance: observation.Balance,
-				ModeledBalance:  modeledBalance,
-				Adjustment:      observation.Balance - modeledBalance,
-			})
 			latestObserved[observation.AccountID] = observation
 			continue
 		}
@@ -296,8 +286,7 @@ func applyChronologicalHistoryAt(model *types.FinancialModel, projectionStartDat
 		snapshots:              historicalSnapshots,
 		includeStartDateEvents: true,
 		latestObserved:         latestObserved,
-		adjustments:            adjustments,
-		zeroDeltaObservations:  zeroDeltaObservations,
+		noopCheckpointKeys:     noopCheckpointKeys,
 	}, nil
 }
 
@@ -314,7 +303,21 @@ func preparePosition(model *types.FinancialModel, startDate string, overrides ty
 }
 
 func preparePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
-	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinancialModel)
+	position, err := preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinancialModel, false)
+	if err != nil {
+		return nil, err
+	}
+	// Modeled rule replay contributes transaction ledgers, latest-realized
+	// amounts, and annual-cap state. Historical snapshots and balance authority
+	// stay actual-only so the timeline converges to the projection baseline.
+	modeled, err := applyChronologicalHistoryAt(&position.model, startDate, cutInstant)
+	if err != nil {
+		return nil, err
+	}
+	state := CloneSimulationState(*modeled.state)
+	state.Balances = SnapshotBalances(position.state.Balances)
+	position.state = &state
+	return position, nil
 }
 
 // prepareFinancePositionAt applies recorded history for ordinary finance reads
@@ -334,10 +337,10 @@ func prepareFinancePositionAt(model *types.FinancialModel, startDate string, cut
 		}
 		model = &cutModel
 	}
-	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinanceModel)
+	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinanceModel, false)
 }
 
-func preparePositionWithValidator(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides, validate func(*types.FinancialModel) []types.ModelValidationIssue) (*preparedPosition, error) {
+func preparePositionWithValidator(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides, validate func(*types.FinancialModel) []types.ModelValidationIssue, includeScheduleOccurrences bool) (*preparedPosition, error) {
 	if model == nil {
 		model = &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
 	}
@@ -361,7 +364,7 @@ func preparePositionWithValidator(model *types.FinancialModel, startDate string,
 			Path:     []any{"fallbackProjectionStartDate"},
 		}}}
 	}
-	applied, err := applyChronologicalHistoryAt(&effectiveModel, startDate, cutInstant)
+	applied, err := applyChronologicalHistoryAtMode(&effectiveModel, startDate, cutInstant, includeScheduleOccurrences)
 	if err != nil {
 		return nil, err
 	}
@@ -370,9 +373,9 @@ func preparePositionWithValidator(model *types.FinancialModel, startDate string,
 }
 
 // PrepareSimulationRequest resolves overrides, validation, history, and dates.
-// Recorded history is applied through the cut instant and the simulation continues after
-// it, skipping occurrences already applied by the same cut so nothing
-// executes twice.
+// Recorded actuals set the authoritative balance baseline and historical rows
+// through the cut. Modeled replay separately retains transaction ledgers, while
+// simulation continues after the cut without repeating applied occurrences.
 func PrepareSimulationRequest(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
 	if err := requireResimulationAllowed("PrepareSimulationRequest"); err != nil {
 		return nil, err

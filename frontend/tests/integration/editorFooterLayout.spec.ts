@@ -142,7 +142,12 @@ test.describe("editor dialog mobile layout", () => {
 	test("debt account fills the viewport with a fixed action footer", async ({
 		page,
 	}) => {
-		await assertFooterLayout(page, await openDebtEditor(page), false);
+		const dialog = await openDebtEditor(page);
+		await assertFooterLayout(page, dialog, false);
+		await expect(dialog.getByText("Source", { exact: true })).toHaveCount(0);
+		await expect(dialog.getByText("Manual entry", { exact: true })).toHaveCount(
+			0,
+		);
 	});
 });
 

@@ -150,13 +150,6 @@ type Checkpoint struct {
 	ObservedAt int64 `json:"observedAt"`
 }
 
-type CheckpointCorrection struct {
-	AccountID       string  `json:"accountId"`
-	ObservedBalance float64 `json:"observedBalance"`
-	ModeledBalance  float64 `json:"modeledBalance"`
-	Adjustment      float64 `json:"adjustment"`
-}
-
 type Frequency string
 
 const (

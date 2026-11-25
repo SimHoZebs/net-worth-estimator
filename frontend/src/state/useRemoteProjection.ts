@@ -27,7 +27,7 @@ import {
 import { financialIndependenceRange } from "../api/financialIndependence.ts";
 import { UserScopeError } from "../api/scopedRequest.ts";
 import { finite } from "../domain/guards.ts";
-import { isoDateFromEpochSeconds } from "../domain/format.ts";
+import { isoDateFromEpochSeconds, todayIso } from "../domain/format.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { horizonDate } from "../domain/result.ts";
 import {
@@ -41,7 +41,6 @@ import { projectionEvaluationKey } from "./projectionKeys.ts";
 import {
 	normalizedEvaluations,
 	projectionSourceFromModel,
-	projectionStartDate,
 	projectionStartDateFromRows,
 	type ProjectionSource,
 } from "./projectionSource.ts";
@@ -101,8 +100,7 @@ type ProjectionInput = ProjectionRows & {
 };
 
 function projectionStartOf(input: ProjectionInput): string {
-	if (input.startDate) return input.startDate;
-	return projectionStartDate(input as FinancialModel);
+	return input.startDate || todayIso();
 }
 
 function projectionKeyOf(input: ProjectionInput): string {

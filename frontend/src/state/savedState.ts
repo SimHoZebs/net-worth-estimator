@@ -16,7 +16,7 @@ import type {
 	Transaction,
 } from "../domain/model.ts";
 import { summaryEvaluations } from "./evaluationQueries.ts";
-import { projectionStartDateFromRows } from "./projectionSource.ts";
+import { savedStartDateFromRows } from "./projectionSource.ts";
 import {
 	useAccountBalances,
 	useCheckpoints,
@@ -103,7 +103,7 @@ export function useSavedStartDate(): string | null {
 	return useMemo(() => {
 		if (checkpoints === null || schedules === null || transactions === null)
 			return null;
-		return projectionStartDateFromRows({
+		return savedStartDateFromRows({
 			checkpoints,
 			schedules,
 			transactions,

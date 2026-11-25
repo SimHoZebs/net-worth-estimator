@@ -144,2398 +144,2377 @@
     "disabledTransactionIds": []
   },
   "result": {
-    "bands": [
-      {
-        "date": "2026-02-01",
-        "isHistorical": true,
-        "netWorth": {
-          "p10": 1000,
-          "p25": 1000,
-          "p50": 1000,
-          "p75": 1000,
-          "p90": 1000
-        }
-      },
-      {
-        "date": "2026-02-01",
-        "isHistorical": true,
-        "netWorth": {
-          "p10": 1000,
-          "p25": 1000,
-          "p50": 1000,
-          "p75": 1000,
-          "p90": 1000
-        }
-      },
-      {
-        "date": "2026-02-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 600,
-          "p25": 600,
-          "p50": 600,
-          "p75": 600,
-          "p90": 600
-        }
-      },
-      {
-        "date": "2026-03-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 1600,
-          "p25": 1600,
-          "p50": 1600,
-          "p75": 1600,
-          "p90": 1600
-        }
-      },
-      {
-        "date": "2026-03-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 1200,
-          "p25": 1200,
-          "p50": 1200,
-          "p75": 1200,
-          "p90": 1200
-        }
-      },
-      {
-        "date": "2026-04-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 2200,
-          "p25": 2200,
-          "p50": 2200,
-          "p75": 2200,
-          "p90": 2200
-        }
-      },
-      {
-        "date": "2026-04-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 1800,
-          "p25": 1800,
-          "p50": 1800,
-          "p75": 1800,
-          "p90": 1800
-        }
-      },
-      {
-        "date": "2026-05-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 2800,
-          "p25": 2800,
-          "p50": 2800,
-          "p75": 2800,
-          "p90": 2800
-        }
-      },
-      {
-        "date": "2026-05-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 2400,
-          "p25": 2400,
-          "p50": 2400,
-          "p75": 2400,
-          "p90": 2400
-        }
-      },
-      {
-        "date": "2026-06-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 3400,
-          "p25": 3400,
-          "p50": 3400,
-          "p75": 3400,
-          "p90": 3400
-        }
-      },
-      {
-        "date": "2026-06-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 3000,
-          "p25": 3000,
-          "p50": 3000,
-          "p75": 3000,
-          "p90": 3000
-        }
-      },
-      {
-        "date": "2026-07-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 4000,
-          "p25": 4000,
-          "p50": 4000,
-          "p75": 4000,
-          "p90": 4000
-        }
-      },
-      {
-        "date": "2026-07-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 3600,
-          "p25": 3600,
-          "p50": 3600,
-          "p75": 3600,
-          "p90": 3600
-        }
-      },
-      {
-        "date": "2026-08-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 4600,
-          "p25": 4600,
-          "p50": 4600,
-          "p75": 4600,
-          "p90": 4600
-        }
-      },
-      {
-        "date": "2026-08-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 4200,
-          "p25": 4200,
-          "p50": 4200,
-          "p75": 4200,
-          "p90": 4200
-        }
-      },
-      {
-        "date": "2026-09-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 5200,
-          "p25": 5200,
-          "p50": 5200,
-          "p75": 5200,
-          "p90": 5200
-        }
-      },
-      {
-        "date": "2026-09-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 4800,
-          "p25": 4800,
-          "p50": 4800,
-          "p75": 4800,
-          "p90": 4800
-        }
-      },
-      {
-        "date": "2026-10-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 5800,
-          "p25": 5800,
-          "p50": 5800,
-          "p75": 5800,
-          "p90": 5800
-        }
-      },
-      {
-        "date": "2026-10-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 5400,
-          "p25": 5400,
-          "p50": 5400,
-          "p75": 5400,
-          "p90": 5400
-        }
-      },
-      {
-        "date": "2026-11-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 6400,
-          "p25": 6400,
-          "p50": 6400,
-          "p75": 6400,
-          "p90": 6400
-        }
-      },
-      {
-        "date": "2026-11-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 6000,
-          "p25": 6000,
-          "p50": 6000,
-          "p75": 6000,
-          "p90": 6000
-        }
-      },
-      {
-        "date": "2026-12-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 7000,
-          "p25": 7000,
-          "p50": 7000,
-          "p75": 7000,
-          "p90": 7000
-        }
-      },
-      {
-        "date": "2026-12-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 6600,
-          "p25": 6600,
-          "p50": 6600,
-          "p75": 6600,
-          "p90": 6600
-        }
-      },
-      {
-        "date": "2027-01-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 7600,
-          "p25": 7600,
-          "p50": 7600,
-          "p75": 7600,
-          "p90": 7600
-        }
-      },
-      {
-        "date": "2027-01-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 7200,
-          "p25": 7200,
-          "p50": 7200,
-          "p75": 7200,
-          "p90": 7200
-        }
-      },
-      {
-        "date": "2027-02-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 8200,
-          "p25": 8200,
-          "p50": 8200,
-          "p75": 8200,
-          "p90": 8200
-        }
-      },
-      {
-        "date": "2027-02-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 7800,
-          "p25": 7800,
-          "p50": 7800,
-          "p75": 7800,
-          "p90": 7800
-        }
-      },
-      {
-        "date": "2027-03-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 8800,
-          "p25": 8800,
-          "p50": 8800,
-          "p75": 8800,
-          "p90": 8800
-        }
-      },
-      {
-        "date": "2027-03-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 8400,
-          "p25": 8400,
-          "p50": 8400,
-          "p75": 8400,
-          "p90": 8400
-        }
-      },
-      {
-        "date": "2027-04-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 9400,
-          "p25": 9400,
-          "p50": 9400,
-          "p75": 9400,
-          "p90": 9400
-        }
-      },
-      {
-        "date": "2027-04-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 9000,
-          "p25": 9000,
-          "p50": 9000,
-          "p75": 9000,
-          "p90": 9000
-        }
-      },
-      {
-        "date": "2027-05-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 10000,
-          "p25": 10000,
-          "p50": 10000,
-          "p75": 10000,
-          "p90": 10000
-        }
-      },
-      {
-        "date": "2027-05-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 9600,
-          "p25": 9600,
-          "p50": 9600,
-          "p75": 9600,
-          "p90": 9600
-        }
-      },
-      {
-        "date": "2027-06-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 10600,
-          "p25": 10600,
-          "p50": 10600,
-          "p75": 10600,
-          "p90": 10600
-        }
-      },
-      {
-        "date": "2027-06-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 10200,
-          "p25": 10200,
-          "p50": 10200,
-          "p75": 10200,
-          "p90": 10200
-        }
-      },
-      {
-        "date": "2027-07-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 11200,
-          "p25": 11200,
-          "p50": 11200,
-          "p75": 11200,
-          "p90": 11200
-        }
-      },
-      {
-        "date": "2027-07-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 10800,
-          "p25": 10800,
-          "p50": 10800,
-          "p75": 10800,
-          "p90": 10800
-        }
-      },
-      {
-        "date": "2027-08-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 11800,
-          "p25": 11800,
-          "p50": 11800,
-          "p75": 11800,
-          "p90": 11800
-        }
-      },
-      {
-        "date": "2027-08-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 11400,
-          "p25": 11400,
-          "p50": 11400,
-          "p75": 11400,
-          "p90": 11400
-        }
-      },
-      {
-        "date": "2027-09-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 12400,
-          "p25": 12400,
-          "p50": 12400,
-          "p75": 12400,
-          "p90": 12400
-        }
-      },
-      {
-        "date": "2027-09-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 12000,
-          "p25": 12000,
-          "p50": 12000,
-          "p75": 12000,
-          "p90": 12000
-        }
-      },
-      {
-        "date": "2027-10-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 13000,
-          "p25": 13000,
-          "p50": 13000,
-          "p75": 13000,
-          "p90": 13000
-        }
-      },
-      {
-        "date": "2027-10-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 12600,
-          "p25": 12600,
-          "p50": 12600,
-          "p75": 12600,
-          "p90": 12600
-        }
-      },
-      {
-        "date": "2027-11-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 13600,
-          "p25": 13600,
-          "p50": 13600,
-          "p75": 13600,
-          "p90": 13600
-        }
-      },
-      {
-        "date": "2027-11-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 13200,
-          "p25": 13200,
-          "p50": 13200,
-          "p75": 13200,
-          "p90": 13200
-        }
-      },
-      {
-        "date": "2027-12-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 14200,
-          "p25": 14200,
-          "p50": 14200,
-          "p75": 14200,
-          "p90": 14200
-        }
-      },
-      {
-        "date": "2027-12-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 13800,
-          "p25": 13800,
-          "p50": 13800,
-          "p75": 13800,
-          "p90": 13800
-        }
-      },
-      {
-        "date": "2028-01-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 14800,
-          "p25": 14800,
-          "p50": 14800,
-          "p75": 14800,
-          "p90": 14800
-        }
-      },
-      {
-        "date": "2028-01-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 14400,
-          "p25": 14400,
-          "p50": 14400,
-          "p75": 14400,
-          "p90": 14400
-        }
-      },
-      {
-        "date": "2028-02-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 15400,
-          "p25": 15400,
-          "p50": 15400,
-          "p75": 15400,
-          "p90": 15400
-        }
-      },
-      {
-        "date": "2028-02-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 15000,
-          "p25": 15000,
-          "p50": 15000,
-          "p75": 15000,
-          "p90": 15000
-        }
-      },
-      {
-        "date": "2028-03-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 16000,
-          "p25": 16000,
-          "p50": 16000,
-          "p75": 16000,
-          "p90": 16000
-        }
-      },
-      {
-        "date": "2028-03-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 15600,
-          "p25": 15600,
-          "p50": 15600,
-          "p75": 15600,
-          "p90": 15600
-        }
-      },
-      {
-        "date": "2028-04-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 16600,
-          "p25": 16600,
-          "p50": 16600,
-          "p75": 16600,
-          "p90": 16600
-        }
-      },
-      {
-        "date": "2028-04-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 16200,
-          "p25": 16200,
-          "p50": 16200,
-          "p75": 16200,
-          "p90": 16200
-        }
-      },
-      {
-        "date": "2028-05-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 17200,
-          "p25": 17200,
-          "p50": 17200,
-          "p75": 17200,
-          "p90": 17200
-        }
-      },
-      {
-        "date": "2028-05-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 16800,
-          "p25": 16800,
-          "p50": 16800,
-          "p75": 16800,
-          "p90": 16800
-        }
-      },
-      {
-        "date": "2028-06-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 17800,
-          "p25": 17800,
-          "p50": 17800,
-          "p75": 17800,
-          "p90": 17800
-        }
-      },
-      {
-        "date": "2028-06-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 17400,
-          "p25": 17400,
-          "p50": 17400,
-          "p75": 17400,
-          "p90": 17400
-        }
-      },
-      {
-        "date": "2028-07-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 18400,
-          "p25": 18400,
-          "p50": 18400,
-          "p75": 18400,
-          "p90": 18400
-        }
-      },
-      {
-        "date": "2028-07-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 18000,
-          "p25": 18000,
-          "p50": 18000,
-          "p75": 18000,
-          "p90": 18000
-        }
-      },
-      {
-        "date": "2028-08-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 19000,
-          "p25": 19000,
-          "p50": 19000,
-          "p75": 19000,
-          "p90": 19000
-        }
-      },
-      {
-        "date": "2028-08-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 18600,
-          "p25": 18600,
-          "p50": 18600,
-          "p75": 18600,
-          "p90": 18600
-        }
-      },
-      {
-        "date": "2028-09-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 19600,
-          "p25": 19600,
-          "p50": 19600,
-          "p75": 19600,
-          "p90": 19600
-        }
-      },
-      {
-        "date": "2028-09-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 19200,
-          "p25": 19200,
-          "p50": 19200,
-          "p75": 19200,
-          "p90": 19200
-        }
-      },
-      {
-        "date": "2028-10-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 20200,
-          "p25": 20200,
-          "p50": 20200,
-          "p75": 20200,
-          "p90": 20200
-        }
-      },
-      {
-        "date": "2028-10-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 19800,
-          "p25": 19800,
-          "p50": 19800,
-          "p75": 19800,
-          "p90": 19800
-        }
-      },
-      {
-        "date": "2028-11-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 20800,
-          "p25": 20800,
-          "p50": 20800,
-          "p75": 20800,
-          "p90": 20800
-        }
-      },
-      {
-        "date": "2028-11-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 20400,
-          "p25": 20400,
-          "p50": 20400,
-          "p75": 20400,
-          "p90": 20400
-        }
-      },
-      {
-        "date": "2028-12-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 21400,
-          "p25": 21400,
-          "p50": 21400,
-          "p75": 21400,
-          "p90": 21400
-        }
-      },
-      {
-        "date": "2028-12-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 21000,
-          "p25": 21000,
-          "p50": 21000,
-          "p75": 21000,
-          "p90": 21000
-        }
-      },
-      {
-        "date": "2029-01-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 22000,
-          "p25": 22000,
-          "p50": 22000,
-          "p75": 22000,
-          "p90": 22000
-        }
-      },
-      {
-        "date": "2029-01-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 21600,
-          "p25": 21600,
-          "p50": 21600,
-          "p75": 21600,
-          "p90": 21600
-        }
-      },
-      {
-        "date": "2029-02-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 22600,
-          "p25": 22600,
-          "p50": 22600,
-          "p75": 22600,
-          "p90": 22600
-        }
-      },
-      {
-        "date": "2029-02-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 22200,
-          "p25": 22200,
-          "p50": 22200,
-          "p75": 22200,
-          "p90": 22200
-        }
-      },
-      {
-        "date": "2029-03-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 23200,
-          "p25": 23200,
-          "p50": 23200,
-          "p75": 23200,
-          "p90": 23200
-        }
-      },
-      {
-        "date": "2029-03-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 22800,
-          "p25": 22800,
-          "p50": 22800,
-          "p75": 22800,
-          "p90": 22800
-        }
-      },
-      {
-        "date": "2029-04-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 23800,
-          "p25": 23800,
-          "p50": 23800,
-          "p75": 23800,
-          "p90": 23800
-        }
-      },
-      {
-        "date": "2029-04-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 23400,
-          "p25": 23400,
-          "p50": 23400,
-          "p75": 23400,
-          "p90": 23400
-        }
-      },
-      {
-        "date": "2029-05-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 24400,
-          "p25": 24400,
-          "p50": 24400,
-          "p75": 24400,
-          "p90": 24400
-        }
-      },
-      {
-        "date": "2029-05-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 24000,
-          "p25": 24000,
-          "p50": 24000,
-          "p75": 24000,
-          "p90": 24000
-        }
-      },
-      {
-        "date": "2029-06-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 25000,
-          "p25": 25000,
-          "p50": 25000,
-          "p75": 25000,
-          "p90": 25000
-        }
-      },
-      {
-        "date": "2029-06-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 24600,
-          "p25": 24600,
-          "p50": 24600,
-          "p75": 24600,
-          "p90": 24600
-        }
-      },
-      {
-        "date": "2029-07-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 25600,
-          "p25": 25600,
-          "p50": 25600,
-          "p75": 25600,
-          "p90": 25600
-        }
-      },
-      {
-        "date": "2029-07-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 25200,
-          "p25": 25200,
-          "p50": 25200,
-          "p75": 25200,
-          "p90": 25200
-        }
-      },
-      {
-        "date": "2029-08-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 26200,
-          "p25": 26200,
-          "p50": 26200,
-          "p75": 26200,
-          "p90": 26200
-        }
-      },
-      {
-        "date": "2029-08-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 25800,
-          "p25": 25800,
-          "p50": 25800,
-          "p75": 25800,
-          "p90": 25800
-        }
-      },
-      {
-        "date": "2029-09-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 26800,
-          "p25": 26800,
-          "p50": 26800,
-          "p75": 26800,
-          "p90": 26800
-        }
-      },
-      {
-        "date": "2029-09-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 26400,
-          "p25": 26400,
-          "p50": 26400,
-          "p75": 26400,
-          "p90": 26400
-        }
-      },
-      {
-        "date": "2029-10-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 27400,
-          "p25": 27400,
-          "p50": 27400,
-          "p75": 27400,
-          "p90": 27400
-        }
-      },
-      {
-        "date": "2029-10-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 27000,
-          "p25": 27000,
-          "p50": 27000,
-          "p75": 27000,
-          "p90": 27000
-        }
-      },
-      {
-        "date": "2029-11-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 28000,
-          "p25": 28000,
-          "p50": 28000,
-          "p75": 28000,
-          "p90": 28000
-        }
-      },
-      {
-        "date": "2029-11-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 27600,
-          "p25": 27600,
-          "p50": 27600,
-          "p75": 27600,
-          "p90": 27600
-        }
-      },
-      {
-        "date": "2029-12-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 28600,
-          "p25": 28600,
-          "p50": 28600,
-          "p75": 28600,
-          "p90": 28600
-        }
-      },
-      {
-        "date": "2029-12-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 28200,
-          "p25": 28200,
-          "p50": 28200,
-          "p75": 28200,
-          "p90": 28200
-        }
-      },
-      {
-        "date": "2030-01-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 29200,
-          "p25": 29200,
-          "p50": 29200,
-          "p75": 29200,
-          "p90": 29200
-        }
-      },
-      {
-        "date": "2030-01-05",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 28800,
-          "p25": 28800,
-          "p50": 28800,
-          "p75": 28800,
-          "p90": 28800
-        }
-      },
-      {
-        "date": "2030-02-01",
-        "isHistorical": false,
-        "netWorth": {
-          "p10": 29800,
-          "p25": 29800,
-          "p50": 29800,
-          "p75": 29800,
-          "p90": 29800
-        }
+  "config": {
+    "runCount": 20,
+    "seed": 42
+  },
+  "bands": [
+    {
+      "date": "2026-02-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": -400,
+        "p25": -400,
+        "p50": -400,
+        "p75": -400,
+        "p90": -400
       }
-    ],
-    "config": {
-      "runCount": 20,
-      "seed": 42
     },
-    "evaluations": {
-      "financialIndependence": [
-        {
-          "instanceId": "fi-golden",
-          "name": "FI golden",
-          "status": "not-satisfied",
-          "deterministic": {
-            "milestones": {
-              "firstCoverageDate": null,
-              "firstSelfSustainingDate": null
-            },
-            "rows": [
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 2,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 2,
-                    "balance": 50,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.00016666666666666666,
-                "date": "2026-02-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 1000,
-                "selectedAssetBalance": 50,
-                "totalAnnualCapacity": 2
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 4,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 4,
-                    "balance": 100,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0003333333333333333,
-                "date": "2026-03-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 1600,
-                "selectedAssetBalance": 100,
-                "totalAnnualCapacity": 4
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 6,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 6,
-                    "balance": 150,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0005,
-                "date": "2026-04-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 2200,
-                "selectedAssetBalance": 150,
-                "totalAnnualCapacity": 6
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 8,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 8,
-                    "balance": 200,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0006666666666666666,
-                "date": "2026-05-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 2800,
-                "selectedAssetBalance": 200,
-                "totalAnnualCapacity": 8
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 10,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 10,
-                    "balance": 250,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0008333333333333334,
-                "date": "2026-06-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 3400,
-                "selectedAssetBalance": 250,
-                "totalAnnualCapacity": 10
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 12,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 12,
-                    "balance": 300,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.001,
-                "date": "2026-07-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 4000,
-                "selectedAssetBalance": 300,
-                "totalAnnualCapacity": 12
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 14,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 14,
-                    "balance": 350,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0011666666666666668,
-                "date": "2026-08-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 4600,
-                "selectedAssetBalance": 350,
-                "totalAnnualCapacity": 14
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 16,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 16,
-                    "balance": 400,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0013333333333333333,
-                "date": "2026-09-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 5200,
-                "selectedAssetBalance": 400,
-                "totalAnnualCapacity": 16
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 18,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 18,
-                    "balance": 450,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0015,
-                "date": "2026-10-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 5800,
-                "selectedAssetBalance": 450,
-                "totalAnnualCapacity": 18
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 20,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 20,
-                    "balance": 500,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0016666666666666668,
-                "date": "2026-11-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 6400,
-                "selectedAssetBalance": 500,
-                "totalAnnualCapacity": 20
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 22,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 22,
-                    "balance": 550,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0018333333333333333,
-                "date": "2026-12-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 7000,
-                "selectedAssetBalance": 550,
-                "totalAnnualCapacity": 22
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 24,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 24,
-                    "balance": 600,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.002,
-                "date": "2027-01-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 7600,
-                "selectedAssetBalance": 600,
-                "totalAnnualCapacity": 24
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 26,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 26,
-                    "balance": 650,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0021666666666666666,
-                "date": "2027-02-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 8200,
-                "selectedAssetBalance": 650,
-                "totalAnnualCapacity": 26
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 28,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 28,
-                    "balance": 700,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0023333333333333335,
-                "date": "2027-03-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 8800,
-                "selectedAssetBalance": 700,
-                "totalAnnualCapacity": 28
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 30,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 30,
-                    "balance": 750,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0025,
-                "date": "2027-04-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 9400,
-                "selectedAssetBalance": 750,
-                "totalAnnualCapacity": 30
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 32,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 32,
-                    "balance": 800,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0026666666666666666,
-                "date": "2027-05-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 10000,
-                "selectedAssetBalance": 800,
-                "totalAnnualCapacity": 32
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 34,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 34,
-                    "balance": 850,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0028333333333333335,
-                "date": "2027-06-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 10600,
-                "selectedAssetBalance": 850,
-                "totalAnnualCapacity": 34
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 36,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 36,
-                    "balance": 900,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.003,
-                "date": "2027-07-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 11200,
-                "selectedAssetBalance": 900,
-                "totalAnnualCapacity": 36
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 38,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 38,
-                    "balance": 950,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0031666666666666666,
-                "date": "2027-08-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 11800,
-                "selectedAssetBalance": 950,
-                "totalAnnualCapacity": 38
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 40,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 40,
-                    "balance": 1000,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0033333333333333335,
-                "date": "2027-09-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 12400,
-                "selectedAssetBalance": 1000,
-                "totalAnnualCapacity": 40
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 42,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 42,
-                    "balance": 1050,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0035,
-                "date": "2027-10-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 13000,
-                "selectedAssetBalance": 1050,
-                "totalAnnualCapacity": 42
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 44,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 44,
-                    "balance": 1100,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.0036666666666666666,
-                "date": "2027-11-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 13600,
-                "selectedAssetBalance": 1100,
-                "totalAnnualCapacity": 44
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 46,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 46,
-                    "balance": 1150,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.003833333333333333,
-                "date": "2027-12-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 14200,
-                "selectedAssetBalance": 1150,
-                "totalAnnualCapacity": 46
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 48,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 48,
-                    "balance": 1200,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.004,
-                "date": "2028-01-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 14800,
-                "selectedAssetBalance": 1200,
-                "totalAnnualCapacity": 48
-              },
-              {
-                "annualDirectIncome": 0,
-                "annualExpenseTarget": 12000,
-                "annualWithdrawalCapacity": 50,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "annualWithdrawalCapacity": 50,
-                    "balance": 1250,
-                    "withdrawalRate": 0.04
-                  }
-                ],
-                "coverageRatio": 0.004166666666666667,
-                "date": "2028-02-01",
-                "isCovered": false,
-                "isEligible": false,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "netWorth": 15400,
-                "selectedAssetBalance": 1250,
-                "totalAnnualCapacity": 50
-              }
-            ],
-            "runOutcomes": [
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-02-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 50,
-                "endingSelectedAssetBalance": 50,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 50,
-                "startingSelectedAssetBalance": 50,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-03-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 100,
-                "endingSelectedAssetBalance": 100,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 100,
-                "startingSelectedAssetBalance": 100,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-04-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 150,
-                "endingSelectedAssetBalance": 150,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 150,
-                "startingSelectedAssetBalance": 150,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-05-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 200,
-                "endingSelectedAssetBalance": 200,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 200,
-                "startingSelectedAssetBalance": 200,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-06-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 250,
-                "endingSelectedAssetBalance": 250,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 250,
-                "startingSelectedAssetBalance": 250,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-07-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 300,
-                "endingSelectedAssetBalance": 300,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 300,
-                "startingSelectedAssetBalance": 300,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-08-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 350,
-                "endingSelectedAssetBalance": 350,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 350,
-                "startingSelectedAssetBalance": 350,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-09-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 400,
-                "endingSelectedAssetBalance": 400,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 400,
-                "startingSelectedAssetBalance": 400,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-10-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 450,
-                "endingSelectedAssetBalance": 450,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 450,
-                "startingSelectedAssetBalance": 450,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-11-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 500,
-                "endingSelectedAssetBalance": 500,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 500,
-                "startingSelectedAssetBalance": 500,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2026-12-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 550,
-                "endingSelectedAssetBalance": 550,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 550,
-                "startingSelectedAssetBalance": 550,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-01-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 600,
-                "endingSelectedAssetBalance": 600,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 600,
-                "startingSelectedAssetBalance": 600,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-02-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 650,
-                "endingSelectedAssetBalance": 650,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 650,
-                "startingSelectedAssetBalance": 650,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-03-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 700,
-                "endingSelectedAssetBalance": 700,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 700,
-                "startingSelectedAssetBalance": 700,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-04-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 750,
-                "endingSelectedAssetBalance": 750,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 750,
-                "startingSelectedAssetBalance": 750,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-05-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 800,
-                "endingSelectedAssetBalance": 800,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 800,
-                "startingSelectedAssetBalance": 800,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-06-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 850,
-                "endingSelectedAssetBalance": 850,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 850,
-                "startingSelectedAssetBalance": 850,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-07-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 900,
-                "endingSelectedAssetBalance": 900,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 900,
-                "startingSelectedAssetBalance": 900,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-08-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 950,
-                "endingSelectedAssetBalance": 950,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 950,
-                "startingSelectedAssetBalance": 950,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-09-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 1000,
-                "endingSelectedAssetBalance": 1000,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 1000,
-                "startingSelectedAssetBalance": 1000,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-10-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 1050,
-                "endingSelectedAssetBalance": 1050,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 1050,
-                "startingSelectedAssetBalance": 1050,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-11-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 1100,
-                "endingSelectedAssetBalance": 1100,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 1100,
-                "startingSelectedAssetBalance": 1100,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2027-12-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 1150,
-                "endingSelectedAssetBalance": 1150,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 1150,
-                "startingSelectedAssetBalance": 1150,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2028-01-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 1200,
-                "endingSelectedAssetBalance": 1200,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 1200,
-                "startingSelectedAssetBalance": 1200,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              },
-              {
-                "balanceTrajectory": [],
-                "candidateDate": "2028-02-01",
-                "cycleEstablished": false,
-                "endingRealSelectedAssetBalance": 1250,
-                "endingSelectedAssetBalance": 1250,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "initialCoverageMet": false,
-                "minimumNetWorthMet": true,
-                "principalReplenished": false,
-                "startingRealSelectedAssetBalance": 1250,
-                "startingSelectedAssetBalance": 1250,
-                "status": "ineligible",
-                "withdrawals": {
-                  "accounts": [],
-                  "constraints": [],
-                  "firstShortfall": null,
-                  "firstShortfallDate": null,
-                  "lastShortfallDate": null,
-                  "realizedAmount": 0,
-                  "relatedAccountIds": [],
-                  "requestedAmount": 0,
-                  "shortfallAmount": 0,
-                  "shortfallOccurrenceCount": 0
-                }
-              }
-            ]
-          },
-          "probabilistic": {
-            "fiCycleSuccessProbability": 0,
-            "medianCoverageDate": null,
-            "selfSustainingDate": null,
-            "selfSustainingProbability": null
-          },
-          "diagnostics": []
-        }
-      ],
-      "netWorthThreshold": [
-        {
-          "instanceId": "nw-500",
-          "name": "Net worth 500",
-          "status": "satisfied",
-          "deterministic": {
-            "firstReachedDate": "2026-02-01",
-            "reached": true
-          },
-          "probabilistic": {
-            "medianReachedDate": "2026-02-01",
-            "p10ReachedDate": "2026-02-01",
-            "p90ReachedDate": "2026-02-01",
-            "probability": 1
-          },
-          "diagnostics": []
-        }
-      ],
-      "accountBalance": [],
-      "transactionFulfillment": [
-        {
-          "instanceId": "pf-all",
-          "name": "Transaction fulfillment",
-          "status": "satisfied",
-          "deterministic": {
-            "completionRate": 1,
-            "firstUnderfulfilledDate": null,
-            "realizedAmount": 69600,
-            "requestedAmount": 69600,
-            "unfulfilledAmount": 0
-          },
-          "probabilistic": {
-            "fulfilledRunCount": 20,
-            "fullFulfillmentProbability": 1,
-            "runCount": 20,
-            "unfulfilledAmountPercentiles": {
-              "p10": 0,
-              "p25": 0,
-              "p50": 0,
-              "p75": 0,
-              "p90": 0
-            }
-          },
-          "diagnostics": []
-        }
-      ],
-      "cycleFulfillment": []
+    {
+      "date": "2026-03-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 600,
+        "p25": 600,
+        "p50": 600,
+        "p75": 600,
+        "p90": 600
+      }
     },
-    "milestones": {
-      "finalNetWorthPercentiles": {
-        "p10": 29800,
-        "p25": 29800,
-        "p50": 29800,
-        "p75": 29800,
-        "p90": 29800
+    {
+      "date": "2026-03-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 200,
+        "p25": 200,
+        "p50": 200,
+        "p75": 200,
+        "p90": 200
+      }
+    },
+    {
+      "date": "2026-04-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 1200,
+        "p25": 1200,
+        "p50": 1200,
+        "p75": 1200,
+        "p90": 1200
+      }
+    },
+    {
+      "date": "2026-04-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 800,
+        "p25": 800,
+        "p50": 800,
+        "p75": 800,
+        "p90": 800
+      }
+    },
+    {
+      "date": "2026-05-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 1800,
+        "p25": 1800,
+        "p50": 1800,
+        "p75": 1800,
+        "p90": 1800
+      }
+    },
+    {
+      "date": "2026-05-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 1400,
+        "p25": 1400,
+        "p50": 1400,
+        "p75": 1400,
+        "p90": 1400
+      }
+    },
+    {
+      "date": "2026-06-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 2400,
+        "p25": 2400,
+        "p50": 2400,
+        "p75": 2400,
+        "p90": 2400
+      }
+    },
+    {
+      "date": "2026-06-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 2000,
+        "p25": 2000,
+        "p50": 2000,
+        "p75": 2000,
+        "p90": 2000
+      }
+    },
+    {
+      "date": "2026-07-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 3000,
+        "p25": 3000,
+        "p50": 3000,
+        "p75": 3000,
+        "p90": 3000
+      }
+    },
+    {
+      "date": "2026-07-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 2600,
+        "p25": 2600,
+        "p50": 2600,
+        "p75": 2600,
+        "p90": 2600
+      }
+    },
+    {
+      "date": "2026-08-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 3600,
+        "p25": 3600,
+        "p50": 3600,
+        "p75": 3600,
+        "p90": 3600
+      }
+    },
+    {
+      "date": "2026-08-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 3200,
+        "p25": 3200,
+        "p50": 3200,
+        "p75": 3200,
+        "p90": 3200
+      }
+    },
+    {
+      "date": "2026-09-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 4200,
+        "p25": 4200,
+        "p50": 4200,
+        "p75": 4200,
+        "p90": 4200
+      }
+    },
+    {
+      "date": "2026-09-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 3800,
+        "p25": 3800,
+        "p50": 3800,
+        "p75": 3800,
+        "p90": 3800
+      }
+    },
+    {
+      "date": "2026-10-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 4800,
+        "p25": 4800,
+        "p50": 4800,
+        "p75": 4800,
+        "p90": 4800
+      }
+    },
+    {
+      "date": "2026-10-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 4400,
+        "p25": 4400,
+        "p50": 4400,
+        "p75": 4400,
+        "p90": 4400
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 5400,
+        "p25": 5400,
+        "p50": 5400,
+        "p75": 5400,
+        "p90": 5400
+      }
+    },
+    {
+      "date": "2026-11-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 5000,
+        "p25": 5000,
+        "p50": 5000,
+        "p75": 5000,
+        "p90": 5000
+      }
+    },
+    {
+      "date": "2026-12-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 6000,
+        "p25": 6000,
+        "p50": 6000,
+        "p75": 6000,
+        "p90": 6000
+      }
+    },
+    {
+      "date": "2026-12-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 5600,
+        "p25": 5600,
+        "p50": 5600,
+        "p75": 5600,
+        "p90": 5600
+      }
+    },
+    {
+      "date": "2027-01-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 6600,
+        "p25": 6600,
+        "p50": 6600,
+        "p75": 6600,
+        "p90": 6600
+      }
+    },
+    {
+      "date": "2027-01-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 6200,
+        "p25": 6200,
+        "p50": 6200,
+        "p75": 6200,
+        "p90": 6200
+      }
+    },
+    {
+      "date": "2027-02-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 7200,
+        "p25": 7200,
+        "p50": 7200,
+        "p75": 7200,
+        "p90": 7200
+      }
+    },
+    {
+      "date": "2027-02-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 6800,
+        "p25": 6800,
+        "p50": 6800,
+        "p75": 6800,
+        "p90": 6800
+      }
+    },
+    {
+      "date": "2027-03-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 7800,
+        "p25": 7800,
+        "p50": 7800,
+        "p75": 7800,
+        "p90": 7800
+      }
+    },
+    {
+      "date": "2027-03-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 7400,
+        "p25": 7400,
+        "p50": 7400,
+        "p75": 7400,
+        "p90": 7400
+      }
+    },
+    {
+      "date": "2027-04-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 8400,
+        "p25": 8400,
+        "p50": 8400,
+        "p75": 8400,
+        "p90": 8400
+      }
+    },
+    {
+      "date": "2027-04-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 8000,
+        "p25": 8000,
+        "p50": 8000,
+        "p75": 8000,
+        "p90": 8000
+      }
+    },
+    {
+      "date": "2027-05-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 9000,
+        "p25": 9000,
+        "p50": 9000,
+        "p75": 9000,
+        "p90": 9000
+      }
+    },
+    {
+      "date": "2027-05-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 8600,
+        "p25": 8600,
+        "p50": 8600,
+        "p75": 8600,
+        "p90": 8600
+      }
+    },
+    {
+      "date": "2027-06-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 9600,
+        "p25": 9600,
+        "p50": 9600,
+        "p75": 9600,
+        "p90": 9600
+      }
+    },
+    {
+      "date": "2027-06-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 9200,
+        "p25": 9200,
+        "p50": 9200,
+        "p75": 9200,
+        "p90": 9200
+      }
+    },
+    {
+      "date": "2027-07-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 10200,
+        "p25": 10200,
+        "p50": 10200,
+        "p75": 10200,
+        "p90": 10200
+      }
+    },
+    {
+      "date": "2027-07-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 9800,
+        "p25": 9800,
+        "p50": 9800,
+        "p75": 9800,
+        "p90": 9800
+      }
+    },
+    {
+      "date": "2027-08-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 10800,
+        "p25": 10800,
+        "p50": 10800,
+        "p75": 10800,
+        "p90": 10800
+      }
+    },
+    {
+      "date": "2027-08-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 10400,
+        "p25": 10400,
+        "p50": 10400,
+        "p75": 10400,
+        "p90": 10400
+      }
+    },
+    {
+      "date": "2027-09-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 11400,
+        "p25": 11400,
+        "p50": 11400,
+        "p75": 11400,
+        "p90": 11400
+      }
+    },
+    {
+      "date": "2027-09-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 11000,
+        "p25": 11000,
+        "p50": 11000,
+        "p75": 11000,
+        "p90": 11000
+      }
+    },
+    {
+      "date": "2027-10-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 12000,
+        "p25": 12000,
+        "p50": 12000,
+        "p75": 12000,
+        "p90": 12000
+      }
+    },
+    {
+      "date": "2027-10-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 11600,
+        "p25": 11600,
+        "p50": 11600,
+        "p75": 11600,
+        "p90": 11600
+      }
+    },
+    {
+      "date": "2027-11-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 12600,
+        "p25": 12600,
+        "p50": 12600,
+        "p75": 12600,
+        "p90": 12600
+      }
+    },
+    {
+      "date": "2027-11-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 12200,
+        "p25": 12200,
+        "p50": 12200,
+        "p75": 12200,
+        "p90": 12200
+      }
+    },
+    {
+      "date": "2027-12-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 13200,
+        "p25": 13200,
+        "p50": 13200,
+        "p75": 13200,
+        "p90": 13200
+      }
+    },
+    {
+      "date": "2027-12-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 12800,
+        "p25": 12800,
+        "p50": 12800,
+        "p75": 12800,
+        "p90": 12800
+      }
+    },
+    {
+      "date": "2028-01-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 13800,
+        "p25": 13800,
+        "p50": 13800,
+        "p75": 13800,
+        "p90": 13800
+      }
+    },
+    {
+      "date": "2028-01-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 13400,
+        "p25": 13400,
+        "p50": 13400,
+        "p75": 13400,
+        "p90": 13400
+      }
+    },
+    {
+      "date": "2028-02-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 14400,
+        "p25": 14400,
+        "p50": 14400,
+        "p75": 14400,
+        "p90": 14400
+      }
+    },
+    {
+      "date": "2028-02-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 14000,
+        "p25": 14000,
+        "p50": 14000,
+        "p75": 14000,
+        "p90": 14000
+      }
+    },
+    {
+      "date": "2028-03-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 15000,
+        "p25": 15000,
+        "p50": 15000,
+        "p75": 15000,
+        "p90": 15000
+      }
+    },
+    {
+      "date": "2028-03-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 14600,
+        "p25": 14600,
+        "p50": 14600,
+        "p75": 14600,
+        "p90": 14600
+      }
+    },
+    {
+      "date": "2028-04-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 15600,
+        "p25": 15600,
+        "p50": 15600,
+        "p75": 15600,
+        "p90": 15600
+      }
+    },
+    {
+      "date": "2028-04-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 15200,
+        "p25": 15200,
+        "p50": 15200,
+        "p75": 15200,
+        "p90": 15200
+      }
+    },
+    {
+      "date": "2028-05-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 16200,
+        "p25": 16200,
+        "p50": 16200,
+        "p75": 16200,
+        "p90": 16200
+      }
+    },
+    {
+      "date": "2028-05-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 15800,
+        "p25": 15800,
+        "p50": 15800,
+        "p75": 15800,
+        "p90": 15800
+      }
+    },
+    {
+      "date": "2028-06-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 16800,
+        "p25": 16800,
+        "p50": 16800,
+        "p75": 16800,
+        "p90": 16800
+      }
+    },
+    {
+      "date": "2028-06-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 16400,
+        "p25": 16400,
+        "p50": 16400,
+        "p75": 16400,
+        "p90": 16400
+      }
+    },
+    {
+      "date": "2028-07-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 17400,
+        "p25": 17400,
+        "p50": 17400,
+        "p75": 17400,
+        "p90": 17400
+      }
+    },
+    {
+      "date": "2028-07-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 17000,
+        "p25": 17000,
+        "p50": 17000,
+        "p75": 17000,
+        "p90": 17000
+      }
+    },
+    {
+      "date": "2028-08-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 18000,
+        "p25": 18000,
+        "p50": 18000,
+        "p75": 18000,
+        "p90": 18000
+      }
+    },
+    {
+      "date": "2028-08-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 17600,
+        "p25": 17600,
+        "p50": 17600,
+        "p75": 17600,
+        "p90": 17600
+      }
+    },
+    {
+      "date": "2028-09-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 18600,
+        "p25": 18600,
+        "p50": 18600,
+        "p75": 18600,
+        "p90": 18600
+      }
+    },
+    {
+      "date": "2028-09-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 18200,
+        "p25": 18200,
+        "p50": 18200,
+        "p75": 18200,
+        "p90": 18200
+      }
+    },
+    {
+      "date": "2028-10-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 19200,
+        "p25": 19200,
+        "p50": 19200,
+        "p75": 19200,
+        "p90": 19200
+      }
+    },
+    {
+      "date": "2028-10-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 18800,
+        "p25": 18800,
+        "p50": 18800,
+        "p75": 18800,
+        "p90": 18800
+      }
+    },
+    {
+      "date": "2028-11-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 19800,
+        "p25": 19800,
+        "p50": 19800,
+        "p75": 19800,
+        "p90": 19800
+      }
+    },
+    {
+      "date": "2028-11-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 19400,
+        "p25": 19400,
+        "p50": 19400,
+        "p75": 19400,
+        "p90": 19400
+      }
+    },
+    {
+      "date": "2028-12-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 20400,
+        "p25": 20400,
+        "p50": 20400,
+        "p75": 20400,
+        "p90": 20400
+      }
+    },
+    {
+      "date": "2028-12-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 20000,
+        "p25": 20000,
+        "p50": 20000,
+        "p75": 20000,
+        "p90": 20000
+      }
+    },
+    {
+      "date": "2029-01-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 21000,
+        "p25": 21000,
+        "p50": 21000,
+        "p75": 21000,
+        "p90": 21000
+      }
+    },
+    {
+      "date": "2029-01-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 20600,
+        "p25": 20600,
+        "p50": 20600,
+        "p75": 20600,
+        "p90": 20600
+      }
+    },
+    {
+      "date": "2029-02-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 21600,
+        "p25": 21600,
+        "p50": 21600,
+        "p75": 21600,
+        "p90": 21600
+      }
+    },
+    {
+      "date": "2029-02-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 21200,
+        "p25": 21200,
+        "p50": 21200,
+        "p75": 21200,
+        "p90": 21200
+      }
+    },
+    {
+      "date": "2029-03-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 22200,
+        "p25": 22200,
+        "p50": 22200,
+        "p75": 22200,
+        "p90": 22200
+      }
+    },
+    {
+      "date": "2029-03-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 21800,
+        "p25": 21800,
+        "p50": 21800,
+        "p75": 21800,
+        "p90": 21800
+      }
+    },
+    {
+      "date": "2029-04-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 22800,
+        "p25": 22800,
+        "p50": 22800,
+        "p75": 22800,
+        "p90": 22800
+      }
+    },
+    {
+      "date": "2029-04-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 22400,
+        "p25": 22400,
+        "p50": 22400,
+        "p75": 22400,
+        "p90": 22400
+      }
+    },
+    {
+      "date": "2029-05-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 23400,
+        "p25": 23400,
+        "p50": 23400,
+        "p75": 23400,
+        "p90": 23400
+      }
+    },
+    {
+      "date": "2029-05-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 23000,
+        "p25": 23000,
+        "p50": 23000,
+        "p75": 23000,
+        "p90": 23000
+      }
+    },
+    {
+      "date": "2029-06-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 24000,
+        "p25": 24000,
+        "p50": 24000,
+        "p75": 24000,
+        "p90": 24000
+      }
+    },
+    {
+      "date": "2029-06-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 23600,
+        "p25": 23600,
+        "p50": 23600,
+        "p75": 23600,
+        "p90": 23600
+      }
+    },
+    {
+      "date": "2029-07-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 24600,
+        "p25": 24600,
+        "p50": 24600,
+        "p75": 24600,
+        "p90": 24600
+      }
+    },
+    {
+      "date": "2029-07-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 24200,
+        "p25": 24200,
+        "p50": 24200,
+        "p75": 24200,
+        "p90": 24200
+      }
+    },
+    {
+      "date": "2029-08-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 25200,
+        "p25": 25200,
+        "p50": 25200,
+        "p75": 25200,
+        "p90": 25200
+      }
+    },
+    {
+      "date": "2029-08-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 24800,
+        "p25": 24800,
+        "p50": 24800,
+        "p75": 24800,
+        "p90": 24800
+      }
+    },
+    {
+      "date": "2029-09-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 25800,
+        "p25": 25800,
+        "p50": 25800,
+        "p75": 25800,
+        "p90": 25800
+      }
+    },
+    {
+      "date": "2029-09-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 25400,
+        "p25": 25400,
+        "p50": 25400,
+        "p75": 25400,
+        "p90": 25400
+      }
+    },
+    {
+      "date": "2029-10-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 26400,
+        "p25": 26400,
+        "p50": 26400,
+        "p75": 26400,
+        "p90": 26400
+      }
+    },
+    {
+      "date": "2029-10-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 26000,
+        "p25": 26000,
+        "p50": 26000,
+        "p75": 26000,
+        "p90": 26000
+      }
+    },
+    {
+      "date": "2029-11-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 27000,
+        "p25": 27000,
+        "p50": 27000,
+        "p75": 27000,
+        "p90": 27000
+      }
+    },
+    {
+      "date": "2029-11-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 26600,
+        "p25": 26600,
+        "p50": 26600,
+        "p75": 26600,
+        "p90": 26600
+      }
+    },
+    {
+      "date": "2029-12-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 27600,
+        "p25": 27600,
+        "p50": 27600,
+        "p75": 27600,
+        "p90": 27600
+      }
+    },
+    {
+      "date": "2029-12-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 27200,
+        "p25": 27200,
+        "p50": 27200,
+        "p75": 27200,
+        "p90": 27200
+      }
+    },
+    {
+      "date": "2030-01-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 28200,
+        "p25": 28200,
+        "p50": 28200,
+        "p75": 28200,
+        "p90": 28200
+      }
+    },
+    {
+      "date": "2030-01-05",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 27800,
+        "p25": 27800,
+        "p50": 27800,
+        "p75": 27800,
+        "p90": 27800
+      }
+    },
+    {
+      "date": "2030-02-01",
+      "isHistorical": false,
+      "netWorth": {
+        "p10": 28800,
+        "p25": 28800,
+        "p50": 28800,
+        "p75": 28800,
+        "p90": 28800
       }
     }
+  ],
+  "milestones": {
+    "finalNetWorthPercentiles": {
+      "p10": 28800,
+      "p25": 28800,
+      "p50": 28800,
+      "p75": 28800,
+      "p90": 28800
+    }
   },
+  "evaluations": {
+    "financialIndependence": [
+      {
+        "instanceId": "fi-golden",
+        "name": "FI golden",
+        "status": "not-satisfied",
+        "deterministic": {
+          "milestones": {
+            "firstCoverageDate": null,
+            "firstSelfSustainingDate": null
+          },
+          "rows": [
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 0,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 0,
+                  "balance": 0,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0,
+              "date": "2026-02-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 0,
+              "selectedAssetBalance": 0,
+              "totalAnnualCapacity": 0
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 2,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 2,
+                  "balance": 50,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.00016666666666666666,
+              "date": "2026-03-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 600,
+              "selectedAssetBalance": 50,
+              "totalAnnualCapacity": 2
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 4,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 4,
+                  "balance": 100,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0003333333333333333,
+              "date": "2026-04-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 1200,
+              "selectedAssetBalance": 100,
+              "totalAnnualCapacity": 4
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 6,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 6,
+                  "balance": 150,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0005,
+              "date": "2026-05-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 1800,
+              "selectedAssetBalance": 150,
+              "totalAnnualCapacity": 6
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 8,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 8,
+                  "balance": 200,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0006666666666666666,
+              "date": "2026-06-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 2400,
+              "selectedAssetBalance": 200,
+              "totalAnnualCapacity": 8
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 10,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 10,
+                  "balance": 250,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0008333333333333334,
+              "date": "2026-07-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 3000,
+              "selectedAssetBalance": 250,
+              "totalAnnualCapacity": 10
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 12,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 12,
+                  "balance": 300,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.001,
+              "date": "2026-08-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 3600,
+              "selectedAssetBalance": 300,
+              "totalAnnualCapacity": 12
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 14,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 14,
+                  "balance": 350,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0011666666666666668,
+              "date": "2026-09-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 4200,
+              "selectedAssetBalance": 350,
+              "totalAnnualCapacity": 14
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 16,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 16,
+                  "balance": 400,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0013333333333333333,
+              "date": "2026-10-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 4800,
+              "selectedAssetBalance": 400,
+              "totalAnnualCapacity": 16
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 18,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 18,
+                  "balance": 450,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0015,
+              "date": "2026-11-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 5400,
+              "selectedAssetBalance": 450,
+              "totalAnnualCapacity": 18
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 20,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 20,
+                  "balance": 500,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0016666666666666668,
+              "date": "2026-12-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 6000,
+              "selectedAssetBalance": 500,
+              "totalAnnualCapacity": 20
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 22,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 22,
+                  "balance": 550,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0018333333333333333,
+              "date": "2027-01-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 6600,
+              "selectedAssetBalance": 550,
+              "totalAnnualCapacity": 22
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 24,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 24,
+                  "balance": 600,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.002,
+              "date": "2027-02-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 7200,
+              "selectedAssetBalance": 600,
+              "totalAnnualCapacity": 24
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 26,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 26,
+                  "balance": 650,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0021666666666666666,
+              "date": "2027-03-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 7800,
+              "selectedAssetBalance": 650,
+              "totalAnnualCapacity": 26
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 28,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 28,
+                  "balance": 700,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0023333333333333335,
+              "date": "2027-04-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 8400,
+              "selectedAssetBalance": 700,
+              "totalAnnualCapacity": 28
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 30,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 30,
+                  "balance": 750,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0025,
+              "date": "2027-05-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 9000,
+              "selectedAssetBalance": 750,
+              "totalAnnualCapacity": 30
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 32,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 32,
+                  "balance": 800,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0026666666666666666,
+              "date": "2027-06-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 9600,
+              "selectedAssetBalance": 800,
+              "totalAnnualCapacity": 32
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 34,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 34,
+                  "balance": 850,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0028333333333333335,
+              "date": "2027-07-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 10200,
+              "selectedAssetBalance": 850,
+              "totalAnnualCapacity": 34
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 36,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 36,
+                  "balance": 900,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.003,
+              "date": "2027-08-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 10800,
+              "selectedAssetBalance": 900,
+              "totalAnnualCapacity": 36
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 38,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 38,
+                  "balance": 950,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0031666666666666666,
+              "date": "2027-09-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 11400,
+              "selectedAssetBalance": 950,
+              "totalAnnualCapacity": 38
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 40,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 40,
+                  "balance": 1000,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0033333333333333335,
+              "date": "2027-10-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 12000,
+              "selectedAssetBalance": 1000,
+              "totalAnnualCapacity": 40
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 42,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 42,
+                  "balance": 1050,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0035,
+              "date": "2027-11-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 12600,
+              "selectedAssetBalance": 1050,
+              "totalAnnualCapacity": 42
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 44,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 44,
+                  "balance": 1100,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.0036666666666666666,
+              "date": "2027-12-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 13200,
+              "selectedAssetBalance": 1100,
+              "totalAnnualCapacity": 44
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 46,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 46,
+                  "balance": 1150,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.003833333333333333,
+              "date": "2028-01-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 13800,
+              "selectedAssetBalance": 1150,
+              "totalAnnualCapacity": 46
+            },
+            {
+              "annualDirectIncome": 0,
+              "annualExpenseTarget": 12000,
+              "annualWithdrawalCapacity": 48,
+              "assetContributions": [
+                {
+                  "accountId": "brokerage",
+                  "annualWithdrawalCapacity": 48,
+                  "balance": 1200,
+                  "withdrawalRate": 0.04
+                }
+              ],
+              "coverageRatio": 0.004,
+              "date": "2028-02-01",
+              "isCovered": false,
+              "isEligible": false,
+              "minimumNetWorth": 0,
+              "minimumNetWorthMet": true,
+              "netWorth": 14400,
+              "selectedAssetBalance": 1200,
+              "totalAnnualCapacity": 48
+            }
+          ],
+          "runOutcomes": [
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-02-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 0,
+              "endingSelectedAssetBalance": 0,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 0,
+              "startingSelectedAssetBalance": 0,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-03-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 50,
+              "endingSelectedAssetBalance": 50,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 50,
+              "startingSelectedAssetBalance": 50,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-04-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 100,
+              "endingSelectedAssetBalance": 100,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 100,
+              "startingSelectedAssetBalance": 100,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-05-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 150,
+              "endingSelectedAssetBalance": 150,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 150,
+              "startingSelectedAssetBalance": 150,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-06-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 200,
+              "endingSelectedAssetBalance": 200,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 200,
+              "startingSelectedAssetBalance": 200,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-07-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 250,
+              "endingSelectedAssetBalance": 250,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 250,
+              "startingSelectedAssetBalance": 250,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-08-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 300,
+              "endingSelectedAssetBalance": 300,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 300,
+              "startingSelectedAssetBalance": 300,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-09-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 350,
+              "endingSelectedAssetBalance": 350,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 350,
+              "startingSelectedAssetBalance": 350,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-10-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 400,
+              "endingSelectedAssetBalance": 400,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 400,
+              "startingSelectedAssetBalance": 400,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-11-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 450,
+              "endingSelectedAssetBalance": 450,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 450,
+              "startingSelectedAssetBalance": 450,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2026-12-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 500,
+              "endingSelectedAssetBalance": 500,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 500,
+              "startingSelectedAssetBalance": 500,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-01-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 550,
+              "endingSelectedAssetBalance": 550,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 550,
+              "startingSelectedAssetBalance": 550,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-02-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 600,
+              "endingSelectedAssetBalance": 600,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 600,
+              "startingSelectedAssetBalance": 600,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-03-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 650,
+              "endingSelectedAssetBalance": 650,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 650,
+              "startingSelectedAssetBalance": 650,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-04-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 700,
+              "endingSelectedAssetBalance": 700,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 700,
+              "startingSelectedAssetBalance": 700,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-05-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 750,
+              "endingSelectedAssetBalance": 750,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 750,
+              "startingSelectedAssetBalance": 750,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-06-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 800,
+              "endingSelectedAssetBalance": 800,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 800,
+              "startingSelectedAssetBalance": 800,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-07-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 850,
+              "endingSelectedAssetBalance": 850,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 850,
+              "startingSelectedAssetBalance": 850,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-08-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 900,
+              "endingSelectedAssetBalance": 900,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 900,
+              "startingSelectedAssetBalance": 900,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-09-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 950,
+              "endingSelectedAssetBalance": 950,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 950,
+              "startingSelectedAssetBalance": 950,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-10-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 1000,
+              "endingSelectedAssetBalance": 1000,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 1000,
+              "startingSelectedAssetBalance": 1000,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-11-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 1050,
+              "endingSelectedAssetBalance": 1050,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 1050,
+              "startingSelectedAssetBalance": 1050,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2027-12-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 1100,
+              "endingSelectedAssetBalance": 1100,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 1100,
+              "startingSelectedAssetBalance": 1100,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2028-01-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 1150,
+              "endingSelectedAssetBalance": 1150,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 1150,
+              "startingSelectedAssetBalance": 1150,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            },
+            {
+              "balanceTrajectory": [],
+              "candidateDate": "2028-02-01",
+              "cycleEstablished": false,
+              "endingRealSelectedAssetBalance": 1200,
+              "endingSelectedAssetBalance": 1200,
+              "expensesFullyCovered": false,
+              "hadWithdrawalShortfall": false,
+              "initialCoverageMet": false,
+              "minimumNetWorthMet": true,
+              "principalReplenished": false,
+              "startingRealSelectedAssetBalance": 1200,
+              "startingSelectedAssetBalance": 1200,
+              "status": "ineligible",
+              "withdrawals": {
+                "accounts": [],
+                "constraints": [],
+                "firstShortfall": null,
+                "firstShortfallDate": null,
+                "lastShortfallDate": null,
+                "realizedAmount": 0,
+                "relatedAccountIds": [],
+                "requestedAmount": 0,
+                "shortfallAmount": 0,
+                "shortfallOccurrenceCount": 0
+              }
+            }
+          ]
+        },
+        "probabilistic": {
+          "fiCycleSuccessProbability": 0,
+          "medianCoverageDate": null,
+          "selfSustainingDate": null,
+          "selfSustainingProbability": null
+        },
+        "diagnostics": []
+      }
+    ],
+    "netWorthThreshold": [
+      {
+        "instanceId": "nw-500",
+        "name": "Net worth 500",
+        "status": "satisfied",
+        "deterministic": {
+          "firstReachedDate": "2026-03-01",
+          "reached": true
+        },
+        "probabilistic": {
+          "medianReachedDate": "2026-03-01",
+          "p10ReachedDate": "2026-03-01",
+          "p90ReachedDate": "2026-03-01",
+          "probability": 1
+        },
+        "diagnostics": []
+      }
+    ],
+    "accountBalance": [],
+    "transactionFulfillment": [
+      {
+        "instanceId": "pf-all",
+        "name": "Transaction fulfillment",
+        "status": "satisfied",
+        "deterministic": {
+          "completionRate": 1,
+          "destinationLimitedAmount": 0,
+          "firstUnderfulfilledDate": null,
+          "realizedAmount": 69600,
+          "requestedAmount": 69600,
+          "unfulfilledAmount": 0
+        },
+        "probabilistic": {
+          "fulfilledRunCount": 20,
+          "fullFulfillmentProbability": 1,
+          "runCount": 20,
+          "unfulfilledAmountPercentiles": {
+            "p10": 0,
+            "p25": 0,
+            "p50": 0,
+            "p75": 0,
+            "p90": 0
+          }
+        },
+        "diagnostics": []
+      }
+    ],
+    "cycleFulfillment": []
+  }
+},
   "settings": {
     "evaluations": {
       "financialIndependence": [

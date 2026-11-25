@@ -10,7 +10,7 @@ import (
 
 func roundCurrency(value float64) float64 { return math.Round(value) }
 
-func createRow(date string, isHistorical bool, balances map[string]float64, accounts []types.Account, accountImpacts map[string][]types.AccountDelta, externalInflowAmount, externalOutflowAmount, internalTransferAmount float64, checkpointCorrections []types.CheckpointCorrection) types.ProjectionRow {
+func createRow(date string, isHistorical bool, balances map[string]float64, accounts []types.Account, accountImpacts map[string][]types.AccountDelta, externalInflowAmount, externalOutflowAmount, internalTransferAmount float64) types.ProjectionRow {
 	accountSnapshots := make([]types.AccountSnapshot, 0, len(accounts))
 	for _, account := range accounts {
 		snapshot := types.AccountSnapshot{
@@ -24,7 +24,7 @@ func createRow(date string, isHistorical bool, balances map[string]float64, acco
 		}
 		accountSnapshots = append(accountSnapshots, snapshot)
 	}
-	row := types.ProjectionRow{
+	return types.ProjectionRow{
 		Date:                   date,
 		IsHistorical:           isHistorical,
 		NetWorth:               ComputeNetWorth(balances, accounts),
@@ -32,12 +32,7 @@ func createRow(date string, isHistorical bool, balances map[string]float64, acco
 		ExternalInflowAmount:   externalInflowAmount,
 		ExternalOutflowAmount:  externalOutflowAmount,
 		InternalTransferAmount: internalTransferAmount,
-		CheckpointCorrections:  checkpointCorrections,
 	}
-	if row.CheckpointCorrections == nil {
-		row.CheckpointCorrections = []types.CheckpointCorrection{}
-	}
-	return row
 }
 
 func roundRow(row types.ProjectionRow) types.ProjectionRow {
@@ -50,14 +45,6 @@ func roundRow(row types.ProjectionRow) types.ProjectionRow {
 		snapshot.Balance = roundCurrency(snapshot.Balance)
 		for impactIndex := range snapshot.Impacts {
 			snapshot.Impacts[impactIndex].Delta = roundCurrency(snapshot.Impacts[impactIndex].Delta)
-		}
-	}
-	if row.CheckpointCorrections != nil {
-		for index := range row.CheckpointCorrections {
-			correction := &row.CheckpointCorrections[index]
-			correction.ObservedBalance = roundCurrency(correction.ObservedBalance)
-			correction.ModeledBalance = roundCurrency(correction.ModeledBalance)
-			correction.Adjustment = roundCurrency(correction.Adjustment)
 		}
 	}
 	return row
@@ -258,7 +245,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	for _, snapshot := range prepared.HistoricalSnapshots {
 		historicalRows = append(historicalRows, createRow(
 			snapshot.Date, true, snapshot.Balances, effectiveModel.Accounts,
-			map[string][]types.AccountDelta{}, 0, 0, 0, snapshot.CheckpointCorrections,
+			map[string][]types.AccountDelta{}, 0, 0, 0,
 		))
 	}
 	projectedRows := make([]types.ProjectionRow, 0, len(run.Snapshots))
@@ -270,7 +257,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 		projectedRows = append(projectedRows, createRow(
 			snapshot.Date, false, snapshot.Balances, effectiveModel.Accounts,
 			classified.accountImpacts, classified.externalInflowAmount,
-			classified.externalOutflowAmount, classified.internalTransferAmount, nil,
+			classified.externalOutflowAmount, classified.internalTransferAmount,
 		))
 	}
 	rows := append(append([]types.ProjectionRow{}, historicalRows...), projectedRows...)
@@ -337,7 +324,7 @@ func HistoricalProjectionRows(model *types.FinancialModel, settings *types.Proje
 	for _, snapshot := range prepared.HistoricalSnapshots {
 		rows = append(rows, createRow(
 			snapshot.Date, true, snapshot.Balances, prepared.EffectiveModel.Accounts,
-			map[string][]types.AccountDelta{}, 0, 0, 0, snapshot.CheckpointCorrections,
+			map[string][]types.AccountDelta{}, 0, 0, 0,
 		))
 	}
 	return rows, prepared.Request.InitialState.Balances, nil
@@ -349,21 +336,21 @@ func HistoricalProjectionRows(model *types.FinancialModel, settings *types.Proje
 func RenderProjectionResult(rows []types.ProjectionRow, events []types.TransactionEvent, model types.FinancialModel, initialBalances map[string]float64, startDate types.IsoDate) *types.ProjectionResult {
 	accounts := model.Accounts
 	var latestHistoricalRow *types.ProjectionRow
-	var latestRow *types.ProjectionRow
+	var latestProjectedRow *types.ProjectionRow
 	for index := range rows {
 		row := &rows[index]
 		if row.IsHistorical {
 			latestHistoricalRow = row
+		} else {
+			latestProjectedRow = row
 		}
-		latestRow = row
 	}
+	// The prepared initial balances are the authoritative current position.
+	// Historical rows use the same actual-only replay and converge to it.
 	currentNetWorth := ComputeNetWorth(initialBalances, accounts)
-	if latestHistoricalRow != nil {
-		currentNetWorth = latestHistoricalRow.NetWorth
-	}
 	endingBalances := map[string]float64{}
-	if latestRow != nil {
-		for _, snapshot := range latestRow.AccountSnapshots {
+	if latestProjectedRow != nil {
+		for _, snapshot := range latestProjectedRow.AccountSnapshots {
 			endingBalances[snapshot.AccountID] = snapshot.Balance
 		}
 	} else {
@@ -407,8 +394,8 @@ func RenderProjectionResult(rows []types.ProjectionRow, events []types.Transacti
 	result.Milestones.ProjectionStartDate = startDate
 	result.Summary.CurrentNetWorth = roundCurrency(currentNetWorth)
 	finalNetWorth := currentNetWorth
-	if latestRow != nil {
-		finalNetWorth = latestRow.NetWorth
+	if latestProjectedRow != nil {
+		finalNetWorth = latestProjectedRow.NetWorth
 	}
 	result.Summary.FinalNetWorth = roundCurrency(finalNetWorth)
 	result.TransactionEvents = events

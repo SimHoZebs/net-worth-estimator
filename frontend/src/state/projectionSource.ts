@@ -123,44 +123,58 @@ export function savedRowFingerprint(
 	return parts.join("|");
 }
 
-/** Latest checkpoint, else first schedule, else first transaction, else today. */
-export function projectionStartDateFromRows({
-	checkpoints,
-	schedules,
-	transactions,
-}: {
+/** Row-backed projections start today unless the caller supplies an explicit
+ * start. Historical rows remain available to the server's history replay. */
+export function projectionStartDateFromRows(_input: {
 	checkpoints: { observedAt: number }[];
 	schedules: { startDate: string }[];
 	transactions: { startDate: string }[];
 }): string {
-	const latest = checkpoints
+	return todayIso();
+}
+
+/** Saved display start from the narrow row queries. This preserves the
+ * established checkpoint/schedule/transaction derivation for account
+ * activity filtering, independent of the projection fallback. */
+export function savedStartDateFromRows(input: {
+	checkpoints: { observedAt: number }[];
+	schedules: { startDate: string }[];
+	transactions: { startDate: string }[];
+}): string {
+	const latest = input.checkpoints
 		.map((checkpoint) => isoDateFromEpochSeconds(checkpoint.observedAt))
 		.sort()
 		.at(-1);
 	return (
 		latest ??
-		schedules[0]?.startDate ??
-		transactions[0]?.startDate ??
+		input.schedules[0]?.startDate ??
+		input.transactions[0]?.startDate ??
 		todayIso()
 	);
 }
 
 /**
- * Pre-projection fallback for a model document (fixtures and overrides).
- * The server milestone (ProjectionMilestones.projectionStartDate) is the
- * authority once a projection result exists; this helper only supplies the
- * fallback start before the first result, with today for empty fixtures.
+ * Pre-projection fallback for an override model document. Explicit model
+ * fixtures keep their established checkpoint/schedule/transaction derivation;
+ * the server milestone is authoritative once a projection result exists.
  */
 export function projectionStartDate(model: FinancialModel): string {
-	return projectionStartDateFromRows({
-		checkpoints: model.checkpoints,
-		schedules: model.schedules ?? [],
-		transactions: model.transactions.map((transaction) => ({
-			startDate: isoDateFromEpochSeconds(
-				transaction.transactionTime > 0
-					? transaction.transactionTime
-					: transaction.postedTime,
-			),
-		})),
-	});
+	const latest = model.checkpoints
+		.map((checkpoint) => isoDateFromEpochSeconds(checkpoint.observedAt))
+		.sort()
+		.at(-1);
+	return (
+		latest ??
+		model.schedules?.[0]?.startDate ??
+		model.transactions
+			.map((transaction) =>
+				isoDateFromEpochSeconds(
+					transaction.transactionTime > 0
+						? transaction.transactionTime
+						: transaction.postedTime,
+				),
+			)
+			.at(0) ??
+		todayIso()
+	);
 }
