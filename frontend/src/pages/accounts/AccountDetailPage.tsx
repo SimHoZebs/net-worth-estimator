@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useAccountAdjustments } from "../../state/accountAdjustments.ts";
@@ -65,6 +65,7 @@ import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { useBreadcrumbSlot } from "../../workspace/breadcrumbSlot.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 
 /**
  * Presentational account detail. Renders the transaction, recurring,
@@ -104,10 +105,46 @@ export function AccountDetailView({
 		nameEditable,
 	);
 	const kindSuggestion = useCardKindSuggestion(account.id, account.kind);
+	const actionsVisible = edit.dirty || edit.saving;
+	const accountNameRef = useRef<HTMLInputElement>(null);
+	const saveButtonRef = useRef<HTMLButtonElement>(null);
+	const sectionRef = useRef<HTMLElement>(null);
+	const actionBarRef = useRef<HTMLDivElement>(null);
+	const saveHadFocus = useRef(false);
+	const savingStarted = useRef(false);
+	useEffect(() => {
+		if (edit.saving) {
+			savingStarted.current = true;
+			return;
+		}
+		if (savingStarted.current && !actionsVisible && saveHadFocus.current) {
+			accountNameRef.current?.focus();
+		}
+		savingStarted.current = false;
+		saveHadFocus.current = false;
+	}, [actionsVisible, edit.saving]);
+	useLayoutEffect(() => {
+		const section = sectionRef.current;
+		const bar = actionBarRef.current;
+		if (!section || !bar) return;
+		const updateClearance = () => {
+			section.style.setProperty(
+				"--account-action-bar-height",
+				`${bar.getBoundingClientRect().height}px`,
+			);
+		};
+		updateClearance();
+		const observer = new ResizeObserver(updateClearance);
+		observer.observe(bar);
+		return () => {
+			observer.disconnect();
+			section.style.removeProperty("--account-action-bar-height");
+		};
+	}, [actionsVisible]);
 	const [pendingEdit, setPendingEdit] = useState<EditorTarget | null>(null);
 	const requestEdit = (target: EditorTarget) => {
 		if (edit.saving) return;
-		if (edit.activeField !== null) {
+		if (edit.dirty) {
 			setPendingEdit(target);
 			edit.setConfirmCancel(true);
 			return;
@@ -117,7 +154,7 @@ export function AccountDetailView({
 	const requestClose = () => {
 		if (edit.saving) return;
 		setPendingEdit(null);
-		if (edit.activeField !== null) {
+		if (edit.dirty) {
 			edit.setConfirmCancel(true);
 			return;
 		}
@@ -228,14 +265,20 @@ export function AccountDetailView({
 		account.kind === "credit_card" && !isGroupedDisplay(account);
 	return (
 		<section
+			ref={sectionRef}
 			aria-label="Account details"
-			className="grid min-w-0 gap-6 [&>*]:min-w-0 max-sm:pb-[calc(4rem_+_env(safe-area-inset-bottom))]"
+			className={cn(
+				"grid min-w-0 gap-6 [&>*]:min-w-0",
+				actionsVisible &&
+					"max-sm:pb-[max(var(--account-action-bar-height,4rem),calc(4rem_+_env(safe-area-inset-bottom)))]",
+			)}
 		>
 			{breadcrumbSlot ? createPortal(breadcrumb, breadcrumbSlot) : null}
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div className="flex min-w-0 items-center gap-3">
 					<AccountIcon account={account} size="lg" />
 					<Input
+						ref={accountNameRef}
 						id={`${edit.formId}-name`}
 						aria-label="Account name"
 						name="name"
@@ -257,14 +300,17 @@ export function AccountDetailView({
 				<form
 					id={edit.formId}
 					className="min-w-0"
-					onSubmit={(event) => void edit.submit(event)}
+					onSubmit={(event) => {
+						saveHadFocus.current =
+							document.activeElement === saveButtonRef.current;
+						void edit.submit(event);
+					}}
 				>
 					{(() => {
 						// The header shows both recorded bases. Manual accounts keep
 						// the balance editor; synced or grouped accounts get the
 						// read-only figures. The form stays mounted so the name
-						// field and the sticky save button keep working in every
-						// branch.
+						// field and the save controls keep working in every branch.
 						if (!account.readOnly && !isGroupedDisplay(account)) {
 							return <AccountBalanceValue edit={edit} readOnly={locked} />;
 						}
@@ -279,12 +325,15 @@ export function AccountDetailView({
 					})()}
 				</form>
 			</div>
-			<Tabs defaultValue="transactions" className="gap-0">
+			<Tabs
+				defaultValue="transactions"
+				className="gap-0 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-4"
+			>
 				<TabsList
 					variant="line"
 					scrollable
 					aria-label="Account view"
-					className="mb-0 gap-6 max-sm:gap-5"
+					className="mb-0 min-w-0 flex-1 gap-6 max-sm:gap-5 sm:col-start-1 sm:row-start-1"
 				>
 					<TabsTrigger value="transactions" className="flex-none">
 						Transactions
@@ -305,7 +354,7 @@ export function AccountDetailView({
 				</TabsList>
 				<TabsContent
 					value="transactions"
-					className="flex min-w-0 flex-col gap-4"
+					className="flex min-w-0 flex-col gap-4 sm:col-span-2 sm:row-start-2"
 				>
 					<Transactions
 						occurrences={occurrences}
@@ -334,7 +383,10 @@ export function AccountDetailView({
 						/>
 					)}
 				</TabsContent>
-				<TabsContent value="recurring" className="flex min-w-0 flex-col gap-4">
+				<TabsContent
+					value="recurring"
+					className="flex min-w-0 flex-col gap-4 sm:col-span-2 sm:row-start-2"
+				>
 					{rulesQuery.isPending ? (
 						<p role="status">Loading recurring transactions…</p>
 					) : rulesQuery.isError ? (
@@ -363,7 +415,7 @@ export function AccountDetailView({
 				{showStatementsTab && (
 					<TabsContent
 						value="statements"
-						className="flex min-w-0 flex-col gap-4"
+						className="flex min-w-0 flex-col gap-4 sm:col-span-2 sm:row-start-2"
 					>
 						<AccountStatements
 							key={`statements-${account.id}`}
@@ -371,7 +423,10 @@ export function AccountDetailView({
 						/>
 					</TabsContent>
 				)}
-				<TabsContent value="details" className="flex min-w-0 flex-col gap-4">
+				<TabsContent
+					value="details"
+					className="flex min-w-0 flex-col gap-4 sm:col-span-2 sm:row-start-2"
+				>
 					{kindSuggestion.finding && (
 						<CardKindSuggestion
 							finding={kindSuggestion.finding}
@@ -396,6 +451,31 @@ export function AccountDetailView({
 						/>
 					)}
 				</TabsContent>
+				{actionsVisible && (
+					<div
+						ref={actionBarRef}
+						data-account-action-bar
+						className="ml-auto flex flex-wrap shrink-0 items-center justify-end gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:w-full max-sm:bottom-0 max-sm:z-(--z-local) max-sm:min-h-[calc(4rem_+_env(safe-area-inset-bottom))] max-sm:border-t max-sm:border-border max-sm:bg-card max-sm:pl-[max(1.25rem,env(safe-area-inset-left))] max-sm:pr-[max(1.25rem,env(safe-area-inset-right))] max-sm:pt-2 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:col-start-2 sm:row-start-1 sm:self-center"
+					>
+						<Button
+							type="button"
+							variant="secondary"
+							className="max-sm:min-h-11"
+							onClick={requestClose}
+						>
+							Cancel
+						</Button>
+						<Button
+							ref={saveButtonRef}
+							type="submit"
+							form={edit.formId}
+							className="max-sm:min-h-11"
+							disabled={edit.saveBlocked || !edit.dirty}
+						>
+							{edit.saving ? "Saving…" : "Save changes"}
+						</Button>
+					</div>
+				)}
 			</Tabs>
 			{edit.error && (
 				<Alert variant="destructive">
@@ -407,24 +487,6 @@ export function AccountDetailView({
 					Saving…
 				</p>
 			)}
-			{/* Below `sm` the bar is a viewport-level surface, outside the
-			    scrolling account content. The section reserves matching bottom
-			    padding so the last row can scroll fully above it. */}
-			<div
-				data-account-action-bar
-				className="sticky bottom-0 z-(--z-local) mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card py-3 max-sm:fixed max-sm:inset-x-0 max-sm:mt-0 max-sm:px-5 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-			>
-				<Button type="button" variant="secondary" onClick={requestClose}>
-					Cancel
-				</Button>
-				<Button
-					type="submit"
-					form={edit.formId}
-					disabled={edit.saveBlocked || !edit.dirty}
-				>
-					{edit.saving ? "Saving…" : "Save changes"}
-				</Button>
-			</div>
 			{edit.confirmCancel && (
 				<AlertDialog
 					open

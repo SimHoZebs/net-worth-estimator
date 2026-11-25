@@ -138,7 +138,21 @@ export function useAccountEdit(
 		(row) => row.observedAt === Math.floor(instant / 1000),
 	);
 	const previousBalance = existing?.previousBalance ?? previous.data;
-	useBeforeUnload(edit.dirty || saving);
+	const balance = parseDisplayNumber(edit.value.balance);
+	const adjustmentPending =
+		observedAt !== null &&
+		(balance === null ||
+			previousBalance === undefined ||
+			previous.isFetching ||
+			previous.isPending ||
+			previous.isError);
+	const moved =
+		observedAt !== null &&
+		balance !== null &&
+		previousBalance !== undefined &&
+		balance !== (existing?.balance ?? previousBalance);
+	const dirty = edit.dirty || adjustmentPending || moved;
+	useBeforeUnload(dirty || saving);
 	const update = (patch: Partial<typeof source>, field: AccountEditField) => {
 		// The kind selector stays available on synced accounts: kind is a
 		// user-configured label, and changing it is the supported way to
@@ -249,8 +263,7 @@ export function useAccountEdit(
 			);
 			setSaving(false);
 			if (ok) {
-				setActiveField(null);
-				setConfirmCancel(false);
+				reset();
 			} else {
 				setError(
 					"The account could not be saved. Review the workspace notice and try again.",
@@ -265,7 +278,6 @@ export function useAccountEdit(
 			return;
 		}
 		const name = edit.value.name.trim();
-		const balance = parseDisplayNumber(edit.value.balance);
 		const minBalance = parseDisplayNumber(edit.value.minBalance);
 		const maxBalance = edit.value.noCeiling
 			? null
@@ -351,9 +363,7 @@ export function useAccountEdit(
 			setError("Load the balance at the adjustment time before saving.");
 			return;
 		}
-		const moved =
-			observedAt !== null && balance !== (existing?.balance ?? previousBalance);
-		if (!edit.dirty && !moved) {
+		if (!dirty) {
 			reset();
 			return;
 		}
@@ -414,7 +424,7 @@ export function useAccountEdit(
 		clearTerms,
 		error,
 		saving,
-		dirty: edit.dirty,
+		dirty,
 		confirmCancel,
 		setConfirmCancel,
 		observedAt,

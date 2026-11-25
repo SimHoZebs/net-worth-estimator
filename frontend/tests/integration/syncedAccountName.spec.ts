@@ -61,10 +61,12 @@ test("a synced account name is editable on mobile and persists", async ({
 	expect(
 		await name.evaluate((element) => document.activeElement === element),
 	).toBe(true);
-	await name.fill("My everyday checking");
+	await name.fill("  My everyday checking  ");
 	await page.getByRole("button", { name: "Save changes" }).click();
 	expect((await saved).status()).toBe(200);
 	await expect(name).toHaveValue("My everyday checking");
+	await expect(page.locator("[data-account-action-bar]")).toHaveCount(0);
+	await expect(name).toBeFocused();
 
 	const api = await request.newContext();
 	try {
