@@ -1,10 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
 import { acceptTestResource } from "@/mocks/resource.ts";
 import { stubTestServer } from "@/mocks/waypointServer.ts";
 import { summaryFixture } from "@/mocks/safeSpendingSummary.ts";
 import { resetServerQueryCache, serverQueryClient } from "./serverQuery.ts";
-import { safeSpendingSummaryOptions } from "./useSafeSpendingSummary.ts";
-import { refreshAccounts, refreshTransactions } from "./workspaceResources.ts";
+import {
+	safeSpendingSummaryOptions,
+	useSafeSpendingSummary,
+} from "./useSafeSpendingSummary.ts";
+import {
+	refreshAccounts,
+	refreshTransactions,
+	userResourceKey,
+} from "./workspaceResources.ts";
 import {
 	safeSpendingSettingsKey,
 	defaultSafeSpendingSettings,
@@ -33,6 +41,47 @@ describe("safe spending summary query", () => {
 				signal: expect.any(AbortSignal),
 			}),
 		);
+	});
+
+	it("keeps cached summary data while the summary refetches", async () => {
+		const revision = "synthetic";
+		const options = safeSpendingSummaryOptions([revision, revision, revision]);
+		const cache = serverQueryClient();
+		cache.setQueryData([...userResourceKey("balances"), "latest"], {
+			accounts: [],
+			asOf: "2026-11-17",
+			revision,
+		});
+		cache.setQueryData([...userResourceKey("transactions"), ""], {
+			transactions: [],
+			revision,
+		});
+		cache.setQueryData([...userResourceKey("rules"), ""], {
+			schedules: [],
+			revision,
+		});
+		cache.setQueryData(options.queryKey, summaryFixture());
+		const server = stubTestServer();
+		const deferred = { resolve: null as ((value: Response) => void) | null };
+		const fetcher = vi.fn(
+			() =>
+				new Promise<Response>((resolve) => {
+					deferred.resolve = resolve;
+				}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		const rendered = renderHook(() => useSafeSpendingSummary());
+		expect(rendered.result.current.data).toEqual(summaryFixture());
+		expect(rendered.result.current.isPending).toBe(false);
+		const refetch = rendered.result.current.refetch();
+		await waitFor(() =>
+			expect(cache.isFetching({ queryKey: options.queryKey })).toBe(1),
+		);
+		expect(rendered.result.current.data).toEqual(summaryFixture());
+		expect(rendered.result.current.isPending).toBe(false);
+		deferred.resolve?.(server.ok(summaryFixture()));
+		await refetch;
+		expect(fetcher).toHaveBeenCalled();
 	});
 
 	it("refreshes the current-day summary at UTC midnight", async () => {

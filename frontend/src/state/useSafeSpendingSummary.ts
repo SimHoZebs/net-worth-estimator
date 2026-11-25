@@ -74,10 +74,14 @@ export function useSafeSpendingSummary() {
 		{
 			...safeSpendingSummaryOptions(revisions, scope),
 			enabled: scope.status === "ready" && coherent && !savingSettings,
-			refetchOnMount: "always",
 		},
 		serverQueryClient(),
 	);
+	const canUseData =
+		coherent &&
+		!savingSettings &&
+		!query.isError &&
+		query.data?.revision === expectedRevision;
 	const summaryRevision = query.data?.revision;
 	useEffect(() => {
 		if (
@@ -103,19 +107,11 @@ export function useSafeSpendingSummary() {
 	]);
 	return {
 		...query,
-		data:
-			coherent &&
-			!savingSettings &&
-			!query.isFetching &&
-			!query.isError &&
-			query.data?.revision === expectedRevision
-				? query.data
-				: undefined,
+		data: canUseData ? query.data : undefined,
 		isPending:
 			query.isPending ||
 			savingSettings ||
-			query.isFetching ||
-			!coherent ||
+			(!canUseData && (query.isFetching || !coherent)) ||
 			(!!query.data && query.data.revision !== expectedRevision),
 	};
 }
