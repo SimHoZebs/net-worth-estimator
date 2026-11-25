@@ -180,6 +180,9 @@ func (s *sqliteStore) DeleteLoan(id string) error {
 				continue
 			}
 			for _, ruleID := range []string{a.Display.InterestScheduleID, a.Display.PaymentScheduleID} {
+				if err := clearProvisionalPostingsForRule(tx, ruleID); err != nil {
+					return err
+				}
 				if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
 					return err
 				}

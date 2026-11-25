@@ -257,15 +257,28 @@ func writeBankValues(tx *userTx, id string, transaction types.Transaction) error
 		pending, enabled = false, true
 	}
 	posted := transaction.PostedTime
-	if posted <= 0 {
+	provisional := false
+	if transaction.Pending || posted <= 0 {
 		var storedPosted int64
-		_ = tx.QueryRow(`SELECT posted_time FROM transactions WHERE id = ? AND user_id = :user_id`, id).Scan(&storedPosted)
-		if storedPosted > 0 {
+		var storedProvisional bool
+		_ = tx.QueryRow(`SELECT posted_time, EXISTS(SELECT 1 FROM transaction_provisional_postings pp WHERE pp.user_id = transactions.user_id AND pp.transaction_id = transactions.id) FROM transactions WHERE id = ? AND user_id = :user_id`, id).Scan(&storedPosted, &storedProvisional)
+		if transaction.Pending {
+			// The bridge's pending flag, not the claimed-row participation
+			// override, decides whether this is a real posting. Pending refreshes
+			// preserve the stored application instant and provisional marker.
+			if storedPosted > 0 {
+				posted = storedPosted
+			}
+			provisional = storedProvisional
+		} else if storedPosted > 0 {
 			posted = storedPosted
-		} else if !pending && transaction.TransactionTime > 0 {
+			provisional = storedProvisional
+		} else if transaction.TransactionTime > 0 {
 			posted = transaction.TransactionTime
 		}
 	}
+	// A settled payload with a positive posted instant needs no stored read:
+	// it finalizes the claim, even when that instant equals occurred time.
 	amount, err := json.Marshal(transaction.Amount)
 	if err != nil {
 		return err
@@ -290,6 +303,9 @@ func writeBankValues(tx *userTx, id string, transaction types.Transaction) error
 	// touches it.
 	if _, err := tx.Exec(`UPDATE transaction_sim SET enabled = ? WHERE transaction_id = ? AND user_id = :user_id`,
 		boolToInt(enabled), id); err != nil {
+		return err
+	}
+	if err := setTransactionProvisionalPosting(tx, id, provisional); err != nil {
 		return err
 	}
 	// Settled conversions and bank refreshes reshape automatic visibility

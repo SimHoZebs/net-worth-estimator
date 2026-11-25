@@ -8,9 +8,9 @@ import (
 )
 
 // SetTransactionClaims replaces occurrence claims for the named transactions in one
-// transaction. It touches only transaction_claims (plus pending clearing when a
-// pending bank row becomes a claimed occurrence) so concurrent name or
-// amount edits never lose data.
+// transaction. It touches only transaction_claims plus the pending-to-claimed
+// lifecycle and provisional posted instant so concurrent name or amount edits
+// never lose data.
 func (s *sqliteStore) SetTransactionClaims(claims []types.TransactionClaimUpdate) ([]types.Transaction, error) {
 	return s.setTransactionClaims(claims, nil)
 }
@@ -44,17 +44,19 @@ func (s *sqliteStore) setTransactionClaims(claims []types.TransactionClaimUpdate
 			if !lifecycle.ownerEditable() {
 				return SyncOwned(item.TransactionID)
 			}
-			var storedClaim int
-			_ = tx.QueryRow(`SELECT 1 FROM transaction_claims WHERE transaction_id = ? AND user_id = :user_id`, item.TransactionID).Scan(&storedClaim)
-			claiming := lifecycle.source != SourceUser && lifecycle.pending && storedClaim == 0
+			claiming := lifecycle.source != SourceUser && lifecycle.pending
 			if claiming {
-				if _, err := tx.Exec(`UPDATE transactions SET pending = 0 WHERE id = ? AND user_id = :user_id`, item.TransactionID); err != nil {
+				if _, err := tx.Exec(`UPDATE transactions SET pending = 0, posted_time = transaction_time WHERE id = ? AND user_id = :user_id`, item.TransactionID); err != nil {
 					return fmt.Errorf("clear pending for claim %s: %w", item.TransactionID, err)
 				}
 				// A claimed pending charge now records its occurrence, so it
-				// must participate in projections.
+				// must participate in projections. Its posted instant is a
+				// provisional copy of occurred time until the bank settles.
 				if _, err := tx.Exec(`UPDATE transaction_sim SET enabled = 1 WHERE transaction_id = ? AND user_id = :user_id`, item.TransactionID); err != nil {
 					return fmt.Errorf("enable claim %s: %w", item.TransactionID, err)
+				}
+				if err := setTransactionProvisionalPosting(tx, item.TransactionID, true); err != nil {
+					return fmt.Errorf("mark provisional claim %s: %w", item.TransactionID, err)
 				}
 			}
 			if _, err := tx.Exec(`INSERT INTO transaction_claims (transaction_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)

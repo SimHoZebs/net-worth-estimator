@@ -30,6 +30,9 @@ await run("go", ["build", "-o", join(tools, "prune-noop-checkpoints"), "./script
 await run("go", ["build", "-o", join(tools, "upgrade-statement-closing-day"), "./scripts/one-time/statement-closing-day"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-provisional-postings"), "./scripts/one-time/provisional-postings"], {
+  cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
+});
 const sql = async (db, query) => (await run("sqlite3", [db, query])).stdout.trim();
 const sha256File = async (path) => (await run("sha256sum", [path])).stdout.trim().split(/\s+/)[0];
 const migrate = async (db, env = {}) => {
@@ -320,6 +323,7 @@ test("target image provisions Analysis, preserves facts, and survives setup fail
 set -eu
 test "$(id -u)" = 10001
 test -x /app/migrate.sh
+test -x /app/upgrade-provisional-postings
 export NET_WORTH_ESTIMATOR_DB='/tmp/analysis fixture.db'
 if /app/migrate.sh 2>/dev/null; then exit 1; fi
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer https://fixture.invalid --subject owner >/dev/null

@@ -14,6 +14,7 @@ Use **transaction** for a recorded movement. The saved model's "Transactions" ta
 - A record supplied by a source is a **deposit** or **withdrawal**.
 - A transaction recorded as an occurrence of a schedule fulfills the occurrence the schedule guessed; the occurrence happened when the transaction happened.
 - The link is a **claim**: the transaction claims that occurrence. A schedule never points at a transaction. A claim names the guessed occurrence date, never the transaction's own day; recorded rows display and sort by their own day.
+- Claiming a pending bank hold creates an enabled occurrence. When no posted date is supplied, its posted instant is a provisional copy of occurred time until a real bank posting or an owner save confirms the posted date.
 - Starting a schedule from a transaction creates a separate schedule and claims the transaction's date as its first occurrence. The transaction stays recorded and unchanged.
 - Ending a schedule with a transaction records the one-time movement that happened and removes the schedule.
 

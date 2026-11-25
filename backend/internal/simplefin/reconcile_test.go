@@ -9,6 +9,10 @@ import (
 
 func reconcileTransaction(name, account, amount string, pending bool, txTime int64) store.SyncTransaction {
 	source := account
+	posted := txTime
+	if pending {
+		posted = 0
+	}
 	return store.SyncTransaction{
 		ProviderAccountID: "bridge-" + account,
 		TransactionID:     name,
@@ -16,7 +20,7 @@ func reconcileTransaction(name, account, amount string, pending bool, txTime int
 			Name:            name,
 			SourceAccountID: &source,
 			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
-			PostedTime:      txTime,
+			PostedTime:      posted,
 			TransactionTime: txTime,
 			Enabled:         !pending,
 			Pending:         pending,
@@ -26,6 +30,10 @@ func reconcileTransaction(name, account, amount string, pending bool, txTime int
 
 func reconcileBankRow(id, name, account, amount string, pending, void bool, keys ...store.BankKey) store.BankRow {
 	source := account
+	posted := int64(1785628800)
+	if pending || void {
+		posted = 0
+	}
 	return store.BankRow{
 		Transaction: types.Transaction{
 			ID:              id,
@@ -33,7 +41,7 @@ func reconcileBankRow(id, name, account, amount string, pending, void bool, keys
 			Source:          store.SourceBankSync,
 			SourceAccountID: &source,
 			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
-			PostedTime:      1785628800,
+			PostedTime:      posted,
 			TransactionTime: 1785628800,
 			Enabled:         !pending && !void,
 			Pending:         pending,
@@ -370,6 +378,149 @@ func TestReconcileSettledDedupStaysExact(t *testing.T) {
 	directives = Reconcile(nil, exact, bank, map[string]bool{"prime_card": true})
 	if len(directives) != 0 {
 		t.Fatalf("exact repeat = %+v, want suppression", directives)
+	}
+}
+
+func TestReconcilePreservesStoredOccurredTimeOnLifecycleUpdates(t *testing.T) {
+	const occurred = int64(1773129600)
+	const posted = int64(1773140400)
+	covered := map[string]bool{"prime_card": true}
+
+	t.Run("pending refresh", func(t *testing.T) {
+		stored := reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false, pendingKey("prime_card", "auth"))
+		stored.Transaction.TransactionTime = occurred
+		stored.Transaction.PostedTime = 0
+		incoming := reconcileTransaction("Corner Store", "prime_card", "42.10", true, posted)
+		incoming.TransactionID = "auth"
+		incoming.Transaction.PostedTime = 0
+		directives := Reconcile([]store.SyncTransaction{incoming}, nil, []store.BankRow{stored}, covered)
+		upserts, _, _ := directivesByAction(directives)
+		if upserts != 1 {
+			t.Fatalf("directives = %+v, want one pending upsert", directives)
+		}
+		got := directives[0].Upsert.Transaction
+		if got.TransactionTime != occurred || got.PostedTime != 0 {
+			t.Fatalf("pending refresh occurred/posted = %d/%d, want %d/0", got.TransactionTime, got.PostedTime, occurred)
+		}
+	})
+
+	for _, state := range []string{"pending", "void", "awaiting claimed posting"} {
+		t.Run("same-key "+state, func(t *testing.T) {
+			stored := reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", state == "pending", state == "void", pendingKey("prime_card", "auth"))
+			stored.Transaction.TransactionTime = occurred
+			stored.Transaction.PostedTime = 0
+			if state == "awaiting claimed posting" {
+				stored.Transaction.Enabled = true
+				stored.Transaction.PostedTime = occurred
+				stored.Transaction.PostedTimeProvisional = true
+				stored.Transaction.Claim = &types.TransactionClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"}
+			}
+			incoming := reconcileTransaction("Corner Store", "prime_card", "42.10", false, posted)
+			incoming.TransactionID = "auth"
+			directives := Reconcile(nil, []store.SyncTransaction{incoming}, []store.BankRow{stored}, covered)
+			upserts, converts, voids := directivesByAction(directives)
+			if upserts != 1 || converts != 0 || len(voids) != 0 {
+				t.Fatalf("directives = %+v, want one same-key upsert", directives)
+			}
+			got := directives[0].Upsert.Transaction
+			if got.TransactionTime != occurred || got.PostedTime != posted {
+				t.Fatalf("settlement occurred/posted = %d/%d, want %d/%d", got.TransactionTime, got.PostedTime, occurred, posted)
+			}
+		})
+	}
+
+	t.Run("unique-key conversion", func(t *testing.T) {
+		stored := reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false, pendingKey("prime_card", "auth"))
+		stored.Transaction.TransactionTime = occurred
+		stored.Transaction.PostedTime = 0
+		incoming := reconcileTransaction("Corner Store", "prime_card", "42.10", false, posted)
+		directives := Reconcile(nil, []store.SyncTransaction{incoming}, []store.BankRow{stored}, covered)
+		upserts, converts, voids := directivesByAction(directives)
+		if upserts != 0 || converts != 1 || len(voids) != 0 {
+			t.Fatalf("directives = %+v, want one conversion", directives)
+		}
+		got := directives[0].Convert.Transaction
+		if got.TransactionTime != occurred || got.PostedTime != posted {
+			t.Fatalf("conversion occurred/posted = %d/%d, want %d/%d", got.TransactionTime, got.PostedTime, occurred, posted)
+		}
+	})
+
+	t.Run("new insert keeps candidate date", func(t *testing.T) {
+		incoming := reconcileTransaction("Corner Store", "prime_card", "42.10", false, posted)
+		directives := Reconcile(nil, []store.SyncTransaction{incoming}, nil, covered)
+		upserts, converts, voids := directivesByAction(directives)
+		if upserts != 1 || converts != 0 || len(voids) != 0 {
+			t.Fatalf("directives = %+v, want one insert", directives)
+		}
+		if got := directives[0].Upsert.Transaction; got.TransactionTime != posted || got.PostedTime != posted {
+			t.Fatalf("insert occurred/posted = %d/%d, want candidate %d/%d", got.TransactionTime, got.PostedTime, posted, posted)
+		}
+	})
+
+	t.Run("stored nonpositive date does not replace candidate", func(t *testing.T) {
+		stored := reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false, pendingKey("prime_card", "auth"))
+		stored.Transaction.TransactionTime = 0
+		incoming := reconcileTransaction("Corner Store", "prime_card", "42.10", true, posted)
+		incoming.TransactionID = "auth"
+		directives := Reconcile([]store.SyncTransaction{incoming}, nil, []store.BankRow{stored}, covered)
+		if got := directives[0].Upsert.Transaction; got.TransactionTime != posted {
+			t.Fatalf("pending occurred = %d, want candidate %d", got.TransactionTime, posted)
+		}
+	})
+}
+
+func TestReconcileSameKeyClaimedSettlementIsOneTime(t *testing.T) {
+	const occurred = int64(1773129600)
+	const posted = int64(1773140400)
+	tests := []struct {
+		name           string
+		claimed        bool
+		provisional    bool
+		storedPosted   int64
+		incomingPost   int64
+		incomingAmount string
+		wantUpserts    int
+		wantPosted     int64
+	}{
+		{name: "awaiting real posting", claimed: true, provisional: true, storedPosted: occurred, incomingPost: posted, incomingAmount: "42.10", wantUpserts: 1, wantPosted: posted},
+		{name: "same instant final amount", claimed: true, provisional: true, storedPosted: occurred, incomingPost: occurred, incomingAmount: "45.00", wantUpserts: 1, wantPosted: occurred},
+		{name: "real posting already landed", claimed: true, storedPosted: posted, incomingPost: posted, incomingAmount: "42.10"},
+		{name: "owner edited posted date", claimed: true, storedPosted: posted + 3600, incomingPost: posted, incomingAmount: "42.10"},
+		{name: "owner edited posted date equals occurred", claimed: true, storedPosted: occurred, incomingPost: posted, incomingAmount: "42.10"},
+		{name: "missing incoming posted date", claimed: true, provisional: true, storedPosted: occurred, incomingAmount: "42.10"},
+		{name: "unclaimed row remains settled", storedPosted: occurred, incomingPost: posted, incomingAmount: "42.10"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stored := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false, pendingKey("prime_card", "auth"))
+			stored.Transaction.TransactionTime = occurred
+			stored.Transaction.PostedTime = test.storedPosted
+			stored.Transaction.PostedTimeProvisional = test.provisional
+			if test.claimed {
+				stored.Transaction.Claim = &types.TransactionClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"}
+			}
+			candidateTime := test.incomingPost
+			if candidateTime <= 0 {
+				candidateTime = occurred
+			}
+			incoming := reconcileTransaction("Corner Store", "prime_card", test.incomingAmount, false, candidateTime)
+			incoming.TransactionID = "auth"
+			incoming.Transaction.PostedTime = test.incomingPost
+			directives := Reconcile(nil, []store.SyncTransaction{incoming}, []store.BankRow{stored}, map[string]bool{"prime_card": true})
+			upserts, converts, voids := directivesByAction(directives)
+			if upserts != test.wantUpserts || converts != 0 || len(voids) != 0 {
+				t.Fatalf("directives = %+v, want %d upserts", directives, test.wantUpserts)
+			}
+			if test.wantUpserts == 1 {
+				got := directives[0].Upsert.Transaction
+				if got.TransactionTime != occurred || got.PostedTime != test.wantPosted {
+					t.Fatalf("real posting occurred/posted = %d/%d, want %d/%d", got.TransactionTime, got.PostedTime, occurred, test.wantPosted)
+				}
+				if expression, _ := got.Amount.Config["expression"].(string); expression != test.incomingAmount {
+					t.Fatalf("real posting amount = %q, want final amount %q", expression, test.incomingAmount)
+				}
+			}
+		})
 	}
 }
 

@@ -14,12 +14,16 @@ func bankKeys(provider, account, transaction string) []BankKey {
 
 func bankSeedTransaction(name, account, amount string, pending bool) types.Transaction {
 	source := &account
+	posted := int64(1785628800)
+	if pending {
+		posted = 0
+	}
 	return types.Transaction{
 		Name:            name,
 		Source:          SourceBankSync,
 		SourceAccountID: source,
 		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
-		PostedTime:      1785628800,
+		PostedTime:      posted,
 		TransactionTime: 1785628800,
 		Enabled:         !pending,
 		Pending:         pending,
@@ -79,6 +83,9 @@ func TestClaimedPendingSurvivesBankRefresh(t *testing.T) {
 	if row.Pending || !row.Enabled {
 		t.Fatalf("claimed row demoted by refresh: %+v", row)
 	}
+	if row.PostedTime != row.TransactionTime || !row.PostedTimeProvisional {
+		t.Fatalf("claimed provisional posting changed on pending refresh: %+v", row)
+	}
 	if row.Claim == nil || row.Claim.ScheduleID != "rent" {
 		t.Fatalf("claim lost on refresh: %+v", row)
 	}
@@ -127,8 +134,8 @@ func TestClaimedSettledPreservesPostedTimeOnPendingRefresh(t *testing.T) {
 	if row.Pending || !row.Enabled {
 		t.Fatalf("claimed row demoted by refresh: %+v", row)
 	}
-	if row.PostedTime != 1794657600 {
-		t.Fatalf("claimed posted time lost: %+v", row)
+	if row.PostedTime != 1794657600 || row.PostedTimeProvisional {
+		t.Fatalf("claimed settled posted time lost or marked provisional: %+v", row)
 	}
 	if row.Claim == nil || row.Claim.ScheduleID != "rent" {
 		t.Fatalf("claim lost on refresh: %+v", row)
@@ -168,7 +175,7 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 		t.Fatalf("rows = %+v, err %v", after, err)
 	}
 	row := after.Transactions[0]
-	if row.ID != id || row.Pending || !row.Enabled {
+	if row.ID != id || row.Pending || !row.Enabled || row.PostedTimeProvisional {
 		t.Fatalf("converted row = %+v", row)
 	}
 	if row.Claim == nil || row.Claim.ScheduleID != "rent" {
@@ -177,6 +184,181 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 	bank, err := database.LoadBankTransactions()
 	if err != nil || len(bank) != 1 || len(bank[0].Keys) != 1 || bank[0].Keys[0].TransactionID != "post1" {
 		t.Fatalf("keys after rotation = %+v, %v", bank, err)
+	}
+}
+
+func TestSetTransactionClaimsPromotesPendingPostedTime(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	seed := bankSeedTransaction("Bistro", "prime_card", "50.00", true)
+	seed.PostedTime = 0
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, ProviderSimpleFIN, "bridge-prime", "pend1")})
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Transactions) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	if _, err := database.CreateSchedule(testRuleFixture("dining")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	claimed, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: loaded.Transactions[0].ID,
+		Claim:         types.TransactionClaim{ScheduleID: "dining", OccurrenceDate: "2026-08-02"},
+	}})
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim = %+v, err %v", claimed, err)
+	}
+	row := claimed[0]
+	if row.Pending || !row.Enabled || row.PostedTime != row.TransactionTime || row.PostedTime <= 0 || !row.PostedTimeProvisional {
+		t.Fatalf("claimed pending row = %+v, want enabled provisional occurrence at its transaction instant", row)
+	}
+}
+
+func TestOwnerUpdateClearsClaimedProvisionalPosting(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "checking")
+	seed := bankSeedTransaction("Rent", "checking", "1000", true)
+	seed.TransactionTime = autoClaimNoon("2026-04-01")
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, ProviderSimpleFIN, "bridge-checking", "pend-apr")})
+	model, err := database.LoadModel()
+	if err != nil || len(model.Transactions) != 1 {
+		t.Fatalf("rows = %+v, err %v", model, err)
+	}
+	if _, err := database.CreateSchedule(autoClaimSchedule("rent", "checking")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	claimed, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: model.Transactions[0].ID,
+		Claim:         types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-04-01"},
+	}})
+	if err != nil || len(claimed) != 1 || !claimed[0].PostedTimeProvisional {
+		t.Fatalf("claim = %+v, err %v", claimed, err)
+	}
+
+	edited := claimed[0]
+	edited.Name = "Owner confirmed rent"
+	edited.PostedTime = edited.TransactionTime
+	edited, err = database.UpdateTransaction(edited)
+	if err != nil {
+		t.Fatalf("owner edit = %v", err)
+	}
+	if edited.PostedTimeProvisional || edited.PostedTime != edited.TransactionTime {
+		t.Fatalf("owner edit did not confirm posted instant: %+v", edited)
+	}
+	refresh := bankSeedTransaction("Rent", "checking", "1000", true)
+	refresh.TransactionTime = edited.TransactionTime
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(refresh, ProviderSimpleFIN, "bridge-checking", "pend-apr")})
+	after, err := database.LoadBankTransactions()
+	if err != nil || len(after) != 1 {
+		t.Fatalf("refresh = %+v, err %v", after, err)
+	}
+	if after[0].Transaction.PostedTimeProvisional || after[0].Transaction.PostedTime != edited.PostedTime {
+		t.Fatalf("pending refresh changed owner-confirmed posted instant: %+v", after[0].Transaction)
+	}
+}
+
+func TestCreateOwnerTransactionNeverPersistsProvisionalPosting(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "checking")
+	created, err := database.CreateTransaction(types.Transaction{
+		Name: "Owner", SourceAccountID: &[]string{"checking"}[0],
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}},
+		PostedTime: 1785628800, TransactionTime: 1785628800, Enabled: true, PostedTimeProvisional: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.PostedTimeProvisional {
+		t.Fatalf("owner create returned provisional state: %+v", created)
+	}
+	if got := countRows(t, database, "transaction_provisional_postings", ""); got != 0 {
+		t.Fatalf("owner create persisted %d provisional markers", got)
+	}
+}
+
+func TestDeleteScheduleClearsClaimedProvisionalPosting(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "checking")
+	seed := bankSeedTransaction("Rent", "checking", "1000", true)
+	seed.TransactionTime = autoClaimNoon("2026-04-01")
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, ProviderSimpleFIN, "bridge-checking", "pend-apr")})
+	model, err := database.LoadModel()
+	if err != nil || len(model.Transactions) != 1 {
+		t.Fatalf("rows = %+v, err %v", model, err)
+	}
+	if _, err := database.CreateSchedule(autoClaimSchedule("rent", "checking")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	if _, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: model.Transactions[0].ID,
+		Claim:         types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-04-01"},
+	}}); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	if err := database.DeleteSchedule("rent"); err != nil {
+		t.Fatalf("delete rule = %v", err)
+	}
+	after, err := database.LoadBankTransactions()
+	if err != nil || len(after) != 1 {
+		t.Fatalf("bank rows = %+v, err %v", after, err)
+	}
+	if after[0].Transaction.Claim != nil || after[0].Transaction.PostedTimeProvisional {
+		t.Fatalf("provisional marker survived claim removal: %+v", after[0].Transaction)
+	}
+}
+
+func TestImportModelPreservesClaimedBankProvisionalPosting(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "checking")
+	seed := bankSeedTransaction("Rent", "checking", "1000", true)
+	seed.TransactionTime = autoClaimNoon("2026-04-01")
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, ProviderSimpleFIN, "bridge-checking", "pend-apr")})
+	model, err := database.LoadModel()
+	if err != nil || len(model.Transactions) != 1 {
+		t.Fatalf("rows = %+v, err %v", model, err)
+	}
+	if _, err := database.CreateSchedule(autoClaimSchedule("rent", "checking")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	if _, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: model.Transactions[0].ID,
+		Claim:         types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-04-01"},
+	}}); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	before, err := database.LoadBankTransactions()
+	if err != nil || len(before) != 1 || !before[0].Transaction.PostedTimeProvisional {
+		t.Fatalf("claimed bank row = %+v, err %v", before, err)
+	}
+
+	model, err = database.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	model.Transactions = append(model.Transactions, types.Transaction{
+		ID: "01900000-0000-7000-8000-000000000002", Name: "Imported owner", SourceAccountID: &[]string{"checking"}[0],
+		Amount:     types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}},
+		PostedTime: autoClaimNoon("2026-05-01"), TransactionTime: autoClaimNoon("2026-05-01"), Enabled: true,
+		PostedTimeProvisional: true,
+		Claim:                 &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-05-01"},
+	})
+	if _, err := database.ImportModel(model); err != nil {
+		t.Fatalf("import model = %v", err)
+	}
+	after, err := database.LoadBankTransactions()
+	if err != nil || len(after) != 1 {
+		t.Fatalf("re-merged bank rows = %+v, err %v", after, err)
+	}
+	if after[0].Transaction.ID != before[0].Transaction.ID || !after[0].Transaction.PostedTimeProvisional || after[0].Transaction.PostedTime != before[0].Transaction.PostedTime {
+		t.Fatalf("provisional marker lost on model save: before %+v after %+v", before[0].Transaction, after[0].Transaction)
+	}
+	imported, err := database.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range imported.Transactions {
+		if row.Name == "Imported owner" && row.PostedTimeProvisional {
+			t.Fatalf("owner import acquired provisional state: %+v", row)
+		}
 	}
 }
 
@@ -206,11 +388,48 @@ func TestClaimPendingPromotesPostedTime(t *testing.T) {
 	}
 	// The promotion takes the bank's transaction instant so the recorded
 	// occurrence carries a positive posted time.
-	if updated.PostedTime != updated.TransactionTime || updated.PostedTime <= 0 {
-		t.Fatalf("posted time not promoted: %+v", updated)
+	if updated.PostedTime != updated.TransactionTime || updated.PostedTime <= 0 || !updated.PostedTimeProvisional {
+		t.Fatalf("posted time not promoted as provisional: %+v", updated)
 	}
 	if updated.Claim == nil || updated.Claim.ScheduleID != "dining" {
 		t.Fatalf("claim lost: %+v", updated)
+	}
+}
+
+func TestClaimPendingWithExplicitPostedDateIsNotProvisional(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		offset int64
+	}{
+		{name: "same instant"},
+		{name: "later instant", offset: 3600},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			database := openSQLiteStore(t)
+			seedAccount(t, database, "prime_card")
+			seed := bankSeedTransaction("Bistro", "prime_card", "50.00", true)
+			applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, ProviderSimpleFIN, "bridge-prime", "pend1")})
+			loaded, err := database.LoadModel()
+			if err != nil || len(loaded.Transactions) != 1 {
+				t.Fatalf("rows = %+v, err %v", loaded, err)
+			}
+			if _, err := database.CreateSchedule(testRuleFixture("dining")); err != nil {
+				t.Fatalf("rule = %v", err)
+			}
+			claimed := loaded.Transactions[0]
+			claimed.Claim = &types.TransactionClaim{ScheduleID: "dining", OccurrenceDate: "2026-08-02"}
+			claimed.PostedTime = claimed.TransactionTime + test.offset
+			updated, err := database.UpdateTransaction(claimed)
+			if err != nil {
+				t.Fatalf("claim with explicit posted date: %v", err)
+			}
+			if updated.Pending || !updated.Enabled || updated.PostedTime != claimed.PostedTime || updated.PostedTimeProvisional {
+				t.Fatalf("explicit posted date was not confirmed: %+v", updated)
+			}
+			if got := countRows(t, database, "transaction_provisional_postings", ""); got != 0 {
+				t.Fatalf("explicit posted date persisted %d provisional markers", got)
+			}
+		})
 	}
 }
 

@@ -185,6 +185,38 @@ describe("transaction rows", () => {
 		});
 	});
 
+	it("keeps settled bank occurrence and posting dates distinct", () => {
+		const transactionTime = 1773129600;
+		const postedTime = 1773226800;
+		const settled = transactionToDisplay({
+			id: "settled-1",
+			name: "Corner Store",
+			sourceAccountId: "card",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "42.10" },
+				inputs: {},
+			},
+			startDate: "2026-03-10",
+			endDate: null,
+			enabled: true,
+			syncOwned: true,
+			readOnly: false,
+			pending: false,
+			void: false,
+			postedTime,
+			transactionTime,
+		} as never);
+		expect(settled).toMatchObject({
+			startDate: "2026-03-10",
+			postedDate: "2026-03-11",
+			pending: false,
+			void: false,
+			transactionTime,
+		});
+	});
+
 	it("reads the occurrence claim from its wire member", () => {
 		const row = transactionToDisplay({
 			id: "rent",

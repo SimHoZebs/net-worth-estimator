@@ -91,7 +91,7 @@ func TestAutoClaimSweepBackfillsManualAndBankRows(t *testing.T) {
 		Source:          SourceBankSync,
 		SourceAccountID: &checking,
 		Amount:          autoClaimAmount("1000"),
-		PostedTime:      autoClaimNoon("2026-04-01"),
+		PostedTime:      0,
 		TransactionTime: autoClaimNoon("2026-04-01"),
 		Enabled:         false,
 		Pending:         true,
@@ -156,6 +156,9 @@ func TestAutoClaimSweepBackfillsManualAndBankRows(t *testing.T) {
 	if pendingAfter.Pending || !pendingAfter.Enabled {
 		t.Fatalf("claimed pending not promoted: %+v", pendingAfter)
 	}
+	if pendingAfter.PostedTime != pendingAfter.TransactionTime || pendingAfter.PostedTime <= 0 || !pendingAfter.PostedTimeProvisional {
+		t.Fatalf("claimed pending posted time = %+v, want a provisional occurred instant", pendingAfter)
+	}
 
 	// Repeat sweeps never duplicate or move claims.
 	if err := database.autoClaimSweep(); err != nil {
@@ -205,7 +208,7 @@ func TestAutoClaimSweepSkipsDisabledAndVoid(t *testing.T) {
 		Source:          SourceBankSync,
 		SourceAccountID: &checking,
 		Amount:          autoClaimAmount("1000"),
-		PostedTime:      autoClaimNoon("2026-05-01"),
+		PostedTime:      0,
 		TransactionTime: autoClaimNoon("2026-05-01"),
 		Enabled:         false,
 		Pending:         true,

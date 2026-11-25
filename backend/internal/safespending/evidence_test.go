@@ -73,7 +73,8 @@ func TestOldMultiDestinationFactDoesNotPoisonObservedCash(t *testing.T) {
 		t.Fatalf("old routing %+v", s)
 	}
 	assertMoney(t, s.CashAfterBills, 1244.43)
-	m.Transactions[0].TransactionTime = stamp("2026-11-14T21:00:00Z")
+	// Settled bank chronology follows the posted instant, not occurred time.
+	m.Transactions[0].PostedTime = stamp("2026-11-14T21:00:00Z")
 	s = Build(m, nil, "2026-11-15", testEnd)
 	if s.CashAfterBills != nil || !slices.Contains(s.Reasons, ReasonPostedRoutingUnknown) {
 		t.Fatalf("new routing %+v", s)
@@ -84,16 +85,47 @@ func TestCashCutUsesCanonicalTransactionInstantNotPostedMetadata(t *testing.T) {
 	m := baseModel()
 	m.Checkpoints[0].AvailableBalance = ptr(1608.05)
 	before := payment("before", 10, "2026-11-15T10:00:00Z")
+	before.Source = "user"
 	before.TransactionTime = stamp("2026-11-14T19:59:59Z")
 	at := payment("at", 20, "2026-11-15T10:00:01Z")
+	at.Source = "user"
 	at.TransactionTime = stamp("2026-11-14T20:00:00Z")
 	after := payment("after", 30, "2026-11-14T12:00:00Z")
+	after.Source = "user"
 	after.TransactionTime = stamp("2026-11-14T20:00:01Z")
 	fallback := payment("fallback", 40, "2026-11-14T20:00:02Z")
+	fallback.Source = "user"
 	fallback.TransactionTime = 0
 	m.Transactions = []types.Transaction{before, at, after, fallback}
 	s := Build(m, nil, "2026-11-15", testEnd)
 	assertMoney(t, s.CashAfterBills, 1538.05)
+}
+
+func TestClaimedBankSettlementWaitsForPostedTime(t *testing.T) {
+	m := baseModel()
+	m.Checkpoints[0].AvailableBalance = ptr(1608.05)
+	m.Schedules = []types.Schedule{bill("bill", "2026-11-15", 100)}
+	settlement := payment("settlement", 80, "2026-11-15T08:00:00Z")
+	settlement.PostedTime = stamp("2026-11-15T11:00:00Z")
+	settlement.Claim = &types.TransactionClaim{ScheduleID: "bill", OccurrenceDate: "2026-11-15"}
+	m.Transactions = []types.Transaction{settlement}
+
+	before := buildEvidence(m, nil, "2026-11-15", testEnd, settlement.PostedTime-1)
+	if len(before.Bills) != 1 || before.Bills[0].Status != "unpaid" || before.Bills[0].ActualDate != nil {
+		t.Fatalf("settlement became evidence before posted time: %+v", before.Bills)
+	}
+	assertMoney(t, before.CheckingAvailable, 1608.05)
+	assertMoney(t, before.OutstandingBillsTotal, 100)
+	assertMoney(t, before.CashAfterBills, 1508.05)
+
+	after := buildEvidence(m, nil, "2026-11-15", testEnd, settlement.PostedTime)
+	if len(after.Bills) != 1 || after.Bills[0].Status != "paid" || after.Bills[0].ActualDate == nil || *after.Bills[0].ActualDate != "2026-11-15" {
+		t.Fatalf("settlement missing at posted time: %+v", after.Bills)
+	}
+	assertMoney(t, after.Bills[0].Amount, 80)
+	assertMoney(t, after.CheckingAvailable, 1528.05)
+	assertMoney(t, after.OutstandingBillsTotal, 0)
+	assertMoney(t, after.CashAfterBills, 1528.05)
 }
 
 func TestSameInstantExecutionOrderForKnownRecordedAmountDependencies(t *testing.T) {
@@ -107,6 +139,27 @@ func TestSameInstantExecutionOrderForKnownRecordedAmountDependencies(t *testing.
 	m.Transactions = []types.Transaction{second, first}
 	s := Build(m, nil, "2026-11-15", testEnd)
 	assertMoney(t, s.CashAfterBills, 1578.05)
+}
+
+func TestSamePostedInstantUsesTransactionTimeBeforeExecutionOrder(t *testing.T) {
+	m := baseModel()
+	// Equal posted and available cash isolates chronology from aggregate hold coverage.
+	m.Checkpoints[0].Balance = 1244.43
+	postedAt := "2026-11-15T09:00:00Z"
+	first := payment("first", 10, postedAt)
+	first.TransactionTime = stamp("2026-11-15T08:00:00Z")
+	first.ExecutionOrder = 2
+	second := payment("second", 0, postedAt)
+	second.TransactionTime = stamp("2026-11-15T08:30:00Z")
+	second.ExecutionOrder = 1
+	second.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "previous * 2"}, Inputs: map[string]types.AmountInputBinding{"previous": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "first"}}}}
+	m.Transactions = []types.Transaction{second, first}
+
+	s := Build(m, nil, "2026-11-15", testEnd)
+	if slices.Contains(s.Reasons, ReasonPostedAmountUnavailable) {
+		t.Fatalf("canonical chronology left the recorded amount unavailable: %+v", s)
+	}
+	assertMoney(t, s.CashAfterBills, 1214.43)
 }
 
 func TestDynamicRecordedAmountsCannotBorrowLaterObservation(t *testing.T) {
@@ -281,6 +334,8 @@ func TestPendingOutsideBillWindowRespectsObservationCut(t *testing.T) {
 		tx := payment("earlier-hold", 363.62, "2026-11-14T12:00:00Z")
 		tx.Enabled = false
 		tx.Pending = true
+		// A pending bank authorization has no settlement instant.
+		tx.PostedTime = 0
 		if claimedOutside {
 			// Even a transaction dated inside the window is not a bill in it
 			// when its exact claim names an earlier occurrence.

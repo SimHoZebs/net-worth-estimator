@@ -117,8 +117,8 @@ func TestTranslateProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if settled.ProviderAccountID != testAccountKey("bridge-prime") || settled.TransactionID != "post1" || settled.Pending || !settled.Enabled {
 		t.Fatalf("settled identity/state = %+v, want enabled settled participant", settled)
 	}
-	if settled.TransactionTime != settled.PostedTime {
-		t.Fatalf("settled event time = %d, want posted instant %d", settled.TransactionTime, settled.PostedTime)
+	if settled.TransactionTime != 1785542400 || settled.PostedTime != 1785542400 {
+		t.Fatalf("settled timestamps = %d/%d, want posted fallback 1785542400 when transacted_at is absent", settled.TransactionTime, settled.PostedTime)
 	}
 	if settled.SourceAccountID == nil || *settled.SourceAccountID != "prime_card" {
 		t.Fatalf("settled source = %+v", settled.SourceAccountID)
@@ -293,9 +293,100 @@ func TestTranslateSeparatesSameAccountIDAcrossConnections(t *testing.T) {
 	}
 }
 
-func TestTranslateNormalizesSettledEventTimeToPosted(t *testing.T) { // A purchase authorized at 08:00 but posted at 11:00 affects the
-	// reported balance at transaction: the settled event time is the post
-	// instant. Pending seeds keep the purchase timestamp for matching.
+func TestTranslateUsesPositiveTransactedAtForSettledOccurredTime(t *testing.T) {
+	now := time.Unix(1773144000, 0).UTC()
+	tests := []struct {
+		name          string
+		posted        int64
+		transacted    int64
+		hasTransacted bool
+		wantOccurred  int64
+		wantPosted    int64
+	}{
+		{name: "present", posted: 1773140400, transacted: 1773129600, hasTransacted: true, wantOccurred: 1773129600, wantPosted: 1773140400},
+		{name: "absent", posted: 1773140400, wantOccurred: 1773140400, wantPosted: 1773140400},
+		{name: "zero", posted: 1773140400, transacted: 0, hasTransacted: true, wantOccurred: 1773140400, wantPosted: 1773140400},
+		{name: "negative", posted: 1773140400, transacted: -1, hasTransacted: true, wantOccurred: 1773140400, wantPosted: 1773140400},
+		{name: "missing posted preserves occurred", posted: 0, transacted: 1773129600, hasTransacted: true, wantOccurred: 1773129600, wantPosted: now.Unix()},
+		{name: "both missing use arrival", posted: 0, wantOccurred: now.Unix(), wantPosted: now.Unix()},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			settled := false
+			var transactedAt *int64
+			if test.hasTransacted {
+				value := test.transacted
+				transactedAt = &value
+			}
+			set := &AccountSet{Accounts: []Account{{
+				ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
+				Balance: "0.00", BalanceDate: 1773133200,
+				Transactions: []Transaction{{
+					ID: "set1", Posted: test.posted, Amount: "-100.00", Description: "Groceries", Pending: &settled, TransactedAt: transactedAt,
+				}},
+			}}}
+			translation, err := Translate(set, map[string]string{testAccountKey("bridge-prime"): "prime_card"}, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(translation.Settled) != 1 || len(translation.Pending) != 0 {
+				t.Fatalf("translation = %+v, want one settled row", translation)
+			}
+			got := translation.Settled[0].Transaction
+			if got.TransactionTime != test.wantOccurred || got.PostedTime != test.wantPosted {
+				t.Fatalf("occurred/posted = %d/%d, want %d/%d", got.TransactionTime, got.PostedTime, test.wantOccurred, test.wantPosted)
+			}
+		})
+	}
+}
+
+func TestTranslatePendingOccurredTimeFallsBackToArrival(t *testing.T) {
+	now := time.Unix(1773144000, 0).UTC()
+	pending := true
+	tests := []struct {
+		name          string
+		transacted    int64
+		hasTransacted bool
+		wantOccurred  int64
+	}{
+		{name: "present", transacted: 1773129600, hasTransacted: true, wantOccurred: 1773129600},
+		{name: "absent", wantOccurred: now.Unix()},
+		{name: "zero", transacted: 0, hasTransacted: true, wantOccurred: now.Unix()},
+		{name: "negative", transacted: -1, hasTransacted: true, wantOccurred: now.Unix()},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var transactedAt *int64
+			if test.hasTransacted {
+				value := test.transacted
+				transactedAt = &value
+			}
+			set := &AccountSet{Accounts: []Account{{
+				ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
+				Balance: "0.00", BalanceDate: 1773133200,
+				Transactions: []Transaction{{
+					ID: "pend1", Posted: 0, Amount: "-10.00", Description: "Hold", Pending: &pending, TransactedAt: transactedAt,
+				}},
+			}}}
+			translation, err := Translate(set, map[string]string{testAccountKey("bridge-prime"): "prime_card"}, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(translation.Pending) != 1 || len(translation.Settled) != 0 {
+				t.Fatalf("translation = %+v, want one pending row", translation)
+			}
+			got := translation.Pending[0].Transaction
+			if got.TransactionTime != test.wantOccurred || got.PostedTime != 0 || got.Enabled || !got.Pending {
+				t.Fatalf("pending timestamps/state = %+v, want occurred %d and no posted date", got, test.wantOccurred)
+			}
+		})
+	}
+}
+
+// TestTranslatePreservesSettledOccurredTime keeps a purchase authorized at
+// 08:00 and posted at 11:00 on its purchase instant while recording when the
+// movement affected the account.
+func TestTranslatePreservesSettledOccurredTime(t *testing.T) {
 	set := &AccountSet{Accounts: []Account{{
 		ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
 		Balance: "0.00", BalanceDate: 1773100800,
@@ -315,8 +406,8 @@ func TestTranslateNormalizesSettledEventTimeToPosted(t *testing.T) { // A purcha
 	if !settled.Enabled {
 		t.Fatalf("settled bank actual must participate: %+v", settled.Transaction)
 	}
-	if settled.Transaction.TransactionTime != 1773140400 || settled.Transaction.PostedTime != 1773140400 {
-		t.Fatalf("settled event time = %d/%d, want posted instant 1773140400", settled.Transaction.TransactionTime, settled.Transaction.PostedTime)
+	if settled.Transaction.TransactionTime != 1773129600 || settled.Transaction.PostedTime != 1773140400 {
+		t.Fatalf("settled occurred/posted = %d/%d, want 1773129600/1773140400", settled.Transaction.TransactionTime, settled.Transaction.PostedTime)
 	}
 	pending := translation.Pending[0]
 	if pending.Enabled || pending.Transaction.TransactionTime != 1773129600 {

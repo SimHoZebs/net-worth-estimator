@@ -26,10 +26,28 @@ type DatedTransactionOccurrence struct {
 	DocPath     []any
 }
 
+// CompareTransactionChronology orders one-time transactions by application
+// instant, then raw transaction time, posted time, and execution order. Negative
+// means a sorts first; zero means every chronology field ties.
+func CompareTransactionChronology(a, b *types.Transaction) int {
+	if aInstant, bInstant := TransactionInstant(a), TransactionInstant(b); aInstant != bInstant {
+		return cmp.Compare(aInstant, bInstant)
+	}
+	if a.TransactionTime != b.TransactionTime {
+		return cmp.Compare(a.TransactionTime, b.TransactionTime)
+	}
+	if a.PostedTime != b.PostedTime {
+		return cmp.Compare(a.PostedTime, b.PostedTime)
+	}
+	return cmp.Compare(a.ExecutionOrder, b.ExecutionOrder)
+}
+
 // compareDatedTransactionOccurrences is the single strict ordering shared by
 // simulation, recorded-history application, and the financial independence branch: one
-// definition so one edit changes all three. Negative means a sorts first;
-// zero means every ordered field ties (callers break it stably).
+// definition so one edit changes all three. One-time transactions order by
+// application instant first, then retain raw transaction time, posted time,
+// execution order, and index as deterministic tie-breakers. Negative means a
+// sorts first; zero means every ordered field ties (callers break it stably).
 func compareDatedTransactionOccurrences(a, b DatedTransactionOccurrence) int {
 	aPurchase, bPurchase := a.Purchase, b.Purchase
 	if (aPurchase != nil) != (bPurchase != nil) {
@@ -52,14 +70,8 @@ func compareDatedTransactionOccurrences(a, b DatedTransactionOccurrence) int {
 		return 1
 	}
 	if !aRule {
-		if a.Transaction.TransactionTime != b.Transaction.TransactionTime {
-			return cmp.Compare(a.Transaction.TransactionTime, b.Transaction.TransactionTime)
-		}
-		if a.Transaction.PostedTime != b.Transaction.PostedTime {
-			return cmp.Compare(a.Transaction.PostedTime, b.Transaction.PostedTime)
-		}
-		if a.Transaction.ExecutionOrder != b.Transaction.ExecutionOrder {
-			return cmp.Compare(a.Transaction.ExecutionOrder, b.Transaction.ExecutionOrder)
+		if chronology := CompareTransactionChronology(a.Transaction, b.Transaction); chronology != 0 {
+			return chronology
 		}
 		return cmp.Compare(a.Index, b.Index)
 	}
@@ -71,7 +83,9 @@ func compareDatedTransactionOccurrences(a, b DatedTransactionOccurrence) int {
 
 // sortOccurrences orders same-day occurrences with one-time transactions
 // first, then scheduled rule instances. Within one-time transactions it orders
-// by transaction time, then posted time, then explicit execution order.
+// by application instant, then raw transaction time, posted time, and explicit
+// execution order. The application instant keeps bank rows on their posted day
+// while owner rows stay transaction-time ordered.
 // Within rule instances it orders by rule priority, then declaration sequence. Accepted purchases
 // follow both, ordered by purchase priority then sequence. Simulate, history
 // application, and the financial independence branch share this order so one edit
@@ -82,13 +96,10 @@ func sortOccurrences(occurrences []DatedTransactionOccurrence) {
 	})
 }
 
-// transactionDay returns the UTC calendar day for a transaction, derived from
-// transaction time with posted time as fallback.
+// transactionDay returns the UTC calendar day on which a transaction applies,
+// derived from the same authored chronology as TransactionInstant.
 func transactionDay(transaction *types.Transaction) string {
-	stamp := transaction.TransactionTime
-	if stamp <= 0 {
-		stamp = transaction.PostedTime
-	}
+	stamp := TransactionInstant(transaction)
 	if stamp <= 0 {
 		return ""
 	}
@@ -473,7 +484,7 @@ func claimsByRule(transactions []types.Transaction) map[string]map[string]bool {
 // [windowStart, windowEnd] and merges enabled manual transactions dated in the
 // window. Window inclusivity of the start follows includeStartDate. Claimed
 // rule occurrences are skipped; the claiming transaction executes on its own
-// date. Index values are global resolution order for stable sorting.
+// application day. Index values are global resolution order for stable sorting.
 func ResolveOccurrences(rules []types.Schedule, transactions []types.Transaction, windowStart, windowEnd string, includeStartDate bool) ResolvedOccurrences {
 	claims := claimsByRule(transactions)
 	inWindow := func(date string) bool {

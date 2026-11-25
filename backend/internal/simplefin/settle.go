@@ -40,7 +40,7 @@ func settleCandidate(voidRow types.Transaction, candidate types.Transaction) (Se
 	if !profile.allowsAmount(staleCents, candidateCents) {
 		return SettleCandidate{}, false
 	}
-	gap := candidate.TransactionTime - voidRow.TransactionTime
+	gap := reconciliationInstant(candidate) - reconciliationInstant(voidRow)
 	return SettleCandidate{
 		Transaction:       candidate,
 		Cents:             candidateCents,
@@ -91,9 +91,9 @@ func SettleCandidates(hold store.BankRow, bank []store.BankRow) []SettleCandidat
 	return candidates
 }
 
-// SettleCandidateDate returns the display day for a candidate. Settled bank
-// rows normalize their transaction time to the posted instant, so the first
-// nonzero stamp is the day the owner sees in the activity list.
+// SettleCandidateDate returns the occurred date shown by the activity list.
+// Settlement matching uses the posted instant, while display and occurrence
+// claims keep the transaction's occurred date.
 func SettleCandidateDate(candidate SettleCandidate) string {
 	stamp := candidate.Transaction.TransactionTime
 	if stamp <= 0 {

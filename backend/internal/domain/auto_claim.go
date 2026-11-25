@@ -171,6 +171,9 @@ func autoClaimStartOffset(start, lower string, recurrence types.Recurrence) int 
 }
 
 func autoClaimDay(transaction types.Transaction) string {
+	// Claims identify the scheduled occurrence independently of the bank's
+	// application day, so matching stays transaction-time first even when a
+	// settled bank row carries a later posted time.
 	stamp := transaction.TransactionTime
 	if stamp <= 0 {
 		stamp = transaction.PostedTime

@@ -59,9 +59,9 @@ type Store interface {
 	CreateTransaction(transaction types.Transaction) (types.Transaction, error)
 	UpdateTransaction(transaction types.Transaction) (types.Transaction, error)
 	// SetTransactionClaims replaces occurrence claims for the named transactions in
-	// one transaction. It touches only transaction_claims (plus pending clearing
-	// when a pending bank row becomes a claimed occurrence) so concurrent
-	// name or amount edits never lose data.
+	// one transaction. It touches only transaction_claims plus the pending-to-claimed
+	// lifecycle, provisional posted instant, and enablement of a pending bank row so
+	// concurrent name or amount edits never lose data.
 	SetTransactionClaims(claims []types.TransactionClaimUpdate) ([]types.Transaction, error)
 	DeleteTransaction(id string) error
 	MoveTransaction(id, beforeID string) error

@@ -174,28 +174,14 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 			}
 			source := modelAccountID
 			postedTime := transaction.Posted
-			transactionTime := postedTime
-			if seed {
-				// Pending seeds have no posted date by definition
-				// (IsPending means the bridge sent Posted == 0): keep
-				// whatever the bridge reported instead of fabricating
-				// the sync instant. The purchase timestamp carries the
-				// event time for pending-to-settled matching, falling
-				// back to arrival when the bridge sends none.
-				if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
-					transactionTime = *transaction.TransactedAt
-				} else {
-					transactionTime = now.Unix()
-				}
-			} else {
-				if postedTime <= 0 {
-					postedTime = now.Unix()
-				}
-				// Settled movements affect the reported balance when posted,
-				// not at the earlier purchase timestamp: normalize the settled
-				// event time to the post instant. Manual transactions are
-				// untouched: their TransactionTime-first ordering is unchanged.
+			transactionTime := now.Unix()
+			if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
+				transactionTime = *transaction.TransactedAt
+			} else if !seed && postedTime > 0 {
 				transactionTime = postedTime
+			}
+			if !seed && postedTime <= 0 {
+				postedTime = now.Unix()
 			}
 			transaction := store.SyncTransaction{
 				ProviderAccountID: bridgeID,

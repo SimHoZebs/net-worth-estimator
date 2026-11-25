@@ -73,6 +73,9 @@ func (s *sqliteStore) DeleteScheduleCreatingTransaction(scheduleID string, trans
 	}
 	transaction.Source = store.SourceUser
 	err := withRowTx(s.db, func(tx *userTx) error {
+		if err := clearProvisionalPostingsForRule(tx, scheduleID); err != nil {
+			return fmt.Errorf("clear provisional postings for schedule %s: %w", scheduleID, err)
+		}
 		if _, err := tx.Exec(
 			`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`,
 			scheduleID,

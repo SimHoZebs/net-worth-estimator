@@ -37,6 +37,10 @@ await run("go", ["build", "-o", join(tools, "upgrade-statement-closing-day"), ".
   cwd: new URL("../backend/", import.meta.url).pathname,
   env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-provisional-postings"), "./scripts/one-time/provisional-postings"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
 
 const sqlite = (db, sql) => run("sqlite3", [db, sql]);
 const rows = async (db, sql) => (await sqlite(db, sql)).stdout.trim();
@@ -485,6 +489,72 @@ test("unknown frequencies and undated weekly schedules fail closed with the orig
     assert.equal((await sqlite(db, ".dump")).stdout, expected);
     assert.deepEqual(await backups(directory), []);
   }
+});
+
+test("legacy provisional-posting satellite is created once and later marker rows stay unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-provisional-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='transaction_provisional_postings';"), "1");
+  await sqlite(db, `DROP TABLE transaction_provisional_postings;
+    INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);
+    INSERT INTO recurrence_rules(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,recurrence_unit,recurrence_interval,recurrence_weekdays,recurrence_month_mode,start_date,end_date,annual_cap,priority,enabled)
+      VALUES ('${owner}','rent',0,'Rent','checking','null','{}','month',1,'[]','byDate','2026-04-01',NULL,NULL,0,1);
+    INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES
+      ('${owner}','claimed-equal','Claimed equal','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
+      ('${owner}','claimed-later','Claimed later','checking','null','{}',1775048400,1775044800,'simplefin',0,0),
+      ('${owner}','unclaimed-equal','Unclaimed equal','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
+      ('${owner}','owner-equal','Owner equal','checking','null','{}',1775044800,1775044800,'user',0,0);
+    INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES
+      ('${owner}','claimed-equal',0,1,1),('${owner}','claimed-later',1,1,2),
+      ('${owner}','unclaimed-equal',2,1,3),('${owner}','owner-equal',3,1,4);
+    INSERT INTO transaction_claims(user_id,transaction_id,fulfills_rule_id,fulfills_occurrence_date) VALUES
+      ('${owner}','claimed-equal','rent','2026-04-01'),
+      ('${owner}','claimed-later','rent','2026-04-01'),
+      ('${owner}','owner-equal','rent','2026-04-01');`);
+  const transactionsBefore = await rows(db, "SELECT * FROM transactions ORDER BY user_id,id;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "SELECT transaction_id FROM transaction_provisional_postings ORDER BY 1;"), "claimed-equal");
+  assert.equal(await rows(db, "SELECT * FROM transactions ORDER BY user_id,id;"), transactionsBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  assert.equal(await rows(join(directory, names[0], "before.db"), "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='transaction_provisional_postings';"), "0");
+
+  // A later owner confirmation clears the ambiguous legacy marker, and a new
+  // equal-date claim has no marker. Neither may be reclassified on repeat.
+  await sqlite(db, `DELETE FROM transaction_provisional_postings WHERE transaction_id='claimed-equal';
+    INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
+      VALUES ('${owner}','late-equal','Late equal','checking','null','{}',1775044800,1775044800,'simplefin',0,0);
+    INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES ('${owner}','late-equal',4,1,5);
+    INSERT INTO transaction_claims(user_id,transaction_id,fulfills_rule_id,fulfills_occurrence_date) VALUES ('${owner}','late-equal','rent','2026-04-01');`);
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+  assert.deepEqual(await backups(directory), names);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM transaction_provisional_postings;"), "0");
+});
+
+test("partial provisional-posting satellite fails closed before backup", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-provisional-shape-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE transaction_provisional_postings;
+    CREATE TABLE transaction_provisional_postings(
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      transaction_id TEXT NOT NULL,
+      FOREIGN KEY(transaction_id, user_id) REFERENCES transactions(id, user_id) ON DELETE CASCADE,
+      PRIMARY KEY(user_id, transaction_id)
+    );`);
+  const dumpBefore = (await sqlite(db, ".dump")).stdout;
+  const error = await migrateFails(db);
+  assert.match(error.stderr ?? error.stdout ?? "", /provisional posting/i);
+  assert.equal((await sqlite(db, ".dump")).stdout, dumpBefore);
+  assert.deepEqual(await backups(directory), []);
 });
 
 test("complete target repeats read-only and preserves owner disables byte-identical", async (t) => {

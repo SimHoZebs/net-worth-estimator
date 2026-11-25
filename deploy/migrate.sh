@@ -28,6 +28,9 @@
 #  10. Historical forward no-op bank checkpoints are pruned: posted balances
 #      that match the modeled balance need no row. Owner rows, first
 #      observations, and changed available balances survive.
+#  11. The provisional-posting satellite is created when absent, with the
+#      one-time equality backfill for legacy claimed bank rows. Existing
+#      satellite rows are verified and never rewritten.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -384,6 +387,42 @@ available_state() {
   echo 1
 }
 
+# Provisional posting state is a sparse satellite. Absent is the supported
+# legacy source; current requires the exact scoped key and cascade shape. The
+# one-time equality backfill runs only while creating an absent table.
+provisional_postings_state() {
+  count=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='transaction_provisional_postings';") \
+    || fail "Cannot inspect provisional posting schema; refusing to guess."
+  case "$count" in
+    0) echo absent; return 0 ;;
+    1) ;;
+    *) fail "Partial provisional posting schema. Refusing automatic repair." ;;
+  esac
+  sqlite3 -readonly "$1" 'SELECT user_id, transaction_id FROM transaction_provisional_postings LIMIT 0;' \
+    || fail "Incomplete provisional posting schema. Refusing automatic repair."
+  notnull=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('transaction_provisional_postings') WHERE name IN ('user_id','transaction_id') AND \"notnull\" != 1;") \
+    || fail "Cannot inspect provisional posting constraints; refusing to guess."
+  test "$notnull" = 0 || fail "Incomplete provisional posting schema. Refusing automatic repair."
+  pk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_index_list('transaction_provisional_postings') i WHERE i.origin = 'pk' AND (SELECT COUNT(*) FROM pragma_index_info(i.name)) = 2 AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 0) = 'user_id' AND (SELECT name FROM pragma_index_info(i.name) WHERE seqno = 1) = 'transaction_id';") \
+    || fail "Cannot inspect provisional posting key; refusing to guess."
+  test "$pk" = 1 || fail "Incomplete provisional posting schema. Refusing automatic repair."
+  fk=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('transaction_provisional_postings');") \
+    || fail "Cannot inspect provisional posting foreign keys; refusing to guess."
+  test "$fk" = 3 || fail "Incomplete provisional posting schema. Refusing automatic repair."
+  matched=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('transaction_provisional_postings') WHERE on_delete = 'CASCADE' AND ((\"table\" = 'users' AND \"from\" = 'user_id' AND \"to\" = 'id') OR (\"table\" = 'transactions' AND \"from\" = 'transaction_id' AND \"to\" = 'id') OR (\"table\" = 'transactions' AND \"from\" = 'user_id' AND \"to\" = 'user_id'));") \
+    || fail "Cannot inspect provisional posting foreign keys; refusing to guess."
+  test "$matched" = 3 || fail "Incomplete provisional posting schema. Refusing automatic repair."
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM (SELECT id FROM pragma_foreign_key_list('transaction_provisional_postings') GROUP BY id HAVING COUNT(*) = 1);")" = 1 || fail "Provisional posting user key is not separate. Refusing automatic repair."
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM (SELECT id FROM pragma_foreign_key_list('transaction_provisional_postings') GROUP BY id HAVING COUNT(*) = 2);")" = 1 || fail "Provisional posting transaction key is not scoped. Refusing automatic repair."
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_foreign_key_list('transaction_provisional_postings') WHERE \"table\" = 'transactions' AND ((seq = 0 AND \"from\" = 'user_id' AND \"to\" = 'user_id') OR (seq = 1 AND \"from\" = 'transaction_id' AND \"to\" = 'id'));")" = 2 || fail "Provisional posting transaction key columns are out of scope order. Refusing automatic repair."
+  echo current
+}
+
+check_provisional_postings() {
+  test "$(provisional_postings_state "$1")" = current || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM transaction_provisional_postings pp JOIN transactions p ON p.user_id = pp.user_id AND p.id = pp.transaction_id LEFT JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id WHERE p.source IN ('user', 'model', '') OR c.transaction_id IS NULL OR p.pending != 0 OR p.void != 0 OR p.posted_time <= 0 OR p.posted_time != p.transaction_time;")" = 0
+}
+
 # Card statements are derived from closing-day cadence plus bank evidence, so
 # there is no card_statements table in the current schema. Allocations carry
 # the derived identity closingDate~accountId in statement_id.
@@ -554,6 +593,10 @@ else
 fi
 suppressed=$(suppressed_state "$db") || fail "Cannot inspect suppression-key schema; refusing to guess."
 available=$(available_state "$db") || fail "Cannot inspect available-balance schema; refusing to guess."
+provisional_postings=$(provisional_postings_state "$db") || fail "Cannot inspect provisional posting schema; refusing to guess."
+if [ "$provisional_postings" = current ]; then
+  check_provisional_postings "$db" || fail "Invalid provisional posting markers; refusing automatic repair."
+fi
 card_statements=$(card_statements_state "$db") || fail "Cannot inspect card statement schema; refusing to guess."
 if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
@@ -639,7 +682,7 @@ fi
 # one and a failed dry run falls through to the full path instead of stranding
 # the window. The full path provisions the candidate and keeps a verified
 # backup either way.
-if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$card_statements" = current ] && [ "$legacy_cards" = 0 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ] && [ "$safe_spending_missing" = 0 ] && [ "$safe_spending_reserve" = 0 ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$provisional_postings" = current ] && [ "$card_statements" = current ] && [ "$legacy_cards" = 0 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ] && [ "$safe_spending_missing" = 0 ] && [ "$safe_spending_reserve" = 0 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
   if ! sqlite3 -readonly "$db" ".backup '$(esc "$dry_copy")'" 2>/dev/null; then
@@ -682,6 +725,14 @@ if ! upgrade-transaction-sim-split --db "$candidate" > "$backup/transaction-sim.
   printf 'migrate: transaction split failed: %s\n' "$(cat "$backup/transaction-sim.log")" >&2
   fail "Candidate transaction split failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
+# Explicit provisional-posting state is a sparse satellite. Create and backfill
+# it only on the actual legacy upgrade; an existing satellite is verified with
+# its rows unchanged. This runs after the claim satellite exists.
+if ! upgrade-provisional-postings --db "$candidate" > "$backup/provisional-postings.log" 2>&1; then
+  printf 'migrate: provisional posting upgrade failed: %s\n' "$(cat "$backup/provisional-postings.log")" >&2
+  fail "Candidate provisional posting upgrade failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+check_provisional_postings "$candidate" || fail "Candidate provisional posting postconditions failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 # Reconcile the retired household cycle start into one per-card statement
 # closing day. The tool no-ops on an already-converted candidate and fails
 # closed on unknown shapes before setupdb validates the candidate.

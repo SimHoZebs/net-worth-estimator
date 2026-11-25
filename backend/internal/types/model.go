@@ -264,12 +264,18 @@ type TransactionClaim struct {
 	OccurrenceDate IsoDate `json:"occurrenceDate"`
 }
 
-// Transaction is a single transaction with two times: posted time is when the
-// bank posts it, transaction time is when the money moves. Both are Unix
-// seconds. The UTC day of transaction time groups the transaction. Transactions
-// never repeat; repetition is owned by Schedule, which expands into
-// occurrences at projection time. A transaction with a Claim is an actual
-// recorded against one scheduled occurrence of its rule.
+// Transaction is a single transaction with two times: transaction time is the
+// canonical occurred and display time, while positive posted time is when a
+// non-owner-authored bank movement applies to balances and projections. Both
+// are Unix seconds. Owner-authored rows, including an empty source, remain
+// transaction-time ordered with posted time as fallback; pending bank rows
+// without a posted time also use transaction time. Claiming a pending bank hold
+// without a posted date clears pending, enables the occurrence, and copies
+// transaction time to posted time with an internal provisional marker until a
+// real bank posting or owner save confirms the posted instant. Transactions
+// never repeat; repetition is owned by Schedule, which expands into occurrences at projection time. A
+// transaction with a Claim is an actual recorded against one scheduled
+// occurrence of its rule.
 type Transaction struct {
 	ID              string                      `json:"id"`
 	Name            string                      `json:"name"`
@@ -278,15 +284,21 @@ type Transaction struct {
 	Amount          TransactionAmountResolution `json:"amount"`
 	PostedTime      int64                       `json:"postedTime"`
 	TransactionTime int64                       `json:"transactionTime"`
-	Claim           *TransactionClaim           `json:"claim,omitempty"`
-	Enabled         bool                        `json:"enabled"`
+	// PostedTimeProvisional is internal settlement state. A true marker means
+	// the positive posted instant was copied from occurred time when a pending
+	// bank hold was claimed, and the first real bank posting may replace it.
+	// It never crosses the JSON wire.
+	PostedTimeProvisional bool              `json:"-"`
+	Claim                 *TransactionClaim `json:"claim,omitempty"`
+	Enabled               bool              `json:"enabled"`
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
 	// The sync sets it on arrival; the owner may clear it to settle the hold.
 	Pending bool `json:"pending,omitempty"`
 	// Source names the row author: "user" for owner-authored rows,
 	// "banksync" for bank-reported rows. Authorship never changes after
-	// creation. The sync may touch pending and void rows but never settled
-	// ones. Owner writes may touch any row including pending and void rows.
+	// creation. The sync may touch pending and void rows, plus a claimed row's
+	// one-time provisional-to-real posting, but otherwise leaves settled rows
+	// alone. Owner writes may touch any row including pending and void rows.
 	Source string `json:"source,omitempty"`
 	// ExecutionOrder breaks equal-time ties independently of identity and display
 	// position. The store assigns it on create and preserves it on owner updates.

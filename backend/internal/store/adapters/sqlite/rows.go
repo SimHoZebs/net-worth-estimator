@@ -507,6 +507,9 @@ func (s *sqliteStore) UpdateSchedule(rule types.Schedule) (types.Schedule, error
 // DeleteSchedule removes one recurrence rule.
 func (s *sqliteStore) DeleteSchedule(id string) error {
 	err := withRowTx(s.db, func(tx *userTx) error {
+		if err := clearProvisionalPostingsForRule(tx, id); err != nil {
+			return fmt.Errorf("clear provisional postings for rule %s: %w", id, err)
+		}
 		if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, id); err != nil {
 			return fmt.Errorf("release claims for rule %s: %w", id, err)
 		}

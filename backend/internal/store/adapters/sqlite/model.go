@@ -297,10 +297,34 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 // wire Transaction must use this fragment with transactionJoins so all three stay
 // in sync. types.Transaction.Destinations keeps its wire name; it reads from
 // the destination_account_ids column.
-const transactionSelect = `p.id, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.posted_time, p.transaction_time, c.fulfills_rule_id, c.fulfills_occurrence_date, s.enabled, p.source, p.pending, p.void, s.execution_order`
+const transactionSelect = `p.id, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.posted_time, p.transaction_time, c.fulfills_rule_id, c.fulfills_occurrence_date, s.enabled, p.source, p.pending, p.void, EXISTS(SELECT 1 FROM transaction_provisional_postings pp WHERE pp.user_id = p.user_id AND pp.transaction_id = p.id), s.execution_order`
 
 // transactionJoins attaches the transaction satellites to a transactions alias p.
 const transactionJoins = `FROM transactions p LEFT JOIN transaction_sim s ON s.user_id = p.user_id AND s.transaction_id = p.id LEFT JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id`
+
+// setTransactionProvisionalPosting stores the internal settlement marker.
+// Deleting an absent marker is intentional: every non-claim owner write and
+// every real settled bank write clears provisional state.
+func setTransactionProvisionalPosting(tx *userTx, transactionID string, provisional bool) error {
+	if !provisional {
+		_, err := tx.Exec(`DELETE FROM transaction_provisional_postings WHERE transaction_id = ? AND user_id = :user_id`, transactionID)
+		return err
+	}
+	_, err := tx.Exec(`INSERT INTO transaction_provisional_postings (transaction_id, user_id) VALUES (?, :user_id)
+		ON CONFLICT(user_id, transaction_id) DO NOTHING`, transactionID)
+	return err
+}
+
+// clearProvisionalPostingsForRule removes markers whose claim is about to be
+// released. The transaction survives, but without a claim its posted instant is
+// no longer a provisional scheduled occurrence.
+func clearProvisionalPostingsForRule(tx *userTx, ruleID string) error {
+	_, err := tx.Exec(`DELETE FROM transaction_provisional_postings
+		WHERE user_id = ? AND transaction_id IN (
+			SELECT transaction_id FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = ?
+		)`, tx.userID, ruleID, tx.userID)
+	return err
+}
 
 func insertTransaction(tx *userTx, position int, transaction *types.Transaction, source string) error {
 	if transaction.ExecutionOrder == 0 {
@@ -327,6 +351,11 @@ func insertTransaction(tx *userTx, position int, transaction *types.Transaction,
 		transaction.PostedTime, transaction.TransactionTime, source, boolToInt(source != SourceUser && transaction.Pending), boolToInt(transaction.Void),
 	); err != nil {
 		return fmt.Errorf("insert transaction %s: %w", transaction.ID, err)
+	}
+	if source != SourceUser && transaction.Claim != nil && transaction.PostedTimeProvisional {
+		if err := setTransactionProvisionalPosting(tx, transaction.ID, true); err != nil {
+			return fmt.Errorf("insert provisional posting %s: %w", transaction.ID, err)
+		}
 	}
 	if _, err := tx.Exec(
 		`INSERT INTO transaction_sim (transaction_id, position, enabled, execution_order, user_id) VALUES (?, ?, ?, ?, :user_id)`,
@@ -422,8 +451,9 @@ func scanTransactionRow(rows *sql.Rows) (types.Transaction, error) {
 	var destinationsJSON, amountJSON string
 	var enabled, executionOrder sql.NullInt64
 	var pending, voided int64
+	var postedTimeProvisional bool
 	var source sql.NullString
-	if err := rows.Scan(&transaction.ID, &transaction.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &transaction.PostedTime, &transaction.TransactionTime, &claimScheduleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &executionOrder); err != nil {
+	if err := rows.Scan(&transaction.ID, &transaction.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &transaction.PostedTime, &transaction.TransactionTime, &claimScheduleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &postedTimeProvisional, &executionOrder); err != nil {
 		return types.Transaction{}, err
 	}
 	if sourceAccountID.Valid {
@@ -446,6 +476,7 @@ func scanTransactionRow(rows *sql.Rows) (types.Transaction, error) {
 	transaction.Enabled = enabled.Valid && enabled.Int64 != 0
 	transaction.Pending = pending != 0
 	transaction.Void = voided != 0
+	transaction.PostedTimeProvisional = postedTimeProvisional
 	if executionOrder.Valid {
 		transaction.ExecutionOrder = executionOrder.Int64
 	}

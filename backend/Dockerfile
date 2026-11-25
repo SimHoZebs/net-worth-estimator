@@ -27,6 +27,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/repair-claimed-posted-time ./scripts/one-time/repair-claimed-posted-time
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/upgrade-statement-closing-day ./scripts/one-time/statement-closing-day
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/upgrade-provisional-postings ./scripts/one-time/provisional-postings
 
 FROM alpine:3.22 AS standalone
 
@@ -78,7 +80,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 # upgrade-transaction-rename, and repair-claimed-posted-time are operator
 # tools that migrate.sh and api-boot.sh never invoke; leaving them out of
 # the northflank target keeps the pull smaller without changing behavior.
-COPY --from=standalone --chown=app:app /app/server /app/setupdb /app/authzctl /app/upgrade-transaction-sim-split /app/upgrade-planned-purchases /app/simplefin-v2-keys /app/prune-noop-checkpoints /app/upgrade-statement-closing-day /app/api-boot.sh /app/migrate.sh /app/analysis-schema.sql /app/
+COPY --from=standalone --chown=app:app /app/server /app/setupdb /app/authzctl /app/upgrade-transaction-sim-split /app/upgrade-planned-purchases /app/simplefin-v2-keys /app/prune-noop-checkpoints /app/upgrade-statement-closing-day /app/upgrade-provisional-postings /app/api-boot.sh /app/migrate.sh /app/analysis-schema.sql /app/
 # Runtime imports only server, model, and evidence. Test modules stay out
 # of the image.
 COPY ml/server.py ml/model.py ml/evidence.py /app/ml/

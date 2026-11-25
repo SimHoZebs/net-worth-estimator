@@ -13,6 +13,35 @@ import (
 // Hold settlement uses the merchant profile's window instead.
 const settleMatchWindowSeconds = 7 * 24 * 3600
 
+// reconciliationInstant is the instant a bank movement affected the account.
+// Settlement matching uses the posted date when the bridge supplies one and
+// falls back to the occurred date when no posted date is available.
+func reconciliationInstant(transaction types.Transaction) int64 {
+	if transaction.PostedTime > 0 {
+		return transaction.PostedTime
+	}
+	return transaction.TransactionTime
+}
+
+// awaitingSameKeySettlement identifies a claimed hold whose posted instant is
+// still the provisional copy of occurred time. One settled payload with any
+// positive posted instant finalizes it, including the same instant with a
+// changed final amount. A cleared marker means the stored date is settled,
+// including an owner-edited date equal to occurred time.
+func awaitingSameKeySettlement(stored, incoming types.Transaction) bool {
+	return stored.Claim != nil && !stored.Pending && !stored.Void &&
+		stored.PostedTimeProvisional && incoming.PostedTime > 0
+}
+
+// preserveOccurredTime keeps the hold's original occurred date when a
+// lifecycle update carries the bank's later posted values.
+func preserveOccurredTime(candidate, stored types.Transaction) types.Transaction {
+	if stored.TransactionTime > 0 {
+		candidate.TransactionTime = stored.TransactionTime
+	}
+	return candidate
+}
+
 func transactionAmountCents(transaction types.Transaction) (int64, bool) {
 	if transaction.Amount.Resolver != "expression" {
 		return 0, false
@@ -65,7 +94,7 @@ func settleJoinKeysWith(stale types.Transaction, candidate types.Transaction, wi
 	if !ok || candidateCents <= 0 {
 		return 0, 0, false
 	}
-	gap := candidate.TransactionTime - stale.TransactionTime
+	gap := reconciliationInstant(candidate) - reconciliationInstant(stale)
 	if gap < -windowSeconds || gap > windowSeconds {
 		return 0, 0, false
 	}
@@ -138,10 +167,11 @@ func candidateKey(item store.SyncTransaction) store.BankKey {
 // participate; other providers' bank rows are invisible to it. Covered limits
 // stale handling to resolved accounts so unlinked accounts' rows are never
 // touched. A candidate whose key already points at a settled row is already
-// imported and never reprocesses, so repeat feeds are stable no-ops. Keys that
-// point only at pending or void rows never suppress a settled candidate. The
-// settled-to-settled duplicate check stays exact so near-amount repeats never
-// suppress a genuine second charge.
+// imported and never reprocesses, so repeat feeds are stable no-ops. A claimed
+// row with an explicit provisional-posting marker accepts one real same-key
+// posting. Keys that point only at pending or void rows never suppress a
+// settled candidate. The settled-to-settled duplicate check stays exact so
+// near-amount repeats never suppress a genuine second charge.
 func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
@@ -162,12 +192,16 @@ func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, c
 	// Pending upserts are intentionally ungated by coverage: the translation
 	// emits them only for resolved accounts.
 	for _, item := range pending {
-		directives = append(directives, store.BankDirective{
-			Upsert: &store.BankUpsert{Transaction: item.Transaction, Keys: []store.BankKey{candidateKey(item)}, Facts: item.Facts},
-		})
+		transaction := item.Transaction
 		if id, ok := byKey[candidateKey(item)]; ok {
+			if row, exists := byID[id]; exists {
+				transaction = preserveOccurredTime(transaction, row.Transaction)
+			}
 			seen[id] = true
 		}
+		directives = append(directives, store.BankDirective{
+			Upsert: &store.BankUpsert{Transaction: transaction, Keys: []store.BankKey{candidateKey(item)}, Facts: item.Facts},
+		})
 	}
 	type staleRow struct {
 		id      string
@@ -190,6 +224,9 @@ func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, c
 		row, ok := byID[id]
 		if !ok {
 			return true
+		}
+		if awaitingSameKeySettlement(row.Transaction, item.Transaction) {
+			return false
 		}
 		return !row.Transaction.Pending && !row.Transaction.Void
 	}
@@ -321,7 +358,7 @@ func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, c
 		target := targets[ti]
 		directives = append(directives, store.BankDirective{Convert: &store.BankConvert{
 			ID:          target.id,
-			Transaction: candidate.Transaction,
+			Transaction: preserveOccurredTime(candidate.Transaction, target.transaction),
 			AddKeys:     []store.BankKey{candidateKey(candidate)},
 			Facts:       candidate.Facts,
 		}})
@@ -373,8 +410,14 @@ func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, c
 		if duplicateSuppressed(candidate) {
 			continue
 		}
+		transaction := candidate.Transaction
+		if id, ok := byKey[candidateKey(candidate)]; ok {
+			if row, exists := byID[id]; exists {
+				transaction = preserveOccurredTime(transaction, row.Transaction)
+			}
+		}
 		directives = append(directives, store.BankDirective{
-			Upsert: &store.BankUpsert{Transaction: candidate.Transaction, Keys: []store.BankKey{candidateKey(candidate)}, Facts: candidate.Facts},
+			Upsert: &store.BankUpsert{Transaction: transaction, Keys: []store.BankKey{candidateKey(candidate)}, Facts: candidate.Facts},
 		})
 	}
 	// Evidence refreshes also apply to known settled keys, independently of the

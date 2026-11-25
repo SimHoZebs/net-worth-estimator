@@ -135,6 +135,51 @@ func TestSettleProfiles(t *testing.T) {
 	}
 }
 
+func TestReconciliationInstantPrefersPositivePostedTime(t *testing.T) {
+	tests := []struct {
+		name        string
+		posted      int64
+		transacted  int64
+		wantInstant int64
+	}{
+		{name: "posted first", posted: 1773140400, transacted: 1773129600, wantInstant: 1773140400},
+		{name: "zero posted falls back", posted: 0, transacted: 1773129600, wantInstant: 1773129600},
+		{name: "negative posted falls back", posted: -1, transacted: 1773129600, wantInstant: 1773129600},
+		{name: "both missing", posted: 0, transacted: 0, wantInstant: 0},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := reconciliationInstant(types.Transaction{PostedTime: test.posted, TransactionTime: test.transacted})
+			if got != test.wantInstant {
+				t.Fatalf("instant = %d, want %d", got, test.wantInstant)
+			}
+		})
+	}
+}
+
+func TestSettleCandidateUsesPostedInstantButDisplaysOccurredDate(t *testing.T) {
+	hold := reconcileBankRow("hold", "Corner Store", "prime_card", "42.10", false, true, pendingKey("prime_card", "auth"))
+	hold.Transaction.TransactionTime = 1785542400 // 2026-08-01
+	hold.Transaction.PostedTime = 0
+	candidate := reconcileBankRow("posted", "Corner Store", "prime_card", "42.10", false, false, pendingKey("prime_card", "post"))
+	candidate.Transaction.TransactionTime = 1782864000 // 2026-07-01
+	candidate.Transaction.PostedTime = 1785628800      // 2026-08-02
+
+	candidates := SettleCandidates(hold, []store.BankRow{candidate})
+	if len(candidates) != 1 {
+		t.Fatalf("candidates = %+v, want posted-instant match", candidates)
+	}
+	if candidates[0].DayGapDays != 1 {
+		t.Fatalf("day gap = %d, want 1 from posted instants", candidates[0].DayGapDays)
+	}
+	if got := SettleCandidateDate(candidates[0]); got != "2026-07-01" {
+		t.Fatalf("display date = %s, want occurred date 2026-07-01", got)
+	}
+	if !settleMatch(hold.Transaction, candidate.Transaction) {
+		t.Fatal("settlement window must compare posted instants")
+	}
+}
+
 func TestFloorProfileAcceptsAuthAsFloor(t *testing.T) {
 	// A tiny fuel authorization posts at a much larger amount and still
 	// settles the hold in place. A posted amount below the auth's tolerance

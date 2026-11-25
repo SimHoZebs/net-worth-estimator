@@ -17,6 +17,10 @@ func flowTransaction(id, name, account, amount string, pending bool, day string)
 	if err != nil {
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
+	posted := stamp.Unix()
+	if pending {
+		posted = 0
+	}
 	return store.SyncTransaction{
 		ProviderAccountID: testAccountKey("bridge-" + account),
 		TransactionID:     id,
@@ -25,12 +29,22 @@ func flowTransaction(id, name, account, amount string, pending bool, day string)
 			Source:          store.SourceBankSync,
 			SourceAccountID: &account,
 			Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
-			PostedTime:      stamp.Unix(),
+			PostedTime:      posted,
 			TransactionTime: stamp.Unix(),
 			Enabled:         !pending,
 			Pending:         pending,
 		},
 	}
+}
+
+func flowSettledTransaction(id, name, account, amount, occurredDay, postedDay string) store.SyncTransaction {
+	transaction := flowTransaction(id, name, account, amount, false, occurredDay)
+	posted, err := time.ParseInLocation("2006-01-02", postedDay, time.UTC)
+	if err != nil {
+		panic(err)
+	}
+	transaction.PostedTime = posted.Unix()
+	return transaction
 }
 
 func applyFlow(t *testing.T, database store.Store, pending, settled []store.SyncTransaction) store.SyncApplySummary {
@@ -73,9 +87,9 @@ func TestSyncFlowPendingConvertsToSettled(t *testing.T) {
 		t.Fatalf("pending rows = %v", rows)
 	}
 	// The posted charge arrives under a new id: the hold itself becomes
-	// the posted charge, keeping its UUID.
+	// the posted charge, keeping its UUID and original occurred date.
 	second := applyFlow(t, database, nil,
-		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+		[]store.SyncTransaction{flowSettledTransaction("post-a", "Corner Store", "prime_card", "42.10", "2026-08-02", "2026-08-03")})
 	if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingDeleted != 0 {
 		t.Fatalf("settle = %+v, want one convert of the hold", second)
 	}
@@ -83,15 +97,21 @@ func TestSyncFlowPendingConvertsToSettled(t *testing.T) {
 	if len(after) != 1 {
 		t.Fatalf("settle rows = %v, want the hold updated to posted", after)
 	}
-	for id := range after {
-		if _, ok := rows[id]; !ok {
-			t.Fatalf("settle id = %s, want the hold's id", id)
-		}
+	var pendingID string
+	for id := range rows {
+		pendingID = id
+	}
+	row, ok := after[pendingID]
+	if !ok {
+		t.Fatalf("settle id = %v, want the hold's id %s", after, pendingID)
+	}
+	if row.Pending || row.Void || !row.Enabled || row.TransactionTime != 1785628800 || row.PostedTime != 1785715200 {
+		t.Fatalf("settled row = %+v, want occurred 2026-08-02 and posted 2026-08-03", row)
 	}
 	// The settled charge stays in later feeds without duplicating.
 	third := applyFlow(t, database, nil,
-		[]store.SyncTransaction{flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
-	if third.SettledConverted != 0 || third.SettledInserted != 0 || third.PendingDeleted != 0 {
+		[]store.SyncTransaction{flowSettledTransaction("post-a", "Corner Store", "prime_card", "42.10", "2026-08-02", "2026-08-03")})
+	if third.SettledConverted != 0 || third.SettledInserted != 0 || third.PendingDeleted != 0 || third.PendingUpdated != 0 {
 		t.Fatalf("repeat = %+v", third)
 	}
 	if len(bankRowIDs(t, database)) != 1 {
@@ -145,6 +165,9 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	}
 	if row.Pending || !row.Enabled {
 		t.Fatalf("settled row = %+v", row)
+	}
+	if row.TransactionTime != 1785628800 || row.PostedTime != 1785715200 {
+		t.Fatalf("settled occurred/posted = %d/%d, want 1785628800/1785715200", row.TransactionTime, row.PostedTime)
 	}
 	if row.Claim == nil || row.Claim.ScheduleID != "corner" {
 		t.Fatalf("claim lost on settle: %+v", row)
@@ -280,6 +303,27 @@ func settledFeed(t *testing.T, posted, transacted int64) AccountSet {
 	}}}
 }
 
+func pendingFlowFeed(id string, occurred int64) *AccountSet {
+	pending := true
+	return &AccountSet{Accounts: []Account{{
+		ID: "bridge-checking", ConnID: testConnID, Name: "Checking", Currency: "USD",
+		Balance: "1000.00", BalanceDate: 1773133200,
+		Transactions: []Transaction{{
+			ID: id, Posted: 0, Amount: "-100.00", Description: "Groceries", Pending: &pending, TransactedAt: &occurred,
+		}},
+	}}}
+}
+
+func settledFlowFeedWithoutTransactedAt(id string, posted int64) *AccountSet {
+	return &AccountSet{Accounts: []Account{{
+		ID: "bridge-checking", ConnID: testConnID, Name: "Checking", Currency: "USD",
+		Balance: "1000.00", BalanceDate: 1773133200,
+		Transactions: []Transaction{{
+			ID: id, Posted: posted, Amount: "-100.00", Description: "Groceries",
+		}},
+	}}}
+}
+
 func seedFlowChecking(t *testing.T, database store.Store) {
 	t.Helper()
 	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
@@ -384,8 +428,8 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if !translation.Settled[0].Transaction.Enabled {
 		t.Fatalf("settled bank actual must participate: %+v", translation.Settled[0].Transaction)
 	}
-	if translation.Settled[0].Transaction.TransactionTime != 1773140400 {
-		t.Fatalf("settled event time = %d, want posted instant 1773140400", translation.Settled[0].Transaction.TransactionTime)
+	if translation.Settled[0].Transaction.TransactionTime != 1773129600 || translation.Settled[0].Transaction.PostedTime != 1773140400 {
+		t.Fatalf("settled occurred/posted = %d/%d, want 1773129600/1773140400", translation.Settled[0].Transaction.TransactionTime, translation.Settled[0].Transaction.PostedTime)
 	}
 	_, model := applyProviderFeed(t, database, &set, now)
 	position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
@@ -430,6 +474,270 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	}
 	if got := position.Accounts[0].Balance; got != 900 {
 		t.Fatalf("12:00 position after repeat = %v, want 900", got)
+	}
+}
+
+func TestPendingSeedSettlementPreservesDatesForSameAndNewKeys(t *testing.T) {
+	const occurred = int64(1773129600)
+	const posted = int64(1773140400)
+	for _, test := range []struct {
+		name     string
+		sameKey  bool
+		postedID string
+	}{
+		{name: "same key", sameKey: true, postedID: "auth1"},
+		{name: "unique new key", postedID: "post1"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			database := openRunnerStore(t)
+			seedFlowChecking(t, database)
+			first, pendingModel := applyProviderFeed(t, database, pendingFlowFeed("auth1", occurred), time.Unix(1773133200, 0).UTC())
+			if first.PendingInserted != 1 || len(pendingModel.Transactions) != 1 {
+				t.Fatalf("pending seed = %+v, rows = %+v", first, pendingModel.Transactions)
+			}
+			id := pendingModel.Transactions[0].ID
+			if pendingModel.Transactions[0].TransactionTime != occurred || pendingModel.Transactions[0].PostedTime != 0 {
+				t.Fatalf("pending dates = %+v, want occurred %d and no posted date", pendingModel.Transactions[0], occurred)
+			}
+
+			feed := settledFlowFeedWithoutTransactedAt(test.postedID, posted)
+			second, model := applyProviderFeed(t, database, feed, time.Unix(1773140400, 0).UTC())
+			if test.sameKey {
+				if second.PendingUpdated != 1 || second.SettledInserted != 0 || second.SettledConverted != 0 || second.PendingDeleted != 0 {
+					t.Fatalf("same-key settlement = %+v, want one upsert", second)
+				}
+			} else if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingUpdated != 0 || second.PendingDeleted != 0 {
+				t.Fatalf("new-key settlement = %+v, want one conversion", second)
+			}
+			if len(model.Transactions) != 1 {
+				t.Fatalf("settlement rows = %+v, want exactly one", model.Transactions)
+			}
+			row := model.Transactions[0]
+			if row.ID != id || row.Pending || row.Void || !row.Enabled || row.TransactionTime != occurred || row.PostedTime != posted {
+				t.Fatalf("settled row = %+v, want stable UUID %s, occurred %d, posted %d", row, id, occurred, posted)
+			}
+			bank, err := database.LoadBankTransactions()
+			if err != nil || len(bank) != 1 || len(bank[0].Keys) != 1 || bank[0].Keys[0].TransactionID != test.postedID {
+				t.Fatalf("settled bank rows = %+v, err %v, want posted key %s", bank, err, test.postedID)
+			}
+			position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+			if err != nil || position.Accounts[0].Balance != 900 {
+				t.Fatalf("12:00 position = %+v, err %v, want 900", position, err)
+			}
+
+			translation, err := Translate(feed, map[string]string{testAccountKey("bridge-checking"): "checking"}, time.Unix(1773144000, 0).UTC())
+			if err != nil {
+				t.Fatal(err)
+			}
+			directives := Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true})
+			upserts, converts, voids := directivesByAction(directives)
+			if upserts != 0 || converts != 0 || len(voids) != 0 {
+				t.Fatalf("repeat directives = %+v, want no financial writes", directives)
+			}
+			repeat, err := database.ApplySync(nil, directives)
+			if err != nil || repeat != (store.SyncApplySummary{}) {
+				t.Fatalf("repeat = %+v, err %v, want no churn", repeat, err)
+			}
+			again, err := database.LoadBankTransactions()
+			if err != nil || len(again) != 1 {
+				t.Fatalf("repeat rows = %+v, err %v", again, err)
+			}
+			repeated := again[0].Transaction
+			if repeated.ID != id || repeated.TransactionTime != occurred || repeated.PostedTime != posted || repeated.Pending || repeated.Void {
+				t.Fatalf("repeat changed settled row: %+v", repeated)
+			}
+		})
+	}
+}
+
+func TestSameKeyClaimedHoldReceivesRealPostingEndToEnd(t *testing.T) {
+	const occurred = int64(1773129600)
+	const posted = int64(1773140400)
+	database := openRunnerStore(t)
+	seedFlowChecking(t, database)
+	first, model := applyProviderFeed(t, database, pendingFlowFeed("auth1", occurred), time.Unix(1773133200, 0).UTC())
+	if first.PendingInserted != 1 || len(model.Transactions) != 1 {
+		t.Fatalf("pending seed = %+v, rows = %+v", first, model.Transactions)
+	}
+	id := model.Transactions[0].ID
+	if _, err := database.CreateSchedule(types.Schedule{
+		ID: "corner", Name: "Corner Store", Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+		StartDate: "2026-08-01", Enabled: true,
+		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100.00"}, Inputs: map[string]types.AmountInputBinding{}},
+	}); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	claimed := model.Transactions[0]
+	claimed.Claim = &types.TransactionClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"}
+	if _, err := database.UpdateTransaction(claimed); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	claimedModel, err := database.LoadModel()
+	if err != nil || len(claimedModel.Transactions) != 1 {
+		t.Fatalf("claimed rows = %+v, err %v", claimedModel, err)
+	}
+	claimedRow := claimedModel.Transactions[0]
+	if claimedRow.ID != id || claimedRow.Pending || !claimedRow.Enabled || claimedRow.Claim == nil || claimedRow.PostedTime != occurred || !claimedRow.PostedTimeProvisional {
+		t.Fatalf("claimed row = %+v, want stable UUID %s and provisional posted time %d", claimedRow, id, occurred)
+	}
+
+	feed := settledFlowFeedWithoutTransactedAt("auth1", posted)
+	second, settledModel := applyProviderFeed(t, database, feed, time.Unix(1773140400, 0).UTC())
+	if second.PendingUpdated != 1 || second.SettledInserted != 0 || second.SettledConverted != 0 || second.PendingDeleted != 0 {
+		t.Fatalf("real posting = %+v, want one same-key upsert", second)
+	}
+	bank, err := database.LoadBankTransactions()
+	if err != nil || len(bank) != 1 {
+		t.Fatalf("settled bank rows = %+v, err %v, want exactly one", bank, err)
+	}
+	row := bank[0].Transaction
+	if row.ID != id || row.Pending || row.Void || !row.Enabled || row.TransactionTime != occurred || row.PostedTime != posted || row.PostedTimeProvisional {
+		t.Fatalf("real posted row = %+v, want stable UUID %s, occurred %d, posted %d", row, id, occurred, posted)
+	}
+	if row.Claim == nil || row.Claim.ScheduleID != "corner" || row.Claim.OccurrenceDate != "2026-08-01" {
+		t.Fatalf("claim lost on real posting: %+v", row.Claim)
+	}
+	if len(settledModel.Transactions) != 1 {
+		t.Fatalf("settled model rows = %+v, want exactly one", settledModel.Transactions)
+	}
+
+	translation, err := Translate(feed, map[string]string{testAccountKey("bridge-checking"): "checking"}, time.Unix(1773144000, 0).UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	directives := Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 0 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("repeat directives = %+v, want no financial writes", directives)
+	}
+	repeat, err := database.ApplySync(nil, directives)
+	if err != nil || repeat != (store.SyncApplySummary{}) {
+		t.Fatalf("repeat = %+v, err %v, want no churn", repeat, err)
+	}
+	again, err := database.LoadBankTransactions()
+	if err != nil || len(again) != 1 {
+		t.Fatalf("repeat rows = %+v, err %v", again, err)
+	}
+	repeated := again[0].Transaction
+	if repeated.ID != id || repeated.TransactionTime != occurred || repeated.PostedTime != posted || repeated.Claim == nil || repeated.Claim.ScheduleID != "corner" {
+		t.Fatalf("repeat changed claimed settlement: %+v", repeated)
+	}
+}
+
+func TestAutoClaimedHoldReceivesSameInstantFinalPostingEndToEnd(t *testing.T) {
+	const occurred = int64(1773129600)
+	database := openRunnerStore(t)
+	seedFlowChecking(t, database)
+	if _, err := database.CreateSchedule(types.Schedule{
+		ID: "groceries", Name: "Groceries", SourceAccountID: &[]string{"checking"}[0], Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+		StartDate: "2026-03-10", Enabled: true,
+		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100.00"}, Inputs: map[string]types.AmountInputBinding{}},
+	}); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	first, model := applyProviderFeed(t, database, pendingFlowFeed("auth1", occurred), time.Unix(1773133200, 0).UTC())
+	if first.PendingInserted != 1 || len(model.Transactions) != 1 {
+		t.Fatalf("pending seed = %+v, rows = %+v", first, model.Transactions)
+	}
+	claimed := model.Transactions[0]
+	if claimed.Claim == nil || claimed.Claim.ScheduleID != "groceries" || claimed.Pending || !claimed.Enabled {
+		t.Fatalf("auto-claimed hold = %+v", claimed)
+	}
+	if claimed.PostedTime != occurred || !claimed.PostedTimeProvisional {
+		t.Fatalf("auto-claimed hold posted time = %d, want provisional occurred instant %d", claimed.PostedTime, occurred)
+	}
+
+	finalFeed := settledFlowFeedWithoutTransactedAt("auth1", occurred)
+	finalFeed.Accounts[0].Transactions[0].Amount = "-125.00"
+	finalFeed.Accounts[0].Transactions[0].Description = "GROCERIES FINAL"
+	second, settledModel := applyProviderFeed(t, database, finalFeed, time.Unix(1773140400, 0).UTC())
+	if second.PendingUpdated != 1 || second.SettledInserted != 0 || second.SettledConverted != 0 || second.PendingDeleted != 0 {
+		t.Fatalf("same-instant final posting = %+v, want one same-key upsert", second)
+	}
+	if len(settledModel.Transactions) != 1 {
+		t.Fatalf("settled rows = %+v, want exactly one", settledModel.Transactions)
+	}
+	row := settledModel.Transactions[0]
+	if row.ID != claimed.ID || row.TransactionTime != occurred || row.PostedTime != occurred || row.Pending || row.Void || !row.Enabled || row.PostedTimeProvisional {
+		t.Fatalf("same-instant settled row = %+v", row)
+	}
+	if expression, _ := row.Amount.Config["expression"].(string); expression != "125.00" || row.Name != "GROCERIES FINAL" {
+		t.Fatalf("final values not applied: amount %q name %q", expression, row.Name)
+	}
+	if row.Claim == nil || row.Claim.ScheduleID != "groceries" {
+		t.Fatalf("claim lost on final posting: %+v", row.Claim)
+	}
+
+	bank, err := database.LoadBankTransactions()
+	if err != nil || len(bank) != 1 {
+		t.Fatalf("bank rows = %+v, err %v", bank, err)
+	}
+	translation, err := Translate(finalFeed, map[string]string{testAccountKey("bridge-checking"): "checking"}, time.Unix(1773144000, 0).UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	directives := Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 0 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("repeat directives = %+v, want no financial writes", directives)
+	}
+	if repeat, err := database.ApplySync(nil, directives); err != nil || repeat != (store.SyncApplySummary{}) {
+		t.Fatalf("repeat = %+v, err %v, want no churn", repeat, err)
+	}
+}
+
+func TestOwnerEditedPostedDateEqualToOccurredIsNotOverwritten(t *testing.T) {
+	const occurred = int64(1773129600)
+	database := openRunnerStore(t)
+	seedFlowChecking(t, database)
+	feed := settledFlowFeedWithoutTransactedAt("post1", occurred)
+	first, model := applyProviderFeed(t, database, feed, time.Unix(1773140400, 0).UTC())
+	if first.SettledInserted != 1 || len(model.Transactions) != 1 {
+		t.Fatalf("settled seed = %+v, rows = %+v", first, model.Transactions)
+	}
+	if _, err := database.CreateSchedule(types.Schedule{
+		ID: "groceries", Name: "Groceries", Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+		StartDate: "2026-03-10", Enabled: true,
+		Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100.00"}, Inputs: map[string]types.AmountInputBinding{}},
+	}); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	claimed, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+		TransactionID: model.Transactions[0].ID,
+		Claim:         types.TransactionClaim{ScheduleID: "groceries", OccurrenceDate: "2026-03-10"},
+	}})
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim = %+v, err %v", claimed, err)
+	}
+	edited := claimed[0]
+	edited.Name = "Owner edited grocer"
+	edited.PostedTime = occurred
+	edited, err = database.UpdateTransaction(edited)
+	if err != nil {
+		t.Fatalf("owner edit = %v", err)
+	}
+	if edited.PostedTime != occurred || edited.Name != "Owner edited grocer" || edited.PostedTimeProvisional {
+		t.Fatalf("owner edit not preserved: %+v", edited)
+	}
+
+	bank, err := database.LoadBankTransactions()
+	if err != nil || len(bank) != 1 {
+		t.Fatalf("bank rows = %+v, err %v", bank, err)
+	}
+	later := settledFlowFeedWithoutTransactedAt("post1", occurred+3600)
+	later.Accounts[0].Transactions[0].Amount = "-110.00"
+	translation, err := Translate(later, map[string]string{testAccountKey("bridge-checking"): "checking"}, time.Unix(1773144000, 0).UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	directives := Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 0 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("owner-edited posted date was overwritten: %+v", directives)
+	}
+	after, err := database.LoadBankTransactions()
+	if err != nil || len(after) != 1 || after[0].Transaction.PostedTime != occurred || after[0].Transaction.Name != edited.Name {
+		t.Fatalf("owner-edited row changed: %+v, err %v", after, err)
 	}
 }
 

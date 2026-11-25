@@ -63,9 +63,9 @@ func IsOwnerAuthored(source string) bool {
 }
 
 // EffectiveOccurrenceInstant is the instant an occurrence is applied or
-// simulates at: confirmed actuals carry their stored Unix time (including
-// 00:00 — every stored transaction time is timed); rule instances take effect
-// in the day-close phase of their date.
+// simulates at: actuals use their canonical application instant (positive
+// posted time for bank rows, transaction time for owner rows), while rule
+// instances take effect in the day-close phase of their date.
 func EffectiveOccurrenceInstant(occurrence DatedTransactionOccurrence, date string) int64 {
 	if occurrence.Rule != nil {
 		return dayCloseUnix(date)
@@ -73,9 +73,16 @@ func EffectiveOccurrenceInstant(occurrence DatedTransactionOccurrence, date stri
 	return TransactionInstant(occurrence.Transaction)
 }
 
-// TransactionInstant returns the ordering instant of one transaction: transaction
-// time with posted time as fallback, matching transactionDay.
+// TransactionInstant returns the application and ordering instant of a
+// transaction. Transaction time remains the canonical occurred and display
+// time. A non-owner-authored bank movement with a positive posted time applies
+// at that posted instant; pending bank rows without one continue to use
+// transaction time. Owner-authored rows, including an empty source, remain
+// transaction-time first with posted time as fallback.
 func TransactionInstant(transaction *types.Transaction) int64 {
+	if !IsOwnerAuthored(transaction.Source) && transaction.PostedTime > 0 {
+		return transaction.PostedTime
+	}
 	if transaction.TransactionTime > 0 {
 		return transaction.TransactionTime
 	}

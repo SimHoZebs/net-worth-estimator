@@ -124,8 +124,13 @@ func TestValidateFinancialModelAllowsMissingPostedDateOnBankLifecycleRows(t *tes
 		Transactions: []types.Transaction{
 			{ID: "pending", Name: "Pending", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "banksync", Pending: true},
 			{ID: "voided", Name: "Voided", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "banksync", Void: true},
+			{ID: "claimed-provisional", Name: "Claimed provisional", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync", PostedTimeProvisional: true, Claim: &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-03-10"}},
 			{ID: "settled", Name: "Settled", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
+		Schedules: []types.Schedule{{
+			ID: "rent", Name: "Rent", SourceAccountID: &source, Amount: expenseAmount("100"),
+			Recurrence: monthlyTestRecurrence(), StartDate: "2026-03-10", Enabled: true,
+		}},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 

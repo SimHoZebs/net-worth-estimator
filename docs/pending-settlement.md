@@ -7,8 +7,13 @@ that vanished without a posted charge shows **Did not post**.
 ## Settlement updates the hold in place
 
 A posted charge that settles a vanished hold updates that hold under its own
-id instead of deleting the hold and creating the charge. The posted values
-and the posted bank key land on the hold's row.
+id instead of deleting the hold and creating the charge. Settlement preserves
+the hold's original **Occurred** date while applying the posted values and the
+posted bank key to the same row.
+
+Matching uses the posted instant, falling back to the occurred date when no
+posted date is available. The activity list displays the occurred date, and
+occurrence claims keep that date as well.
 
 The join uses the merchant profile: same mirror account, same direction, the
 same leading merchant tokens after authorization noise and processor prefixes
@@ -58,11 +63,17 @@ an occurrence of** and **Replaces occurrence on**. The claim names the
 occurrence the schedule guessed; it never re-dates the row. The occurrence
 happened when the transaction happened: recorded rows display and sort by
 their own day, and the claim only suppresses the guessed occurrence in
-projections. Pending rows accept claims and owner edits while their other values stay editable: the claim lives outside the synced columns, and the pending-to-posted
-convert keeps the same row id.
-The owner may also settle or restore a hold by setting a posted date in the dates modal, which promotes the row to settled enabled with that posted instant. There is no manual void; void is a sync-only concept. Clear-only is enforced from the sync side: the owner cannot set pending or void, and a settled
-row never becomes pending or void by an owner write. Not having a posted date is the only indicator of not being posted. Setting a posted date while the bank still reports the same pending key is ephemeral; the next sync refresh
-restores bank truth.
+projections. Pending rows accept claims and owner edits while their other values
+stay editable: the claim lives outside the synced columns, and the
+pending-to-posted conversion keeps the same row id.
+
+The owner may also settle or restore a hold by setting a posted date in the
+dates modal, which promotes the row to settled enabled with that posted instant.
+There is no manual void; void is a sync-only concept. Clear-only is enforced from
+the sync side: the owner cannot set pending or void, and a settled row never
+becomes pending or void by an owner write. A pending seed has no posted date.
+Setting a posted date while the bank still reports the same pending key is
+ephemeral; the next sync refresh restores the bank's pending lifecycle.
 
 Owner lifecycle transition matrix (bank rows only):
 
@@ -77,14 +88,23 @@ Owner lifecycle transition matrix (bank rows only):
 
 Void rows are editable and may be restored the same way by setting a posted date.
 
-Claiming clears pending, enables the row so it participates, and promotes
-the posted time from the bank's transaction instant. Pending seeds carry no
-posted time, and recorded rows require a positive one. The editor rejects a
-claim with no occurrence date instead of saving the row unlinked.
+Claiming clears pending and enables the row so it participates. When the claim
+supplies no posted date, the bank's transaction instant is copied to posted
+time. Pending seeds carry no posted time, and recorded rows require a positive
+one. The copied instant is explicitly marked provisional in the sparse
+`transaction_provisional_postings` satellite; timestamp equality never decides
+settlement state. A claim that supplies a posted date confirms that date
+immediately. The editor rejects a claim with no occurrence date instead of
+saving the row unlinked.
 
 A settled charge that matches a claimed hold joins it the same way, so the
 claim survives settlement. Refreshes never demote a claimed row back to a
-pending seed.
+pending seed. Pending refreshes preserve the provisional marker and its posted
+instant. The first real same-key posting clears the marker and applies the final
+amount and descriptor while preserving the occurred date, even when the real
+posted instant equals the occurred instant. Repeat feeds are then no-ops. Any
+non-claim owner save clears the marker, so an owner-edited positive posted date
+is settled even when it equals occurred time.
 
 Validation requires each claimed occurrence to be a scheduled date of an
 existing rule, with one claim per rule and date.

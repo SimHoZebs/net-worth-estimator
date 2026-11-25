@@ -104,15 +104,7 @@ func (st *cutState) applyConfirmedFacts() {
 	}
 	st.transactions = slices.Clone(st.model.Transactions)
 	sort.SliceStable(st.transactions, func(i, j int) bool {
-		a, b := st.transactions[i], st.transactions[j]
-		ai, bi := domain.TransactionInstant(&a), domain.TransactionInstant(&b)
-		if ai != bi {
-			return ai < bi
-		}
-		if a.PostedTime != b.PostedTime {
-			return a.PostedTime < b.PostedTime
-		}
-		return a.ExecutionOrder < b.ExecutionOrder
+		return domain.CompareTransactionChronology(&st.transactions[i], &st.transactions[j]) < 0
 	})
 	// Recorded amounts resolve against observed facts only, never schedule application.
 	st.ctx = newAmounts(st.model, st.balances)

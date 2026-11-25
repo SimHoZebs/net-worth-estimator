@@ -54,6 +54,7 @@ func (s *sqliteStore) CreateTransaction(transaction types.Transaction) (types.Tr
 	}
 	transaction.Source, transaction.Pending, transaction.ExecutionOrder = SourceUser, false, 0
 	transaction.Void = false
+	transaction.PostedTimeProvisional = false
 	err = withRowTx(s.db, func(tx *userTx) error {
 		if err := claimRowID(tx, transaction.ID, "transaction"); err != nil {
 			return err
@@ -83,11 +84,9 @@ func (s *sqliteStore) UpdateTransaction(transaction types.Transaction) (types.Tr
 		if !lifecycle.ownerEditable() {
 			return SyncOwned(transaction.ID)
 		}
-		// Detect a pending bank charge being claimed as an occurrence: the
-		// claim converts it from a pending seed into a recorded occurrence.
-		var storedClaim int
-		_ = tx.QueryRow(`SELECT 1 FROM transaction_claims WHERE transaction_id = ? AND user_id = :user_id`, transaction.ID).Scan(&storedClaim)
-		claiming := lifecycle.source != SourceUser && lifecycle.pending && transaction.Claim != nil && storedClaim == 0
+		// A pending bank row with a claim is a recorded occurrence, whether
+		// this write adds the claim or edits an existing one.
+		claiming := lifecycle.source != SourceUser && lifecycle.pending && transaction.Claim != nil
 		// Owner writes change values only. Source is preserved as stored so
 		// bank rows keep their provenance. Pending and void are owner-clearable
 		// lifecycle flags: the sync sets them on arrival and the owner may
@@ -97,6 +96,7 @@ func (s *sqliteStore) UpdateTransaction(transaction types.Transaction) (types.Tr
 		// pending key; the next sync refresh restores bank truth unless the
 		// row is claimed as an occurrence.
 		transaction.Source = lifecycle.source
+		provisional := false
 		if lifecycle.source == SourceUser {
 			transaction.Pending = false
 			transaction.Void = false
@@ -118,9 +118,14 @@ func (s *sqliteStore) UpdateTransaction(transaction types.Transaction) (types.Tr
 				transaction.Enabled = true
 				if transaction.PostedTime <= 0 {
 					transaction.PostedTime = transaction.TransactionTime
+					provisional = claiming
 				}
 			}
 		}
+		// Only a pending-to-claimed transition that had no posted date is
+		// provisional. An explicit posted date in the claiming save confirms
+		// the instant immediately; every other owner write also clears it.
+		transaction.PostedTimeProvisional = provisional
 		if err := tx.QueryRow(`SELECT execution_order FROM transaction_sim WHERE transaction_id = ? AND user_id = :user_id`, transaction.ID).Scan(&transaction.ExecutionOrder); err != nil {
 			return err
 		}
@@ -138,6 +143,9 @@ func (s *sqliteStore) UpdateTransaction(transaction types.Transaction) (types.Tr
 		}
 		if _, err := tx.Exec(`UPDATE transaction_sim SET enabled = ? WHERE transaction_id = ? AND user_id = :user_id`,
 			boolToInt(transaction.Enabled), transaction.ID); err != nil {
+			return err
+		}
+		if err := setTransactionProvisionalPosting(tx, transaction.ID, transaction.PostedTimeProvisional); err != nil {
 			return err
 		}
 		if transaction.Claim != nil {

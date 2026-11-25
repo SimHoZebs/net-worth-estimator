@@ -304,6 +304,9 @@ func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID 
 }
 
 func supersedeDeleteSchedule(tx *userTx, ruleID string) error {
+	if err := clearProvisionalPostingsForRule(tx, ruleID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
 		return fmt.Errorf("delete claims for rule %s: %w", ruleID, err)
 	}
