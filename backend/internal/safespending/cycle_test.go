@@ -13,6 +13,11 @@ func TestNov20ActiveCycleKeepsNov30PaymentProgress(t *testing.T) {
 	prior := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
 	active := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-20"))
 
+	if prior.CycleStart != "2026-10-20" || prior.CycleEnd != "2026-11-19" ||
+		active.CycleStart != "2026-11-20" || active.CycleEnd != "2026-12-19" {
+		t.Fatalf("active cycle dates = %s → %s, want prior Oct 20–Nov 19 and active Nov 20–Dec 19",
+			active.CycleStart, active.CycleEnd)
+	}
 	if active.Payday == nil || *active.Payday != "2026-11-30" {
 		t.Fatalf("actual next income = %v, want 2026-11-30", active.Payday)
 	}

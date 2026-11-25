@@ -15,7 +15,7 @@ import {
 
 type SummaryWindow = Pick<
 	SafeSpendingSummary,
-	"paymentPeriodStart" | "payoffDate" | "cashAsOf"
+	"cycleStart" | "cycleEnd" | "cashAsOf"
 >;
 
 export interface SafeSpendingActivitySummary {
@@ -116,8 +116,9 @@ function sortRows(
 }
 
 /**
- * Recorded activity for the server-owned payment window. The `cashAsOf` cutoff
- * includes its full UTC day because the summary does not expose an exact instant.
+ * Recorded activity for the server-owned active spending cycle. The cycle is
+ * reset-day inclusive through the day before the next reset, capped at the full
+ * `cashAsOf` UTC day because the summary does not expose an exact instant.
  * This adapter only selects and groups saved rows for display; it does not
  * recreate allowance, bill, payoff, or threshold calculations.
  */
@@ -149,9 +150,7 @@ export function buildSafeSpendingActivity({
 	}
 
 	const end =
-		summary.payoffDate < summary.cashAsOf
-			? summary.payoffDate
-			: summary.cashAsOf;
+		summary.cycleEnd < summary.cashAsOf ? summary.cycleEnd : summary.cashAsOf;
 	const spendingById = new Map<string, AccountTransaction>();
 	const cashByEdge = new Map<string, AccountTransaction>();
 	const selections = [
@@ -174,7 +173,7 @@ export function buildSafeSpendingActivity({
 				saved.void ||
 				(!saved.enabled && !saved.pending) ||
 				(!saved.pending && row.excluded) ||
-				day < summary.paymentPeriodStart ||
+				day < summary.cycleStart ||
 				day > end
 			)
 				continue;

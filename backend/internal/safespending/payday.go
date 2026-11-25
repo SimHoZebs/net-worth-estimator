@@ -36,6 +36,7 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 	incomes, incomeScheduleKnown := forecastPaydays(st, today, payoff)
 	st.s.Payday, st.s.ExpectedPay = &incomes[0].date, incomes[0].income
 	cycle, following := cycleScopes(cycleDay, payoffDay, today, st.s.CycleReset, incomes, incomeScheduleKnown)
+	st.s.CycleStart, st.s.CycleEnd = cycle.start, cycle.end
 	if cycle.known {
 		st.s.CycleFundingPayday = &cycle.payday
 	}

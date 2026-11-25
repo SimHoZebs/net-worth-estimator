@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+	activeCycleCaption,
 	isSafeSpendingTransactionsTab,
-	paymentPeriodCaption,
 	SAFE_SPENDING_DETAIL_TABS,
 } from "./safeSpendingDetailModel.ts";
 
@@ -15,12 +15,12 @@ describe("safe spending detail model", () => {
 		expect(isSafeSpendingTransactionsTab("configure")).toBe(false);
 	});
 
-	it("captions the server-owned payment window", () => {
+	it("captions the server-owned active spending cycle", () => {
 		expect(
-			paymentPeriodCaption({
-				start: "2026-10-31",
-				end: "2026-11-30",
+			activeCycleCaption({
+				start: "2028-01-31",
+				end: "2028-02-29",
 			}),
-		).toBe("Oct 31, 2026 – Nov 30, 2026");
+		).toBe("Jan 31, 2028 – Feb 29, 2028");
 	});
 });

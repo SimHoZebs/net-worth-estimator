@@ -4615,11 +4615,19 @@
 						"format": "double",
 						"type": ["number", "null"]
 					},
+					"cycleEnd": {
+						"description": "Inclusive UTC end date of the active spending cycle, the day before the next reset; recorded transaction activity is also capped at cashAsOf",
+						"type": "string"
+					},
 					"cycleFundingPayday": {
 						"description": "Paycheck funding the active spending cycle; Payday stays the actual next income",
 						"type": ["string", "null"]
 					},
 					"cycleReset": {
+						"type": "string"
+					},
+					"cycleStart": {
+						"description": "Inclusive UTC start date of the active spending cycle, beginning on the configured reset day",
 						"type": "string"
 					},
 					"daysUntilReset": {
@@ -4748,6 +4756,8 @@
 					"paymentRoom",
 					"cardPayoffCapacity",
 					"cycleReset",
+					"cycleStart",
+					"cycleEnd",
 					"daysUntilReset",
 					"nextCycleEnd",
 					"incomeFunded",

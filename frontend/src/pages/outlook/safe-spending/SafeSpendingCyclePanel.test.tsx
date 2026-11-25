@@ -63,8 +63,8 @@ const card: Account = {
 };
 const accounts = [checking, card];
 const summary = summaryFixture({
-	paymentPeriodStart: "2026-10-31",
-	payoffDate: "2026-11-30",
+	cycleStart: "2026-10-20",
+	cycleEnd: "2026-11-19",
 	cashAsOf: "2026-11-30",
 });
 
@@ -151,7 +151,7 @@ describe("safe spending transactions panel", () => {
 				fromId: checking.id,
 				toId: card.id,
 				amount: 80,
-				startDate: "2026-11-20",
+				startDate: "2026-11-19",
 			}),
 		]);
 		expect(screen.getByText("Spent")).toBeTruthy();
@@ -161,10 +161,18 @@ describe("safe spending transactions panel", () => {
 		expect(
 			screen.getByRole("heading", { name: "Spending this cycle" }),
 		).toBeTruthy();
+		const spendingHeader = screen.getByRole("heading", {
+			name: "Spending this cycle",
+		}).parentElement!.parentElement!;
+		expect(
+			within(spendingHeader).getByRole("button", {
+				name: /^Sort transactions: Newest first/,
+			}),
+		).toBeTruthy();
 		expect(
 			screen.getByRole("heading", { name: "Cash payments this cycle" }),
 		).toBeTruthy();
-		expect(screen.getByText("Recorded amounts · Oct 31 – Nov 30")).toBeTruthy();
+		expect(screen.getByText("Recorded amounts · Oct 20 – Nov 19")).toBeTruthy();
 		expect(screen.getByText("$80.00")).toBeTruthy();
 		const spendingTable = screen.getByRole("table", {
 			name: "Spending this cycle, newest first",

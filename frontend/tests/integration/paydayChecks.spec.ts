@@ -3,6 +3,8 @@ import { FIXTURE_API } from "./fixture.ts";
 
 const headline = {
 	cycleReset: "2026-11-20",
+	cycleStart: "2026-10-20",
+	cycleEnd: "2026-11-19",
 	daysUntilReset: 3,
 	safeToSpend: 300.92,
 	incomeFunded: 595.52,
@@ -167,6 +169,28 @@ test("safe spending separates immediate room, progress, and next-cycle funding",
 	expect(await card.evaluate((node) => node.scrollWidth)).toBeLessThanOrEqual(
 		await card.evaluate((node) => node.clientWidth),
 	);
+	await card
+		.getByRole("button", {
+			name: /^(?:Transactions this cycle|\d+ transactions? this cycle)$/,
+		})
+		.click();
+	const drawer = page.getByRole("dialog", { name: "Safe spending" });
+	await expect(drawer.getByText("Oct 20, 2026 – Nov 19, 2026")).toBeVisible();
+	const heading = drawer.getByRole("heading", { name: "Spending this cycle" });
+	const sort = drawer.getByRole("button", {
+		name: /^Sort transactions:/,
+	});
+	const headingBox = await heading.boundingBox();
+	const sortBox = await sort.boundingBox();
+	expect(headingBox).not.toBeNull();
+	expect(sortBox).not.toBeNull();
+	expect(sortBox!.x).toBeGreaterThan(headingBox!.x);
+	expect(headingBox!.y).toBeLessThan(sortBox!.y + sortBox!.height);
+	expect(sortBox!.y).toBeLessThan(headingBox!.y + headingBox!.height);
+	expect(sortBox!.x + sortBox!.width).toBeLessThanOrEqual(360);
+	expect(await drawer.evaluate((node) => node.scrollWidth)).toBeLessThanOrEqual(
+		await drawer.evaluate((node) => node.clientWidth),
+	);
 });
 
 test("an unknown cycle funding payday stays undated without hiding payment or income details", async ({
@@ -184,9 +208,9 @@ test("an unknown cycle funding payday stays undated without hiding payment or in
 	await expect(
 		card.getByRole("heading", { name: "Bills and payments by Nov 30" }),
 	).toBeVisible();
-	await card.getByRole("button", { name: /^Details ·/ }).click();
+	await card.getByRole("button", { name: "0 transactions this cycle" }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
-	await expect(drawer.getByText("Oct 31, 2026 – Nov 30, 2026")).toBeVisible();
+	await expect(drawer.getByText("Oct 20, 2026 – Nov 19, 2026")).toBeVisible();
 	await expect(
 		drawer.getByRole("heading", { name: "Spending this cycle" }),
 	).toBeVisible();

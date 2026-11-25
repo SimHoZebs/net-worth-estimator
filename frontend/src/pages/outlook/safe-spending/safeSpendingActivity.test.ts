@@ -61,8 +61,10 @@ function activity(
 		trackedIds: [card.id],
 		spendingIds: [checking.id],
 		summary: summaryFixture({
-			paymentPeriodStart: "2026-10-31",
-			payoffDate: "2026-11-30",
+			cycleStart: "2026-11-01",
+			cycleEnd: "2026-11-30",
+			paymentPeriodStart: "2026-10-01",
+			payoffDate: "2026-12-31",
 			cashAsOf: "2026-11-30",
 		}),
 		...overrides,
@@ -75,8 +77,8 @@ const ids = (rows: { transactionId: string }[]) =>
 describe("safe spending recorded activity", () => {
 	it("uses selected cards and cash accounts with inclusive window and as-of bounds", () => {
 		const result = activity([
-			transaction("before", { startDate: "2026-10-30" }),
-			transaction("start", { startDate: "2026-10-31" }),
+			transaction("before", { startDate: "2026-10-31" }),
+			transaction("start", { startDate: "2026-11-01" }),
 			transaction("end", { startDate: "2026-11-30" }),
 			transaction("after", { startDate: "2026-12-01" }),
 			transaction("cash", {
@@ -103,8 +105,8 @@ describe("safe spending recorded activity", () => {
 			],
 			{
 				summary: summaryFixture({
-					paymentPeriodStart: "2026-10-31",
-					payoffDate: "2026-11-30",
+					cycleStart: "2026-11-01",
+					cycleEnd: "2026-11-30",
 					cashAsOf: "2026-11-15",
 				}),
 			},
@@ -141,8 +143,8 @@ describe("safe spending recorded activity", () => {
 			],
 			{
 				summary: summaryFixture({
-					paymentPeriodStart: "2026-10-31",
-					payoffDate: "2026-11-30",
+					cycleStart: "2026-11-01",
+					cycleEnd: "2026-11-30",
 					cashAsOf: "2026-11-15",
 				}),
 			},
@@ -154,18 +156,55 @@ describe("safe spending recorded activity", () => {
 		]);
 	});
 
-	it("uses the transactionTime UTC day for the payment-window start", () => {
+	it("uses the transactionTime UTC day for the active-cycle start", () => {
 		const result = activity([
-			transaction("instant-before-window", {
-				startDate: "2026-10-31",
-				transactionTime: Date.parse("2026-10-30T23:59:00Z") / 1000,
-			}),
-			transaction("instant-at-window", {
+			transaction("instant-before-cycle", {
 				startDate: "2026-11-01",
-				transactionTime: Date.parse("2026-10-31T00:00:00Z") / 1000,
+				transactionTime: Date.parse("2026-10-31T23:59:00Z") / 1000,
+			}),
+			transaction("instant-at-cycle", {
+				startDate: "2026-11-01",
+				transactionTime: Date.parse("2026-11-01T00:00:00Z") / 1000,
 			}),
 		]);
-		expect(ids(result.spending)).toEqual(["instant-at-window"]);
+		expect(ids(result.spending)).toEqual(["instant-at-cycle"]);
+	});
+
+	it("uses the active cycle instead of the payment window and caps at cashAsOf", () => {
+		const summary = summaryFixture({
+			cycleStart: "2026-11-01",
+			cycleEnd: "2026-11-19",
+			paymentPeriodStart: "2026-10-31",
+			payoffDate: "2026-11-30",
+			cashAsOf: "2026-11-30",
+		});
+		const result = activity(
+			[
+				transaction("before-cycle", { startDate: "2026-10-31" }),
+				transaction("cycle-start-payment", {
+					fromId: checking.id,
+					toId: card.id,
+					startDate: "2026-11-01",
+				}),
+				transaction("cycle-end", { startDate: "2026-11-19" }),
+				transaction("next-cycle-in-payment-window", {
+					startDate: "2026-11-20",
+				}),
+			],
+			{ summary },
+		);
+		expect(ids(result.spending)).toEqual(["cycle-end"]);
+		expect(ids(result.cashPayments)).toEqual(["cycle-start-payment"]);
+		expect(result.count).toBe(2);
+
+		const earlierCut = activity(
+			[
+				transaction("at-cut", { startDate: "2026-11-15" }),
+				transaction("after-cut", { startDate: "2026-11-16" }),
+			],
+			{ summary: { ...summary, cashAsOf: "2026-11-15" } },
+		);
+		expect(ids(earlierCut.spending)).toEqual(["at-cut"]);
 	});
 
 	it("includes pending rows and omits void, disabled, excluded, and scheduled rows", () => {

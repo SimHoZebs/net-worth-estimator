@@ -11,8 +11,9 @@ import (
 func TestNovemberCashFundingAndNextCycleAreSeparate(t *testing.T) {
 	model, settings := novemberForecastFixture()
 	s := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
-	if s.CycleReset != "2026-11-20" || s.NextCycleEnd != "2026-12-19" || s.DaysUntilReset != 3 {
-		t.Fatalf("unexpected global cycle %s → %s (%d days)", s.CycleReset, s.NextCycleEnd, s.DaysUntilReset)
+	if s.CycleReset != "2026-11-20" || s.NextCycleEnd != "2026-12-19" || s.DaysUntilReset != 3 ||
+		s.CycleStart != "2026-10-20" || s.CycleEnd != "2026-11-19" {
+		t.Fatalf("unexpected global cycle %s → %s, active %s → %s (%d days)", s.CycleReset, s.NextCycleEnd, s.CycleStart, s.CycleEnd, s.DaysUntilReset)
 	}
 	assertMoney(t, statementAmount(t, s, "card-a", "closed", "2026-11-17"), 275.55)
 	assertMoney(t, statementAmount(t, s, "card-b", "estimated", "2026-11-19"), 2615.01)
@@ -171,6 +172,7 @@ func TestFallbackAndGlobalCycleClampIndependently(t *testing.T) {
 	settings.IncomeScheduleIDs = nil
 	s := BuildAtCut(model, settings, stamp("2028-02-29T12:00:00Z"))
 	if s.CycleReset != "2028-03-31" || s.NextCycleEnd != "2028-04-29" || s.DaysUntilReset != 31 ||
+		s.CycleStart != "2028-02-29" || s.CycleEnd != "2028-03-30" ||
 		s.PayoffDate != "2028-02-29" || s.Payday == nil || *s.Payday != "2028-02-29" || s.ExpectedPay != nil {
 		t.Fatalf("unexpected dates and income forecast: %+v", s)
 	}

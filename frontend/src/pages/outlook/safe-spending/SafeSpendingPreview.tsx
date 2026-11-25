@@ -25,17 +25,18 @@ import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
 import {
+	activeCycleCaption,
 	isSafeSpendingTransactionsTab,
-	paymentPeriodCaption,
 	type SafeSpendingDetailTab,
 } from "./safeSpendingDetailModel.ts";
 import { useSafeSpendingSettings } from "@/state/useSafeSpendingSettings.ts";
-import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
+import {
+	SAFE_SPENDING_LABELS as labels,
+	transactionCycleLabel,
+} from "./safeSpendingLabels.ts";
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
 import { SafeSpendingBudget } from "./SafeSpendingBudget.tsx";
 import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
-import { buildAllowanceLedger } from "./allowanceLedger.ts";
-import { amountText } from "./amountText.ts";
 import { buildSafeSpendingActivity } from "./safeSpendingActivity.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
 
@@ -122,14 +123,10 @@ export function SafeSpendingPreview({
 			transactionOrder,
 		],
 	);
-	const cardLedger = useMemo(
-		() => (summary.data ? buildAllowanceLedger(summary.data) : undefined),
-		[summary.data],
-	);
 	const caption = summary.data
-		? paymentPeriodCaption({
-				start: summary.data.paymentPeriodStart,
-				end: summary.data.payoffDate,
+		? activeCycleCaption({
+				start: summary.data.cycleStart,
+				end: summary.data.cycleEnd,
 			})
 		: undefined;
 
@@ -162,7 +159,7 @@ export function SafeSpendingPreview({
 					}
 				/>
 				<CardContent className="grid content-start gap-4">
-					{summary.isError && !cardLedger ? (
+					{summary.isError && !summary.data ? (
 						<Alert variant="destructive" aria-label="Safe spending evidence">
 							<AlertDescription>
 								Safe spending evidence could not be loaded.
@@ -171,10 +168,7 @@ export function SafeSpendingPreview({
 								Retry evidence
 							</Button>
 						</Alert>
-					) : !cardLedger ||
-					  !summary.data ||
-					  summary.isPending ||
-					  settingsState.pending ? (
+					) : !summary.data || summary.isPending || settingsState.pending ? (
 						<div aria-busy="true">
 							<Skeleton className="h-32 w-full" />
 						</div>
@@ -189,10 +183,7 @@ export function SafeSpendingPreview({
 								className="justify-start gap-1 p-0 text-sm"
 								onClick={() => onDetail("transactions")}
 							>
-								{labels.protectedSummary} ·{" "}
-								{amountText(cardLedger.protectedTotal, labels.unavailable)} ·{" "}
-								{cardLedger.obligationCount}{" "}
-								{cardLedger.obligationCount === 1 ? "item" : "items"}
+								{transactionCycleLabel(activity?.count)}
 								<ChevronRight size={14} aria-hidden="true" />
 							</Button>
 						</>

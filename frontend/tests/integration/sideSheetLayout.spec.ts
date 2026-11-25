@@ -200,7 +200,11 @@ test("safe spending and transaction sheets share the canonical shell", async ({
 	await expect(configure).not.toBeVisible();
 	// The card's details action opens the same canonical shell, with the
 	// shared transaction detail stacked above it.
-	await card.getByRole("button", { name: /^Details ·/ }).click();
+	await card
+		.getByRole("button", {
+			name: /^(?:Transactions this cycle|\d+ transactions? this cycle)$/,
+		})
+		.click();
 	const drawer = page.locator('[data-slot="sheet-content"]').first();
 	await expect(drawer).toBeVisible();
 	await expect(

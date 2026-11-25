@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-// The demo command sets the clock to the pack's anchor date so the payment
-// window and its recorded activity read against the seeded evidence.
+// The demo command sets the clock to the pack's anchor date so the active
+// spending cycle and its recorded activity read against the seeded evidence.
 const anchor = process.env.DEMO_ANCHOR ?? new Date().toISOString().slice(0, 10);
 
 test("seeded account demo", async ({ page }) => {
@@ -18,7 +18,11 @@ test("seeded account demo", async ({ page }) => {
 			page.getByRole("region", { name: "Next cycle spending" }),
 		).toBeVisible();
 	}
-	await page.getByRole("button", { name: /^Details ·/ }).click();
+	await page
+		.getByRole("button", {
+			name: /^(?:Transactions this cycle|\d+ transactions? this cycle)$/,
+		})
+		.click();
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	await expect(
 		drawer.getByRole("heading", { name: "Spending this cycle" }),

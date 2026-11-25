@@ -18,8 +18,8 @@ export function isSafeSpendingTransactionsTab(
 	);
 }
 
-/** The server owns both ends of the recorded payment window. */
-export function paymentPeriodCaption({
+/** The server owns both inclusive ends of the active spending cycle. */
+export function activeCycleCaption({
 	start,
 	end,
 }: {
@@ -29,8 +29,6 @@ export function paymentPeriodCaption({
 	return `${dateLabel(start, true)} – ${dateLabel(end, true)}`;
 }
 
-export type EvidenceStatus = "available" | "uncertain" | "missing";
-
 export interface ObligationRow {
 	id: string;
 	name: string;
@@ -38,45 +36,6 @@ export interface ObligationRow {
 	amount: number | null;
 	/** Status wording for estimated statement rows. */
 	detail: string | null;
-}
-
-export interface ObligationSection {
-	title: string;
-	/** Server-owned total for this part of the protected ledger. */
-	total: number | null;
-	rows: ObligationRow[];
-}
-
-export interface DatedAllowance {
-	cashAsOf: string;
-	payday: string | null;
-	status: EvidenceStatus;
-	prePaydayRoom: number | null;
-	postIncomeRoom: number | null;
-	paymentRoom: number | null;
-	expectedPay: number | null;
-}
-
-export interface AllowanceEvidence {
-	status: EvidenceStatus;
-	checkingAvailable: number | null;
-	cashAsOf: string;
-	baselines: {
-		accountId: string;
-		accountName: string;
-		basis: string;
-		status: string;
-		amount: number | null;
-	}[];
-}
-
-export interface AllowanceLedger {
-	allowance: DatedAllowance;
-	sections: ObligationSection[];
-	evidence: AllowanceEvidence;
-	/** Server-owned obligation totals combined for the one-line preview summary. */
-	protectedTotal: number | null;
-	obligationCount: number;
 }
 
 export interface SafeSpendingConfigHints extends Pick<

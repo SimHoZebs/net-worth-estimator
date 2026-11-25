@@ -21,6 +21,8 @@ type SafeSpendingSummary struct {
 	PaymentRoom            *float64                `json:"paymentRoom"`
 	CardPayoffCapacity     *float64                `json:"cardPayoffCapacity"`
 	CycleReset             string                  `json:"cycleReset"`
+	CycleStart             string                  `json:"cycleStart" doc:"Inclusive UTC start date of the active spending cycle, beginning on the configured reset day"`
+	CycleEnd               string                  `json:"cycleEnd" doc:"Inclusive UTC end date of the active spending cycle, the day before the next reset; recorded transaction activity is also capped at cashAsOf"`
 	DaysUntilReset         int                     `json:"daysUntilReset"`
 	NextCycleEnd           string                  `json:"nextCycleEnd"`
 	IncomeFunded           *float64                `json:"incomeFunded"`

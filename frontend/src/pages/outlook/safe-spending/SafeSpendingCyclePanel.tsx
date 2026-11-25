@@ -25,7 +25,7 @@ export function SafeSpendingCyclePanel({
 	onTransactionOrderChange,
 }: {
 	activity: SafeSpendingActivity;
-	summary: Pick<SafeSpendingSummary, "paymentPeriodStart" | "payoffDate">;
+	summary: Pick<SafeSpendingSummary, "cycleStart" | "cycleEnd">;
 	accounts: Account[];
 	transactions: Transaction[];
 	readOnly: boolean;
@@ -42,7 +42,7 @@ export function SafeSpendingCyclePanel({
 		visible,
 		savedById,
 	);
-	const cashSubtitle = `Recorded amounts · ${monthDay(summary.paymentPeriodStart)} – ${monthDay(summary.payoffDate)}`;
+	const cashSubtitle = `Recorded amounts · ${monthDay(summary.cycleStart)} – ${monthDay(summary.cycleEnd)}`;
 	return (
 		<TransactionAnalysisProvider
 			transactionIds={visible.map((row) => row.transactionId)}
@@ -67,13 +67,15 @@ export function SafeSpendingCyclePanel({
 						</div>
 					))}
 				</div>
-				<SafeSpendingSectionHeader title="Spending this cycle" />
-				<div className="flex justify-end">
-					<TransactionSortButton
-						order={transactionOrder}
-						onChange={onTransactionOrderChange}
-					/>
-				</div>
+				<SafeSpendingSectionHeader
+					title="Spending this cycle"
+					action={
+						<TransactionSortButton
+							order={transactionOrder}
+							onChange={onTransactionOrderChange}
+						/>
+					}
+				/>
 				<TransactionSectionView
 					transactions={activity.spending}
 					caption="Spending this cycle"

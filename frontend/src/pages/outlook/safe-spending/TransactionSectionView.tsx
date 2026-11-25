@@ -10,14 +10,16 @@ export function SafeSpendingSectionHeader({
 	title,
 	subtitle,
 	total,
+	action,
 }: {
 	title: string;
 	subtitle?: string;
 	total?: number | null;
+	action?: React.ReactNode;
 }) {
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-			<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+			<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 				<h3 className="m-0 text-xs font-semibold text-foreground">{title}</h3>
 				{subtitle && (
 					<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -30,6 +32,7 @@ export function SafeSpendingSectionHeader({
 					{amountText(total)}
 				</strong>
 			)}
+			{action && <div className="flex shrink-0 items-center">{action}</div>}
 		</div>
 	);
 }

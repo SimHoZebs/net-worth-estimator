@@ -21,6 +21,8 @@ export function summaryFixture(
 		cardPayoffCapacity: null,
 		prePaydayRoom: null,
 		postIncomeRoom: null,
+		cycleStart: "2026-10-20",
+		cycleEnd: "2026-11-19",
 		cycleReset: "2026-11-20",
 		daysUntilReset: 3,
 		nextCycleEnd: "2026-12-19",
