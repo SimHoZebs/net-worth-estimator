@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useIsMutating, useQuery } from "@tanstack/react-query";
 import { useReducer } from "react";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
 import {
@@ -136,9 +136,20 @@ function mergeSettings(
 interface SafeSpendingSettingsState extends SafeSpendingSettings {
 	pending: boolean;
 	error: boolean;
-	updateSettings: (next: Partial<SafeSpendingSettings>) => void;
+	mutating: boolean;
+	revision: number;
+	updateSettings: SafeSpendingSettingsUpdate;
 	retry: () => void;
 }
+
+export type SafeSpendingSettingsUpdateOptions = {
+	retry?: boolean;
+};
+
+export type SafeSpendingSettingsUpdate = (
+	next: Partial<SafeSpendingSettings>,
+	options?: SafeSpendingSettingsUpdateOptions,
+) => Promise<void | null> | undefined;
 
 export function safeSpendingSettingsKey(scope = getUserScope()) {
 	return ["safe-spending-settings", scope.key] as const;
@@ -170,7 +181,11 @@ export function getSafeSpendingSettings(
 }
 
 export function updateSettingsForScope(scope: UserScope = getUserScope()) {
-	return (next: Partial<SafeSpendingSettings>) => {
+	return (
+		next: Partial<SafeSpendingSettings>,
+		options: SafeSpendingSettingsUpdateOptions = {},
+	) => {
+		const retry = options.retry ?? true;
 		if (
 			scope !== getUserScope() ||
 			scope.status !== "ready" ||
@@ -210,26 +225,29 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 				notifyError(
 					"safe-spending-settings",
 					`Budget settings were not saved. ${error instanceof Error ? error.message : "Unknown error"}`,
-					{
-						label: "Retry save",
-						onAction: () => updateSettingsForScope(scope)(snapshot),
-						pendingLabel: "Retrying…",
-					},
+					retry
+						? {
+								label: "Retry save",
+								onAction: () => updateSettingsForScope(scope)(snapshot),
+								pendingLabel: "Retrying…",
+							}
+						: undefined,
 				);
 				// Don't pair a server summary with a goal the server did not save.
 				// A preceding queued write may have succeeded, so re-read the saved
-				// values rather than restoring another optimistic snapshot.
+				// values without putting the query into an error state. If that read
+				// also fails, restore the pre-write snapshot. Both writes are guarded
+				// so a newer optimistic value is never clobbered.
 				if (cache.getQueryData(key) === optimistic) {
-					await cache.invalidateQueries({
-						queryKey: key,
-						exact: true,
-						refetchType: "none",
-					});
+					const recovered = await readSafeSpendingSettings(
+						scope,
+						sanitizeSafeSpendingSettings,
+					).catch(() => previous);
 					if (
 						scope === getUserScope() &&
 						cache.getQueryData(key) === optimistic
 					)
-						await cache.fetchQuery(settingsOptions(scope)).catch(() => {});
+						cache.setQueryData(key, recovered ?? defaultSafeSpendingSettings());
 				}
 			},
 		});
@@ -267,16 +285,24 @@ export function useSafeSpendingSettings(): SafeSpendingSettingsState {
 	// The optimistic write reads cache directly so it shows in the same event.
 	const [, bump] = useReducer((version: number) => version + 1, 0);
 	const settings = getSafeSpendingSettings(scope);
+	const mutating =
+		useIsMutating(
+			{ mutationKey: safeSpendingSettingsKey(scope) },
+			serverQueryClient(),
+		) > 0;
 	return {
 		...settings,
 		pending: query.isPending,
 		error: query.isError,
+		mutating,
+		revision: query.dataUpdatedAt,
 		retry: () => {
 			void query.refetch();
 		},
-		updateSettings: (next) => {
-			updateSettingsForScope(scope)(next);
+		updateSettings: (next, options) => {
+			const pending = updateSettingsForScope(scope)(next, options);
 			bump();
+			return pending;
 		},
 	};
 }

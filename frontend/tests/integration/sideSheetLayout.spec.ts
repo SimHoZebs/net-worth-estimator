@@ -3,7 +3,7 @@ import { FIXTURE_API } from "./fixture.ts";
 
 // The right-side Configure sheet and the transaction detail sheet share one
 // canonical shell: full width on mobile, xl on desktop, fixed header with a
-// reserved close zone, scrollable SheetBody, optional footer. These tests lock
+// reserved action zone, fixed tabs, and scrollable tab content. These tests lock
 // that contract on the transaction sheet and prove Configure parity through
 // the same safe-card workflow.
 async function seedCardCharge(): Promise<void> {
@@ -172,30 +172,59 @@ test("safe spending and transaction sheets share the canonical shell", async ({
 	const configureBody = configure.locator(':scope > [data-slot="sheet-body"]');
 	await expect(configureHeader).toHaveCount(1);
 	await expect(configureBody).toHaveCount(1);
-	// In a short viewport the body scrolls while the fixed header stays put.
-	const scrolled = await configureBody.evaluate((el) => {
+	// In a short viewport the tab content scrolls while the tab list and
+	// fixed header stay put.
+	const configureTabs = configure.getByRole("tablist");
+	const configureContent = configure.locator(
+		':scope [data-slot="tabs-content"]',
+	);
+	const bodyStyle = await configureBody.evaluate((el) => {
+		const computed = getComputedStyle(el);
+		return { overflowY: computed.overflowY, flexGrow: computed.flexGrow };
+	});
+	expect(bodyStyle.overflowY).toBe("hidden");
+	expect(bodyStyle.flexGrow).toBe("1");
+	const contentStyle = await configureContent.evaluate((el) => ({
+		overflowY: getComputedStyle(el).overflowY,
+	}));
+	expect(contentStyle.overflowY).toBe("auto");
+	const tabsBefore = await configureTabs.boundingBox();
+	const scrolled = await configureContent.evaluate((el) => {
 		const overflows = el.scrollHeight > el.clientHeight;
 		if (overflows) el.scrollTop = el.scrollHeight;
 		return { overflows, top: el.scrollTop };
 	});
 	expect(scrolled.overflows).toBe(true);
 	expect(scrolled.top).toBeGreaterThan(0);
+	const tabsAfter = await configureTabs.boundingBox();
+	expect(tabsAfter?.y).toBe(tabsBefore?.y);
 	const headerBox = await configureHeader.boundingBox();
-	await configureBody.evaluate((el) => {
+	await configureContent.evaluate((el) => {
 		el.scrollTop = 0;
 	});
 	const resetBox = await configureHeader.boundingBox();
 	expect(resetBox?.y).toBe(headerBox?.y);
 	const configureTitle = configure.locator(':scope [data-slot="sheet-title"]');
+	const configureSave = configure.getByRole("button", {
+		name: "Save",
+		exact: true,
+	});
 	const configureClose = configure.getByRole("button", {
 		name: "Close",
 		exact: true,
 	});
 	const configureTitleBox = await configureTitle.boundingBox();
+	const configureSaveBox = await configureSave.boundingBox();
 	const configureCloseBox = await configureClose.boundingBox();
 	expect(configureTitleBox!.x + configureTitleBox!.width).toBeLessThanOrEqual(
+		configureSaveBox!.x + 1,
+	);
+	expect(configureSaveBox!.x + configureSaveBox!.width).toBeLessThanOrEqual(
 		configureCloseBox!.x + 1,
 	);
+	expect(
+		configureCloseBox!.x - (configureSaveBox!.x + configureSaveBox!.width),
+	).toBeLessThanOrEqual(8);
 	await page.keyboard.press("Escape");
 	await expect(configure).not.toBeVisible();
 	// The card's details action opens the same canonical shell, with the
@@ -262,6 +291,40 @@ test("safe spending and transaction sheets share the canonical shell", async ({
 	expect(detailTitleBox!.x + detailTitleBox!.width).toBeLessThanOrEqual(
 		detailCloseBox!.x + 1,
 	);
+});
+
+test("safe spending keeps the transaction sort for the page session", async ({
+	page,
+}) => {
+	await seedCardCharge();
+	await page.goto("/outlook");
+	const card = page.getByRole("region", { name: "Safe spending" });
+	await expect(card.locator('[aria-busy="true"]')).toHaveCount(0);
+	await card
+		.getByRole("button", {
+			name: /^(?:Transactions this cycle|\d+ transactions? this cycle)$/,
+		})
+		.click();
+	const drawer = page.getByRole("dialog", { name: "Safe spending" });
+	await drawer
+		.getByRole("button", { name: /^Sort transactions: Newest first/ })
+		.click();
+	await expect(
+		drawer.getByRole("button", { name: /^Sort transactions: Oldest first/ }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(drawer).toBeHidden();
+
+	await card
+		.getByRole("button", {
+			name: /^(?:Transactions this cycle|\d+ transactions? this cycle)$/,
+		})
+		.click();
+	await expect(
+		page
+			.getByRole("dialog", { name: "Safe spending" })
+			.getByRole("button", { name: /^Sort transactions: Oldest first/ }),
+	).toBeVisible();
 });
 
 test.describe("side sheet narrow layout", () => {

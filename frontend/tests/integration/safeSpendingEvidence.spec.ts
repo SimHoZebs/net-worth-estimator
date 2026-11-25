@@ -534,6 +534,108 @@ test("an explicitly tracked card keeps its statement payoff", async ({
 	}
 });
 
+test("a failed all-cards-deselected save stays dirty after recovery", async ({
+	page,
+}) => {
+	const api = await request.newContext();
+	try {
+		const today = new Date().toISOString().slice(0, 10);
+		const payday = new Date(Date.parse(`${today}T00:00:00Z`) + 11 * 86_400_000)
+			.toISOString()
+			.slice(0, 10);
+		await seedTrackedCard(api, payday);
+		const baseline = await api.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
+			data: {
+				cycleStartDay: 20,
+				paydayDay: Number(payday.slice(-2)),
+				savingsTarget: 0,
+				accountIds: null,
+				spendingAccountIds: ["evidence-checking"],
+				incomeScheduleIds: ["evidence-salary"],
+				transactionIds: null,
+			},
+		});
+		expect(baseline.ok(), await baseline.text()).toBe(true);
+		const savedBaseline = await api.get(
+			`${FIXTURE_API}/v1/safe-spending-settings`,
+		);
+		expect((await savedBaseline.json()).settings.accountIds).toBeNull();
+
+		await page.clock.setFixedTime(new Date(`${today}T12:00:00Z`));
+		await page.goto("/outlook?detail=safe-spending&tab=configure");
+		const drawer = page.getByRole("dialog", { name: "Safe spending" });
+		const card = drawer.getByRole("button", {
+			name: /Synthetic synced card/,
+		});
+		const save = drawer.getByRole("button", { name: "Save", exact: true });
+		const start = drawer.locator('input[name="cycleStartDay"]');
+		await expect(start).toBeVisible();
+		const startId = await start.getAttribute("id");
+		await expect(card).toHaveAttribute("aria-pressed", "true");
+
+		let failPut = true;
+		let recoveredAccountIds: unknown;
+		await page.route("**/v1/safe-spending-settings", async (route) => {
+			if (route.request().method() === "PUT" && failPut) {
+				failPut = false;
+				await route.fulfill({
+					status: 500,
+					contentType: "application/json",
+					body: JSON.stringify({
+						title: "Your changes could not be saved. Try again.",
+					}),
+				});
+				return;
+			}
+			if (route.request().method() === "GET") {
+				const response = await route.fetch();
+				const body = await response.json();
+				recoveredAccountIds = body.settings?.accountIds;
+				await route.fulfill({ response, json: body });
+				return;
+			}
+			await route.continue();
+		});
+
+		await card.click();
+		await expect(card).toHaveAttribute("aria-pressed", "false");
+		await expect(card.getByText("Unsaved", { exact: true })).toBeVisible();
+		const failed = page.waitForResponse(
+			(response) =>
+				new URL(response.url()).pathname === "/v1/safe-spending-settings" &&
+				response.request().method() === "PUT",
+		);
+		await save.click();
+		expect((await failed).status()).toBe(500);
+
+		await expect(drawer).toBeVisible();
+		expect(recoveredAccountIds).toBeNull();
+		await expect(start).toHaveAttribute("id", startId!);
+		await expect(card).toHaveAttribute("aria-pressed", "false");
+		await expect(card.getByText("Unsaved", { exact: true })).toBeVisible();
+		await expect(
+			drawer.getByText(
+				"Changes were not saved. Review the values and try again.",
+			),
+		).toBeVisible();
+		await expect(save).toBeEnabled();
+
+		const retried = page.waitForResponse(
+			(response) =>
+				new URL(response.url()).pathname === "/v1/safe-spending-settings" &&
+				response.request().method() === "PUT",
+		);
+		await save.click();
+		const response = await retried;
+		expect(response.ok()).toBe(true);
+		expect(response.request().postDataJSON()).toMatchObject({ accountIds: [] });
+		await expect(card.getByText("Unsaved", { exact: true })).toHaveCount(0);
+		await expect(save).toBeDisabled();
+	} finally {
+		await api.dispose();
+	}
+});
+
 test("the dated allowance and recorded transactions come from the server", async ({
 	page,
 }) => {
@@ -787,21 +889,45 @@ test("changing included bills refreshes the allowance without changing recorded 
 		const initialAllowance = await card
 			.getByTestId("income-funded")
 			.textContent();
+		let putCount = 0;
+		page.on("request", (request) => {
+			if (
+				new URL(request.url()).pathname === "/v1/safe-spending-settings" &&
+				request.method() === "PUT"
+			)
+				putCount += 1;
+		});
 
 		await card.getByRole("button", { name: "Configure", exact: true }).click();
 		const drawer = page.getByRole("dialog", { name: "Safe spending" });
 		const bill = drawer.getByRole("button", {
 			name: /Synthetic later bill A/,
 		});
+		const save = drawer.getByRole("button", { name: "Save", exact: true });
 		await expect(bill).toHaveAttribute("aria-pressed", "true");
+		await expect(save).toBeDisabled();
+		await bill.click();
+		await expect(bill).toHaveAttribute("aria-pressed", "false");
+		await expect(bill.getByText("Unsaved", { exact: true })).toBeVisible();
+		await expect(save).toBeEnabled();
+		expect(putCount).toBe(0);
+
 		const saved = page.waitForResponse(
 			(response) =>
 				new URL(response.url()).pathname === "/v1/safe-spending-settings" &&
 				response.request().method() === "PUT",
 		);
-		await bill.click();
-		expect((await saved).ok()).toBe(true);
-		await expect(bill).toHaveAttribute("aria-pressed", "false");
+		const refreshed = page.waitForResponse(isSummary);
+		await save.click();
+		const response = await saved;
+		expect(response.ok()).toBe(true);
+		expect(response.request().postDataJSON().transactionIds).not.toContain(
+			"evidence-future-a",
+		);
+		await refreshed;
+		expect(putCount).toBe(1);
+		await expect(bill.getByText("Unsaved", { exact: true })).toHaveCount(0);
+		await expect(save).toBeDisabled();
 		await page.keyboard.press("Escape");
 		await expect(drawer).toBeHidden();
 		await expect(card.getByTestId("income-funded")).not.toHaveText(

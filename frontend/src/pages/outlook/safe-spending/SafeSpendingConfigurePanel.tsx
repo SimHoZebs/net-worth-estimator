@@ -1,53 +1,71 @@
 import { useId, useMemo } from "react";
 import { AccountToggle } from "../../../components/AccountToggle.tsx";
-import { Field, FieldLegend, FieldSet } from "@/components/ui/field.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import {
+	Field,
+	FieldError,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import type { Account, Transaction } from "../../../domain/model.ts";
-import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import type {
 	BillCandidate,
 	SafeSpendingConfigHints,
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { formatRuleDetail, TogglePill } from "./TogglePill.tsx";
-
-const budgetFields = [
-	{ key: "cycleStartDay", label: "Cycle start day", min: 1, max: 31, step: 1 },
-	{ key: "paydayDay", label: "Payday of month", min: 1, max: 31, step: 1 },
-	{
-		key: "savingsTarget",
-		label: "Monthly savings goal ($)",
-		min: 0,
-		step: 0.01,
-	},
-] as const;
+import {
+	SAFE_SPENDING_NUMERIC_FIELDS,
+	type SafeSpendingNumericInputs,
+	type SafeSpendingNumericKey,
+} from "./safeSpendingDraft.ts";
 
 export function SafeSpendingConfigurePanel({
+	formId,
 	config,
+	numericInputs,
+	dirtyNumericFields,
+	dirtyTrackedIds,
+	dirtySpendingIds,
+	dirtyIncomeIds,
+	dirtyBillIds,
 	billCandidates,
 	trackedBillIds,
 	accounts,
 	incomeCandidates,
 	incomeScheduleIds,
+	disabled,
+	saveFailed,
+	onNumericChange,
 	onToggleIncomeSource,
 	onToggleBill,
 	onToggleAccount,
 	onToggleSpendingAccount,
-	onUpdateConfig,
+	onSave,
 }: {
+	formId: string;
 	config: SafeSpendingConfigHints;
+	numericInputs: SafeSpendingNumericInputs;
+	dirtyNumericFields: Record<SafeSpendingNumericKey, boolean>;
+	dirtyTrackedIds: ReadonlySet<string>;
+	dirtySpendingIds: ReadonlySet<string>;
+	dirtyIncomeIds: ReadonlySet<string>;
+	dirtyBillIds: ReadonlySet<string>;
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Account[];
 	incomeCandidates: Transaction[];
 	incomeScheduleIds: string[];
+	disabled: boolean;
+	saveFailed: boolean;
+	onNumericChange: (key: SafeSpendingNumericKey, value: string) => void;
 	onToggleIncomeSource: (id: string) => void;
 	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
-	onUpdateConfig: (next: Partial<SafeSpendingSettings>) => void;
+	onSave: () => Promise<void>;
 }) {
 	const accountsById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
@@ -55,37 +73,47 @@ export function SafeSpendingConfigurePanel({
 	);
 	const fieldId = useId();
 	return (
-		<div className="grid content-start gap-3">
-			<form
-				aria-labelledby={`${fieldId}-budget`}
-				onSubmit={(event) => {
-					event.preventDefault();
-					const fields = new FormData(event.currentTarget);
-					const next: Partial<SafeSpendingSettings> = {};
-					for (const { key } of budgetFields) {
-						const value = Number(fields.get(key));
-						if (value !== config[key]) next[key] = value;
-					}
-					if (Object.keys(next).length) onUpdateConfig(next);
-				}}
-			>
-				<FieldSet>
-					<FieldLegend id={`${fieldId}-budget`} variant="label">
-						Monthly budget
-					</FieldLegend>
-					<p
-						id={`${fieldId}-dates`}
-						className="text-sm leading-relaxed text-muted-foreground"
-					>
-						Days 1–31 · Short months: last day
-					</p>
-					{budgetFields.map(({ key, label, min, step, ...limits }) => {
+		<form
+			id={formId}
+			aria-labelledby={`${fieldId}-budget`}
+			className="grid content-start gap-3"
+			onSubmit={(event) => {
+				event.preventDefault();
+				void onSave();
+			}}
+		>
+			{saveFailed && (
+				<FieldError>
+					Changes were not saved. Review the values and try again.
+				</FieldError>
+			)}
+			<FieldSet>
+				<FieldLegend
+					id={`${fieldId}-budget`}
+					variant="label"
+					className="sr-only"
+				>
+					Budget settings
+				</FieldLegend>
+				{SAFE_SPENDING_NUMERIC_FIELDS.map(
+					({ key, label, min, step, ...limits }) => {
 						const id = `${fieldId}-${key}`;
+						const dirty = dirtyNumericFields[key];
 						return (
 							<Field key={key}>
-								<Label htmlFor={id}>{label}</Label>
+								<div className="flex items-center justify-between gap-2">
+									<Label htmlFor={id}>{label}</Label>
+									{dirty && (
+										<Badge
+											id={`${id}-unsaved`}
+											variant="outline"
+											className="border-warning-border bg-warning-bg text-warning-text"
+										>
+											Unsaved
+										</Badge>
+									)}
+								</div>
 								<Input
-									key={config[key]}
 									id={id}
 									name={key}
 									type="number"
@@ -93,21 +121,19 @@ export function SafeSpendingConfigurePanel({
 									step={step}
 									{...limits}
 									required
-									aria-describedby={`${fieldId}-dates`}
-									defaultValue={config[key]}
+									disabled={disabled}
+									aria-describedby={dirty ? `${id}-unsaved` : undefined}
+									value={numericInputs[key]}
+									onChange={(event) => onNumericChange(key, event.target.value)}
+									className={
+										dirty ? "border-warning-border bg-warning-bg" : undefined
+									}
 								/>
 							</Field>
 						);
-					})}
-					<Button
-						className="justify-self-start self-start"
-						type="submit"
-						variant="outline"
-					>
-						Save monthly budget
-					</Button>
-				</FieldSet>
-			</form>
+					},
+				)}
+			</FieldSet>
 			<FieldSet>
 				<FieldLegend variant="label">{labels.cashAccounts}</FieldLegend>
 				<div className="flex flex-wrap gap-2">
@@ -120,6 +146,8 @@ export function SafeSpendingConfigurePanel({
 								key={account.id}
 								account={full}
 								checked={checked}
+								disabled={disabled}
+								dirty={dirtySpendingIds.has(account.id)}
 								onToggle={() => onToggleSpendingAccount(account.id)}
 							/>
 						);
@@ -138,6 +166,8 @@ export function SafeSpendingConfigurePanel({
 								key={card.id}
 								account={full}
 								checked={checked}
+								disabled={disabled}
+								dirty={dirtyTrackedIds.has(card.id)}
 								onToggle={() => onToggleAccount(card.id)}
 							/>
 						);
@@ -153,6 +183,8 @@ export function SafeSpendingConfigurePanel({
 							name={source.name}
 							detail={formatRuleDetail({ amount: source.amount })}
 							checked={incomeScheduleIds.includes(source.id)}
+							disabled={disabled}
+							dirty={dirtyIncomeIds.has(source.id)}
 							onToggle={() => onToggleIncomeSource(source.id)}
 						/>
 					))}
@@ -166,6 +198,8 @@ export function SafeSpendingConfigurePanel({
 								name={`Unavailable source (${id})`}
 								detail="Remove selection"
 								checked
+								disabled={disabled}
+								dirty={dirtyIncomeIds.has(id)}
 								onToggle={() => onToggleIncomeSource(id)}
 							/>
 						))}
@@ -190,6 +224,8 @@ export function SafeSpendingConfigurePanel({
 										: formatRuleDetail({ amount: bill.amount })
 								}
 								checked={trackedBillIds.includes(bill.id)}
+								disabled={disabled}
+								dirty={dirtyBillIds.has(bill.id)}
 								onToggle={() => onToggleBill(bill.id)}
 							/>
 						))}
@@ -200,6 +236,6 @@ export function SafeSpendingConfigurePanel({
 					</p>
 				)}
 			</FieldSet>
-		</div>
+		</form>
 	);
 }

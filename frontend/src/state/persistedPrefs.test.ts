@@ -20,7 +20,9 @@ import {
 	defaultSafeSpendingSettings,
 	hydrateFinancialPreferences,
 	refreshSafeSpendingSettings,
+	safeSpendingSettingsKey,
 } from "./useSafeSpendingSettings.ts";
+import { serverQueryClient } from "./serverQuery.ts";
 import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../mocks/safeSpendingSettings.ts";
 import { memoryStorage, stubStorage } from "../mocks/storage.ts";
 import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "../mocks/resource.ts";
@@ -165,11 +167,49 @@ describe("unified persisted prefs", () => {
 		const options = published.find(
 			(entry) => entry.id === "safe-spending-settings",
 		);
+		expect(options?.actionProps?.children).toBe("Retry save");
 		(options?.actionProps?.onClick as (() => void) | undefined)?.();
 		await vi.waitFor(() => expect(closed).toContain("safe-spending-settings"));
 		expect(
 			(server.puts.at(-1) as { savingsTarget?: number }).savingsTarget,
 		).toBe(123);
+	});
+
+	it("omits the global retry action when the caller owns its retry path", async () => {
+		server.putErrors.push(new Error("Offline"));
+		await expect(
+			useSafeSpendingSettings
+				.getState()
+				.updateSettings({ savingsTarget: 123 }, { retry: false }),
+		).rejects.toBeInstanceOf(ApiNetworkError);
+		await vi.waitFor(() =>
+			expect(published).toContainEqual(
+				expect.objectContaining({
+					id: "safe-spending-settings",
+					type: "error",
+					description: expect.stringContaining("not saved"),
+				}),
+			),
+		);
+		const options = published.find(
+			(entry) => entry.id === "safe-spending-settings",
+		);
+		expect(options?.actionProps).toBeUndefined();
+	});
+
+	it("restores a successful pre-write snapshot when both the save and recovery read fail", async () => {
+		server.putErrors.push(new Error("Offline"));
+		server.getError = new Error("Recovery offline");
+		await expect(
+			useSafeSpendingSettings
+				.getState()
+				.updateSettings({ savingsTarget: 500 }, { retry: false }),
+		).rejects.toBeInstanceOf(ApiNetworkError);
+
+		expect(useSafeSpendingSettings.getState().savingsTarget).toBe(0);
+		expect(
+			serverQueryClient().getQueryState(safeSpendingSettingsKey())?.status,
+		).toBe("success");
 	});
 
 	it("restores the saved goal before pairing it with a summary after a failed write", async () => {

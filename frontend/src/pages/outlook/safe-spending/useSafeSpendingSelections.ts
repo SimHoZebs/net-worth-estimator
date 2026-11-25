@@ -19,6 +19,60 @@ import {
 import { incomeSourceCandidates } from "@/domain/safeSpendingIncome.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 
+type SafeSpendingSelectionInput = {
+	accounts: Account[];
+	rules: Transaction[];
+	savedRules: Schedule[];
+	settings: SafeSpendingSettings;
+	displayToday: string;
+};
+
+/** Pure resolution shared by persisted evidence and the Configure draft. */
+export function resolveSafeSpendingSelections({
+	accounts,
+	rules,
+	savedRules,
+	settings,
+	displayToday,
+}: SafeSpendingSelectionInput) {
+	const { accountIds, spendingAccountIds, transactionIds, incomeScheduleIds } =
+		settings;
+	const candidateAccounts = visibleAccounts(accounts);
+	const cards = safeSpendingCards(accounts);
+	const cardIds = cards.map(({ id }) => id);
+	const trackedIds = selectedCardIds(accountIds, cardIds);
+	const spendableAccounts = candidateAccounts.filter(
+		(account) => !isLiability(account),
+	);
+	const knownSpendingIds = spendableAccounts.map((account) => account.id);
+	const fallbackId = checkingAccountId(accounts);
+	const fallback =
+		fallbackId && knownSpendingIds.includes(fallbackId) ? [fallbackId] : [];
+	const spendingIds = resolveEffectiveIds(
+		spendingAccountIds,
+		knownSpendingIds,
+		fallback,
+	);
+	const incomeCandidates = incomeSourceCandidates({
+		accounts,
+		rules,
+		spendingIds,
+		incomeScheduleIds,
+		today: displayToday,
+	});
+	const billCandidates = buildBillCandidates(savedRules, spendingIds);
+	const trackedBillIds = effectiveBillIds(transactionIds, billCandidates);
+	return {
+		cards,
+		trackedIds,
+		spendableAccounts,
+		spendingIds,
+		incomeCandidates,
+		billCandidates,
+		trackedBillIds,
+	};
+}
+
 /**
  * The one place that resolves and toggles the four user selections behind
  * safe spending. `null` means automatic for cards, cash accounts and bills;
@@ -32,59 +86,21 @@ export function useSafeSpendingSelections({
 	settings,
 	displayToday,
 	updateSettings,
-}: {
-	accounts: Account[];
-	rules: Transaction[];
-	savedRules: Schedule[];
-	settings: SafeSpendingSettings;
-	displayToday: string;
+}: SafeSpendingSelectionInput & {
 	updateSettings: (next: Partial<SafeSpendingSettings>) => void;
 }) {
-	const { accountIds, spendingAccountIds, transactionIds, incomeScheduleIds } =
-		settings;
-
-	const candidateAccounts = useMemo(
-		() => visibleAccounts(accounts),
-		[accounts],
-	);
-	const cards = useMemo(() => safeSpendingCards(accounts), [accounts]);
-	const cardIds = useMemo(() => cards.map(({ id }) => id), [cards]);
-	const trackedIds = useMemo(
-		() => selectedCardIds(accountIds, cardIds),
-		[accountIds, cardIds],
-	);
-
-	const spendableAccounts = useMemo(
-		() => candidateAccounts.filter((account) => !isLiability(account)),
-		[candidateAccounts],
-	);
-	const spendingIds = useMemo(() => {
-		const knownIds = spendableAccounts.map((account) => account.id);
-		const fallbackId = checkingAccountId(accounts);
-		const fallback =
-			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
-		return resolveEffectiveIds(spendingAccountIds, knownIds, fallback);
-	}, [spendingAccountIds, spendableAccounts, accounts]);
-
-	const incomeCandidates = useMemo(
+	const selections = useMemo(
 		() =>
-			incomeSourceCandidates({
+			resolveSafeSpendingSelections({
 				accounts,
 				rules,
-				spendingIds,
-				incomeScheduleIds,
-				today: displayToday,
+				savedRules,
+				settings,
+				displayToday,
 			}),
-		[accounts, rules, spendingIds, incomeScheduleIds, displayToday],
+		[accounts, rules, savedRules, settings, displayToday],
 	);
-	const billCandidates = useMemo(
-		() => buildBillCandidates(savedRules, spendingIds),
-		[savedRules, spendingIds],
-	);
-	const trackedBillIds = useMemo(
-		() => effectiveBillIds(transactionIds, billCandidates),
-		[transactionIds, billCandidates],
-	);
+	const { trackedIds, spendableAccounts, billCandidates } = selections;
 
 	const toggleAccount = (accountId: string) => {
 		const next = trackedIds.includes(accountId)
@@ -99,7 +115,7 @@ export function useSafeSpendingSelections({
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		updateSettings({
 			spendingAccountIds: toggleEffectiveId(
-				spendingAccountIds,
+				settings.spendingAccountIds,
 				knownIds,
 				accountId,
 				fallback,
@@ -109,7 +125,7 @@ export function useSafeSpendingSelections({
 	const toggleBill = (transactionId: string) =>
 		updateSettings({
 			transactionIds: toggleEffectiveId(
-				transactionIds,
+				settings.transactionIds,
 				billCandidates.map((bill) => bill.id),
 				transactionId,
 			),
@@ -118,19 +134,13 @@ export function useSafeSpendingSelections({
 	// automatic income, so it must not collapse back to the automatic null.
 	const toggleIncomeSource = (id: string) =>
 		updateSettings({
-			incomeScheduleIds: incomeScheduleIds.includes(id)
-				? incomeScheduleIds.filter((item) => item !== id)
-				: [...incomeScheduleIds, id],
+			incomeScheduleIds: settings.incomeScheduleIds.includes(id)
+				? settings.incomeScheduleIds.filter((item) => item !== id)
+				: [...settings.incomeScheduleIds, id],
 		});
 
 	return {
-		cards,
-		trackedIds,
-		spendableAccounts,
-		spendingIds,
-		incomeCandidates,
-		billCandidates,
-		trackedBillIds,
+		...selections,
 		toggleAccount,
 		toggleSpendingAccount,
 		toggleBill,

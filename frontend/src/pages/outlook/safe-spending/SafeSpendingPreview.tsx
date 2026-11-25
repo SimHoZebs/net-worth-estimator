@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
 	Card,
@@ -22,13 +22,8 @@ import {
 } from "@/domain/transactionSort.ts";
 import { useTransferLinks } from "@/state/analyses.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
-import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
-import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
-import {
-	activeCycleCaption,
-	isSafeSpendingTransactionsTab,
-	type SafeSpendingDetailTab,
-} from "./safeSpendingDetailModel.ts";
+import type { SafeSpendingSettings } from "@/api/contracts.ts";
+import type { SafeSpendingDetailTab } from "./safeSpendingDetailModel.ts";
 import { useSafeSpendingSettings } from "@/state/useSafeSpendingSettings.ts";
 import {
 	SAFE_SPENDING_LABELS as labels,
@@ -36,9 +31,9 @@ import {
 } from "./safeSpendingLabels.ts";
 import { useSafeSpendingSummary } from "@/state/useSafeSpendingSummary.ts";
 import { SafeSpendingBudget } from "./SafeSpendingBudget.tsx";
-import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
 import { buildSafeSpendingActivity } from "./safeSpendingActivity.ts";
 import { useSafeSpendingSelections } from "./useSafeSpendingSelections.ts";
+import { SafeSpendingDetail } from "./SafeSpendingDetail.tsx";
 
 function SafeSpendingCardHeader({ action }: { action?: React.ReactNode }) {
 	return (
@@ -71,7 +66,27 @@ export function SafeSpendingPreview({
 	const transactions = useSavedTransactions();
 	const savedRules = useSavedSchedules();
 	const settingsState = useSafeSpendingSettings();
-	const { updateSettings, ...settings } = settingsState;
+	const updateSettings = settingsState.updateSettings;
+	const settings = useMemo<SafeSpendingSettings>(
+		() => ({
+			cycleStartDay: settingsState.cycleStartDay,
+			paydayDay: settingsState.paydayDay,
+			savingsTarget: settingsState.savingsTarget,
+			accountIds: settingsState.accountIds,
+			spendingAccountIds: settingsState.spendingAccountIds,
+			incomeScheduleIds: settingsState.incomeScheduleIds,
+			transactionIds: settingsState.transactionIds,
+		}),
+		[
+			settingsState.cycleStartDay,
+			settingsState.paydayDay,
+			settingsState.savingsTarget,
+			settingsState.accountIds,
+			settingsState.spendingAccountIds,
+			settingsState.incomeScheduleIds,
+			settingsState.transactionIds,
+		],
+	);
 	const summary = useSafeSpendingSummary();
 	const readOnly = useUserReadOnly();
 	const transferLinks = useTransferLinks();
@@ -123,12 +138,6 @@ export function SafeSpendingPreview({
 			transactionOrder,
 		],
 	);
-	const caption = summary.data
-		? activeCycleCaption({
-				start: summary.data.cycleStart,
-				end: summary.data.cycleEnd,
-			})
-		: undefined;
 
 	if (settingsState.error)
 		return (
@@ -191,80 +200,28 @@ export function SafeSpendingPreview({
 				</CardContent>
 			</Card>
 			{detail && (
-				<SafeSpendingDetailShell
+				<SafeSpendingDetail
 					tab={detail}
 					onTabChange={onTabChange}
-					counts={{ transactions: activity?.count }}
-					caption={caption}
 					onClose={() => onDetail(null)}
-				>
-					{isSafeSpendingTransactionsTab(detail) &&
-						(transferLinks.isError ? (
-							<Alert
-								variant="destructive"
-								aria-label="Safe spending transactions"
-							>
-								<AlertTitle>Transactions unavailable</AlertTitle>
-								<AlertDescription>
-									Transactions could not be loaded. The Safe Spending budget is
-									still available.
-								</AlertDescription>
-								<Button
-									variant="link"
-									disabled={transferLinks.isFetching}
-									onClick={() => void transferLinks.refetch()}
-								>
-									Retry transactions
-								</Button>
-							</Alert>
-						) : !activity || !summary.data ? (
-							<div className="grid content-start gap-3" aria-busy="true">
-								<Skeleton className="h-32 w-full" />
-								<p role="status" className="m-0 text-sm text-muted-foreground">
-									Loading transactions…
-								</p>
-							</div>
-						) : (
-							<SafeSpendingCyclePanel
-								key={detail}
-								activity={activity}
-								summary={summary.data}
-								accounts={accounts ?? []}
-								transactions={savedRows}
-								readOnly={readOnly}
-								transactionOrder={transactionOrder}
-								onTransactionOrderChange={setTransactionOrder}
-							/>
-						))}
-					{detail === "configure" && (
-						<SafeSpendingConfigurePanel
-							config={{
-								cycleStartDay: settings.cycleStartDay,
-								paydayDay: settings.paydayDay,
-								savingsTarget: settings.savingsTarget,
-								cards: selections.cards.map((account) => ({
-									id: account.id,
-									name: account.name,
-								})),
-								trackedIds: selections.trackedIds,
-								spendingAccounts: selections.spendableAccounts.map(
-									(account) => ({ id: account.id, name: account.name }),
-								),
-								trackedSpendingIds: selections.spendingIds,
-							}}
-							billCandidates={selections.billCandidates}
-							trackedBillIds={selections.trackedBillIds}
-							accounts={accounts ?? []}
-							incomeCandidates={selections.incomeCandidates}
-							incomeScheduleIds={settings.incomeScheduleIds}
-							onToggleIncomeSource={selections.toggleIncomeSource}
-							onToggleBill={selections.toggleBill}
-							onToggleAccount={selections.toggleAccount}
-							onToggleSpendingAccount={selections.toggleSpendingAccount}
-							onUpdateConfig={updateSettings}
-						/>
-					)}
-				</SafeSpendingDetailShell>
+					settings={settings}
+					settingsReady={!settingsState.pending && !settingsState.error}
+					settingsMutating={settingsState.mutating}
+					settingsRevision={settingsState.revision}
+					updateSettings={updateSettings}
+					accounts={accounts ?? []}
+					rules={rules}
+					savedRules={savedRules ?? []}
+					transactions={savedRows}
+					summary={summary.data}
+					activity={activity}
+					transferLinksError={transferLinks.isError}
+					transferLinksFetching={transferLinks.isFetching}
+					onRetryTransferLinks={() => void transferLinks.refetch()}
+					readOnly={readOnly}
+					transactionOrder={transactionOrder}
+					onTransactionOrderChange={setTransactionOrder}
+				/>
 			)}
 		</>
 	);
