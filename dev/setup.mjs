@@ -6,6 +6,7 @@ import {
   envFileFor,
   loadConfig,
   originProfile,
+  parseLoopbackPort,
   portsFor,
   projectFor,
   saveConfig,
@@ -18,9 +19,10 @@ import {
 import { checkServe, nodeHostname } from "./tailnet.mjs";
 import { devOptions } from "./lib/args.mjs";
 import { compose, composeCommandFor } from "./lib/compose.mjs";
+import { rejectCheckPort } from "./lib/validate.mjs";
 import { runIfCli } from "./lib/entry.mjs";
 import { exists, root, run as runCommand } from "./lib/shell.mjs";
-import { pickFreePorts, usedSlotPorts, writeOwner } from "./lib/slots.mjs";
+import { pickFreePorts, portIsAvailable, usedSlotPorts, writeOwner } from "./lib/slots.mjs";
 import { snapshot } from "./lib/snapshot.mjs";
 
 const canonicalStateDir = stateDirFor(root, "");
@@ -32,6 +34,7 @@ export function parseSetupArgs(args) {
 export function validateSetup(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   const slot = slotFromOptions(values);
+  rejectCheckPort(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
   if (values.pack !== undefined) throw new Error("--pack applies only to demo.");
@@ -71,10 +74,7 @@ export async function resolveSetupScope(values) {
     const used = await usedSlotPorts(slot);
     const parsePort = (raw, name) => {
       if (raw === undefined) return undefined;
-      const port = Number(raw);
-      if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-        throw new Error(`${name} must be a loopback port from 1024 to 65535`);
-      }
+      const port = parseLoopbackPort(raw, name);
       if (used.has(port)) throw new Error(`${name} ${port} is already used by another dev stack`);
       return port;
     };
@@ -93,6 +93,13 @@ export async function resolveSetupScope(values) {
       if (backendPort === undefined) backendPort = free[cursor++];
     }
     if (appPort === authPort) throw new Error("App and auth slot ports must differ");
+    const selectedPorts = [...new Set([appPort, authPort, backendPort])];
+    const availability = await Promise.all(selectedPorts.map((port) => portIsAvailable(port)));
+    const occupied = selectedPorts.filter((port, index) => !availability[index]);
+    if (occupied.length > 0)
+      throw new Error(
+        `Port ${occupied.join(", ")} is already in use on a loopback address. Choose different slot ports.`,
+      );
     slotOptions = { slot, appPort, authPort, backendPort };
     // Clone the canonical database when the slot has no explicit source.
     if (!source) {

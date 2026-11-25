@@ -5,6 +5,7 @@ import { runRefreshCommand } from "./lib/refresh.mjs";
 import {
   checkSlot,
   rejectBulkClearExceptSeed,
+  rejectCheckPort,
   rejectPackExceptDemo,
   rejectPortsAfterCreation,
   rejectPositionals,
@@ -18,6 +19,7 @@ export function parsePublishArgs(args) {
 export function validatePublish(values, positionals = []) {
   rejectPositionals(positionals);
   checkSlot(values);
+  rejectCheckPort(values);
   rejectBulkClearExceptSeed(values);
   rejectPackExceptDemo(values);
   rejectTailnet(values);

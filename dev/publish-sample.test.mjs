@@ -8,6 +8,7 @@ test("publication explicitly selects reviewed source and the provisioned guest d
     /only to seed/,
   );
   assert.throws(() => validatePublish({ pack: "safe-spending" }), /only to demo/);
+  assert.throws(() => validatePublish({ port: "8765" }), /applies only to check/);
   assert.throws(() => validatePublish({}), /source-user/);
   assert.throws(
     () => validatePublish({ "source-user": "users/source" }),

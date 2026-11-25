@@ -34,7 +34,7 @@ export function slotFromOptions(values) {
   return sanitizeSlot(values?.slot ?? process.env.DEV_SLOT ?? "");
 }
 
-function validPort(value, name) {
+export function parseLoopbackPort(value, name) {
   const port = typeof value === "string" && value !== "" ? Number(value) : value;
   if (!Number.isInteger(port) || port < 1024 || port > 65535) {
     throw new Error(`${name} must be a loopback port from 1024 to 65535`);
@@ -67,8 +67,8 @@ export function originProfile(appUrl, issuerUrl) {
   if (isLoopbackOrigin(appUrl) && isLoopbackOrigin(issuerUrl)) {
     const appPort = Number(new URL(appUrl).port);
     const issuerPort = Number(new URL(issuerUrl).port);
-    validPort(appPort, "App port");
-    validPort(issuerPort, "Auth port");
+    parseLoopbackPort(appPort, "App port");
+    parseLoopbackPort(issuerPort, "Auth port");
     if (appPort === issuerPort) throw new Error("App and auth loopback ports must differ");
     return null;
   }
@@ -93,11 +93,11 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
   }
   const app = hostname
     ? tailnetOrigins(hostname).APP_PUBLIC_URL
-    : `http://localhost:${validPort(appPort, "App port")}`;
+    : `http://localhost:${parseLoopbackPort(appPort, "App port")}`;
   const issuer = hostname
     ? tailnetOrigins(hostname).AUTH_PUBLIC_URL
-    : `http://localhost:${validPort(authPort, "Auth port")}`;
-  validPort(backendPort, "Backend port");
+    : `http://localhost:${parseLoopbackPort(authPort, "Auth port")}`;
+  parseLoopbackPort(backendPort, "Backend port");
   if (!hostname && app === issuer) throw new Error("App and auth loopback ports must differ");
   return {
     version: 3,
@@ -159,9 +159,9 @@ export function settings(config) {
   if (typeof config.ports !== "object" || config.ports === null) {
     throw new Error("Dev ports must map app, auth, and backend to loopback ports");
   }
-  const app = validPort(config.ports.app, "App port");
-  const auth = validPort(config.ports.auth, "Auth port");
-  validPort(config.ports.backend, "Backend port");
+  const app = parseLoopbackPort(config.ports.app, "App port");
+  const auth = parseLoopbackPort(config.ports.auth, "Auth port");
+  parseLoopbackPort(config.ports.backend, "Backend port");
   if (app === auth) throw new Error("App and auth loopback ports must differ");
   if (config.slot) {
     const parsedApp = isLoopbackOrigin(result.appUrl) ? Number(new URL(result.appUrl).port) : null;
@@ -177,9 +177,9 @@ export function settings(config) {
 
 export function portsFor(config) {
   return {
-    app: validPort(config.ports.app, "App port"),
-    auth: validPort(config.ports.auth, "Auth port"),
-    backend: validPort(config.ports.backend, "Backend port"),
+    app: parseLoopbackPort(config.ports.app, "App port"),
+    auth: parseLoopbackPort(config.ports.auth, "Auth port"),
+    backend: parseLoopbackPort(config.ports.backend, "Backend port"),
   };
 }
 

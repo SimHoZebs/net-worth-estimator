@@ -63,7 +63,15 @@ One shared application database holds every private user, the published guest sc
 
 ## Run from source
 
-For low-level source debugging, run the API and Vite separately; normal manual testing uses the dev stack above, and both frontends cannot use port 5178 at the same time. Copy a database backup to the dev database path while the server is stopped; `tmp/` is gitignored and survives reboot.
+For low-level source debugging, run the API and Vite separately; normal manual testing uses the dev stack above, and both frontends cannot use port 5178 at the same time. Before starting an ad hoc server, preflight every port it will bind. `check` rejects loopback ports that are already listening or reserved by a dev slot; `ps-all` shows the registered stacks.
+
+```bash
+./scripts/dev ps-all
+./scripts/dev check --port 8765
+./scripts/dev check --port 8787
+```
+
+Copy a database backup to the dev database path while the server is stopped; `tmp/` is gitignored and survives reboot.
 
 ```bash
 # terminal 1
@@ -73,10 +81,10 @@ CGO_ENABLED=0 go -C backend run ./cmd/server
 
 # terminal 2
 bun install --frozen-lockfile
-bun --filter ./frontend dev
+bun --filter ./frontend dev --port 8765
 ```
 
-The Vite server runs on http://localhost:5178 and proxies `/v1` to `127.0.0.1:8787`.
+The Vite server runs on http://localhost:8765 and proxies `/v1` to `127.0.0.1:8787`.
 
 ## Verification
 

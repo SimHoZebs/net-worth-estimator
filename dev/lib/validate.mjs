@@ -18,6 +18,10 @@ export function rejectTailnet(values, message = "--tailnet applies only to setup
   if (values.tailnet) throw new Error(message);
 }
 
+export function rejectCheckPort(values) {
+  if (values.port !== undefined) throw new Error("--port applies only to check.");
+}
+
 export function rejectPortsAfterCreation(values) {
   if (
     values["app-port"] !== undefined ||

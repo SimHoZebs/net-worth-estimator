@@ -1,11 +1,12 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { createServer } from "node:net";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { devOptions } from "./lib/args.mjs";
 import { runIfCli } from "./lib/entry.mjs";
+import { rejectCheckPort } from "./lib/validate.mjs";
 import { root } from "./lib/shell.mjs";
+import { pickFreePorts, usedSlotPorts } from "./lib/slots.mjs";
 
 const DEFAULT_PACK = "safe-spending";
 
@@ -26,6 +27,7 @@ function anchorFor(packPath) {
 }
 
 export function validateDemo(values, positionals = []) {
+  rejectCheckPort(values);
   if (positionals.length > 0)
     throw new Error("Unexpected demo arguments. Use scripts/dev --help.");
   for (const key of [
@@ -51,21 +53,13 @@ export function validateDemo(values, positionals = []) {
   return { pack, anchor: anchorFor(packPath) };
 }
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close(() => resolve(address.port));
-    });
-  });
+export async function allocateDemoPorts() {
+  return pickFreePorts(2, [...(await usedSlotPorts())]);
 }
 
 export async function run(values, positionals) {
   const { pack, anchor } = validateDemo(values, positionals);
-  const [frontendPort, apiPort] = await Promise.all([freePort(), freePort()]);
+  const [frontendPort, apiPort] = await allocateDemoPorts();
   const env = {
     ...process.env,
     TEST_FRONTEND_PORT: String(frontendPort),

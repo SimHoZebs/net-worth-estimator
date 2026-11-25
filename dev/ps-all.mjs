@@ -6,6 +6,7 @@ import { devOptions } from "./lib/args.mjs";
 import { composeCommandFor } from "./lib/compose.mjs";
 import { runIfCli } from "./lib/entry.mjs";
 import { exists, root } from "./lib/shell.mjs";
+import { rejectCheckPort } from "./lib/validate.mjs";
 import { readOwner } from "./lib/slots.mjs";
 
 export function parseStatusArgs(args) {
@@ -14,6 +15,7 @@ export function parseStatusArgs(args) {
 
 export function validateStatus(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
+  rejectCheckPort(values);
   if (values.slot || values.from || values.user || values["source-user"]) {
     throw new Error("ps-all takes no scope options. Run it bare to list every dev stack.");
   }

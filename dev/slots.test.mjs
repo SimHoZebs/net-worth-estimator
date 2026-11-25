@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -15,7 +15,7 @@ import {
   stateDirFor,
 } from "./config.mjs";
 import { composeArgs, composeCommandFor } from "./lib/compose.mjs";
-import { pickFreePorts } from "./lib/slots.mjs";
+import { pickFreePorts, usedSlotPorts } from "./lib/slots.mjs";
 import { validateSetup } from "./setup.mjs";
 import { validateStatus } from "./ps-all.mjs";
 
@@ -75,6 +75,7 @@ test("slot compose args isolate the project without touching the canonical defau
 test("ps-all and slot options validate before any service operation", () => {
   assert.doesNotThrow(() => validateStatus({}, []));
   assert.throws(() => validateStatus({ slot: "shots" }, []), /bare/);
+  assert.throws(() => validateStatus({ port: "8765" }, []), /applies only to check/);
   assert.doesNotThrow(() => validateSetup({ slot: "shots", "source-user": "users/owner" }, []));
   assert.throws(() => validateSetup({ slot: "Bad Name" }, []), /Slot names/);
 });
@@ -113,6 +114,24 @@ test("free port picker returns distinct loopback ports", async () => {
   for (const port of ports) {
     assert.ok(Number.isInteger(port) && port >= 1024 && port <= 65535);
     assert.ok(![5178, 8000, 8788].includes(port));
+  }
+});
+
+test("slot reservations include saved config before an owner record exists", async () => {
+  const dir = await mkdtemp(resolve(tmpdir(), "waypoint-dev-config-slot-"));
+  try {
+    const stateDir = resolve(dir, "tmp/dev-shots");
+    await mkdir(stateDir, { recursive: true });
+    await writeFile(
+      resolve(stateDir, "config.json"),
+      JSON.stringify({ slot: "shots", ports: { app: 5183, auth: 8103, backend: 8891 } }),
+    );
+    const used = await usedSlotPorts("", dir);
+    assert.ok(used.has(5183));
+    assert.ok(used.has(8103));
+    assert.ok(used.has(8891));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 

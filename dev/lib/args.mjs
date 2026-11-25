@@ -13,6 +13,7 @@ export const devOptions = {
   "app-port": { type: "string" },
   "auth-port": { type: "string" },
   "backend-port": { type: "string" },
+  port: { type: "string" },
   tailnet: { type: "boolean" },
   help: { type: "boolean", short: "h" },
 };

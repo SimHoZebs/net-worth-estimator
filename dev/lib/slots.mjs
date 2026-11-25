@@ -15,13 +15,36 @@ function freePort() {
   });
 }
 
+function probeLoopbackPort(port, host) {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.unref();
+    server.once("error", (error) => {
+      if (error.code === "EADDRINUSE") resolve(false);
+      else if (error.code === "EAFNOSUPPORT" || error.code === "EADDRNOTAVAIL") resolve(true);
+      else reject(error);
+    });
+    server.listen(port, host, () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+export async function portIsAvailable(port) {
+  const [ipv4, ipv6] = await Promise.all([
+    probeLoopbackPort(port, "127.0.0.1"),
+    probeLoopbackPort(port, "::1"),
+  ]);
+  return ipv4 && ipv6;
+}
+
 export async function pickFreePorts(count, used = []) {
   const taken = new Set(used);
   const ports = [];
   for (let i = 0; i < count; i++) {
     for (let attempt = 0; attempt < 20; attempt++) {
       const port = await freePort();
-      if (port < 1024 || taken.has(port)) continue;
+      if (port < 1024 || taken.has(port) || !(await portIsAvailable(port))) continue;
       taken.add(port);
       ports.push(port);
       break;
@@ -47,11 +70,11 @@ export async function writeOwner(stateDir, owner) {
   });
 }
 
-export async function usedSlotPorts(excludeSlot = "") {
+export async function usedSlotPorts(excludeSlot = "", repoRoot = root) {
   const used = new Set([defaultPorts.app, defaultPorts.auth, defaultPorts.backend]);
   let tmpEntries = [];
   try {
-    tmpEntries = await readdir(resolve(root, "tmp"));
+    tmpEntries = await readdir(resolve(repoRoot, "tmp"));
   } catch {
     return used;
   }
@@ -60,27 +83,40 @@ export async function usedSlotPorts(excludeSlot = "") {
     if (name !== "dev" && !name.startsWith("dev-")) continue;
     let isDir = false;
     try {
-      isDir = (await stat(resolve(root, "tmp", name))).isDirectory();
+      isDir = (await stat(resolve(repoRoot, "tmp", name))).isDirectory();
     } catch {
       continue;
     }
     if (!isDir) continue;
     const slotName = name === "dev" ? "" : name.slice(4);
     if (slotName === sanitizeSlot(excludeSlot)) continue;
-    const owner = await readOwner(resolve(root, `tmp/${name}`));
-    if (!owner) continue;
-    for (const url of [owner.appUrl, owner.authUrl]) {
-      if (typeof url !== "string") continue;
-      try {
-        const port = Number(new URL(url).port);
-        if (Number.isInteger(port) && port > 0) used.add(port);
-      } catch {}
-    }
-    if (owner.ports && typeof owner.ports === "object") {
-      for (const p of Object.values(owner.ports)) {
-        const port = Number(p);
-        if (Number.isInteger(port) && port > 0) used.add(port);
+    const stateDir = resolve(repoRoot, `tmp/${name}`);
+    const owner = await readOwner(stateDir);
+    if (owner) {
+      for (const url of [owner.appUrl, owner.authUrl]) {
+        if (typeof url !== "string") continue;
+        try {
+          const port = Number(new URL(url).port);
+          if (Number.isInteger(port) && port > 0) used.add(port);
+        } catch {}
       }
+      if (owner.ports && typeof owner.ports === "object") {
+        for (const p of Object.values(owner.ports)) {
+          const port = Number(p);
+          if (Number.isInteger(port) && port > 0) used.add(port);
+        }
+      }
+    }
+    try {
+      const config = JSON.parse(await readFile(resolve(stateDir, "config.json"), "utf8"));
+      if (config.ports && typeof config.ports === "object") {
+        for (const p of Object.values(config.ports)) {
+          const port = Number(p);
+          if (Number.isInteger(port) && port > 0) used.add(port);
+        }
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
     }
   }
   return used;

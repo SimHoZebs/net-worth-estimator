@@ -11,6 +11,7 @@ import {
 import { databaseName, snapshotFile, validateSnapshot } from "./database.mjs";
 import { devOptions } from "./lib/args.mjs";
 import { compose } from "./lib/compose.mjs";
+import { rejectCheckPort } from "./lib/validate.mjs";
 import { runIfCli } from "./lib/entry.mjs";
 import { exists, root, run as runCommand } from "./lib/shell.mjs";
 
@@ -21,6 +22,7 @@ export function parseSeedArgs(args) {
 export function validateSeed(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   slotFromOptions(values);
+  rejectCheckPort(values);
   if (values.tailnet) throw new Error("--tailnet applies only to setup");
   if (values.pack !== undefined)
     throw new Error("--pack applies only to demo.");
