@@ -12,6 +12,7 @@ let published: {
 	type?: unknown;
 	description?: unknown;
 	priority?: unknown;
+	timeout?: number;
 	actionProps?: {
 		children?: unknown;
 		onClick?: unknown;
@@ -77,6 +78,7 @@ describe("notification policy", () => {
 				type: "error",
 				description: "Load failed.",
 				priority: "high",
+				timeout: 5_000,
 			}),
 		);
 	});
@@ -89,16 +91,18 @@ describe("notification policy", () => {
 				type: "success",
 				description: "Changes saved.",
 				priority: "low",
+				timeout: 5_000,
 			}),
 		);
 	});
 
-	it("replaces the toast for a repeated key instead of stacking", () => {
+	it("replaces the toast and timeout for a repeated key instead of stacking", () => {
 		notifyError("workspace", "First.");
-		notifyError("workspace", "Second.");
-		expect(
-			published.filter((options) => options.id === "workspace"),
-		).toHaveLength(2);
+		notifyError("workspace", "Retry.", { label: "Retry", onAction: vi.fn() });
+		notifyError("workspace", "Third.");
+		const options = published.filter((entry) => entry.id === "workspace");
+		expect(options).toHaveLength(3);
+		expect(options.map((entry) => entry.timeout)).toEqual([5_000, 0, 5_000]);
 		expect(closed).not.toContain("workspace");
 	});
 
@@ -112,6 +116,7 @@ describe("notification policy", () => {
 			onDismiss,
 		);
 		const options = optionsFor("workspace");
+		expect(options?.timeout).toBe(0);
 		expect(options?.actionProps).toMatchObject({ children: "Retry" });
 		clickAction("workspace");
 		expect(onAction).toHaveBeenCalledTimes(1);
@@ -158,6 +163,7 @@ describe("notification policy", () => {
 			}),
 		});
 		expect(updated[0]?.updates).not.toHaveProperty("description");
+		expect(updated[0]?.updates).not.toHaveProperty("timeout");
 		finish();
 		await settle();
 	});
@@ -208,6 +214,7 @@ describe("notification policy", () => {
 			id: "workspace",
 			type: "error",
 			description: "Still offline.",
+			timeout: 0,
 		});
 		expect(published[1]?.actionProps?.onClick).toBeTypeOf("function");
 	});

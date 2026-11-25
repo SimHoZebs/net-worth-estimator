@@ -1,15 +1,17 @@
 import type { CDPSession } from "@playwright/test";
-import { expect, test, type Page } from "./base.ts";
+import { expect, test, type Locator, type Page } from "./base.ts";
 
 async function swipe(
 	cdp: CDPSession,
 	from: { x: number; y: number },
 	to: { x: number; y: number },
+	afterStart?: () => Promise<void>,
 ) {
 	await cdp.send("Input.dispatchTouchEvent", {
 		type: "touchStart",
 		touchPoints: [from],
 	});
+	await afterStart?.();
 	for (let step = 1; step <= 12; step++) {
 		await cdp.send("Input.dispatchTouchEvent", {
 			type: "touchMove",
@@ -40,6 +42,60 @@ async function mobilePage(page: Page) {
 	return cdp;
 }
 
+async function savedTransactionToast(page: Page) {
+	await page.getByRole("button", { name: "Add transaction" }).first().click();
+	const editor = page.locator(
+		'[data-slot="dialog-content"][data-full-screen-mobile]',
+	);
+	await expect(editor).toBeVisible();
+	await editor.getByLabel("Transaction name").fill("Toast swipe transaction");
+	await editor.getByLabel("Amount").fill("42");
+	await editor.getByRole("combobox", { name: "To", exact: true }).click();
+	await page.getByRole("option", { name: "Everyday checking" }).click();
+	const saved = page.waitForResponse(
+		(response) =>
+			response.url().includes("/v1/transactions") &&
+			response.request().method() === "POST",
+	);
+	await editor.getByRole("button", { name: "Add transaction" }).click();
+	expect([200, 201]).toContain((await saved).status());
+	await expect(editor).toBeHidden();
+	const toast = page
+		.locator('[data-slot="toast"]')
+		.filter({ hasText: "Changes saved." });
+	await expect(toast).toBeVisible();
+	return toast;
+}
+
+async function toastSwipeStart(page: Page, toast: Locator) {
+	await toast.evaluate(async (element) => {
+		await Promise.all(
+			element
+				.getAnimations({ subtree: true })
+				.map((animation) => animation.finished.catch(() => {})),
+		);
+	});
+	const description = toast.locator('[data-slot="toast-description"]');
+	const box = await description.boundingBox();
+	expect(box).not.toBeNull();
+	const from = { x: box!.x + 12, y: box!.y + box!.height / 2 };
+	const hit = await page.evaluate(
+		({ x, y }) => ({
+			insideToast: Boolean(
+				document.elementFromPoint(x, y)?.closest('[data-slot="toast"]'),
+			),
+			interactive: Boolean(
+				document
+					.elementFromPoint(x, y)
+					?.closest('button,a,input,textarea,[role="button"]'),
+			),
+		}),
+		from,
+	);
+	expect(hit).toEqual({ insideToast: true, interactive: false });
+	return from;
+}
+
 test("rightward mobile swipe opens larger navigation and a link dismisses it", async ({
 	page,
 }) => {
@@ -63,6 +119,40 @@ test("rightward mobile swipe opens larger navigation and a link dismisses it", a
 	await expect(sidebar).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(sidebar).toBeHidden();
+});
+
+test("a rightward swipe starting on a visible toast opens mobile navigation", async ({
+	page,
+}) => {
+	const cdp = await mobilePage(page);
+	const toast = await savedTransactionToast(page);
+	const from = await toastSwipeStart(page, toast);
+	await swipe(
+		cdp,
+		from,
+		{ x: Math.min(from.x + 220, 380), y: from.y + 5 },
+		async () => {
+			await expect(toast).toBeVisible();
+		},
+	);
+	await expect(
+		page.getByRole("dialog", { name: "Sidebar", exact: true }),
+	).toBeVisible();
+});
+
+test("a rightward swipe dismisses a toast on desktop", async ({ page }) => {
+	const cdp = await mobilePage(page);
+	await page.setViewportSize({ width: 1440, height: 1080 });
+	await expect(
+		page.getByRole("link", { name: "Accounts", exact: true }),
+	).toBeVisible();
+	const toast = await savedTransactionToast(page);
+	const from = await toastSwipeStart(page, toast);
+	await swipe(cdp, from, {
+		x: Math.min(from.x + 220, 1420),
+		y: from.y + 5,
+	});
+	await expect(toast).toBeHidden();
 });
 
 test("native horizontal scrolling owns the entire swipe even when it reaches its edge", async ({

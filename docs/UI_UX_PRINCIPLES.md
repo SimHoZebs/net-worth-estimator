@@ -375,8 +375,9 @@ Everything else goes:
 Error messages, read-only locks, destructive-action confirmations, and empty states with no guiding action are not hints; they are state and remain.
 
 Errors and confirmations float in the bottom-right notification stack instead
-of displacing content: one toast per failure with its retry action, dismissed
-manually, cleared on user-scope change. Only errors that gate an open native dialog
+of displacing content. Non-action errors and confirmations dismiss after five
+seconds. Errors with retry actions remain until dismissed manually, resolved,
+or cleared on user-scope change. Only errors that gate an open native dialog
 stay inline inside it, where the top layer would hide a toast.
 
 ## Core Principle

@@ -13,6 +13,8 @@ interface ActiveRun {
 	startGeneration: number;
 }
 
+const AUTO_DISMISS_TIMEOUT_MS = 5_000;
+
 const generations = new Map<string, number>();
 const active = new Map<string, ActiveRun>();
 
@@ -77,8 +79,9 @@ async function runToastAction(
  * single notification system: stacking, manual/swipe dismissal, and
  * announcement urgency. Stable keys upsert in place through the manager id,
  * so repeats replace rather than stack. Identity-scope changes close every
- * toast. NotificationCenter disables automatic dismissal so retry actions
- * remain available until dismissal, recovery, or identity-scope change.
+ * toast. Non-action errors and successes auto-dismiss after five seconds.
+ * NotificationCenter disables automatic dismissal globally so errors with retry
+ * actions remain available until dismissal, recovery, or identity-scope change.
  */
 export function notifyError(
 	key: string,
@@ -93,6 +96,7 @@ export function notifyError(
 		type: "error",
 		description: message,
 		priority: "high",
+		timeout: action ? 0 : AUTO_DISMISS_TIMEOUT_MS,
 		...(action
 			? {
 					actionProps: {
@@ -125,6 +129,7 @@ export function notifySuccess(
 		type: "success",
 		description: message,
 		priority: "low",
+		timeout: AUTO_DISMISS_TIMEOUT_MS,
 		...(onDismiss ? { onClose: onDismiss } : {}),
 	});
 }

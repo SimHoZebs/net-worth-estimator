@@ -6,8 +6,9 @@ const MIN_SWIPE_DISTANCE = 64;
 const DIRECTION_RATIO = 1.5;
 const SCROLL_SLOP = 1;
 const IGNORE_SELECTOR = 'input[type="range"], [data-swipe-ignore]';
+// Non-modal dialog surfaces such as toasts explicitly set aria-modal=false.
 const MODAL_SELECTOR =
-	'[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open]';
+	'[role="dialog"]:not([aria-modal="false"]), [role="alertdialog"]:not([aria-modal="false"]), [aria-modal="true"], dialog[open]';
 
 type ScrollOwner = {
 	element: Element;

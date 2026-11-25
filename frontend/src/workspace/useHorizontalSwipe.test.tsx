@@ -301,6 +301,22 @@ describe("useHorizontalSwipe", () => {
 		expect(onSwipeRight).toHaveBeenCalledOnce();
 	});
 
+	it.each(["dialog", "alertdialog"])(
+		"allows a gesture over a non-modal %s",
+		(role) => {
+			const onSwipeRight = vi.fn();
+			renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+			const surface = document.createElement("div");
+			surface.setAttribute("role", role);
+			surface.setAttribute("aria-modal", "false");
+			const element = document.createElement("div");
+			surface.append(element);
+			container.append(surface);
+			gesture(element);
+			expect(onSwipeRight).toHaveBeenCalledOnce();
+		},
+	);
+
 	it("suppresses opening while a native dialog is open", () => {
 		const onSwipeRight = vi.fn();
 		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
