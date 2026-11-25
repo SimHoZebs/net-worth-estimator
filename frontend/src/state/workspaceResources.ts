@@ -179,7 +179,6 @@ export function useServerStatus(options: { enabled?: boolean } = {}) {
 	return useQuery(
 		{
 			...statusOptions(scope),
-			refetchOnMount: "always",
 			enabled: options.enabled ?? false,
 		},
 		serverQueryClient(),
@@ -190,7 +189,6 @@ export function useAmountPresets(options: { enabled?: boolean } = {}) {
 	return useQuery(
 		{
 			...presetsOptions(scope),
-			refetchOnMount: "always",
 			enabled: options.enabled ?? false,
 		},
 		serverQueryClient(),
@@ -427,7 +425,6 @@ export function useAccountBalances(options: { asOf?: string } = {}) {
 	return useQuery(
 		{
 			...balancesOptions(scope, options.asOf),
-			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -474,7 +471,6 @@ export function useTransactions(filters: { accountId?: string } = {}) {
 	return useQuery(
 		{
 			...transactionsOptions(scope, filters),
-			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -486,7 +482,6 @@ export function useSchedules(filters: { accountId?: string } = {}) {
 	return useQuery(
 		{
 			...schedulesOptions(scope, filters),
-			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -498,7 +493,6 @@ export function usePlannedPurchases(options: { enabled?: boolean } = {}) {
 	return useQuery(
 		{
 			...purchasesOptions(scope),
-			refetchOnMount: "always",
 			enabled: options.enabled ?? scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -510,7 +504,6 @@ export function useTransactionCatalog() {
 	return useQuery(
 		{
 			...catalogOptions(scope),
-			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -522,7 +515,6 @@ export function usePaymentTerms(options: { enabled?: boolean } = {}) {
 	return useQuery(
 		{
 			...paymentTermsOptions(scope),
-			refetchOnMount: "always",
 			enabled: options.enabled ?? scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -643,7 +635,6 @@ export function useCheckpoints(filters: ListCheckpointsParams = {}) {
 	return useQuery(
 		{
 			...checkpointsOptions(scope, filters),
-			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
 		serverQueryClient(),
@@ -670,7 +661,6 @@ export function useEvaluationSummary() {
 	return useQuery(
 		{
 			...evalSummaryOptions(scope),
-			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
 		serverQueryClient(),

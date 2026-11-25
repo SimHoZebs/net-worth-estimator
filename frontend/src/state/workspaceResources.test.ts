@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
 import {
@@ -11,6 +12,7 @@ import {
 	reloadWorkspace,
 	resolversOptions,
 	statusOptions,
+	useAccountBalances,
 	userResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
@@ -29,6 +31,23 @@ afterEach(() => {
 });
 
 describe("direct Query ownership", () => {
+	it("does not refetch cached workspace data on remount", async () => {
+		const server = stubTestServer();
+		server.setRevision("current");
+		const mounted = renderHook(() => useAccountBalances());
+		await waitFor(() =>
+			expect(mounted.result.current.data?.revision).toBe("current"),
+		);
+		expect(server.fetcher).toHaveBeenCalledOnce();
+		mounted.unmount();
+
+		const remounted = renderHook(() => useAccountBalances());
+		expect(remounted.result.current.data?.revision).toBe("current");
+		expect(remounted.result.current.isFetching).toBe(false);
+		expect(server.fetcher).toHaveBeenCalledOnce();
+		remounted.unmount();
+	});
+
 	it("deduplicates and caches resolver discovery through the generated client", async () => {
 		const server = stubTestServer();
 		const data = {
