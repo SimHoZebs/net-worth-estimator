@@ -17,9 +17,14 @@ type CategoryStore interface {
 	// SetInferredTransactionCategory stores one classifier result. It never
 	// replaces a bank or user assignment.
 	SetInferredTransactionCategory(transactionID, category, producer string) error
-	// ListTransactionCategoryCandidates returns bank transactions with no assignment,
-	// newest first, so a classifier can fill them without blocking sync.
+	// ListTransactionCategoryCandidates returns eligible bank transactions in
+	// keyset order from the durable per-user cursor, wrapping to the head once
+	// when the scan reaches the end. Terminal evaluations and deferred evaluations
+	// before their next attempt are excluded.
 	ListTransactionCategoryCandidates(limit int) ([]types.TransactionCategoryCandidate, error)
+	// RecordTransactionCategoryBatch publishes classifications and advances the
+	// scan cursor atomically. The store re-reads evidence and skips stale results.
+	RecordTransactionCategoryBatch(batch types.TransactionCategoryBatch) error
 	// ListCategoryFeedback returns journal rows in sequence order with stable
 	// zero-padded string IDs. after names the last delivered item ID
 	// (empty for the head); rows at or below it are excluded. The source,

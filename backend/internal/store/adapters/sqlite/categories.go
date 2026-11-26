@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -43,28 +42,71 @@ func (d *Database) ListCategoryUsers() ([]string, error) {
 	return users, rows.Err()
 }
 
-func ensureCategorySchema(tx *userTx) error {
+func categorySchemaReady(db queryer) (bool, error) {
+	args := make([]any, 0, len(categorySchemaTableNames)+len(categoryTriggerNames)+len(categorySchemaIndexNames))
+	for _, names := range [][]string{categorySchemaTableNames, categoryTriggerNames, categorySchemaIndexNames} {
+		for _, name := range names {
+			args = append(args, name)
+		}
+	}
+	placeholders := func(names []string) string {
+		values := make([]string, len(names))
+		for index := range names {
+			values[index] = "?"
+		}
+		return strings.Join(values, ",")
+	}
+	query := `SELECT COUNT(*) FROM sqlite_master WHERE
+		(type = 'table' AND name IN (` + placeholders(categorySchemaTableNames) + `)) OR
+		(type = 'trigger' AND name IN (` + placeholders(categoryTriggerNames) + `)) OR
+		(type = 'index' AND name IN (` + placeholders(categorySchemaIndexNames) + `))`
 	var count int
-	if err := tx.Tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_categories'`).Scan(&count); err != nil {
+	if err := db.QueryRow(query, args...).Scan(&count); err != nil {
+		return false, err
+	}
+	return count == len(args), nil
+}
+
+func ensureCategorySchema(tx *userTx) error {
+	ready, err := categorySchemaReady(tx.Tx)
+	if err != nil {
 		return err
 	}
-	if count == 1 {
+	if ready {
 		return nil
 	}
-	_, err := tx.Tx.Exec(transactionCategoriesDDL)
-	return err
+	for _, ddl := range categorySchemaTableDDLs() {
+		if _, err := tx.Exec(ddl); err != nil {
+			return err
+		}
+	}
+	for _, ddl := range categorySchemaTriggerDDLs() {
+		if _, err := tx.Exec(ddl); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureCategorySchemaDB(db *userDB) error {
-	var count int
-	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_categories'`).Scan(&count); err != nil {
+	ready, err := categorySchemaReady(db.DB)
+	if err != nil {
 		return err
 	}
-	if count == 1 {
+	if ready {
 		return nil
 	}
-	_, err := db.DB.Exec(transactionCategoriesDDL)
-	return err
+	for _, ddl := range categorySchemaTableDDLs() {
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+	for _, ddl := range categorySchemaTriggerDDLs() {
+		if _, err := db.Exec(ddl); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // LoadTransactionCategories returns assignments for the named transactions. Missing
@@ -144,6 +186,9 @@ func (s *sqliteStore) SetUserTransactionCategory(transactionID string, category 
 			return fmt.Errorf("read transaction facts %s: %w", transactionID, err)
 		}
 		if category != nil {
+			if err := deleteCategoryEvaluation(tx, transactionID); err != nil {
+				return err
+			}
 			if err := writeTransactionCategory(tx, transactionID, *category, types.CategorySourceUser, ""); err != nil {
 				return err
 			}
@@ -157,6 +202,9 @@ func (s *sqliteStore) SetUserTransactionCategory(transactionID string, category 
 		}
 		// Clearing an override records the removed key: the sidecar row the
 		// clear replaces or deletes is the owner's rejected label.
+		if err := deleteCategoryEvaluation(tx, transactionID); err != nil {
+			return err
+		}
 		var removed sql.NullString
 		if err := tx.QueryRow(`SELECT category FROM transaction_categories WHERE transaction_id = ? AND user_id = :user_id`, transactionID).Scan(&removed); err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("read transaction category %s: %w", transactionID, err)
@@ -219,15 +267,7 @@ func (s *sqliteStore) SetInferredTransactionCategory(transactionID, category, pr
 			}
 			return fmt.Errorf("read transaction %s: %w", transactionID, err)
 		}
-		_, err := tx.Exec(`INSERT INTO transaction_categories (transaction_id, category, source, producer, updated_at, user_id)
-			VALUES (?, ?, ?, ?, ?, :user_id)
-			ON CONFLICT(user_id, transaction_id) DO UPDATE SET
-				category = excluded.category,
-				source = excluded.source,
-				producer = excluded.producer,
-				updated_at = excluded.updated_at
-			WHERE transaction_categories.source = 'inferred'`,
-			transactionID, category, types.CategorySourceInferred, producer, time.Now().Unix())
+		err := writeInferredTransactionCategory(tx, transactionID, category, producer, time.Now().Unix())
 		if err != nil {
 			return fmt.Errorf("store inferred category %s: %w", transactionID, err)
 		}
@@ -235,53 +275,19 @@ func (s *sqliteStore) SetInferredTransactionCategory(transactionID, category, pr
 	})
 }
 
-// ListTransactionCategoryCandidates returns uncategorized, non-void bank rows,
-// newest first. Pending rows stay eligible: their assignment survives
-// settlement because the transaction identity is preserved.
-func (s *sqliteStore) ListTransactionCategoryCandidates(limit int) ([]types.TransactionCategoryCandidate, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > categoryChunkSize {
-		limit = categoryChunkSize
-	}
-	if err := ensureCategorySchemaDB(s.db); err != nil {
-		return nil, fmt.Errorf("ensure transaction categories: %w", err)
-	}
-	rows, err := s.db.Query(`SELECT p.id, p.name,
-			CASE WHEN p.source_account_id IS NULL THEN 'in' ELSE 'out' END,
-			f.facts_json
-		FROM transactions p
-		LEFT JOIN transaction_source_facts f ON f.user_id = p.user_id AND f.transaction_id = p.id
-		LEFT JOIN transaction_categories c ON c.user_id = p.user_id AND c.transaction_id = p.id
-		WHERE p.source != ?
-			AND p.projection_slice_id IS NULL
-			AND p.void = 0
-			AND c.transaction_id IS NULL
-			AND p.user_id = :user_id
-		ORDER BY p.posted_time DESC, p.id DESC
-		LIMIT `+strconv.Itoa(limit), store.SourceUser)
-	if err != nil {
-		return nil, fmt.Errorf("list category candidates: %w", err)
-	}
-	defer rows.Close()
-	candidates := []types.TransactionCategoryCandidate{}
-	for rows.Next() {
-		var item types.TransactionCategoryCandidate
-		var raw sql.NullString
-		if err := rows.Scan(&item.TransactionID, &item.Name, &item.Direction, &raw); err != nil {
-			return nil, err
-		}
-		if raw.Valid {
-			var facts types.TransactionFacts
-			if err := json.Unmarshal([]byte(raw.String), &facts); err != nil {
-				return nil, fmt.Errorf("decode transaction evidence: %w", err)
-			}
-			item.Facts = &facts
-		}
-		candidates = append(candidates, item)
-	}
-	return candidates, rows.Err()
+// writeInferredTransactionCategory applies classifier precedence in one upsert.
+// Existing bank and user assignments always win.
+func writeInferredTransactionCategory(tx *userTx, transactionID, category, producer string, updatedAt int64) error {
+	_, err := tx.Exec(`INSERT INTO transaction_categories (transaction_id, category, source, producer, updated_at, user_id)
+		VALUES (?, ?, ?, ?, ?, :user_id)
+		ON CONFLICT(user_id, transaction_id) DO UPDATE SET
+			category = excluded.category,
+			source = excluded.source,
+			producer = excluded.producer,
+			updated_at = excluded.updated_at
+		WHERE transaction_categories.source = 'inferred'`,
+		transactionID, category, types.CategorySourceInferred, producer, updatedAt)
+	return err
 }
 
 // writeTransactionCategory upserts one assignment. The caller chooses the source

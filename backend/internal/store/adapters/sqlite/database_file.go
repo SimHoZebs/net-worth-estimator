@@ -66,7 +66,7 @@ func existingDatabaseFile(path string, setup bool) (string, error) {
 		var count int
 		err = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).Scan(&count)
 		if err == nil && count != 0 {
-			err = checkExistingSchema(db)
+			err = checkExistingSchemaMode(db, true)
 		}
 	} else {
 		err = checkExistingSchema(db)
@@ -165,6 +165,13 @@ func protectDatabaseSidecar(path string) error {
 }
 
 func checkExistingSchema(db queryer) error {
+	return checkExistingSchemaMode(db, false)
+}
+
+// checkExistingSchemaMode lets additive setup provision missing category
+// sidecars before full current-schema validation. Present category objects must
+// still have the current shape, and every core table remains required.
+func checkExistingSchemaMode(db queryer, setup bool) error {
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).Scan(&count); err != nil {
 		return err
@@ -175,7 +182,7 @@ func checkExistingSchema(db queryer) error {
 	if err := checkSharedSchemaMarker(db); err != nil {
 		return err
 	}
-	if err := validateSchemaObjects(db); err != nil {
+	if err := validateSchemaObjectsMode(db, setup); err != nil {
 		return err
 	}
 	return nil

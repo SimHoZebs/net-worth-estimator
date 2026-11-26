@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Database discovers users with bank transactions. The worker never sees raw
@@ -60,6 +61,8 @@ func (w *Worker) RunOnce(ctx context.Context) error {
 	return firstError
 }
 
+const categoryBatchSize = 100
+
 func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) error {
 	if setter, ok := w.classifier.(FeedbackSetter); ok {
 		// Training delivery rides the existing session-open path: the
@@ -68,10 +71,30 @@ func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) e
 		// keyword-only compositions (no setter) are untouched.
 		setter.SetFeedbackSource(newJournalFeedbackSource(scoped, user))
 	}
-	candidates, err := scoped.ListTransactionCategoryCandidates(100)
-	if err != nil || len(candidates) == 0 {
-		return err
+	var previous types.TransactionCategoryCursor
+	hasPrevious := false
+	for {
+		candidates, err := scoped.ListTransactionCategoryCandidates(categoryBatchSize)
+		if err != nil {
+			return err
+		}
+		if len(candidates) == 0 {
+			return nil
+		}
+		wrapped := categoryBatchWrapped(candidates, previous, hasPrevious)
+		if err := w.classifyAndRecord(ctx, scoped, candidates); err != nil {
+			return err
+		}
+		last := candidates[len(candidates)-1]
+		previous = types.TransactionCategoryCursor{PostedTime: last.PostedTime, TransactionID: last.TransactionID}
+		hasPrevious = true
+		if wrapped || len(candidates) < categoryBatchSize {
+			return nil
+		}
 	}
+}
+
+func (w *Worker) classifyAndRecord(ctx context.Context, scoped store.Store, candidates []types.TransactionCategoryCandidate) error {
 	inputs := make([]Input, len(candidates))
 	for index, candidate := range candidates {
 		inputs[index] = Input{
@@ -87,12 +110,53 @@ func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) e
 	if err != nil {
 		return err
 	}
-	for transactionID, classified := range results {
-		if err := scoped.SetInferredTransactionCategory(transactionID, classified.Category, classified.Producer); err != nil && !store.IsNotFound(err) {
-			return err
+	evaluations := make([]types.TransactionCategoryEvaluation, 0, len(candidates))
+	for _, candidate := range candidates {
+		classified, ok := results[candidate.TransactionID]
+		if !ok {
+			return fmt.Errorf("categorization classifier omitted an outcome")
+		}
+		evaluations = append(evaluations, types.TransactionCategoryEvaluation{
+			TransactionID: candidate.TransactionID,
+			EvidenceHash:  candidate.EvidenceHash,
+			Outcome:       classified.Outcome,
+			Category:      classified.Category,
+			Producer:      classified.Producer,
+			ProblemCode:   classified.ProblemCode,
+		})
+	}
+	last := candidates[len(candidates)-1]
+	return scoped.RecordTransactionCategoryBatch(types.TransactionCategoryBatch{
+		ClassifierVersion: w.classifier.Version(),
+		Evaluations:       evaluations,
+		Cursor: types.TransactionCategoryCursor{
+			PostedTime:    last.PostedTime,
+			TransactionID: last.TransactionID,
+		},
+	})
+}
+
+// categoryBatchWrapped detects the store's single head wrap. A wrapped page is
+// either ordered before the prior cursor or contains a descending keyset boundary
+// where tail rows and head rows meet.
+func categoryBatchWrapped(candidates []types.TransactionCategoryCandidate, previous types.TransactionCategoryCursor, hasPrevious bool) bool {
+	if hasPrevious && !categoryCandidateAfter(candidates[0], previous) {
+		return true
+	}
+	for index := 1; index < len(candidates); index++ {
+		prior := types.TransactionCategoryCursor{PostedTime: candidates[index-1].PostedTime, TransactionID: candidates[index-1].TransactionID}
+		if !categoryCandidateAfter(candidates[index], prior) {
+			return true
 		}
 	}
-	return nil
+	return false
+}
+
+func categoryCandidateAfter(candidate types.TransactionCategoryCandidate, cursor types.TransactionCategoryCursor) bool {
+	if candidate.PostedTime != cursor.PostedTime {
+		return candidate.PostedTime > cursor.PostedTime
+	}
+	return candidate.TransactionID > cursor.TransactionID
 }
 
 // Start owns its goroutine and waits for it on stop.

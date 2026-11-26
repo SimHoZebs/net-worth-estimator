@@ -1,6 +1,9 @@
 package types
 
-import "testing"
+import (
+	"encoding/hex"
+	"testing"
+)
 
 func TestBankCategoryAcceptsSupportedAndDetailedValues(t *testing.T) {
 	cases := map[string]string{
@@ -40,6 +43,32 @@ func TestBankCategoryLeavesUnknownValuesForTheClassifier(t *testing.T) {
 		if got, ok := BankCategory(value); ok {
 			t.Fatalf("BankCategory(%q) = %q, want unknown", value, got)
 		}
+	}
+}
+
+func TestCategoryEvidenceHashFingerprintsExactEvidence(t *testing.T) {
+	base := CategoryEvidenceHash("MERCHANT", "out", `{"amount":"-12.00","memo":"A"}`)
+	if len(base) != 64 {
+		t.Fatalf("hash length=%d", len(base))
+	}
+	if _, err := hex.DecodeString(base); err != nil {
+		t.Fatalf("hash is not hex: %v", err)
+	}
+	if got := CategoryEvidenceHash("MERCHANT", "out", `{"amount":"-12.00","memo":"A"}`); got != base {
+		t.Fatal("same evidence produced a different hash")
+	}
+	for _, got := range []string{
+		CategoryEvidenceHash("OTHER MERCHANT", "out", `{"amount":"-12.00","memo":"A"}`),
+		CategoryEvidenceHash("MERCHANT", "in", `{"amount":"-12.00","memo":"A"}`),
+		CategoryEvidenceHash("MERCHANT", "out", `{"memo":"A","amount":"-12.00"}`),
+		CategoryEvidenceHash("MERCHANT", "out", ""),
+	} {
+		if got == base {
+			t.Fatal("changed evidence kept the same hash")
+		}
+	}
+	if CategoryEvidenceHash("a", "bc", "") == CategoryEvidenceHash("ab", "c", "") {
+		t.Fatal("hash omitted field boundaries")
 	}
 }
 

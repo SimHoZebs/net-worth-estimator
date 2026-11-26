@@ -49,9 +49,22 @@ again.
 `updated_at`. Transaction deletion cascades. Category writes never change the
 financial model, the model revision, or a projection.
 
-The table is additive. Fresh databases create it during setup. Existing
-databases create it on first category read or write, the same way the
-do-not-import list self-heals.
+`category_evaluations` stores one explicit outcome per examined transaction:
+`assigned`, `evaluated`, or `deferred`. It records the evidence fingerprint,
+classifier version, attempt count, retry time, sanitized problem code, and
+evaluation time. It stores no descriptors, facts, amounts, or credentials.
+`category_scan_progress` stores one durable `(posted_time, transaction_id)`
+keyset cursor per user. `category_feedback` is the owner-choice journal described
+below.
+
+All four category tables are additive current-schema tables. Fresh databases
+create them during setup, and additive setup or the category ensure helpers fill
+missing tables and triggers without converting rows. Transaction and user
+deletion cascade to the evaluation and journal rows. Source-facts changes and
+transaction name, source, or source-account changes delete the evaluation and
+any inferred assignment, while user and bank assignments keep precedence. An
+explicit user assign or clear deletes the evaluation in the same sidecar
+transaction.
 
 ## Bank values
 
@@ -73,10 +86,14 @@ When `ML_JUDGMENT_URL` names a judgment endpoint, both mains compose a
 composite classifier: keywords answer first and the learner
 (`ml-categories-v1`) backfills only what keywords skip, so the model can
 add labels but never replace a keyword answer. `ML_CATEGORIES=0` forces
-keyword-only. A learner error keeps the keyword answers and leaves the
-rest uncategorized. The learner fills only uncategorized rows, never bank
-or user assignments, the same as keywords. Each stored assignment records
-the producer that made it, while the worker version names the composition.
+keyword-only. A learner provider failure defers only the skipped transactions
+with the sanitized `provider_error` code; keyword assignments remain assigned.
+Every classifier call returns an outcome for every input. Keyword misses and ML
+no-request, uncertain, or unsupported results are terminal `evaluated` outcomes.
+Context cancellation remains an error. The learner fills only eligible
+uncategorized rows, never bank or user assignments, the same as keywords. Each
+stored assignment records the producer that made it, while the evaluation records
+the classifier composition version.
 
 The learner previously opened judgment sessions with no training feedback, so
 user overrides did not train the learner yet; warm weights came from the
@@ -89,10 +106,25 @@ otherwise stay uncategorized. Held-out public descriptors score 0.91
 confident precision on unseen merchants, so the model generalizes rather
 than memorizing training rows.
 
-A periodic worker scans uncategorized bank transactions, newest first, and writes
-inferred assignments. It never blocks sync and keeps no queue table: an
-interrupted run resumes from the rows on the next tick. Pending transactions stay
-eligible because settlement preserves the transaction identity.
+A periodic worker scans eligible bank transactions in ascending
+`(posted_time, transaction_id)` keyset order from the durable per-user cursor.
+Terminal evaluations are excluded, and deferred evaluations become eligible only
+when their retry time arrives. Reaching the end wraps to the head once for that
+scan, which picks up backdated new rows and explicit clears. An interrupted run
+resumes from the last committed cursor.
+
+Classification happens outside the publication transaction. The worker then
+re-reads current name, direction, and exact source-facts JSON, compares the
+deterministic evidence fingerprint, and publishes each current outcome plus the
+cursor in one short batch transaction. Stale results create neither a category
+nor an evaluation, but the examined cursor still advances. Assigned outcomes use
+the conditional inferred upsert and never replace user or bank rows. Deferred
+attempts back off exponentially from 15 seconds to a one-hour cap; terminal
+outcomes clear the retry time.
+
+Legacy inferred assignments without an evaluation are not automatically queued.
+Changed evidence removes the stale inferred assignment and evaluation so the row
+can be classified again.
 
 The worker does not classify recurrence rules. Owner-authored transactions are
 also skipped; the user can still assign a category to those transactions through
@@ -123,8 +155,9 @@ separate from the transaction form.
   sidecar assignment, including user overrides on bank rows that the import
   preserves. Bank values return on the next sync; inferred values return when
   the worker scans again.
-- The classifier does not retroactively reclassify rows after a version
-  change; `producer` records the version that made the current assignment.
+- Classifier or model revision changes do not requeue evaluated rows. Changed
+  evidence, an explicit user clear, or a future explicit reprocess operation does;
+  `producer` records the version that made the current assignment.
 - An explicit "uncategorized, do not suggest" state is not implemented.
 
 ## Journal
@@ -136,11 +169,16 @@ sidecar write back, so the two never diverge. The row records `action`
 null when the clear removed nothing), plus a snapshot of the bank row at
 review time (`name`, `direction`, `facts_json`) and `created_at` unix
 seconds. The table is additive and self-heals like `transaction_categories`:
-fresh and existing databases both create it on first journal read or
-write, with no migration file. Deletes cascade
-exactly like the sidecar: removing a transaction or a user drops its
+fresh databases create it during setup, and existing databases gain it through
+additive setup or the first journal read or write, with no migration file.
+Deletes cascade exactly like the sidecar: removing a transaction or a user drops its
 journal rows. Normal paths never update or delete journal rows. Bank and
 inferred writes are not journaled; only owner choices train.
+
+A full offline model refresh copies the current category sidecar, journal,
+evaluations, and cursor after source facts so invalidation triggers do not erase
+the copied state. A financial-only public copy keeps transaction categories but
+excludes source facts, feedback, evaluations, and scan progress.
 
 Row IDs are the zero-padded sequence (`%020d`), so lexicographic order is
 sequence order.

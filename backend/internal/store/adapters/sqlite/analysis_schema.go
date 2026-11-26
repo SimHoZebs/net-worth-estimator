@@ -82,6 +82,7 @@ func analysisSchemaStatements() []string {
 	for _, ddl := range incrementalTriggerDDLs() {
 		statements = append(statements, strings.Replace(ddl, "CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS ", 1))
 	}
+	statements = append(statements, categorySchemaTriggerDDLs()...)
 	return append(statements, `CREATE TRIGGER IF NOT EXISTS analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON transaction_sim
 		WHEN (OLD.enabled != NEW.enabled)
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)

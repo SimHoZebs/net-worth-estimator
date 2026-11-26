@@ -3,6 +3,7 @@ package categorization
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
@@ -62,8 +63,21 @@ func TestMLClassifierIgnoresWeakJudgments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 0 {
-		t.Fatalf("weak judgments classified: %+v", results)
+	if got := results["txn-weak"]; got.Outcome != OutcomeEvaluated || got.Category != "" {
+		t.Fatalf("weak judgment was not terminal: %+v", results)
+	}
+}
+
+func TestMLClassifierUnsupportedIsTerminalEvaluated(t *testing.T) {
+	input := Input{TransactionID: "txn-unsupported", Name: "SHELL OIL", Direction: "out"}
+	requests := CategoryJudgmentRequests(input)
+	provider := stubProvider{session: stubSession{judgments: supportedJudgments(requests, "unsupported", "strong")}}
+	results, err := NewMLClassifier(provider).Classify(context.Background(), []Input{input})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := results[input.TransactionID]; got.Outcome != OutcomeEvaluated || got.Category != "" {
+		t.Fatalf("unsupported outcome=%+v", got)
 	}
 }
 
@@ -84,10 +98,48 @@ func TestMLClassifierTiebreaksByCategoryOrder(t *testing.T) {
 	}
 }
 
-func TestMLClassifierSurfacesProviderErrors(t *testing.T) {
-	provider := stubProvider{err: errors.New("provider down")}
-	if _, err := NewMLClassifier(provider).Classify(context.Background(), []Input{{TransactionID: "txn-err", Name: "SHELL OIL", Direction: "out"}}); err == nil {
-		t.Fatal("provider error swallowed")
+func TestMLClassifierDefersProviderErrors(t *testing.T) {
+	provider := stubProvider{err: errors.New("provider down: PRIVATE DESCRIPTOR")}
+	results, err := NewMLClassifier(provider).Classify(context.Background(), []Input{{TransactionID: "txn-err", Name: "SHELL OIL", Direction: "out"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := results["txn-err"]
+	if got.Outcome != OutcomeDeferred || got.ProblemCode != types.TransactionCategoryProblemProvider || got.Category != "" {
+		t.Fatalf("provider failure=%+v", got)
+	}
+}
+
+func TestMLClassifierNoRequestIsTerminalEvaluated(t *testing.T) {
+	input := Input{TransactionID: "txn-empty", Name: "LOCAL SHOP", Direction: "out"}
+	if len(CategoryJudgmentRequests(input)) != 0 {
+		t.Fatal("test input unexpectedly emitted requests")
+	}
+	results, err := NewMLClassifier(stubProvider{err: errors.New("provider should not open")}).Classify(context.Background(), []Input{input})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := results[input.TransactionID]; got.Outcome != OutcomeEvaluated || got.ProblemCode != "" {
+		t.Fatalf("no-request outcome=%+v", got)
+	}
+}
+
+func TestMLClassifierCancellationRemainsAnError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := NewMLClassifier(stubProvider{}).Classify(ctx, []Input{{TransactionID: "txn-cancel", Name: "SHELL OIL", Direction: "out"}}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation error=%v", err)
+	}
+}
+
+func TestMLClassifierProviderTimeoutIsDeferred(t *testing.T) {
+	provider := stubProvider{err: fmt.Errorf("provider timeout: %w", context.DeadlineExceeded)}
+	results, err := NewMLClassifier(provider).Classify(context.Background(), []Input{{TransactionID: "txn-timeout", Name: "SHELL OIL", Direction: "out"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := results["txn-timeout"]; got.Outcome != OutcomeDeferred || got.ProblemCode != types.TransactionCategoryProblemProvider {
+		t.Fatalf("provider timeout=%+v", got)
 	}
 }
 
@@ -106,6 +158,43 @@ func TestCompositeClassifierFallsBackOnMLError(t *testing.T) {
 	got, ok := results["txn-kw"]
 	if !ok || got.Category != types.CategoryTransportation || got.Producer != "keyword-v1" {
 		t.Fatalf("results=%+v", results)
+	}
+}
+
+func TestCompositeClassifierCancellationRemainsAnError(t *testing.T) {
+	composite := CompositeClassifier{
+		ML:      NewMLClassifier(stubProvider{}),
+		Keyword: KeywordClassifier{},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := composite.Classify(ctx, []Input{{TransactionID: "txn-ml", Name: "QFC #5881", Direction: "out"}}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation error=%v", err)
+	}
+}
+
+func TestCompositeClassifierDefinesEveryOutcomeOnMLError(t *testing.T) {
+	composite := CompositeClassifier{
+		ML:      NewMLClassifier(stubProvider{err: errors.New("provider down")}),
+		Keyword: KeywordClassifier{},
+	}
+	inputs := []Input{
+		{TransactionID: "txn-kw", Name: "SHELL OIL", Direction: "out"},
+		{TransactionID: "txn-ml", Name: "QFC #5881", Direction: "out"},
+		{TransactionID: "txn-empty", Name: "LOCAL SHOP", Direction: "out"},
+	}
+	results, err := composite.Classify(context.Background(), inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := results["txn-kw"]; got.Outcome != OutcomeAssigned || got.Category != types.CategoryTransportation {
+		t.Fatalf("keyword answer=%+v", got)
+	}
+	if got := results["txn-ml"]; got.Outcome != OutcomeDeferred || got.ProblemCode != types.TransactionCategoryProblemProvider {
+		t.Fatalf("provider failure=%+v", got)
+	}
+	if got := results["txn-empty"]; got.Outcome != OutcomeEvaluated {
+		t.Fatalf("no-request outcome=%+v", got)
 	}
 }
 
