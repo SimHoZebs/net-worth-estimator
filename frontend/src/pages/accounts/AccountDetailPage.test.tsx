@@ -127,6 +127,47 @@ beforeEach(() => {
 });
 
 describe("account detail authoritative balances", () => {
+	it.each(["available", "posted"] as const)(
+		"styles both recorded balances identically with %s basis",
+		(displayBasis) => {
+			const account: Account = {
+				...baseAccount,
+				name: "Amazon Credit Card",
+				kind: "credit_card",
+				balance: -276,
+				observedBalance: -276,
+				availableBalance: 0,
+				displayBasis,
+				readOnly: true,
+			};
+			accountEditMock.mockReturnValue(editStub(account));
+			const { container } = render(
+				<AccountDetailView
+					account={account}
+					accounts={[account]}
+					transactions={[]}
+					startDate={financialModelFixture.startDate}
+					readOnly={false}
+					onClose={vi.fn()}
+					onEdit={vi.fn()}
+				/>,
+			);
+			const labels = Array.from(container.querySelectorAll("dt"));
+			expect(labels.map((label) => label.textContent)).toEqual([
+				"Available balance",
+				"Posted balance",
+			]);
+			const available = labels[0]!.nextElementSibling!;
+			const posted = labels[1]!.nextElementSibling!;
+			expect(available.textContent).toBe("$0");
+			expect(posted.textContent).toBe("-$276");
+			expect(available.className).toBe(posted.className);
+			expect(available.className).toContain(
+				"text-lg font-semibold tabular-nums text-foreground",
+			);
+		},
+	);
+
 	it("renders a manual posted balance and transactions without adjustment UI", () => {
 		const account: Account = {
 			...baseAccount,

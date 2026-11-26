@@ -261,6 +261,7 @@ export function AccountDetailView({
 								<AccountBalances
 									data={accountBalanceHeaderData(account)}
 									columns={2}
+									emphasis="uniform"
 								/>
 							</div>
 						);

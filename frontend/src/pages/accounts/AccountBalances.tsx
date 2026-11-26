@@ -11,14 +11,14 @@ function BalanceFigure({
 	label: string;
 	value: number;
 	emphasized: boolean;
-	emphasis: "strong" | "plain";
+	emphasis: "strong" | "plain" | "uniform";
 }) {
 	return (
 		<div className="min-w-0">
 			<dt className="text-xs font-medium text-muted-foreground">{label}</dt>
 			<dd
 				className={
-					emphasized
+					emphasis === "uniform" || emphasized
 						? emphasis === "plain"
 							? "m-0 text-sm font-normal tabular-nums text-foreground"
 							: "m-0 text-lg font-semibold tabular-nums text-foreground"
@@ -40,7 +40,8 @@ function BalanceFigure({
  * accounts list keeps the default responsive stacking. The `emphasis` prop
  * is styling only: `"plain"` renders an emphasized figure at the table's
  * original size and weight, while the default `"strong"` keeps the display
- * treatment used by the detail header. Non-emphasized figures are unaffected.
+ * treatment. `"uniform"` gives every figure that same strong treatment,
+ * regardless of the selected basis. Non-emphasized figures are otherwise unaffected.
  */
 export function AccountBalances({
 	data,
@@ -49,7 +50,7 @@ export function AccountBalances({
 }: {
 	data: BalanceDisplayData;
 	columns?: 1 | 2;
-	emphasis?: "strong" | "plain";
+	emphasis?: "strong" | "plain" | "uniform";
 }) {
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-1">
