@@ -108,6 +108,119 @@ describe("derive funding gaps", () => {
 		expect(summary.shortfall).toBe(2650);
 	});
 
+	it("counts a cross-boundary posted movement once on its Posted day", () => {
+		const saved = {
+			id: "cross-boundary-charge",
+			name: "Corner Store",
+			amount: 42.1,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			kind: "transaction" as const,
+			startDate: "2026-01-01",
+			endDate: null,
+			annualIncrease: 0,
+			enabled: true,
+			readOnly: true,
+			claimScheduleId: null,
+			claimOccurrenceDate: null,
+			postedDate: "2026-01-05",
+			pending: false,
+			void: false,
+			syncOwned: true,
+		};
+		const projection = projectionFixture({
+			transactions: [
+				transactionFixture({
+					transactionId: saved.id,
+					name: saved.name,
+					date: saved.postedDate,
+					requested: saved.amount,
+					realized: saved.amount,
+					available: saved.amount,
+					constraint: null,
+					accountDeltas: [{ accountId: "checking", delta: -saved.amount }],
+				}),
+				transactionFixture({
+					date: "2026-01-06",
+					requested: 1000,
+					realized: 957.9,
+					available: 957.9,
+					accountDeltas: [{ accountId: "checking", delta: -957.9 }],
+				}),
+			],
+		});
+		const [gap] = deriveFundingGaps({
+			accounts: financialModelFixture.accounts.map((account) =>
+				account.id === "checking" ? { ...account, balance: 1000 } : account,
+			),
+			transactions: [saved],
+			startDate: "2026-01-02",
+			projection,
+		});
+		expect(gap?.transactions).toEqual([
+			expect.objectContaining({
+				date: "2026-01-05",
+				name: saved.name,
+				amount: -42.1,
+			}),
+		]);
+		const summary = summarizeFundingGap(gap!);
+		expect(summary.moneyOut).toBe(42.1);
+		expect(summary.rows[0]?.balanceAfter).toBeCloseTo(957.9);
+	});
+
+	it("keeps owner evidence on its Occurred day when postedDate differs", () => {
+		const saved = {
+			id: "owner-charge",
+			name: "Owner purchase",
+			amount: 42.1,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			kind: "transaction" as const,
+			startDate: "2026-01-01",
+			endDate: null,
+			annualIncrease: 0,
+			enabled: true,
+			readOnly: false,
+			claimScheduleId: null,
+			claimOccurrenceDate: null,
+			postedDate: "2026-01-05",
+			pending: false,
+			void: false,
+			syncOwned: false,
+		};
+		const [gap] = deriveFundingGaps({
+			accounts: financialModelFixture.accounts.map((account) =>
+				account.id === "checking" ? { ...account, balance: 1000 } : account,
+			),
+			transactions: [saved],
+			startDate: "2026-01-02",
+			projection: projectionFixture({
+				transactions: [
+					transactionFixture({
+						date: "2026-01-06",
+						requested: 1000,
+						realized: 957.9,
+						available: 957.9,
+						accountDeltas: [{ accountId: "checking", delta: -957.9 }],
+					}),
+				],
+			}),
+		});
+		expect(gap?.transactions).toEqual([
+			expect.objectContaining({
+				date: "2026-01-01",
+				name: saved.name,
+				amount: -42.1,
+			}),
+		]);
+		const summary = summarizeFundingGap(gap!);
+		expect(summary.moneyOut).toBe(42.1);
+		expect(summary.rows[0]?.balanceAfter).toBeCloseTo(957.9);
+	});
+
 	it("uses fulfillment amounts instead of the reconstructed account balance", () => {
 		const projection = projectionFixture({
 			transactions: [transactionFixture()],

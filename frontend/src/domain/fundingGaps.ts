@@ -1,4 +1,7 @@
-import { accountTransactions } from "./accountActivity.ts";
+import {
+	accountTransactions,
+	type AccountTransaction,
+} from "./accountActivity.ts";
 import type { Account, Transaction } from "./model.ts";
 import type { TransactionResult, Projection } from "./result.ts";
 
@@ -116,6 +119,10 @@ function kindFor(
 
 function monthStart(date: string): string {
 	return `${date.slice(0, 7)}-01`;
+}
+
+function applicationDate(transaction: AccountTransaction): string {
+	return transaction.postedDate ?? transaction.date;
 }
 
 /**
@@ -237,28 +244,32 @@ export function deriveFundingGaps({
 			failureIndexByObject.get(failure) ??
 			projectionIndex.get(`${failure.transactionId}\u0000${failure.date}`) ??
 			-1;
-		const orderedLedger = fullLedger.filter(
-			(transaction) =>
-				transaction.date >= windowStart &&
-				transaction.date <= failure.date &&
+		const orderedLedger = fullLedger.filter((transaction) => {
+			const date = applicationDate(transaction);
+			return (
+				date >= windowStart &&
+				date <= failure.date &&
 				!(
 					transaction.transactionId === failure.transactionId &&
-					transaction.date === failure.date
+					date === failure.date
 				) &&
 				(() => {
 					const index = projectionIndex.get(
-						`${transaction.transactionId}\u0000${transaction.date}`,
+						`${transaction.transactionId}\u0000${date}`,
 					);
 					return index === undefined || index < failureIndex;
-				})(),
-		);
+				})()
+			);
+		});
 		const entries: FundingGapTransaction[] = orderedLedger
-			.sort((a, b) =>
-				a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1,
-			)
+			.sort((a, b) => {
+				const aDate = applicationDate(a);
+				const bDate = applicationDate(b);
+				return aDate < bDate ? -1 : aDate > bDate ? 1 : a.id < b.id ? -1 : 1;
+			})
 			.map((transaction) => ({
 				id: transaction.id,
-				date: transaction.date,
+				date: applicationDate(transaction),
 				name: transaction.name,
 				amount:
 					transaction.direction === "in"

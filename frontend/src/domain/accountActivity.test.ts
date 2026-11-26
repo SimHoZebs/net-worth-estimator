@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
-import { activityProjection } from "../mocks/projection.ts";
+import {
+	activityProjection,
+	projectionFixture,
+	transactionFixture,
+} from "../mocks/projection.ts";
 import {
 	accountTransactions,
 	defaultActivityFilters,
@@ -51,6 +55,88 @@ describe("account-scoped transactions", () => {
 		expect(
 			rows.some((row) => row.transactionId === "historical-server-event"),
 		).toBe(false);
+	});
+
+	it("keeps a cross-boundary posting as one occurred-dated historical row", () => {
+		const saved = {
+			id: "cross-boundary-charge",
+			name: "Corner Store",
+			amount: 42.1,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			kind: "transaction" as const,
+			startDate: "2026-01-01",
+			endDate: null,
+			annualIncrease: 0,
+			enabled: true,
+			readOnly: true,
+			claimScheduleId: null,
+			claimOccurrenceDate: null,
+			postedDate: "2026-01-05",
+			pending: false,
+			void: false,
+			syncOwned: true,
+		};
+		const rows = accountTransactions({
+			accountId: "checking",
+			accounts,
+			transactions: [saved],
+			startDate: "2026-01-02",
+			projection: projectionFixture({
+				transactions: [
+					transactionFixture({
+						transactionId: saved.id,
+						name: saved.name,
+						date: saved.postedDate,
+						requested: saved.amount,
+						realized: saved.amount,
+						available: saved.amount,
+						constraint: null,
+						accountDeltas: [{ accountId: "checking", delta: -saved.amount }],
+					}),
+				],
+			}),
+		});
+		expect(rows.filter((row) => row.transactionId === saved.id)).toEqual([
+			expect.objectContaining({
+				source: "historical",
+				date: "2026-01-01",
+				postedDate: "2026-01-05",
+			}),
+		]);
+	});
+
+	it("keeps repeated projected occurrences for an unrecorded schedule", () => {
+		const rows = accountTransactions({
+			accountId: "checking",
+			accounts,
+			transactions,
+			startDate,
+			projection: projectionFixture({
+				transactions: [
+					transactionFixture({
+						transactionId: "living",
+						date: "2026-10-01",
+						requested: 5400,
+						realized: 5400,
+						constraint: null,
+						accountDeltas: [{ accountId: "checking", delta: -5400 }],
+					}),
+					transactionFixture({
+						transactionId: "living",
+						date: "2026-11-01",
+						requested: 5400,
+						realized: 5400,
+						constraint: null,
+						accountDeltas: [{ accountId: "checking", delta: -5400 }],
+					}),
+				],
+			}),
+		});
+		expect(rows.filter((row) => row.transactionId === "living")).toHaveLength(
+			2,
+		);
 	});
 
 	it("shows the same transfer as money out of the source and money into the destination", () => {

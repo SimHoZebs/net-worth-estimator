@@ -20,6 +20,8 @@ export interface AccountTransaction {
 	date: string;
 	/** Exact ISO instant for chronology when the activity supplies one. */
 	sortDate?: string;
+	/** Bank-owned Posted/application day when it differs from the displayed Occurred day. */
+	postedDate?: string;
 	name: string;
 	source: "historical" | "projected";
 	direction: "in" | "out";
@@ -178,6 +180,7 @@ export function accountTransactions({
 	// participates like a manual actual unless the owner disables it.
 	// Single pass builds the recorded partition plus the pending/void sets.
 	const recorded: AccountTransaction[] = [];
+	const recordedTransactionIds = new Set<string>();
 	const pendingIds = new Set<string>();
 	const voidIds = new Set<string>();
 	for (const transaction of transactions) {
@@ -188,10 +191,22 @@ export function accountTransactions({
 				isPendingTransaction(transaction)) &&
 			(transaction.fromId === accountId || transaction.toId === accountId)
 		) {
+			// Settled one-time records own their identity. Schedules may recur,
+			// while pending and void rows have no projected movement to merge.
+			if (
+				transaction.kind === "transaction" &&
+				!isPendingTransaction(transaction) &&
+				transaction.void !== true
+			)
+				recordedTransactionIds.add(transaction.id);
 			recorded.push({
 				id: `recorded-${transaction.id}`,
 				transactionId: transaction.id,
 				date: transaction.startDate,
+				// Owner rows apply at Occurred time even when they carry postedDate.
+				...(transaction.syncOwned === true && transaction.postedDate
+					? { postedDate: transaction.postedDate }
+					: {}),
 				name: transaction.name,
 				source: "historical",
 				...connection({
@@ -220,6 +235,7 @@ export function accountTransactions({
 		: projection.transactions
 				.filter(
 					(transaction) =>
+						!recordedTransactionIds.has(transaction.transactionId) &&
 						(transaction.date > startDate ||
 							(transaction.date === startDate && !startDateHasCheckpoint)) &&
 						(transaction.accountDeltas.length > 0
