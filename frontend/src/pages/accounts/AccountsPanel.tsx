@@ -1,4 +1,4 @@
-import { LockKeyhole, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -95,13 +95,6 @@ export function AccountsPanel({
 									nameClassName="truncate group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
 									suffix={!account.enabled ? " · excluded" : undefined}
 								/>
-								{account.readOnly && (
-									<LockKeyhole
-										size={14}
-										aria-label="Read-only record"
-										className="shrink-0"
-									/>
-								)}
 							</Button>
 						</TableHead>
 						<TableCell className="text-right max-sm:whitespace-normal max-sm:px-1 max-sm:py-4">
