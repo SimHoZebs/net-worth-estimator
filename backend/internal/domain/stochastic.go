@@ -63,7 +63,7 @@ func StochasticNetWorthSamples(
 func exportStochasticSamples(session *stochasticSession) map[string][]float64 {
 	samples := make(map[string][]float64, len(session.sortedValuesByDate))
 	for date, values := range session.sortedValuesByDate {
-		if session.isHistoricalByDate[date] && !session.projectedDates[date] {
+		if session.isHistoricalByDate[date] {
 			continue
 		}
 		copied := make([]float64, len(values))
@@ -216,10 +216,15 @@ func consumeOrdered(
 	})
 	for _, row := range path.Rows {
 		session.pendingValuesByDate[row.Date] = append(session.pendingValuesByDate[row.Date], mathRound(row.NetWorth))
-		if _, ok := session.isHistoricalByDate[row.Date]; !ok {
-			session.isHistoricalByDate[row.Date] = row.IsHistorical
+		if !row.IsHistorical {
+			// A date with any projected row is retained in samples, even if the
+			// deterministic row on the same date was historical.
+			session.isHistoricalByDate[row.Date] = false
+			continue
 		}
-		session.projectedDates[row.Date] = true
+		if _, ok := session.isHistoricalByDate[row.Date]; !ok {
+			session.isHistoricalByDate[row.Date] = true
+		}
 	}
 	session.completedRuns++
 	batchComplete := session.completedRuns%stochasticProgressBatch == 0 || session.completedRuns == session.config.RunCount

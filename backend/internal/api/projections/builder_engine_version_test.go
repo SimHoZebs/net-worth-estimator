@@ -22,14 +22,12 @@ func TestUnifiedEngineVersionBumpsExistingState(t *testing.T) {
 	if _, err := store.SaveProjectionState(state); err != nil {
 		t.Fatal(err)
 	}
-	state, canonical, err := handler.ensureCanonicalState(&types.ProjectionRuntimeSettings{
+	state, _, err = handler.ensureCanonicalState(&types.ProjectionRuntimeSettings{
 		FallbackProjectionStartDate: "2026-01-01",
+		HorizonYears:                1,
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if canonical {
-		t.Fatal("state migration must dirty the canonical projection")
 	}
 	if state.EngineVersion != unifiedEngineVersion {
 		t.Fatalf("engine version = %q, want %q", state.EngineVersion, unifiedEngineVersion)

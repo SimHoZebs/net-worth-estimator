@@ -48,7 +48,6 @@ type stochasticSession struct {
 	sortedValuesByDate          map[string][]float64
 	pendingValuesByDate         map[string][]float64
 	isHistoricalByDate          map[string]bool
-	projectedDates              map[string]bool
 	progressUpdateRuns          int
 	completedRuns               int
 	onProgress                  StochasticProgressCallback
@@ -149,7 +148,6 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 		sortedValuesByDate:  map[string][]float64{},
 		pendingValuesByDate: map[string][]float64{},
 		isHistoricalByDate:  map[string]bool{},
-		projectedDates:      map[string]bool{},
 	}
 	session.progressUpdateRuns = GetStochasticProgressUpdateRunInterval(session.config.RunCount)
 	if onProgress != nil {
