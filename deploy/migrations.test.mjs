@@ -1644,14 +1644,33 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
     GITHUB_API_URL: "https://api.github.test",
   };
   let apiQuery;
-  const gateDispatchFetch = async (url) => {
+  const gateDispatchFetch = (workflowRuns) => async (url) => {
     apiQuery = new URL(url);
-    return { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "success", event: "push", head_branch: "main" }] }) };
+    return { ok: true, json: async () => ({ workflow_runs: workflowRuns }) };
   };
-  await executeGate({ env: { ...dispatchEnv } }, gateDispatchFetch, { log() {} });
+  const successfulRun = (event, overrides = {}) => ({
+    head_sha: sha, conclusion: "success", event, head_branch: "main", ...overrides,
+  });
+  await executeGate({ env: { ...dispatchEnv } }, gateDispatchFetch([successfulRun("push")]), { log() {} });
   assert.equal(apiQuery.searchParams.get("head_sha"), sha);
+  await executeGate({ env: { ...dispatchEnv } }, gateDispatchFetch([successfulRun("workflow_dispatch")]), { log() {} });
+  assert.equal(apiQuery.searchParams.get("head_sha"), sha);
+  for (const run of [
+    successfulRun("push", { conclusion: "failure" }),
+    successfulRun("workflow_dispatch", { conclusion: "failure" }),
+    successfulRun("pull_request"),
+    successfulRun("push", { head_branch: "feature" }),
+    successfulRun("workflow_dispatch", { head_branch: "feature" }),
+    successfulRun("push", { head_sha: "b".repeat(40) }),
+    successfulRun("workflow_dispatch", { head_sha: "b".repeat(40) }),
+  ]) {
+    await assert.rejects(
+      executeGate({ env: { ...dispatchEnv } }, gateDispatchFetch([run]), { log() {} }),
+      /No successful main Tests run/,
+    );
+  }
   await assert.rejects(
-    executeGate({ env: { ...dispatchEnv } }, async () => ({ ok: true, json: async () => ({ workflow_runs: [] }) }), { log() {} }),
+    executeGate({ env: { ...dispatchEnv } }, gateDispatchFetch([]), { log() {} }),
     /No successful main Tests run/,
   );
   await assert.rejects(

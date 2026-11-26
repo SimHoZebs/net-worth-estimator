@@ -148,14 +148,33 @@ test("Vercel production deploys wait for a green main Tests run", async () => {
     GITHUB_API_URL: "https://api.github.test",
   };
   let apiQuery;
-  const dispatchFetch = async (url) => {
+  const dispatchFetch = (workflowRuns) => async (url) => {
     apiQuery = new URL(url);
-    return { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "success", event: "push", head_branch: "main" }] }) };
+    return { ok: true, json: async () => ({ workflow_runs: workflowRuns }) };
   };
-  await execute({ env: { ...dispatchEnv } }, dispatchFetch, { log() {} });
+  const successfulRun = (event, overrides = {}) => ({
+    head_sha: sha, conclusion: "success", event, head_branch: "main", ...overrides,
+  });
+  await execute({ env: { ...dispatchEnv } }, dispatchFetch([successfulRun("push")]), { log() {} });
   assert.equal(apiQuery.searchParams.get("head_sha"), sha);
+  await execute({ env: { ...dispatchEnv } }, dispatchFetch([successfulRun("workflow_dispatch")]), { log() {} });
+  assert.equal(apiQuery.searchParams.get("head_sha"), sha);
+  for (const run of [
+    successfulRun("push", { conclusion: "failure" }),
+    successfulRun("workflow_dispatch", { conclusion: "failure" }),
+    successfulRun("pull_request"),
+    successfulRun("push", { head_branch: "feature" }),
+    successfulRun("workflow_dispatch", { head_branch: "feature" }),
+    successfulRun("push", { head_sha: "b".repeat(40) }),
+    successfulRun("workflow_dispatch", { head_sha: "b".repeat(40) }),
+  ]) {
+    await assert.rejects(
+      execute({ env: { ...dispatchEnv } }, dispatchFetch([run]), { log() {} }),
+      /No successful main Tests run/,
+    );
+  }
   await assert.rejects(
-    execute({ env: { ...dispatchEnv } }, async () => ({ ok: true, json: async () => ({ workflow_runs: [] }) }), { log() {} }),
+    execute({ env: { ...dispatchEnv } }, dispatchFetch([]), { log() {} }),
     /No successful main Tests run/,
   );
   await assert.rejects(

@@ -21,8 +21,11 @@ if (process.env.EVENT_NAME === "workflow_run") {
   });
   if (!response.ok) throw new Error(`Cannot read Tests runs (HTTP ${response.status})`);
   const runs = (await response.json()).workflow_runs ?? [];
+  // Fast-forwarding main to an already-tested SHA creates no new push run.
+  // Manual Tests dispatch runs every gate, so accept its completed success too.
   const green = runs.some((run) =>
-    run.conclusion === "success" && run.event === "push" && run.head_branch === "main");
+    run.conclusion === "success" && run.head_sha === sha && run.head_branch === "main" &&
+    (run.event === "push" || run.event === "workflow_dispatch"));
   if (!green) throw new Error(`No successful main Tests run for ${sha}`);
 } else {
   throw new Error("Unsupported release event");
