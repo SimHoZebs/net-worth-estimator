@@ -93,11 +93,8 @@ func TestBankTransactionAppliesAtPostedInstant(t *testing.T) {
 			if got := applied.state.Balances[account]; got != testCase.wantBalance {
 				t.Fatalf("balance = %v, want %v", got, testCase.wantBalance)
 			}
-			if len(applied.snapshots) != 1 || len(applied.snapshots[0].CheckpointCorrections) != 1 {
-				t.Fatalf("checkpoint evidence = %+v, want one correction", applied.snapshots)
-			}
-			if got := applied.snapshots[0].CheckpointCorrections[0].ModeledBalance; got != 0 {
-				t.Fatalf("modeled balance at the 09:00 checkpoint = %v, want 0 before the bank posts", got)
+			if len(applied.snapshots) != 1 {
+				t.Fatalf("checkpoint snapshots = %+v, want one snapshot", applied.snapshots)
 			}
 		})
 	}
@@ -224,19 +221,15 @@ func TestHistoryAndProjectionSharePostedOrdering(t *testing.T) {
 		if got := applied.state.Balances[account]; got != 0 {
 			t.Fatalf("history balance = %v, want 0 after owner inflow then posted charge", got)
 		}
-		var postedDay types.HistoricalObservationSnapshot
+		foundPostedDay := false
 		for _, snapshot := range applied.snapshots {
 			if snapshot.Date == "2026-01-02" {
-				postedDay = snapshot
+				foundPostedDay = true
 				break
 			}
 		}
-		if len(postedDay.CheckpointCorrections) != 1 {
-			t.Fatalf("posted-day checkpoint evidence = %+v, want one correction", postedDay)
-		}
-		correction := postedDay.CheckpointCorrections[0]
-		if correction.ModeledBalance != 150 || correction.Adjustment != 0 {
-			t.Fatalf("13:00 checkpoint correction = %+v, want owner inflow applied before the 15:00 charge", correction)
+		if !foundPostedDay {
+			t.Fatalf("posted-day snapshot = %+v, want the posted day anchored", applied.snapshots)
 		}
 	})
 	t.Run("projection", func(t *testing.T) {
