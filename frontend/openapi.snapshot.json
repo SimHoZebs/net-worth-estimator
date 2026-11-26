@@ -6303,6 +6303,9 @@
 					"payee": {
 						"type": "string"
 					},
+					"pending": {
+						"type": "boolean"
+					},
 					"postedTime": {
 						"format": "int64",
 						"type": "integer"
@@ -6314,6 +6317,7 @@
 					"memo",
 					"amount",
 					"currency",
+					"pending",
 					"postedTime",
 					"occurredAt",
 					"metadata"
