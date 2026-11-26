@@ -58,9 +58,10 @@ keyset cursor per user. `category_feedback` is the owner-choice journal describe
 below.
 
 All four category tables are additive current-schema tables. Fresh databases
-create them during setup, and additive setup or the category ensure helpers fill
-missing tables and triggers without converting rows. Transaction and user
-deletion cascade to the evaluation and journal rows. Source-facts changes and
+create them during setup, and existing databases gain missing tables and
+triggers on the first category read or write without converting rows.
+Transaction and user deletion cascade to the evaluation and journal rows.
+Source-facts changes and
 transaction name, source, or source-account changes delete the evaluation and
 any inferred assignment, while user and bank assignments keep precedence. An
 explicit user assign or clear deletes the evaluation in the same sidecar
@@ -170,7 +171,7 @@ null when the clear removed nothing), plus a snapshot of the bank row at
 review time (`name`, `direction`, `facts_json`) and `created_at` unix
 seconds. The table is additive and self-heals like `transaction_categories`:
 fresh databases create it during setup, and existing databases gain it through
-additive setup or the first journal read or write, with no migration file.
+the first journal read or write, with no migration file.
 Deletes cascade exactly like the sidecar: removing a transaction or a user drops its
 journal rows. Normal paths never update or delete journal rows. Bank and
 inferred writes are not journaled; only owner choices train.

@@ -53,7 +53,7 @@ Schema setup does not grant access. User workspace flags are in the auth runbook
 The API never creates a missing directory or database and never
 repairs the core financial/identity tables. Startup validates the
 required tables and their columns, the identity grant index, and the
-analysis and category triggers (`backend/internal/store/adapters/sqlite/schema.go:
+analysis triggers (`backend/internal/store/adapters/sqlite/schema.go:
 validateSchemaObjects`), and stops with an operator error when one is
 missing. The runtime connection uses SQLite `mode=rw`, which cannot
 create a missing database. Normal SQLite WAL/SHM journaling remains
@@ -67,8 +67,8 @@ plus sharing indexes such as `sharing_grants_grantee`,
 `sharing_copies_source`, `sharing_visibility_group`,
 `sharing_audit_owner`, and `sharing_policies_group`. Fresh databases
 create them from the shared schema; pre-existing databases gain a
-missing sidecar or sharing index through additive setup, its `ensure*`
-helper, or `CREATE INDEX IF NOT EXISTS` when the feature is first read or
+missing sidecar or sharing index through its `ensure*` helper or
+`CREATE INDEX IF NOT EXISTS` when the feature is first read or
 written. `suppressed_sync_keys` and `checkpoint_available_balances` are
 required current-schema tables instead: fresh databases create them from
 the shared schema, and the offline deployment migration provisions them

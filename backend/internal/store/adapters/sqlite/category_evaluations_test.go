@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -444,10 +443,13 @@ func TestSetupCreatesCategorySchemaObjects(t *testing.T) {
 	}
 }
 
-func TestSetupSelfHealsAdditiveCategorySchema(t *testing.T) {
+func TestSetupLeavesAdditiveCategorySchemaForFirstUse(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "category-upgrade.db")
 	database, err := SetupDatabase(path)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.EnsureUser("owner", "https://issuer.test", "owner"); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range categoryTriggerNames {
@@ -463,17 +465,24 @@ func TestSetupSelfHealsAdditiveCategorySchema(t *testing.T) {
 	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if opened, err := OpenDatabase(path); !errors.Is(err, ErrSetupRequired) {
-		if opened != nil {
-			opened.Close()
-		}
-		t.Fatalf("runtime accepted missing category schema: %v", err)
-	}
 	database, err = SetupDatabase(path)
+	if err != nil {
+		t.Fatalf("setup rejected additive category schema: %v", err)
+	}
+	defer database.Close()
+	for _, name := range []string{"category_evaluations", "category_scan_progress", "category_feedback"} {
+		var count int
+		if err := database.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("setup provisioned %s early: count=%d err=%v", name, count, err)
+		}
+	}
+	scoped, err := database.User("owner")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer database.Close()
+	if _, err := scoped.ListTransactionCategoryCandidates(1); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range categorySchemaTableNames {
 		var count int
 		if err := database.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&count); err != nil || count != 1 {
@@ -485,6 +494,39 @@ func TestSetupSelfHealsAdditiveCategorySchema(t *testing.T) {
 		if err := database.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = ?`, name).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("trigger %s count=%d err=%v", name, count, err)
 		}
+	}
+}
+
+func TestRuntimeSelfHealsCategoryTriggersAfterOfflineSchemaWork(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "category-trigger-upgrade.db")
+	database, err := SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.EnsureUser("owner", "https://issuer.test", "owner"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.db.Exec(`DROP TRIGGER category_evaluations_facts_insert`); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	database, err = OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("runtime rejected self-healing category trigger: %v", err)
+	}
+	defer database.Close()
+	scoped, err := database.User("owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scoped.ListTransactionCategoryCandidates(1); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := database.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = 'category_evaluations_facts_insert'`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("category trigger count=%d err=%v", count, err)
 	}
 }
 

@@ -183,15 +183,6 @@ func isCategorySchemaTable(name string) bool {
 	return false
 }
 
-func isCategoryTrigger(name string) bool {
-	for _, candidate := range categoryTriggerNames {
-		if name == candidate {
-			return true
-		}
-	}
-	return false
-}
-
 func categorySchemaTableDDLs() []string {
 	return []string{transactionCategoriesDDL, categoryScanProgressDDL, categoryEvaluationsDDL, categoryEvaluationsRetryIndexDDL, categoryFeedbackDDL, categoryFeedbackIndexDDL, transactionsCategoryScanIndexDDL}
 }
@@ -1009,17 +1000,15 @@ var requiredSchemaColumns = map[string]string{
 }
 
 func validateSchemaObjects(db queryer) error {
-	return validateSchemaObjectsMode(db, false)
-}
-
-func validateSchemaObjectsMode(db queryer, setup bool) error {
 	for table, columns := range requiredSchemaColumns {
 		var count int
 		if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&count); err != nil {
 			return err
 		}
 		if count != 1 {
-			if setup && isCategorySchemaTable(table) {
+			// Category sidecars are additive and self-heal on first category
+			// use. A present table must still have the current shape.
+			if isCategorySchemaTable(table) {
 				continue
 			}
 			return fmt.Errorf("%w: missing table %s", ErrSetupRequired, table)
@@ -1036,14 +1025,11 @@ func validateSchemaObjectsMode(db queryer, setup bool) error {
 	if count != 1 {
 		return fmt.Errorf("%w: missing identity_grant_subject index", ErrSetupRequired)
 	}
-	for _, name := range append(append([]string(nil), analysisTriggerNames...), categoryTriggerNames...) {
+	for _, name := range analysisTriggerNames {
 		if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = ?`, name).Scan(&count); err != nil {
 			return err
 		}
 		if count != 1 {
-			if setup && isCategoryTrigger(name) {
-				continue
-			}
 			return fmt.Errorf("%w: missing schema trigger %s", ErrSetupRequired, name)
 		}
 	}

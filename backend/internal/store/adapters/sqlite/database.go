@@ -98,22 +98,6 @@ func (d *Database) setupSchema() error {
 				return fmt.Errorf("setup incremental tables: %w", err)
 			}
 		}
-		for _, ddl := range categorySchemaTableDDLs() {
-			if _, err := tx.Exec(ddl); err != nil {
-				return fmt.Errorf("setup category tables: %w", err)
-			}
-		}
-		var categoryTriggerParents int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('transactions', 'transaction_source_facts')`).Scan(&categoryTriggerParents); err != nil {
-			return err
-		}
-		if categoryTriggerParents == 2 {
-			for _, ddl := range categorySchemaTriggerDDLs() {
-				if _, err := tx.Exec(ddl); err != nil {
-					return fmt.Errorf("setup category triggers: %w", err)
-				}
-			}
-		}
 		if err := refreshIncrementalTriggersTx(tx); err != nil {
 			return err
 		}
