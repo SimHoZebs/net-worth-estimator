@@ -3,6 +3,10 @@ package assets
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"image"
+	_ "image/png"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -68,6 +72,9 @@ func TestVersionedCatalogAsset(t *testing.T) {
 	if w.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatal("missing nosniff")
 	}
+	if w.Header().Get("Link") != "" {
+		t.Fatalf("CC0 asset carries a license link: %q", w.Header().Get("Link"))
+	}
 	if w.Header().Get("ETag") != `"`+asset.SHA256+`"` {
 		t.Fatalf("ETag = %q", w.Header().Get("ETag"))
 	}
@@ -89,6 +96,43 @@ func TestVersionedCatalogAsset(t *testing.T) {
 	head := request(h, http.MethodHead, path, nil)
 	if head.Code != http.StatusOK || head.Body.Len() != 0 {
 		t.Fatalf("HEAD = %d %d", head.Code, head.Body.Len())
+	}
+}
+
+func TestVersionedFidelityPNGAsset(t *testing.T) {
+	h, _ := testHandler(t)
+	asset, ok := businesslogos.Lookup("fidelity-investments")
+	if !ok {
+		t.Fatal("Fidelity Investments is not in the manifest")
+	}
+	path := businesslogos.PathPrefix + "fidelity-investments/" + asset.Version
+	w := request(h, http.MethodGet, path, nil)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("versioned Fidelity asset = %d %q", w.Code, w.Header().Get("Content-Type"))
+	}
+	if w.Header().Get("X-Content-Type-Options") != "nosniff" || w.Header().Get("ETag") != `"`+asset.SHA256+`"` {
+		t.Fatalf("Fidelity asset headers = %v", w.Header())
+	}
+	if want := `<` + asset.LicenseURL + `>; rel="license"`; w.Header().Get("Link") != want {
+		t.Fatalf("Fidelity license link = %q, want %q", w.Header().Get("Link"), want)
+	}
+	if w.Header().Get("Content-Length") != strconv.FormatInt(asset.Size, 10) || int64(w.Body.Len()) != asset.Size {
+		t.Fatalf("Fidelity asset length = %q %d", w.Header().Get("Content-Length"), w.Body.Len())
+	}
+	if !bytes.HasPrefix(w.Body.Bytes(), []byte("\x89PNG\r\n\x1a\n")) {
+		t.Fatal("Fidelity asset body is not a PNG")
+	}
+	config, format, err := image.DecodeConfig(bytes.NewReader(w.Body.Bytes()))
+	if err != nil || format != "png" || config.Width < 16 || config.Height < 16 {
+		t.Fatalf("Fidelity asset config = %+v %q %v", config, format, err)
+	}
+	digest := sha256.Sum256(w.Body.Bytes())
+	if hex.EncodeToString(digest[:]) != asset.SHA256 {
+		t.Fatal("Fidelity asset digest does not match the manifest")
+	}
+	cached := request(h, http.MethodGet, path, map[string]string{"If-None-Match": `"` + asset.SHA256 + `"`})
+	if cached.Code != http.StatusNotModified || cached.Body.Len() != 0 {
+		t.Fatalf("Fidelity conditional GET = %d %d", cached.Code, cached.Body.Len())
 	}
 }
 

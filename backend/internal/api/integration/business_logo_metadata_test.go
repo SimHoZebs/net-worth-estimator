@@ -77,6 +77,54 @@ func TestBusinessLogoKeyIsReadOnlyResponseMetadata(t *testing.T) {
 	}
 }
 
+func TestFidelityInvestmentsKeyIsReadOnlyResponseMetadata(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	manualID := createNamedAccount(t, handler, "Fidelity Investments brokerage")
+	unknownID := createNamedAccount(t, handler, "Fidelity Bank")
+	linkedID := createNamedAccount(t, handler, "Checking 2002")
+
+	rows, _ := balanceRowsWithRevision(t, handler)
+	byID := map[string]map[string]any{}
+	for _, row := range rows {
+		byID[row["id"].(string)] = row
+	}
+	if byID[manualID]["recognizedBusinessKey"] != "fidelity-investments" {
+		t.Fatalf("manual Fidelity name key = %v", byID[manualID]["recognizedBusinessKey"])
+	}
+	if _, ok := byID[unknownID]["recognizedBusinessKey"]; ok {
+		t.Fatalf("unrelated Fidelity Bank carries a key: %v", byID[unknownID])
+	}
+
+	if _, err := database.SaveAccountLink(store.AccountLink{
+		BridgeAccountID: "sf2.test.fidelity",
+		ModelAccountID:  linkedID,
+		BridgeName:      "Brokerage",
+		Institution:     "Fidelity Investments",
+		Currency:        "USD",
+		Origin:          store.LinkOriginAuto,
+	}); err != nil {
+		t.Fatalf("save link: %v", err)
+	}
+	rows, _ = balanceRowsWithRevision(t, handler)
+	for _, row := range rows {
+		if row["id"] == linkedID && row["recognizedBusinessKey"] != "fidelity-investments" {
+			t.Fatalf("link institution key = %v", row["recognizedBusinessKey"])
+		}
+	}
+	model, err := database.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "recognizedBusinessKey") {
+		t.Fatal("Fidelity key leaked into canonical model persistence")
+	}
+}
+
 func TestLinkOnlyUpdateRefreshesLogoWithoutModelRevisionChange(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})

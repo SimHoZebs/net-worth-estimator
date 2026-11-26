@@ -9,11 +9,13 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"image"
+	_ "image/png"
 	"sort"
 	"strings"
 )
 
-//go:embed logos/*.svg
+//go:embed logos/*.svg logos/*.png
 var logoFiles embed.FS
 
 // Asset is one immutable, catalog-approved logo. ObjectKey is namespaced so a
@@ -27,6 +29,9 @@ type Asset struct {
 	Version     string
 	Size        int64
 	ContentType string
+	// LicenseURL is set only for assets that are not CC0. It lets the asset
+	// handler attach the source license without a general attribution system.
+	LicenseURL string
 }
 
 // PathPrefix is the only application path the browser uses for catalog logos.
@@ -34,27 +39,58 @@ type Asset struct {
 // this stable path; clients never build it from user metadata.
 const PathPrefix = "/v1/assets/business-logos/"
 
-const maxLogoBytes = 16 << 10
+const (
+	maxLogoBytes     = 16 << 10
+	maxLogoDimension = 512
+	svgLogoType      = "image/svg+xml"
+	pngLogoType      = "image/png"
+	pngFileSignature = "\x89PNG\r\n\x1a\n"
+)
+
+// logoFormat is the declared source encoding of a curated file. Content type
+// comes from this declaration and never from a caller-supplied file name or
+// MIME hint. Only the manifest opts a raster file in.
+type logoFormat uint8
+
+const (
+	svgLogo logoFormat = iota
+	pngLogo
+)
 
 type logoSpec struct {
-	key  string
-	file string
+	key        string
+	file       string
+	format     logoFormat
+	licenseURL string
 }
 
-// Every supported key has exactly one checked-in SVG and at least one alias.
+// Every supported key has exactly one checked-in asset and at least one alias.
 // Keys mirror canonical issuer IDs where one exists. Brands without a
 // verified distributable asset are deliberately absent: an unsupported name
 // resolves to unknown and the generic account glyph stays visible.
 var logoSpecs = []logoSpec{
-	{key: "american-express", file: "americanexpress.svg"},
-	{key: "bank-of-america", file: "bankofamerica.svg"},
-	{key: "barclays", file: "barclays.svg"},
-	{key: "chase", file: "chase.svg"},
-	{key: "discover", file: "discover.svg"},
-	{key: "klarna", file: "klarna.svg"},
-	{key: "paypal", file: "paypal.svg"},
-	{key: "venmo", file: "venmo.svg"},
-	{key: "wells-fargo", file: "wellsfargo.svg"},
+	{key: "ally", file: "ally.svg", format: svgLogo},
+	{key: "american-express", file: "americanexpress.svg", format: svgLogo},
+	{key: "bank-of-america", file: "bankofamerica.svg", format: svgLogo},
+	{key: "barclays", file: "barclays.svg", format: svgLogo},
+	{key: "bmo", file: "bmo.svg", format: svgLogo},
+	{key: "capital-one", file: "capitalone.svg", format: svgLogo},
+	{key: "chase", file: "chase.svg", format: svgLogo},
+	{key: "citi", file: "citi.svg", format: svgLogo},
+	{key: "discover", file: "discover.svg", format: svgLogo},
+	{
+		key:        "fidelity-investments",
+		file:       "fidelityinvestments.png",
+		format:     pngLogo,
+		licenseURL: "https://creativecommons.org/licenses/by-sa/4.0/",
+	},
+	{key: "klarna", file: "klarna.svg", format: svgLogo},
+	{key: "paypal", file: "paypal.svg", format: svgLogo},
+	{key: "pnc", file: "pnc.svg", format: svgLogo},
+	{key: "truist", file: "truist.svg", format: svgLogo},
+	{key: "us-bank", file: "usbank.svg", format: svgLogo},
+	{key: "venmo", file: "venmo.svg", format: svgLogo},
+	{key: "wells-fargo", file: "wellsfargo.svg", format: svgLogo},
 }
 
 // alias is a normalized token sequence matched on whole tokens. Single-token
@@ -75,6 +111,11 @@ type business struct {
 // Network names are intentionally absent. A network on a card is not the
 // account business and must never displace a recognized issuer.
 var businesses = []business{
+	// "Ally" is an ordinary word and is never an alias by itself.
+	{key: "ally", aliases: []alias{
+		{tokens: []string{"ally", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"ally", "financial"}, bridge: true, manual: true},
+	}},
 	{key: "american-express", aliases: []alias{
 		{tokens: []string{"american", "express"}, bridge: true, manual: true},
 		{tokens: []string{"amex"}, bridge: true, manual: true},
@@ -86,20 +127,72 @@ var businesses = []business{
 		{tokens: []string{"barclays"}, bridge: true, manual: true},
 		{tokens: []string{"barclays", "bank"}, bridge: true, manual: true},
 	}},
+	{key: "bmo", aliases: []alias{
+		{tokens: []string{"bmo"}, bridge: true, manual: true},
+		{tokens: []string{"bmo", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"bmo", "harris"}, bridge: true, manual: true},
+		{tokens: []string{"bank", "of", "montreal"}, bridge: true, manual: true},
+	}},
+	// Capital One is named by the whole phrase. Bare "capital" and bare "one"
+	// are ordinary words and never match, alone or as embedded substrings.
+	{key: "capital-one", aliases: []alias{
+		{tokens: []string{"capital", "one"}, bridge: true, manual: true},
+		{tokens: []string{"capitalone"}, bridge: true, manual: true},
+		{tokens: []string{"capital", "one", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"capital", "one", "financial"}, bridge: true, manual: true},
+	}},
 	{key: "chase", aliases: []alias{
 		{tokens: []string{"chase"}, bridge: true, manual: true},
 		{tokens: []string{"jpmorgan", "chase"}, bridge: true, manual: true},
 		{tokens: []string{"chase", "bank"}, bridge: true, manual: true},
 	}},
+	{key: "citi", aliases: []alias{
+		{tokens: []string{"citi"}, bridge: true, manual: true},
+		{tokens: []string{"citibank"}, bridge: true, manual: true},
+		{tokens: []string{"citigroup"}, bridge: true, manual: true},
+		{tokens: []string{"citi", "bank"}, bridge: true, manual: true},
+	}},
 	{key: "discover", aliases: []alias{
 		{tokens: []string{"discover"}, bridge: true, manual: true},
 		{tokens: []string{"discover", "bank"}, bridge: true, manual: true},
+	}},
+	// Fidelity Investments is named only by distinctive multi-token forms.
+	// The bare word "Fidelity" is shared with Fidelity Bank and Fidelity
+	// International, so it is never an alias and is never substring-matched.
+	{key: "fidelity-investments", aliases: []alias{
+		{tokens: []string{"fidelity", "investments"}, bridge: true, manual: true},
+		{tokens: []string{"fidelity", "brokerage", "services"}, bridge: true, manual: true},
+		{tokens: []string{"fidelity", "netbenefits"}, bridge: true, manual: true},
+		{tokens: []string{"netbenefits"}, bridge: true, manual: true},
+		{tokens: []string{"fidelity", "brokerage"}, manual: true},
+		{tokens: []string{"fidelity", "ira"}, manual: true},
+		{tokens: []string{"fidelity", "401k"}, manual: true},
+		{tokens: []string{"fidelity", "401", "k"}, manual: true},
 	}},
 	{key: "klarna", aliases: []alias{
 		{tokens: []string{"klarna"}, bridge: true, manual: true},
 	}},
 	{key: "paypal", aliases: []alias{
 		{tokens: []string{"paypal"}, bridge: true, manual: true},
+	}},
+	{key: "pnc", aliases: []alias{
+		{tokens: []string{"pnc"}, bridge: true, manual: true},
+		{tokens: []string{"pnc", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"pnc", "financial", "services"}, bridge: true, manual: true},
+	}},
+	{key: "truist", aliases: []alias{
+		{tokens: []string{"truist"}, bridge: true, manual: true},
+		{tokens: []string{"truist", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"truist", "financial"}, bridge: true, manual: true},
+	}},
+	// Both "US Bank" and "U.S. Bank" normalize to distinct token sequences,
+	// as do "US Bancorp" and "U.S. Bancorp". Bare "us" and bare "bank" never
+	// match, and "US" alone is never treated as a business name.
+	{key: "us-bank", aliases: []alias{
+		{tokens: []string{"us", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"u", "s", "bank"}, bridge: true, manual: true},
+		{tokens: []string{"us", "bancorp"}, bridge: true, manual: true},
+		{tokens: []string{"u", "s", "bancorp"}, bridge: true, manual: true},
 	}},
 	{key: "venmo", aliases: []alias{
 		{tokens: []string{"venmo"}, bridge: true, manual: true},
@@ -116,7 +209,8 @@ var manifest = func() map[string]Asset {
 		if err != nil {
 			panic(fmt.Sprintf("read curated logo %s: %v", spec.key, err))
 		}
-		if err := validateSVG(data); err != nil {
+		contentType, err := validateLogo(data, spec.format)
+		if err != nil {
 			panic(fmt.Sprintf("curated logo %s: %v", spec.key, err))
 		}
 		digest := sha256.Sum256(data)
@@ -128,7 +222,8 @@ var manifest = func() map[string]Asset {
 			SHA256:      hash,
 			Version:     hash,
 			Size:        int64(len(data)),
-			ContentType: "image/svg+xml",
+			ContentType: contentType,
+			LicenseURL:  spec.licenseURL,
 		}
 	}
 	return result
@@ -186,6 +281,46 @@ func validateSVG(data []byte) error {
 		if strings.Contains(lower, forbidden) {
 			return fmt.Errorf("SVG contains forbidden token %q", forbidden)
 		}
+	}
+	return nil
+}
+
+// validateLogo validates the declared encoding only and returns the fixed
+// content type for it. Both formats stay inside the same bounded payload.
+func validateLogo(data []byte, format logoFormat) (string, error) {
+	switch format {
+	case svgLogo:
+		if err := validateSVG(data); err != nil {
+			return "", err
+		}
+		return svgLogoType, nil
+	case pngLogo:
+		if err := validatePNG(data); err != nil {
+			return "", err
+		}
+		return pngLogoType, nil
+	default:
+		return "", fmt.Errorf("unsupported logo format %d", format)
+	}
+}
+
+// validatePNG accepts a bounded, well-formed, reasonably sized PNG. The
+// signature and decoded format agree so an unrelated image format cannot be
+// served with an image/png content type. Catalog files are deliberately
+// opted in; no user-supplied image reaches this path.
+func validatePNG(data []byte) error {
+	if len(data) == 0 || len(data) > maxLogoBytes {
+		return fmt.Errorf("PNG payload length %d out of range", len(data))
+	}
+	if !bytes.HasPrefix(data, []byte(pngFileSignature)) {
+		return fmt.Errorf("PNG has an unexpected signature")
+	}
+	config, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || format != "png" {
+		return fmt.Errorf("PNG could not be decoded: %v", err)
+	}
+	if config.Width <= 0 || config.Height <= 0 || config.Width > maxLogoDimension || config.Height > maxLogoDimension {
+		return fmt.Errorf("PNG dimensions %dx%d out of range", config.Width, config.Height)
 	}
 	return nil
 }

@@ -53,6 +53,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", immutableCache)
 	w.Header().Set("Content-Type", asset.ContentType)
+	if asset.LicenseURL != "" {
+		w.Header().Set("Link", `<`+asset.LicenseURL+`>; rel="license"`)
+	}
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return

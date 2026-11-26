@@ -66,8 +66,9 @@ func modelRawRoutes(api huma.API) {
 			{Name: "version", In: "path", Required: true, Schema: &huma.Schema{Type: "string"}},
 		},
 		Responses: map[string]*huma.Response{
-			"200": {Description: "Curated SVG logo", Content: map[string]*huma.MediaType{
+			"200": {Description: "Curated catalog logo", Content: map[string]*huma.MediaType{
 				"image/svg+xml": {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+				"image/png":     {Schema: &huma.Schema{Type: "string", Format: "binary"}},
 			}},
 			"304": {Description: "Unchanged catalog asset"},
 			"404": {Description: "Key or version outside the curated catalog"},

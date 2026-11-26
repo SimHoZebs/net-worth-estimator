@@ -7522,6 +7522,13 @@
 				"responses": {
 					"200": {
 						"content": {
+							"image/png": {
+								"schema": {
+									"contentMediaType": "application/octet-stream",
+									"format": "binary",
+									"type": "string"
+								}
+							},
 							"image/svg+xml": {
 								"schema": {
 									"contentMediaType": "application/octet-stream",
@@ -7530,7 +7537,7 @@
 								}
 							}
 						},
-						"description": "Curated SVG logo"
+						"description": "Curated catalog logo"
 					},
 					"304": {
 						"description": "Unchanged catalog asset"

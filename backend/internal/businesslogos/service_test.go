@@ -40,7 +40,7 @@ func TestServiceSeedsAndServesOnlyCatalogAssets(t *testing.T) {
 		}
 		data, err := io.ReadAll(reader)
 		closeErr := reader.Close()
-		if err != nil || closeErr != nil || int64(len(data)) != served.Size || served.ContentType != "image/svg+xml" {
+		if err != nil || closeErr != nil || int64(len(data)) != served.Size || served.ContentType != asset.ContentType {
 			t.Fatalf("open %s: %d %v %v", key, len(data), err, closeErr)
 		}
 	}
