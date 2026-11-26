@@ -61,6 +61,7 @@ part of database operation.
 
 Additive sidecar tables and sharing indexes self-heal on first use
 after a schema upgrade, with no row conversion: `transaction_categories`,
+`category_scan_progress`, `category_evaluations`, `category_feedback`,
 `gmail_credentials`, and `email_receipts`,
 plus sharing indexes such as `sharing_grants_grantee`,
 `sharing_copies_source`, `sharing_visibility_group`,

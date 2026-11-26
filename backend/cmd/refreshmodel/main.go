@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
@@ -23,7 +24,7 @@ import (
 // tables fail closed so a schema extension cannot silently leave stale rows.
 var financialTables = []string{
 	"account_displays",
-	"accounts", "checkpoints", "checkpoint_available_balances", "transactions", "transaction_sim", "transaction_claims", "transaction_provisional_postings", "transaction_sync_keys", "suppressed_sync_keys", "transaction_categories",
+	"accounts", "checkpoints", "checkpoint_available_balances", "transactions", "transaction_sim", "transaction_claims", "transaction_provisional_postings", "transaction_sync_keys", "suppressed_sync_keys", "transaction_categories", "category_scan_progress", "category_evaluations", "category_feedback",
 	"statement_allocations", "statement_allocation_events",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"model_metadata", "payment_terms", "entity_ids",
@@ -108,6 +109,22 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 	if err != nil {
 		return err
 	}
+	// Source-facts insert triggers invalidate inferred categories and
+	// evaluations. Copy both after all current evidence is in place so a full
+	// refresh preserves the reviewed category state.
+	sort.SliceStable(tables, func(i, j int) bool {
+		rank := func(name string) int {
+			switch name {
+			case "transaction_categories":
+				return 1
+			case "category_evaluations":
+				return 2
+			default:
+				return 0
+			}
+		}
+		return rank(tables[i].name) < rank(tables[j].name)
+	})
 	var present int
 	if err := db.SQL().QueryRow("SELECT document_present FROM incoming.model_metadata WHERE user_id=? AND id=1", sourceRow).Scan(&present); err != nil {
 		return fmt.Errorf("source user must contain a current financial model: %w", err)
@@ -156,7 +173,16 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		if table.name == "receipts" {
 			continue
 		}
-		if financialOnly && (table.name == "account_links" || table.name == "transaction_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || table.name == "email_receipts" || strings.HasPrefix(table.name, "analysis_") || table.name == "provider_connections" || table.name == "projection_states" || table.name == "projection_slices" || table.name == "monte_carlo_statistics" || table.name == "projection_rows" || table.name == "net_worth_threshold_outputs" || table.name == "account_balance_outputs" || table.name == "transaction_fulfillment_outputs" || table.name == "cycle_fulfillment_outputs" || table.name == "planned_purchases_outputs" || table.name == "financial_independence_outputs" || table.name == "whatif_outputs") {
+		if lazyTables[table.name] {
+			present, err := attachedTableExists(tx, "incoming", table.name)
+			if err != nil {
+				return err
+			}
+			if !present {
+				continue
+			}
+		}
+		if financialOnly && (table.name == "account_links" || table.name == "transaction_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || table.name == "category_scan_progress" || table.name == "category_evaluations" || table.name == "category_feedback" || table.name == "email_receipts" || strings.HasPrefix(table.name, "analysis_") || table.name == "provider_connections" || table.name == "projection_states" || table.name == "projection_slices" || table.name == "monte_carlo_statistics" || table.name == "projection_rows" || table.name == "net_worth_threshold_outputs" || table.name == "account_balance_outputs" || table.name == "transaction_fulfillment_outputs" || table.name == "cycle_fulfillment_outputs" || table.name == "planned_purchases_outputs" || table.name == "financial_independence_outputs" || table.name == "whatif_outputs") {
 			// Guest publication carries no sync identity: the provisioned
 			// guest never syncs, so bank keys and the do-not-import list
 			// stay behind with the credentials. Full refresh copies both.
@@ -237,6 +263,9 @@ var identityTables = map[string]bool{
 var lazyTables = map[string]bool{
 	"email_receipts":           true,
 	"transaction_categories":   true,
+	"category_scan_progress":   true,
+	"category_evaluations":     true,
+	"category_feedback":        true,
 	"analysis_fact_dirty":      true,
 	"analysis_payment_streams": true,
 }
@@ -304,6 +333,10 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 			for _, shape := range shapes {
 				prior, ok := previous[shape.name]
 				if !ok {
+					switch shape.name {
+					case "transaction_categories", "category_feedback", "category_evaluations", "category_scan_progress":
+						return nil, fmt.Errorf("destination lacks source category table %s; provision the current category schema before refresh", shape.name)
+					}
 					if lazyTables[shape.name] {
 						continue
 					}
@@ -316,6 +349,18 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 			}
 			for _, shape := range result {
 				if lazyTables[shape.name] {
+					found := false
+					for _, incoming := range shapes {
+						if incoming.name == shape.name {
+							found = true
+							break
+						}
+					}
+					if !found {
+						// Keep the destination shape in the delete pass even when
+						// an older source cannot supply replacement rows.
+						merged = append(merged, shape)
+					}
 					continue
 				}
 				found := false
@@ -348,6 +393,14 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 		}
 	}
 	return result, nil
+}
+
+func attachedTableExists(tx *sql.Tx, schema, table string) (bool, error) {
+	var count int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM `+schema+`.sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&count); err != nil {
+		return false, err
+	}
+	return count == 1, nil
 }
 
 func tableColumns(db *sql.DB, schema, table string) ([]string, error) {

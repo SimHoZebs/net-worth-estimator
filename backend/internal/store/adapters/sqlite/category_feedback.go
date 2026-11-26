@@ -35,33 +35,43 @@ const categoryFeedbackDDL = `CREATE TABLE IF NOT EXISTS category_feedback (
 
 const categoryFeedbackIndexDDL = `CREATE INDEX IF NOT EXISTS category_feedback_user_txn ON category_feedback(user_id, transaction_id, seq)`
 
-func ensureCategoryFeedbackSchema(tx *userTx) error {
+func categoryFeedbackSchemaReady(db queryer) (bool, error) {
 	var count int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'category_feedback'`).Scan(&count); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE
+		(type = 'table' AND name = 'category_feedback') OR
+		(type = 'index' AND name = 'category_feedback_user_txn')`).Scan(&count); err != nil {
+		return false, err
+	}
+	return count == 2, nil
+}
+
+func ensureCategoryFeedbackSchema(tx *userTx) error {
+	ready, err := categoryFeedbackSchemaReady(tx.Tx)
+	if err != nil {
 		return err
 	}
-	if count == 1 {
+	if ready {
 		return nil
 	}
 	if _, err := tx.Exec(categoryFeedbackDDL); err != nil {
 		return err
 	}
-	_, err := tx.Exec(categoryFeedbackIndexDDL)
+	_, err = tx.Exec(categoryFeedbackIndexDDL)
 	return err
 }
 
 func ensureCategoryFeedbackSchemaDB(db *userDB) error {
-	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'category_feedback'`).Scan(&count); err != nil {
+	ready, err := categoryFeedbackSchemaReady(db.DB)
+	if err != nil {
 		return err
 	}
-	if count == 1 {
+	if ready {
 		return nil
 	}
 	if _, err := db.Exec(categoryFeedbackDDL); err != nil {
 		return err
 	}
-	_, err := db.Exec(categoryFeedbackIndexDDL)
+	_, err = db.Exec(categoryFeedbackIndexDDL)
 	return err
 }
 

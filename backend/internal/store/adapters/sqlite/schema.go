@@ -89,6 +89,113 @@ const transactionCategoriesDDL = `CREATE TABLE IF NOT EXISTS transaction_categor
 	FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 )`
 
+// categoryScanProgressDDL is the durable keyset cursor for one user's category
+// scan. The transaction ID is deliberately not a foreign key: the cursor remains
+// a valid ordering position after its row is deleted.
+const categoryScanProgressDDL = `CREATE TABLE IF NOT EXISTS category_scan_progress (
+	user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+	posted_time INTEGER NOT NULL,
+	transaction_id TEXT NOT NULL,
+	updated_at INTEGER NOT NULL
+)`
+
+// categoryEvaluationsDDL records the terminal or retryable outcome for the
+// exact evidence fingerprint. It stores no descriptors, facts, or amounts.
+const categoryEvaluationsDDL = `CREATE TABLE IF NOT EXISTS category_evaluations (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	transaction_id TEXT NOT NULL,
+	evidence_hash TEXT NOT NULL,
+	classifier_version TEXT NOT NULL,
+	outcome TEXT NOT NULL CHECK(outcome IN ('assigned', 'evaluated', 'deferred')),
+	attempts INTEGER NOT NULL CHECK(attempts >= 1),
+	next_attempt_at INTEGER NOT NULL DEFAULT 0,
+	problem_code TEXT NOT NULL DEFAULT '',
+	evaluated_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, transaction_id),
+	FOREIGN KEY(user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
+)`
+
+const categoryEvaluationsRetryIndexDDL = `CREATE INDEX IF NOT EXISTS category_evaluations_retry ON category_evaluations(user_id, outcome, next_attempt_at)`
+
+const transactionsCategoryScanIndexDDL = `CREATE INDEX IF NOT EXISTS transactions_category_scan ON transactions(user_id, posted_time, id)`
+
+// Evidence changes invalidate both the evaluation and an inferred assignment.
+// User and bank assignments retain precedence and are never removed by these
+// triggers. Clearing inferred sidecars on changed evidence makes the row
+// eligible again without reprocessing legacy inferred rows that predate the
+// evaluation table.
+const categoryEvaluationsFactsInsertTriggerDDL = `CREATE TRIGGER IF NOT EXISTS category_evaluations_facts_insert
+	AFTER INSERT ON transaction_source_facts
+	BEGIN
+		DELETE FROM category_evaluations WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id;
+		DELETE FROM transaction_categories WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id AND source = 'inferred';
+	END`
+
+const categoryEvaluationsFactsUpdateTriggerDDL = `CREATE TRIGGER IF NOT EXISTS category_evaluations_facts_update
+	AFTER UPDATE OF facts_json ON transaction_source_facts
+	WHEN OLD.facts_json IS NOT NEW.facts_json
+	BEGIN
+		DELETE FROM category_evaluations WHERE user_id = OLD.user_id AND transaction_id = OLD.transaction_id;
+		DELETE FROM transaction_categories WHERE user_id = OLD.user_id AND transaction_id = OLD.transaction_id AND source = 'inferred';
+	END`
+
+const categoryEvaluationsFactsDeleteTriggerDDL = `CREATE TRIGGER IF NOT EXISTS category_evaluations_facts_delete
+	AFTER DELETE ON transaction_source_facts
+	BEGIN
+		DELETE FROM category_evaluations WHERE user_id = OLD.user_id AND transaction_id = OLD.transaction_id;
+		DELETE FROM transaction_categories WHERE user_id = OLD.user_id AND transaction_id = OLD.transaction_id AND source = 'inferred';
+	END`
+
+const categoryEvaluationsTransactionUpdateTriggerDDL = `CREATE TRIGGER IF NOT EXISTS category_evaluations_transaction_update
+	AFTER UPDATE OF name, source, source_account_id ON transactions
+	WHEN OLD.name IS NOT NEW.name OR OLD.source IS NOT NEW.source OR OLD.source_account_id IS NOT NEW.source_account_id
+	BEGIN
+		DELETE FROM category_evaluations WHERE user_id = OLD.user_id AND transaction_id = OLD.id;
+		DELETE FROM transaction_categories WHERE user_id = OLD.user_id AND transaction_id = OLD.id AND source = 'inferred';
+	END`
+
+var categorySchemaTableNames = []string{
+	"transaction_categories",
+	"category_scan_progress",
+	"category_evaluations",
+	"category_feedback",
+}
+
+var categoryTriggerNames = []string{
+	"category_evaluations_facts_insert",
+	"category_evaluations_facts_update",
+	"category_evaluations_facts_delete",
+	"category_evaluations_transaction_update",
+}
+
+var categorySchemaIndexNames = []string{
+	"category_evaluations_retry",
+	"category_feedback_user_txn",
+	"transactions_category_scan",
+}
+
+func isCategorySchemaTable(name string) bool {
+	for _, candidate := range categorySchemaTableNames {
+		if name == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func categorySchemaTableDDLs() []string {
+	return []string{transactionCategoriesDDL, categoryScanProgressDDL, categoryEvaluationsDDL, categoryEvaluationsRetryIndexDDL, categoryFeedbackDDL, categoryFeedbackIndexDDL, transactionsCategoryScanIndexDDL}
+}
+
+func categorySchemaTriggerDDLs() []string {
+	return []string{
+		categoryEvaluationsFactsInsertTriggerDDL,
+		categoryEvaluationsFactsUpdateTriggerDDL,
+		categoryEvaluationsFactsDeleteTriggerDDL,
+		categoryEvaluationsTransactionUpdateTriggerDDL,
+	}
+}
+
 // checkpointAvailableBalancesDDL is bank evidence tied to one checkpoint.
 // It is additive metadata: fresh and migrated databases receive it from
 // schemaStatements; unmigrated databases fail current-schema validation.
@@ -233,6 +340,7 @@ func schemaStatements() []string {
 			FOREIGN KEY(user_id, source_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		`CREATE INDEX IF NOT EXISTS transactions_projection_slice ON transactions(user_id, projection_slice_id)`,
+		transactionsCategoryScanIndexDDL,
 		transactionProvisionalPostingsDDL,
 		`CREATE TABLE IF NOT EXISTS transaction_sim (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -264,6 +372,11 @@ func schemaStatements() []string {
 		)`,
 		suppressedSyncKeysDDL,
 		transactionCategoriesDDL,
+		categoryScanProgressDDL,
+		categoryEvaluationsDDL,
+		categoryEvaluationsRetryIndexDDL,
+		categoryFeedbackDDL,
+		categoryFeedbackIndexDDL,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,
@@ -855,6 +968,10 @@ var requiredSchemaColumns = map[string]string{
 	"transaction_claims":               "user_id, transaction_id, fulfills_rule_id, fulfills_occurrence_date",
 	"transaction_sync_keys":            "user_id, provider, bridge_account_id, bank_transaction_id, transaction_id",
 	"suppressed_sync_keys":             "user_id, provider, bridge_account_id, bank_transaction_id, suppressed_at",
+	"transaction_categories":           "user_id, transaction_id, category, source, producer, updated_at",
+	"category_scan_progress":           "user_id, posted_time, transaction_id, updated_at",
+	"category_evaluations":             "user_id, transaction_id, evidence_hash, classifier_version, outcome, attempts, next_attempt_at, problem_code, evaluated_at",
+	"category_feedback":                "user_id, seq, transaction_id, action, category, name, direction, facts_json, created_at",
 	"schema_migrations":                "name",
 	"planned_purchases":                "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
 	"recurrence_rules":                 "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, recurrence_unit, recurrence_interval, recurrence_weekdays, recurrence_month_mode, start_date, end_date, annual_cap, priority, enabled",
@@ -889,6 +1006,11 @@ func validateSchemaObjects(db queryer) error {
 			return err
 		}
 		if count != 1 {
+			// Category sidecars are additive and self-heal on first category
+			// use. A present table must still have the current shape.
+			if isCategorySchemaTable(table) {
+				continue
+			}
 			return fmt.Errorf("%w: missing table %s", ErrSetupRequired, table)
 		}
 		err := db.QueryRow(`SELECT ` + columns + ` FROM ` + table + ` LIMIT 0`).Scan()
@@ -908,7 +1030,7 @@ func validateSchemaObjects(db queryer) error {
 			return err
 		}
 		if count != 1 {
-			return fmt.Errorf("%w: missing analysis trigger %s", ErrSetupRequired, name)
+			return fmt.Errorf("%w: missing schema trigger %s", ErrSetupRequired, name)
 		}
 	}
 	return checkReceiptBlobSchemaObjects(db)
@@ -950,6 +1072,9 @@ func expectedSchemaTables() []string {
 		"transaction_sync_keys",
 		"suppressed_sync_keys",
 		"transaction_categories",
+		"category_scan_progress",
+		"category_evaluations",
+		"category_feedback",
 		"schema_migrations",
 		"planned_purchases",
 		"recurrence_rules",

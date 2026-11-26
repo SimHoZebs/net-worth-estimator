@@ -34,11 +34,18 @@ func TestKeywordClassifierRecognizesCommonInputs(t *testing.T) {
 	}
 	for _, item := range cases {
 		got, ok := results[item.input.TransactionID]
-		if ok != item.recognized || got.Category != item.expected {
-			t.Fatalf("%s: got %+v, %v; want %q, %v", item.name, got, ok, item.expected, item.recognized)
+		if !ok {
+			t.Fatalf("%s: missing explicit outcome", item.name)
 		}
-		if ok && got.Producer != (KeywordClassifier{}).Version() {
-			t.Fatalf("%s: producer=%q", item.name, got.Producer)
+		if item.recognized {
+			if got.Category != item.expected || got.Outcome != OutcomeAssigned {
+				t.Fatalf("%s: got %+v; want %q, assigned", item.name, got, item.expected)
+			}
+			if got.Producer != (KeywordClassifier{}).Version() {
+				t.Fatalf("%s: producer=%q", item.name, got.Producer)
+			}
+		} else if got.Outcome != OutcomeEvaluated || got.Category != "" {
+			t.Fatalf("%s: got %+v; want terminal evaluated miss", item.name, got)
 		}
 	}
 }

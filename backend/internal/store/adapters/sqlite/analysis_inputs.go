@@ -11,6 +11,9 @@ import (
 )
 
 func observeBankTransaction(tx *userTx, observation *BankObservation) error {
+	if err := ensureCategorySchema(tx); err != nil {
+		return fmt.Errorf("ensure transaction categories: %w", err)
+	}
 	id, err := resolveBankKeys(tx, observation.Keys)
 	if err != nil || id == "" {
 		return err
@@ -24,9 +27,6 @@ func observeBankTransaction(tx *userTx, observation *BankObservation) error {
 		WHERE transaction_source_facts.facts_json != excluded.facts_json`, id, string(data))
 	if err != nil {
 		return err
-	}
-	if err := ensureCategorySchema(tx); err != nil {
-		return fmt.Errorf("ensure transaction categories: %w", err)
 	}
 	provider := ""
 	if len(observation.Keys) > 0 {

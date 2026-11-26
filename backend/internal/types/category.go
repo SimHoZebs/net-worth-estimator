@@ -1,6 +1,11 @@
 package types
 
-import "strings"
+import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"strings"
+)
 
 // Transaction categories mirror the Plaid personal finance primary taxonomy.
 // The set lives in code: there is no category taxonomy table. Bank values are
@@ -143,6 +148,63 @@ type TransactionCategoryCandidate struct {
 	Name          string
 	Direction     string
 	Facts         *TransactionFacts
+	PostedTime    int64
+	Attempts      int
+	EvidenceHash  string
+}
+
+// Transaction category evaluation outcomes are explicit for every candidate.
+const (
+	TransactionCategoryOutcomeAssigned  = "assigned"
+	TransactionCategoryOutcomeEvaluated = "evaluated"
+	TransactionCategoryOutcomeDeferred  = "deferred"
+)
+
+// TransactionCategoryProblemProvider is the sanitized code retained for a
+// transient classifier provider failure. Provider errors and evidence never
+// enter the evaluation row.
+const TransactionCategoryProblemProvider = "provider_error"
+
+// TransactionCategoryCursor is one durable keyset position per user.
+type TransactionCategoryCursor struct {
+	PostedTime    int64
+	TransactionID string
+}
+
+// TransactionCategoryEvaluation is one classifier outcome ready for atomic
+// publication. The store revalidates EvidenceHash against current bank evidence
+// before writing either the evaluation or an inferred category.
+type TransactionCategoryEvaluation struct {
+	TransactionID string
+	EvidenceHash  string
+	Outcome       string
+	Category      string
+	Producer      string
+	ProblemCode   string
+}
+
+// TransactionCategoryBatch publishes one examined scan batch and its cursor in
+// the same transaction. ClassifierVersion records the composition for every
+// outcome without making version changes requeue terminal evaluations.
+type TransactionCategoryBatch struct {
+	ClassifierVersion string
+	Evaluations       []TransactionCategoryEvaluation
+	Cursor            TransactionCategoryCursor
+}
+
+// CategoryEvidenceHash fingerprints the exact classifier evidence. Length
+// framing keeps field boundaries unambiguous, and factsJSON is hashed verbatim
+// so any source-facts change invalidates the evaluation.
+func CategoryEvidenceHash(name, direction, factsJSON string) string {
+	hash := sha256.New()
+	_, _ = hash.Write([]byte("nwe-category-evidence-v1\x00"))
+	for _, part := range []string{name, direction, factsJSON} {
+		var size [8]byte
+		binary.BigEndian.PutUint64(size[:], uint64(len(part)))
+		_, _ = hash.Write(size[:])
+		_, _ = hash.Write([]byte(part))
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // CategoryFeedbackAction names the user intent behind one journal row.
