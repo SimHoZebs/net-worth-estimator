@@ -56,22 +56,21 @@ func StochasticNetWorthSamples(
 	if err != nil {
 		return nil, nil, err
 	}
-	historicalDates := make(map[string]bool)
-	for _, row := range session.deterministicPath.Rows {
-		if row.IsHistorical {
-			historicalDates[row.Date] = true
-		}
-	}
+	samples := exportStochasticSamples(session)
+	return result, samples, nil
+}
+
+func exportStochasticSamples(session *stochasticSession) map[string][]float64 {
 	samples := make(map[string][]float64, len(session.sortedValuesByDate))
 	for date, values := range session.sortedValuesByDate {
-		if historicalDates[date] {
+		if session.isHistoricalByDate[date] && !session.projectedDates[date] {
 			continue
 		}
 		copied := make([]float64, len(values))
 		copy(copied, values)
 		samples[date] = copied
 	}
-	return result, samples, nil
+	return samples
 }
 
 // runUnsampledSession runs the no-volatility fast path: Monte Carlo stays
@@ -220,6 +219,7 @@ func consumeOrdered(
 		if _, ok := session.isHistoricalByDate[row.Date]; !ok {
 			session.isHistoricalByDate[row.Date] = row.IsHistorical
 		}
+		session.projectedDates[row.Date] = true
 	}
 	session.completedRuns++
 	batchComplete := session.completedRuns%stochasticProgressBatch == 0 || session.completedRuns == session.config.RunCount

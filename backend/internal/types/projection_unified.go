@@ -187,7 +187,7 @@ type WhatIfOutput struct {
 func UnifiedProjectionDefaults() ProjectionState {
 	return ProjectionState{
 		CalendarTimezone: "UTC",
-		EngineVersion:    "v1",
+		EngineVersion:    "v2",
 		TrialCount:       1000,
 	}
 }

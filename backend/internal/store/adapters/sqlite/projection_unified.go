@@ -55,7 +55,7 @@ func (s *sqliteStore) SaveProjectionState(state types.ProjectionState) (types.Pr
 		state.CalendarTimezone = "UTC"
 	}
 	if state.EngineVersion == "" {
-		state.EngineVersion = "v1"
+		state.EngineVersion = "v2"
 	}
 	if state.TrialCount <= 0 {
 		state.TrialCount = 1000

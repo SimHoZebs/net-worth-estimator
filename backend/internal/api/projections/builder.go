@@ -20,7 +20,7 @@ import (
 // Unified build and read orchestration: one canonical state per user.
 // Slice validity is revision-scoped; the dirty date scopes the rewrite.
 
-const unifiedEngineVersion = "v1"
+const unifiedEngineVersion = "v2"
 
 // canonicalEvalJSON serializes evaluation tables in struct field order.
 func canonicalEvalJSON(tables *types.EvaluationTables) (string, error) {

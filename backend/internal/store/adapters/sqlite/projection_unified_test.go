@@ -21,7 +21,7 @@ func TestInitializeProjectionStateFreezesOnce(t *testing.T) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			if _, err := s.InitializeProjectionState("2026-01-01", "2027-01-01", "scope", "v1"); err != nil {
+			if _, err := s.InitializeProjectionState("2026-01-01", "2027-01-01", "scope", "v2"); err != nil {
 				errs <- err
 			}
 		}()
