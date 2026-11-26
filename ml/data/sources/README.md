@@ -2,7 +2,9 @@
 
 No raw rows are vendored here. This directory holds a registry, not data:
 `manifest.json` records sources, row counts, sampling recipes, mapping
-pointers, seed hashes, and regeneration commands. Fixtures stay gitignored.
+pointers, seed hashes, and regeneration commands. Fixtures stay gitignored
+under `ml/data/work/`, raw downloads under `ml/data/cache/raw/`, reports
+under `ml/data/reports/runs/`, and probes under `ml/data/seeds/probes/`.
 
 The mitul gated subset stays out of git until its license is confirmed.
 Only the deterministic 48,003-row per-key sample trains the seed, and only
@@ -22,15 +24,15 @@ cd ml && uv run --with pyarrow --with pandas --with openpyxl \
   eval/harness.py --source all \
   --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
   --mitul-path <path/to/transaction-categorization/default/train/0000.parquet> \
-  --full --cache-dir /tmp/opencode/evalboth \
-  --export-seed ml/seed.sqlite3
+  --full \
+  --export-seed data/seeds/runtime-v1/seed.sqlite3
 ```
 
 Verify the manifest:
 
 ```bash
-python3 ml/eval/store/verify.py
+python3 ml/data/verify_sources.py
 ```
 
-It checks JSON parses, required keys exist, `ml/seed.sqlite3` sha256
+It checks JSON parses, required keys exist, `ml/data/seeds/runtime-v1/seed.sqlite3` sha256
 matches the manifest hash, and mapping symbols import from `datasets.py`.

@@ -1,0 +1,1 @@
+{"entries": [{"bytes": 1024000, "id": "runtime-v1", "invariants": ["model table has exactly one row", "events table is empty", "checkpoints table is empty"], "path": "ml/data/seeds/runtime-v1/seed.sqlite3", "provenance": "docs/eval-datasets.md", "sha256": "51df0d5bf66b921d9711dc35cab3edd40c99a47cdc3bf910fbdd7c988f6c812f"}], "version": 1}

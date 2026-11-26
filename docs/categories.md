@@ -202,7 +202,7 @@ write path:
 3. Verify the gates (quarantine, supersession).
 4. Seed swap with a backup of the replaced database, pointing at the
    existing recipe (`ml/eval/seed_export.py`, canonical seed
-   `ml/seed.sqlite3`, provenance as documented in `ml/README.md`).
+   `ml/data/seeds/runtime-v1/seed.sqlite3`, provenance as documented in `ml/README.md`).
 
 The learner never writes its own seed; an operator performs the swap.
 

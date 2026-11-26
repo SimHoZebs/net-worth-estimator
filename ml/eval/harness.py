@@ -13,9 +13,11 @@ Run with the repo toolchain from the ml directory, e.g.::
 
     cd ml && uv run --with pyarrow --with pandas eval/harness.py --slice 5000
 
-Layout: fixture JSON and findings JSON live under ml/eval/.cache/ (gitignored);
-the learner uses a throwaway ML_MODEL_PATH under /tmp. Nothing is vendored
-into the repo.
+Layout: raw downloads live under ml/data/cache/raw/ (gitignored);
+per-run fixture and findings JSON live under ml/data/work/<run-id>/;
+per-run reports live under ml/data/reports/runs/<run-id/>; seed probes
+live under ml/data/seeds/probes/; the learner uses a throwaway
+ML_MODEL_PATH under /tmp. Nothing is vendored into the repo.
 """
 
 from __future__ import annotations
@@ -55,7 +57,7 @@ from training import (
     run_seed_recipe,
 )
 
-CACHE_DIR = EVAL_DIR / ".cache"
+DATA_DIR = ML_DIR / "data"
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,10 +68,11 @@ def parse_args() -> argparse.Namespace:
                         help="use all 68k rows instead of --slice")
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--months", type=int, default=6)
-    parser.add_argument("--cache-dir", type=Path, default=CACHE_DIR)
+    parser.add_argument("--data-dir", type=Path, default=DATA_DIR)
+    parser.add_argument("--run-id", type=str, default="local")
     parser.add_argument("--report", type=Path, default=None)
     parser.add_argument("--export-seed", type=Path, default=None,
-                        help="export a seed learner DB to this path (outside the repo)")
+                        help="export a seed learner DB to this path")
     parser.add_argument("--seed-probe", type=Path, default=None,
                         help="write the seed verification probe set here")
     parser.add_argument("--source", choices=("hf-v2", "moneydata", "mitul", "all"),
@@ -82,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_source(args, cache: Path, tag: str, rows: list[dict],
+def run_source(args, work_dir: Path, report_dir: Path, tag: str, rows: list[dict],
                source_label: str, source_license: str) -> tuple[dict, list, list]:
     """One full eval pass for a dataset; returns (report, seed_ordered, cat_seed_ordered).
 
@@ -102,7 +105,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
         sampled = sample_rows(rows, args.slice, args.seed)
     aliases = build_aliases(sampled)
 
-    fixture_path = cache / f"fixture{suffix}.json"
+    fixture_path = work_dir / f"fixture{suffix}.json"
     with open(fixture_path, "w") as handle:
         json.dump(
             {
@@ -118,7 +121,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
             },
             handle,
         )
-    findings_path = cache / f"findings{suffix}.json"
+    findings_path = work_dir / f"findings{suffix}.json"
     output = run_go_harness(fixture_path, findings_path, months, args.seed)
     transactions = output["transactions"]
 
@@ -194,7 +197,7 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
         "category_learner": cat_learner_arms,
         "seed": None,
     }
-    report_path = args.report or (cache / f"report{suffix}.json")
+    report_path = args.report or (report_dir / f"report{suffix}.json")
     with open(report_path, "w") as handle:
         json.dump(report, handle, indent=2)
     print(f"### source: {tag}")
@@ -204,15 +207,20 @@ def run_source(args, cache: Path, tag: str, rows: list[dict],
 
 def main() -> None:
     args = parse_args()
-    cache = args.cache_dir
-    cache.mkdir(parents=True, exist_ok=True)
+    data_dir = args.data_dir
+    raw_dir = data_dir / "cache" / "raw"
+    work_dir = data_dir / "work" / args.run_id
+    report_dir = data_dir / "reports" / "runs" / args.run_id
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    report_dir.mkdir(parents=True, exist_ok=True)
 
     tags = ("hf-v2", "moneydata", "mitul") if args.source == "all" else (args.source,)
     seed_inputs: list[tuple[str, list]] = []
     cat_seed_inputs: list[tuple[str, list]] = []
     for tag in tags:
         if tag == "hf-v2":
-            parquet_path = download_parquet(cache, PARQUET_URL)
+            parquet_path = download_parquet(raw_dir / "hf-v2", PARQUET_URL)
             rows = load_rows(parquet_path)
             source_label = "DoDataThings/us-bank-transaction-categories-v2"
             source_license = "MIT"
@@ -228,7 +236,7 @@ def main() -> None:
             rows = load_moneydata(args.moneydata_path)
             source_label = MONEYDATASET_ID
             source_license = "CC BY 4.0 (citation required, see README)"
-        _, seed_ordered, cat_seed_ordered = run_source(args, cache, tag, rows,
+        _, seed_ordered, cat_seed_ordered = run_source(args, work_dir, report_dir, tag, rows,
                                      source_label, source_license)
         # The mitul arm runs a single representative occurrence per row, so
         # its payment findings carry no recurrence signal and stay out of
@@ -238,7 +246,8 @@ def main() -> None:
         cat_seed_inputs.append((tag, cat_seed_ordered))
 
     if args.export_seed is not None:
-        probe_path = args.seed_probe or (cache / "seed-probe.json")
+        probe_path = args.seed_probe or (data_dir / "seeds" / "probes" / f"{args.run_id}.json")
+        probe_path.parent.mkdir(parents=True, exist_ok=True)
         seed = run_seed_recipe(seed_inputs, args.export_seed, probe_path,
                                cat_ordered_lists=cat_seed_inputs)
         print("### combined seed")
