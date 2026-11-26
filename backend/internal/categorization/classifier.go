@@ -19,16 +19,27 @@ type Input struct {
 	Facts         *types.TransactionFacts
 }
 
-// Classified is one classifier decision. Producer names the exact classifier
-// version that supplied it, so the stored assignment records its origin.
+// Classified is one classifier decision. Outcome is always assigned, evaluated,
+// or deferred. Producer names the exact classifier version that supplied an
+// assignment; ProblemCode is a sanitized stable code for deferred outcomes.
 type Classified struct {
-	Category string
-	Producer string
+	Category    string
+	Producer    string
+	Outcome     string
+	ProblemCode string
 }
 
+// Classifier outcome names alias the shared store vocabulary.
+const (
+	OutcomeAssigned  = types.TransactionCategoryOutcomeAssigned
+	OutcomeEvaluated = types.TransactionCategoryOutcomeEvaluated
+	OutcomeDeferred  = types.TransactionCategoryOutcomeDeferred
+)
+
 // Classifier maps uncategorized transactions onto the supported category keys.
-// Missing transaction IDs stay uncategorized. Implementations must be safe for
-// concurrent calls and must honor context cancellation.
+// Every input receives an explicit outcome. Missing transaction IDs stay
+// uncategorized. Implementations must be safe for concurrent calls and must
+// honor context cancellation.
 type Classifier interface {
 	Version() string
 	Classify(ctx context.Context, inputs []Input) (map[string]Classified, error)
@@ -42,16 +53,25 @@ type KeywordClassifier struct{}
 // Version identifies the classifier composition in stored assignments.
 func (KeywordClassifier) Version() string { return "keyword-v1" }
 
-// Classify returns one category per recognized transaction.
+// Classify returns one explicit outcome per transaction. Keyword misses are
+// terminal evaluated outcomes so unchanged evidence is not classified again.
 func (c KeywordClassifier) Classify(ctx context.Context, inputs []Input) (map[string]Classified, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	results := map[string]Classified{}
 	for _, input := range inputs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		result := Classified{Outcome: OutcomeEvaluated}
 		if category, ok := classifyKeyword(input); ok {
-			results[input.TransactionID] = Classified{Category: category, Producer: c.Version()}
+			result = Classified{Category: category, Producer: c.Version(), Outcome: OutcomeAssigned}
 		}
+		results[input.TransactionID] = result
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }

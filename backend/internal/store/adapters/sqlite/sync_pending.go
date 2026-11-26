@@ -342,6 +342,11 @@ func mirrorAccount(transaction types.Transaction) (string, bool) {
 // behavior: inserts split on the carried lifecycle flag, updates count as
 // refreshes, conversions and void flips count on actual change.
 func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncApplySummary) error {
+	// Install evidence invalidation before the first bank mutation, including
+	// the first sync of a database whose category sidecars are not provisioned.
+	if err := ensureCategorySchema(tx); err != nil {
+		return fmt.Errorf("ensure transaction categories: %w", err)
+	}
 	position, err := nextTablePosition(tx, "transactions")
 	if err != nil {
 		return err

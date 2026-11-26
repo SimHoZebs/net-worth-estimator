@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Database discovers users with bank transactions. The worker never sees raw
@@ -60,6 +61,8 @@ func (w *Worker) RunOnce(ctx context.Context) error {
 	return firstError
 }
 
+const categoryBatchSize = 100
+
 func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) error {
 	if setter, ok := w.classifier.(FeedbackSetter); ok {
 		// Training delivery rides the existing session-open path: the
@@ -68,10 +71,14 @@ func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) e
 		// keyword-only compositions (no setter) are untouched.
 		setter.SetFeedbackSource(newJournalFeedbackSource(scoped, user))
 	}
-	candidates, err := scoped.ListTransactionCategoryCandidates(100)
+	candidates, err := scoped.ListTransactionCategoryCandidates(categoryBatchSize)
 	if err != nil || len(candidates) == 0 {
 		return err
 	}
+	return w.classifyAndRecord(ctx, scoped, candidates)
+}
+
+func (w *Worker) classifyAndRecord(ctx context.Context, scoped store.Store, candidates []types.TransactionCategoryCandidate) error {
 	inputs := make([]Input, len(candidates))
 	for index, candidate := range candidates {
 		inputs[index] = Input{
@@ -85,14 +92,45 @@ func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) e
 	defer cancel()
 	results, err := w.classifier.Classify(work, inputs)
 	if err != nil {
-		return err
-	}
-	for transactionID, classified := range results {
-		if err := scoped.SetInferredTransactionCategory(transactionID, classified.Category, classified.Producer); err != nil && !store.IsNotFound(err) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if work.Err() != context.DeadlineExceeded {
 			return err
 		}
+		// The worker's own budget expired, not its caller. Record a retry
+		// and advance the scan rather than pinning this page indefinitely.
+		results = make(map[string]Classified, len(inputs))
+		for _, input := range inputs {
+			results[input.TransactionID] = Classified{
+				Outcome: OutcomeDeferred, ProblemCode: types.TransactionCategoryProblemProvider,
+			}
+		}
 	}
-	return nil
+	evaluations := make([]types.TransactionCategoryEvaluation, 0, len(candidates))
+	for _, candidate := range candidates {
+		classified, ok := results[candidate.TransactionID]
+		if !ok {
+			return fmt.Errorf("categorization classifier omitted an outcome")
+		}
+		evaluations = append(evaluations, types.TransactionCategoryEvaluation{
+			TransactionID: candidate.TransactionID,
+			EvidenceHash:  candidate.EvidenceHash,
+			Outcome:       classified.Outcome,
+			Category:      classified.Category,
+			Producer:      classified.Producer,
+			ProblemCode:   classified.ProblemCode,
+		})
+	}
+	last := candidates[len(candidates)-1]
+	return scoped.RecordTransactionCategoryBatch(types.TransactionCategoryBatch{
+		ClassifierVersion: w.classifier.Version(),
+		Evaluations:       evaluations,
+		Cursor: types.TransactionCategoryCursor{
+			PostedTime:    last.PostedTime,
+			TransactionID: last.TransactionID,
+		},
+	})
 }
 
 // Start owns its goroutine and waits for it on stop.
