@@ -74,7 +74,7 @@ cd ml && uv run --with pyarrow --with pandas eval/harness.py --slice 5000
 uv run --with pyarrow --with pandas eval/harness.py --full   # all 68k rows
 ```
 
-Per-source reports land under `ml/eval/.cache/report{suffix}.json` with a
+Per-source reports land under `ml/data/reports/runs/<run-id>/` with a
 stdout summary: `deterministic` and `category_deterministic` (pair-counted
 precision/recall/F1 plus strict exact-set accuracy), `signal_support`
 (backed vs hint-only requests), `strength` (strong vs moderate findings),
@@ -98,7 +98,7 @@ dismiss-and-retry so one shift never wipes the seed. Export fails loudly
 unless every payment classifier kind and every mapped category kind clears
 its coverage minimum; a probe set verifies that a fresh load of the seed
 evaluates identically to the in-memory trained state. The canonical seed
-is versioned at `ml/seed.sqlite3` (see `docs/eval-datasets.md` for
+is versioned at `ml/data/seeds/runtime-v1/seed.sqlite3` (see `docs/eval-datasets.md` for
 provenance); regenerate it with the documented command rather than
 hand-editing it. Real-vs-synthesized accounting lives in
 `ml/eval/README.md`.

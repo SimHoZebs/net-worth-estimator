@@ -31,6 +31,14 @@ Bank detail is preserved in `transaction_source_facts` when the provider sends
 it as a string of at most 500 characters. Object-valued or oversized `extra`
 values are dropped. Only the primary key is stored and returned.
 
+## Merchant classification data
+
+Merchant-name classification is server-owned. Its future lookup data lives in
+`backend/internal/categorization/merchantdata/`, beside the classifier. The Go
+taxonomy and merchant normalizer remain authoritative. ML training datasets and
+the River seed live under `ml/data/` and do not own production classification
+policy. The merchant table has no runtime consumer yet.
+
 ## Precedence
 
 1. A user assignment always wins.
@@ -202,7 +210,7 @@ write path:
 3. Verify the gates (quarantine, supersession).
 4. Seed swap with a backup of the replaced database, pointing at the
    existing recipe (`ml/eval/seed_export.py`, canonical seed
-   `ml/seed.sqlite3`, provenance as documented in `ml/README.md`).
+   `ml/data/seeds/runtime-v1/seed.sqlite3`, provenance as documented in `ml/README.md`).
 
 The learner never writes its own seed; an operator performs the swap.
 

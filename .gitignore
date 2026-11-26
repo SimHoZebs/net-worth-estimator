@@ -12,4 +12,10 @@ tmp/
 __pycache__/
 *.pyc
 /data/
-/ml/eval/.cache/
+/ml/data/cache/
+/ml/data/work/
+/ml/data/reports/runs/
+/ml/data/seeds/probes/
+/ml/data/**/*.sqlite3-shm
+/ml/data/**/*.sqlite3-wal
+/ml/data/**/*.sqlite3-journal

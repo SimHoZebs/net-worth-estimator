@@ -19,3 +19,8 @@ coverage
 **/playwright-report
 auth/better-auth/test-support.ts
 auth/better-auth/**/*.test.ts
+ml/data/cache
+ml/data/work
+ml/data/derived
+ml/data/reports/runs
+ml/data/seeds/probes

@@ -82,7 +82,7 @@ COPY --from=standalone --chown=app:app /app/server /app/setupdb /app/authzctl /a
 # Runtime imports only server, model, and evidence. Test modules stay out
 # of the image.
 COPY ml/server.py ml/model.py ml/evidence.py /app/ml/
-COPY ml/seed.sqlite3 /app/ml/seed.sqlite3
+COPY ml/data/seeds/runtime-v1/seed.sqlite3 /app/ml/seed.sqlite3
 COPY deploy/northflank/runtime.py /app/northflank-runtime.py
 ENV HOST=0.0.0.0 PORT=8787 NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db \
     ML_JUDGMENT_URL=http://127.0.0.1:8766 ML_MODEL_PATH=/data/ml.sqlite3 \

@@ -68,7 +68,7 @@ Income→INCOME, Government & Legal and Charity & Donations both
 others outflow); currency rides along as-is.
 
 The data is **never vendored**: the harness downloads the 1.6MB parquet at
-eval time into `ml/eval/.cache/` (gitignored) and reuses it on later runs.
+eval time into `ml/data/cache/raw/hf-v2/` (gitignored) and reuses it on later runs.
 
 ## What is real vs synthesized
 
@@ -116,7 +116,7 @@ mitul arm warms them, but they remain baseline until production feedback).
 The harness also writes a probe set (`--seed-probe`)
 covering payment, HF/MoneyData category, and mitul category requests (200
 each) and verifies that a fresh load of
-the seed evaluates the probe identically to the in-memory trained state. The canonical seed is versioned at `ml/seed.sqlite3` (see
+the seed evaluates the probe identically to the in-memory trained state. The canonical seed is versioned at `ml/data/seeds/runtime-v1/seed.sqlite3` (see
 `docs/eval-datasets.md` for provenance); regenerate with the command
 above rather than hand-editing it. Standalone use:
 `python eval/seed_export.py export --src ... --dest ...` and
@@ -132,7 +132,7 @@ series and runs `PaymentPatterns{}.Analyze` nil-resolver plus
 category arm, (4) Python scores deterministic output vs labels, trains
 throwaway `PaymentModelStore` instances (`ML_MODEL_PATH` under `/tmp`),
 (5) optionally exports a verified seed DB (`--export-seed`), and
-(6) writes `ml/eval/.cache/report.json` plus a stdout summary. The harness
+(6) writes `ml/data/reports/runs/<run-id>/report.json` plus a stdout summary. The harness
 touches only `PaymentModelStore.state/evaluate/observe` (stable API).
 
 ## How to read the report

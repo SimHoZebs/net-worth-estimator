@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Verify ml/eval/store/manifest.json against repo state. Read-only."""
+"""Verify ml/data/sources/manifest.json against repo state. Read-only."""
 
 import hashlib
 import json
 import sys
 from pathlib import Path
 
-STORE = Path(__file__).resolve().parent
-REPO = STORE.parent.parent.parent
-EVAL = STORE.parent
+DATA_DIR = Path(__file__).resolve().parent
+REPO = DATA_DIR.parent.parent
+EVAL = REPO / "ml" / "eval"
 
 REQUIRED = {"id", "source", "rows_total", "rows_used", "license",
             "local_path_hint", "sampling", "mapping", "seed_contribution",
@@ -16,7 +16,7 @@ REQUIRED = {"id", "source", "rows_total", "rows_used", "license",
 
 
 def main() -> int:
-    manifest = json.loads((STORE / "manifest.json").read_text())
+    manifest = json.loads((DATA_DIR / "sources" / "manifest.json").read_text())
     ids = [e["id"] for e in manifest["entries"]]
     assert ids == ["hf-v2", "moneydata", "mitul-sample", "seed",
                    "prod-labels-note"], ids
@@ -24,8 +24,13 @@ def main() -> int:
         missing = REQUIRED - set(entry)
         assert not missing, (entry["id"], missing)
     seed = next(e for e in manifest["entries"] if e["id"] == "seed")
-    digest = hashlib.sha256((REPO / "ml/seed.sqlite3").read_bytes()).hexdigest()
+    seed_path = REPO / "ml/data/seeds/runtime-v1/seed.sqlite3"
+    digest = hashlib.sha256(seed_path.read_bytes()).hexdigest()
     assert digest in seed["content_pointer"], (digest, seed["content_pointer"])
+    seed_manifest = json.loads((DATA_DIR / "seeds" / "manifest.json").read_text())
+    runtime = next(e for e in seed_manifest["entries"] if e["id"] == "runtime-v1")
+    assert runtime["sha256"] == digest, (runtime["sha256"], digest)
+    assert runtime["bytes"] == seed_path.stat().st_size
     sys.path.insert(0, str(REPO / "ml"))
     sys.path.insert(0, str(EVAL))
     import datasets  # noqa: E402

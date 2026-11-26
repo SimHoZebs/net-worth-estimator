@@ -8,7 +8,7 @@
       "rows_total": 68000,
       "rows_used": 68000,
       "license": "MIT",
-      "local_path_hint": "ml/eval/.cache/us-bank-txn-cats-v2.parquet (gitignored cache; never committed)",
+      "local_path_hint": "ml/data/cache/raw/hf-v2/us-bank-txn-cats-v2.parquet (gitignored cache; never committed)",
       "content_pointer": "https://huggingface.co/datasets/DoDataThings/us-bank-transaction-categories-v2/resolve/refs%2Fconvert%2Fparquet/default/train/0000.parquet",
       "sampling": "Seed trains full set; eval slices use datasets.sample_rows stratified per category, seed 7.",
       "mapping": "datasets.EXPECTED_KIND, datasets.EXPECTED_CATEGORY, datasets.resolve_expected_category",
@@ -50,13 +50,13 @@
       "rows_total": 55425,
       "rows_used": 55425,
       "license": "Derived artifact (MIT + CC BY 4.0 sources; mitul gated eval-use only)",
-      "local_path_hint": "ml/seed.sqlite3 (versioned seed)",
+      "local_path_hint": "ml/data/seeds/runtime-v1/seed.sqlite3 (versioned seed)",
       "content_pointer": "sha256 51df0d5bf66b921d9711dc35cab3edd40c99a47cdc3bf910fbdd7c988f6c812f, 1024000 bytes, model row only",
       "sampling": "Deterministic concatenation with fixed seeds; see training.run_seed_recipe.",
       "mapping": "training.run_seed_recipe; seed_export.export_seed/verify_seed; training.order_requests interleaved mode",
       "alias": "N/A: seed stores weights only; alias tables are rebuilt per eval run.",
       "seed_contribution": "4,156 payment events then 51,269 category events (HF, MoneyData, mitul); coverage gate >= 50 per kind (HOME_IMPROVEMENT, GOVERNMENT_AND_NON_PROFIT exempt).",
-      "regenerate": "cd ml && uv run --with pyarrow --with pandas --with openpyxl eval/harness.py --source all --moneydata-path <xlsx> --mitul-path <parquet> --full --cache-dir /tmp/opencode/evalboth --export-seed ml/seed.sqlite3"
+      "regenerate": "cd ml && uv run --with pyarrow --with pandas --with openpyxl eval/harness.py --source all --moneydata-path <xlsx> --mitul-path <parquet> --full --export-seed data/seeds/runtime-v1/seed.sqlite3"
     },
     {
       "id": "prod-labels-note",

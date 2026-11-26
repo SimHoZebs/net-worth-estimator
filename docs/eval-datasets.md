@@ -6,9 +6,9 @@ what data, what is real versus synthesized, and how the deployable seed
 was produced. No dataset is vendored into the repo; the harness downloads
 at eval time into a gitignored cache.
 
-Machine-readable registry: `ml/eval/store/manifest.json` records each
+Machine-readable registry: `ml/data/sources/manifest.json` records each
 source with row counts, sampling recipes, mapping pointers, seed hashes,
-and regeneration commands; `ml/eval/store/README.md` covers verification.
+and regeneration commands; `ml/data/sources/README.md` covers verification.
 No raw rows live there.
 
 ## Sources
@@ -71,7 +71,7 @@ merchant name carries no keyword evidence and emits no request at all
 (single generic words, short names) — a descriptor-coverage finding, not a
 model failure.
 
-## The seed (`ml/seed.sqlite3`)
+## The seed (`ml/data/seeds/runtime-v1/seed.sqlite3`)
 
 1000KB SQLite containing only the `model` row: warm weights and per-kind
 example counts from training on the full HF v2 set plus all of MoneyData
@@ -121,11 +121,11 @@ cd ml && uv run --with pyarrow --with pandas --with openpyxl \
   eval/harness.py --source all \
   --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
   --mitul-path <path/to/transaction-categorization/default/train/0000.parquet> \
-  --full --cache-dir /tmp/opencode/evalboth \
-  --export-seed ml/seed.sqlite3
+  --full \
+  --export-seed data/seeds/runtime-v1/seed.sqlite3
 ```
 
-Then copy the export over `ml/seed.sqlite3` deliberately — never as a
+Then copy the export over `ml/data/seeds/runtime-v1/seed.sqlite3` deliberately — never as a
 drive-by. Removing the seed requires removing the Dockerfile `COPY` and
 the `ML_SEED_PATH` env together, or every image build fails.
 
