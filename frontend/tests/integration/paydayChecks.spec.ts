@@ -49,9 +49,11 @@ async function overrideSummary(
 ) {
 	await page.route("**/v1/safe-spending-summary", async (route) => {
 		const response = await route.fetch();
+		const body = await response.json();
 		await route.fulfill({
-			response,
-			json: { ...(await response.json()), ...headline, ...patch },
+			status: response.status(),
+			headers: response.headers(),
+			json: { ...body, ...headline, ...patch },
 		});
 	});
 }
