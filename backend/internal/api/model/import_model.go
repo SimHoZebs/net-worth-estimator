@@ -39,6 +39,9 @@ func (s *handler) importModel(_ context.Context, input *struct {
 	}
 	candidate := input.Body.Model
 	mergeStoredLifecycle(&candidate, current)
+	if err := rejectLinkedAccountOmission(s.store, current, &candidate); err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
 	issues := domain.ValidateFinancialModel(&candidate)
 	for _, issue := range issues {
 		if issue.Severity == types.SeverityError {
@@ -101,6 +104,33 @@ func mergeStoredLifecycle(candidate *types.FinancialModel, current *types.Financ
 
 func importCheckpointKey(checkpoint types.Checkpoint) string {
 	return fmt.Sprintf("%s\x00%d", checkpoint.AccountID, checkpoint.ObservedAt)
+}
+
+// rejectLinkedAccountOmission preflights the reviewed document before any row
+// write. Linked accounts are synced state even when they currently have no bank
+// rows, so replacement must retain them rather than fail halfway through apply.
+func rejectLinkedAccountOmission(st store.Store, current, next *types.FinancialModel) error {
+	if current == nil {
+		return nil
+	}
+	currentIDs := make(map[string]bool, len(current.Accounts))
+	for _, account := range current.Accounts {
+		currentIDs[account.ID] = true
+	}
+	nextIDs := make(map[string]bool, len(next.Accounts))
+	for _, account := range next.Accounts {
+		nextIDs[account.ID] = true
+	}
+	links, err := st.ListAccountLinks()
+	if err != nil {
+		return err
+	}
+	for _, link := range links {
+		if currentIDs[link.ModelAccountID] && !nextIDs[link.ModelAccountID] {
+			return fmt.Errorf("linked accounts cannot be omitted from an import")
+		}
+	}
+	return nil
 }
 
 // applyImportedModel reconciles the reviewed document against the stored

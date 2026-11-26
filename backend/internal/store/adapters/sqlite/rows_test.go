@@ -330,16 +330,18 @@ func TestProvisionStoresInstitutionOnLink(t *testing.T) {
 }
 
 func TestProvisionReportsStaleLinks(t *testing.T) {
-	store := openTestStore(t)
+	store := openSQLiteStore(t)
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
 	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "College"}); err != nil {
 		t.Fatalf("save link: %v", err)
 	}
-	if err := store.DeleteAccount("checking"); err != nil {
-		t.Fatalf("delete account: %v", err)
-	}
+	execSyncSetup(t, store, []string{
+		`DELETE FROM account_displays WHERE account_id = 'checking' AND user_id = :user_id`,
+		`DELETE FROM accounts WHERE id = 'checking' AND user_id = :user_id`,
+		`DELETE FROM entity_ids WHERE id = 'checking' AND user_id = :user_id`,
+	})
 	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-checking", Name: "College", Currency: "USD"},
 	})

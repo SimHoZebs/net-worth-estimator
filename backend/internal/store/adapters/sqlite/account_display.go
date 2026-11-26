@@ -166,55 +166,5 @@ func (s *sqliteStore) SaveLoan(bundle types.LoanBundle, create bool) (types.Acco
 	return bundle.Accounts[0], nil
 }
 
-func (s *sqliteStore) DeleteLoan(id string) error {
-	err := withRowTx(s.db, func(tx *userTx) error {
-		model, err := loadModel(tx)
-		if err != nil {
-			return err
-		}
-		if model == nil {
-			return NotFound(id)
-		}
-		for _, a := range model.Accounts {
-			if a.ID != id || a.Display == nil || types.IsPassthroughDisplay(a.Display, a.ID) {
-				continue
-			}
-			for _, ruleID := range []string{a.Display.InterestScheduleID, a.Display.PaymentScheduleID} {
-				if err := clearProvisionalPostingsForRule(tx, ruleID); err != nil {
-					return err
-				}
-				if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
-					return err
-				}
-				if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, ruleID); err != nil {
-					return err
-				}
-				if err := releaseRowID(tx, ruleID); err != nil {
-					return err
-				}
-			}
-			for _, c := range a.Display.Components {
-				for _, table := range []string{"checkpoints", "checkpoint_available_balances"} {
-					if _, err := tx.Exec(`DELETE FROM `+table+` WHERE model_account_id = ? AND user_id = :user_id`, c.AccountID); err != nil {
-						return err
-					}
-				}
-				if _, err := tx.Exec(`DELETE FROM accounts WHERE id = ? AND user_id = :user_id`, c.AccountID); err != nil {
-					return err
-				}
-				if err := stripSharingPolicyAccount(tx, c.AccountID); err != nil {
-					return err
-				}
-				if err := releaseRowID(tx, c.AccountID); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-		return NotFound(id)
-	})
-	if err != nil {
-		return err
-	}
-	return s.markDirtyStart()
-}
+// DeleteLoan is implemented by the shared account-deletion cascade in
+// account_delete.go.

@@ -34,6 +34,7 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "list-account-balances", Method: "GET", Path: "/accounts/balances", Summary: "List accounts with balances as of a date"}, s.listAccountBalances)
 	huma.Register(api, huma.Operation{OperationID: "create-account", Method: "POST", Path: "/accounts", Summary: "Create one account"}, s.createAccount)
 	huma.Register(api, huma.Operation{OperationID: "update-account", Method: "PATCH", Path: "/accounts/{id}", Summary: "Replace one account"}, s.updateAccount)
+	huma.Register(api, huma.Operation{OperationID: "delete-account", Method: "DELETE", Path: "/accounts/{id}", Summary: "Delete one manual account and its dependent history"}, s.deleteAccount)
 	huma.Register(api, huma.Operation{OperationID: "list-transactions", Method: "GET", Path: "/transactions", Summary: "List recorded transactions touching an account"}, s.listTransactions)
 	huma.Register(api, huma.Operation{OperationID: "record-transaction", Method: "POST", Path: "/transactions", Summary: "Record one transaction"}, s.recordTransaction)
 	huma.Register(api, huma.Operation{OperationID: "amend-transaction", Method: "POST", Path: "/transactions/{id}/amend", Summary: "Amend the terms of one transaction"}, s.amendTransaction)

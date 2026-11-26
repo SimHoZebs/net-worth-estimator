@@ -109,19 +109,8 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM email_receipts WHERE user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear email receipts: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM monte_carlo_statistics WHERE user_id = :user_id`); err != nil {
+	if err := purgeProjectionArtifactsTx(tx); err != nil {
 		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM projection_slices WHERE user_id = :user_id`); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM projection_rows WHERE user_id = :user_id`); err != nil {
-		return err
-	}
-	for _, table := range []string{"net_worth_threshold_outputs", "account_balance_outputs", "transaction_fulfillment_outputs", "cycle_fulfillment_outputs", "planned_purchases_outputs", "financial_independence_outputs", "whatif_outputs"} {
-		if _, err := tx.Exec(`DELETE FROM ` + table + ` WHERE user_id = :user_id`); err != nil {
-			return err
-		}
 	}
 	if _, err := tx.Exec(`DELETE FROM projection_states WHERE user_id = :user_id`); err != nil {
 		return err

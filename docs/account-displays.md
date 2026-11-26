@@ -28,8 +28,7 @@ always be summed at the same projection cut.
 Payment destination selection expands the visible account to interest, then
 principal at the write boundary. The calculation engine still uses raw
 account IDs. Account-balance goal checks use the combined balance when the
-selected account owns a display relationship. Deleting a loan removes its components, balance checks, and
-managed schedules atomically. Other financial references block deletion.
+selected account owns a display relationship. Deleting a loan removes both components, their balance checks, managed schedules, and every dependent financial row atomically. Deleting either component deletes the whole visible loan. A bridge link or bank-owned checkpoint or transaction on any component blocks the entire deletion.
 
 ## Existing databases
 

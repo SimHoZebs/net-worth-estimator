@@ -187,6 +187,40 @@ it("stays silent without refresh when the resource switches during the call", as
 	expect(published()).toEqual([]);
 });
 
+it("marks a destructive write persisted before a failed refresh", async () => {
+	stubTestServer();
+	const onPersisted = vi.fn();
+	const result = await performSave({
+		call: async () => ({ data: { saved: true, issues: [] } }),
+		refresh: async () => {
+			expect(onPersisted).toHaveBeenCalledTimes(1);
+			throw new Error("reload failed");
+		},
+		failureMessage: "Nope.",
+		onPersisted,
+	});
+	expect(result).toBe(false);
+	expect(onPersisted).toHaveBeenCalledTimes(1);
+});
+
+it("does not mark a rejected destructive write persisted", async () => {
+	stubTestServer();
+	const onPersisted = vi.fn();
+	const result = await performSave({
+		call: async () => ({
+			data: {
+				saved: false,
+				issues: [{ severity: "error", message: "Still syncing." }],
+			},
+		}),
+		refresh: vi.fn(async () => {}),
+		failureMessage: "Nope.",
+		onPersisted,
+	});
+	expect(result).toBe(false);
+	expect(onPersisted).not.toHaveBeenCalled();
+});
+
 it("reports a saved-but-unconfirmed state when the reload fails", async () => {
 	stubTestServer();
 	const refresh = vi.fn(async () => {

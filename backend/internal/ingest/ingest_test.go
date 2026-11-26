@@ -61,6 +61,12 @@ func (a *fakeAdapter) Translate(_ context.Context, _ store.Store, _ any, resolve
 
 func openIngestStore(t *testing.T) store.Store {
 	t.Helper()
+	_, st := openIngestDatabase(t)
+	return st
+}
+
+func openIngestDatabase(t *testing.T) (*sqlite.Database, store.Store) {
+	t.Helper()
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "ingest.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +76,7 @@ func openIngestStore(t *testing.T) store.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return st
+	return database, st
 }
 
 func seedIngestLink(t *testing.T, st store.Store, bridgeID, modelID string) {
@@ -375,10 +381,16 @@ func TestSyncEmptyRunMarksNothing(t *testing.T) {
 }
 
 func TestSyncDropsStaleBridges(t *testing.T) {
-	st := openIngestStore(t)
+	database, st := openIngestDatabase(t)
 	seedIngestLink(t, st, "bridge-old", "checking")
-	if err := st.DeleteAccount("checking"); err != nil {
-		t.Fatalf("delete account: %v", err)
+	for _, statement := range []string{
+		`DELETE FROM account_displays WHERE account_id = 'checking' AND user_id = 'ingest-user'`,
+		`DELETE FROM accounts WHERE id = 'checking' AND user_id = 'ingest-user'`,
+		`DELETE FROM entity_ids WHERE id = 'checking' AND user_id = 'ingest-user'`,
+	} {
+		if _, err := database.SQL().Exec(statement); err != nil {
+			t.Fatalf("seed stale link: %v", err)
+		}
 	}
 	adapter := &fakeAdapter{
 		snapshot:    fakeSnapshot{bridges: []string{"bridge-old"}},

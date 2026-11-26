@@ -50,6 +50,9 @@ export const accountSchema = z.object({
 	balanceCheck: z.boolean(),
 	source: name,
 	readOnly: z.boolean(),
+	// Server-owned bank relationship or bank-authored evidence. Separate from
+	// readOnly, which also reflects workspace policy.
+	syncOwned: z.boolean().optional(),
 	// Bank organization name for synced accounts, from the sync link.
 	// Missing means manual or unknown; never a generic label.
 	institution: z.string().trim().max(100).optional(),

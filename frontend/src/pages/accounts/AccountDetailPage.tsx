@@ -47,6 +47,8 @@ import {
 import { RecurringRules } from "../../components/activity/RecurringRules.tsx";
 import { Transactions } from "../../components/activity/Transactions.tsx";
 import { AccountBalances } from "./AccountBalances.tsx";
+import { AccountDeleteSection } from "./AccountDeleteSection.tsx";
+import { focusAccountSearchOnNextMount } from "./accountSearchFocus.ts";
 import {
 	Tabs,
 	TabsContent,
@@ -373,6 +375,13 @@ export function AccountDetailView({
 							readOnly={readOnly}
 						/>
 					)}
+					<AccountDeleteSection
+						account={account}
+						readOnly={readOnly}
+						busy={edit.saving}
+						dirty={edit.dirty}
+						onDeleted={onClose}
+					/>
 				</TabsContent>
 			</Tabs>
 			{edit.error && (
@@ -486,7 +495,10 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
 			transactions={transactions}
 			startDate={startDate}
 			readOnly={readOnly}
-			onClose={() => void router.navigate({ to: "/accounts" })}
+			onClose={() => {
+				focusAccountSearchOnNextMount();
+				void router.navigate({ to: "/accounts" });
+			}}
 			onEdit={overlays.openEditor}
 		/>
 	);

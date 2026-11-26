@@ -93,17 +93,11 @@ function toDisplayData(
 }
 
 /**
- * A sync date belongs only to bank-owned accounts. The adapter derives the
- * account source from the row's ownership flag, so "Synced balance check"
- * marks a bank-owned account while manual sources do not. The read-only flag
- * cannot serve as this signal because the backend also derives it from
- * deployment-level config, which would make a manual account in a read-only
- * deployment look synced.
+ * A sync date belongs only to bank-owned accounts. The server-owned flag is
+ * separate from readOnly, which also reflects deployment or workspace policy.
  */
 function observedSyncDate(account: Account): string | null {
-	return account.source === "Synced balance check"
-		? account.observedOn || null
-		: null;
+	return account.syncOwned === true ? account.observedOn || null : null;
 }
 
 /**
@@ -239,6 +233,7 @@ export function toDisplayAccounts(accounts: Account[]): Account[] {
 				balance: components.reduce((sum, c) => sum + c.balance, 0),
 				archived: members.every((c) => c.account!.archived),
 				readOnly: members.some((c) => c.account!.readOnly),
+				syncOwned: members.some((c) => c.account!.syncOwned === true),
 				// Different observation times do not form one recorded total.
 				observedBalance: sameObservation
 					? components.reduce((sum, c) => sum + c.observedBalance!, 0)

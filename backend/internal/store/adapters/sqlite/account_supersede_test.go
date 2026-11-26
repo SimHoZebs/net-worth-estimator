@@ -156,7 +156,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		t.Fatalf("synced bank checkpoint changed: %+v", model.Checkpoints)
 	}
 	if len(model.Schedules) != 1 || model.Schedules[0].SourceAccountID == nil ||
-		*model.Schedules[0].SourceAccountID != "synced" || !supersedeContains(model.Schedules[0].Destinations, "savings") {
+		*model.Schedules[0].SourceAccountID != "synced" || !containsID(model.Schedules[0].Destinations, "savings") {
 		t.Fatalf("rule route did not move: %+v", model.Schedules)
 	}
 	if got := model.Schedules[0].Amount.Inputs["manual"].Arguments["id"]; got != "synced" {
@@ -366,7 +366,7 @@ func TestSupersedeAccountRollsBackInvalidCandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("supersede invalid candidate: %v", err)
 	}
-	if result.Persisted || !supersedeHasErrors(result.Issues) {
+	if result.Persisted || !hasValidationErrors(result.Issues) {
 		t.Fatalf("invalid candidate = %+v, want persisted false with errors", result)
 	}
 	after, err := scoped.LoadModel()

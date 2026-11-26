@@ -95,6 +95,12 @@ export async function performSave(options: {
 	 */
 	onRejected?: (message: string) => void;
 	/**
+	 * Marks a destructive write as persisted once the server accepts it, before
+	 * the authoritative refresh. Callers must not offer the same destructive
+	 * action again when only that refresh fails.
+	 */
+	onPersisted?: () => void;
+	/**
 	 * Keeps write failures inline in the open editor instead of relying on
 	 * a transient notification for an error that needs correction or retry.
 	 */
@@ -142,6 +148,7 @@ export async function performSave(options: {
 				}
 				throw new Error(rejection);
 			}
+			if (scope === getUserScope()) options.onPersisted?.();
 			try {
 				await options.refresh();
 			} catch {

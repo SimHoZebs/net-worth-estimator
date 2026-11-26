@@ -61,6 +61,7 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 				? "Balance check"
 				: "No balance check",
 		readOnly: row.readOnly,
+		syncOwned: row.syncOwned,
 		...(row.institution ? { institution: row.institution } : {}),
 		...(row.syncedName ? { syncedName: row.syncedName } : {}),
 		...(row.currency ? { currency: row.currency } : {}),

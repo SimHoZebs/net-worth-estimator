@@ -2,9 +2,11 @@ package model
 
 import (
 	"context"
+	"errors"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -226,4 +228,51 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 		return nil, err
 	}
 	return &accountOutput{Body: writeResult[types.Account]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
+}
+
+type accountDeleteBody struct {
+	DeletedID string                       `json:"deletedId"`
+	Issues    []types.ModelValidationIssue `json:"issues"`
+	Saved     bool                         `json:"saved"`
+	Revision  string                       `json:"revision"`
+}
+
+type accountDeleteOutput struct {
+	Body accountDeleteBody `json:"body"`
+}
+
+// deleteAccount delegates the complete cascade to the store. Validation
+// rejections use the ordinary 200 save envelope; synced refusal and missing
+// accounts map to 409 and 404.
+func (s *handler) deleteAccount(_ context.Context, input *struct {
+	ID string `path:"id"`
+}) (*accountDeleteOutput, error) {
+	err := s.store.DeleteAccount(input.ID)
+	if err != nil {
+		var rejected store.AccountDeletionRejected
+		if errors.As(err, &rejected) {
+			revision, revisionErr := modelstate.CurrentRevision(s.store)
+			if revisionErr != nil {
+				return nil, huma.Error500InternalServerError(revisionErr.Error())
+			}
+			issues := rejected.Issues
+			if issues == nil {
+				issues = []types.ModelValidationIssue{}
+			}
+			return &accountDeleteOutput{Body: accountDeleteBody{DeletedID: input.ID, Issues: issues, Saved: false, Revision: revision}}, nil
+		}
+		switch {
+		case errors.Is(err, store.ErrAccountSynced):
+			return nil, huma.Error409Conflict(store.ErrAccountSynced.Error())
+		case store.IsNotFound(err):
+			return nil, huma.Error404NotFound("account not found")
+		default:
+			return nil, modelstate.WriteError(err)
+		}
+	}
+	revision, err := modelstate.CurrentRevision(s.store)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	return &accountDeleteOutput{Body: accountDeleteBody{DeletedID: input.ID, Issues: []types.ModelValidationIssue{}, Saved: true, Revision: revision}}, nil
 }

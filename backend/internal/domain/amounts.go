@@ -53,6 +53,7 @@ type providerDefinition struct {
 	description             string
 	resolve                 func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error)
 	validateReferences      func(args map[string]types.JsonValue, refs *AmountReferenceContext) error
+	accountReferences       func(args map[string]types.JsonValue) []string
 	transactionDependencies func(args map[string]types.JsonValue) []string
 	// volatileParams reports sampling parameters when the provider carries rate behavior.
 	// Nil means never volatile.
@@ -191,6 +192,12 @@ var amountProviders = map[string]providerDefinition{
 			}
 			return nil
 		},
+		accountReferences: func(args map[string]types.JsonValue) []string {
+			if id, ok := args["id"].(string); ok {
+				return []string{id}
+			}
+			return nil
+		},
 	},
 	"account-balance": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
@@ -207,6 +214,12 @@ var amountProviders = map[string]providerDefinition{
 			}
 			if !refs.AccountIDs[id] {
 				return amtErrf("Account '%s' does not exist.", id)
+			}
+			return nil
+		},
+		accountReferences: func(args map[string]types.JsonValue) []string {
+			if id, ok := args["id"].(string); ok {
+				return []string{id}
 			}
 			return nil
 		},
@@ -291,6 +304,12 @@ var amountProviders = map[string]providerDefinition{
 			}
 			return nil
 		},
+		accountReferences: func(args map[string]types.JsonValue) []string {
+			if id, ok := args["id"].(string); ok {
+				return []string{id}
+			}
+			return nil
+		},
 	},
 	// late-fee charges a flat fee when the payment fell short in the same calendar month.
 	"late-fee": {
@@ -348,6 +367,12 @@ var amountProviders = map[string]providerDefinition{
 			}
 			return nil
 		},
+		accountReferences: func(args map[string]types.JsonValue) []string {
+			if id, ok := args["account"].(string); ok {
+				return []string{id}
+			}
+			return nil
+		},
 	},
 	// balance-fee charges a flat fee when the live balance sits below a threshold.
 	"balance-fee": {
@@ -384,6 +409,12 @@ var amountProviders = map[string]providerDefinition{
 			fee, ok := args["fee"].(float64)
 			if !ok || math.IsNaN(fee) || math.IsInf(fee, 0) || fee < 0 {
 				return amtErrf("Balance fee 'fee' must be a finite number at or above zero.")
+			}
+			return nil
+		},
+		accountReferences: func(args map[string]types.JsonValue) []string {
+			if id, ok := args["account"].(string); ok {
+				return []string{id}
 			}
 			return nil
 		},
@@ -579,6 +610,35 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 		return amtErrf("Amount inputs do not match requirements. Missing: %s. Extra: %s.", missingText, extraText)
 	}
 	return nil
+}
+
+// AmountDescriptorAccountIDs returns the account references carried by one
+// validated descriptor. It shares the provider registry with amount resolution
+// and reference validation so account deletion follows the same dependency
+// semantics as simulation.
+func AmountDescriptorAccountIDs(amount types.TransactionAmountResolution) ([]string, error) {
+	if _, err := ValidateAmountDescriptor(amount, nil); err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	ids := []string{}
+	for _, binding := range amount.Inputs {
+		if binding.Source != "provider" {
+			continue
+		}
+		provider, ok := LookupAmountProvider(binding.Provider)
+		if !ok || provider.accountReferences == nil {
+			continue
+		}
+		for _, id := range provider.accountReferences(binding.Arguments) {
+			if id != "" && !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 // ValidateAmountDescriptor validates a descriptor and returns dependencies.

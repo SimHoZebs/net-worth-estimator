@@ -146,13 +146,22 @@ export function balanceRowsAt(model: FinancialModel, cut = todayIso()) {
 		const latest = latestByAccount.get(account.id);
 		const observedBalance = latest?.Balance ?? null;
 		const balance = Math.round((balances.get(account.id) ?? 0) * 100) / 100;
-		const syncOwned = model.checkpoints.some(
+		const checkpointOwned = model.checkpoints.some(
 			(row) =>
 				row.AccountId === account.id &&
 				typeof row.source === "string" &&
 				row.source !== "" &&
 				row.source !== "user",
 		);
+		const transactionOwned = model.transactions.some(
+			(row) =>
+				(row.sourceAccountId === account.id ||
+					(row.destinations ?? []).includes(account.id)) &&
+				typeof row.source === "string" &&
+				row.source !== "" &&
+				row.source !== "user",
+		);
+		const syncOwned = checkpointOwned || transactionOwned;
 		return {
 			...account,
 			balance,
@@ -473,6 +482,72 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			}, row);
 		}
 		let match = path.match(/^\/v1\/accounts\/([^/]+)$/);
+		if (match && method === "DELETE") {
+			const id = decodeURIComponent(match[1]!);
+			const accounts = current.accounts;
+			const target = accounts.find((row) => row.id === id);
+			if (!target) throw new Error("Account not found.");
+			const owner = accounts.find((row) =>
+				row.display?.components?.some(
+					(component) => component.accountId === id,
+				),
+			);
+			const ids = new Set<string>([id]);
+			for (const component of owner?.display?.components ?? [])
+				ids.add(component.accountId);
+			const touches = (source: string | null, destinations: string[] | null) =>
+				(source !== null && ids.has(source)) ||
+				(destinations ?? []).some((destination) => ids.has(destination));
+			const bankCheckpoint = current.checkpoints.some(
+				(row) =>
+					ids.has(row.AccountId) &&
+					typeof row.source === "string" &&
+					row.source !== "" &&
+					row.source !== "user",
+			);
+			const bankTransaction = current.transactions.some(
+				(row) =>
+					touches(row.sourceAccountId, row.destinations) &&
+					typeof row.source === "string" &&
+					row.source !== "" &&
+					row.source !== "user",
+			);
+			if (bankCheckpoint || bankTransaction)
+				throw new Error("Bank-synced accounts cannot be deleted.");
+			const managedRules = new Set(
+				[
+					target.display?.interestScheduleId,
+					target.display?.paymentScheduleId,
+				].filter((value): value is string => Boolean(value)),
+			);
+			revisionValue = '"sha256-test-deleted"';
+			return write(
+				() => {
+					current.accounts = accounts.filter((row) => !ids.has(row.id));
+					current.checkpoints = current.checkpoints.filter(
+						(row) => !ids.has(row.AccountId),
+					);
+					current.transactions = current.transactions.filter(
+						(row) =>
+							!touches(row.sourceAccountId, row.destinations) &&
+							!ids.has(row.id),
+					);
+					current.schedules = current.schedules.filter(
+						(row) =>
+							!touches(row.sourceAccountId, row.destinations) &&
+							!managedRules.has(row.id),
+					);
+					current.paymentTerms = (current.paymentTerms ?? []).filter(
+						(row) => !ids.has(row.accountId),
+					);
+					current.plannedPurchases = (current.plannedPurchases ?? []).filter(
+						(row) =>
+							row.fundingAccountId === null || !ids.has(row.fundingAccountId),
+					);
+				},
+				{ deletedIds: [...ids] },
+			);
+		}
 		if (match && method === "PATCH") {
 			const [, id] = match;
 			return write(() => {

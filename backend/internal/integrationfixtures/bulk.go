@@ -1,10 +1,10 @@
 // Bulk seed support for development and test harnesses.
 //
 // The bulk builder creates additive synthetic rows tagged with a fixed ID
-// prefix. Inject adds rows beside existing data. Clear removes only tagged
-// rows and leaves every other row intact. Replace flows (browser reseed,
-// pack seeding) keep using ImportModel; additive flows (dev seed, bulk on
-// top of a pack) use Inject and Clear here.
+// prefix. Inject adds rows beside existing data. Clear removes tagged accounts
+// and the financial rows that depend on them; independent real rows stay
+// untouched. Replace flows (browser reseed, pack seeding) keep using ImportModel;
+// additive flows (dev seed, bulk on top of a pack) use Inject and Clear here.
 package integrationfixtures
 
 import (
@@ -240,56 +240,41 @@ func InjectBulk(scoped store.Store, spec BulkSpec) (BulkResult, error) {
 	return result, nil
 }
 
-// ClearSeed removes only bulk rows. It matches tagged accounts by prefix,
-// then drops every transaction and rule tied to those accounts, then the
-// checkpoints and the accounts themselves. Real rows stay untouched.
-// Transactions and rules go before accounts so row references never dangle.
+// ClearSeed removes bulk-tagged accounts through the store's transactional
+// cascade. Destination-only and amount-dependent rows go with them; counts
+// report the actual before/after row reduction, including those cascades.
 func ClearSeed(scoped store.Store) (BulkResult, error) {
 	var result BulkResult
-	model, err := scoped.LoadModel()
+	before, err := scoped.LoadModel()
 	if err != nil {
 		return result, fmt.Errorf("integrationfixtures: clear seed read: %w", err)
 	}
-	seedAccounts := map[string]bool{}
-	for _, account := range model.Accounts {
+	if before == nil {
+		return result, nil
+	}
+	seedAccounts := make([]string, 0)
+	for _, account := range before.Accounts {
 		if strings.HasPrefix(account.ID, SeedPrefix) {
-			seedAccounts[account.ID] = true
+			seedAccounts = append(seedAccounts, account.ID)
 		}
 	}
 	if len(seedAccounts) == 0 {
 		return result, nil
 	}
-	for _, transaction := range model.Transactions {
-		if transaction.SourceAccountID == nil || !seedAccounts[*transaction.SourceAccountID] {
-			continue
-		}
-		if err := scoped.DeleteTransaction(transaction.ID); err != nil {
-			return result, fmt.Errorf("integrationfixtures: clear seed transaction %q: %w", transaction.ID, err)
-		}
-		result.Transactions++
-	}
-	for _, rule := range model.Schedules {
-		if rule.SourceAccountID == nil || !seedAccounts[*rule.SourceAccountID] {
-			continue
-		}
-		if err := scoped.DeleteSchedule(rule.ID); err != nil {
-			return result, fmt.Errorf("integrationfixtures: clear seed rule %q: %w", rule.ID, err)
-		}
-		result.Rules++
-	}
-	for _, checkpoint := range model.Checkpoints {
-		if !seedAccounts[checkpoint.AccountID] {
-			continue
-		}
-		if err := scoped.DeleteCheckpointAt(checkpoint.AccountID, checkpoint.ObservedAt); err != nil {
-			return result, fmt.Errorf("integrationfixtures: clear seed checkpoint %q: %w", checkpoint.AccountID, err)
-		}
-	}
-	for id := range seedAccounts {
-		if err := scoped.DeleteAccount(id); err != nil {
+	for _, id := range seedAccounts {
+		if err := scoped.DeleteAccount(id); err != nil && !store.IsNotFound(err) {
 			return result, fmt.Errorf("integrationfixtures: clear seed account %q: %w", id, err)
 		}
-		result.Accounts++
 	}
+	after, err := scoped.LoadModel()
+	if err != nil {
+		return result, fmt.Errorf("integrationfixtures: clear seed reload: %w", err)
+	}
+	if after == nil {
+		after = &types.FinancialModel{}
+	}
+	result.Accounts = len(before.Accounts) - len(after.Accounts)
+	result.Transactions = len(before.Transactions) - len(after.Transactions)
+	result.Rules = len(before.Schedules) - len(after.Schedules)
 	return result, nil
 }

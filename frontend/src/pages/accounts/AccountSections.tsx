@@ -1,5 +1,5 @@
 import { Plus, Search } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TablePagination } from "../../components/TablePagination.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -41,6 +41,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useWorkspaceOverlays } from "../../workspace/useWorkspaceOverlays.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
+import { consumeAccountSearchFocus } from "./accountSearchFocus.ts";
 
 export type AccountSectionView = "accounts" | "transactions";
 
@@ -80,6 +81,10 @@ function AccountsView({
 	const [query, setQuery] = useState("");
 	const balances = useAccountBalances();
 	const searchId = useId();
+	const searchRef = useRef<HTMLInputElement>(null);
+	useEffect(() => {
+		if (consumeAccountSearchFocus()) searchRef.current?.focus();
+	}, []);
 	const visible = useMemo(
 		() =>
 			visibleAccounts(
@@ -102,6 +107,7 @@ function AccountsView({
 					<Search size={16} aria-hidden="true" className="shrink-0" />
 					<span className="sr-only">Search accounts</span>
 					<Input
+						ref={searchRef}
 						id={searchId}
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}

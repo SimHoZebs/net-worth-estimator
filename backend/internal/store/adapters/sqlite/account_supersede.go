@@ -58,7 +58,7 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		if err := supersedeAccountProfile(tx, manual, syncedID); err != nil {
 			return err
 		}
-		if err := supersedeDeleteTransactions(tx, deletedTransactionIDs); err != nil {
+		if err := deleteTransactionsTx(tx, deletedTransactionIDs); err != nil {
 			return err
 		}
 		if err := supersedeTransactionAmounts(tx, baseline, deletedTransactionSet, manualID, syncedID); err != nil {
@@ -67,7 +67,7 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		if err := supersedeRuleAmounts(tx, baseline, deletedRuleSet, manualID, syncedID); err != nil {
 			return err
 		}
-		if err := supersedeDeleteCheckpoints(tx, manualID); err != nil {
+		if err := deleteCheckpointsTx(tx, []string{manualID}); err != nil {
 			return err
 		}
 		if err := supersedePlannedPurchases(tx, manualID, syncedID); err != nil {
@@ -100,7 +100,7 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		}
 		issues := domain.ValidateFinanceWriteChange(domain.EvaluationReferenceIssues(baseline), candidate)
 		result.Issues = issues
-		if supersedeHasErrors(issues) {
+		if hasValidationErrors(issues) {
 			result.Persisted = false
 			return errSupersedeValidation
 		}
@@ -156,7 +156,7 @@ func supersedeCheckPreconditions(tx *userTx, model *types.FinancialModel, manual
 		}
 	}
 	for _, transaction := range model.Transactions {
-		if supersedeTransactionTouches(transaction, manual.ID) && transaction.Source != store.SourceUser {
+		if transactionTouchesAccount(transaction, manual.ID) && transaction.Source != store.SourceUser {
 			return fmt.Errorf("%w: %s still has bank transactions", store.ErrAccountSupersedeInvalid, manual.Name)
 		}
 	}
@@ -212,21 +212,52 @@ func supersedeAccountProfile(tx *userTx, manual types.Account, syncedID string) 
 func supersedeTransactionsTouching(model *types.FinancialModel, accountID string) []string {
 	var ids []string
 	for _, transaction := range model.Transactions {
-		if supersedeTransactionTouches(transaction, accountID) {
+		if transactionTouchesAccount(transaction, accountID) {
 			ids = append(ids, transaction.ID)
 		}
 	}
 	return ids
 }
 
-func supersedeTransactionTouches(transaction types.Transaction, accountID string) bool {
+func transactionTouchesAccount(transaction types.Transaction, accountID string) bool {
 	if transaction.SourceAccountID != nil && *transaction.SourceAccountID == accountID {
 		return true
 	}
-	return supersedeContains(transaction.Destinations, accountID)
+	return containsID(transaction.Destinations, accountID)
 }
 
-func supersedeDeleteTransactions(tx *userTx, transactionIDs []string) error {
+func transactionTouchesAccounts(transaction types.Transaction, accountIDs map[string]bool) bool {
+	if transaction.SourceAccountID != nil && accountIDs[*transaction.SourceAccountID] {
+		return true
+	}
+	for _, accountID := range transaction.Destinations {
+		if accountIDs[accountID] {
+			return true
+		}
+	}
+	return false
+}
+
+func ruleTouchesAccount(rule types.Schedule, accountID string) bool {
+	if rule.SourceAccountID != nil && *rule.SourceAccountID == accountID {
+		return true
+	}
+	return containsID(rule.Destinations, accountID)
+}
+
+func ruleTouchesAccounts(rule types.Schedule, accountIDs map[string]bool) bool {
+	if rule.SourceAccountID != nil && accountIDs[*rule.SourceAccountID] {
+		return true
+	}
+	for _, accountID := range rule.Destinations {
+		if accountIDs[accountID] {
+			return true
+		}
+	}
+	return false
+}
+
+func deleteTransactionsTx(tx *userTx, transactionIDs []string) error {
 	if len(transactionIDs) == 0 {
 		return nil
 	}
@@ -255,12 +286,16 @@ func supersedeDeleteTransactions(tx *userTx, transactionIDs []string) error {
 	return nil
 }
 
-func supersedeDeleteCheckpoints(tx *userTx, accountID string) error {
-	if _, err := tx.Exec(`DELETE FROM checkpoint_available_balances WHERE model_account_id = ? AND user_id = :user_id`, accountID); err != nil {
-		return fmt.Errorf("delete available balances for %s: %w", accountID, err)
+func deleteCheckpointsTx(tx *userTx, accountIDs []string) error {
+	if len(accountIDs) == 0 {
+		return nil
 	}
-	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE model_account_id = ? AND user_id = :user_id`, accountID); err != nil {
-		return fmt.Errorf("delete checkpoints for %s: %w", accountID, err)
+	placeholders, args := sliceIDArgs(accountIDs)
+	if _, err := tx.Exec(`DELETE FROM checkpoint_available_balances WHERE model_account_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
+		return fmt.Errorf("delete available balances for %v: %w", accountIDs, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE model_account_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
+		return fmt.Errorf("delete checkpoints for %v: %w", accountIDs, err)
 	}
 	return nil
 }
@@ -271,7 +306,7 @@ func supersedeDeleteCheckpoints(tx *userTx, accountID string) error {
 func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID string) ([]string, error) {
 	var deleted []string
 	for _, rule := range model.Schedules {
-		if !supersedeRuleTouches(rule, manualID) {
+		if !ruleTouchesAccount(rule, manualID) {
 			continue
 		}
 		source := rule.SourceAccountID
@@ -279,9 +314,9 @@ func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID 
 			replacement := syncedID
 			source = &replacement
 		}
-		destinations := supersedeReplaceIDs(rule.Destinations, manualID, syncedID)
-		if source != nil && supersedeContains(destinations, *source) {
-			if err := supersedeDeleteSchedule(tx, rule.ID); err != nil {
+		destinations := replaceIDs(rule.Destinations, manualID, syncedID)
+		if source != nil && containsID(destinations, *source) {
+			if err := deleteRuleTx(tx, rule.ID); err != nil {
 				return nil, err
 			}
 			deleted = append(deleted, rule.ID)
@@ -303,24 +338,25 @@ func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID 
 	return deleted, nil
 }
 
-func supersedeDeleteSchedule(tx *userTx, ruleID string) error {
+func deleteRuleTx(tx *userTx, ruleID string) error {
 	if err := clearProvisionalPostingsForRule(tx, ruleID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
 		return fmt.Errorf("delete claims for rule %s: %w", ruleID, err)
 	}
-	if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, ruleID); err != nil {
+	result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, ruleID)
+	if err != nil {
 		return fmt.Errorf("delete rule %s: %w", ruleID, err)
 	}
-	return releaseRowID(tx, ruleID)
-}
-
-func supersedeRuleTouches(rule types.Schedule, accountID string) bool {
-	if rule.SourceAccountID != nil && *rule.SourceAccountID == accountID {
-		return true
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
 	}
-	return supersedeContains(rule.Destinations, accountID)
+	if affected == 0 {
+		return NotFound(ruleID)
+	}
+	return releaseRowID(tx, ruleID)
 }
 
 func supersedePlannedPurchases(tx *userTx, manualID, syncedID string) error {
@@ -353,7 +389,7 @@ func supersedePaymentTerms(tx *userTx, model *types.FinancialModel, manualID, sy
 	return nil
 }
 
-func supersedeReplaceIDs(ids []string, oldID, newID string) []string {
+func replaceIDs(ids []string, oldID, newID string) []string {
 	if ids == nil {
 		return nil
 	}
@@ -380,7 +416,7 @@ func supersedeReplaceIDs(ids []string, oldID, newID string) []string {
 	return out
 }
 
-func supersedeRemoveIDs(ids []string, removed map[string]bool) []string {
+func removeIDs(ids []string, removed map[string]bool) []string {
 	if ids == nil {
 		return nil
 	}
@@ -397,7 +433,7 @@ func supersedeRemoveIDs(ids []string, removed map[string]bool) []string {
 	return out
 }
 
-func supersedeContains(ids []string, target string) bool {
+func containsID(ids []string, target string) bool {
 	for _, id := range ids {
 		if id == target {
 			return true
@@ -414,7 +450,7 @@ func stringSet(ids []string) map[string]bool {
 	return out
 }
 
-func supersedeHasErrors(issues []types.ModelValidationIssue) bool {
+func hasValidationErrors(issues []types.ModelValidationIssue) bool {
 	for _, issue := range issues {
 		if issue.Severity == types.SeverityError {
 			return true

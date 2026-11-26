@@ -111,6 +111,7 @@ describe("balance rows to display accounts", () => {
 			balanceCheck: true,
 			source: "Balance check",
 			readOnly: false,
+			syncOwned: false,
 		});
 		expect(
 			balanceRowToDisplay(balanceRow({ hasCheckpoint: false })),
@@ -123,6 +124,7 @@ describe("balance rows to display accounts", () => {
 		).toMatchObject({
 			source: "Synced balance check",
 			readOnly: true,
+			syncOwned: true,
 		});
 	});
 

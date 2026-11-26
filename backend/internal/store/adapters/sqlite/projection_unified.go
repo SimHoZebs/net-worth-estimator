@@ -3,6 +3,7 @@ package sqlite
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -476,6 +477,67 @@ func (s *sqliteStore) DeleteMonteCarloStatistics(sliceIDs []string) error {
 	placeholders, args := sliceIDArgs(sliceIDs)
 	if _, err := s.db.Exec(`DELETE FROM monte_carlo_statistics WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
 		return fmt.Errorf("delete statistics: %w", err)
+	}
+	return nil
+}
+
+var projectionOutputTables = []string{
+	"net_worth_threshold_outputs",
+	"account_balance_outputs",
+	"transaction_fulfillment_outputs",
+	"cycle_fulfillment_outputs",
+	"planned_purchases_outputs",
+	"financial_independence_outputs",
+	"whatif_outputs",
+}
+
+// purgeProjectionArtifactsTx removes every derived projection and evaluation
+// output for the scope. Model replacement and account deletion share this
+// cleanup so no stale generated fact or typed output survives its inputs.
+func purgeProjectionArtifactsTx(tx *userTx) error {
+	if _, err := tx.Exec(`DELETE FROM transactions WHERE projection_slice_id IS NOT NULL AND user_id = :user_id`); err != nil {
+		return fmt.Errorf("delete projected transactions: %w", err)
+	}
+	for _, table := range projectionOutputTables {
+		if _, err := tx.Exec(`DELETE FROM ` + table + ` WHERE user_id = :user_id`); err != nil {
+			return fmt.Errorf("delete projection outputs %s: %w", table, err)
+		}
+	}
+	for _, table := range []string{"monte_carlo_statistics", "projection_rows", "projection_slices"} {
+		if _, err := tx.Exec(`DELETE FROM ` + table + ` WHERE user_id = :user_id`); err != nil {
+			return fmt.Errorf("delete projection artifacts %s: %w", table, err)
+		}
+	}
+	return nil
+}
+
+// invalidateProjectionStateTx fences every published build and clears its
+// evaluation fingerprints in the same transaction as the model cascade. A
+// missing state is created at revision one so the invalidation is durable.
+func invalidateProjectionStateTx(tx *userTx) error {
+	var projectionStart string
+	err := tx.QueryRow(`SELECT projection_start FROM projection_states WHERE id = ? AND user_id = :user_id`, defaultProjectionStateID).Scan(&projectionStart)
+	if errors.Is(err, sql.ErrNoRows) {
+		fresh := types.UnifiedProjectionDefaults()
+		fresh.ID = defaultProjectionStateID
+		fresh.Revision = 1
+		_, err = tx.Exec(`INSERT INTO projection_states (id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json, user_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
+			fresh.ID, fresh.ScopeID, fresh.Revision, fresh.PublishedRevision, fresh.DirtyFrom, fresh.ProjectionStart, fresh.HorizonEnd, fresh.CalendarTimezone, fresh.EngineVersion, fresh.TrialCount, nullable(fresh.StochasticSeed), fresh.DetEvaluationsJSON, fresh.StochEvaluationsJSON)
+		if err != nil {
+			return fmt.Errorf("create invalid projection state: %w", err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read projection state for invalidation: %w", err)
+	}
+	dirtyFrom := dirtyDay(projectionStart)
+	if _, err := tx.Exec(`UPDATE projection_states SET revision = revision + 1, published_revision = 0,
+		dirty_from = CASE WHEN dirty_from = 0 OR dirty_from > ? THEN ? ELSE dirty_from END,
+		det_evaluations_json = '', stoch_evaluations_json = '' WHERE id = ? AND user_id = :user_id`,
+		dirtyFrom, dirtyFrom, defaultProjectionStateID); err != nil {
+		return fmt.Errorf("invalidate projection state: %w", err)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package simplefin
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,12 @@ var errBridgeDown = errors.New("bridge down")
 
 func openRunnerStore(t *testing.T) store.Store {
 	t.Helper()
-	database, err := sqlite.Open(filepath.Join(t.TempDir(), "runner.db"))
+	return openRunnerStoreAt(t, filepath.Join(t.TempDir(), "runner.db"))
+}
+
+func openRunnerStoreAt(t *testing.T, path string) store.Store {
+	t.Helper()
+	database, err := sqlite.Open(path)
 	if err != nil {
 		t.Fatalf("open runner store: %v", err)
 	}
@@ -79,7 +85,8 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 }
 
 func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
-	database := openRunnerStore(t)
+	path := filepath.Join(t.TempDir(), "runner.db")
+	database := openRunnerStoreAt(t, path)
 	seedRunnerAccounts(t, database)
 	if _, err := database.CreateAccount(types.Account{ID: "ghost", Name: "Ghost"}); err != nil {
 		t.Fatalf("create ghost: %v", err)
@@ -87,8 +94,19 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: testAccountKey("bridge-old"), ModelAccountID: "ghost", BridgeName: "Old"}); err != nil {
 		t.Fatalf("save link: %v", err)
 	}
-	if err := database.DeleteAccount("ghost"); err != nil {
-		t.Fatalf("delete ghost: %v", err)
+	raw, err := sql.Open("sqlite", "file:"+path+"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	for _, statement := range []string{
+		`DELETE FROM account_displays WHERE account_id = 'ghost' AND user_id = (SELECT id FROM users LIMIT 1)`,
+		`DELETE FROM accounts WHERE id = 'ghost' AND user_id = (SELECT id FROM users LIMIT 1)`,
+		`DELETE FROM entity_ids WHERE id = 'ghost' AND user_id = (SELECT id FROM users LIMIT 1)`,
+	} {
+		if _, err := raw.Exec(statement); err != nil {
+			t.Fatalf("seed stale link: %v", err)
+		}
 	}
 	runner := NewRunner(database, Config{}, nil)
 	transacted := int64(1773129600)
@@ -101,7 +119,7 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 				}}},
 		}}, nil
 	}
-	err := runner.Sync(context.Background())
+	err = runner.Sync(context.Background())
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}

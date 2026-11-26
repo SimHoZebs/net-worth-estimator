@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"strconv"
 	"testing"
@@ -45,6 +46,7 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 	t.Helper()
 	execSyncSetup(t, store, []string{
 		`INSERT INTO accounts (id, position, name, enabled, user_id) VALUES ('prime_card', 1, 'Prime', 1, :user_id)`,
+		`INSERT INTO account_displays (account_id, display_json, user_id) VALUES ('prime_card', '{"name":"Prime","components":[{"accountId":"prime_card","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}', :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('prime_card', 'account', :user_id)`,
 		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, provider, observed_at, user_id) VALUES (10, 10, 'checking', 111, 'banksync', 'simplefin', 1785628799, :user_id)`,
 		`INSERT INTO transactions (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
@@ -134,17 +136,17 @@ func transactionIDsFromModel(model *types.FinancialModel) (ids []string, sources
 	return ids, sources
 }
 
-func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
-	store := openTestStore(t)
-	seedOwnerModel(t, store)
-	seedSyncState(t, store)
-	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "College"}); err != nil {
+func TestDeleteSyncedAccountFailsWithoutChangingSyncRows(t *testing.T) {
+	s := openTestStore(t)
+	seedOwnerModel(t, s)
+	seedSyncState(t, s)
+	if _, err := s.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "College"}); err != nil {
 		t.Fatalf("seed link: %v", err)
 	}
-	if err := store.DeleteAccount("checking"); err == nil {
-		t.Fatal("deleted an account referenced by financial rows")
+	if err := s.DeleteAccount("checking"); !errors.Is(err, store.ErrAccountSynced) {
+		t.Fatalf("delete synced account err = %v, want ErrAccountSynced", err)
 	}
-	loaded, err := store.LoadModel()
+	loaded, err := s.LoadModel()
 	if err != nil || loaded == nil {
 		t.Fatalf("load after account delete = %+v, err %v", loaded, err)
 	}
@@ -157,12 +159,12 @@ func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 	if len(syncedPendingIDs(loaded)) != 1 {
 		t.Fatal("sync pending transaction was garbage-collected")
 	}
-	links, err := store.ListAccountLinks()
+	links, err := s.ListAccountLinks()
 	if err != nil {
 		t.Fatalf("list links: %v", err)
 	}
-	// The link survives the account delete: it is the memory of the
-	// mapping, and recreating the account resumes sync flow.
+	// The link survives the refused deletion: it remains the memory of the
+	// mapping, and bank-owned accounts are never deletable.
 	foundLink := false
 	for _, link := range links {
 		if link.BridgeAccountID == "bridge-checking" && link.ModelAccountID == "checking" {

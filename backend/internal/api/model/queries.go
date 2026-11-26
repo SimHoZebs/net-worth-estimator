@@ -26,6 +26,18 @@ func isSyncOwned(source string) bool {
 	return source != "" && source != "user"
 }
 
+func transactionTouchesAccount(transaction types.Transaction, accountID string) bool {
+	if transaction.SourceAccountID != nil && *transaction.SourceAccountID == accountID {
+		return true
+	}
+	for _, destination := range transaction.Destinations {
+		if destination == accountID {
+			return true
+		}
+	}
+	return false
+}
+
 // isArchivedDebt hides a paid-off configured liability: an account with
 // payment terms whose latest observed balance at or before the viewed
 // date is effectively zero. The observed balance comes from the history application's
@@ -155,10 +167,18 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 			if hasCheckpoint {
 				observedOn = latestObservationDay(adjusted, cutDay)
 			}
-			syncOwned := false
+			_, syncOwned := byModelAccount[account.ID]
 			if model != nil {
 				for _, checkpoint := range model.Checkpoints {
 					if checkpoint.AccountID == account.ID && isSyncOwned(checkpoint.Source) {
+						syncOwned = true
+						break
+					}
+				}
+			}
+			if model != nil && !syncOwned {
+				for _, transaction := range model.Transactions {
+					if isSyncOwned(transaction.Source) && transactionTouchesAccount(transaction, account.ID) {
 						syncOwned = true
 						break
 					}

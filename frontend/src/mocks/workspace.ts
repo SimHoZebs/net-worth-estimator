@@ -102,7 +102,10 @@ export function setServerModelFixture(
 				...row,
 				hasCheckpoint: displayAccount?.balanceCheck ?? row.hasCheckpoint,
 				archived: displayAccount?.archived ?? row.archived,
-				syncOwned: displayAccount?.readOnly ?? row.syncOwned,
+				syncOwned:
+					displayAccount?.syncOwned ??
+					displayAccount?.readOnly ??
+					row.syncOwned,
 				readOnly: displayAccount?.readOnly ?? row.readOnly,
 			};
 		}),

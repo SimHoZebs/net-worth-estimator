@@ -409,39 +409,6 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 	return account, nil
 }
 
-// DeleteAccount removes one account and its registry entry. Bridge
-// links are kept: the link is the memory of the mapping, so recreating
-// the account restores sync flow, and the links endpoint keeps showing
-// the last-seen snapshot. Dependent rows are validated at the API layer
-// before this runs. Composite foreign keys also reject dangling financial
-// references when a caller bypasses API validation. Stale account links are
-// deliberate metadata and have no account-row foreign key. Sharing
-// preferences lose the deleted account in the same transaction (with a
-// version bump each), so consent never silently reattaches on ID reuse.
-func (s *sqliteStore) DeleteAccount(id string) error {
-	err := withRowTx(s.db, func(tx *userTx) error {
-		result, err := tx.Exec(`DELETE FROM accounts WHERE id = ? AND user_id = :user_id`, id)
-		if err != nil {
-			return fmt.Errorf("delete account %s: %w", id, err)
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected == 0 {
-			return NotFound(id)
-		}
-		if err := stripSharingPolicyAccount(tx, id); err != nil {
-			return err
-		}
-		return releaseRowID(tx, id)
-	})
-	if err != nil {
-		return err
-	}
-	return s.markDirtyStart()
-}
-
 // MoveAccount positions one account before another (or appends).
 func (s *sqliteStore) MoveAccount(id, beforeID string) error {
 	return withRowTx(s.db, func(tx *userTx) error {
@@ -507,24 +474,7 @@ func (s *sqliteStore) UpdateSchedule(rule types.Schedule) (types.Schedule, error
 // DeleteSchedule removes one recurrence rule.
 func (s *sqliteStore) DeleteSchedule(id string) error {
 	err := withRowTx(s.db, func(tx *userTx) error {
-		if err := clearProvisionalPostingsForRule(tx, id); err != nil {
-			return fmt.Errorf("clear provisional postings for rule %s: %w", id, err)
-		}
-		if _, err := tx.Exec(`DELETE FROM transaction_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, id); err != nil {
-			return fmt.Errorf("release claims for rule %s: %w", id, err)
-		}
-		result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, id)
-		if err != nil {
-			return fmt.Errorf("delete rule %s: %w", id, err)
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected == 0 {
-			return NotFound(id)
-		}
-		return releaseRowID(tx, id)
+		return deleteRuleTx(tx, id)
 	})
 	if err != nil {
 		return err

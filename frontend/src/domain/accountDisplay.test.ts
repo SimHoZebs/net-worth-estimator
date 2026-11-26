@@ -98,6 +98,15 @@ describe("visible accounts", () => {
 		expect(raw[0]!.balance).toBe(-1000);
 		expect(componentIds(grouped[0]!)).toEqual(["p", "i"]);
 	});
+	it("aggregates sync ownership across grouped components", () => {
+		const raw = fixture();
+		raw[1]!.syncOwned = true;
+		raw[1]!.readOnly = true;
+		expect(toDisplayAccounts(raw)[0]).toMatchObject({
+			readOnly: true,
+			syncOwned: true,
+		});
+	});
 	it("keeps different observation times separate", () => {
 		const raw = fixture();
 		raw[1]!.observedAt = 200;
@@ -172,7 +181,7 @@ describe("visible accounts", () => {
 	describe("accountBalanceDisplayData", () => {
 		it("prepares both labeled entries with emphasis on the effective available figure", () => {
 			const row = account("cash", 100, 44.43);
-			row.source = "Synced balance check";
+			row.syncOwned = true;
 			row.readOnly = true;
 			expect(accountBalanceDisplayData(row)).toEqual({
 				entries: [
@@ -222,11 +231,11 @@ describe("visible accounts", () => {
 		});
 		it("reports a bank-owned account's recorded date even when read-only", () => {
 			const synced = account("cash", 100);
-			synced.source = "Synced balance check";
+			synced.syncOwned = true;
 			synced.readOnly = true;
 			expect(accountBalanceDisplayData(synced).synced).toBe("2026-01-31");
 			const unobserved = account("cash", 100);
-			unobserved.source = "Synced balance check";
+			unobserved.syncOwned = true;
 			unobserved.readOnly = true;
 			unobserved.observedOn = "";
 			expect(accountBalanceDisplayData(unobserved).synced).toBeNull();
@@ -247,7 +256,7 @@ describe("visible accounts", () => {
 	describe("accountBalanceHeaderData", () => {
 		it("shows available first then posted with emphasis on the effective available figure", () => {
 			const row = account("cash", 100, 44.43);
-			row.source = "Synced balance check";
+			row.syncOwned = true;
 			row.readOnly = true;
 			expect(accountBalanceHeaderData(row)).toEqual({
 				entries: [
@@ -267,7 +276,7 @@ describe("visible accounts", () => {
 		});
 		it("shows only the posted entry when available is missing", () => {
 			const row = account("cash", 100, null);
-			row.source = "Synced balance check";
+			row.syncOwned = true;
 			row.readOnly = true;
 			expect(accountBalanceHeaderData(row)).toEqual({
 				entries: [{ label: "Posted balance", value: 100, emphasized: true }],
@@ -284,11 +293,11 @@ describe("visible accounts", () => {
 		});
 		it("passes through a bank-owned account's recorded date even when read-only", () => {
 			const synced = account("cash", 100, 44.43);
-			synced.source = "Synced balance check";
+			synced.syncOwned = true;
 			synced.readOnly = true;
 			expect(accountBalanceHeaderData(synced).synced).toBe("2026-01-31");
 			const unobserved = account("cash", 100, 44.43);
-			unobserved.source = "Synced balance check";
+			unobserved.syncOwned = true;
 			unobserved.readOnly = true;
 			unobserved.observedOn = "";
 			expect(accountBalanceHeaderData(unobserved).synced).toBeNull();

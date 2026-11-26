@@ -84,6 +84,7 @@ func TestWriteGuardCoversRowOperations(t *testing.T) {
 	}{
 		{http.MethodPost, "/v1/accounts", `{"name":"x"}`},
 		{http.MethodPatch, "/v1/accounts/x", `{"name":"x"}`},
+		{http.MethodDelete, "/v1/accounts/x", ""},
 		{http.MethodPost, "/v1/transactions", `{"name":"x"}`},
 		{http.MethodPost, "/v1/transactions/x/amend", `{"name":"x"}`},
 		{http.MethodDelete, "/v1/transactions/x", ""},

@@ -247,6 +247,35 @@
 				"required": ["accountId", "role"],
 				"type": "object"
 			},
+			"AccountDeleteBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/AccountDeleteBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"deletedId": {
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					}
+				},
+				"required": ["deletedId", "issues", "saved", "revision"],
+				"type": "object"
+			},
 			"AccountDelta": {
 				"additionalProperties": false,
 				"properties": {
@@ -6694,6 +6723,42 @@
 			}
 		},
 		"/v1/accounts/{id}": {
+			"delete": {
+				"operationId": "delete-account",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountDeleteBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one manual account and its dependent history"
+			},
 			"patch": {
 				"operationId": "update-account",
 				"parameters": [

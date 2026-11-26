@@ -116,6 +116,8 @@ amounts.
 The evidence cut is now. The summary uses the current plan and settings and
 does not accept a recorded-history application parameter.
 
+Deleting a manual account removes it from the selected card and spending-account lists in the same transaction as the account cascade. Deleted transactions and schedules are removed from the transaction and income-schedule lists too. Unrelated settings and the distinction between “all cards” (`null`) and “no cards” (`[]`) are preserved.
+
 Each selected cash account uses its effective display basis at that
 checkpoint. An explicit posted preference takes the applied posted figure. The
 configured or default available preference takes the bank-reported available

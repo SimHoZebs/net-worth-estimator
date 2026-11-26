@@ -42,6 +42,17 @@ type AccountSupersedeResult struct {
 	Persisted     bool
 }
 
+// AccountDeletionRejected reports a deletion candidate that failed validation.
+// Issues carries the same diagnostics as a row-write envelope and the store has
+// rolled back every write.
+type AccountDeletionRejected struct {
+	Issues []types.ModelValidationIssue
+}
+
+func (e AccountDeletionRejected) Error() string {
+	return "account deletion rejected by model validation"
+}
+
 // AccountLink binds one SimpleFIN bridge account to one model account.
 // Links are sync metadata: owner payloads never carry them, model saves
 // never rewrite them, and a vanished bridge account leaves its link and

@@ -38,7 +38,7 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidationIssue {
 	issues := validateModel(model, true)
 	if model != nil {
-		validateAccountDisplays(&issues, model)
+		issues = append(issues, ValidateAccountDisplays(model)...)
 	}
 	return issues
 }
@@ -52,8 +52,20 @@ func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidation
 func ValidateFinanceModel(model *types.FinancialModel) []types.ModelValidationIssue {
 	issues := validateModel(model, false)
 	if model != nil {
-		validateAccountDisplays(&issues, model)
+		issues = append(issues, ValidateAccountDisplays(model)...)
 	}
+	return issues
+}
+
+// ValidateAccountDisplays checks visible-account membership and grouped loan
+// structure without running unrelated finance validation. Account deletion uses
+// it to resolve a complete loan set and fails closed on malformed displays.
+func ValidateAccountDisplays(model *types.FinancialModel) []types.ModelValidationIssue {
+	if model == nil {
+		return []types.ModelValidationIssue{}
+	}
+	issues := []types.ModelValidationIssue{}
+	validateAccountDisplays(&issues, model)
 	return issues
 }
 

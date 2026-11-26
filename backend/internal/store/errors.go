@@ -76,6 +76,11 @@ var ErrSharingConflict = errors.New("the sharing request conflicts with a commit
 // payment linked to more than one settlement. Handlers map it to 409.
 var ErrSettlementConflict = errors.New("settlement conflicts with a recorded settlement")
 
+// ErrAccountSynced reports an account deletion refused because the account set
+// still carries a bridge link or bank-owned checkpoint or transaction. Synced
+// accounts are never deletable; imported documents must retain them too.
+var ErrAccountSynced = errors.New("synced accounts cannot be deleted")
+
 // ErrAccountSupersedeInvalid reports a manual account that cannot be
 // replaced by a synced account: already bank-owned, linked to a bridge,
 // missing payment-term routing, or otherwise not a manual account. Handlers

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -373,23 +374,21 @@ func (d *Database) PreviewSharingPolicyDraft(ownerID, groupID string, input stor
 	}, nil
 }
 
-// stripSharingPolicyAccount removes one deleted account from the owner's
-// policies in the same write, bumping each touched version so stale
-// generations fence immediately. A policy narrowed to zero accounts keeps
-// its row and flag but matches nothing. Each touched (owner, group) index
-// slice is re-derived at the bumped version in the same transaction, and
-// one audit row per touched policy records before/after coverage.
-func stripSharingPolicyAccount(tx *userTx, accountID string) error {
+// rewriteSharingPolicyAccounts applies one account-selection transformation to
+// every touched owner policy. A grouped deletion therefore bumps and audits each
+// policy once, fences the old visibility generation, and re-derives the new one
+// in the same transaction.
+func rewriteSharingPolicyAccounts(tx *userTx, rewrite func([]string) ([]string, bool), auditKind string, metadata func(before, after []string) map[string]any) error {
 	rows, err := tx.Query(`SELECT group_id, account_ids_json, version FROM sharing_policies WHERE owner_user_id = :user_id`)
 	if err != nil {
 		return err
 	}
-	type stripped struct {
+	type rewrittenPolicy struct {
 		group         string
 		before, after []string
 		version       int64
 	}
-	var touched []stripped
+	var touched []rewrittenPolicy
 	for rows.Next() {
 		var group, accountsJSON string
 		var version int64
@@ -402,24 +401,15 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 			rows.Close()
 			return fmt.Errorf("parse sharing policy accounts: %w", err)
 		}
-		// Snapshot before filtering: kept compacts a fresh slice so the
-		// audit's before-coverage keeps the original selection.
 		before := append([]string(nil), accounts...)
-		kept := make([]string, 0, len(accounts))
-		removed := false
-		for _, id := range accounts {
-			if id == accountID {
-				removed = true
-				continue
-			}
-			kept = append(kept, id)
+		after, changed := rewrite(accounts)
+		if !changed {
+			continue
 		}
-		if removed {
-			if kept == nil {
-				kept = []string{}
-			}
-			touched = append(touched, stripped{group: group, before: before, after: kept, version: version + 1})
+		if after == nil {
+			after = []string{}
 		}
+		touched = append(touched, rewrittenPolicy{group: group, before: before, after: after, version: version + 1})
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
@@ -434,7 +424,7 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 		}
 		if _, err := tx.Exec(`UPDATE sharing_policies SET account_ids_json = ?, version = ?, updated_at = ? WHERE group_id = ? AND owner_user_id = :user_id`,
 			string(encoded), item.version, now, item.group); err != nil {
-			return fmt.Errorf("strip sharing account %s: %w", accountID, err)
+			return fmt.Errorf("rewrite sharing accounts: %w", err)
 		}
 		if err := rebuildVisibilityForOwnerGroupScoped(tx, item.group); err != nil {
 			return err
@@ -443,19 +433,53 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 		if before == nil {
 			before = []string{}
 		}
-		if after == nil {
-			after = []string{}
+		detail := map[string]any{
+			"before": map[string]any{"accounts": before},
+			"after":  map[string]any{"accounts": after, "version": item.version},
 		}
-		detail, _ := json.Marshal(map[string]any{
-			"before":           map[string]any{"accounts": before},
-			"after":            map[string]any{"accounts": after, "version": item.version},
-			"stripped_account": accountID,
-		})
-		if err := auditSharingScoped(tx, tx.userID, "policy-strip", "", "", "", item.group, string(detail)); err != nil {
+		if metadata != nil {
+			for key, value := range metadata(before, after) {
+				detail[key] = value
+			}
+		}
+		encodedDetail, _ := json.Marshal(detail)
+		if err := auditSharingScoped(tx, tx.userID, auditKind, "", "", "", item.group, string(encodedDetail)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// stripSharingPolicyAccount removes one deleted account from the owner's
+// policies in the same write, bumping each touched version so stale
+// generations fence immediately. A policy narrowed to zero accounts keeps
+// its row and flag but matches nothing.
+func stripSharingPolicyAccount(tx *userTx, accountID string) error {
+	return stripSharingPolicyAccounts(tx, map[string]bool{accountID: true})
+}
+
+func stripSharingPolicyAccounts(tx *userTx, removed map[string]bool) error {
+	return rewriteSharingPolicyAccounts(tx, func(accounts []string) ([]string, bool) {
+		kept := make([]string, 0, len(accounts))
+		changed := false
+		for _, id := range accounts {
+			if removed[id] {
+				changed = true
+				continue
+			}
+			kept = append(kept, id)
+		}
+		return kept, changed
+	}, "policy-strip", func(before, after []string) map[string]any {
+		stripped := make([]string, 0, len(removed))
+		for id := range removed {
+			if containsID(before, id) {
+				stripped = append(stripped, id)
+			}
+		}
+		sort.Strings(stripped)
+		return map[string]any{"stripped_accounts": stripped}
+	})
 }
 
 // automaticPolicyAccess evaluates the policy-derived automatic reason for

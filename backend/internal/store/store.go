@@ -41,6 +41,11 @@ type Store interface {
 	SaveLoan(bundle types.LoanBundle, create bool) (types.Account, error)
 	DeleteLoan(id string) error
 	UpdateAccount(account types.Account) (types.Account, error)
+	// DeleteAccount removes one manual account and its dependent financial
+	// history in one transaction. Deleting any grouped-loan component removes
+	// the whole visible loan. Linked accounts and bank-owned facts return
+	// ErrAccountSynced; a candidate rejected by validation returns
+	// AccountDeletionRejected and changes nothing.
 	DeleteAccount(id string) error
 	MoveAccount(id, beforeID string) error
 	// CreateAccountWithBalance stores an account and, when balance is set,

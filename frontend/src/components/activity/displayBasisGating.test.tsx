@@ -21,6 +21,7 @@ function account(overrides: Partial<Account> = {}): Account {
 		balanceCheck: true,
 		source: "Synced balance check",
 		readOnly: true,
+		syncOwned: true,
 		observedAt: 1773133200,
 		observedBalance: 798.01,
 		availableBalance: null,
