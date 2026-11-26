@@ -77,13 +77,13 @@ gh run watch "$run" --exit-status --interval 10
 - Separate landing verification from release verification as defined in `docs/release-gates.md`. For an actual release, verify that the Northflank `waypoint-release` run for the landed SHA is `success` with its `migrate` step at exit 0, that `GET https://http--nwe-api--bc5m9smksgps.code.run/readyz` returns `ok` and never `maintenance`, and record the workflow run ID and migration backup hash. If an enabled release failed, inspect the failed stage and retry the same reviewed target before declaring that release complete. A documentation-only commit has no release to verify by design.
 - Verify the frontend deploy. Check that the `vercel-release` run for the landed SHA is `success`, which means its production deployment for that SHA is ready, and record the deployment id from the run log. When the Vercel project id is unset, the deploy job never runs and the frontend deploy is not requested; report it as not requested, never as a successful deployment.
 - Dispatch `End-to-end tests` for changes to auth, images, migrations, or the proxy. Otherwise, it runs nightly, on dispatch, and on pull requests carrying the `e2e` label.
-- If your work impacts frontend interactions then capture one gif per interaction workflow you touched and share each gif in chat. When several distinct interactions are involved then capture one gif for each interaction. If your work impacts only static visuals then screenshots are sufficient. Pace each gif with one interaction every 3 seconds so the motion stays readable rather than rushed.
+- For frontend interaction changes, capture and share one WebM recording per affected workflow. For static visual changes, screenshots are sufficient. Pace recordings at one interaction every three seconds.
 
 ## Landing visualization (viz/)
 
-- `viz/` holds the backlog landing map (`nwe-landing-map.html`, Mermaid diagrams) and `viz/captures/` (Playwright screenshots and gifs). Gitignored; never commit.
+- `viz/` holds the backlog landing map (`nwe-landing-map.html`, Mermaid diagrams) and `viz/captures/` (screenshots and WebM recordings). Gitignored; never commit.
 - Serve from `viz/`: `python3 -m http.server 8123 --bind 127.0.0.1` (LAN: `--bind 0.0.0.0`). Map at `/nwe-landing-map.html`, captures at `/captures/<area>/<file>`.
-- Capture against TESTING.md browser harnesses on isolated ports; place media under `viz/captures/<area>/` with descriptive names and display it in chat through markdown formatting. Pace interaction gifs with one interaction every 3 seconds.
+- Capture against TESTING.md browser harnesses on isolated ports. Place media under `viz/captures/<area>/` with descriptive names. Embed screenshots and link `.webm` recordings in chat; use a PNG preview if inline video is unavailable.
 - Keep worktrees out of `/tmp`. Use the standard worktree dir; relocate with remove plus re-add at the same ref when a move must cross devices.
 
 ## Production deployment
