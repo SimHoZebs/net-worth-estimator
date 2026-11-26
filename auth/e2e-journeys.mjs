@@ -316,15 +316,24 @@ export async function guestGrantRevoke(ctx, guestBundle) {
     await ctx.setGuestRole("member");
     const writable = await session(guest, origin);
     assert.ok(writable.resource.permissions.includes("user:write"));
-    const probe = await api(guest, origin, writable, "POST", "/v1/accounts", {
-      id: "e2e-policy-probe",
-      name: "E2E policy probe",
-      kind: "cash",
-      enabled: true,
-    });
+    const modelResponse = await api(guest, origin, writable, "GET", "/v1/financial-model");
+    assert.equal(modelResponse.status(), 200);
+    const model = await modelResponse.json();
+    const account = model.model.accounts.find((item) => item.id === E2E_SEED.accountId);
+    assert.ok(account, "the published guest model must contain the seeded account");
+    // The model wire uses null for unset optional scalars; PATCH accepts their
+    // omission, not null, so preserve every authored value without inventing one.
+    const accountPatch = Object.fromEntries(
+      ["id", "name", "kind", "minBalance", "maxBalance", "color", "enabled", "displayBasis", "statementClosingDay"]
+        .filter((field) => account[field] !== undefined && account[field] !== null)
+        .map((field) => [field, account[field]]),
+    );
+    const probe = await api(guest, origin, writable, "PATCH", `/v1/accounts/${account.id}`, accountPatch);
     assert.equal(probe.status(), 200, "the provider grant must enable the ordinary guest write");
     assert.equal((await probe.json()).saved, true);
-    assert.equal((await api(guest, origin, writable, "DELETE", "/v1/accounts/e2e-policy-probe")).status(), 200);
+    const verified = await api(guest, origin, writable, "GET", "/v1/financial-model");
+    assert.equal(verified.status(), 200);
+    assert.deepEqual((await verified.json()).model.accounts.map((item) => item.id), [E2E_SEED.accountId]);
   } finally {
     await ctx.setGuestRole("viewer");
   }
