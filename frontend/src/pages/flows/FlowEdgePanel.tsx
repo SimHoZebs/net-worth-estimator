@@ -108,10 +108,7 @@ export function FlowEdgePanel({
 				</TableBody>
 			</Table>
 			{edge.kind === "transfer" && (
-				<TransferMatchNote
-					transactionIds={transactionIds}
-					transferCount={edge.sources.length}
-				/>
+				<TransferMatchNote transactionIds={transactionIds} />
 			)}
 		</section>
 	);

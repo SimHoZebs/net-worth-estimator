@@ -182,9 +182,6 @@ export function TransferLinkSection({
 						</span>
 					)}
 				</p>
-				<p className="mt-1 text-xs text-muted-foreground">
-					Counted once as a transfer, not as income plus spending.
-				</p>
 				{!readOnly && (
 					<div className="mt-2">
 						<Button
@@ -252,9 +249,6 @@ export function TransferLinkSection({
 			<p className="flex items-center gap-2 text-xs">
 				<Link2 size={15} aria-hidden="true" />
 				<strong>Possible transfer</strong>
-			</p>
-			<p className="mt-1 text-xs text-muted-foreground">
-				Counted once as a transfer, not as income plus spending.
 			</p>
 			{!readOnly && peers.length === 1 && (
 				<div className="mt-2">

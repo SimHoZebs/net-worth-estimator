@@ -74,12 +74,9 @@ export function transferLinkForEdge(
 
 export function TransferMatchNote({
 	transactionIds,
-	transferCount,
 	readOnly: readOnlyProp,
 }: {
 	transactionIds: string[];
-	/** Number of source transactions behind the edge. */
-	transferCount: number;
 	/** Write-permission override; production reads server policy. */
 	readOnly?: boolean;
 }) {
@@ -153,11 +150,6 @@ export function TransferMatchNote({
 	};
 	return (
 		<div className="mt-3 border-t border-border pt-3">
-			<p className="text-xs text-muted-foreground">
-				Counted once as a transfer
-				{transferCount > 1 ? ` across ${transferCount} transactions` : ""}, not
-				as income plus spending.
-			</p>
 			{query.isError ? (
 				<p className="mt-1 text-xs text-muted-foreground">
 					Transfer-pair information could not be loaded.
