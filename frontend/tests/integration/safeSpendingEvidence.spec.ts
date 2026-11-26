@@ -15,6 +15,13 @@ const amount = (value: number) => ({
 	inputs: {},
 });
 
+const utcDayStart = () => {
+	const now = new Date();
+	return (
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000
+	);
+};
+
 // Synthetic reproduction: a newer investment observation must not advance the
 // checking cut, today's bills must survive, and Nov 30 income is not cash now.
 async function seedEvidence(api: APIRequestContext) {
@@ -79,8 +86,8 @@ async function seedEvidence(api: APIRequestContext) {
 			sourceAccountId: "evidence-card",
 			destinations: [],
 			amount: amount(50),
-			transactionTime: Math.floor(Date.now() / 1000) - 300,
-			postedTime: Math.floor(Date.now() / 1000) - 300,
+			transactionTime: utcDayStart(),
+			postedTime: utcDayStart(),
 			enabled: true,
 		},
 	];
@@ -152,7 +159,7 @@ async function seedConfirmedCashTransfer(api: APIRequestContext) {
 	const read = await api.get(`${FIXTURE_API}/v1/financial-model`);
 	expect(read.ok(), await read.text()).toBe(true);
 	const { model } = await read.json();
-	const transferTime = Math.floor(Date.now() / 1000) - 300;
+	const transferTime = utcDayStart();
 	const imported = await api.post(`${FIXTURE_API}/v1/model/import`, {
 		data: {
 			model: {
@@ -723,7 +730,9 @@ test("failed transaction links keep the budget usable and retry in the drawer", 
 		});
 		await page.clock.setFixedTime(new Date(`${AS_OF}T12:00:00Z`));
 		await page.goto("/outlook");
-		const cardRegion = page.locator('[role="region"][aria-label="Safe spending"]');
+		const cardRegion = page.locator(
+			'[role="region"][aria-label="Safe spending"]',
+		);
 		const card = page.getByRole("region", { name: "Safe spending" });
 		await expect(card.getByTestId("with-cash-cushion")).toBeVisible();
 		const action = cardRegion.locator("button").filter({
