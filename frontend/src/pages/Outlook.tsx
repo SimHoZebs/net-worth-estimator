@@ -20,7 +20,11 @@ import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview
 export function Outlook() {
 	// The route renders this page directly; overlay actions subscribe
 	// through the workspace hooks where they are used.
-	return <OutlookContent />;
+	return (
+		<div className="@container/outlook">
+			<OutlookContent />
+		</div>
+	);
 }
 
 function OutlookContent() {
@@ -82,22 +86,28 @@ function OutlookContent() {
 		);
 	}
 	return (
-		<>
+		<div className="mx-auto w-full max-w-xl @3xl/outlook:max-w-6xl">
 			{balancesError}
-			<SafeSpendingPreview
-				detail={overlays.safeSpendingDetail}
-				onDetail={(tab) => {
-					if (tab) overlays.openSafeSpendingDetail(tab);
-					else overlays.closeSafeSpendingDetail();
-				}}
-				onTabChange={overlays.switchSafeSpendingTab}
-			/>
-			<div className="mt-6 max-sm:mt-5">
-				<ProjectionChart
-					onEvidence={() => overlays.openEvidence({ kind: "position" })}
-				/>
+			<div className="grid grid-cols-1 gap-6 @3xl/outlook:grid-cols-2">
+				{/* Each card owns its cell so sibling alerts, status text, and
+				    the portaled detail sheet never become grid items. */}
+				<div className="min-w-0">
+					<SafeSpendingPreview
+						detail={overlays.safeSpendingDetail}
+						onDetail={(tab) => {
+							if (tab) overlays.openSafeSpendingDetail(tab);
+							else overlays.closeSafeSpendingDetail();
+						}}
+						onTabChange={overlays.switchSafeSpendingTab}
+					/>
+				</div>
+				<div className="min-w-0">
+					<ProjectionChart
+						onEvidence={() => overlays.openEvidence({ kind: "position" })}
+					/>
+				</div>
 			</div>
 			<PinnedEvaluations />
-		</>
+		</div>
 	);
 }

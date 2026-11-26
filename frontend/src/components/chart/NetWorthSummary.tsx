@@ -60,7 +60,7 @@ export function NetWorthSummary({
 				)}
 			</div>
 			{actions && (
-				<CardAction className="flex flex-wrap items-center gap-2 max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-2 max-sm:justify-self-start">
+				<CardAction className="flex flex-wrap items-center gap-2 @max-lg/card-header:col-start-1 @max-lg/card-header:row-span-1 @max-lg/card-header:row-start-2 @max-lg/card-header:justify-self-start">
 					{actions}
 				</CardAction>
 			)}
