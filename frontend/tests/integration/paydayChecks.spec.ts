@@ -570,7 +570,6 @@ test("failed save and recovery keep the modal draft mounted for retry", async ({
 test("pending save status stays visible after switching tabs", async ({
 	page,
 }) => {
-	await overrideSummary(page);
 	await page.goto("/outlook?detail=safe-spending&tab=configure");
 	const drawer = page.getByRole("dialog", { name: "Safe spending" });
 	const target = drawer.getByLabel("Monthly savings goal ($)");

@@ -605,8 +605,14 @@ test("a failed all-cards-deselected save stays dirty after recovery", async ({
 				new URL(response.url()).pathname === "/v1/safe-spending-settings" &&
 				response.request().method() === "PUT",
 		);
+		const recovered = page.waitForResponse(
+			(response) =>
+				new URL(response.url()).pathname === "/v1/safe-spending-settings" &&
+				response.request().method() === "GET",
+		);
 		await save.click();
 		expect((await failed).status()).toBe(500);
+		await recovered;
 
 		await expect(drawer).toBeVisible();
 		expect(recoveredAccountIds).toBeNull();
