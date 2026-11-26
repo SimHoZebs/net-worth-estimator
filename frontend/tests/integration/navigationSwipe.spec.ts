@@ -6,6 +6,7 @@ async function swipe(
 	from: { x: number; y: number },
 	to: { x: number; y: number },
 	afterStart?: () => Promise<void>,
+	beforeEnd?: () => Promise<void>,
 ) {
 	await cdp.send("Input.dispatchTouchEvent", {
 		type: "touchStart",
@@ -25,6 +26,7 @@ async function swipe(
 		// Allow Chromium to perform native scrolling between touch updates.
 		await new Promise((resolve) => setTimeout(resolve, 20));
 	}
+	await beforeEnd?.();
 	await cdp.send("Input.dispatchTouchEvent", {
 		type: "touchEnd",
 		touchPoints: [],
@@ -119,6 +121,23 @@ test("rightward mobile swipe opens larger navigation and a link dismisses it", a
 	await expect(sidebar).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(sidebar).toBeHidden();
+});
+
+test("mobile navigation opens near the start of the swipe before release", async ({
+	page,
+}) => {
+	const cdp = await mobilePage(page);
+	const sidebar = page.getByRole("dialog", { name: "Sidebar", exact: true });
+	await swipe(
+		cdp,
+		{ x: 90, y: 100 },
+		{ x: 110, y: 101 },
+		undefined,
+		async () => {
+			await expect(sidebar).toBeVisible();
+		},
+	);
+	await expect(sidebar).toBeVisible();
 });
 
 test("a rightward swipe starting on a visible toast opens mobile navigation", async ({

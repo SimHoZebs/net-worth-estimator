@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent } from "react";
 
-const MIN_SWIPE_DISTANCE = 64;
+const MIN_SWIPE_DISTANCE = 14;
 // Horizontal travel must dominate vertical travel so diagonal scrolling is
 // not hijacked.
 const DIRECTION_RATIO = 1.5;
@@ -81,7 +81,6 @@ export function useHorizontalSwipe({
 		let startTarget: EventTarget | null = null;
 		let owners: ScrollOwner[] = [];
 		let tracking = false;
-		let scrolled = false;
 
 		const onTouchStart = (event: TouchEvent) => {
 			if (event.touches.length !== 1) {
@@ -107,7 +106,6 @@ export function useHorizontalSwipe({
 			startY = touch.clientY;
 			startTarget = event.target;
 			owners = scrollOwners(origin);
-			scrolled = false;
 			tracking = true;
 		};
 
@@ -121,33 +119,33 @@ export function useHorizontalSwipe({
 				if (
 					Math.abs(owner.element.scrollLeft - owner.startLeft) > SCROLL_SLOP
 				) {
-					scrolled = true;
+					tracking = false;
 					return;
 				}
 			}
-		};
-
-		const onTouchEnd = (event: TouchEvent) => {
-			if (!tracking) return;
-			tracking = false;
-			if (event.changedTouches.length !== 1) return;
-			const touch = event.changedTouches[0];
+			const touch = event.touches[0];
 			if (!touch) return;
 			const dx = touch.clientX - startX;
 			const dy = touch.clientY - startY;
+			if (
+				Math.abs(dy) >= MIN_SWIPE_DISTANCE &&
+				Math.abs(dy) > Math.abs(dx) * DIRECTION_RATIO
+			) {
+				tracking = false;
+				return;
+			}
 			if (Math.abs(dx) < MIN_SWIPE_DISTANCE) return;
 			if (Math.abs(dx) < Math.abs(dy) * DIRECTION_RATIO) return;
+			// Resolve once while the finger is down. Releasing the touch or
+			// continuing the gesture must never fire another action.
+			tracking = false;
 			if (suppressWhenModalOpen && modalIsOpen()) return;
 			// Ownership is decided at touch start, so a scroller that reached
 			// its edge during the gesture still consumed the swipe. A
 			// scroller already at the edge in the swipe direction does not.
-			const consumed =
-				scrolled ||
-				owners.some((owner) =>
-					dx > 0
-						? owner.startLeft > SCROLL_SLOP
-						: owner.startRight > SCROLL_SLOP,
-				);
+			const consumed = owners.some((owner) =>
+				dx > 0 ? owner.startLeft > SCROLL_SLOP : owner.startRight > SCROLL_SLOP,
+			);
 			if (consumed) return;
 			if (dx < 0) handleSwipeLeft(dx, startTarget);
 			else handleSwipeRight(dx, startTarget);
@@ -159,12 +157,12 @@ export function useHorizontalSwipe({
 
 		window.addEventListener("touchstart", onTouchStart, { passive: true });
 		window.addEventListener("touchmove", onTouchMove, { passive: true });
-		window.addEventListener("touchend", onTouchEnd, { passive: true });
+		window.addEventListener("touchend", onTouchCancel, { passive: true });
 		window.addEventListener("touchcancel", onTouchCancel, { passive: true });
 		return () => {
 			window.removeEventListener("touchstart", onTouchStart);
 			window.removeEventListener("touchmove", onTouchMove);
-			window.removeEventListener("touchend", onTouchEnd);
+			window.removeEventListener("touchend", onTouchCancel);
 			window.removeEventListener("touchcancel", onTouchCancel);
 		};
 	}, [enabled, suppressWhenModalOpen]);

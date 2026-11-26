@@ -116,14 +116,178 @@ describe("useHorizontalSwipe", () => {
 		expect(onSwipeLeft.mock.calls[0]?.[0]).toBeLessThan(0);
 	});
 
-	it("ignores short or vertical travel", () => {
+	it("calls back during touchmove before touchend and only once", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 90, clientY: 101 }]),
+			);
+			// Tiny travel so far: nothing yet.
+			expect(onSwipeRight).not.toHaveBeenCalled();
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 110, clientY: 101 }]),
+			);
+			// Horizontal intent is clear from the touchmove itself, before any
+			// touchend has been dispatched.
+			expect(onSwipeRight).toHaveBeenCalledOnce();
+			// Further movement must not re-fire.
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 160, clientY: 101 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 220, clientY: 102 }]),
+			);
+			expect(onSwipeRight).toHaveBeenCalledOnce();
+			element.dispatchEvent(
+				touchEvent("touchend", [], [{ clientX: 220, clientY: 102 }]),
+			);
+		});
+		// Releasing the touch must not fire a second time.
+		expect(onSwipeRight).toHaveBeenCalledOnce();
+	});
+
+	it("does not call back on touchstart", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+		});
+		expect(onSwipeRight).not.toHaveBeenCalled();
+	});
+
+	it("passes the latest dx observed so far to the callback", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 140, clientY: 100 }]),
+			);
+		});
+		expect(onSwipeRight).toHaveBeenCalledOnce();
+		expect(onSwipeRight.mock.calls[0]?.[0]).toBe(60);
+	});
+
+	it("ignores tiny horizontal travel below the intent slop", () => {
 		const onSwipeRight = vi.fn();
 		const onSwipeLeft = vi.fn();
 		renderHook(() => useHorizontalSwipe({ onSwipeRight, onSwipeLeft }));
 		const element = target();
-		gesture(element, { dx: 20, dy: 0 });
-		gesture(element, { dx: 8, dy: -200 });
+		// Shorter than the slop, with no touchmove at all, and with a move.
+		gesture(element, { dx: 8, dy: 0 });
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 93, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchend", [], [{ clientX: 93, clientY: 100 }]),
+			);
+		});
 		expect(onSwipeRight).not.toHaveBeenCalled();
+		expect(onSwipeLeft).not.toHaveBeenCalled();
+	});
+
+	it("opens at the small intent slop before touchend", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 93, clientY: 100 }]),
+			);
+		});
+		// 13px is still below the slop.
+		expect(onSwipeRight).not.toHaveBeenCalled();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 94, clientY: 100 }]),
+			);
+		});
+		// 14px horizontal travel with no vertical travel clears intent.
+		expect(onSwipeRight).toHaveBeenCalledOnce();
+	});
+
+	it("requires horizontal travel to dominate vertical travel", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			// Past the slop horizontally, but not by the direction ratio.
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 95, clientY: 111 }]),
+			);
+		});
+		expect(onSwipeRight).not.toHaveBeenCalled();
+	});
+
+	it("ignores clearly vertical travel", () => {
+		const onSwipeRight = vi.fn();
+		const onSwipeLeft = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight, onSwipeLeft }));
+		gesture(target(), { dx: 8, dy: -200 });
+		expect(onSwipeRight).not.toHaveBeenCalled();
+		expect(onSwipeLeft).not.toHaveBeenCalled();
+	});
+
+	it("locks out a clearly vertical gesture so later horizontal travel cannot hijack it", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			// The gesture starts as a clearly vertical scroll...
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 82, clientY: 140 }]),
+			);
+			// ...then a horizontal segment large enough to satisfy intent on
+			// its own must not open anything.
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 240, clientY: 142 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchend", [], [{ clientX: 240, clientY: 142 }]),
+			);
+		});
+		expect(onSwipeRight).not.toHaveBeenCalled();
+	});
+
+	it("locks out a clearly vertical leftward scroll the same way", () => {
+		const onSwipeLeft = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeLeft }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 78, clientY: 60 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: -80, clientY: 58 }]),
+			);
+		});
 		expect(onSwipeLeft).not.toHaveBeenCalled();
 	});
 
@@ -166,6 +330,31 @@ describe("useHorizontalSwipe", () => {
 		scroller(surface, { left: 0 });
 		gesture(element);
 		expect(onSwipeRight).toHaveBeenCalledOnce();
+	});
+
+	it("does not open while a horizontal scroller actually scrolled during the move", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const surface = document.createElement("div");
+		const element = document.createElement("div");
+		surface.append(element);
+		container.append(surface);
+		const scroll = scroller(surface, { left: 0 });
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			// The browser scrolls the surface while the finger travels even
+			// though the scroller started at its edge.
+			scroll.setLeft(12);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 94, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchend", [], [{ clientX: 200, clientY: 100 }]),
+			);
+		});
+		expect(onSwipeRight).not.toHaveBeenCalled();
 	});
 
 	it("owns the gesture through nested scrollers", () => {
@@ -281,6 +470,31 @@ describe("useHorizontalSwipe", () => {
 			);
 			element.dispatchEvent(touchEvent("touchcancel"));
 			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 200, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchend", [], [{ clientX: 200, clientY: 100 }]),
+			);
+		});
+		expect(onSwipeRight).not.toHaveBeenCalled();
+	});
+
+	it("ignores a cancelled gesture before horizontal intent clears", () => {
+		const onSwipeRight = vi.fn();
+		renderHook(() => useHorizontalSwipe({ onSwipeRight }));
+		const element = target();
+		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchstart", [{ clientX: 80, clientY: 100 }]),
+			);
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 90, clientY: 100 }]),
+			);
+			element.dispatchEvent(touchEvent("touchcancel"));
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 200, clientY: 100 }]),
+			);
+			element.dispatchEvent(
 				touchEvent("touchend", [], [{ clientX: 200, clientY: 100 }]),
 			);
 		});
@@ -383,6 +597,9 @@ describe("useHorizontalSwipe", () => {
 		});
 		hook.rerender({ onSwipeRight: second });
 		act(() => {
+			element.dispatchEvent(
+				touchEvent("touchmove", [{ clientX: 200, clientY: 100 }]),
+			);
 			element.dispatchEvent(
 				touchEvent("touchend", [], [{ clientX: 200, clientY: 100 }]),
 			);
