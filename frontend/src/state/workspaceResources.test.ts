@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryObserver } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
@@ -12,6 +13,7 @@ import {
 	getPaymentTermsForAccount,
 	getPaymentTermsList,
 	paymentTermsOptions,
+	purchasesOptions,
 	reloadWorkspace,
 	resolversOptions,
 	statusOptions,
@@ -254,6 +256,53 @@ describe("direct Query ownership", () => {
 		expect(await reloadWorkspace()).toBe(true);
 		server.failStatusOnce(new Error("boom"));
 		expect(await reloadWorkspace()).toBe(false);
+	});
+	it("completes observer-owned reads before balances can unmount their view", async () => {
+		const server = stubTestServer();
+		const respond = server.fetcher.getMockImplementation();
+		if (!respond) throw new Error("fixture fetcher missing");
+		let unsubscribe: (() => void) | undefined;
+		let destroy: (() => void) | undefined;
+		let unmounted = false;
+		const events: string[] = [];
+		server.fetcher.mockImplementation(async (...args) => {
+			const url = new URL(String(args[0]), "http://test");
+			if (url.pathname.endsWith("/v1/planned-purchases")) {
+				events.push("purchases-start");
+				await new Promise((resolve) => setTimeout(resolve, 20));
+			}
+			const response = await respond(...args);
+			if (url.pathname.endsWith("/v1/planned-purchases"))
+				events.push("purchases-end");
+			if (url.pathname.endsWith("/v1/accounts/balances")) {
+				events.push("balances");
+				unmounted = true;
+				destroy?.();
+			}
+			return response;
+		});
+		const observer = new QueryObserver(serverQueryClient(), {
+			...purchasesOptions(getUserScope()),
+			enabled: false,
+		});
+		unsubscribe = observer.subscribe(() => {});
+		destroy = () => observer.destroy();
+		try {
+			events.length = 0;
+			expect(await reloadWorkspace()).toBe(true);
+			expect(events.indexOf("purchases-end")).toBeLessThan(
+				events.indexOf("balances"),
+			);
+			expect(unmounted).toBe(true);
+			expect(
+				server.fetcher.mock.calls.filter(([url]) =>
+					String(url).endsWith("/v1/planned-purchases"),
+				),
+			).toHaveLength(1);
+		} finally {
+			unsubscribe?.();
+			destroy?.();
+		}
 	});
 	it("loads payment terms from the canonical model read", async () => {
 		const server = stubTestServer(undefined, {

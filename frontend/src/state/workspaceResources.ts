@@ -237,7 +237,6 @@ export async function reloadWorkspace(
 	const results = await Promise.allSettled([
 		cache.fetchQuery(statusOptions(scope)),
 		cache.fetchQuery(presetsOptions(scope)),
-		cache.fetchQuery(balancesOptions(scope)),
 		cache.fetchQuery(catalogOptions(scope)),
 		cache.fetchQuery(evalSummaryOptions(scope)),
 		cache.fetchQuery(transactionsOptions(scope)),
@@ -246,10 +245,17 @@ export async function reloadWorkspace(
 		cache.fetchQuery(purchasesOptions(scope)),
 		cache.fetchQuery(paymentTermsOptions(scope)),
 	]);
-	const requiredIdx = [0, 2, 4, 5, 6, 7, 8] as const;
-	const requiredOk = requiredIdx.every(
-		(index) => results[index]?.status === "fulfilled",
-	);
+	if (scope !== getUserScope() || scope.status !== "ready") return false;
+	// Balance rows decide whether the current account detail stays mounted.
+	// Finish the projection reads it observes before publishing a deletion,
+	// otherwise unmounting that view cancels their in-flight fetches.
+	const [balances] = await Promise.allSettled([
+		cache.fetchQuery(balancesOptions(scope)),
+	]);
+	const requiredIdx = [0, 3, 4, 5, 6, 7] as const;
+	const requiredOk =
+		requiredIdx.every((index) => results[index]?.status === "fulfilled") &&
+		balances.status === "fulfilled";
 	const statusOk = results[0]?.status === "fulfilled";
 	if (scope === getUserScope() && statusOk) {
 		// A successful explicit reload resets a temporary permission guard.

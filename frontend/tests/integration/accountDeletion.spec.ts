@@ -34,6 +34,12 @@ test("manual account deletion cascades history and returns focus to search", asy
 	const api = await request.newContext();
 	try {
 		await seedAccountWithHistory(api);
+		let deletionAccepted = false;
+		await page.route("**/v1/planned-purchases", async (route) => {
+			if (deletionAccepted)
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			await route.continue();
+		});
 		await page.goto(`/accounts/${ACCOUNT_ID}`);
 		await page.getByRole("tab", { name: "Details", exact: true }).click();
 		const trigger = page.getByRole("button", {
@@ -55,17 +61,31 @@ test("manual account deletion cascades history and returns focus to search", asy
 		await expect(trigger).toBeFocused();
 
 		await trigger.click();
-		const deleted = page.waitForResponse(
-			(response) =>
+		const deleted = page.waitForResponse((response) => {
+			if (
 				new URL(response.url()).pathname === `/v1/accounts/${ACCOUNT_ID}` &&
-				response.request().method() === "DELETE",
-		);
+				response.request().method() === "DELETE"
+			) {
+				deletionAccepted = true;
+				return true;
+			}
+			return false;
+		});
 		await dialog
 			.getByRole("button", { name: "Delete account", exact: true })
 			.click();
 		expect((await deleted).status()).toBe(200);
 		await expect(page).toHaveURL(/\/accounts$/);
 		await expect(page.getByPlaceholder("Find an account…")).toBeFocused();
+		await expect(
+			page.getByRole("region", { name: "Notifications" }),
+		).toContainText("Changes saved.");
+		await expect(
+			page.getByText(
+				"The change was saved, but the latest server data could not be reloaded. Retry the server request.",
+				{ exact: true },
+			),
+		).toHaveCount(0);
 
 		const model = await readSavedServerModel();
 		expect(model.accounts.some((row) => row.id === ACCOUNT_ID)).toBe(false);
