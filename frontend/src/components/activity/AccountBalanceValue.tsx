@@ -1,4 +1,3 @@
-import { isLiability } from "../../domain/accountKinds.ts";
 import type { AccountEdit } from "./useAccountEdit.ts";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -49,14 +48,10 @@ export function AccountBalanceValue({
 						required
 						// A locked (synced) balance never blocks a kind change at the
 						// HTML layer: the submit path reports a plain-language
-						// mismatch on a field the owner cannot edit.
-						min={
-							readOnly
-								? undefined
-								: isLiability(edit.draft)
-									? "-10000000000"
-									: "0"
-						}
+						// mismatch on a field the owner cannot edit. The minimum
+						// stays permissive because recorded actuals can already
+						// hold a negative total; submit validation owns kind rules.
+						min={readOnly ? undefined : "-10000000000"}
 						max={
 							readOnly
 								? undefined

@@ -6,7 +6,7 @@ test("Outlook reports failed balances and retries instead of loading forever", a
 	page,
 }) => {
 	let failing = true;
-	await page.route("**/v1/accounts/balances", async (route) => {
+	await page.route("**/v1/accounts/balances*", async (route) => {
 		if (!failing) return route.continue();
 		await route.fulfill({
 			status: 422,
@@ -28,7 +28,8 @@ test("Outlook reports failed balances and retries instead of loading forever", a
 	failing = false;
 	const loaded = page.waitForResponse(
 		(response) =>
-			response.url().endsWith("/v1/accounts/balances") && response.ok(),
+			new URL(response.url(), page.url()).pathname ===
+				"/v1/accounts/balances" && response.ok(),
 	);
 	await error.getByRole("button", { name: "Retry", exact: true }).click();
 	await loaded;
