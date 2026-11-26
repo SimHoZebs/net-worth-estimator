@@ -193,6 +193,10 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			s.serveAuth(w, r)
 			return
 		}
+		if IsCatalogAssetRequest(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if r.URL.Path == "/v1" || strings.HasPrefix(r.URL.Path, "/v1/") {
 			if (isGroupRoute(r.URL.Path) || IsSharingRoute(r.URL.Path) || IsInboxRoute(r.URL.Path)) && r.Method == http.MethodOptions {
 				// The groups/sharing/inbox CORS wrappers answer preflight without a session.

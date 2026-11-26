@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/businesslogos"
 )
 
 const ResourceHeader = "Waypoint-Resource"
@@ -63,6 +64,17 @@ const clientErrorsPath = "/v1/client-errors"
 // asserts a resource; every other check in the boundary still applies.
 func IsClientErrorBeacon(r *http.Request) bool {
 	return r.Method == http.MethodPost && r.URL.Path == clientErrorsPath
+}
+
+// IsCatalogAssetRequest reports a read of a curated business logo. An <img>
+// cannot set Waypoint-Resource, and these bytes are catalog assets with no
+// user or receipt data, so only GET and HEAD on the exact catalog prefix skip
+// identity. Writes and every other /v1 route keep the full boundary.
+func IsCatalogAssetRequest(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	return strings.HasPrefix(r.URL.Path, businesslogos.PathPrefix)
 }
 
 // Action strings are user:* under the application Casbin model.

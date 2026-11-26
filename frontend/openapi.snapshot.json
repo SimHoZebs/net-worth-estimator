@@ -121,6 +121,10 @@
 					"readOnly": {
 						"type": "boolean"
 					},
+					"recognizedBusinessKey": {
+						"description": "Curated business-logo key recognized from bridge identity or the account name",
+						"type": "string"
+					},
 					"statementClosingDay": {
 						"format": "int64",
 						"type": "integer"
@@ -7469,6 +7473,72 @@
 					}
 				},
 				"summary": "Confirm a detector-ranked pair as one transfer"
+			}
+		},
+		"/v1/assets/business-logos/{key}": {
+			"get": {
+				"operationId": "get-business-logo",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "key",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"302": {
+						"description": "Redirect to the immutable catalog asset path"
+					},
+					"404": {
+						"description": "Key outside the curated catalog"
+					}
+				}
+			}
+		},
+		"/v1/assets/business-logos/{key}/{version}": {
+			"get": {
+				"operationId": "get-business-logo-version",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "key",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "path",
+						"name": "version",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"image/svg+xml": {
+								"schema": {
+									"contentMediaType": "application/octet-stream",
+									"format": "binary",
+									"type": "string"
+								}
+							}
+						},
+						"description": "Curated SVG logo"
+					},
+					"304": {
+						"description": "Unchanged catalog asset"
+					},
+					"404": {
+						"description": "Key or version outside the curated catalog"
+					}
+				}
 			}
 		},
 		"/v1/auth/change-password": {

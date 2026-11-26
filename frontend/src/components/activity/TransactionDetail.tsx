@@ -145,7 +145,10 @@ import { useSharingGrants } from "../../state/sharing.ts";
 import { useSettleCandidates } from "../../state/settleCandidates.ts";
 import { useClaimOccurrenceOptions } from "../../state/scheduleOccurrences.ts";
 
-type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
+type AccountRef = Pick<
+	Account,
+	"id" | "kind" | "color" | "name" | "recognizedBusinessKey"
+>;
 
 const EMPTY_SETTLE_CANDIDATES: SettleCandidateRow[] = [];
 

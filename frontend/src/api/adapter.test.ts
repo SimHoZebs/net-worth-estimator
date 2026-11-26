@@ -176,6 +176,14 @@ describe("balance rows to display accounts", () => {
 		expect(manual.currency).toBeUndefined();
 	});
 
+	it("carries the computed catalog logo key without changing the account itself", () => {
+		expect(
+			balanceRowToDisplay(balanceRow({ recognizedBusinessKey: "chase" })),
+		).toMatchObject({ recognizedBusinessKey: "chase" });
+		const unknown = balanceRowToDisplay(balanceRow());
+		expect(unknown.recognizedBusinessKey).toBeUndefined();
+	});
+
 	it("carries colors and falls back to the row id for a blank name", () => {
 		expect(balanceRowToDisplay(balanceRow({ color: "#4287f5" })).color).toBe(
 			"#4287f5",

@@ -155,6 +155,26 @@ describe("failure ledger", () => {
 		expect(ledger?.summary).toContain("plus 2 more");
 	});
 
+	it("carries the recognized logo key into the failure ledger account icon", () => {
+		const failure = decemberFailure();
+		const accounts = financialModelFixture.accounts.map((account) =>
+			account.id === "checking"
+				? { ...account, recognizedBusinessKey: "chase" }
+				: account,
+		);
+		const ledger = failureLedger({
+			accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
+			projection: checkingProjection([failure]),
+			failure,
+		});
+		expect(ledger?.accountIcon).toMatchObject({
+			id: "checking",
+			recognizedBusinessKey: "chase",
+		});
+	});
+
 	it("returns null without an internal account", () => {
 		const external = move({ fromId: null, toId: null });
 		expect(

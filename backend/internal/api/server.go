@@ -11,12 +11,14 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/analyses"
+	assethttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/assets"
 	gmailhttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/gmail"
 	integrationshttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/model"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/projections"
 	receipthttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/receipts"
 	synchttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/sync"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/businesslogos"
 	gmailservice "github.com/simhozebs/net-worth-estimator/backend/internal/gmail"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
@@ -45,6 +47,10 @@ type Config struct {
 	// GmailFrontendBaseURL receives the OAuth post-callback redirect with
 	// the connection outcome as query parameters.
 	GmailFrontendBaseURL string
+	// AssetService serves catalog-approved business logos from a store dedicated
+	// to public assets. Nil disables asset routes in probes and tests that have
+	// no asset store; account recognition metadata is unaffected.
+	AssetService *businesslogos.Service
 }
 
 // New builds the chi router with all routes.
@@ -86,6 +92,12 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	projections.Register(compute, st, serverConfig.ResourceID)
 	registerStatus(api, st, serverConfig)
 
+	if serverConfig.AssetService != nil {
+		// Catalog-only raw route: the identity boundary exempts GET and HEAD on
+		// this exact prefix so a same-origin <img> needs no user headers.
+		assetHandler := assethttp.NewHandler(serverConfig.AssetService)
+		router.HandleFunc(businesslogos.PathPrefix+"*", assetHandler.ServeHTTP)
+	}
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))

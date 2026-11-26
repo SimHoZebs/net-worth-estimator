@@ -65,6 +65,9 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 		...(row.institution ? { institution: row.institution } : {}),
 		...(row.syncedName ? { syncedName: row.syncedName } : {}),
 		...(row.currency ? { currency: row.currency } : {}),
+		...(row.recognizedBusinessKey
+			? { recognizedBusinessKey: row.recognizedBusinessKey }
+			: {}),
 	};
 }
 

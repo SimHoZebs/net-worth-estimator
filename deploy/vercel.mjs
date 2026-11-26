@@ -18,6 +18,29 @@ export function vercelConfig(env) {
     // Production deploys come from the gated workflow, not a Git push.
     git: { deploymentEnabled: { main: false } },
     routes: [
+      // Curated catalog logos are public immutable assets. This narrow route
+      // keeps the API proxy's no-store header off them so the versioned SVG
+      // can use its long-lived cache. No user data or object key is served.
+      {
+        src: "^/(v1/assets/business-logos(?:/[^/]+){1,2}/?)$",
+        has: [{ type: "host", value: { eq: new URL(publicOrigin).host } }],
+        dest: `${backend}/$1`,
+        transforms: [
+          {
+            type: "request.headers",
+            op: "set",
+            target: { key: "Waypoint-Proxy-Secret" },
+            args: `$${secretVariable}`,
+            env: [secretVariable],
+          },
+          {
+            type: "request.headers",
+            op: "set",
+            target: { key: "Waypoint-Public-Origin" },
+            args: publicOrigin,
+          },
+        ],
+      },
       {
         src: "^/(v1(?:/.*)?|healthz|readyz)$",
         has: [{ type: "host", value: { eq: new URL(publicOrigin).host } }],

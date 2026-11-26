@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/businesslogos"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -89,6 +90,11 @@ type accountBalanceRow struct {
 	DisplayBasis types.DisplayBasis `json:"displayBasis,omitempty"`
 	// StatementClosingDay is the account's authoritative closing day.
 	StatementClosingDay int `json:"statementClosingDay"`
+	// RecognizedBusinessKey is a curated catalog key computed from the sync
+	// link and the owner's account name. It is read-only response metadata:
+	// it is not stored on the account, never affects its kind, and is absent
+	// when no business is recognized unambiguously.
+	RecognizedBusinessKey *string `json:"recognizedBusinessKey,omitempty" doc:"Curated business-logo key recognized from bridge identity or the account name"`
 }
 
 type accountBalancesOutput struct {
@@ -110,6 +116,10 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
+	// Revision is the canonical financial model's content identity only.
+	// Account links, recognizedBusinessKey, and catalog asset hashes are
+	// computed fresh from each response and stay outside that financial
+	// revision, so a link-only update changes the logo without a model write.
 	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
@@ -219,6 +229,16 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				AvailableBalance:    adjusted.AvailableBalance,
 				DisplayBasis:        account.DisplayBasis,
 				StatementClosingDay: account.StatementClosingDay,
+			}
+			bridgeInstitution, bridgeName := "", ""
+			if institution != nil {
+				bridgeInstitution = *institution
+			}
+			if syncedName != nil {
+				bridgeName = *syncedName
+			}
+			if key := businesslogos.Recognize(bridgeInstitution, bridgeName, account.Name); key != "" {
+				row.RecognizedBusinessKey = &key
 			}
 			if components[account.ID] {
 				value := adjusted.UnroundedBalance

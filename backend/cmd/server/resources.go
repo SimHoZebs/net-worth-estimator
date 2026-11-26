@@ -185,7 +185,11 @@ func newUserRouter(database store.Database, config userRouterConfig) (*userRoute
 }
 
 func (p *userRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
+	// Catalog logos are shared, curated bytes with no user scope. Route them
+	// to the single public handler before requiring a verified scope so a
+	// same-origin <img> works for every user.
+	if (r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/")) ||
+		identity.IsCatalogAssetRequest(r) {
 		p.public.ServeHTTP(w, r)
 		return
 	}

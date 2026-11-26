@@ -8,8 +8,9 @@ import {
 	Wallet,
 } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { cn } from "@/lib/utils.ts";
+import { businessLogoURL } from "../lib/businessLogos.ts";
 import type { Account } from "../domain/model.ts";
 import { ACCOUNT_TYPE_LABELS } from "../domain/accountKinds.ts";
 import { cssVariables } from "./cssVariables.ts";
@@ -56,10 +57,21 @@ export function AccountIcon({
 	style,
 	...props
 }: {
-	account: Pick<Account, "id" | "kind" | "color">;
+	account: Pick<Account, "id" | "kind" | "color" | "recognizedBusinessKey">;
 	size?: NonNullable<VariantProps<typeof accountIconStyles>["size"]>;
 } & ComponentProps<"span">) {
 	const Icon = account.id === "savings" ? PiggyBank : icons[account.kind];
+	const logoKey = account.recognizedBusinessKey;
+	const logoURL = businessLogoURL(logoKey);
+	// A key change starts a fresh load: both outcomes are tagged with the key
+	// they belong to, so an old failure never hides a newly recognized logo.
+	const [assetState, setAssetState] = useState<{
+		key: string;
+		status: "loaded" | "failed";
+	} | null>(null);
+	const status =
+		logoKey && assetState?.key === logoKey ? assetState.status : "loading";
+	const showLogo = Boolean(logoKey) && status === "loaded";
 	return (
 		<span
 			{...props}
@@ -69,6 +81,7 @@ export function AccountIcon({
 					size,
 					customColor: Boolean(account.color),
 				}),
+				logoKey ? "relative" : undefined,
 				className,
 			)}
 			style={{
@@ -78,7 +91,24 @@ export function AccountIcon({
 				...style,
 			}}
 		>
-			<Icon size={iconSizes[size]} strokeWidth={1.7} aria-hidden="true" />
+			{logoKey && logoURL && status !== "failed" ? (
+				<img
+					src={logoURL}
+					alt=""
+					aria-hidden="true"
+					width={iconSizes[size]}
+					height={iconSizes[size]}
+					className={cn(
+						"object-contain dark:invert",
+						showLogo ? undefined : "pointer-events-none absolute opacity-0",
+					)}
+					onLoad={() => setAssetState({ key: logoKey, status: "loaded" })}
+					onError={() => setAssetState({ key: logoKey, status: "failed" })}
+				/>
+			) : null}
+			{showLogo ? null : (
+				<Icon size={iconSizes[size]} strokeWidth={1.7} aria-hidden="true" />
+			)}
 		</span>
 	);
 }
@@ -101,7 +131,10 @@ export function AccountLabel({
 	nameClassName,
 	...props
 }: {
-	account: Pick<Account, "id" | "kind" | "color" | "name">;
+	account: Pick<
+		Account,
+		"id" | "kind" | "color" | "name" | "recognizedBusinessKey"
+	>;
 	suffix?: string;
 	nameClassName?: string;
 } & ComponentProps<"span">) {

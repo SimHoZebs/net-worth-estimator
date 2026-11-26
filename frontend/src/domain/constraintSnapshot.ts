@@ -15,7 +15,10 @@ export interface LedgerRow {
 
 export interface FailureLedger {
 	accountName: string;
-	accountIcon: Pick<Account, "id" | "kind" | "color"> | null;
+	accountIcon: Pick<
+		Account,
+		"id" | "kind" | "color" | "recognizedBusinessKey"
+	> | null;
 	month: string;
 	rows: LedgerRow[];
 	overflow: number;
@@ -64,7 +67,14 @@ export function failureLedger({
 	const account = accounts.find((item) => item.id === accountId);
 	const accountName = account?.name ?? "Unknown account";
 	const accountIcon = account
-		? { id: account.id, kind: account.kind, color: account.color }
+		? {
+				id: account.id,
+				kind: account.kind,
+				color: account.color,
+				...(account.recognizedBusinessKey
+					? { recognizedBusinessKey: account.recognizedBusinessKey }
+					: {}),
+			}
 		: null;
 	const month = dateLabel(`${monthKey(failure.date)}-01`);
 	const candidates = accountTransactions({

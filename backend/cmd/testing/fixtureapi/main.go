@@ -29,6 +29,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/memory"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/businesslogos"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
@@ -245,6 +247,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure fixture receipt source: %v", err)
 	}
+	// The fixture uses a deterministic in-memory catalog store seeded once at
+	// boot from embedded SVGs. It writes no working directory and never shares
+	// a root with private receipt storage.
+	assetService, err := businesslogos.New(memory.New())
+	if err != nil {
+		log.Fatalf("configure fixture catalog: %v", err)
+	}
+	seedCtx, cancelSeed := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := assetService.Seed(seedCtx); err != nil {
+		cancelSeed()
+		log.Fatalf("seed fixture catalog: %v", err)
+	}
+	cancelSeed()
 	// A reset must not interleave with an in-flight request holding the store.
 	// Normal requests share the read side; reset and social seeds take the
 	// write side so they never clear rows under a projection build.
@@ -337,6 +352,7 @@ func main() {
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
 			ResourceID:     fixtureResourceID,
+			AssetService:   assetService,
 		})
 		// Social routes ride the same fixture database as the plan API so
 		// browser tests exercise real group and sharing behavior. The

@@ -82,6 +82,11 @@ func main() {
 		bootFatalf("open store", err)
 	}
 	defer database.Close()
+	assetService, closeAssets, err := configureAssetService(dbPath, os.Getenv)
+	if err != nil {
+		bootFatalf("configure catalog assets", err)
+	}
+	defer closeAssets()
 	stopBlobCleanup := database.StartBlobCleanup(context.Background(), func(err error) { slog.Error("blob cleanup", "error", err) })
 	defer stopBlobCleanup()
 	analysisRunner, err := analysis.NewRunner(database, analysis.Definitions()...)
@@ -114,6 +119,7 @@ func main() {
 		ReadOnly:             readOnly,
 		GmailService:         configureGmail(),
 		GmailFrontendBaseURL: strings.TrimRight(os.Getenv("NET_WORTH_ESTIMATOR_PUBLIC_URL"), "/"),
+		AssetService:         assetService,
 	}
 	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig, syncManager)
 	if err != nil {

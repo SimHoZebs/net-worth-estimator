@@ -34,7 +34,7 @@ test("Vercel upload keeps workspace manifests without identity implementation", 
 
 test("Vercel proxies the API, callbacks, probes, and streams before static fallback", () => {
   const config = vercelConfig(settings);
-  const [proxy, filesystem, fallback] = config.routes;
+  const [catalog, proxy, filesystem, fallback] = config.routes;
   const pattern = new RegExp(`^${proxy.src}$`);
   for (const path of ["/v1", "/v1/auth/login", "/v1/auth/callback", "/v1/auth/backchannel-logout", "/v1/projections/stochastic", "/healthz", "/readyz"]) {
     assert.equal(path.replace(pattern, proxy.dest), `https://api.example.test${path}`);
@@ -47,11 +47,19 @@ test("Vercel proxies the API, callbacks, probes, and streams before static fallb
   assert.equal(config.outputDirectory, "frontend/dist");
   assert.equal(proxy.headers["Cache-Control"], "no-store");
   assert.deepEqual(proxy.has, [{ type: "host", value: { eq: "app.example.test" } }]);
+
+  const catalogPattern = new RegExp(`^${catalog.src}$`);
+  for (const path of ["/v1/assets/business-logos/chase", "/v1/assets/business-logos/chase/abc123"])
+    assert.equal(path.replace(catalogPattern, catalog.dest), `https://api.example.test${path}`);
+  assert.equal(catalogPattern.test("/v1/assets/receipts/secret"), false);
+  assert.equal(catalog.headers, undefined);
+  assert.deepEqual(catalog.has, [{ type: "host", value: { eq: "app.example.test" } }]);
 });
 
 test("the edge replaces client ingress headers without embedding the secret", () => {
   const config = vercelConfig(settings);
-  const transforms = config.routes[0].transforms;
+  const transforms = config.routes[1].transforms;
+  assert.deepEqual(config.routes[0].transforms, transforms);
   assert.deepEqual(transforms, [
     {
       type: "request.headers", op: "set", target: { key: "Waypoint-Proxy-Secret" },
@@ -68,6 +76,7 @@ test("the edge replaces client ingress headers without embedding the secret", ()
 test("operator settings change hosts without source changes", () => {
   const config = vercelConfig({ ...settings, BACKEND_URL: "https://different-host.test" });
   assert.equal(config.routes[0].dest, "https://different-host.test/$1");
+  assert.equal(config.routes[1].dest, "https://different-host.test/$1");
 });
 
 test("Vercel fails closed on incomplete or unsafe deployment settings", () => {

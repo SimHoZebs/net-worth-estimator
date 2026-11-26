@@ -42,6 +42,37 @@ func modelRawRoutes(api huma.API) {
 		}
 		spec.AddOperation(op)
 	}
+	// Catalog logos are raw routes so a browser <img> can fetch them without
+	// a resource header. Describe them here for the generated client and the
+	// checked-in OpenAPI snapshot. Only manifest keys exist on these paths.
+	spec.AddOperation(&huma.Operation{
+		OperationID: "get-business-logo",
+		Method:      "GET",
+		Path:        "/v1/assets/business-logos/{key}",
+		Parameters: []*huma.Param{
+			{Name: "key", In: "path", Required: true, Schema: &huma.Schema{Type: "string"}},
+		},
+		Responses: map[string]*huma.Response{
+			"302": {Description: "Redirect to the immutable catalog asset path"},
+			"404": {Description: "Key outside the curated catalog"},
+		},
+	})
+	spec.AddOperation(&huma.Operation{
+		OperationID: "get-business-logo-version",
+		Method:      "GET",
+		Path:        "/v1/assets/business-logos/{key}/{version}",
+		Parameters: []*huma.Param{
+			{Name: "key", In: "path", Required: true, Schema: &huma.Schema{Type: "string"}},
+			{Name: "version", In: "path", Required: true, Schema: &huma.Schema{Type: "string"}},
+		},
+		Responses: map[string]*huma.Response{
+			"200": {Description: "Curated SVG logo", Content: map[string]*huma.MediaType{
+				"image/svg+xml": {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+			}},
+			"304": {Description: "Unchanged catalog asset"},
+			"404": {Description: "Key or version outside the curated catalog"},
+		},
+	})
 	// The Gmail OAuth callback runs outside Huma (a browser GET that 302s
 	// to the frontend with the connection outcome). Describe it here so
 	// the generated client and the snapshot cover every request.

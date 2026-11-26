@@ -2,7 +2,10 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { Account } from "../domain/model.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 
-export type AccountEntryAccount = Pick<Account, "id" | "kind" | "color">;
+export type AccountEntryAccount = Pick<
+	Account,
+	"id" | "kind" | "color" | "recognizedBusinessKey"
+>;
 
 // One row of a money flow: the same account glyph used in the account and
 // account views grouped with its value, so the user recognizes the account

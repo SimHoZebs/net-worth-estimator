@@ -22,7 +22,10 @@ export function ConstraintSnapshot({
 }: {
 	ledger: FailureLedger;
 	failure: TransactionResult;
-	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
+	accounts: Pick<
+		Account,
+		"id" | "kind" | "color" | "name" | "recognizedBusinessKey"
+	>[];
 	/** Saved rules, for the detail view's rule lookups and edit controls. */
 	transactions: Transaction[];
 	readOnly: boolean;

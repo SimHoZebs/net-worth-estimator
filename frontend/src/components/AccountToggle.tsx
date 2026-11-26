@@ -17,7 +17,10 @@ export function AccountToggle({
 	onToggle,
 	className,
 }: {
-	account: Pick<Account, "id" | "kind" | "color" | "name">;
+	account: Pick<
+		Account,
+		"id" | "kind" | "color" | "name" | "recognizedBusinessKey"
+	>;
 	checked: boolean;
 	disabled?: boolean;
 	dirty?: boolean;
