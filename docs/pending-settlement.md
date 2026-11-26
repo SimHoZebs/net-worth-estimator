@@ -97,14 +97,30 @@ settlement state. A claim that supplies a posted date confirms that date
 immediately. The editor rejects a claim with no occurrence date instead of
 saving the row unlinked.
 
-A settled charge that matches a claimed hold joins it the same way, so the
-claim survives settlement. Refreshes never demote a claimed row back to a
+A posted charge that matches a pending or explicitly provisional claimed hold
+joins it the same way, so the claim survives settlement. A settled,
+non-provisional claimed row is an owner record and is never a conversion target
+for a different-key charge. Refreshes never demote a claimed row back to a
 pending seed. Pending refreshes preserve the provisional marker and its posted
 instant. The first real same-key posting clears the marker and applies the final
 amount and descriptor while preserving the occurred date, even when the real
 posted instant equals the occurred instant. Repeat feeds are then no-ops. Any
 non-claim owner save clears the marker, so an owner-edited positive posted date
 is settled even when it equals occurred time.
+
+For databases that predate the satellite, the offline backfill first applies the
+legacy lifecycle and equality conditions, then requires persisted source facts
+with `pending` exactly boolean `true` and a present numeric `postedTime` exactly
+equal to zero. Both signals are required because a pending feed item can carry a
+positive posted timestamp and a settled item can carry zero. Future SimpleFIN
+facts persist `pending` from `Transaction.IsPending()`.
+
+Legacy facts with `pending: false`, absent pending, or any other unknown shape
+remain unmarked; pre-flag documents normally backfill zero markers. A positive
+posted time also stays unmarked even when `pending` is true. Missing facts, a
+missing facts table, and non-numeric values remain unknown so owner edits and
+exclusions survive. Malformed candidate facts abort the migration before
+publication. Equality alone is never applied universally as settlement evidence.
 
 Validation requires each claimed occurrence to be a scheduled date of an
 existing rule, with one claim per rule and date.

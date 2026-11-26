@@ -1,17 +1,20 @@
 // This standalone one-time operator tool creates the provisional-posting
-// satellite and backfills the legacy equality heuristic exactly once. Neither
-// setupdb nor the server calls it. deploy/migrate.sh runs it on the verified
-// candidate copy after the transaction satellite split.
+// satellite and backfills legacy claimed bank rows only when persisted source
+// facts prove pending origin. Neither setupdb nor the server calls it.
+// deploy/migrate.sh runs it on the verified candidate copy after the
+// transaction satellite split.
 package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -24,16 +27,26 @@ const provisionalPostingsSchema = `CREATE TABLE transaction_provisional_postings
 	FOREIGN KEY (user_id, transaction_id) REFERENCES transactions(user_id, id) ON DELETE CASCADE
 )`
 
-const legacyCandidates = `SELECT p.user_id, p.id
+const legacyCandidates = `SELECT p.user_id, p.id, f.facts_json
 	FROM transactions p
 	JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id
+	LEFT JOIN transaction_source_facts f ON f.user_id = p.user_id AND f.transaction_id = p.id
 	WHERE p.source NOT IN ('user', 'model', '')
 	  AND p.pending = 0
 	  AND p.void = 0
 	  AND p.posted_time > 0
 	  AND p.posted_time = p.transaction_time`
 
-const legacyBackfill = `INSERT INTO transaction_provisional_postings (user_id, transaction_id) ` + legacyCandidates
+const insertProvisionalPosting = `INSERT INTO transaction_provisional_postings (user_id, transaction_id) VALUES (?, ?)`
+
+// zeroPostedTime matches JSON numeric spellings whose exact mathematical value
+// is zero. The decoder validates number syntax; the caller must also verify the
+// separate pending boolean before treating a candidate as pending evidence.
+var zeroPostedTime = regexp.MustCompile(`^-?0(?:\.0+)?(?:[eE][+-]?[0-9]+)?$`)
+
+type legacyCandidate struct {
+	userID, transactionID string
+}
 
 type counts struct {
 	Created    bool
@@ -117,23 +130,27 @@ func upgrade(path string) (counts, error) {
 		return result, err
 	}
 	if !exists {
-		var legacy int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM (` + legacyCandidates + `)`).Scan(&legacy); err != nil {
+		candidates, err := pendingOriginCandidates(tx)
+		if err != nil {
 			return result, err
 		}
 		if _, err := tx.Exec(provisionalPostingsSchema); err != nil {
 			return result, fmt.Errorf("create provisional posting satellite: %w", err)
 		}
-		inserted, err := tx.Exec(legacyBackfill)
-		if err != nil {
-			return result, fmt.Errorf("backfill provisional postings: %w", err)
-		}
-		backfilled, err := inserted.RowsAffected()
-		if err != nil {
-			return result, err
-		}
-		if backfilled != int64(legacy) {
-			return result, fmt.Errorf("backfilled %d provisional postings, want %d", backfilled, legacy)
+		var backfilled int64
+		for _, candidate := range candidates {
+			inserted, err := tx.Exec(insertProvisionalPosting, candidate.userID, candidate.transactionID)
+			if err != nil {
+				return result, fmt.Errorf("backfill provisional postings: %w", err)
+			}
+			count, err := inserted.RowsAffected()
+			if err != nil {
+				return result, err
+			}
+			if count != 1 {
+				return result, fmt.Errorf("backfilled %d provisional postings for %s/%s, want 1", count, candidate.userID, candidate.transactionID)
+			}
+			backfilled += count
 		}
 		result.Created = true
 		result.Backfilled = int(backfilled)
@@ -160,6 +177,81 @@ func upgrade(path string) (counts, error) {
 		return result, fmt.Errorf("foreign key violations: %d", violations)
 	}
 	return result, tx.Commit()
+}
+
+func pendingOriginCandidates(tx *sql.Tx) ([]legacyCandidate, error) {
+	exists, err := tableExists(tx, "transaction_source_facts")
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, nil
+	}
+	rows, err := tx.Query(legacyCandidates + ` ORDER BY p.user_id, p.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var candidates []legacyCandidate
+	for rows.Next() {
+		var candidate legacyCandidate
+		var facts sql.NullString
+		if err := rows.Scan(&candidate.userID, &candidate.transactionID, &facts); err != nil {
+			return nil, err
+		}
+		if !facts.Valid {
+			continue
+		}
+		pending, err := factsProvePendingOrigin(facts.String)
+		if err != nil {
+			return nil, fmt.Errorf("source facts for legacy candidate %s/%s: %w", candidate.userID, candidate.transactionID, err)
+		}
+		if pending {
+			candidates = append(candidates, candidate)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return candidates, nil
+}
+
+// factsProvePendingOrigin requires both a present boolean pending equal to true
+// and a present numeric postedTime whose exact value is zero. Missing fields,
+// null, non-boolean pending, non-numeric posted times, non-object documents, and
+// every nonzero posted time are unknown rather than pending evidence. Malformed
+// JSON is an error so a candidate fails closed before publication.
+func factsProvePendingOrigin(raw string) (bool, error) {
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	var document any
+	if err := decoder.Decode(&document); err != nil {
+		return false, fmt.Errorf("malformed source facts JSON: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return false, fmt.Errorf("malformed source facts JSON: multiple values")
+		}
+		return false, fmt.Errorf("malformed source facts JSON: %w", err)
+	}
+	facts, ok := document.(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	pending, ok := facts["pending"].(bool)
+	if !ok || !pending {
+		return false, nil
+	}
+	value, exists := facts["postedTime"]
+	if !exists {
+		return false, nil
+	}
+	number, ok := value.(json.Number)
+	if !ok {
+		return false, nil
+	}
+	return zeroPostedTime.MatchString(number.String()), nil
 }
 
 func tableExists(tx *sql.Tx, table string) (bool, error) {

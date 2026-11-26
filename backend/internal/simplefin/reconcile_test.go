@@ -161,13 +161,14 @@ func TestReconcileConvertsSameKeyPendingToSettled(t *testing.T) {
 	}
 }
 
-func TestReconcileConvertsVanishedClaimedOccurrence(t *testing.T) {
-	// A claimed hold already cleared pending, so it is settled; when the
-	// posted charge arrives under a new id it still joins the claimed row
-	// instead of inserting beside it.
+func TestReconcileConvertsVanishedProvisionalClaimedOccurrence(t *testing.T) {
+	// A claimed hold already cleared pending and carries an explicit provisional
+	// posted instant. A posted charge under a new id joins that hold instead of
+	// inserting beside it.
 	row := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false,
 		pendingKey("prime_card", "old-auth"))
 	row.Transaction.Enabled = true
+	row.Transaction.PostedTimeProvisional = true
 	row.Transaction.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
 	bank := []store.BankRow{row}
 	settled := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", false, 1785715200)}
@@ -204,6 +205,7 @@ func TestReconcileIgnoresLiveClaimedRowAsConvertTarget(t *testing.T) {
 	row := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false,
 		pendingKey("prime_card", "old-auth"))
 	row.Transaction.Enabled = true
+	row.Transaction.PostedTimeProvisional = true
 	row.Transaction.Claim = &types.TransactionClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
 	stillPending := reconcileTransaction("Corner Store", "prime_card", "42.10", true, 1785628800)
 	stillPending.TransactionID = "old-auth"

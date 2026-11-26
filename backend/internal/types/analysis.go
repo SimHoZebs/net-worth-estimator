@@ -9,6 +9,7 @@ type TransactionFacts struct {
 	Memo        string            `json:"memo"`
 	Amount      string            `json:"amount"`
 	Currency    string            `json:"currency"`
+	Pending     bool              `json:"pending"`
 	PostedTime  int64             `json:"postedTime"`
 	OccurredAt  int64             `json:"occurredAt"`
 	Metadata    map[string]string `json:"metadata"`

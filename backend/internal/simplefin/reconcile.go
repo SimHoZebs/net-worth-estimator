@@ -169,9 +169,10 @@ func candidateKey(item store.SyncTransaction) store.BankKey {
 // touched. A candidate whose key already points at a settled row is already
 // imported and never reprocesses, so repeat feeds are stable no-ops. A claimed
 // row with an explicit provisional-posting marker accepts one real same-key
-// posting. Keys that point only at pending or void rows never suppress a
-// settled candidate. The settled-to-settled duplicate check stays exact so
-// near-amount repeats never suppress a genuine second charge.
+// posting, and only such a claimed row can convert a different-key posting.
+// Keys that point only at pending or void rows never suppress a settled
+// candidate. The settled-to-settled duplicate check stays exact so near-amount
+// repeats never suppress a genuine second charge.
 func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
@@ -276,8 +277,10 @@ func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, c
 	// A posted charge that settles a vanished hold converts that hold in
 	// place: the hold keeps its UUID (and any occurrence claim on it) and
 	// takes the posted values with the posted key. Eligible holds are
-	// vanished pending rows plus vanished claimed occurrences, matched by
-	// the same merchant-profile join the candidate endpoint uses. The join
+	// vanished pending rows plus vanished claimed occurrences whose posted
+	// instant is explicitly provisional, matched by the same merchant-profile
+	// join the candidate endpoint uses. Settled claimed rows are owner records,
+	// not holds, even when their posted instant equals occurred time. The join
 	// needs a unique pair: several candidates for one hold, or several
 	// holds for one candidate, fall back to void-plus-insert for the owner
 	// to resolve by hand. Zero-amount auths never join, direction
@@ -316,7 +319,7 @@ func Reconcile(pending, settled []store.SyncTransaction, bank []store.BankRow, c
 		}
 		if row.Transaction.Pending {
 			targets = append(targets, convertTarget{id: row.Transaction.ID, transaction: row.Transaction})
-		} else if row.Transaction.Claim != nil && !row.Transaction.Void {
+		} else if row.Transaction.Claim != nil && row.Transaction.PostedTimeProvisional && !row.Transaction.Void {
 			targets = append(targets, convertTarget{id: row.Transaction.ID, transaction: row.Transaction})
 		}
 	}

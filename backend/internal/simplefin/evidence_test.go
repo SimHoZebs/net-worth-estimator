@@ -10,6 +10,44 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+func TestTransactionFactsPersistPendingEvidence(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "explicit pending with positive posted", raw: `{"posted":1785628800,"pending":true}`, want: true},
+		{name: "explicit pending with zero posted", raw: `{"posted":0,"pending":true}`, want: true},
+		{name: "explicit settled with zero posted", raw: `{"posted":0,"pending":false}`, want: false},
+		{name: "explicit settled with positive posted", raw: `{"posted":1785628800,"pending":false}`, want: false},
+		{name: "missing pending falls back to zero posted", raw: `{"posted":0}`, want: true},
+		{name: "missing pending falls back to positive posted", raw: `{"posted":1785628800}`, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var transaction Transaction
+			if err := json.Unmarshal([]byte(test.raw), &transaction); err != nil {
+				t.Fatal(err)
+			}
+			facts := transactionFacts(transaction, "USD", "")
+			if facts.Pending != test.want {
+				t.Fatalf("facts pending = %v, want %v", facts.Pending, test.want)
+			}
+			encoded, err := json.Marshal(facts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document map[string]any
+			if err := json.Unmarshal(encoded, &document); err != nil {
+				t.Fatal(err)
+			}
+			pending, ok := document["pending"].(bool)
+			if !ok || pending != test.want {
+				t.Fatalf("persisted pending = %#v, want boolean %v in %s", document["pending"], test.want, encoded)
+			}
+		})
+	}
+}
+
 func TestBridgeAccountTypeHintIsAllowlistedMetadata(t *testing.T) {
 	var transaction Transaction
 	if err := json.Unmarshal([]byte(`{"id":"one","description":"CARD PURCHASE","amount":"-25","posted":1785628800,"extra":{"type":"credit_card","account_id":"private-id"}}`), &transaction); err != nil {

@@ -501,22 +501,34 @@ test("legacy provisional-posting satellite is created once and later marker rows
     INSERT INTO recurrence_rules(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,recurrence_unit,recurrence_interval,recurrence_weekdays,recurrence_month_mode,start_date,end_date,annual_cap,priority,enabled)
       VALUES ('${owner}','rent',0,'Rent','checking','null','{}','month',1,'[]','byDate','2026-04-01',NULL,NULL,0,1);
     INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES
-      ('${owner}','claimed-equal','Claimed equal','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
+      ('${owner}','claimed-pending','Claimed pending evidence','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
+      ('${owner}','claimed-settled','Claimed settled evidence','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
+      ('${owner}','claimed-legacy-zero','Claimed legacy zero','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
+      ('${owner}','claimed-missing','Claimed missing facts','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
       ('${owner}','claimed-later','Claimed later','checking','null','{}',1775048400,1775044800,'simplefin',0,0),
       ('${owner}','unclaimed-equal','Unclaimed equal','checking','null','{}',1775044800,1775044800,'simplefin',0,0),
       ('${owner}','owner-equal','Owner equal','checking','null','{}',1775044800,1775044800,'user',0,0);
     INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES
-      ('${owner}','claimed-equal',0,1,1),('${owner}','claimed-later',1,1,2),
-      ('${owner}','unclaimed-equal',2,1,3),('${owner}','owner-equal',3,1,4);
+      ('${owner}','claimed-pending',0,1,1),('${owner}','claimed-settled',1,1,2),
+      ('${owner}','claimed-legacy-zero',2,1,3),('${owner}','claimed-missing',3,1,4),
+      ('${owner}','claimed-later',4,1,5),('${owner}','unclaimed-equal',5,1,6),
+      ('${owner}','owner-equal',6,1,7);
     INSERT INTO transaction_claims(user_id,transaction_id,fulfills_rule_id,fulfills_occurrence_date) VALUES
-      ('${owner}','claimed-equal','rent','2026-04-01'),
+      ('${owner}','claimed-pending','rent','2026-04-01'),
+      ('${owner}','claimed-settled','rent','2026-04-01'),
+      ('${owner}','claimed-legacy-zero','rent','2026-04-01'),
+      ('${owner}','claimed-missing','rent','2026-04-01'),
       ('${owner}','claimed-later','rent','2026-04-01'),
-      ('${owner}','owner-equal','rent','2026-04-01');`);
+      ('${owner}','owner-equal','rent','2026-04-01');
+    INSERT INTO transaction_source_facts(user_id,transaction_id,facts_json) VALUES
+      ('${owner}','claimed-pending','{"pending":true,"postedTime":0}'),
+      ('${owner}','claimed-settled','{"pending":false,"postedTime":1775044800}'),
+      ('${owner}','claimed-legacy-zero','{"pending":false,"postedTime":0}');`);
   const transactionsBefore = await rows(db, "SELECT * FROM transactions ORDER BY user_id,id;");
 
   const result = await migrate(db);
   assert.doesNotMatch(result.stdout, /verified, nothing to do/);
-  assert.equal(await rows(db, "SELECT transaction_id FROM transaction_provisional_postings ORDER BY 1;"), "claimed-equal");
+  assert.equal(await rows(db, "SELECT transaction_id FROM transaction_provisional_postings ORDER BY 1;"), "claimed-pending");
   assert.equal(await rows(db, "SELECT * FROM transactions ORDER BY user_id,id;"), transactionsBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
@@ -524,12 +536,12 @@ test("legacy provisional-posting satellite is created once and later marker rows
   assert.equal(names.length, 1);
   assert.equal(await rows(join(directory, names[0], "before.db"), "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name='transaction_provisional_postings';"), "0");
 
-  // A later owner confirmation clears the ambiguous legacy marker, and a new
-  // equal-date claim has no marker. Neither may be reclassified on repeat.
-  await sqlite(db, `DELETE FROM transaction_provisional_postings WHERE transaction_id='claimed-equal';
+  // A later owner confirmation clears the pending-evidence marker, and a new
+  // equal-date claim without facts has no marker. Neither may be reclassified.
+  await sqlite(db, `DELETE FROM transaction_provisional_postings WHERE transaction_id='claimed-pending';
     INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
       VALUES ('${owner}','late-equal','Late equal','checking','null','{}',1775044800,1775044800,'simplefin',0,0);
-    INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES ('${owner}','late-equal',4,1,5);
+    INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES ('${owner}','late-equal',7,1,8);
     INSERT INTO transaction_claims(user_id,transaction_id,fulfills_rule_id,fulfills_occurrence_date) VALUES ('${owner}','late-equal','rent','2026-04-01');`);
   const hashAfter = await sha256File(db);
   const repeat = await migrate(db);

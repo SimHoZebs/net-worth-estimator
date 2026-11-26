@@ -174,6 +174,100 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	}
 }
 
+func TestSyncFlowClaimedConversionTargetsRequireProvisionalPosting(t *testing.T) {
+	t.Run("settled owner-edited claim is not a conversion target", func(t *testing.T) {
+		database := openRunnerStore(t)
+		seedRunnerAccounts(t, database)
+		if first := applyFlow(t, database, nil, []store.SyncTransaction{
+			flowTransaction("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-02"),
+		}); first.SettledInserted != 1 {
+			t.Fatalf("settled seed = %+v", first)
+		}
+		rows := bankRowIDs(t, database)
+		var id string
+		for rowID := range rows {
+			id = rowID
+		}
+		if _, err := database.CreateSchedule(types.Schedule{
+			ID: "corner", Name: "Corner Store", Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+			StartDate: "2026-08-01", Enabled: true,
+			Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "43.00"}, Inputs: map[string]types.AmountInputBinding{}},
+		}); err != nil {
+			t.Fatalf("rule = %v", err)
+		}
+		claimed, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+			TransactionID: id,
+			Claim:         types.TransactionClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"},
+		}})
+		if err != nil || len(claimed) != 1 || claimed[0].PostedTimeProvisional {
+			t.Fatalf("settled claim = %+v, err %v", claimed, err)
+		}
+		edited := claimed[0]
+		edited.Name = "Corner Store owner confirmed"
+		edited.Amount = types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "43.00"}, Inputs: map[string]types.AmountInputBinding{}}
+		edited.Enabled = false
+		if _, err := database.UpdateTransaction(edited); err != nil {
+			t.Fatalf("owner edit = %v", err)
+		}
+
+		summary := applyFlow(t, database, nil, []store.SyncTransaction{
+			flowSettledTransaction("post-b", "Corner Store", "prime_card", "43.00", "2026-08-02", "2026-08-03"),
+		})
+		if summary.SettledConverted != 0 || summary.SettledInserted != 1 {
+			t.Fatalf("new-key candidate = %+v, want a separate insert rather than conversion", summary)
+		}
+		after := bankRowIDs(t, database)
+		row, ok := after[id]
+		if !ok || row.Name != edited.Name || row.Enabled || row.PostedTimeProvisional || row.Claim == nil || row.TransactionTime != 1785628800 || row.PostedTime != 1785628800 {
+			t.Fatalf("settled owner-edited claim changed: before %+v after %+v", edited, row)
+		}
+		if expression, _ := row.Amount.Config["expression"].(string); expression != "43.00" {
+			t.Fatalf("settled owner-edited amount changed: %q", expression)
+		}
+	})
+
+	t.Run("provisional claimed hold still converts and preserves occurred time", func(t *testing.T) {
+		database := openRunnerStore(t)
+		seedRunnerAccounts(t, database)
+		if first := applyFlow(t, database, []store.SyncTransaction{
+			flowTransaction("auth-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02"),
+		}, nil); first.PendingInserted != 1 {
+			t.Fatalf("pending seed = %+v", first)
+		}
+		rows := bankRowIDs(t, database)
+		var id string
+		for rowID := range rows {
+			id = rowID
+		}
+		if _, err := database.CreateSchedule(types.Schedule{
+			ID: "corner", Name: "Corner Store", Recurrence: types.Recurrence{Unit: types.RecurrenceMonth, Interval: 1, MonthlyMode: types.RecurrenceMonthlyByDate},
+			StartDate: "2026-08-01", Enabled: true,
+			Amount: types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
+		}); err != nil {
+			t.Fatalf("rule = %v", err)
+		}
+		claimed, err := database.SetTransactionClaims([]types.TransactionClaimUpdate{{
+			TransactionID: id,
+			Claim:         types.TransactionClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"},
+		}})
+		if err != nil || len(claimed) != 1 || !claimed[0].PostedTimeProvisional {
+			t.Fatalf("provisional claim = %+v, err %v", claimed, err)
+		}
+
+		summary := applyFlow(t, database, nil, []store.SyncTransaction{
+			flowSettledTransaction("post-b", "Corner Store", "prime_card", "42.10", "2026-08-02", "2026-08-03"),
+		})
+		if summary.SettledConverted != 1 || summary.SettledInserted != 0 {
+			t.Fatalf("new-key settlement = %+v, want one conversion", summary)
+		}
+		after := bankRowIDs(t, database)
+		row, ok := after[id]
+		if !ok || row.Pending || row.Void || !row.Enabled || row.PostedTimeProvisional || row.Claim == nil || row.TransactionTime != 1785628800 || row.PostedTime != 1785715200 {
+			t.Fatalf("provisional claim conversion = %+v, want stable id and occurred 2026-08-02", row)
+		}
+	})
+}
+
 func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)

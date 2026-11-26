@@ -17,7 +17,7 @@ const accountTypeMetadata = "account_type"
 func transactionFacts(transaction Transaction, currency, accountType string) *types.TransactionFacts {
 	facts := &types.TransactionFacts{
 		Description: transaction.Description, Payee: transaction.Payee, Memo: transaction.Memo,
-		Amount: transaction.Amount, Currency: currency, PostedTime: transaction.Posted,
+		Amount: transaction.Amount, Currency: currency, Pending: transaction.IsPending(), PostedTime: transaction.Posted,
 		Metadata: map[string]string{},
 	}
 	if facts.Currency == "" {

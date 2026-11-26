@@ -28,9 +28,11 @@
 #  10. Historical forward no-op bank checkpoints are pruned: posted balances
 #      that match the modeled balance need no row. Owner rows, first
 #      observations, and changed available balances survive.
-#  11. The provisional-posting satellite is created when absent, with the
-#      one-time equality backfill for legacy claimed bank rows. Existing
-#      satellite rows are verified and never rewritten.
+#  11. The provisional-posting satellite is created when absent, with a
+#      one-time evidence-based backfill: equality candidates are marked only
+#      when persisted source facts carry pending=true and numeric postedTime=0.
+#      Legacy facts without both signals stay unknown and normally backfill zero.
+#      Existing satellite rows are verified and never rewritten.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -389,7 +391,7 @@ available_state() {
 
 # Provisional posting state is a sparse satellite. Absent is the supported
 # legacy source; current requires the exact scoped key and cascade shape. The
-# one-time equality backfill runs only while creating an absent table.
+# one-time pending-evidence backfill runs only while creating an absent table.
 provisional_postings_state() {
   count=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='transaction_provisional_postings';") \
     || fail "Cannot inspect provisional posting schema; refusing to guess."
@@ -726,8 +728,10 @@ if ! upgrade-transaction-sim-split --db "$candidate" > "$backup/transaction-sim.
   fail "Candidate transaction split failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 # Explicit provisional-posting state is a sparse satellite. Create and backfill
-# it only on the actual legacy upgrade; an existing satellite is verified with
-# its rows unchanged. This runs after the claim satellite exists.
+# it only on the actual legacy upgrade, and only when facts prove pending=true
+# plus numeric postedTime=0; legacy facts without both normally backfill zero.
+# An existing satellite is verified with its rows unchanged. This runs after the
+# claim satellite exists.
 if ! upgrade-provisional-postings --db "$candidate" > "$backup/provisional-postings.log" 2>&1; then
   printf 'migrate: provisional posting upgrade failed: %s\n' "$(cat "$backup/provisional-postings.log")" >&2
   fail "Candidate provisional posting upgrade failed. Original unchanged; backup retained at $backup. Keep the API stopped."
