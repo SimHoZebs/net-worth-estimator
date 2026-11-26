@@ -278,7 +278,9 @@ func TestLegacyInferredAssignmentsAreNotMassReprocessed(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	id := seedCategoryTransaction(t, s, "LOCAL SHOP", "legacy", 100, categoryFacts("LOCAL SHOP", ""))
-	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "old-classifier"); err != nil {
+	if err := withRowTx(s.db, func(tx *userTx) error {
+		return writeTransactionCategory(tx, id, types.CategoryTravel, types.CategorySourceInferred, "old-classifier")
+	}); err != nil {
 		t.Fatal(err)
 	}
 	candidates, err := s.ListTransactionCategoryCandidates(10)

@@ -91,7 +91,9 @@ keyword-only. A learner provider failure defers only the skipped transactions
 with the sanitized `provider_error` code; keyword assignments remain assigned.
 Every classifier call returns an outcome for every input. Keyword misses and ML
 no-request, uncertain, or unsupported results are terminal `evaluated` outcomes.
-Context cancellation remains an error. The learner fills only eligible
+Pending, unavailable, malformed batches, and provider failures defer the affected
+transactions with the sanitized `provider_error` code. Context cancellation
+remains an error. The learner fills only eligible
 uncategorized rows, never bank or user assignments, the same as keywords. Each
 stored assignment records the producer that made it, while the evaluation records
 the classifier composition version.
@@ -109,10 +111,11 @@ than memorizing training rows.
 
 A periodic worker scans eligible bank transactions in ascending
 `(posted_time, transaction_id)` keyset order from the durable per-user cursor.
-Terminal evaluations are excluded, and deferred evaluations become eligible only
-when their retry time arrives. Reaching the end wraps to the head once for that
-scan, which picks up backdated new rows and explicit clears. An interrupted run
-resumes from the last committed cursor.
+It processes at most one candidate batch per user per run so a large backlog
+cannot starve other users. Terminal evaluations are excluded, and deferred
+evaluations become eligible only when their retry time arrives. Reaching the end
+wraps to the head once for that scan, which picks up backdated new rows and
+explicit clears. An interrupted run resumes from the last committed cursor.
 
 Classification happens outside the publication transaction. The worker then
 re-reads current name, direction, and exact source-facts JSON, compares the

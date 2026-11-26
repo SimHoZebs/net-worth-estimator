@@ -102,39 +102,37 @@ func TestResetWithoutBankValueClearsTheAssignment(t *testing.T) {
 	}
 }
 
-func TestInferredCategoryNeverReplacesBankOrUser(t *testing.T) {
+func TestCategoryBatchNeverReplacesBankOrUser(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAccount(t, s, "checking")
 	applyDirectives(t, s, []BankDirective{
 		categoryUpsertDirective(bankSeedTransaction("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "UNKNOWN_PROVIDER_VALUE")),
 	})
 	id := mustBankTransactionID(t, s)
-	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
-		t.Fatal(err)
+	candidates, err := s.ListTransactionCategoryCandidates(1)
+	if err != nil || len(candidates) != 1 {
+		t.Fatalf("candidates=%+v err=%v", candidates, err)
 	}
+	batch := categoryBatchFor(t, candidates, "keyword-v1", types.TransactionCategoryOutcomeAssigned)
+	recordCategoryBatch(t, s, batch)
 	if got := loadedCategory(t, s, id); got.Category != types.CategoryTravel || got.Source != types.CategorySourceInferred {
 		t.Fatalf("inferred category=%+v", got)
 	}
-	// A supported bank value replaces an inferred assignment.
-	applyDirectives(t, s, []BankDirective{
-		categoryUpsertDirective(bankSeedTransaction("LOCAL SHOP", "checking", "10.00", false), ProviderSimpleFIN, "bridge", "shop", categoryFacts("LOCAL SHOP", "GENERAL_MERCHANDISE")),
-	})
-	if got := loadedCategory(t, s, id); got.Category != types.CategoryGeneralMerchandise || got.Source != types.CategorySourceBank {
-		t.Fatalf("bank did not replace inferred: %+v", got)
-	}
-	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
+	// A bank assignment that appears before publication keeps precedence.
+	if err := withRowTx(s.db, func(tx *userTx) error {
+		return writeTransactionCategory(tx, id, types.CategoryGeneralMerchandise, types.CategorySourceBank, ProviderSimpleFIN)
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if got := loadedCategory(t, s, id); got.Source != types.CategorySourceBank {
+	recordCategoryBatch(t, s, batch)
+	if got := loadedCategory(t, s, id); got.Category != types.CategoryGeneralMerchandise || got.Source != types.CategorySourceBank {
 		t.Fatalf("inferred replaced bank: %+v", got)
 	}
 	userCategory := types.CategoryMedical
 	if _, err := s.SetUserTransactionCategory(id, &userCategory); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetInferredTransactionCategory(id, types.CategoryTravel, "keyword-v1"); err != nil {
-		t.Fatal(err)
-	}
+	recordCategoryBatch(t, s, batch)
 	if got := loadedCategory(t, s, id); got.Source != types.CategorySourceUser || got.Category != types.CategoryMedical {
 		t.Fatalf("inferred replaced user: %+v", got)
 	}

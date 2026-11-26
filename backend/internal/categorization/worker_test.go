@@ -398,16 +398,34 @@ func TestWorkerSkipsStaleEvidenceBeforePublication(t *testing.T) {
 	}
 }
 
-func TestWorkerWrapsAfterExactBatchBoundaryInSameRun(t *testing.T) {
-	scoped, database := newCategoryStore(t)
-	for index := 0; index < 100; index++ {
-		seedChargeAt(t, scoped, fmt.Sprintf("LOCAL SHOP %03d", index), fmt.Sprintf("row-%03d", index), "", int64(100+index))
+func TestWorkerProcessesOneBatchPerUserAndPreservesProgress(t *testing.T) {
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "worker-fairness.db"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	var newHead string
+	t.Cleanup(func() { _ = database.Close() })
+	a, err := database.EnsureUser("a", "https://issuer.test", "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := database.EnsureUser("b", "https://issuer.test", "b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scoped := range []store.Store{a, b} {
+		if _, err := scoped.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index := 0; index < 100; index++ {
+		seedChargeAt(t, a, fmt.Sprintf("LOCAL SHOP %03d", index), fmt.Sprintf("row-%03d", index), "", int64(100+index))
+	}
+	seedChargeAt(t, b, "LOCAL SHOP B", "row-b", "", 100)
+	var extraID string
 	var classifier *scriptedClassifier
 	classifier = &scriptedClassifier{classify: func(_ context.Context, inputs []categorization.Input) (map[string]categorization.Classified, error) {
 		if classifier.calls == 1 {
-			newHead = seedChargeAt(t, scoped, "NEW HEAD", "new-head", "", 50)
+			extraID = seedChargeAt(t, a, "EXTRA A", "extra-a", "", 200)
 		}
 		results := make(map[string]categorization.Classified, len(inputs))
 		for _, input := range inputs {
@@ -422,16 +440,32 @@ func TestWorkerWrapsAfterExactBatchBoundaryInSameRun(t *testing.T) {
 	if err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if classifier.calls != 2 || newHead == "" {
-		t.Fatalf("exact-boundary wrap calls=%d newHead=%q", classifier.calls, newHead)
+	if classifier.calls != 2 || extraID == "" {
+		t.Fatalf("first run calls=%d extra=%q, want one batch for each user", classifier.calls, extraID)
 	}
-	var count int
-	if err := database.SQL().QueryRow(`SELECT COUNT(*) FROM category_evaluations WHERE user_id = 'category-user'`).Scan(&count); err != nil || count != 101 {
-		t.Fatalf("evaluation rows=%d err=%v", count, err)
+	for user, want := range map[string]int{"a": 100, "b": 1} {
+		var count int
+		if err := database.SQL().QueryRow(`SELECT COUNT(*) FROM category_evaluations WHERE user_id = ?`, user).Scan(&count); err != nil || count != want {
+			t.Fatalf("user %s evaluations=%d want=%d err=%v", user, count, want, err)
+		}
 	}
 	var cursorID string
-	if err := database.SQL().QueryRow(`SELECT transaction_id FROM category_scan_progress WHERE user_id = 'category-user'`).Scan(&cursorID); err != nil || cursorID != newHead {
-		t.Fatalf("cursor=%q want=%q err=%v", cursorID, newHead, err)
+	var posted int64
+	if err := database.SQL().QueryRow(`SELECT posted_time, transaction_id FROM category_scan_progress WHERE user_id = 'a'`).Scan(&posted, &cursorID); err != nil || posted != 199 || cursorID == extraID {
+		t.Fatalf("first cursor posted=%d id=%q extra=%q err=%v", posted, cursorID, extraID, err)
+	}
+	if err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if classifier.calls != 3 {
+		t.Fatalf("second run calls=%d, want only user a's next batch", classifier.calls)
+	}
+	var count int
+	if err := database.SQL().QueryRow(`SELECT COUNT(*) FROM category_evaluations WHERE user_id = 'a'`).Scan(&count); err != nil || count != 101 {
+		t.Fatalf("user a evaluations=%d err=%v", count, err)
+	}
+	if err := database.SQL().QueryRow(`SELECT transaction_id FROM category_scan_progress WHERE user_id = 'a'`).Scan(&cursorID); err != nil || cursorID != extraID {
+		t.Fatalf("second cursor=%q want=%q err=%v", cursorID, extraID, err)
 	}
 }
 

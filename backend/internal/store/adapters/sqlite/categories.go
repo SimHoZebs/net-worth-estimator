@@ -249,32 +249,6 @@ func (s *sqliteStore) SetUserTransactionCategory(transactionID string, category 
 	return result, nil
 }
 
-// SetInferredTransactionCategory stores one classifier result without replacing a
-// bank or user assignment.
-func (s *sqliteStore) SetInferredTransactionCategory(transactionID, category, producer string) error {
-	category = strings.TrimSpace(category)
-	if !types.ValidCategory(category) {
-		return fmt.Errorf("unsupported category %q", category)
-	}
-	return withRowTx(s.db, func(tx *userTx) error {
-		if err := ensureCategorySchema(tx); err != nil {
-			return fmt.Errorf("ensure transaction categories: %w", err)
-		}
-		var present int
-		if err := tx.QueryRow(`SELECT 1 FROM transactions WHERE id = ? AND user_id = :user_id`, transactionID).Scan(&present); err != nil {
-			if err == sql.ErrNoRows {
-				return store.NotFound(transactionID)
-			}
-			return fmt.Errorf("read transaction %s: %w", transactionID, err)
-		}
-		err := writeInferredTransactionCategory(tx, transactionID, category, producer, time.Now().Unix())
-		if err != nil {
-			return fmt.Errorf("store inferred category %s: %w", transactionID, err)
-		}
-		return nil
-	})
-}
-
 // writeInferredTransactionCategory applies classifier precedence in one upsert.
 // Existing bank and user assignments always win.
 func writeInferredTransactionCategory(tx *userTx, transactionID, category, producer string, updatedAt int64) error {

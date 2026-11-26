@@ -71,27 +71,11 @@ func (w *Worker) runUser(ctx context.Context, user string, scoped store.Store) e
 		// keyword-only compositions (no setter) are untouched.
 		setter.SetFeedbackSource(newJournalFeedbackSource(scoped, user))
 	}
-	var previous types.TransactionCategoryCursor
-	hasPrevious := false
-	for {
-		candidates, err := scoped.ListTransactionCategoryCandidates(categoryBatchSize)
-		if err != nil {
-			return err
-		}
-		if len(candidates) == 0 {
-			return nil
-		}
-		wrapped := categoryBatchWrapped(candidates, previous, hasPrevious)
-		if err := w.classifyAndRecord(ctx, scoped, candidates); err != nil {
-			return err
-		}
-		last := candidates[len(candidates)-1]
-		previous = types.TransactionCategoryCursor{PostedTime: last.PostedTime, TransactionID: last.TransactionID}
-		hasPrevious = true
-		if wrapped || len(candidates) < categoryBatchSize {
-			return nil
-		}
+	candidates, err := scoped.ListTransactionCategoryCandidates(categoryBatchSize)
+	if err != nil || len(candidates) == 0 {
+		return err
 	}
+	return w.classifyAndRecord(ctx, scoped, candidates)
 }
 
 func (w *Worker) classifyAndRecord(ctx context.Context, scoped store.Store, candidates []types.TransactionCategoryCandidate) error {
@@ -134,29 +118,6 @@ func (w *Worker) classifyAndRecord(ctx context.Context, scoped store.Store, cand
 			TransactionID: last.TransactionID,
 		},
 	})
-}
-
-// categoryBatchWrapped detects the store's single head wrap. A wrapped page is
-// either ordered before the prior cursor or contains a descending keyset boundary
-// where tail rows and head rows meet.
-func categoryBatchWrapped(candidates []types.TransactionCategoryCandidate, previous types.TransactionCategoryCursor, hasPrevious bool) bool {
-	if hasPrevious && !categoryCandidateAfter(candidates[0], previous) {
-		return true
-	}
-	for index := 1; index < len(candidates); index++ {
-		prior := types.TransactionCategoryCursor{PostedTime: candidates[index-1].PostedTime, TransactionID: candidates[index-1].TransactionID}
-		if !categoryCandidateAfter(candidates[index], prior) {
-			return true
-		}
-	}
-	return false
-}
-
-func categoryCandidateAfter(candidate types.TransactionCategoryCandidate, cursor types.TransactionCategoryCursor) bool {
-	if candidate.PostedTime != cursor.PostedTime {
-		return candidate.PostedTime > cursor.PostedTime
-	}
-	return candidate.TransactionID > cursor.TransactionID
 }
 
 // Start owns its goroutine and waits for it on stop.

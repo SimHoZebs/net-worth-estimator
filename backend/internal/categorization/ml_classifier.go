@@ -10,7 +10,7 @@ import (
 // MLClassifier judges category hypotheses through a judgment provider. It
 // returns an assigned outcome only for a ready, strong, supported judgment;
 // no-request, uncertain, and unsupported inputs are terminal evaluated outcomes,
-// and provider failures are deferred outcomes.
+// while pending, unavailable, and provider failures are deferred outcomes.
 //
 // Feedback is the journal-backed training source, set per tick by the
 // worker from the scoped store before Classify opens the session.
@@ -48,8 +48,9 @@ type pendingCategoryRequest struct {
 
 // Classify judges every direction-eligible category hypothesis for the batch.
 // Every input receives an explicit outcome: no-request, uncertain, and
-// unsupported results are terminal evaluated outcomes; provider failures are
-// deferred with a sanitized problem code. Context cancellation remains an error.
+// unsupported results are terminal evaluated outcomes; pending, unavailable,
+// malformed batches, and provider failures are deferred with a sanitized
+// problem code. Context cancellation remains an error.
 func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string]Classified, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -89,18 +90,17 @@ func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string
 		return deferredProviderResults(results, requested), nil
 	}
 	supported := map[string]map[string]bool{}
+	deferred := map[string]bool{}
 	for start := 0; start < len(batch); start += 100 {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		end := min(start+100, len(batch))
-		judgments, err := session.Evaluate(ctx, batch[start:end])
-		if err != nil {
-			if err := categoryContextError(ctx, err); err != nil {
-				return nil, err
-			}
-			return deferredProviderResults(results, requested), nil
-		}
+		// Assess supplies ordered unavailable fallbacks for invalid or failed
+		// responses and preserves valid pending/unavailable decisions. Its error
+		// is represented by those statuses, so earlier successful chunks remain
+		// usable and no provider error text enters the outcome.
+		judgments, _ := judgment.Assess(ctx, session, batch[start:end])
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -109,16 +109,29 @@ func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string
 			if !ok {
 				continue
 			}
-			if item.Status != "ready" || item.Decision != "supported" || item.Strength != "strong" {
-				continue
+			switch item.Status {
+			case "pending", "unavailable":
+				deferred[pending.transactionID] = true
+			case "ready":
+				if item.Decision == "supported" && item.Strength == "strong" {
+					if supported[pending.transactionID] == nil {
+						supported[pending.transactionID] = map[string]bool{}
+					}
+					supported[pending.transactionID][pending.category] = true
+				}
 			}
-			if supported[pending.transactionID] == nil {
-				supported[pending.transactionID] = map[string]bool{}
-			}
-			supported[pending.transactionID][pending.category] = true
+		}
+	}
+	for transactionID := range deferred {
+		results[transactionID] = Classified{
+			Outcome:     OutcomeDeferred,
+			ProblemCode: types.TransactionCategoryProblemProvider,
 		}
 	}
 	for transactionID, kinds := range supported {
+		if deferred[transactionID] {
+			continue
+		}
 		for _, key := range types.CategoryKeys {
 			if kinds[key] {
 				results[transactionID] = Classified{Category: key, Producer: m.Version(), Outcome: OutcomeAssigned}
@@ -172,9 +185,9 @@ func (c CompositeClassifier) SetFeedbackSource(source judgment.FeedbackSource) {
 }
 
 // Classify fills keyword answers first, then judges the skipped
-// transactions with the learner. Provider failures become deferred outcomes for
-// the skipped transactions while keyword assignments stay assigned. Context
-// cancellation remains an error.
+// transactions with the learner. Pending, unavailable, malformed, and provider
+// failures become deferred outcomes for the affected transactions while keyword
+// assignments stay assigned. Context cancellation remains an error.
 func (c CompositeClassifier) Classify(ctx context.Context, inputs []Input) (map[string]Classified, error) {
 	results, err := c.Keyword.Classify(ctx, inputs)
 	if err != nil {

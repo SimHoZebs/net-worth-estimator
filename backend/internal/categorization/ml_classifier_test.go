@@ -13,11 +13,15 @@ import (
 type stubSession struct {
 	judgments []types.AnalysisJudgment
 	err       error
+	evaluate  func(context.Context, []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error)
 }
 
 func (s stubSession) Revision() string { return "stub" }
 
-func (s stubSession) Evaluate(context.Context, []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+func (s stubSession) Evaluate(ctx context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+	if s.evaluate != nil {
+		return s.evaluate(ctx, requests)
+	}
 	return s.judgments, s.err
 }
 
@@ -78,6 +82,99 @@ func TestMLClassifierUnsupportedIsTerminalEvaluated(t *testing.T) {
 	}
 	if got := results[input.TransactionID]; got.Outcome != OutcomeEvaluated || got.Category != "" {
 		t.Fatalf("unsupported outcome=%+v", got)
+	}
+}
+
+func TestMLClassifierDefersWhenAnyRequestIsPendingOrUnavailable(t *testing.T) {
+	input := Input{TransactionID: "txn-deferred", Name: "NETFLIX WHOLE FOODS", Direction: "out"}
+	requests := CategoryJudgmentRequests(input)
+	if len(requests) < 2 {
+		t.Fatalf("expected competing requests, got %d", len(requests))
+	}
+	for _, status := range []string{"pending", "unavailable"} {
+		t.Run(status, func(t *testing.T) {
+			judgments := supportedJudgments(requests, "supported", "strong")
+			judgments[len(judgments)-1] = types.AnalysisJudgment{RequestID: requests[len(requests)-1].ID, Status: status}
+			results, err := NewMLClassifier(stubProvider{session: stubSession{judgments: judgments}}).Classify(context.Background(), []Input{input})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := results[input.TransactionID]; got.Outcome != OutcomeDeferred || got.ProblemCode != types.TransactionCategoryProblemProvider || got.Category != "" {
+				t.Fatalf("partial %s outcome=%+v", status, got)
+			}
+		})
+	}
+}
+
+func TestMLClassifierDefersMalformedBatches(t *testing.T) {
+	input := Input{TransactionID: "txn-malformed", Name: "NETFLIX WHOLE FOODS", Direction: "out"}
+	requests := CategoryJudgmentRequests(input)
+	if len(requests) < 2 {
+		t.Fatalf("expected competing requests, got %d", len(requests))
+	}
+	for _, test := range []struct {
+		name      string
+		judgments []types.AnalysisJudgment
+	}{
+		{name: "partial cardinality", judgments: supportedJudgments(requests[:len(requests)-1], "supported", "strong")},
+		{name: "duplicate IDs", judgments: func() []types.AnalysisJudgment {
+			judgments := supportedJudgments(requests, "supported", "strong")
+			judgments[1].RequestID = judgments[0].RequestID
+			return judgments
+		}()},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			results, err := NewMLClassifier(stubProvider{session: stubSession{judgments: test.judgments}}).Classify(context.Background(), []Input{input})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := results[input.TransactionID]; got.Outcome != OutcomeDeferred || got.ProblemCode != types.TransactionCategoryProblemProvider || got.Category != "" {
+				t.Fatalf("malformed batch outcome=%+v", got)
+			}
+		})
+	}
+}
+
+func TestMLClassifierPreservesEarlierChunkWhenLaterChunkFails(t *testing.T) {
+	inputs := make([]Input, 101)
+	for index := range inputs {
+		inputs[index] = Input{TransactionID: fmt.Sprintf("txn-%03d", index), Name: "SHELL OIL", Direction: "out"}
+	}
+	if got := len(CategoryJudgmentRequests(inputs[0])); got != 1 {
+		t.Fatalf("test input emitted %d requests, want 1", got)
+	}
+	calls := 0
+	session := stubSession{evaluate: func(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+		calls++
+		if calls == 1 {
+			return supportedJudgments(requests, "supported", "strong"), nil
+		}
+		return nil, errors.New("later provider failure")
+	}}
+	results, err := NewMLClassifier(stubProvider{session: session}).Classify(context.Background(), inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("Evaluate calls=%d, want 2", calls)
+	}
+	if got := results[inputs[0].TransactionID]; got.Outcome != OutcomeAssigned || got.Category != types.CategoryTransportation {
+		t.Fatalf("earlier successful chunk=%+v", got)
+	}
+	if got := results[inputs[100].TransactionID]; got.Outcome != OutcomeDeferred || got.ProblemCode != types.TransactionCategoryProblemProvider {
+		t.Fatalf("later failed chunk=%+v", got)
+	}
+}
+
+func TestMLClassifierCancellationDuringEvaluationRemainsAnError(t *testing.T) {
+	input := Input{TransactionID: "txn-cancel-evaluate", Name: "SHELL OIL", Direction: "out"}
+	ctx, cancel := context.WithCancel(context.Background())
+	session := stubSession{evaluate: func(context.Context, []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+		cancel()
+		return nil, errors.New("provider stopped")
+	}}
+	if _, err := NewMLClassifier(stubProvider{session: session}).Classify(ctx, []Input{input}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation error=%v", err)
 	}
 }
 
