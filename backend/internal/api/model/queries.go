@@ -283,6 +283,11 @@ type transactionRow struct {
 	TransactionTime int64                             `json:"transactionTime,omitempty"`
 	Category        string                            `json:"category,omitempty"`
 	CategorySource  string                            `json:"categorySource,omitempty"`
+	// RecognizedBusinessKey is read-only response metadata matched from
+	// retained bank merchant/payee evidence, then the transaction name. It is
+	// absent for internal two-sided transfers and ambiguous or unsupported
+	// matches, and never changes the canonical model or its revision.
+	RecognizedBusinessKey *string `json:"recognizedBusinessKey,omitempty" doc:"Curated merchant-logo key recognized from bank evidence or the transaction name"`
 	// ReceiptIDs is the reverse lookup this row displays, read once for the
 	// whole list instead of loading the model document.
 	ReceiptIDs []string `json:"receiptIds,omitempty"`
@@ -379,6 +384,36 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			}
 			for index := range transactions {
 				transactions[index].ReceiptIDs = links[transactions[index].ID]
+			}
+		}
+		// Read retained evidence only for rows eligible after the account
+		// filter and two-sided-transfer exclusion. The store batches these IDs
+		// and scopes them to this user. The facts JSON includes the source-reported
+		// amount, but recognition uses only merchant and payee fields, exposes no
+		// facts, and does not reselect financial amount data or sync keys.
+		recognitionIDs := make([]string, 0, len(transactions))
+		recognitionRows := make([]int, 0, len(transactions))
+		for index, row := range transactions {
+			if row.SourceAccountID == nil || len(row.Destinations) == 0 {
+				recognitionIDs = append(recognitionIDs, row.ID)
+				recognitionRows = append(recognitionRows, index)
+			}
+		}
+		factsByTransaction, err := s.store.LoadTransactionSourceFacts(recognitionIDs)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+		// Rows with both an account source and account destinations stay on
+		// the generic two-sided transfer arrow and are absent from this loop.
+		for _, index := range recognitionRows {
+			row := &transactions[index]
+			merchantName, payee := "", ""
+			if facts, ok := factsByTransaction[row.ID]; ok {
+				merchantName = facts.Metadata["merchant_name"]
+				payee = facts.Payee
+			}
+			if key := businesslogos.RecognizeTransaction(merchantName, payee, row.Name); key != "" {
+				row.RecognizedBusinessKey = &key
 			}
 		}
 	}

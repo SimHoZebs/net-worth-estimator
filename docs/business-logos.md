@@ -1,9 +1,10 @@
-# Business logos on accounts
+# Business logos on accounts and transactions
 
-Account icons show a recognizable business mark when the server can identify
-one with confidence. The generic account-kind glyph stays the fallback for
-unknown, loading, failed, and unsupported cases. Nothing about the financial
-model, account kind, analysis state, or revision changes because of a logo.
+Account and transaction icons show a recognizable business mark when the
+server can identify one with confidence. The generic account-kind glyph or
+transaction arrow stays the fallback for unknown, loading, failed, and
+unsupported cases. Nothing about the financial model, account kind, analysis
+state, or revision changes because of a logo.
 
 ## Recognition
 
@@ -29,36 +30,79 @@ content identity. Links and the computed key are metadata of the response, so
 a link-only update changes the logo on the next read with no model write and
 no revision change. Clients should treat that metadata as fresh per response.
 
+### Transaction recognition
+
+`GET /v1/transactions` carries the same optional, read-only
+`recognizedBusinessKey` on each transaction row. Recognition uses retained
+bank evidence already stored with the row and the editable transaction name,
+in this order:
+
+1. the bank fact's `merchant_name`
+2. the bank fact's `Payee`
+3. the transaction `name` as a conservative fallback
+
+After account filtering and two-sided-transfer exclusion, the list reads source
+facts only for its eligible transaction IDs. The store scopes the query to the
+current user and batches large ID sets. The retained JSON includes the
+source-reported amount, but recognition uses only `merchant_name` and `Payee`,
+exposes no facts, and does not select financial transaction rows or
+amount-resolution data a second time. It also does not read sync keys or
+unrelated rows. The first evidence source that names a curated transaction
+merchant decides the result. If that source names more than one merchant, the
+row stays generic and later sources are not consulted. Unsupported names also
+stay generic. Matching uses the catalog's existing case/punctuation
+normalization and whole-token boundaries, with explicit transaction-scoped
+aliases.
+
+Account names, sync-link institutions, bridge account names, memos, and the
+separate raw bank description are not transaction evidence. A transaction
+with both an account source and at least one account destination stays on the
+generic two-sided transfer arrow. Schedules do not carry this key. Recognition
+performs no network request or model write, and the transaction response's
+`Revision` remains the canonical financial model's content identity.
+
 ## Supported catalog
 
 Every supported key has one checked-in asset and explicit aliases. Unsupported
 business names resolve to unknown and keep the generic glyph.
 
-| Catalog key | Aliases | Original source |
-| --- | --- | --- |
-| `ally` | Ally Bank, Ally Financial | Wikimedia Commons `Ally Financial.svg` |
-| `american-express` | American Express, Amex | Wikimedia Commons American Express logo |
-| `bank-of-america` | Bank of America | bankofamerica.com |
-| `barclays` | Barclays | home.barclays |
-| `bmo` | BMO, BMO Bank, BMO Harris, Bank of Montreal | Wikimedia Commons `BMO Logo.svg` |
-| `capital-one` | Capital One, CapitalOne, Capital One Bank, Capital One Financial | Wikimedia Commons `Capital One logo.svg` |
-| `chase` | Chase, JPMorgan Chase | Wikimedia Commons Chase logo |
-| `citi` | Citi, Citibank, Citigroup, Citi Bank | Wikimedia Commons `Citi.svg` |
-| `discover` | Discover | Discover business resources |
-| `fidelity-investments` | Fidelity Investments, Fidelity Brokerage Services, Fidelity NetBenefits, NetBenefits; manual Fidelity brokerage/IRA/401(k) | Wikimedia Commons `Fidelity Logo.jpg` by Prodbot, CC BY-SA 4.0 |
-| `klarna` | Klarna | klarna.design |
-| `paypal` | PayPal | paypal.com |
-| `pnc` | PNC, PNC Bank, PNC Financial Services | Wikimedia Commons `PNClogo.svg` |
-| `truist` | Truist, Truist Bank, Truist Financial | Wikimedia Commons `Truist Financial logo.svg` |
-| `us-bank` | US Bank, U.S. Bank, US Bancorp, U.S. Bancorp | Wikimedia Commons `US Bank logo 2023 color.svg` |
-| `venmo` | Venmo | venmo.com/about/brand |
-| `wells-fargo` | Wells Fargo | wellsfargo.com/about |
+| Catalog key | Aliases | Recognition scope | Original source |
+| --- | --- | --- | --- |
+| `ally` | Ally Bank, Ally Financial | Account | Wikimedia Commons `Ally Financial.svg` |
+| `american-express` | American Express, Amex | Account | Wikimedia Commons American Express logo |
+| `bank-of-america` | Bank of America | Account | bankofamerica.com |
+| `barclays` | Barclays | Account | home.barclays |
+| `bmo` | BMO, BMO Bank, BMO Harris, Bank of Montreal | Account | Wikimedia Commons `BMO Logo.svg` |
+| `capital-one` | Capital One, CapitalOne, Capital One Bank, Capital One Financial | Account | Wikimedia Commons `Capital One logo.svg` |
+| `chase` | Chase, JPMorgan Chase | Account | Wikimedia Commons Chase logo |
+| `citi` | Citi, Citibank, Citigroup, Citi Bank | Account | Wikimedia Commons `Citi.svg` |
+| `discover` | Discover | Account | Discover business resources |
+| `fidelity-investments` | Fidelity Investments, Fidelity Brokerage Services, Fidelity NetBenefits, NetBenefits; manual Fidelity brokerage/IRA/401(k) | Account | Wikimedia Commons `Fidelity Logo.jpg` by Prodbot, CC BY-SA 4.0 |
+| `klarna` | Klarna | Account + transaction | klarna.design |
+| `netflix` | Netflix | Transaction | Simple Icons `netflix.svg` |
+| `paypal` | PayPal | Account + transaction | paypal.com |
+| `pnc` | PNC, PNC Bank, PNC Financial Services | Account | Wikimedia Commons `PNClogo.svg` |
+| `spotify` | Spotify | Transaction | Simple Icons `spotify.svg` |
+| `truist` | Truist, Truist Bank, Truist Financial | Account | Wikimedia Commons `Truist Financial logo.svg` |
+| `uber` | Uber | Transaction | Simple Icons `uber.svg` |
+| `us-bank` | US Bank, U.S. Bank, US Bancorp, U.S. Bancorp | Account | Wikimedia Commons `US Bank logo 2023 color.svg` |
+| `venmo` | Venmo | Account + transaction | venmo.com/about/brand |
+| `wells-fargo` | Wells Fargo | Account | wellsfargo.com/about |
 
-The nine original SVG files are copied unmodified from Simple Icons at pinned
+The twelve original SVG files are copied unmodified from Simple Icons at pinned
 commit `801eaab5b70f4933137069397ebbd2ce5f9ad56e`. Their repository license is
 CC0-1.0. Original source URLs are recorded in Simple Icons'
 `data/simple-icons.json` at that commit. PayPal and Venmo also publish brand
 guidelines at the URLs above.
+
+Netflix, Spotify, and Uber are a small transaction-only starter set from that
+same pinned CC0 release. Their aliases identify a merchant on a transaction;
+they never classify an account or sync institution as that merchant. PayPal,
+Venmo, and Klarna explicitly share their existing whole-token aliases between
+account and transaction recognition, so descriptors such as `PAYPAL *REFUND`
+can resolve without duplicating catalog entries. A source naming multiple
+shared or transaction-only brands remains ambiguous and keeps the generic
+icon. Other account aliases remain account-only.
 
 Seven additional US bank and financial brands
 (`ally`, `bmo`, `capital-one`, `citi`, `pnc`, `truist`, `us-bank`) are derived
@@ -114,7 +158,8 @@ such as `high fidelity` never match.
 Adding a business requires a verified, distributable asset, an entry in
 `logoSpecs` with its declared format, explicit aliases in `businesses`,
 catalog tests, and a provenance row here. Never fabricate an approximation or
-derive a logo from transaction descriptions.
+derive logo artwork from transaction descriptions. Matching an already
+curated logo against transaction evidence is recognition, not asset derivation.
 
 ## Asset delivery and storage
 

@@ -49,39 +49,47 @@ export function TransactionRow({
 	removing?: boolean;
 	/**
 	 * Linked transfer peer drilled from the list. Undefined resolves the
-	 * link through the cached transfer-link query; null means unlinked.
+	 * link through the cached transfer-link query; null means the parent
+	 * has no resolved peer, while cached link membership still applies.
 	 */
 	transferPeer?: TransferPeerSummary | null;
 }) {
 	const linksQuery = useTransferLinks();
 	const savedTransactions = useSavedTransactions();
 	const savedAccounts = useSavedAccounts();
+	const link = transferLinkForEdge(linksQuery.data?.links ?? [], [
+		transaction.transactionId,
+	]);
 	const resolved =
 		transferPeer !== undefined
 			? transferPeer
 			: savedTransaction
 				? resolveTransferPeer({
 						transactionId: savedTransaction.id,
-						link: transferLinkForEdge(linksQuery.data?.links ?? [], [
-							savedTransaction.id,
-						]),
+						link,
 						transactions: savedTransactions,
 						accounts: savedAccounts,
 					})
 				: null;
 	const linkedName = resolved?.accountName ?? resolved?.peerName ?? null;
-	const DirectionIcon =
-		resolved || transaction.flow === "transfer"
-			? ArrowRightLeft
-			: transaction.direction === "in"
-				? ArrowDownLeft
-				: ArrowUpRight;
-	const tone =
-		resolved || transaction.flow === "transfer"
-			? ("transfer" as const)
-			: transaction.direction === "in"
-				? ("inflow" as const)
-				: ("outflow" as const);
+	const isTransfer =
+		Boolean(resolved || link) || transaction.flow === "transfer";
+	const DirectionIcon = isTransfer
+		? ArrowRightLeft
+		: transaction.direction === "in"
+			? ArrowDownLeft
+			: ArrowUpRight;
+	const directionIcon = <DirectionIcon size={16} aria-hidden="true" />;
+	const showBusinessLogo =
+		linksQuery.data !== undefined &&
+		!isTransfer &&
+		savedTransaction?.kind === "transaction" &&
+		Boolean(savedTransaction.recognizedBusinessKey);
+	const tone = isTransfer
+		? ("transfer" as const)
+		: transaction.direction === "in"
+			? ("inflow" as const)
+			: ("outflow" as const);
 	const action = "View";
 	// Counterparties that only restate the direction ("External
 	// income/spending" just means in/out) carry no information the icon
@@ -120,7 +128,10 @@ export function TransactionRow({
 					{dateLabel(transaction.date, true)}
 				</time>
 			}
-			icon={<DirectionIcon size={16} aria-hidden="true" />}
+			icon={directionIcon}
+			businessKey={
+				showBusinessLogo ? savedTransaction.recognizedBusinessKey : undefined
+			}
 			tone={tone}
 			title={transaction.name}
 			divider={divider?.tone}

@@ -8,12 +8,12 @@ import {
 	Wallet,
 } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { useState, type ComponentProps } from "react";
+import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils.ts";
-import { businessLogoURL } from "../lib/businessLogos.ts";
 import type { Account } from "../domain/model.ts";
 import { ACCOUNT_TYPE_LABELS } from "../domain/accountKinds.ts";
 import { cssVariables } from "./cssVariables.ts";
+import { BusinessLogo } from "./BusinessLogo.tsx";
 
 const icons: Record<Account["kind"], LucideIcon> = {
 	cash: Wallet,
@@ -62,16 +62,6 @@ export function AccountIcon({
 } & ComponentProps<"span">) {
 	const Icon = account.id === "savings" ? PiggyBank : icons[account.kind];
 	const logoKey = account.recognizedBusinessKey;
-	const logoURL = businessLogoURL(logoKey);
-	// A key change starts a fresh load: both outcomes are tagged with the key
-	// they belong to, so an old failure never hides a newly recognized logo.
-	const [assetState, setAssetState] = useState<{
-		key: string;
-		status: "loaded" | "failed";
-	} | null>(null);
-	const status =
-		logoKey && assetState?.key === logoKey ? assetState.status : "loading";
-	const showLogo = Boolean(logoKey) && status === "loaded";
 	return (
 		<span
 			{...props}
@@ -91,24 +81,13 @@ export function AccountIcon({
 				...style,
 			}}
 		>
-			{logoKey && logoURL && status !== "failed" ? (
-				<img
-					src={logoURL}
-					alt=""
-					aria-hidden="true"
-					width={iconSizes[size]}
-					height={iconSizes[size]}
-					className={cn(
-						"object-contain dark:invert",
-						showLogo ? undefined : "pointer-events-none absolute opacity-0",
-					)}
-					onLoad={() => setAssetState({ key: logoKey, status: "loaded" })}
-					onError={() => setAssetState({ key: logoKey, status: "failed" })}
-				/>
-			) : null}
-			{showLogo ? null : (
-				<Icon size={iconSizes[size]} strokeWidth={1.7} aria-hidden="true" />
-			)}
+			<BusinessLogo
+				businessKey={logoKey}
+				size={iconSizes[size]}
+				fallback={
+					<Icon size={iconSizes[size]} strokeWidth={1.7} aria-hidden="true" />
+				}
+			/>
 		</span>
 	);
 }

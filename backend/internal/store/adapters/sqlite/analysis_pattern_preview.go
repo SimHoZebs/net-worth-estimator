@@ -59,36 +59,10 @@ func (s *sqliteStore) loadPatternPreviewData(findingID string) (patternPreviewDa
 		return data, err
 	}
 	data.model = model
-	data.facts = map[string]types.TransactionFacts{}
-	if len(data.occurrenceIDs) > 0 {
-		placeholders := ""
-		args := make([]any, 0, len(data.occurrenceIDs))
-		for i, id := range data.occurrenceIDs {
-			if i > 0 {
-				placeholders += ","
-			}
-			placeholders += "?"
-			args = append(args, id)
-		}
-		rows, err := s.db.Query(`SELECT transaction_id, facts_json FROM transaction_source_facts WHERE transaction_id IN (`+placeholders+`) AND user_id = :user_id`, args...)
-		if err != nil {
-			return data, err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var id, raw string
-			if err := rows.Scan(&id, &raw); err != nil {
-				return data, err
-			}
-			var item types.TransactionFacts
-			if err := json.Unmarshal([]byte(raw), &item); err != nil {
-				return data, err
-			}
-			data.facts[id] = item
-		}
-		if err := rows.Err(); err != nil {
-			return data, err
-		}
+	facts, err := loadTransactionSourceFacts(s.db, data.occurrenceIDs)
+	if err != nil {
+		return data, err
 	}
+	data.facts = facts
 	return data, nil
 }

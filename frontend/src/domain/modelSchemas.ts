@@ -149,6 +149,9 @@ export const transactionSchema = z.object({
 	// Receipt IDs attached to this transaction. Read with the row list so a
 	// receipt badge does not need the full model document.
 	receiptIds: z.array(z.string()).optional(),
+	// Read-only curated logo key computed by the transaction-row query. Never
+	// persisted on the canonical transaction or sent by editors.
+	recognizedBusinessKey: z.string().trim().max(100).optional(),
 });
 
 export const evaluationSchema = z.object({

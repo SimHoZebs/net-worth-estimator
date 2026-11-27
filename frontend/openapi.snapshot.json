@@ -6402,6 +6402,10 @@
 						},
 						"type": ["array", "null"]
 					},
+					"recognizedBusinessKey": {
+						"description": "Curated merchant-logo key recognized from bank evidence or the transaction name",
+						"type": "string"
+					},
 					"sourceAccountId": {
 						"type": ["string", "null"]
 					},

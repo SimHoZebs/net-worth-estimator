@@ -8,6 +8,10 @@ import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 // Pattern previews read evidence, findings, and saved rows only; pattern
 // actions save acceptance and the finance change in one transaction.
 type AnalysisStore interface {
+	// LoadTransactionSourceFacts returns retained bank evidence for the named
+	// transaction IDs in this user scope. Missing IDs are omitted. Callers can
+	// request a bounded list; the adapter batches large inputs.
+	LoadTransactionSourceFacts(transactionIDs []string) (map[string]types.TransactionFacts, error)
 	ClaimAnalysis(kind, version string) (types.AnalysisRun, types.AnalysisSnapshot, bool, error)
 	CompleteAnalysis(run types.AnalysisRun, findings []types.AnalysisDetection, problem string) error
 	ListAnalysisRuns() ([]types.AnalysisRun, int64, error)

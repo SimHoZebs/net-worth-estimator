@@ -134,6 +134,7 @@ export function transactionToDisplay(
 		syncOwned: row.syncOwned === true,
 		category: row.category ?? null,
 		categorySource: transactionCategorySourceOf(row.categorySource),
+		recognizedBusinessKey: row.recognizedBusinessKey,
 		transactionTime:
 			typeof extra.transactionTime === "number" && extra.transactionTime > 0
 				? extra.transactionTime

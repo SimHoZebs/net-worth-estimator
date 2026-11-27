@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge.tsx";
 import {
 	Empty,
@@ -13,6 +13,7 @@ import { TransactionTable } from "../../components/activity/TransactionTable.tsx
 import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import { cn } from "@/lib/utils.ts";
+import { useTransferLinks } from "../../state/analyses.ts";
 import {
 	isPendingTransaction,
 	type Account,
@@ -36,6 +37,28 @@ export function TransactionsPanel({
 	showHeaders?: boolean;
 }) {
 	const cadenceOf = (id: string) => ruleCadence?.get(id) ?? "Recurring";
+	const names = new Map(accounts.map((account) => [account.id, account.name]));
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const hasLogoCandidates = transactions.some(
+		(transaction) =>
+			transaction.kind === "transaction" &&
+			!(transaction.fromId && transaction.toId) &&
+			Boolean(transaction.recognizedBusinessKey),
+	);
+	const linksQuery = useTransferLinks(hasLogoCandidates);
+	// Cached links remain valid after a failed refresh. Without data, keep
+	// generic arrows because confirmed transfer membership is unknown.
+	const transferLinksReady = linksQuery.data !== undefined;
+	const linkedTransactionIds = useMemo(
+		() =>
+			new Set(
+				(linksQuery.data?.links ?? []).flatMap((link) => [
+					link.legA,
+					link.legB,
+				]),
+			),
+		[linksQuery.data?.links],
+	);
 	if (!transactions.length)
 		return (
 			<Empty>
@@ -47,8 +70,6 @@ export function TransactionsPanel({
 				</EmptyHeader>
 			</Empty>
 		);
-	const names = new Map(accounts.map((account) => [account.id, account.name]));
-	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const selected = selectedId
 		? (transactions.find((transaction) => transaction.id === selectedId) ??
 			null)
@@ -79,11 +100,24 @@ export function TransactionsPanel({
 						.map((id) => (id ? names.get(id) : null))
 						.filter((name): name is string => Boolean(name))
 						.join(" → ");
-					const tone = transaction.fromId
-						? transaction.toId
-							? ("transfer" as const)
-							: ("outflow" as const)
-						: ("inflow" as const);
+					const isTransfer = Boolean(transaction.fromId && transaction.toId);
+					const tone = isTransfer
+						? ("transfer" as const)
+						: transaction.fromId
+							? ("outflow" as const)
+							: ("inflow" as const);
+					const DirectionIcon = isTransfer
+						? ArrowRight
+						: transaction.fromId
+							? ArrowUpRight
+							: ArrowDownLeft;
+					const directionIcon = <DirectionIcon size={16} aria-hidden="true" />;
+					const showBusinessLogo =
+						transferLinksReady &&
+						transaction.kind === "transaction" &&
+						!isTransfer &&
+						!linkedTransactionIds.has(transaction.id) &&
+						Boolean(transaction.recognizedBusinessKey);
 					const dateText =
 						transaction.kind === "transaction"
 							? dateLabel(transaction.startDate, true)
@@ -99,16 +133,9 @@ export function TransactionsPanel({
 									dateText
 								)
 							}
-							icon={
-								transaction.fromId ? (
-									transaction.toId ? (
-										<ArrowRight size={16} aria-hidden="true" />
-									) : (
-										<ArrowUpRight size={16} aria-hidden="true" />
-									)
-								) : (
-									<ArrowDownLeft size={16} aria-hidden="true" />
-								)
+							icon={directionIcon}
+							businessKey={
+								showBusinessLogo ? transaction.recognizedBusinessKey : undefined
 							}
 							tone={tone}
 							title={transaction.name}
@@ -134,7 +161,10 @@ export function TransactionsPanel({
 							}}
 							amount={
 								<>
-									<TransactionAmount transaction={transaction} />
+									<TransactionAmount
+										transaction={transaction}
+										showDirection={showBusinessLogo}
+									/>
 									{pending ? <Badge variant="secondary">Pending</Badge> : null}
 								</>
 							}
@@ -163,19 +193,28 @@ export function TransactionsPanel({
 	);
 }
 
-function TransactionAmount({ transaction }: { transaction: Transaction }) {
-	if (transaction.amountKnown)
+function TransactionAmount({
+	transaction,
+	showDirection,
+}: {
+	transaction: Transaction;
+	showDirection: boolean;
+}) {
+	const sign = showDirection ? (transaction.fromId ? "−" : "+") : "";
+	if (transaction.amountKnown) {
 		return (
 			<strong className={cn("text-sm font-semibold max-sm:text-xs")}>
+				{transaction.amount === 0 ? "" : sign}
 				{money(transaction.amount)}
 			</strong>
 		);
+	}
 	return (
 		<strong
 			className={cn("text-sm font-semibold max-sm:text-xs")}
 			title="Calculated during projection · varies each occurrence"
 		>
-			Varies
+			{sign}Varies
 		</strong>
 	);
 }

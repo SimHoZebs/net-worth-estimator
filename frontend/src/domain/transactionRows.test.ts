@@ -4,6 +4,7 @@ import {
 	literalAmountOf,
 	transactionToDisplay,
 } from "./transactionRows.ts";
+import { transactionSchema } from "./modelSchemas.ts";
 
 describe("transaction rows", () => {
 	it("reads literal and calculated amounts", () => {
@@ -215,6 +216,28 @@ describe("transaction rows", () => {
 			void: false,
 			transactionTime,
 		});
+	});
+
+	it("preserves read-only business logo metadata in the display schema", () => {
+		const row = transactionToDisplay({
+			id: "spotify-1",
+			name: "Spotify",
+			sourceAccountId: "card",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "12" },
+				inputs: {},
+			},
+			startDate: "2026-11-20",
+			endDate: null,
+			enabled: true,
+			syncOwned: true,
+			readOnly: false,
+			recognizedBusinessKey: "spotify",
+		});
+		expect(row.recognizedBusinessKey).toBe("spotify");
+		expect(transactionSchema.parse(row).recognizedBusinessKey).toBe("spotify");
 	});
 
 	it("reads the occurrence claim from its wire member", () => {

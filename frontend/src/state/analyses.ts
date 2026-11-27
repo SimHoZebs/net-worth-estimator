@@ -215,12 +215,12 @@ export function useAddPatternToExistingSchedule() {
 export const transferLinksKey = (scope = getUserScope()) =>
 	["user-resources", scope.key, "transfer-links"] as const;
 
-export function useTransferLinks() {
+export function useTransferLinks(enabled = true) {
 	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: transferLinksKey(scope),
-			enabled: scope.status === "ready",
+			enabled: scope.status === "ready" && enabled,
 			queryFn: async ({ signal }) => {
 				const result = (await listTransferLinks({ signal })).data;
 				if (scope !== getUserScope()) throw new UserScopeError();

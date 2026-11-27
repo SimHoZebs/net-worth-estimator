@@ -225,6 +225,7 @@ describe("safe spending transactions panel", () => {
 				name: "Analyzed charge",
 				amount: 40,
 				receiptIds: ["receipt-3"],
+				recognizedBusinessKey: "spotify",
 			}),
 			transaction("refund", {
 				name: "Card refund",
@@ -258,6 +259,12 @@ describe("safe spending transactions panel", () => {
 		expect(screen.getByText("Pending", { exact: true })).toBeTruthy();
 		expect(screen.getByText("2 receipts")).toBeTruthy();
 		expect(screen.getByText("BNPL")).toBeTruthy();
+		const analyzed = screen.getByRole("button", {
+			name: /^View Analyzed charge /,
+		});
+		expect(analyzed.querySelector("img")?.getAttribute("src")).toBe(
+			"/v1/assets/business-logos/spotify",
+		);
 		expect(screen.getByText("−$12.34")).toBeTruthy();
 		expect(screen.getByText("+$5.00")).toBeTruthy();
 		const payment = screen.getByRole("button", {

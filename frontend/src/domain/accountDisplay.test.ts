@@ -419,10 +419,12 @@ describe("visible accounts", () => {
 				fromId: "checking",
 				toId: "i",
 				readOnly: false,
+				recognizedBusinessKey: "spotify",
 			} as Parameters<typeof toDisplayTransaction>[0],
 			accounts,
 		);
 		expect(row.toId).toBe("p");
 		expect(row.readOnly).toBe(true);
+		expect(row.recognizedBusinessKey).toBe("spotify");
 	});
 });

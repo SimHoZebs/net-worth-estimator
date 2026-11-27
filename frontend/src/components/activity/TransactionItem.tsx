@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BusinessLogo } from "../BusinessLogo.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table.tsx";
@@ -29,6 +30,7 @@ export type TransactionItemSlots = {
 export function TransactionItemRow({
 	date,
 	icon,
+	businessKey,
 	tone,
 	title,
 	amount,
@@ -44,6 +46,8 @@ export function TransactionItemRow({
 }: {
 	date: ReactNode;
 	icon: ReactNode;
+	/** Recognized personal-transaction mark; omitted rows keep their generic icon. */
+	businessKey?: string;
 	tone: TransactionTone;
 	title: string;
 	amount: ReactNode;
@@ -63,8 +67,15 @@ export function TransactionItemRow({
 }) {
 	const nameContent = (
 		<>
-			<span data-transaction-icon className={transactionIconStyles({ tone })}>
-				{icon}
+			<span
+				data-transaction-icon
+				className={cn(transactionIconStyles({ tone }), "relative")}
+			>
+				{businessKey ? (
+					<BusinessLogo businessKey={businessKey} fallback={icon} size={16} />
+				) : (
+					icon
+				)}
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col gap-1">
 				<strong

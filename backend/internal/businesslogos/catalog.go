@@ -85,9 +85,12 @@ var logoSpecs = []logoSpec{
 		licenseURL: "https://creativecommons.org/licenses/by-sa/4.0/",
 	},
 	{key: "klarna", file: "klarna.svg", format: svgLogo},
+	{key: "netflix", file: "netflix.svg", format: svgLogo},
 	{key: "paypal", file: "paypal.svg", format: svgLogo},
 	{key: "pnc", file: "pnc.svg", format: svgLogo},
+	{key: "spotify", file: "spotify.svg", format: svgLogo},
 	{key: "truist", file: "truist.svg", format: svgLogo},
+	{key: "uber", file: "uber.svg", format: svgLogo},
 	{key: "us-bank", file: "usbank.svg", format: svgLogo},
 	{key: "venmo", file: "venmo.svg", format: svgLogo},
 	{key: "wells-fargo", file: "wellsfargo.svg", format: svgLogo},
@@ -96,12 +99,22 @@ var logoSpecs = []logoSpec{
 // alias is a normalized token sequence matched on whole tokens. Single-token
 // aliases are reserved for distinctive brands and are never ordinary words;
 // punctuation and case changes normalize, partial and embedded substrings do
-// not match. Manual and bridge sources carry separate opt-in flags.
+// not match. Each recognition scope opts in explicitly so a merchant alias
+// cannot turn an account into that merchant, or vice versa.
 type alias struct {
-	tokens []string
-	bridge bool
-	manual bool
+	tokens      []string
+	bridge      bool
+	manual      bool
+	transaction bool
 }
+
+type matchScope uint8
+
+const (
+	bridgeMatch matchScope = iota
+	manualMatch
+	transactionMatch
+)
 
 type business struct {
 	key     string
@@ -170,20 +183,31 @@ var businesses = []business{
 		{tokens: []string{"fidelity", "401", "k"}, manual: true},
 	}},
 	{key: "klarna", aliases: []alias{
-		{tokens: []string{"klarna"}, bridge: true, manual: true},
+		{tokens: []string{"klarna"}, bridge: true, manual: true, transaction: true},
+	}},
+	// Starter merchants are transaction-only. Their names identify a
+	// counterparty, not the account or institution that reported the row.
+	{key: "netflix", aliases: []alias{
+		{tokens: []string{"netflix"}, transaction: true},
 	}},
 	{key: "paypal", aliases: []alias{
-		{tokens: []string{"paypal"}, bridge: true, manual: true},
+		{tokens: []string{"paypal"}, bridge: true, manual: true, transaction: true},
 	}},
 	{key: "pnc", aliases: []alias{
 		{tokens: []string{"pnc"}, bridge: true, manual: true},
 		{tokens: []string{"pnc", "bank"}, bridge: true, manual: true},
 		{tokens: []string{"pnc", "financial", "services"}, bridge: true, manual: true},
 	}},
+	{key: "spotify", aliases: []alias{
+		{tokens: []string{"spotify"}, transaction: true},
+	}},
 	{key: "truist", aliases: []alias{
 		{tokens: []string{"truist"}, bridge: true, manual: true},
 		{tokens: []string{"truist", "bank"}, bridge: true, manual: true},
 		{tokens: []string{"truist", "financial"}, bridge: true, manual: true},
+	}},
+	{key: "uber", aliases: []alias{
+		{tokens: []string{"uber"}, transaction: true},
 	}},
 	// Both "US Bank" and "U.S. Bank" normalize to distinct token sequences,
 	// as do "US Bancorp" and "U.S. Bancorp". Bare "us" and bare "bank" never
@@ -195,7 +219,7 @@ var businesses = []business{
 		{tokens: []string{"u", "s", "bancorp"}, bridge: true, manual: true},
 	}},
 	{key: "venmo", aliases: []alias{
-		{tokens: []string{"venmo"}, bridge: true, manual: true},
+		{tokens: []string{"venmo"}, bridge: true, manual: true, transaction: true},
 	}},
 	{key: "wells-fargo", aliases: []alias{
 		{tokens: []string{"wells", "fargo"}, bridge: true, manual: true},
@@ -349,15 +373,24 @@ func containsSequence(tokens, phrase []string) bool {
 	return false
 }
 
-// matches returns catalog keys named by one source. More than one distinct
-// key is ambiguous and yields no key: callers must fall back rather than
-// guess between businesses.
-func matches(text string, bridge bool) []string {
+// matches returns catalog keys named by one source in one recognition scope.
+// More than one distinct key is ambiguous: callers keep the generic glyph
+// rather than guessing between businesses.
+func matches(text string, scope matchScope) []string {
 	tokens := normalize(text)
 	found := map[string]bool{}
 	for _, candidate := range businesses {
 		for _, item := range candidate.aliases {
-			if bridge && !item.bridge || !bridge && !item.manual {
+			inScope := false
+			switch scope {
+			case bridgeMatch:
+				inScope = item.bridge
+			case manualMatch:
+				inScope = item.manual
+			case transactionMatch:
+				inScope = item.transaction
+			}
+			if !inScope {
 				continue
 			}
 			if containsSequence(tokens, item.tokens) {
@@ -374,6 +407,17 @@ func matches(text string, bridge bool) []string {
 	return keys
 }
 
+// decisiveMatch reports a key when the source resolves cleanly and reports
+// decisive when it names any catalog business. An ambiguous source therefore
+// stops precedence without choosing a later, weaker source.
+func decisiveMatch(text string, scope matchScope) (key string, decisive bool) {
+	keys := matches(text, scope)
+	if len(keys) == 1 {
+		return keys[0], true
+	}
+	return "", len(keys) > 1
+}
+
 // Recognize resolves one catalog key from source-supplied bridge identity and
 // the owner's account name. Deterministic precedence is institution, synced
 // bridge name, then manual account name. The first source that names any
@@ -384,19 +428,31 @@ func matches(text string, bridge bool) []string {
 // override a recognized issuer on the same source.
 func Recognize(institution, syncedName, accountName string) string {
 	for _, source := range []struct {
-		text   string
-		bridge bool
+		text  string
+		scope matchScope
 	}{
-		{institution, true},
-		{syncedName, true},
-		{accountName, false},
+		{institution, bridgeMatch},
+		{syncedName, bridgeMatch},
+		{accountName, manualMatch},
 	} {
-		keys := matches(source.text, source.bridge)
-		if len(keys) == 1 {
-			return keys[0]
+		if key, decisive := decisiveMatch(source.text, source.scope); decisive {
+			return key
 		}
-		if len(keys) > 1 {
-			return ""
+	}
+	return ""
+}
+
+// RecognizeTransaction resolves a curated merchant from bank evidence in
+// descending reliability: merchant_name, Payee, then the editable transaction
+// name. Each source is evaluated independently with transaction-scoped aliases.
+// The first source that names a catalog merchant is decisive, including an
+// ambiguous result; later sources never break a tie. Account names, sync
+// institutions, memos, and descriptions outside the editable name are not
+// evidence, and recognition performs no I/O or model mutation.
+func RecognizeTransaction(merchantName, payee, transactionName string) string {
+	for _, text := range []string{merchantName, payee, transactionName} {
+		if key, decisive := decisiveMatch(text, transactionMatch); decisive {
+			return key
 		}
 	}
 	return ""

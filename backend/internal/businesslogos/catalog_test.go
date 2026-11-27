@@ -52,6 +52,45 @@ func TestRecognizePrecedenceAndBoundaries(t *testing.T) {
 	}
 }
 
+func TestRecognizeTransactionPrecedenceAndScope(t *testing.T) {
+	cases := []struct {
+		name                             string
+		merchant, payee, transactionName string
+		want                             string
+	}{
+		{"merchant name wins", "Spotify", "Uber", "Netflix", "spotify"},
+		{"unsupported merchant falls through", "Local Shop", "UBER *TRIP", "Netflix", "uber"},
+		{"payee wins over transaction name", "", "Netflix.com", "Spotify", "netflix"},
+		{"transaction name is conservative fallback", "", "", "SPOTIFY USA", "spotify"},
+		{"whole token punctuation and case", "", "", "uber-eats", "uber"},
+		{"shared paypal refund alias", "", "", "PAYPAL *REFUND", "paypal"},
+		{"shared venmo payment alias", "", "Venmo", "Local Shop", "venmo"},
+		{"shared klarna descriptor alias", "Klarna", "", "Local Shop", "klarna"},
+		{"shared alias follows merchant precedence", "Klarna", "PayPal", "Venmo", "klarna"},
+		{"shared aliases remain ambiguous", "", "", "PayPal Venmo", ""},
+		{"ambiguous merchant is decisive unknown", "Netflix Spotify", "Uber", "Netflix", ""},
+		{"ambiguous payee is decisive unknown", "", "Netflix Spotify", "Uber", ""},
+		{"ambiguous transaction name is unknown", "", "", "Netflix Spotify", ""},
+		{"embedded substring never matches", "", "", "Netflixify", ""},
+		{"unsupported merchant stays generic", "Corner Store", "", "Local Purchase", ""},
+		{"account issuer is not transaction evidence", "Chase", "", "Local Purchase", ""},
+		{"empty evidence stays generic", "", "", "", ""},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if got := RecognizeTransaction(test.merchant, test.payee, test.transactionName); got != test.want {
+				t.Fatalf("RecognizeTransaction(%q,%q,%q) = %q, want %q", test.merchant, test.payee, test.transactionName, got, test.want)
+			}
+		})
+	}
+	if got := Recognize("Netflix", "Spotify", "Uber"); got != "" {
+		t.Fatalf("transaction-only merchant became an account business: %q", got)
+	}
+	if got := Recognize("", "", "Chase Sapphire"); got != "chase" {
+		t.Fatalf("transaction aliases changed account recognition: %q", got)
+	}
+}
+
 func TestRecognizeExpandedUSBankCatalog(t *testing.T) {
 	cases := []struct {
 		name                     string
@@ -105,8 +144,8 @@ func TestRecognizeExpandedUSBankCatalog(t *testing.T) {
 	}
 }
 
-func TestExpandedCatalogAssetsAreStaticMonochromeSVG(t *testing.T) {
-	keys := []string{"ally", "bmo", "capital-one", "citi", "pnc", "truist", "us-bank"}
+func TestSVGCatalogAssetsAreStaticMonochrome(t *testing.T) {
+	keys := []string{"ally", "bmo", "capital-one", "citi", "netflix", "pnc", "spotify", "truist", "uber", "us-bank"}
 	for _, key := range keys {
 		asset, ok := Lookup(key)
 		if !ok {
