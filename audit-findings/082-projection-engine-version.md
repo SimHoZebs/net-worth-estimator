@@ -2,7 +2,7 @@
 id: 082
 title: Remove the single-value projection engine version check
 scope: backend-domain
-status: needs-review
+status: superseded
 ---
 
 ## Scenario
@@ -62,3 +62,7 @@ Every projection read keeps paying for a check whose mismatch branch can only be
 Verify that no `EngineVersion` assignments remain, run projection builder and store tests, and run `deploy/migrations.test.mjs`. The external roadmap was not searched and the historical `dirty_from` bump may have served a one-time upgrade that was not inspected.
 
 References: `backend/internal/api/projections/builder.go:23,98-103`; `backend/internal/store/adapters/sqlite/projection_unified.go:44-46,63-86`; `backend/internal/types/projection_unified.go:31,199`; `docs/unified-projection.md:20`.
+
+## Decision
+
+Superseded by [127](127-projection-engine-version-docs.md). The engine now runs at `v2`, and the version check invalidates results built under `v1`. The premise for removing the check no longer holds.

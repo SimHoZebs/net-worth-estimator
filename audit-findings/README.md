@@ -1,12 +1,15 @@
 # Audit findings
 
-Applied and superseded finding documents have been removed. Finding IDs are stable and are never reused; the remaining documents are the current decision backlog.
+Finding IDs are stable and are never reused. This index includes the current decision backlog and records retained from the latest audit.
 
 ## Status legend
 
 - `needs-review` — proposed and awaiting a decision.
 - `accepted` — approved but not yet applied.
 - `rejected` — the user chose to keep the current behavior.
+- `deferred` — the decision or work was postponed.
+- `implemented` — the change landed and its verification is recorded.
+- `superseded` — a newer finding replaced this record.
 
 ## Current finding index
 
@@ -22,7 +25,7 @@ Applied and superseded finding documents have been removed. Finding IDs are stab
 | [079](079-transfer-leg-matching.md) | Match transfer legs with one shared rule | backend-domain | needs-review |
 | [080](080-categorization-judgment-validation.md) | Apply the same judgment response validation to categorization | backend-domain | needs-review |
 | [081](081-judgment-error-precedence.md) | Decide judgment error precedence in one place | backend-domain | needs-review |
-| [082](082-projection-engine-version.md) | Remove the single-value projection engine version check | backend-domain | needs-review |
+| [082](082-projection-engine-version.md) | Remove the single-value projection engine version check | backend-domain | superseded |
 | [083](083-migration-ledger-repair-script.md) | Record the posted-time repair script in the migration ledger | backend-domain | needs-review |
 | [085](085-claim-state-index.md) | Build one claim-state index in the Safe Spending replay | backend-domain | needs-review |
 | [104](104-passkey-removal-focus.md) | Restore focus and announce passkey removal | ui-ux | needs-review |
@@ -38,9 +41,45 @@ Applied and superseded finding documents have been removed. Finding IDs are stab
 | [114](114-redundant-control-hints.md) | Remove hints that restate the control | ui-ux | needs-review |
 | [115](115-share-until-explicit-choice.md) | Make an open-ended share an explicit choice | ui-ux | needs-review |
 | [116](116-empty-state-roadmap-copy.md) | Remove tutorial and roadmap text from empty states | ui-ux | needs-review |
+| [117](117-statement-latest-balance-check.md) | Price statements from the latest balance check | backend-domain | needs-review |
+| [118](118-range-percentile-calculation.md) | Calculate range percentiles in one place | backend-domain | needs-review |
+| [119](119-stored-projection-history.md) | Replay only recorded history when reading a saved projection | backend-domain | needs-review |
+| [120](120-transaction-row-transfer-data.md) | Resolve transfer information once per transaction list | frontend-state | needs-review |
+| [121](121-alert-dialog-viewport.md) | Keep confirmation dialog actions within reach | ui-ux | needs-review |
+| [122](122-independence-card-keyboard-focus.md) | Show keyboard focus on the Financial Independence card | ui-ux | needs-review |
+| [123](123-reduced-motion-loading.md) | Stop repeating loading animations with reduced motion | ui-ux | needs-review |
+| [124](124-image-reuse-build-context.md) | Rebuild images when build exclusions change | deploy-build-test | needs-review |
+| [125](125-identity-runtime-image.md) | Ship only the identity service runtime | deploy-build-test | needs-review |
+| [126](126-account-balance-test-fixtures.md) | Supply account balances directly in frontend tests | deploy-build-test | needs-review |
+| [127](127-projection-engine-version-docs.md) | Document the current projection engine version | doc-audit-reference | needs-review |
+| [128](128-analysis-input-retention-docs.md) | Correct the Analysis input retention guide | doc-audit-reference | needs-review |
+| [129](129-seed-regeneration-docs.md) | Keep one working recipe for regenerating the ML seed | doc-audit-reference | needs-review |
+| [130](130-flows-projection-horizon.md) | Request only the projection years Flows needs | frontend-domain | needs-review |
+| [131](131-schedule-frequency-fallback.md) | Read only current schedule recurrence | frontend-domain | needs-review |
+| [132](132-schedule-amount-presets.md) | Use saved amount presets when creating a schedule | frontend-domain | needs-review |
+| [133](133-range-cache-default-scenario-count.md) | Align the browser and server range scenario count | backend-api-persist | needs-review |
+| [134](134-range-cache-saved-model-only.md) | Restrict the saved range to saved-model requests | backend-api-persist | needs-review |
+| [135](135-range-cache-atomic-publication.md) | Publish saved range results atomically | backend-api-persist | needs-review |
+| [136](136-bank-amount-literal-normalization.md) | Normalize numeric amounts before saving bank data | contracts-types | needs-review |
+
+## Retired aliases
+
+| Use in findings | Source names grouped under it |
+| --- | --- |
+| Balance check | Checkpoint, bank observation |
+| Range | Stochastic bands, Monte Carlo statistics |
+| Recorded history | Actual-only history |
+| Transfer information | Transfer peer, transfer-link membership |
+| Confirmation dialog | Alert dialog |
+| Identity service | Better Auth image, auth image |
+| Scenario count | Trial count, run count |
+| Saved range | Durable stochastic cache, canonical stochastic artifacts |
+| Schedule recurrence | Legacy schedule frequency |
+| Numeric amount | Amount literal, decimal expression |
 
 ## Audit history
 
+- Optimization audit — 2026-11-27 at `db35e305`.
 - Optimization audit — 2026-11-21 at `7ac73105`.
 - Pattern detection audit — 2026-11-18.
 - shadcn Base UI migration audits — 2026-11-14.
