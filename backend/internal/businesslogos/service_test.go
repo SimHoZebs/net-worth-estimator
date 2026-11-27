@@ -3,8 +3,15 @@ package businesslogos
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -137,4 +144,172 @@ func TestServiceVerifiesDigestAndHidesStoreFailures(t *testing.T) {
 	if _, _, err := service.Open(ctx, "chase"); err == nil {
 		t.Fatal("short payload accepted")
 	}
+}
+
+func TestServiceImportedLifecycle(t *testing.T) {
+	ctx := context.Background()
+	key := importedTestKey(t)
+	dir := t.TempDir()
+	original := importedTestPNG(t, color.RGBA{R: 20, G: 40, B: 60, A: 255})
+	writeImportedTestPNG(t, dir, key, original)
+	store := memory.New()
+	service, err := New(store, WithLogoDevDirectory(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Seed(ctx); err != nil {
+		t.Fatal(err)
+	}
+	asset, ok := service.Lookup(key)
+	digest := sha256.Sum256(original)
+	hash := hex.EncodeToString(digest[:])
+	if !ok || !service.IsImported(key) || asset.Version != hash || asset.SHA256 != hash || asset.ObjectKey != "businesslogo_"+key+"_"+hash {
+		t.Fatalf("imported asset = %+v %v", asset, ok)
+	}
+	if got := readImportedTestObject(t, mustOpenTestObject(t, store, asset.ObjectKey)); !bytes.Equal(got, original) {
+		t.Fatal("stored import differs from source bytes")
+	}
+
+	replacement := importedTestPNG(t, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+	writeImportedTestPNG(t, dir, key, replacement)
+	reader, served, err := service.Open(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readImportedTestObject(t, reader); !bytes.Equal(got, original) || served.Version != hash {
+		t.Fatal("serving reread the import directory")
+	}
+	if err := service.Seed(ctx); err != nil {
+		t.Fatal(err)
+	}
+	updated, ok := service.Lookup(key)
+	if !ok || updated.Version == hash || updated.ObjectKey == asset.ObjectKey {
+		t.Fatalf("updated asset = %+v %v", updated, ok)
+	}
+	if got := readImportedTestObject(t, mustOpenTestObject(t, store, asset.ObjectKey)); !bytes.Equal(got, original) {
+		t.Fatal("update overwrote the old immutable object")
+	}
+	if got := readImportedTestObject(t, mustOpenTestObject(t, store, updated.ObjectKey)); !bytes.Equal(got, replacement) {
+		t.Fatal("updated object differs from replacement bytes")
+	}
+}
+
+func TestServiceBadImportsAreIsolatedAndCuratedAssetsWin(t *testing.T) {
+	dir := t.TempDir()
+	valid := importedTestPNG(t, color.RGBA{A: 255})
+	corruptKey := importedTestKey(t)
+	symlinkKey := importedTestKey(t, corruptKey)
+	writeImportedTestPNG(t, dir, corruptKey, valid[:len(valid)/2])
+	writeImportedTestPNG(t, dir, "not-in-catalog", valid)
+	writeImportedTestPNG(t, dir, "chase", valid)
+	external := filepath.Join(t.TempDir(), "outside.png")
+	if err := os.WriteFile(external, valid, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(dir, symlinkKey+".png")); err != nil {
+		t.Fatal(err)
+	}
+	service, err := New(memory.New(), WithLogoDevDirectory(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Seed(context.Background()); err != nil {
+		t.Fatalf("bad cache blocked startup: %v", err)
+	}
+	for _, key := range []string{corruptKey, symlinkKey, "not-in-catalog"} {
+		if _, ok := service.Lookup(key); ok {
+			t.Fatalf("excluded key %q resolved", key)
+		}
+	}
+	if curated, ok := service.Lookup("chase"); !ok || curated != manifest["chase"] || service.IsImported("chase") {
+		t.Fatalf("curated asset was replaced: %+v", curated)
+	}
+}
+
+func TestServiceImportedStoreFailureIsOptional(t *testing.T) {
+	key := importedTestKey(t)
+	data := importedTestPNG(t, color.RGBA{A: 255})
+	dir := t.TempDir()
+	writeImportedTestPNG(t, dir, key, data)
+	digest := sha256.Sum256(data)
+	objectKey := "businesslogo_" + key + "_" + hex.EncodeToString(digest[:])
+	service, err := New(&importConflictStore{Store: memory.New(), key: objectKey}, WithLogoDevDirectory(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Seed(context.Background()); err != nil {
+		t.Fatalf("conflicting imported object blocked startup: %v", err)
+	}
+	if _, ok := service.Lookup(key); ok {
+		t.Fatal("conflicting import was published")
+	}
+	if _, _, err := service.Open(context.Background(), "chase"); err != nil {
+		t.Fatalf("curated behavior changed: %v", err)
+	}
+}
+
+type importConflictStore struct {
+	blobstore.Store
+	key string
+}
+
+func (s *importConflictStore) Put(ctx context.Context, key string, reader io.Reader, size int64) error {
+	if key == s.key {
+		return blobstore.ErrConflict
+	}
+	return s.Store.Put(ctx, key, reader, size)
+}
+
+func importedTestKey(t *testing.T, excluded ...string) string {
+	t.Helper()
+	skip := make(map[string]bool, len(excluded))
+	for _, key := range excluded {
+		skip[key] = true
+	}
+	for key := range logoDevDomains {
+		if _, curated := manifest[key]; !curated && !skip[key] {
+			return key
+		}
+	}
+	t.Fatal("no allowlisted provider key is available for an import test")
+	return ""
+}
+
+func importedTestPNG(t *testing.T, pixel color.RGBA) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	img.Set(0, 0, pixel)
+	var output bytes.Buffer
+	if err := png.Encode(&output, img); err != nil {
+		t.Fatal(err)
+	}
+	return output.Bytes()
+}
+
+func writeImportedTestPNG(t *testing.T, dir, key string, data []byte) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, key+".png"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustOpenTestObject(t *testing.T, store blobstore.Store, key string) io.ReadCloser {
+	t.Helper()
+	reader, err := store.Open(context.Background(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reader
+}
+
+func readImportedTestObject(t *testing.T, reader io.ReadCloser) []byte {
+	t.Helper()
+	data, err := io.ReadAll(reader)
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

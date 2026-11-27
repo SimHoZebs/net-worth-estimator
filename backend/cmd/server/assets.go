@@ -12,10 +12,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/businesslogos"
 )
 
+const logoDevDirectory = "logo-dev"
+
 // configureAssetService builds a store root separate from private receipts.
 // The directory is created owner-only at the composition boundary and its
-// lifecycle is owned by the server. Curated assets are seeded idempotently;
-// no request ever downloads or writes an asset.
+// lifecycle is owned by the server. Curated assets and operator-imported PNGs
+// are seeded idempotently; no request ever downloads or writes an asset.
 func configureAssetService(dbPath string, getenv func(string) string) (*businesslogos.Service, func() error, error) {
 	dir := strings.TrimSpace(getenv("NET_WORTH_ESTIMATOR_ASSET_DIR"))
 	if dir == "" {
@@ -28,7 +30,7 @@ func configureAssetService(dbPath string, getenv func(string) string) (*business
 	if err != nil {
 		return nil, nil, fmt.Errorf("open asset store: %w", err)
 	}
-	service, err := businesslogos.New(store)
+	service, err := businesslogos.New(store, businesslogos.WithLogoDevDirectory(filepath.Join(dir, logoDevDirectory)))
 	if err != nil {
 		_ = store.Close()
 		return nil, nil, err
@@ -38,7 +40,7 @@ func configureAssetService(dbPath string, getenv func(string) string) (*business
 	defer cancel()
 	if err := service.Seed(ctx); err != nil {
 		_ = store.Close()
-		return nil, nil, fmt.Errorf("seed curated logos: %w", err)
+		return nil, nil, fmt.Errorf("seed business logos: %w", err)
 	}
 	return service, store.Close, nil
 }

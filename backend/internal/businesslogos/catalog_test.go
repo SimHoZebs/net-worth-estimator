@@ -26,6 +26,9 @@ func TestRecognizePrecedenceAndBoundaries(t *testing.T) {
 		{"network does not override issuer", "Chase Visa Signature", "", "", "chase"},
 		{"network alone is unknown", "Visa", "Mastercard", "", ""},
 		{"unsupported brand falls back", "Local Credit Union", "Amazon", "", ""},
+		{"amazon institution stays transaction-only", "Amazon", "", "", ""},
+		{"amzn bridge name stays transaction-only", "", "AMZN", "", ""},
+		{"amazon manual name stays transaction-only", "", "", "Amazon Prime Card", ""},
 		{"ambiguous institution is decisive unknown", "Chase PayPal", "Klarna", "", ""},
 		{"ambiguous manual name is unknown", "", "", "Venmo Klarna", ""},
 		{"exact user phrase", "", "", "Fidelity Investments", "fidelity-investments"},
@@ -63,6 +66,14 @@ func TestRecognizeTransactionPrecedenceAndScope(t *testing.T) {
 		{"payee wins over transaction name", "", "Netflix.com", "Spotify", "netflix"},
 		{"transaction name is conservative fallback", "", "", "SPOTIFY USA", "spotify"},
 		{"whole token punctuation and case", "", "", "uber-eats", "uber"},
+		{"whole amazon token", "", "", "Amazon purchase", "amazon"},
+		{"whole amzn token", "", "", "AMZN MKTP US*2A3B4C5D3", "amazon"},
+		{"Amazon marketplace descriptor", "", "", "AMAZON MKTPLACE PMTS AMZN.COM/BILL WA", "amazon"},
+		{"Amazon punctuation boundaries", "", "", "AMAZON.COM/BILL WA", "amazon"},
+		{"Amazon plus another merchant is ambiguous", "", "", "Amazon Netflix", ""},
+		{"partial Amazon token never matches", "", "", "Amazonify", ""},
+		{"partial AMZN token never matches", "", "", "AMZNX", ""},
+		{"unsupported AWS abbreviation", "", "", "AWS", ""},
 		{"shared paypal refund alias", "", "", "PAYPAL *REFUND", "paypal"},
 		{"shared venmo payment alias", "", "Venmo", "Local Shop", "venmo"},
 		{"shared klarna descriptor alias", "Klarna", "", "Local Shop", "klarna"},
@@ -73,6 +84,16 @@ func TestRecognizeTransactionPrecedenceAndScope(t *testing.T) {
 		{"ambiguous transaction name is unknown", "", "", "Netflix Spotify", ""},
 		{"embedded substring never matches", "", "", "Netflixify", ""},
 		{"unsupported merchant stays generic", "Corner Store", "", "Local Purchase", ""},
+		{"lime ride descriptor", "", "", "LIME*RIDE", "lime"},
+		{"lime payee", "", "Lime", "Scooter trip", "lime"},
+		{"lime fruit is unrelated", "", "", "Lime juice", ""},
+		{"subway transit is unrelated", "", "", "Subway fare", ""},
+		{"american alone is not an airline", "", "", "American Home Supply", ""},
+		{"united alone is not an airline", "", "", "United Health", ""},
+		{"two airline names are ambiguous", "", "", "Lufthansa United Airlines", ""},
+		{"airline merchant name wins", "United Airlines", "", "Lufthansa", "united-airlines"},
+		{"punctuated restaurant descriptor", "", "", "CHICK-FIL-A #02344", "chick-fil-a"},
+		{"restaurant store descriptor", "", "", "MCDONALD'S F12345", "mcdonalds"},
 		{"account issuer is not transaction evidence", "Chase", "", "Local Purchase", ""},
 		{"empty evidence stays generic", "", "", "", ""},
 	}
@@ -202,6 +223,28 @@ func TestCuratedManifest(t *testing.T) {
 	assets["chase"] = Asset{Key: "mutated"}
 	if original, ok := Lookup("chase"); !ok || original.Version == "" {
 		t.Fatal("mutating Assets() changed the manifest")
+	}
+}
+
+func TestTransactionOnlyCatalogAliases(t *testing.T) {
+	domains := LogoDevDomains()
+	for _, entry := range providerBusinesses() {
+		if !IsCatalogKey(entry.key) || domains[entry.key] == "" {
+			t.Errorf("transaction merchant %q has no allowlisted domain", entry.key)
+		}
+		for _, item := range entry.aliases {
+			name := strings.Join(item.tokens, " ")
+			if got := RecognizeTransaction("", "", name); got != entry.key {
+				t.Errorf("transaction alias %q resolved to %q, want %q", name, got, entry.key)
+			}
+			if got := Recognize("", "", name); got != "" {
+				t.Errorf("transaction alias %q also resolved as account %q", name, got)
+			}
+		}
+	}
+	domains["amazon"] = "example.com"
+	if LogoDevDomains()["amazon"] != "amazon.com" {
+		t.Fatal("caller mutated Logo.dev domain allowlist")
 	}
 }
 

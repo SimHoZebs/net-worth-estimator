@@ -63,8 +63,9 @@ performs no network request or model write, and the transaction response's
 
 ## Supported catalog
 
-Every supported key has one checked-in asset and explicit aliases. Unsupported
-business names resolve to unknown and keep the generic glyph.
+Every supported key has explicit aliases and either a checked-in asset or an
+approved public domain for a Logo.dev import. Unsupported business names
+resolve to unknown and keep the generic glyph.
 
 | Catalog key | Aliases | Recognition scope | Original source |
 | --- | --- | --- | --- |
@@ -155,22 +156,61 @@ IRA, and 401(k) forms. The bare word `Fidelity` is never an alias because it
 is shared with Fidelity Bank and Fidelity International; embedded substrings
 such as `high fidelity` never match.
 
-Adding a business requires a verified, distributable asset, an entry in
-`logoSpecs` with its declared format, explicit aliases in `businesses`,
-catalog tests, and a provenance row here. Never fabricate an approximation or
-derive logo artwork from transaction descriptions. Matching an already
-curated logo against transaction evidence is recognition, not asset derivation.
+Adding an embedded business requires a verified, distributable asset, an entry
+in `logoSpecs` with its declared format, explicit aliases in `businesses`,
+catalog tests, and a provenance row here.
+
+## Logo.dev imports
+
+The transaction catalog also recognizes Amazon (`Amazon` and `AMZN`), Lime,
+major domestic and international airlines, and common fast-food chains. The
+domain and alias allowlist is in `backend/internal/businesslogos/transaction_catalog.go`.
+Short ambiguous labels such as `Delta` or `United` need the airline name;
+ordinary names such as `Lime` and `Subway` match only as whole labels or via
+more specific aliases. Coverage depends on both a recognized descriptor and
+an imported logo.
+
+The importer uses the [Logo.dev API for self-hosting](https://www.logo.dev/docs/platform/self-hosting).
+It sends only public domains from the allowlist. Bank data, transaction
+descriptions, user identifiers, and amounts stay in Waypoint. The browser and
+API server never contact Logo.dev when rendering or serving a logo.
+
+Keep the secret key outside source control and use it only with the importer.
+The free plan provides monthly API credits; see [Logo.dev pricing](https://www.logo.dev/pricing)
+and [attribution terms](https://www.logo.dev/docs/platform/attribution).
+Commercial use on that plan requires a visible Logo.dev link on a public
+page before use. Imported artwork belongs in deployment storage.
+
+Import a few known keys or the entire allowlist into the asset store's dedicated
+subdirectory. Supply `LOGO_DEV_SECRET_KEY` in the command environment from
+your secret manager:
+
+```sh
+install -d -m 700 "$ASSET_DIR/logo-dev"
+go -C backend run ./cmd/import-business-logos --dir "$ASSET_DIR/logo-dev" amazon lime mcdonalds
+go -C backend run ./cmd/import-business-logos --dir "$ASSET_DIR/logo-dev" --all
+```
+
+The importer skips files already present. Pass `--refresh` before the key list
+to explicitly replace them; a failed download leaves the existing file intact.
+
+`ASSET_DIR` above is the target's `NET_WORTH_ESTIMATOR_ASSET_DIR` or its
+default `business-logos` directory beside the database. When importing from
+another machine, use a private staging directory and transfer only the PNGs
+to the target's `logo-dev` subdirectory. Restart the API to load the imported
+images. Unavailable or invalid imports fall back to direction arrows.
 
 ## Asset delivery and storage
 
-Assets are served only from a curated manifest through
+Embedded and imported assets are served only from the catalog through
 `/v1/assets/business-logos/{key}`. That stable path redirects to
 `/v1/assets/business-logos/{key}/{hash}`; the versioned response is immutable
 and verified against the manifest digest before it is written. Content type is
 fixed by the manifest's declared format, either `image/svg+xml` or `image/png`,
 with `X-Content-Type-Options: nosniff`, explicit width and height in the UI,
-conditional GET with `ETag`, and bounded payloads. Raster assets additionally
-require a PNG signature and decodable, bounded dimensions at build time.
+conditional GET with `ETag`, and bounded payloads. The embedded PNG is
+validated at build time. Imported PNGs are validated during import and again
+when the API loads them.
 Unknown keys, stale versions, malformed paths, and read failures never reach
 the store with caller-supplied object keys.
 
@@ -184,13 +224,14 @@ asset can cache permanently.
 
 Storage reuses the provider-neutral `blobstore.Store` interface. The server
 creates a dedicated filesystem root at boot, separate from private receipt
-blobs, and seeds the manifest idempotently from embedded files. No download,
-user upload, admin gallery, remote provider, or per-request seeding exists.
+blobs, and seeds the manifest idempotently from embedded files and any valid
+operator imports. The server never downloads, accepts user uploads, or seeds
+assets per request.
 `NET_WORTH_ESTIMATOR_ASSET_DIR` overrides the default `business-logos/`
 directory beside `NET_WORTH_ESTIMATOR_DB`. The directory is created owner-only
 and must stay owner-only for the adapter to open it. Keep it on persistent
-storage in container deployments; all checked-in SVGs and the Fidelity PNG are
-embedded in the Go binary, so no extra image files are needed. Test and fixture
+storage in container deployments. Checked-in SVGs and the Fidelity PNG are
+embedded in the Go binary; imported PNGs remain on that storage. Test and fixture
 APIs use an embedded deterministic in-memory store instead of writing the
 working directory.
 
@@ -201,3 +242,6 @@ When a key is present it renders a contained decorative image with `alt=""`
 and `aria-hidden="true"`. The generic glyph remains visible during loading
 and after an asset error, and a changed key starts a fresh load. No new
 announcement, remote URL, or account name change results from a logo.
+
+Transaction logos keep their original colors. On dark pages they use a light
+backing instead of the account glyph's monochrome inversion.

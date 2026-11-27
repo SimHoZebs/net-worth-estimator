@@ -91,6 +91,10 @@ func TestTransactionBusinessLogoEvidencePrecedenceAndSafety(t *testing.T) {
 			},
 			{ID: "name", Description: "SPOTIFY USA", Amount: "-12", Posted: posted},
 			{ID: "paypal-refund", Description: "PAYPAL *REFUND", Amount: "10", Posted: posted},
+			{ID: "amazon", Description: "AMZN MKTP US*2A3B4C5D3", Amount: "-18", Posted: posted},
+			{ID: "lime", Description: "LIME*RIDE", Amount: "-6", Posted: posted},
+			{ID: "airline", Description: "UNITED AIRLINES TICKET", Amount: "-180", Posted: posted},
+			{ID: "fast-food", Description: "MCDONALD'S F12345", Amount: "-9", Posted: posted},
 			{
 				ID: "ambiguous", Description: "Netflix subscription", Payee: "Uber", Amount: "-13", Posted: posted,
 				Extra: map[string]json.RawMessage{"merchant_name": json.RawMessage(`"Netflix Spotify"`)},
@@ -143,10 +147,14 @@ func TestTransactionBusinessLogoEvidencePrecedenceAndSafety(t *testing.T) {
 		t.Fatalf("transaction revision = %q, want %q", revision, wantRevision)
 	}
 	for name, want := range map[string]string{
-		"NETFLIX.COM":     "spotify",
-		"Netflix payment": "uber",
-		"SPOTIFY USA":     "spotify",
-		"PAYPAL *REFUND":  "paypal",
+		"NETFLIX.COM":            "spotify",
+		"Netflix payment":        "uber",
+		"SPOTIFY USA":            "spotify",
+		"PAYPAL *REFUND":         "paypal",
+		"AMZN MKTP US*2A3B4C5D3": "amazon",
+		"LIME*RIDE":              "lime",
+		"UNITED AIRLINES TICKET": "united-airlines",
+		"MCDONALD'S F12345":      "mcdonalds",
 	} {
 		if got := rows[name]["recognizedBusinessKey"]; got != want {
 			t.Fatalf("%s key = %v, want %s", name, got, want)

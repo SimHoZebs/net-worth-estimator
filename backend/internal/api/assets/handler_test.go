@@ -6,9 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"image"
-	_ "image/png"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -55,6 +58,38 @@ func TestStablePathRedirectsToImmutableVersion(t *testing.T) {
 	}
 	if w.Header().Get("ETag") != `"`+asset.SHA256+`"` {
 		t.Fatalf("stable ETag = %q", w.Header().Get("ETag"))
+	}
+}
+
+func TestImportedAssetRoute(t *testing.T) {
+	h, service, _, key, data := testImportedHandler(t)
+	asset, ok := service.Lookup(key)
+	if !ok {
+		t.Fatal("imported provider key is not in the service manifest")
+	}
+	stable := request(h, http.MethodGet, businesslogos.PathPrefix+key, nil)
+	if stable.Code != http.StatusFound {
+		t.Fatalf("stable imported path = %d %q", stable.Code, stable.Body.String())
+	}
+	if want := businesslogos.PathPrefix + key + "/" + asset.Version; stable.Header().Get("Location") != want {
+		t.Fatalf("imported location = %q, want %q", stable.Header().Get("Location"), want)
+	}
+	if stable.Header().Get("Cache-Control") != "no-cache" || stable.Header().Get("ETag") != `"`+asset.SHA256+`"` {
+		t.Fatalf("stable imported headers = %v", stable.Header())
+	}
+	versioned := request(h, http.MethodGet, stable.Header().Get("Location"), nil)
+	if versioned.Code != http.StatusOK || versioned.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("versioned imported asset = %d %q", versioned.Code, versioned.Header().Get("Content-Type"))
+	}
+	if versioned.Header().Get("Cache-Control") != immutableCache || versioned.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("versioned imported headers = %v", versioned.Header())
+	}
+	if versioned.Header().Get("Content-Length") != strconv.FormatInt(asset.Size, 10) || !bytes.Equal(versioned.Body.Bytes(), data) {
+		t.Fatalf("versioned imported body = %d bytes", versioned.Body.Len())
+	}
+	digest := sha256.Sum256(versioned.Body.Bytes())
+	if hex.EncodeToString(digest[:]) != asset.SHA256 || asset.Version != asset.SHA256 {
+		t.Fatal("imported asset digest does not match the service manifest")
 	}
 }
 
@@ -173,4 +208,82 @@ func TestReadFailureIsNotServed(t *testing.T) {
 	if w.Code != http.StatusInternalServerError || w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("ETag") != "" {
 		t.Fatalf("read failure = %d %v", w.Code, w.Header())
 	}
+}
+
+func TestProviderKeyWithoutImportIsNotFound(t *testing.T) {
+	h, _ := testHandler(t)
+	key := importedHandlerTestKey(t)
+	if !businesslogos.IsCatalogKey(key) {
+		t.Fatalf("provider key %q is not allowlisted", key)
+	}
+	for _, path := range []string{
+		businesslogos.PathPrefix + key,
+		businesslogos.PathPrefix + key + "/deadbeef",
+	} {
+		w := request(h, http.MethodGet, path, nil)
+		if w.Code != http.StatusNotFound || w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatalf("unimported provider path %s = %d %v", path, w.Code, w.Header())
+		}
+	}
+}
+
+func TestUnavailableImportedObjectIsNotFound(t *testing.T) {
+	for _, corrupt := range []bool{false, true} {
+		name := "missing"
+		if corrupt {
+			name = "corrupt"
+		}
+		t.Run(name, func(t *testing.T) {
+			h, service, store, key, _ := testImportedHandler(t)
+			asset, _ := service.Lookup(key)
+			if err := store.Delete(context.Background(), asset.ObjectKey); err != nil {
+				t.Fatal(err)
+			}
+			if corrupt {
+				if err := store.Put(context.Background(), asset.ObjectKey, strings.NewReader("corrupt"), 7); err != nil {
+					t.Fatal(err)
+				}
+			}
+			w := request(h, http.MethodGet, businesslogos.PathPrefix+key+"/"+asset.Version, nil)
+			if w.Code != http.StatusNotFound || w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("ETag") != "" {
+				t.Fatalf("unavailable import = %d %v", w.Code, w.Header())
+			}
+		})
+	}
+}
+
+func testImportedHandler(t *testing.T) (http.Handler, *businesslogos.Service, *memory.Store, string, []byte) {
+	t.Helper()
+	key := importedHandlerTestKey(t)
+	img := image.NewRGBA(image.Rect(0, 0, 6, 5))
+	img.Set(0, 0, color.RGBA{R: 10, G: 20, B: 30, A: 255})
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatal(err)
+	}
+	data := encoded.Bytes()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, key+".png"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := memory.New()
+	service, err := businesslogos.New(store, businesslogos.WithLogoDevDirectory(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Seed(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return NewHandler(service), service, store, key, data
+}
+
+func importedHandlerTestKey(t *testing.T) string {
+	t.Helper()
+	for key := range businesslogos.LogoDevDomains() {
+		if _, curated := businesslogos.Lookup(key); !curated {
+			return key
+		}
+	}
+	t.Fatal("no allowlisted provider key is available for an asset test")
+	return ""
 }

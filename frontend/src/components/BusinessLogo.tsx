@@ -10,10 +10,12 @@ export function BusinessLogo({
 	businessKey,
 	fallback,
 	size,
+	onLightSurface = false,
 }: {
 	businessKey?: string | null;
 	fallback: ReactNode;
 	size: number;
+	onLightSurface?: boolean;
 }) {
 	const logoURL = businessLogoURL(businessKey);
 	// A key change starts a fresh load: both outcomes are tagged with the key
@@ -37,7 +39,8 @@ export function BusinessLogo({
 					width={size}
 					height={size}
 					className={cn(
-						"object-contain dark:invert",
+						"object-contain",
+						onLightSurface ? "dark:rounded-sm dark:bg-white" : "dark:invert",
 						showLogo ? undefined : "pointer-events-none absolute opacity-0",
 					)}
 					onLoad={() => setAssetState({ key: businessKey, status: "loaded" })}

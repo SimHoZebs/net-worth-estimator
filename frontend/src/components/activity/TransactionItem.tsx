@@ -72,7 +72,12 @@ export function TransactionItemRow({
 				className={cn(transactionIconStyles({ tone }), "relative")}
 			>
 				{businessKey ? (
-					<BusinessLogo businessKey={businessKey} fallback={icon} size={16} />
+					<BusinessLogo
+						businessKey={businessKey}
+						fallback={icon}
+						size={16}
+						onLightSurface
+					/>
 				) : (
 					icon
 				)}

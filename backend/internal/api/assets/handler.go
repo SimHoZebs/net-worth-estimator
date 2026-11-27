@@ -1,4 +1,4 @@
-// Package assets serves curated business logos from a catalog-only asset
+// Package assets serves approved business logos from a catalog-only asset
 // service. It exposes no object keys, user data, or general storage access.
 package assets
 
@@ -13,8 +13,9 @@ import (
 
 const immutableCache = "public, max-age=31536000, immutable"
 
-// Handler resolves only manifest keys to manifest assets. Requests are GET or
-// HEAD; the versioned path is immutable and the stable path redirects to it.
+// Handler resolves only service-manifest keys to approved assets. Requests are
+// GET or HEAD; the versioned path is immutable and the stable path redirects
+// to it.
 type Handler struct {
 	service *businesslogos.Service
 }
@@ -35,7 +36,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		notFound(w, r)
 		return
 	}
-	asset, known := businesslogos.Lookup(key)
+	asset, known := h.service.Lookup(key)
 	if !known || (version != "" && version != asset.Version) {
 		notFound(w, r)
 		return
@@ -64,6 +65,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Del("ETag")
+		if h.service.IsImported(key) {
+			w.Header().Del("Content-Type")
+			w.Header().Del("Link")
+			notFound(w, r)
+			return
+		}
 		http.Error(w, "Logo is temporarily unavailable", http.StatusInternalServerError)
 		return
 	}

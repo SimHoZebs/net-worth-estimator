@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"image"
 	_ "image/png"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -106,6 +107,7 @@ type alias struct {
 	bridge      bool
 	manual      bool
 	transaction bool
+	exact       bool
 }
 
 type matchScope uint8
@@ -123,7 +125,7 @@ type business struct {
 
 // Network names are intentionally absent. A network on a card is not the
 // account business and must never displace a recognized issuer.
-var businesses = []business{
+var businesses = append([]business{
 	// "Ally" is an ordinary word and is never an alias by itself.
 	{key: "ally", aliases: []alias{
 		{tokens: []string{"ally", "bank"}, bridge: true, manual: true},
@@ -185,8 +187,6 @@ var businesses = []business{
 	{key: "klarna", aliases: []alias{
 		{tokens: []string{"klarna"}, bridge: true, manual: true, transaction: true},
 	}},
-	// Starter merchants are transaction-only. Their names identify a
-	// counterparty, not the account or institution that reported the row.
 	{key: "netflix", aliases: []alias{
 		{tokens: []string{"netflix"}, transaction: true},
 	}},
@@ -224,7 +224,7 @@ var businesses = []business{
 	{key: "wells-fargo", aliases: []alias{
 		{tokens: []string{"wells", "fargo"}, bridge: true, manual: true},
 	}},
-}
+}, providerBusinesses()...)
 
 var manifest = func() map[string]Asset {
 	result := make(map[string]Asset, len(logoSpecs))
@@ -281,8 +281,9 @@ func Lookup(key string) (Asset, bool) {
 
 // IsCatalogKey reports whether a string is a curated catalog key.
 func IsCatalogKey(key string) bool {
-	_, ok := manifest[key]
-	return ok
+	_, embedded := manifest[key]
+	_, imported := logoDevDomains[key]
+	return embedded || imported
 }
 
 // validateSVG rejects active content and external references at build time.
@@ -366,7 +367,7 @@ func containsSequence(tokens, phrase []string) bool {
 		return false
 	}
 	for start := 0; start+len(phrase) <= len(tokens); start++ {
-		if strings.Join(tokens[start:start+len(phrase)], " ") == strings.Join(phrase, " ") {
+		if slices.Equal(tokens[start:start+len(phrase)], phrase) {
 			return true
 		}
 	}
@@ -391,6 +392,9 @@ func matches(text string, scope matchScope) []string {
 				inScope = item.transaction
 			}
 			if !inScope {
+				continue
+			}
+			if item.exact && len(tokens) != len(item.tokens) {
 				continue
 			}
 			if containsSequence(tokens, item.tokens) {
