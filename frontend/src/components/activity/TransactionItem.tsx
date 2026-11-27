@@ -63,23 +63,26 @@ export function TransactionItemRow({
 }) {
 	const nameContent = (
 		<>
-			<span className={cn(transactionIconStyles({ tone }), "max-sm:hidden")}>
+			<span data-transaction-icon className={transactionIconStyles({ tone })}>
 				{icon}
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col gap-1">
 				<strong
 					title={title}
-					className="block max-w-[48ch] truncate text-xs font-semibold max-sm:max-w-[calc(100vw_-_13rem)]"
+					className="block min-w-0 truncate text-xs font-semibold sm:max-w-[48ch]"
 				>
 					{title}
 				</strong>
 				{slots?.subtitle && (
-					<span className="block max-w-[32ch] truncate text-xs text-muted-foreground max-sm:max-w-[calc(100vw_-_13rem)]">
+					<span className="block min-w-0 truncate text-xs text-muted-foreground sm:max-w-[32ch]">
 						{slots.subtitle}
 					</span>
 				)}
 				{slots?.mobile && (
-					<span className="hidden text-xs text-muted-foreground max-sm:block">
+					<span
+						data-transaction-mobile
+						className="hidden min-w-0 whitespace-normal break-words text-xs text-muted-foreground max-sm:block"
+					>
 						{slots.mobile}
 					</span>
 				)}
@@ -105,14 +108,14 @@ export function TransactionItemRow({
 				className={transactionCellStyles({ column: "name" })}
 			>
 				{readOnly ? (
-					<div className="flex w-full items-center gap-3 px-2 py-1 text-left max-sm:gap-2">
+					<div className="flex w-full items-center gap-3 px-2 py-1 text-left max-sm:gap-2 max-sm:px-0">
 						{nameContent}
 					</div>
 				) : (
 					<Button
 						type="button"
 						variant="ghost"
-						className="h-auto w-full items-center justify-start gap-3 px-2 py-1 text-left has-disabled:opacity-60 max-sm:gap-2"
+						className="h-auto w-full items-center justify-start gap-3 px-2 py-1 text-left has-disabled:opacity-60 max-sm:gap-2 max-sm:px-0"
 						aria-label={actionLabel}
 						onClick={onSelect}
 						disabled={selectDisabled}

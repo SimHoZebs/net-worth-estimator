@@ -730,10 +730,18 @@ test("the dated allowance and recorded transactions come from the server", async
 		await expect(charge).toBeVisible();
 		await charge.click();
 		const inspection = page.getByRole("dialog", {
-			name: "Synthetic card charge",
+			name: "Transaction details",
 			exact: true,
 		});
 		await expect(inspection).toBeVisible();
+		// The dialog title is stable; the selected record is identified by
+		// its editable header fields.
+		await expect(
+			inspection.getByRole("textbox", { name: "Name", exact: true }),
+		).toHaveValue("Synthetic card charge");
+		await expect(
+			inspection.getByRole("spinbutton", { name: "Amount", exact: true }),
+		).toHaveValue("50");
 		await page.keyboard.press("Escape");
 		await expect(inspection).toBeHidden();
 		await expect(drawer).toBeVisible();

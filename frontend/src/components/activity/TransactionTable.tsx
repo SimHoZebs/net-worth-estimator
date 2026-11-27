@@ -17,10 +17,11 @@ import { transactionCellStyles } from "./activityStyles.ts";
  *
  * Scroll ownership and keyboard panning live in the canonical Table
  * container; this composes only the activity columns, caption, and headers.
- * The layout is fixed with the date and amount columns sized to their
- * content and the transaction column taking the remainder, so long titles
- * truncate inside their column instead of forcing the table wider than its
- * container. Transaction rows never need horizontal scrolling.
+ * The mobile layout is intrinsic: the amount column shrink-wraps its content
+ * and the transaction column takes the remainder, so long titles truncate
+ * inside their column instead of forcing the table wider than its container.
+ * Desktop keeps fixed date and amount columns. Transaction rows never need
+ * horizontal scrolling.
  */
 export function TransactionTable({
 	caption,
@@ -40,7 +41,10 @@ export function TransactionTable({
 		<Table
 			{...props}
 			containerProps={{ id: scrollId, role: "region", "aria-label": caption }}
-			className={cn("border-t border-border table-fixed", className)}
+			className={cn(
+				"border-t border-border table-auto sm:table-fixed",
+				className,
+			)}
 		>
 			<TableCaption className={showHeaders ? undefined : "sr-only"}>
 				{caption}
@@ -48,7 +52,7 @@ export function TransactionTable({
 			<colgroup>
 				<col className="w-24 max-sm:hidden" />
 				<col />
-				<col className="w-36 max-sm:w-28" />
+				<col className="sm:w-36" />
 			</colgroup>
 			{showHeaders && (
 				<TableHeader>

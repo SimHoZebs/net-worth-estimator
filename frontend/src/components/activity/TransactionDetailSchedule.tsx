@@ -1,4 +1,4 @@
-import { Link2, Repeat } from "lucide-react";
+import { Repeat } from "lucide-react";
 import { useId, type RefObject } from "react";
 import { dateLabel } from "../../domain/format.ts";
 import {
@@ -7,8 +7,13 @@ import {
 } from "../../domain/recurrence.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { timeOfDay } from "../editors/transactionBodies.ts";
+import {
+	transactionDetailControlStyles,
+	transactionDetailFieldStyles,
+	transactionDetailLabelStyles,
+	transactionDetailRowStackStyles,
+} from "./activityStyles.ts";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import {
 	Card,
 	CardAction,
@@ -115,42 +120,55 @@ export function ClaimFields({
 	staleClaimName?: string | null;
 }) {
 	const scheduleLabel = (value: string | null): string => {
-		if (!value) return "No link — standalone record";
+		if (!value) return "Standalone record";
 		return (
 			claimSchedules.find((rule) => rule.id === value)?.name ??
 			staleClaimName ??
 			"Unknown schedule"
 		);
 	};
-	const occurrencePlaceholder = !draft.claimScheduleId
-		? "Choose a schedule first"
-		: occurrenceOptions.length === 0
+	const occurrencePlaceholder =
+		occurrenceOptions.length === 0
 			? "No claimable occurrences"
 			: "Choose the occurrence";
-	const occurrenceLabel = (value: string | null): string => {
-		if (!value) return occurrencePlaceholder;
-		return dateLabel(value, true);
-	};
+	const occurrenceLabel = (value: string | null): string =>
+		value ? dateLabel(value, true) : occurrencePlaceholder;
 	return (
-		<div className="flex min-w-0 flex-1 flex-col gap-3">
-			<Field>
-				<FieldLabel htmlFor={`${idPrefix}-schedule`}>
+		<div className={`${transactionDetailRowStackStyles} flex-1`}>
+			<Field
+				data-detail-row
+				orientation="horizontal"
+				className={transactionDetailFieldStyles}
+			>
+				<FieldLabel
+					htmlFor={`${idPrefix}-schedule`}
+					className={transactionDetailLabelStyles}
+				>
 					Records an occurrence of
 				</FieldLabel>
 				<Select
 					disabled={!claimEditable}
 					value={draft.claimScheduleId ?? ""}
-					onValueChange={(value) =>
-						updateDraft({ claimScheduleId: value ?? "" }, "schedule")
-					}
+					onValueChange={(value) => {
+						const claimScheduleId = value ?? "";
+						updateDraft(
+							claimScheduleId === draft.claimScheduleId
+								? { claimScheduleId }
+								: { claimScheduleId, claimOccurrenceDate: "" },
+							"schedule",
+						);
+					}}
 				>
-					<SelectTrigger id={`${idPrefix}-schedule`} className="w-full">
-						<SelectValue placeholder="No link — standalone record">
+					<SelectTrigger
+						id={`${idPrefix}-schedule`}
+						className={`${transactionDetailControlStyles} w-full min-w-0`}
+					>
+						<SelectValue placeholder="Standalone record">
 							{(value: string | null) => scheduleLabel(value)}
 						</SelectValue>
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="">No link — standalone record</SelectItem>
+						<SelectItem value="">Standalone record</SelectItem>
 						{claimSchedules.map((rule) => (
 							<SelectItem key={rule.id} value={rule.id}>
 								{rule.name}
@@ -168,46 +186,44 @@ export function ClaimFields({
 					</SelectContent>
 				</Select>
 			</Field>
-			<Field>
-				<FieldLabel htmlFor={`${idPrefix}-occurrence`}>
-					Replaces occurrence on
-				</FieldLabel>
-				<Select
-					disabled={!claimEditable || !draft.claimScheduleId}
-					value={draft.claimOccurrenceDate ?? ""}
-					onValueChange={(value) =>
-						updateDraft({ claimOccurrenceDate: value ?? "" }, "schedule")
-					}
+			{draft.claimScheduleId && (
+				<Field
+					data-detail-row
+					orientation="horizontal"
+					className={transactionDetailFieldStyles}
 				>
-					<SelectTrigger id={`${idPrefix}-occurrence`} className="w-full">
-						<SelectValue
-							placeholder={
-								!draft.claimScheduleId
-									? "Choose a schedule first"
-									: occurrenceOptions.length === 0
-										? "No claimable occurrences"
-										: "Choose the occurrence"
-							}
+					<FieldLabel
+						htmlFor={`${idPrefix}-occurrence`}
+						className={transactionDetailLabelStyles}
+					>
+						Replaces occurrence on
+					</FieldLabel>
+					<Select
+						disabled={!claimEditable}
+						value={draft.claimOccurrenceDate ?? ""}
+						onValueChange={(value) =>
+							updateDraft({ claimOccurrenceDate: value ?? "" }, "schedule")
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}-occurrence`}
+							className={`${transactionDetailControlStyles} w-full min-w-0`}
 						>
-							{(value: string | null) => occurrenceLabel(value)}
-						</SelectValue>
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="">
-							{!draft.claimScheduleId
-								? "Choose a schedule first"
-								: occurrenceOptions.length === 0
-									? "No claimable occurrences"
-									: "Choose the occurrence"}
-						</SelectItem>
-						{occurrenceOptions.map((date) => (
-							<SelectItem key={date} value={date}>
-								{dateLabel(date, true)}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</Field>
+							<SelectValue placeholder={occurrencePlaceholder}>
+								{(value: string | null) => occurrenceLabel(value)}
+							</SelectValue>
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="">{occurrencePlaceholder}</SelectItem>
+							{occurrenceOptions.map((date) => (
+								<SelectItem key={date} value={date}>
+									{dateLabel(date, true)}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
+			)}
 		</div>
 	);
 }
@@ -220,6 +236,7 @@ export function MoreOptions({
 	locked,
 	categoryReadOnly,
 	occurrenceOptions,
+	staleClaimName,
 }: {
 	savedTransaction: Transaction;
 	transactions: Transaction[];
@@ -229,6 +246,7 @@ export function MoreOptions({
 	categoryReadOnly: boolean;
 	/** Scheduled dates of the selected rule, closest to the posted day first. */
 	occurrenceOptions: string[];
+	staleClaimName?: string | null;
 }) {
 	const id = useId();
 	const claimSchedules = transactions.filter(
@@ -239,134 +257,99 @@ export function MoreOptions({
 	return (
 		<section
 			aria-label="Transaction options"
-			className="mt-4 border-t border-border"
+			className={transactionDetailRowStackStyles}
 		>
-			<div className="flex flex-col gap-4 pt-4">
-				{!schedule && (
-					<TransactionCategory
-						transactionId={savedTransaction.id}
-						category={savedTransaction.category}
-						source={savedTransaction.categorySource}
-						readOnly={categoryReadOnly}
-					/>
-				)}
-				{schedule && (
-					<>
-						<RecurrenceFields
-							recurrence={
-								draft.recurrence ?? {
-									unit: "month",
-									interval: 1,
-									monthlyMode: "byDate",
-								}
+			{!schedule && (
+				<TransactionCategory
+					transactionId={savedTransaction.id}
+					category={savedTransaction.category}
+					source={savedTransaction.categorySource}
+					readOnly={categoryReadOnly}
+				/>
+			)}
+			{schedule && (
+				<>
+					<RecurrenceFields
+						recurrence={
+							draft.recurrence ?? {
+								unit: "month",
+								interval: 1,
+								monthlyMode: "byDate",
 							}
-							startDate={draft.startDate}
-							onChange={(recurrence) => updateDraft({ recurrence }, "schedule")}
-							disabled={locked}
-							compact
-							idPrefix={`${id}-recurrence`}
-						/>
-						<Field>
-							<FieldLabel htmlFor={`${id}-annual`}>
-								Annual amount increase (%)
-							</FieldLabel>
-							<Input
-								id={`${id}-annual`}
-								name="annualIncrease"
-								type="number"
-								required
-								disabled={locked || savedTransaction.amountKnown === false}
-								min="-50"
-								max="50"
-								step="0.1"
-								value={draft.annualIncrease}
-								onChange={(event) =>
-									updateDraft(
-										{ annualIncrease: event.target.value },
-										"schedule",
-									)
-								}
-							/>
-						</Field>
-					</>
-				)}
-				{!schedule && (
-					<ClaimFields
-						draft={draft}
-						updateDraft={updateDraft}
-						claimEditable={claimEditable}
-						occurrenceOptions={occurrenceOptions}
-						claimSchedules={claimSchedules}
-						idPrefix={id}
+						}
+						startDate={draft.startDate}
+						onChange={(recurrence) => updateDraft({ recurrence }, "schedule")}
+						disabled={locked}
+						compact
+						idPrefix={`${id}-recurrence`}
 					/>
-				)}
-			</div>
+					<Field
+						data-detail-row
+						orientation="horizontal"
+						className={transactionDetailFieldStyles}
+					>
+						<FieldLabel
+							htmlFor={`${id}-annual`}
+							className={transactionDetailLabelStyles}
+						>
+							Annual amount increase (%)
+						</FieldLabel>
+						<Input
+							id={`${id}-annual`}
+							name="annualIncrease"
+							type="number"
+							required
+							disabled={locked || savedTransaction.amountKnown === false}
+							min="-50"
+							max="50"
+							step="0.1"
+							value={draft.annualIncrease}
+							className={transactionDetailControlStyles}
+							onChange={(event) =>
+								updateDraft({ annualIncrease: event.target.value }, "schedule")
+							}
+						/>
+					</Field>
+				</>
+			)}
+			{!schedule && (
+				<ClaimFields
+					draft={draft}
+					updateDraft={updateDraft}
+					claimEditable={claimEditable}
+					occurrenceOptions={occurrenceOptions}
+					claimSchedules={claimSchedules}
+					idPrefix={id}
+					staleClaimName={staleClaimName}
+				/>
+			)}
 		</section>
 	);
 }
 
 /**
- * Schedule dates for recurring rules: one-time transactions need no card.
- * The card holds the date controls only; the cadence lives in the options
- * below and is never restated here.
+ * Date controls for a recurring rule, rendered only for schedule records.
+ * One-time transactions keep their scheduling in the claim fields below and
+ * render no card here; the cadence is never restated in this card.
  */
 export function ScheduleCapsule({
 	savedTransaction,
 	draft,
 	updateDraft,
-	claimScheduleName,
 	locked,
 	scheduleControlId,
 	controlRef,
-	onRemoveOccurrence,
-	removingOccurrence,
 }: {
 	savedTransaction: Transaction;
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
-	claimScheduleName?: string | null;
 	locked: boolean;
 	/** DOM id for the first schedule control. */
 	scheduleControlId?: string;
 	/** Ref for the first schedule control, used by the footer shortcut. */
 	controlRef?: RefObject<HTMLInputElement | null>;
-	/** Scheduled dates of the selected rule, closest to the posted day first. */
-	occurrenceOptions: string[];
-	/** Direct release of the saved occurrence without opening claim controls. */
-	onRemoveOccurrence?: () => void;
-	removingOccurrence?: boolean;
 }) {
 	const id = useId();
-	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
-	if (savedTransaction.kind === "transaction") {
-		if (!draft.claimScheduleId) return null;
-		return (
-			<div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-[1.6] text-muted-foreground">
-				<p className="flex items-center gap-2">
-					<Link2 size={15} aria-hidden="true" />
-					<span>
-						Happened {dateLabel(draft.startDate, true)} · Replaces{" "}
-						{claimScheduleName ?? draft.claimScheduleId} occurrence on{" "}
-						{draft.claimOccurrenceDate
-							? dateLabel(draft.claimOccurrenceDate, true)
-							: "an unclaimed date"}
-					</span>
-				</p>
-				{onRemoveOccurrence && claimEditable && (
-					<Button
-						type="button"
-						variant="link"
-						className="text-destructive"
-						disabled={removingOccurrence}
-						onClick={onRemoveOccurrence}
-						aria-label={`Remove occurrence recorded by ${savedTransaction.name}`}
-					>
-						{removingOccurrence ? "Removing…" : "Remove"}
-					</Button>
-				)}
-			</div>
-		);
-	}
 	return (
 		<Card size="sm" className="mt-5">
 			<CardHeader>
@@ -381,9 +364,16 @@ export function ScheduleCapsule({
 				)}
 			</CardHeader>
 			<CardContent>
-				<div className="flex flex-wrap items-center gap-2">
-					<Field className="min-w-32 flex-1">
-						<FieldLabel htmlFor={scheduleControlId}>
+				<div className={transactionDetailRowStackStyles}>
+					<Field
+						data-detail-row
+						orientation="horizontal"
+						className={`${transactionDetailFieldStyles} w-full`}
+					>
+						<FieldLabel
+							htmlFor={scheduleControlId}
+							className={transactionDetailLabelStyles}
+						>
 							First occurrence
 						</FieldLabel>
 						<Input
@@ -394,6 +384,7 @@ export function ScheduleCapsule({
 							required
 							readOnly={locked}
 							value={draft.startDate}
+							className={transactionDetailControlStyles}
 							onChange={(event) => {
 								const startDate = event.target.value;
 								const recurrence = draft.recurrence
@@ -408,8 +399,17 @@ export function ScheduleCapsule({
 							}}
 						/>
 					</Field>
-					<Field className="min-w-32 flex-1">
-						<FieldLabel htmlFor={`${id}-end`}>Last occurrence</FieldLabel>
+					<Field
+						data-detail-row
+						orientation="horizontal"
+						className={`${transactionDetailFieldStyles} w-full`}
+					>
+						<FieldLabel
+							htmlFor={`${id}-end`}
+							className={transactionDetailLabelStyles}
+						>
+							Last occurrence
+						</FieldLabel>
 						<Input
 							id={`${id}-end`}
 							type="date"
@@ -417,6 +417,7 @@ export function ScheduleCapsule({
 							disabled={draft.noEndDate || locked}
 							readOnly={locked}
 							value={draft.endDate}
+							className={transactionDetailControlStyles}
 							onChange={(event) =>
 								updateDraft({ endDate: event.target.value }, "schedule")
 							}

@@ -12,6 +12,7 @@ import {
 	Trash2,
 	TriangleAlert,
 	UsersRound,
+	X,
 	type LucideIcon,
 } from "lucide-react";
 import { useId, useMemo, useRef, useState, type FormEvent } from "react";
@@ -20,8 +21,14 @@ import {
 	type AccountTransaction,
 } from "../../domain/accountActivity.ts";
 import { dateLabel } from "../../domain/format.ts";
+import {
+	transactionDetailControlStyles,
+	transactionDetailFieldStyles,
+	transactionDetailLabelStyles,
+	transactionDetailRowStackStyles,
+	transactionDetailValueStyles,
+} from "./activityStyles.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
-import { AccountIconFallback } from "./AccountIconFallback.tsx";
 import {
 	recurrenceFromScheduleLike,
 	type Recurrence,
@@ -62,6 +69,7 @@ import {
 import {
 	Sheet,
 	SheetBody,
+	SheetClose,
 	SheetContent,
 	SheetDescription,
 	SheetFooter,
@@ -72,11 +80,6 @@ import { Button } from "@/components/ui/button.tsx";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import {
-	InputGroup,
-	InputGroupAddon,
-	InputGroupInput,
-} from "@/components/ui/input-group.tsx";
 import {
 	Select,
 	SelectContent,
@@ -580,8 +583,6 @@ export function TransactionDetail({
 	const [endScheduleError, setEndScheduleError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
-	const [removingClaim, setRemovingClaim] = useState(false);
-	const [claimRemoveError, setClaimRemoveError] = useState<string | null>(null);
 	const once = savedTransaction.kind === "transaction";
 	const canEdit = !edit.readOnlyReason;
 	// Settled and pending bank rows are editable and removable through the
@@ -637,9 +638,8 @@ export function TransactionDetail({
 		settleCandidates.data?.candidates ?? EMPTY_SETTLE_CANDIDATES;
 	const showShortfall = transaction.shortfall > 0.01;
 	const showExcluded = transaction.excluded && !transaction.pending;
-	const postedDiffers =
-		savedTransaction.postedDate !== null &&
-		savedTransaction.postedDate !== edit.draft.startDate;
+	// Display the posted date even when it matches the occurred date.
+	const hasPostedDate = edit.draft.postedDate !== "";
 	const fromAccount = accountFor(accounts, edit.draft.fromId || null);
 	const toAccount = accountFor(accounts, edit.draft.toId || null);
 	const accountNameById = useMemo(
@@ -654,17 +654,16 @@ export function TransactionDetail({
 		if (!value) return "External spending";
 		return accountNameById.get(value) ?? "Unknown account";
 	};
-	const showPosted = savedTransaction.postedDate !== null;
-	const hasStatusPill =
+	const showExceptionalBadges =
+		transaction.void ||
 		transaction.pending ||
-		showPosted ||
 		showExcluded ||
 		showShortfall ||
 		savedTransaction.amountKnown === false ||
 		(!savedTransaction.enabled && !transaction.pending && !showExcluded);
 	// Transfer details already state the route with labeled account rows.
-	// Other flows keep the single account under the amount because nothing
-	// else names it.
+	// Other flows still name the single account in its own labeled row because
+	// nothing else does.
 	const accountRoute =
 		kind === "transfer"
 			? ""
@@ -704,25 +703,6 @@ export function TransactionDetail({
 				? "The schedule could not be removed."
 				: "The transaction could not be removed.",
 		);
-	// Direct release of the saved occurrence claim. The row itself stays;
-	// only the link to the schedule occurrence is removed.
-	const removeClaim = async () => {
-		if (removingClaim || readOnly || !savedTransaction.claimScheduleId) return;
-		setRemovingClaim(true);
-		setClaimRemoveError(null);
-		const ok = await performSave({
-			call: () => releaseOccurrence(savedTransaction.id),
-			refresh: refreshTransactions,
-			failureMessage: "The occurrence could not be removed.",
-		});
-		setRemovingClaim(false);
-		if (!ok) setClaimRemoveError("The occurrence could not be removed.");
-	};
-	const claimRemovable =
-		!readOnly &&
-		savedTransaction.kind === "transaction" &&
-		savedTransaction.claimScheduleId !== null &&
-		(!edit.readOnlyReason || canClaimOccurrence(savedTransaction));
 	// Ending a schedule records one real transaction and removes the
 	// schedule. The server copies the schedule's amount and accounts; only
 	// the day it actually happened is new input.
@@ -854,17 +834,6 @@ export function TransactionDetail({
 		scheduleSectionRef.current?.scrollIntoView({ block: "start" });
 		scheduleControlRef.current?.focus();
 	};
-	const editHeading = (
-		<span className="flex min-w-0 items-center gap-2">
-			<span className="min-w-0 flex-1 truncate">{savedTransaction.name}</span>
-			{savedTransaction.kind === "schedule" && (
-				<Badge variant="secondary">
-					<Repeat size={16} aria-hidden="true" />
-					Schedule
-				</Badge>
-			)}
-		</span>
-	);
 	type DetailMenuItem = {
 		id: string;
 		label: string;
@@ -922,9 +891,52 @@ export function TransactionDetail({
 			},
 		});
 	}
-	const saveError = [subscription.error, edit.error, claimRemoveError]
-		.filter(Boolean)
-		.join(" ");
+	const saveError = [subscription.error, edit.error].filter(Boolean).join(" ");
+	// The linked rule may be a fresh draft choice, stale, or read-only and
+	// absent from the live list. Resolve its display name once for the claim
+	// control's stale option, including a saved name from the caller.
+	const linkedScheduleId =
+		edit.draft.claimScheduleId || savedTransaction.claimScheduleId;
+	const linkedScheduleName = linkedScheduleId
+		? (allTransactions.find((item) => item.id === linkedScheduleId)?.name ??
+			claimScheduleName)
+		: null;
+	// Both dates are edited together in the existing modal. Each trigger is
+	// named by its own visible row label plus value, so equal dates still
+	// produce distinct accessible names.
+	const dateRow = (label: string, value: string, id: string, muted = false) => (
+		<div data-detail-row className={transactionDetailFieldStyles}>
+			<span id={`${id}-label`} className={transactionDetailLabelStyles}>
+				{label}
+			</span>
+			{canEdit ? (
+				<Button
+					type="button"
+					variant="outline"
+					id={id}
+					aria-labelledby={`${id}-label ${id}-value`}
+					className={`${transactionDetailControlStyles} w-full min-w-0 justify-start whitespace-normal font-normal text-left`}
+					onClick={() => setDatesOpen(true)}
+				>
+					<span id={`${id}-value`} className="min-w-0 flex-1 break-words">
+						{value}
+					</span>
+					<CalendarDays
+						size={16}
+						className="text-muted-foreground"
+						aria-hidden="true"
+					/>
+				</Button>
+			) : (
+				<span
+					id={`${id}-value`}
+					className={`${transactionDetailValueStyles}${muted ? " text-muted-foreground" : ""}`}
+				>
+					{value}
+				</span>
+			)}
+		</div>
+	);
 	return (
 		<Sheet
 			open
@@ -932,10 +944,32 @@ export function TransactionDetail({
 				if (!open && edit.requestClose()) onClose();
 			}}
 		>
-			<SheetContent side="right">
-				<SheetHeader>
-					<div className="flex min-w-0 items-start justify-between gap-2">
-						<SheetTitle className="min-w-0">{editHeading}</SheetTitle>
+			<SheetContent side="right" showCloseButton={false}>
+				<SheetHeader className="pr-4">
+					<SheetTitle className="sr-only">
+						{savedTransaction.kind === "schedule"
+							? "Schedule details"
+							: "Transaction details"}
+					</SheetTitle>
+					<div className="flex min-w-0 items-center justify-between gap-2">
+						<Input
+							id={`${edit.formId}-name`}
+							aria-label="Name"
+							name="name"
+							type="text"
+							inputMode="text"
+							enterKeyHint="done"
+							autoComplete="off"
+							required
+							maxLength={100}
+							value={edit.draft.name}
+							onChange={(event) =>
+								edit.updateDraft({ name: event.target.value }, "name")
+							}
+							readOnly={!canEdit || edit.saving}
+							form={edit.formId}
+							className="min-w-0 flex-1 text-lg font-semibold max-sm:min-h-11"
+						/>
 						<div className="flex flex-none items-center gap-1">
 							{menuItems.length > 0 && (
 								<DropdownMenu>
@@ -992,6 +1026,10 @@ export function TransactionDetail({
 									</DropdownMenuContent>
 								</DropdownMenu>
 							)}
+							<SheetClose render={<Button variant="ghost" size="icon" />}>
+								<X aria-hidden="true" />
+								<span className="sr-only">Close</span>
+							</SheetClose>
 						</div>
 					</div>
 					<SheetDescription className="sr-only">
@@ -1002,161 +1040,117 @@ export function TransactionDetail({
 				</SheetHeader>
 				<SheetBody>
 					<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
-						<div className="flex flex-col gap-3 pt-1 pb-2">
-							<Field>
-								<FieldLabel htmlFor={`${edit.formId}-name`}>
-									{savedTransaction.kind === "schedule"
-										? "Schedule name"
-										: "Transaction name"}
-								</FieldLabel>
-								<Input
-									id={`${edit.formId}-name`}
-									name="name"
-									required
-									maxLength={100}
-									value={edit.draft.name}
-									onChange={(event) =>
-										edit.updateDraft({ name: event.target.value }, "name")
-									}
-									readOnly={!canEdit}
-									form={edit.formId}
-								/>
-							</Field>
-							<div className="flex min-w-0 flex-col gap-2">
+						<div className={`${transactionDetailRowStackStyles} pt-1 pb-3`}>
+							<div className={transactionDetailRowStackStyles}>
 								{showAmount && (
-									<Field>
-										<FieldLabel htmlFor={`${edit.formId}-amount`}>
-											Amount (USD)
+									<Field
+										data-detail-row
+										orientation="horizontal"
+										className={transactionDetailFieldStyles}
+									>
+										<FieldLabel
+											htmlFor={`${edit.formId}-amount`}
+											className={transactionDetailLabelStyles}
+										>
+											Amount
 										</FieldLabel>
-										<InputGroup className="w-auto max-w-full">
-											<InputGroupAddon aria-hidden="true">
-												{transaction.amount === 0
-													? "$"
-													: `${transaction.direction === "in" ? "+" : "−"}$`}
-											</InputGroupAddon>
-											<InputGroupInput
-												id={`${edit.formId}-amount`}
-												name="amount"
-												type="number"
-												required
-												min="0.01"
-												max="10000000000"
-												step="0.01"
-												value={
-													savedTransaction.amountKnown
-														? edit.draft.amount
-														: String(transaction.amount)
-												}
-												onChange={(event) =>
-													edit.updateDraft(
-														{ amount: event.target.value },
-														"amount",
-													)
-												}
-												readOnly={
-													!canEdit || savedTransaction.amountKnown === false
-												}
-												className={
-													transaction.direction === "in"
-														? "text-success-text tabular-nums"
-														: "tabular-nums"
-												}
-											/>
-										</InputGroup>
+										<Input
+											id={`${edit.formId}-amount`}
+											name="amount"
+											type="number"
+											required
+											min="0.01"
+											max="10000000000"
+											step="0.01"
+											value={
+												savedTransaction.amountKnown
+													? edit.draft.amount
+													: String(transaction.amount)
+											}
+											onChange={(event) =>
+												edit.updateDraft(
+													{ amount: event.target.value },
+													"amount",
+												)
+											}
+											readOnly={
+												!canEdit || savedTransaction.amountKnown === false
+											}
+											className={`tabular-nums ${transactionDetailControlStyles}`}
+										/>
 									</Field>
 								)}
-								<div className="flex flex-wrap items-center gap-2">
-									{transaction.void ? (
-										<Badge variant="secondary">
-											Did not post
-											<span className="sr-only">
-												bank hold that did not post
-											</span>
-										</Badge>
-									) : transaction.pending ? (
-										<Badge variant="secondary">
-											<Clock3 size={10} aria-hidden="true" />
-											Pending
-										</Badge>
-									) : showPosted ? (
-										<Badge variant="secondary">
-											<Check size={10} aria-hidden="true" />
-											Posted
-										</Badge>
-									) : null}
-									{showExcluded && (
-										<Badge variant="secondary">Excluded from account</Badge>
-									)}
-									{showShortfall && (
-										<Badge variant="secondary">
-											<TriangleAlert size={10} aria-hidden="true" />
-											{shortfallLabel ?? "Shortfall"}
-										</Badge>
-									)}
-									{!savedTransaction.enabled &&
-										!transaction.pending &&
-										!transaction.void &&
-										!showExcluded && (
-											<Badge variant="secondary">Excluded</Badge>
-										)}
-									{savedTransaction.amountKnown === false && (
-										<Badge variant="secondary">Calculated</Badge>
+								<div className={transactionDetailRowStackStyles}>
+									{showExceptionalBadges && (
+										<div className="flex min-w-0 flex-wrap items-center gap-2">
+											{transaction.void ? (
+												<Badge variant="secondary">
+													Did not post
+													<span className="sr-only">
+														bank hold that did not post
+													</span>
+												</Badge>
+											) : transaction.pending ? (
+												<Badge variant="secondary">
+													<Clock3 size={10} aria-hidden="true" />
+													Pending
+												</Badge>
+											) : null}
+											{showExcluded && (
+												<Badge variant="secondary">Excluded from account</Badge>
+											)}
+											{showShortfall && (
+												<Badge variant="secondary">
+													<TriangleAlert size={10} aria-hidden="true" />
+													{shortfallLabel ?? "Shortfall"}
+												</Badge>
+											)}
+											{!savedTransaction.enabled &&
+												!transaction.pending &&
+												!transaction.void &&
+												!showExcluded && (
+													<Badge variant="secondary">Excluded</Badge>
+												)}
+											{savedTransaction.amountKnown === false && (
+												<Badge variant="secondary">Calculated</Badge>
+											)}
+										</div>
 									)}
 									{accountRoute && (
-										<>
-											{hasStatusPill && (
-												<span
-													className="text-muted-foreground"
-													aria-hidden="true"
-												>
-													·
-												</span>
-											)}
+										<div
+											data-detail-row
+											className={transactionDetailFieldStyles}
+										>
+											<span className={transactionDetailLabelStyles}>
+												Account
+											</span>
 											<span
 												title={accountRoute}
-												className="block max-w-[32ch] truncate text-xs text-muted-foreground"
+												className={transactionDetailValueStyles}
 											>
 												{accountRoute}
 											</span>
-										</>
+										</div>
 									)}
 								</div>
 							</div>
-							{(once || transaction.pending || postedDiffers) && (
-								<div className="flex min-w-0 flex-col items-start gap-2">
-									{once && (
-										<div className="inline-flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-											<span>Occurred</span>
-											{canEdit ? (
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													id={`${edit.formId}-date`}
-													onClick={() => setDatesOpen(true)}
-												>
-													<CalendarDays size={14} aria-hidden="true" />
-													{dateLabel(edit.draft.startDate, true)}
-												</Button>
-											) : (
-												<span className="text-sm font-medium text-foreground">
-													{dateLabel(edit.draft.startDate, true)}
-												</span>
-											)}
-										</div>
-									)}
-									{(transaction.pending || postedDiffers) && (
-										<div className="inline-flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-											<span>Posted</span>
-											{transaction.pending ? (
-												<span>Not yet posted</span>
-											) : (
-												<span className="text-sm font-medium text-foreground">
-													{dateLabel(edit.draft.postedDate, true)}
-												</span>
-											)}
-										</div>
-									)}
+							{(once || transaction.pending || hasPostedDate) && (
+								<div className={transactionDetailRowStackStyles}>
+									{once &&
+										dateRow(
+											"Occurred",
+											dateLabel(edit.draft.startDate, true),
+											`${edit.formId}-date`,
+										)}
+									{(transaction.pending || hasPostedDate) &&
+										dateRow(
+											"Posted",
+											hasPostedDate
+												? dateLabel(edit.draft.postedDate, true)
+												: "Not yet posted",
+											`${edit.formId}-posted`,
+											!hasPostedDate,
+										)}
 								</div>
 							)}
 						</div>
@@ -1166,43 +1160,46 @@ export function TransactionDetail({
 									<CardTitle>Transfer details</CardTitle>
 								</CardHeader>
 								<CardContent className="flex flex-col gap-3">
-									<Field>
-										<FieldLabel htmlFor={`${edit.formId}-from`}>
+									<Field
+										data-detail-row
+										orientation="horizontal"
+										className={transactionDetailFieldStyles}
+									>
+										<FieldLabel
+											htmlFor={`${edit.formId}-from`}
+											className={transactionDetailLabelStyles}
+										>
 											From account
 										</FieldLabel>
-										<div className="flex items-center gap-3">
-											{fromAccount ? (
-												<AccountIcon account={fromAccount} />
-											) : (
-												<AccountIconFallback />
-											)}
-											<Select
-												value={edit.draft.fromId}
-												disabled={!canEdit}
-												onValueChange={(value) => {
-													if (value !== null)
-														edit.updateDraft({ fromId: value }, "from");
-												}}
+										<Select
+											value={edit.draft.fromId}
+											disabled={!canEdit}
+											onValueChange={(value) => {
+												if (value !== null)
+													edit.updateDraft({ fromId: value }, "from");
+											}}
+										>
+											<SelectTrigger
+												id={`${edit.formId}-from`}
+												aria-label="From"
+												className={`${transactionDetailControlStyles} w-full min-w-0`}
 											>
-												<SelectTrigger
-													id={`${edit.formId}-from`}
-													aria-label="From"
-													className="min-w-0 flex-1"
-												>
-													<SelectValue placeholder="External income">
-														{(value: string | null) => fromAccountLabel(value)}
-													</SelectValue>
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="">External income</SelectItem>
-													{fromAccountOptions(fullAccounts).map((account) => (
-														<SelectItem key={account.id} value={account.id}>
+												<SelectValue placeholder="External income">
+													{(value: string | null) => fromAccountLabel(value)}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="">External income</SelectItem>
+												{fromAccountOptions(fullAccounts).map((account) => (
+													<SelectItem key={account.id} value={account.id}>
+														<AccountIcon account={account} size="sm" />
+														<span className="min-w-0 flex-1">
 															{account.name}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</div>
+														</span>
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
 									</Field>
 									<div
 										className="flex items-center gap-3 text-muted-foreground"
@@ -1210,43 +1207,46 @@ export function TransactionDetail({
 									>
 										<ArrowDown size={16} />
 									</div>
-									<Field>
-										<FieldLabel htmlFor={`${edit.formId}-to`}>
+									<Field
+										data-detail-row
+										orientation="horizontal"
+										className={transactionDetailFieldStyles}
+									>
+										<FieldLabel
+											htmlFor={`${edit.formId}-to`}
+											className={transactionDetailLabelStyles}
+										>
 											To account
 										</FieldLabel>
-										<div className="flex items-center gap-3">
-											{toAccount ? (
-												<AccountIcon account={toAccount} />
-											) : (
-												<AccountIconFallback />
-											)}
-											<Select
-												value={edit.draft.toId}
-												disabled={!canEdit}
-												onValueChange={(value) => {
-													if (value !== null)
-														edit.updateDraft({ toId: value }, "to");
-												}}
+										<Select
+											value={edit.draft.toId}
+											disabled={!canEdit}
+											onValueChange={(value) => {
+												if (value !== null)
+													edit.updateDraft({ toId: value }, "to");
+											}}
+										>
+											<SelectTrigger
+												id={`${edit.formId}-to`}
+												aria-label="To"
+												className={`${transactionDetailControlStyles} w-full min-w-0`}
 											>
-												<SelectTrigger
-													id={`${edit.formId}-to`}
-													aria-label="To"
-													className="min-w-0 flex-1"
-												>
-													<SelectValue placeholder="External spending">
-														{(value: string | null) => toAccountLabel(value)}
-													</SelectValue>
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="">External spending</SelectItem>
-													{visibleAccounts(fullAccounts).map((account) => (
-														<SelectItem key={account.id} value={account.id}>
+												<SelectValue placeholder="External spending">
+													{(value: string | null) => toAccountLabel(value)}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="">External spending</SelectItem>
+												{visibleAccounts(fullAccounts).map((account) => (
+													<SelectItem key={account.id} value={account.id}>
+														<AccountIcon account={account} size="sm" />
+														<span className="min-w-0 flex-1">
 															{account.name}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</div>
+														</span>
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
 									</Field>
 								</CardContent>
 							</Card>
@@ -1266,32 +1266,22 @@ export function TransactionDetail({
 								onUndo={statementReview.undo}
 							/>
 						)}
-						<div
-							ref={scheduleSectionRef}
-							id={`${edit.formId}-schedule-section`}
-							className="scroll-mt-4"
-						>
-							<ScheduleCapsule
-								savedTransaction={savedTransaction}
-								draft={edit.draft}
-								updateDraft={edit.updateDraft}
-								claimScheduleName={
-									savedTransaction.claimScheduleId
-										? (allTransactions.find(
-												(item) => item.id === savedTransaction.claimScheduleId,
-											)?.name ?? claimScheduleName)
-										: null
-								}
-								occurrenceOptions={occurrenceOptions}
-								locked={!canEdit}
-								scheduleControlId={`${edit.formId}-schedule`}
-								controlRef={scheduleControlRef}
-								onRemoveOccurrence={
-									claimRemovable ? () => void removeClaim() : undefined
-								}
-								removingOccurrence={removingClaim}
-							/>
-						</div>
+						{savedTransaction.kind === "schedule" && (
+							<div
+								ref={scheduleSectionRef}
+								id={`${edit.formId}-schedule-section`}
+								className="scroll-mt-4"
+							>
+								<ScheduleCapsule
+									savedTransaction={savedTransaction}
+									draft={edit.draft}
+									updateDraft={edit.updateDraft}
+									locked={!canEdit}
+									scheduleControlId={`${edit.formId}-schedule`}
+									controlRef={scheduleControlRef}
+								/>
+							</div>
+						)}
 						<MoreOptions
 							savedTransaction={savedTransaction}
 							transactions={allTransactions}
@@ -1300,6 +1290,7 @@ export function TransactionDetail({
 							locked={!canEdit}
 							categoryReadOnly={Boolean(readOnly)}
 							occurrenceOptions={occurrenceOptions}
+							staleClaimName={linkedScheduleName}
 						/>
 						{savedTransaction.kind === "schedule" && (
 							<ScheduleHistory

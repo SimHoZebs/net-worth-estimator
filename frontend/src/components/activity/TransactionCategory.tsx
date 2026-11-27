@@ -34,6 +34,11 @@ import { performSave } from "../../state/workspaceWrites.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldLabel } from "@/components/ui/field.tsx";
 import {
+	transactionDetailControlStyles,
+	transactionDetailFieldStyles,
+	transactionDetailLabelStyles,
+} from "./activityStyles.ts";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -62,22 +67,21 @@ const categoryIcons: Record<TransactionCategoryKey, LucideIcon> = {
 
 /**
  * Category assignment is sidecar metadata, so it saves on its own instead of
- * riding the transaction form. It renders as one field row beside the other
- * transaction fields, with a picker that shows one icon per category. Pending
- * bank rows stay editable because the transaction ID survives settlement.
+ * riding the transaction form. It renders as one label/value row beside the
+ * other transaction metadata, with a picker that shows one icon per category.
+ * Pending bank rows stay editable because the transaction ID survives
+ * settlement.
  */
 export function TransactionCategory({
 	transactionId,
 	category,
 	source,
 	readOnly,
-	labelClassName,
 }: {
 	transactionId: string;
 	category: string | null | undefined;
 	source: string | null | undefined;
 	readOnly?: boolean;
-	labelClassName?: string;
 }) {
 	const [draft, setDraft] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
@@ -89,7 +93,6 @@ export function TransactionCategory({
 	const normalizedSource = transactionCategorySourceOf(currentSource);
 	const selected = draft ?? currentCategory ?? "";
 	const selectedLabel = transactionCategoryLabel(selected) ?? "Not categorized";
-	const SelectedIcon = categoryIcons[selected as TransactionCategoryKey] ?? Tag;
 	const sourceLabel = normalizedSource
 		? transactionCategorySourceLabel(normalizedSource)
 		: null;
@@ -113,75 +116,83 @@ export function TransactionCategory({
 	};
 
 	return (
-		<Field className={labelClassName}>
-			<FieldLabel id={labelId} htmlFor={triggerId}>
+		<Field
+			data-detail-row
+			orientation="horizontal"
+			className={transactionDetailFieldStyles}
+		>
+			<FieldLabel
+				id={labelId}
+				htmlFor={triggerId}
+				className={transactionDetailLabelStyles}
+			>
 				Category
 			</FieldLabel>
-			<Select
-				value={selected}
-				disabled={readOnly || saving}
-				onValueChange={(next) => {
-					setDraft(next);
-					void save(next);
-				}}
-			>
-				<SelectTrigger
-					id={triggerId}
-					aria-labelledby={[labelId, valueId, sourceLabel ? sourceId : ""]
-						.filter(Boolean)
-						.join(" ")}
-					aria-busy={saving}
-					className="w-full"
-				>
-					<SelectedIcon
-						size={16}
-						aria-hidden="true"
-						className="flex-none text-muted-foreground"
-					/>
-					<span id={valueId} className="min-w-0 flex-1 truncate">
-						<SelectValue>{selectedLabel}</SelectValue>
-					</span>
-					{sourceLabel && (
-						<span id={sourceId} className="sr-only">
-							{sourceLabel}
-						</span>
-					)}
-					{saving && (
-						<LoaderCircle
-							size={16}
-							aria-hidden="true"
-							className="flex-none animate-spin text-muted-foreground"
-						/>
-					)}
-				</SelectTrigger>
-				<SelectContent>
-					{transactionCategoryOptions.map((option) => {
-						const Icon =
-							categoryIcons[option.value as TransactionCategoryKey] ?? Tag;
-						return (
-							<SelectItem key={option.value} value={option.value}>
-								<Icon
-									size={16}
-									aria-hidden="true"
-									className="flex-none text-muted-foreground"
-								/>
-								<span className="min-w-0 flex-1 truncate">{option.label}</span>
-							</SelectItem>
-						);
-					})}
-				</SelectContent>
-			</Select>
-			{canReset && (
-				<Button
-					type="button"
-					variant="link"
-					size="sm"
+			<div className="flex min-w-0 flex-col items-start gap-2">
+				<Select
+					value={selected}
 					disabled={readOnly || saving}
-					onClick={() => void save(null)}
+					onValueChange={(next) => {
+						setDraft(next);
+						void save(next);
+					}}
 				>
-					Use automatic
-				</Button>
-			)}
+					<SelectTrigger
+						id={triggerId}
+						aria-labelledby={[labelId, valueId, sourceLabel ? sourceId : ""]
+							.filter(Boolean)
+							.join(" ")}
+						aria-busy={saving}
+						className={`${transactionDetailControlStyles} w-full min-w-0`}
+					>
+						<span id={valueId} className="min-w-0 flex-1">
+							<SelectValue>{selectedLabel}</SelectValue>
+						</span>
+						{sourceLabel && (
+							<span id={sourceId} className="sr-only">
+								{sourceLabel}
+							</span>
+						)}
+						{saving && (
+							<LoaderCircle
+								size={16}
+								aria-hidden="true"
+								className="flex-none animate-spin text-muted-foreground"
+							/>
+						)}
+					</SelectTrigger>
+					<SelectContent>
+						{transactionCategoryOptions.map((option) => {
+							const Icon =
+								categoryIcons[option.value as TransactionCategoryKey] ?? Tag;
+							return (
+								<SelectItem key={option.value} value={option.value}>
+									<Icon
+										size={16}
+										aria-hidden="true"
+										className="flex-none text-muted-foreground"
+									/>
+									<span className="min-w-0 flex-1 truncate">
+										{option.label}
+									</span>
+								</SelectItem>
+							);
+						})}
+					</SelectContent>
+				</Select>
+				{canReset && (
+					<Button
+						type="button"
+						variant="link"
+						size="sm"
+						disabled={readOnly || saving}
+						onClick={() => void save(null)}
+						className="shrink-0"
+					>
+						Use automatic
+					</Button>
+				)}
+			</div>
 		</Field>
 	);
 }
