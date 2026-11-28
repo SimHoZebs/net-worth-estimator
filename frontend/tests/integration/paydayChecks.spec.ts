@@ -1,6 +1,12 @@
 import { expect, request, test, type Page } from "./base.ts";
 import { FIXTURE_API } from "./fixture.ts";
 
+// Summary refetches can outlive the final assertion. Drain their route
+// handlers before Playwright disposes the page's API request context.
+test.afterEach(async ({ page }) => {
+	await page.unrouteAll({ behavior: "wait" });
+});
+
 const headline = {
 	cycleReset: "2026-11-20",
 	cycleStart: "2026-10-20",
