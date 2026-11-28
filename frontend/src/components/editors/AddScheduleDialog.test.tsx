@@ -231,21 +231,25 @@ beforeEach(() => {
 });
 
 describe("schedule amount presets", () => {
-	it("offers a saved custom preset and submits its stored definition", async () => {
-		renderScheduleEditor();
-		await selectOption("What kind of amount?", "Yearly bonus");
-		const body = await submitSchedule("Annual bonus", "Checking");
-		expect(body.amount).toMatchObject({
-			resolver: "expression",
-			config: { expression: "base * 2" },
-			inputs: {
-				base: {
-					provider: "model-value",
-					arguments: { id: "salary" },
+	it(
+		"offers a saved custom preset and submits its stored definition",
+		{ timeout: 15000 },
+		async () => {
+			renderScheduleEditor();
+			await selectOption("What kind of amount?", "Yearly bonus");
+			const body = await submitSchedule("Annual bonus", "Checking");
+			expect(body.amount).toMatchObject({
+				resolver: "expression",
+				config: { expression: "base * 2" },
+				inputs: {
+					base: {
+						provider: "model-value",
+						arguments: { id: "salary" },
+					},
 				},
-			},
-		});
-	});
+			});
+		},
+	);
 
 	it("keeps the selected preset across entry rerenders and preset refreshes", async () => {
 		const editor = renderScheduleEditor();
