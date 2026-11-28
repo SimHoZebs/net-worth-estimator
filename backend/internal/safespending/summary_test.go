@@ -31,7 +31,7 @@ func buildEvidence(m *types.FinancialModel, c *types.SafeSpendingSettings, start
 		m = &types.FinancialModel{}
 	}
 	st := cashEvidence(m, c, cut)
-	total := buildObligations(st.s, m, c, st.selected, st.ctx, cut, start, end, nil)
+	total := buildObligations(st.s, m, c, st.selected, st.ctx, st.claims, start, end, nil)
 	st.gateStatus()
 	out := testEvidence{SafeSpendingSummary: *st.s, Start: start, End: end, OutstandingBillsTotal: total}
 	if total != nil && st.s.CheckingAvailable != nil {

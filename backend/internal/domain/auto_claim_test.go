@@ -15,6 +15,35 @@ func autoClaimTestAmount(value string) types.TransactionAmountResolution {
 	}
 }
 
+func TestAutoClaimLiteralCentsUsesNumericAmountParser(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		raw      string
+		resolver string
+		inputs   map[string]types.AmountInputBinding
+		want     int64
+		ok       bool
+	}{
+		{name: "padded decimal", raw: " 001.2300 ", resolver: "expression", want: 123, ok: true},
+		{name: "exponent", raw: "1e3", resolver: "expression", want: 100000, ok: true},
+		{name: "leading dot", raw: "+.5", resolver: "expression", want: 50, ok: true},
+		{name: "zero", raw: "0", resolver: "expression"},
+		{name: "negative", raw: "-1", resolver: "expression"},
+		{name: "nonfinite", raw: "NaN", resolver: "expression"},
+		{name: "calculated", raw: "1 + 2", resolver: "expression"},
+		{name: "wrong resolver", raw: "1", resolver: "literal"},
+		{name: "bound inputs", raw: "1", resolver: "expression", inputs: map[string]types.AmountInputBinding{"rate": {Source: "literal", Value: 1.0}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			amount := types.TransactionAmountResolution{Resolver: tc.resolver, Config: map[string]any{"expression": tc.raw}, Inputs: tc.inputs}
+			got, ok := autoClaimLiteralCents(amount)
+			if ok != tc.ok || (ok && got != tc.want) {
+				t.Fatalf("cents = (%d, %v), want (%d, %v)", got, ok, tc.want, tc.ok)
+			}
+		})
+	}
+}
+
 func autoClaimTestTransaction(id, name string, day string, amount string, source *string) types.Transaction {
 	stamp := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC).Unix()
 	if day != "" {

@@ -2,24 +2,15 @@ package analysis
 
 import (
 	"context"
-	"math"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 const TransferVersion = "transfer-v2"
-
-// transferMatchWindowDays bounds how far apart opposite legs may post.
-//
-// Decided product rule (see VIS-03): both sides of a transfer between owned
-// accounts are logged as one movement, but the two records do not arrive in
-// sync, so legs can be days apart. Change this constant only with a new
-// product decision.
-const transferMatchWindowDays = 7
 
 // transferStrongThreshold is the minimum edge score for a greedily matched
 // pair to count as a clear winner. A unique close pair (time 7 + order 1 +
@@ -34,15 +25,7 @@ func (Transfer) Version() string { return TransferVersion }
 
 type transferLeg struct {
 	transaction types.AnalysisTransaction
-	cents       int64
-	day         int64
-}
-
-func transferStamp(facts types.TransactionFacts) int64 {
-	if facts.OccurredAt > 0 {
-		return facts.OccurredAt
-	}
-	return facts.PostedTime
+	key         domain.TransferLegFacts
 }
 
 // transferEdge is one scored outflow-to-inflow candidate pair. Scores are
@@ -146,12 +129,12 @@ func transferShareToken(a, b string) bool {
 // same-provider legs score slightly stronger, and refund/reversal markers
 // apply a heavy penalty so tainted pairs lose to clean ones.
 func transferScore(outflow, inflow transferLeg, frequency int, outflowText, inflowText string) int {
-	gap := outflow.day - inflow.day
+	gap := outflow.key.Day - inflow.key.Day
 	if gap < 0 {
 		gap = -gap
 	}
-	score := int(transferMatchWindowDays - gap)
-	if outflow.day <= inflow.day {
+	score := int(domain.TransferMatchWindowDays - gap)
+	if outflow.key.Day <= inflow.key.Day {
 		score++
 	}
 	switch frequency {
@@ -204,41 +187,28 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 		if transaction.Pending || transaction.Void || transaction.Facts.Currency != "USD" {
 			continue
 		}
-		amount, err := strconv.ParseFloat(transaction.Facts.Amount, 64)
-		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || math.Abs(amount) > 1e10 || amount == 0 {
+		key, ok := domain.TransferLegKey(transaction.Facts)
+		if !ok {
 			continue
 		}
-		stamp := transferStamp(transaction.Facts)
-		if stamp <= 0 {
-			continue
-		}
-		leg := transferLeg{transaction: transaction, cents: int64(math.Round(math.Abs(amount) * 100)), day: stamp / 86400}
-		if leg.cents == 0 {
-			continue
-		}
-		if amount < 0 {
+		key.AccountID = transaction.AccountID
+		key.Settled = true
+		leg := transferLeg{transaction: transaction, key: key}
+		if key.Outflow {
 			outflows = append(outflows, leg)
 		} else {
 			inflows = append(inflows, leg)
 		}
 	}
 	matches := func(outflow, inflow transferLeg) bool {
-		if outflow.transaction.AccountID == inflow.transaction.AccountID {
-			return false
-		} // Legs on one account are corrections or refunds, not transfers.
-		if outflow.cents != inflow.cents {
-			return false
-		} // Decided product rule: exact to the cent. Near-matches from fees
-		// or currency conversion stay unmatched by decision, not omission.
-		gap := outflow.day - inflow.day
-		return gap >= -transferMatchWindowDays && gap <= transferMatchWindowDays
+		return domain.TransferLegsMatch(outflow.key, inflow.key)
 	}
 	frequency := map[int64]int{}
 	for _, outflow := range outflows {
-		frequency[outflow.cents]++
+		frequency[outflow.key.Cents]++
 	}
 	for _, inflow := range inflows {
-		frequency[inflow.cents]++
+		frequency[inflow.key.Cents]++
 	}
 	outflowTexts := make([]string, len(outflows))
 	for o, outflow := range outflows {
@@ -263,7 +233,7 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 			if !matches(outflow, inflow) {
 				continue
 			}
-			score := transferScore(outflow, inflow, frequency[outflow.cents], outflowTexts[o], inflowTexts[i])
+			score := transferScore(outflow, inflow, frequency[outflow.key.Cents], outflowTexts[o], inflowTexts[i])
 			edgeScore[[2]int{o, i}] = score
 			edges = append(edges, transferEdge{outflow: o, inflow: i, score: score})
 			outflowCandidates[o] = append(outflowCandidates[o], i)

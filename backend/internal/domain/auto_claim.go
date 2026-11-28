@@ -2,7 +2,6 @@ package domain
 
 import (
 	"math"
-	"strconv"
 	"strings"
 	"time"
 
@@ -45,11 +44,11 @@ func autoClaimLiteralCents(amount types.TransactionAmountResolution) (int64, boo
 	if !ok {
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
+	parsed, err := ParseNumericAmount(raw)
+	if err != nil || parsed.Value <= 0 {
 		return 0, false
 	}
-	return int64(math.Round(value * 100)), true
+	return int64(math.Round(parsed.Value * 100)), true
 }
 
 func autoClaimNamesMatch(a, b string) bool {

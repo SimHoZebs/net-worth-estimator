@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -194,6 +195,83 @@ func TestIncrementalMatchesFullRecompute(t *testing.T) {
 				t.Fatalf("warm ready pass should judge nothing: calls=%d recomputed=%v", warmJudge.calls, warm.RecomputedStreamIDs)
 			}
 		})
+	}
+}
+
+func incrementalPrecedenceHistory(streams int) []types.AnalysisTransaction {
+	items := make([]types.AnalysisTransaction, 0, streams*3)
+	for stream := 0; stream < streams; stream++ {
+		merchant := fmt.Sprintf("PAYER%03d", stream)
+		for index, month := range []time.Month{time.January, time.February, time.March} {
+			items = append(items, incomeTx(
+				fmt.Sprintf("p%03d-%d", stream, index), merchant, "100.00", incomeDay(2026, month, 5),
+			))
+		}
+	}
+	return items
+}
+
+func TestIncrementalJudgmentErrorPrecedenceWithCarriedFindings(t *testing.T) {
+	const streamCount = 102
+	items := incrementalPrecedenceHistory(streamCount)
+	seedJudge := &incrCountingJudge{decide: incrReadyDecision}
+	seed, err := analysis.AnalyzeIncrementalPayments(context.Background(), nil, seedJudge, nil,
+		types.AnalysisSnapshot{UserID: "u1", Revision: 1, Transactions: items}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seedJudge.requests != streamCount || len(seed.UpdatedStreams) != streamCount {
+		t.Fatalf("seed requests=%d streams=%d, want %d", seedJudge.requests, len(seed.UpdatedStreams), streamCount)
+	}
+
+	updated := cloneIncrHistory(items)
+	dirty := make([]store.AnalysisDirtyFact, 0, streamCount-1)
+	for stream := 0; stream < streamCount-1; stream++ {
+		index := stream * 3
+		updated[index].Facts.Amount = "99.00"
+		dirty = append(dirty, store.AnalysisDirtyFact{TransactionID: updated[index].TransactionID, Revision: 2, Kind: "updated"})
+	}
+	calls, requests := 0, 0
+	judge := incomeEvaluator(func(_ context.Context, batch []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+		status := "pending"
+		if calls == 1 {
+			status = "unavailable"
+		}
+		calls++
+		requests += len(batch)
+		decisions := make([]types.AnalysisJudgment, len(batch))
+		for i, request := range batch {
+			decisions[i] = types.AnalysisJudgment{RequestID: request.ID, Status: status}
+		}
+		return decisions, nil
+	})
+	outcome, err := analysis.AnalyzeIncrementalPayments(context.Background(), nil, judge, nil,
+		types.AnalysisSnapshot{UserID: "u1", Revision: 2, Transactions: updated}, dirty, seed.UpdatedStreams, seed.Findings)
+	if !errors.Is(err, judgment.ErrUnavailable) {
+		t.Fatalf("error = %v, want unavailable", err)
+	}
+	if calls != 2 || requests != streamCount-1 {
+		t.Fatalf("provider calls=%d requests=%d, want 2 and %d", calls, requests, streamCount-1)
+	}
+
+	carriedStream := ""
+	for _, finding := range seed.Findings {
+		if finding.TransactionID == "p101-0" {
+			carriedStream = finding.StreamID
+			break
+		}
+	}
+	if carriedStream == "" {
+		t.Fatal("carried stream missing from seed")
+	}
+	changed := changedIncrStreams(t, seed.Findings, outcome.Findings)
+	if len(changed) != streamCount-1 {
+		t.Fatalf("changed streams = %d, want %d", len(changed), streamCount-1)
+	}
+	for _, streamID := range changed {
+		if streamID == carriedStream {
+			t.Fatalf("carried stream %s changed", carriedStream)
+		}
 	}
 }
 

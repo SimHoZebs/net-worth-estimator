@@ -17,9 +17,7 @@ func judgePayments(ctx context.Context, evaluator judgment.Evaluator, patterns [
 	for start := 0; start < len(requests); start += 100 {
 		end := min(start+100, len(requests))
 		decisions, err := judgment.Assess(ctx, evaluator, requests[start:end])
-		if err != nil && (deferred == nil || err == judgment.ErrUnavailable) {
-			deferred = err
-		}
+		deferred = judgment.AggregateDeferredErrors(deferred, err)
 		for i := range decisions {
 			patterns[start+i].judgment = &decisions[i]
 		}

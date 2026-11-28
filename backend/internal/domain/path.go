@@ -177,26 +177,20 @@ func netLinkedAttempts(result *classifiedAttempts, attempts []*types.Transaction
 		if !ok {
 			continue
 		}
-		outID, inID := link.A, link.B
-		if IsExternalInflow(first) && IsExternalOutflow(second) {
-			outID, inID = link.B, link.A
-		} else if !IsExternalOutflow(first) || !IsExternalInflow(second) {
+		var firstSum, secondSum float64
+		for _, attempt := range byID[link.A] {
+			firstSum += attempt.RealizedAmount
+		}
+		for _, attempt := range byID[link.B] {
+			secondSum += attempt.RealizedAmount
+		}
+		_, _, amount, ok := NettableTransferLink(first, second, firstSum, secondSum)
+		if !ok {
 			continue
 		}
-		var outSum, inSum float64
-		for _, attempt := range byID[outID] {
-			outSum += attempt.RealizedAmount
-		}
-		for _, attempt := range byID[inID] {
-			inSum += attempt.RealizedAmount
-		}
-		outX, inX := roundCurrency(outSum), roundCurrency(inSum)
-		if outX <= 0 || outX != inX {
-			continue
-		}
-		result.externalOutflowAmount -= outX
-		result.externalInflowAmount -= inX
-		result.internalTransferAmount += outX
+		result.externalOutflowAmount -= amount
+		result.externalInflowAmount -= amount
+		result.internalTransferAmount += amount
 		netted[link.A], netted[link.B] = true, true
 	}
 }

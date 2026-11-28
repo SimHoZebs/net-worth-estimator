@@ -10,6 +10,7 @@ import (
 
 func TestNov20ActiveCycleKeepsNov30PaymentProgress(t *testing.T) {
 	model, settings := novemberForecastFixture()
+	model.Checkpoints = append(model.Checkpoints, types.Checkpoint{AccountID: "card-b", Balance: -2615.01, ObservedAt: domain.DayCloseUnix("2026-11-19")})
 	prior := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-17"))
 	active := BuildAtCut(model, settings, domain.DayCloseUnix("2026-11-20"))
 
@@ -129,6 +130,10 @@ func TestPendingChargesThatMissedCloseFundTheActiveCycle(t *testing.T) {
 	cut := domain.DayCloseUnix("2026-11-20")
 	build := func(withPending bool) types.SafeSpendingSummary {
 		model, settings := paydayFixture()
+		model.Checkpoints = append(model.Checkpoints,
+			types.Checkpoint{AccountID: "card-a", Balance: -500, ObservedAt: domain.DayCloseUnix("2026-11-19")},
+			types.Checkpoint{AccountID: "card-b", Balance: -150, ObservedAt: domain.DayCloseUnix("2026-11-19")},
+		)
 		model.Schedules[0].StartDate = "2026-12-02"
 		model.Schedules[0].Amount = fixed(10)
 		model.Schedules[0].EndDate = ptr("2026-12-02")

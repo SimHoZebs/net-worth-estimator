@@ -52,6 +52,7 @@ type cutState struct {
 	basis          map[string]types.DisplayBasis
 	transactions   []types.Transaction
 	ctx            *amounts
+	claims         claimStateResult
 	cut            int64
 	knownAvailable bool
 }
@@ -60,6 +61,7 @@ func cashEvidence(model *types.FinancialModel, settings *types.SafeSpendingSetti
 	day := domain.FormatIsoDate(time.Unix(cut, 0))
 	s := types.SafeSpendingSummary{CashAsOf: day, Status: "available", Reasons: []string{}, Baselines: []types.SafeSpendingBaseline{}, Bills: []types.SafeSpendingBill{}, Statements: []types.SafeSpendingStatement{}}
 	st := &cutState{s: &s, model: model, settings: settings, latest: pickCheckpoints(model, cut), selected: map[string]bool{}, balances: map[string]float64{}, basis: map[string]types.DisplayBasis{}, cut: cut}
+	st.claims = claimState(model, cut)
 	st.applyConfirmedFacts()
 	st.deriveBaselines()
 	st.ctx.basis = st.basis

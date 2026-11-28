@@ -205,6 +205,47 @@ func TestHundredsOfClassificationsUseBoundedSharedBatches(t *testing.T) {
 	}
 }
 
+func TestPaymentJudgmentErrorPrecedenceAcrossBatches(t *testing.T) {
+	definitions := make([]analysis.PaymentClassification, 201)
+	for i := range definitions {
+		definitions[i] = analysis.PaymentClassification{ID: fmt.Sprintf("type-%03d", i), Label: "payment", Direction: "outflow", SupportSignals: []string{"rent-descriptor"}}
+	}
+	for _, tc := range []struct {
+		name     string
+		statuses []string
+		want     error
+	}{
+		{name: "ready", statuses: []string{"ready", "ready", "ready"}},
+		{name: "pending", statuses: []string{"pending", "ready", "ready"}, want: judgment.ErrPending},
+		{name: "pending then unavailable", statuses: []string{"pending", "unavailable", "ready"}, want: judgment.ErrUnavailable},
+		{name: "unavailable then pending", statuses: []string{"unavailable", "pending", "ready"}, want: judgment.ErrUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			detector := analysis.PaymentPatterns{Classifications: definitions, Judge: incomeEvaluator(func(_ context.Context, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
+				status := tc.statuses[calls]
+				calls++
+				decisions := make([]types.AnalysisJudgment, len(requests))
+				for i, request := range requests {
+					decisions[i] = types.AnalysisJudgment{RequestID: request.ID, Status: status}
+					if status == "ready" {
+						decisions[i].Decision = "supported"
+						decisions[i].Strength = "strong"
+					}
+				}
+				return decisions, nil
+			})}
+			_, err := detector.Analyze(context.Background(), types.AnalysisSnapshot{UserID: "owner", Transactions: rentTransactions("RENT")})
+			if calls != 3 {
+				t.Fatalf("provider calls = %d, want 3", calls)
+			}
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("error = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestClassificationPolicyChangesInvalidateVersionNotStreamIdentity(t *testing.T) {
 	definitions := analysis.PaymentClassifications()
 	before := analysis.PaymentPatterns{Classifications: definitions}

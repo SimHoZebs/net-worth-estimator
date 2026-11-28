@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -52,8 +51,12 @@ func LoanRuleTerms(principalID string, charge, payment types.Schedule) (annualRa
 	if !ok || !loanPaymentLiteral.MatchString(strings.TrimSpace(literal)) {
 		return 0, 0, "", unsupported
 	}
-	paymentAmount, err = strconv.ParseFloat(strings.TrimSpace(literal), 64)
-	if err != nil || math.IsNaN(paymentAmount) || math.IsInf(paymentAmount, 0) || paymentAmount < 0 || paymentAmount > 1e10 || math.Round(paymentAmount*100)/100 != paymentAmount {
+	parsed, err := ParseNumericAmount(literal)
+	if err != nil {
+		return 0, 0, "", unsupported
+	}
+	paymentAmount = parsed.Value
+	if paymentAmount < 0 || paymentAmount > 1e10 || math.Round(paymentAmount*100)/100 != paymentAmount {
 		return 0, 0, "", unsupported
 	}
 	return annualRate, paymentAmount, rateInput, nil

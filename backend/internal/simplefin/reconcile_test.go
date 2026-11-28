@@ -69,6 +69,35 @@ func directivesByAction(directives []store.BankDirective) (upserts, converts int
 	return upserts, converts, voids
 }
 
+func TestTransactionAmountCentsUsesNumericAmountParser(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		raw      string
+		resolver string
+		inputs   map[string]types.AmountInputBinding
+		want     int64
+		ok       bool
+	}{
+		{name: "padded decimal", raw: " 42.10 ", resolver: "expression", want: 4210, ok: true},
+		{name: "exponent", raw: "1e3", resolver: "expression", want: 100000, ok: true},
+		{name: "leading dot", raw: "+.5", resolver: "expression", want: 50, ok: true},
+		{name: "zero remains numeric", raw: "0", resolver: "expression", want: 0, ok: true},
+		{name: "negative remains numeric", raw: "-1.5e3", resolver: "expression", want: -150000, ok: true},
+		{name: "nonfinite", raw: "Inf", resolver: "expression"},
+		{name: "calculated", raw: "1 + 2", resolver: "expression"},
+		{name: "wrong resolver", raw: "1", resolver: "literal"},
+		{name: "inputs remain caller-owned", raw: "1", resolver: "expression", inputs: map[string]types.AmountInputBinding{"rate": {Source: "literal", Value: 1.0}}, want: 100, ok: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			transaction := types.Transaction{Amount: types.TransactionAmountResolution{Resolver: tc.resolver, Config: map[string]any{"expression": tc.raw}, Inputs: tc.inputs}}
+			got, ok := transactionAmountCents(transaction)
+			if ok != tc.ok || (ok && got != tc.want) {
+				t.Fatalf("cents = (%d, %v), want (%d, %v)", got, ok, tc.want, tc.ok)
+			}
+		})
+	}
+}
+
 func TestReconcileUpsertsPendingByKey(t *testing.T) {
 	pending := []store.SyncTransaction{reconcileTransaction("Corner Store", "prime_card", "42.10", true, 1785628800)}
 	directives := Reconcile(pending, nil, nil, map[string]bool{"prime_card": true})

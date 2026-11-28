@@ -2,9 +2,8 @@ package simplefin
 
 import (
 	"math"
-	"strconv"
-	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -50,11 +49,11 @@ func transactionAmountCents(transaction types.Transaction) (int64, bool) {
 	if !ok {
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+	amount, err := domain.ParseNumericAmount(raw)
+	if err != nil {
 		return 0, false
 	}
-	return int64(math.Round(value * 100)), true
+	return int64(math.Round(amount.Value * 100)), true
 }
 
 // rowOutflow reports whether a bank transaction moves money out of its mirror

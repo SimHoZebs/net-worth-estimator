@@ -9,13 +9,11 @@ import (
 )
 
 // DeriveStatements reconstructs the full close history of every enabled credit
-// card from the card's closing-day cadence and recorded bank evidence. The
-// billed amount of a closed statement is the bank-observed balance at that
-// close, negated into debt; the open cycle is priced with the same history application
-// engine the forecast uses (cardStatementRows). A close with no observation in
-// its cycle stays unknown instead of being invented from a closing day or a
-// current balance. Payment terms supply due dates; a card without terms keeps
-// a null due date.
+// card from the card's closing-day cadence and recorded bank evidence. A closed
+// statement starts from the latest balance check inside its cycle and applies
+// posted activity after that check through the close. A close with no in-cycle
+// check stays unknown. The open cycle is priced with the forecast engine
+// (cardStatementRows); payment terms supply due dates.
 func DeriveStatements(model *types.FinancialModel, settings *types.SafeSpendingSettings, cut int64) []types.DerivedStatement {
 	if settings == nil {
 		settings = &types.SafeSpendingSettings{}
@@ -56,22 +54,11 @@ func DeriveStatements(model *types.FinancialModel, settings *types.SafeSpendingS
 		closes = append(closes, estimated)
 
 		amounts := map[string]*float64{}
-		obs := observations[card.ID]
 		for _, close := range closes {
-			previous := lastClosingBefore(day, close)
-			for i := len(obs) - 1; i >= 0; i-- {
-				cp := obs[i]
-				if cp.day > previous && cp.day <= close {
-					amount := -cp.balance // a negative bank balance is debt owed
-					if amount < 0 {
-						amount = 0
-					}
-					priced := domain.MoneyCents(amount)
-					value := domain.MoneyFromCents(priced)
-					amounts[close] = &value
-					break
-				}
+			if close == estimated {
+				continue
 			}
+			amounts[close] = closedStatementBalance(model, settings, card.ID, day, close, cut)
 		}
 
 		// The open cycle has no close observation yet. Price it with the
@@ -120,11 +107,13 @@ func DeriveStatements(model *types.FinancialModel, settings *types.SafeSpendingS
 }
 
 type checkpointObservation struct {
-	day     string
-	balance float64
+	day        string
+	observedAt int64
 }
 
-// checkpointObservations collects each card's bank observations in day order.
+// checkpointObservations collects each card's bank observations in exact-time
+// order. Calendar day is retained only for history bounds; selection never
+// discards the observation instant.
 func checkpointObservations(model *types.FinancialModel, cut int64, today string) map[string][]checkpointObservation {
 	byCard := map[string][]checkpointObservation{}
 	for _, cp := range model.Checkpoints {
@@ -135,12 +124,39 @@ func checkpointObservations(model *types.FinancialModel, cut int64, today string
 		if day > today {
 			day = today
 		}
-		byCard[cp.AccountID] = append(byCard[cp.AccountID], checkpointObservation{day: day, balance: cp.Balance})
+		byCard[cp.AccountID] = append(byCard[cp.AccountID], checkpointObservation{day: day, observedAt: cp.ObservedAt})
 	}
 	for _, rows := range byCard {
-		sort.Slice(rows, func(i, j int) bool { return rows[i].day < rows[j].day })
+		sort.Slice(rows, func(i, j int) bool { return rows[i].observedAt < rows[j].observedAt })
 	}
 	return byCard
+}
+
+// closedStatementBalance is the authoritative close price shared by the
+// Statements read and Safe Spending. The latest checkpoint at or before the
+// close must belong to this cycle. cashEvidence then reuses the canonical
+// exact-time replay to apply only posted facts after that observation through
+// the close; an unresolved post-check fact leaves the balance unknown.
+func closedStatementBalance(model *types.FinancialModel, settings *types.SafeSpendingSettings, cardID string, day int, close string, cut int64) *float64 {
+	closeCut := min(domain.DayCloseUnix(close), cut)
+	if closeCut < domain.DayCloseUnix(close) {
+		return nil
+	}
+	previous := lastClosingBefore(day, close)
+	cycleStart := domain.DayCloseUnix(previous)
+	if closeCut <= cycleStart {
+		return nil
+	}
+	evidence := cashEvidence(model, settings, closeCut)
+	checkpoint, observed := evidence.latest[cardID]
+	if !observed || checkpoint.ObservedAt <= cycleStart || checkpoint.ObservedAt > closeCut {
+		return nil
+	}
+	balance, known := evidence.balances[cardID]
+	if !known {
+		return nil
+	}
+	return money(max(0, -balance))
 }
 
 // firstHistoryClose bounds how far back unknown history is enumerated: the

@@ -2,9 +2,8 @@ package analysis
 
 import (
 	"context"
-	"math"
-	"strconv"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -16,19 +15,11 @@ func paymentLegKeyFacts(facts types.TransactionFacts) (cents, day int64, outflow
 	if facts.Currency != "USD" {
 		return 0, 0, false, false
 	}
-	amount, err := strconv.ParseFloat(facts.Amount, 64)
-	if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 || math.Abs(amount) > 1e10 {
+	key, ok := domain.TransferLegKey(facts)
+	if !ok {
 		return 0, 0, false, false
 	}
-	stamp := paymentStamp(facts)
-	if stamp <= 0 {
-		return 0, 0, false, false
-	}
-	cents = int64(math.Round(math.Abs(amount) * 100))
-	if cents == 0 {
-		return 0, 0, false, false
-	}
-	return cents, stamp / 86400, amount < 0, true
+	return key.Cents, key.Day, key.Outflow, true
 }
 
 // Match the Transfer detector's USD opposite-leg rule. Index by amount and
@@ -51,8 +42,8 @@ func paymentTransferIDs(ctx context.Context, transactions []types.AnalysisTransa
 // the other leg.
 func paymentTransferPairs(ctx context.Context, transactions []types.AnalysisTransaction) (map[string]map[string]bool, error) {
 	type leg struct {
-		id, account string
-		cents, day  int64
+		id  string
+		key domain.TransferLegFacts
 	}
 	type key struct{ cents, day int64 }
 	inflows := map[key][]leg{}
@@ -68,7 +59,8 @@ func paymentTransferPairs(ctx context.Context, transactions []types.AnalysisTran
 		if !ok {
 			continue
 		}
-		l := leg{tx.TransactionID, tx.AccountID, cents, day}
+		legKey := domain.TransferLegFacts{AccountID: tx.AccountID, Currency: tx.Facts.Currency, Cents: cents, Day: day, Outflow: outflow, Settled: true}
+		l := leg{id: tx.TransactionID, key: legKey}
 		if outflow {
 			outflows = append(outflows, l)
 		} else {
@@ -80,20 +72,21 @@ func paymentTransferPairs(ctx context.Context, transactions []types.AnalysisTran
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		for day := o.day - 7; day <= o.day+7; day++ {
-			for _, i := range inflows[key{o.cents, day}] {
+		for day := o.key.Day - domain.TransferMatchWindowDays; day <= o.key.Day+domain.TransferMatchWindowDays; day++ {
+			for _, i := range inflows[key{o.key.Cents, day}] {
 				if err := ctx.Err(); err != nil {
 					return nil, err
 				}
-				if o.account != i.account {
-					if partners[o.id] == nil {
-						partners[o.id] = map[string]bool{}
-					}
-					if partners[i.id] == nil {
-						partners[i.id] = map[string]bool{}
-					}
-					partners[o.id][i.id], partners[i.id][o.id] = true, true
+				if !domain.TransferLegsMatch(o.key, i.key) {
+					continue
 				}
+				if partners[o.id] == nil {
+					partners[o.id] = map[string]bool{}
+				}
+				if partners[i.id] == nil {
+					partners[i.id] = map[string]bool{}
+				}
+				partners[o.id][i.id], partners[i.id][o.id] = true, true
 			}
 		}
 	}

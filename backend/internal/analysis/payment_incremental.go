@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -208,15 +209,17 @@ func updatePaymentStreams(ctx context.Context, definitions []PaymentClassificati
 			}
 		}
 		if leg, ok := cachedLegs[fact.TransactionID]; ok {
+			cachedKey := domain.TransferLegFacts{AccountID: leg.Account, Currency: "USD", Cents: leg.Cents, Day: leg.Day, Outflow: leg.Outflow, Settled: true}
 			for _, tx := range input.Transactions {
-				if tx.Pending || tx.Void || tx.Facts.Currency != "USD" {
+				if tx.Pending || tx.Void {
 					continue
 				}
 				cents, day, outflow, ok := paymentLegKeyFacts(tx.Facts)
-				if !ok || cents != leg.Cents || outflow == leg.Outflow || tx.AccountID == leg.Account {
+				if !ok {
 					continue
 				}
-				if day < leg.Day-7 || day > leg.Day+7 {
+				currentKey := domain.TransferLegFacts{AccountID: tx.AccountID, Currency: tx.Facts.Currency, Cents: cents, Day: day, Outflow: outflow, Settled: true}
+				if !domain.TransferLegsMatch(cachedKey, currentKey) {
 					continue
 				}
 				if streamID := newAssign[tx.TransactionID]; streamID != "" {
@@ -339,9 +342,7 @@ func judgeSelectedPayments(ctx context.Context, evaluator judgment.Evaluator, pr
 	for start := 0; start < len(ordered); start += 100 {
 		end := min(start+100, len(ordered))
 		decisions, err := judgment.Assess(ctx, evaluator, ordered[start:end])
-		if err != nil && (deferred == nil || err == judgment.ErrUnavailable) {
-			deferred = err
-		}
+		deferred = judgment.AggregateDeferredErrors(deferred, err)
 		for i := range decisions {
 			for _, pi := range indexes[ordered[start+i].ID] {
 				dupe := decisions[i]
@@ -522,24 +523,16 @@ func sortPaymentFindings(findings []types.AnalysisDetection) {
 }
 
 // scanPaymentJudgments reports the dominant judgment status across final
-// findings, with unavailable winning over pending like judgment.Assess.
+// findings through the shared judgment precedence rule.
 func scanPaymentJudgments(findings []types.AnalysisDetection) error {
-	pending := false
+	statuses := make([]string, 0, len(findings))
 	for _, finding := range findings {
 		if finding.Judgment == nil {
 			continue
 		}
-		switch finding.Judgment.Status {
-		case "unavailable":
-			return judgment.ErrUnavailable
-		case "pending":
-			pending = true
-		}
+		statuses = append(statuses, finding.Judgment.Status)
 	}
-	if pending {
-		return judgment.ErrPending
-	}
-	return nil
+	return judgment.DeferredError(statuses)
 }
 
 // incrementalJudgmentError mirrors full-recompute judgment problems without

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/judgment"
@@ -120,6 +121,21 @@ func TestMLClassifierDefersMalformedBatches(t *testing.T) {
 		{name: "duplicate IDs", judgments: func() []types.AnalysisJudgment {
 			judgments := supportedJudgments(requests, "supported", "strong")
 			judgments[1].RequestID = judgments[0].RequestID
+			return judgments
+		}()},
+		{name: "overlong reason", judgments: func() []types.AnalysisJudgment {
+			judgments := supportedJudgments(requests, "supported", "strong")
+			judgments[0].Reason = strings.Repeat("x", 2001)
+			return judgments
+		}()},
+		{name: "empty strength", judgments: func() []types.AnalysisJudgment {
+			judgments := supportedJudgments(requests, "supported", "strong")
+			judgments[0].Strength = ""
+			return judgments
+		}()},
+		{name: "unmatched ID", judgments: func() []types.AnalysisJudgment {
+			judgments := supportedJudgments(requests, "supported", "strong")
+			judgments[0].RequestID = "not-requested"
 			return judgments
 		}()},
 	} {

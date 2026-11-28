@@ -54,6 +54,7 @@ func buildBeyondHorizon(t *testing.T, hold *types.Transaction) types.SafeSpendin
 	t.Helper()
 	model, settings := paydayFixture()
 	model.Accounts[1].StatementClosingDay = 30
+	model.Checkpoints = append(model.Checkpoints, types.Checkpoint{AccountID: "card-b", Balance: -150, ObservedAt: domain.DayCloseUnix("2026-11-19")})
 	if hold != nil {
 		model.Transactions = append(model.Transactions, *hold)
 	}
@@ -168,7 +169,8 @@ func TestPendingCardRepaymentIsNotConfirmedCash(t *testing.T) {
 	model.Transactions = append(model.Transactions, repayment)
 
 	s := BuildAtCut(model, settings, stamp(paydayCut))
-	if statementAmount(t, s, "card-a", "closed", "2026-10-19") != nil ||
+	assertMoney(t, statementAmount(t, s, "card-a", "closed", "2026-10-19"), 500)
+	if statementAmount(t, s, "card-a", "estimated", "2026-11-19") != nil ||
 		s.StatementReserve != nil || s.SafeToSpend != nil {
 		t.Fatalf("unconfirmed repayment reduced the payoff or invented cash: %+v", s)
 	}

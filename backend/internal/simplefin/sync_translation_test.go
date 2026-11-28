@@ -3,12 +3,16 @@ package simplefin
 import (
 	"context"
 	"encoding/json"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
+	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Redacted bridge-shaped fixture: balances, one pending charge, one posted
@@ -136,6 +140,121 @@ func TestTranslateProducesCheckpointsAndPendingOnly(t *testing.T) {
 	}
 	if translation.Skipped[SkipUnmappedAccount] != 2 {
 		t.Fatalf("unmapped skipped = %+v", translation.Skipped)
+	}
+}
+
+func TestTranslateNormalizesAmountExpressions(t *testing.T) {
+	for _, tc := range []struct {
+		raw        string
+		expression string
+		value      float64
+		outflow    bool
+	}{
+		{raw: "-42.10", expression: "42.10", value: 42.1, outflow: true},
+		{raw: " +001.2300 ", expression: "001.2300", value: 1.23},
+		{raw: "-.5", expression: "0.5", value: 0.5, outflow: true},
+		{raw: "1e3", expression: "1000", value: 1000},
+		{raw: "-1E+3", expression: "1000", value: 1000, outflow: true},
+		{raw: " 0.00 ", expression: "0", value: 0},
+	} {
+		t.Run(tc.raw, func(t *testing.T) {
+			set := &AccountSet{Accounts: []Account{{
+				ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
+				Balance: "0.00", BalanceDate: 1773133200,
+				Transactions: []Transaction{{ID: "amount", Posted: 1773140400, Amount: tc.raw, Description: "Merchant"}},
+			}}}
+			translation, err := Translate(set, map[string]string{testAccountKey("bridge-prime"): "prime_card"}, time.Unix(1773140400, 0).UTC())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(translation.Settled) != 1 || len(translation.Pending) != 0 {
+				t.Fatalf("translation = %+v, want one settled row", translation)
+			}
+			row := translation.Settled[0]
+			expression, _ := row.Amount.Config["expression"].(string)
+			if expression != tc.expression {
+				t.Fatalf("expression = %q, want %q", expression, tc.expression)
+			}
+			value, err := domain.EvaluateArithmetic(expression, nil)
+			if err != nil || math.Abs(value-tc.value) > 1e-12 {
+				t.Fatalf("evaluated = %v, err %v, want %v", value, err, tc.value)
+			}
+			if tc.outflow != (row.SourceAccountID != nil) {
+				t.Fatalf("direction = %+v, want outflow %v", row.Transaction, tc.outflow)
+			}
+		})
+	}
+}
+
+func TestSyncStoresEvaluableNormalizedAmounts(t *testing.T) {
+	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
+	amounts := map[string]struct {
+		raw        string
+		expression string
+		value      float64
+	}{
+		"decimal":     {raw: " -001.2300 ", expression: "001.2300", value: 1.23},
+		"exponent":    {raw: "1e3", expression: "1000", value: 1000},
+		"leading-dot": {raw: "+.5", expression: "0.5", value: 0.5},
+	}
+	transactions := make([]Transaction, 0, len(amounts))
+	for id, amount := range amounts {
+		transactions = append(transactions, Transaction{ID: id, Posted: 1773140400, Amount: amount.raw, Description: id})
+	}
+	runner := NewRunner(database, Config{}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		return &AccountSet{Accounts: []Account{{
+			ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
+			Balance: "0.00", BalanceDate: 1773133200, Transactions: transactions,
+		}}}, nil
+	}
+	if err := runner.Sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	bank, err := database.LoadBankTransactions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bank) != len(amounts) {
+		t.Fatalf("stored rows = %d, want %d", len(bank), len(amounts))
+	}
+	for _, row := range bank {
+		if len(row.Keys) == 0 {
+			t.Fatalf("stored row has no upstream key: %+v", row)
+		}
+		transactionID := row.Keys[0].TransactionID
+		want, ok := amounts[transactionID]
+		if !ok {
+			t.Fatalf("unexpected stored row %+v", row)
+		}
+		expression, _ := row.Transaction.Amount.Config["expression"].(string)
+		if expression != want.expression {
+			t.Fatalf("%s expression = %q, want %q", transactionID, expression, want.expression)
+		}
+		value, err := domain.EvaluateArithmetic(expression, nil)
+		if err != nil || math.Abs(value-want.value) > 1e-12 {
+			t.Fatalf("%s evaluated = %v, err %v, want %v", transactionID, value, err, want.value)
+		}
+	}
+}
+
+func TestTranslateSkipsInvalidAndNonFiniteAmounts(t *testing.T) {
+	invalid := []string{"n/a", "NaN", "+Inf", "-Inf", "1e999", "0x1p2", "1_000"}
+	transactions := make([]Transaction, 0, len(invalid))
+	for index, raw := range invalid {
+		transactions = append(transactions, Transaction{ID: fmt.Sprintf("bad-%d", index), Posted: 1773140400, Amount: raw, Description: "Broken"})
+	}
+	set := &AccountSet{Accounts: []Account{{
+		ID: "bridge-prime", ConnID: testConnID, Name: "Prime", Currency: "USD",
+		Balance: "0.00", BalanceDate: 1773133200, Transactions: transactions,
+	}}}
+	translation, err := Translate(set, map[string]string{testAccountKey("bridge-prime"): "prime_card"}, time.Unix(1773140400, 0).UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(translation.Settled) != 0 || len(translation.Pending) != 0 || translation.Skipped[SkipBadAmount] != len(invalid) {
+		t.Fatalf("translation = %+v, want every invalid amount skipped", translation)
 	}
 }
 

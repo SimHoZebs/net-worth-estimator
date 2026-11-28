@@ -369,13 +369,13 @@ func netConfirmedTransferPairs(transactionByID map[string]*types.Transaction, ed
 		if !ok {
 			continue
 		}
-		outLeg, inLeg := first, second
-		outID, inID := link.A, link.B
-		if IsExternalInflow(first) && IsExternalOutflow(second) {
-			outLeg, inLeg = second, first
-			outID, inID = link.B, link.A
-		} else if !IsExternalOutflow(first) || !IsExternalInflow(second) {
+		outLeg, inLeg, ok := ExternalTransferLinkDirections(first, second)
+		if !ok {
 			continue
+		}
+		outID, inID := link.A, link.B
+		if outLeg == second {
+			outID, inID = link.B, link.A
 		}
 		source, ok := TransactionSourceAccount(outLeg)
 		if !ok || len(inLeg.Destinations) == 0 {
@@ -396,7 +396,8 @@ func netConfirmedTransferPairs(transactionByID map[string]*types.Transaction, ed
 			if len(outRecords) == 0 || len(inRecords) == 0 {
 				continue
 			}
-			if outSum <= 0 || outSum != inSum {
+			_, _, amount, ok := NettableTransferLink(first, second, outSum, inSum)
+			if !ok {
 				continue
 			}
 			// The legs must live only on their expected edges: a legsplit
@@ -414,7 +415,6 @@ func netConfirmedTransferPairs(transactionByID map[string]*types.Transaction, ed
 			if !contained {
 				continue
 			}
-			amount := outSum
 			removeLegRecords(outEdge, outID, nodes)
 			removeLegRecords(inEdge, inID, nodes)
 			if len(outEdge.Sources) == 0 {

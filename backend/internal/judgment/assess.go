@@ -2,6 +2,7 @@ package judgment
 
 import (
 	"context"
+	"errors"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -10,12 +11,20 @@ import (
 // Unavailable responses preserve deterministic feature behavior; pending is a
 // first-class, retryable result, not a blocked worker or a fabricated answer.
 func Assess(ctx context.Context, evaluator Evaluator, requests []types.AnalysisJudgmentInput) ([]types.AnalysisJudgment, error) {
-	fallback := make([]types.AnalysisJudgment, 0, len(requests))
-	for _, request := range requests {
-		fallback = append(fallback, types.AnalysisJudgment{RequestID: request.ID, Status: "unavailable"})
-	}
 	decisions, err := evaluator.Evaluate(ctx, requests)
-	if err != nil || len(decisions) != len(requests) {
+	if err != nil {
+		return unavailableFallback(requests), ErrUnavailable
+	}
+	return ValidateResponse(requests, decisions)
+}
+
+// ValidateResponse validates provider decisions against the exact request batch
+// and returns them in request order. Invalid responses fall back to unavailable
+// decisions for every request. Valid pending and unavailable decisions remain
+// intact and contribute the batch's deferred error.
+func ValidateResponse(requests []types.AnalysisJudgmentInput, decisions []types.AnalysisJudgment) ([]types.AnalysisJudgment, error) {
+	fallback := unavailableFallback(requests)
+	if len(decisions) != len(requests) {
 		return fallback, ErrUnavailable
 	}
 	byID := map[string]types.AnalysisJudgment{}
@@ -48,16 +57,57 @@ func Assess(ctx context.Context, evaluator Evaluator, requests []types.AnalysisJ
 			return fallback, ErrUnavailable
 		}
 	}
-	var deferred error
 	result := make([]types.AnalysisJudgment, 0, len(requests))
+	statuses := make([]string, 0, len(requests))
 	for _, request := range requests {
 		decision := byID[request.ID]
 		result = append(result, decision)
-		if decision.Status == "unavailable" {
-			deferred = ErrUnavailable
-		} else if decision.Status == "pending" && deferred == nil {
-			deferred = ErrPending
+		statuses = append(statuses, decision.Status)
+	}
+	return result, DeferredError(statuses)
+}
+
+func unavailableFallback(requests []types.AnalysisJudgmentInput) []types.AnalysisJudgment {
+	fallback := make([]types.AnalysisJudgment, 0, len(requests))
+	for _, request := range requests {
+		fallback = append(fallback, types.AnalysisJudgment{RequestID: request.ID, Status: "unavailable"})
+	}
+	return fallback
+}
+
+// DeferredError maps judgment statuses to one run-level error. Unavailable
+// outranks pending; ready and unknown statuses do not contribute an error.
+func DeferredError(statuses []string) error {
+	pending := false
+	for _, status := range statuses {
+		switch status {
+		case "unavailable":
+			return ErrUnavailable
+		case "pending":
+			pending = true
 		}
 	}
-	return result, deferred
+	if pending {
+		return ErrPending
+	}
+	return nil
+}
+
+// AggregateDeferredErrors combines per-batch errors with the same precedence as
+// DeferredError. The first non-nil error stands unless a later unavailable error
+// outranks it.
+func AggregateDeferredErrors(errs ...error) error {
+	var deferred error
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, ErrUnavailable) {
+			return ErrUnavailable
+		}
+		if deferred == nil {
+			deferred = err
+		}
+	}
+	return deferred
 }

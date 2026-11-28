@@ -3,9 +3,11 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -297,6 +299,37 @@ func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
 		after.Transactions[0].Claim == nil ||
 		after.Transactions[0].Claim.ScheduleID != schedule.Result.ID {
 		t.Fatalf("second start changed the model: schedules=%+v claim=%+v", after.Schedules, after.Transactions[0].Claim)
+	}
+}
+
+func TestStartScheduleFromTransactionAcceptsPaddedLiteralWithAnnualIncrease(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	checking := "checking"
+	if _, err := database.CreateAccount(types.Account{ID: checking, Name: "Checking", Kind: "cash"}); err != nil {
+		t.Fatal(err)
+	}
+	transactionID := "01900000-0000-7000-8000-000000000136"
+	recorded, err := database.CreateTransaction(types.Transaction{
+		ID: transactionID, Name: "Rent", SourceAccountID: &checking,
+		Amount: types.TransactionAmountResolution{
+			Resolver: "expression", Config: map[string]any{"expression": " 42.50 "}, Inputs: map[string]types.AmountInputBinding{},
+		},
+		TransactionTime: 1782864000, PostedTime: 1782864000, Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+recorded.ID+"/schedule",
+		`{"annualIncrease":5,"recurrence":{"unit":"month","interval":1,"monthlyMode":"byDate"},"startDate":"2026-07-02"}`)
+	schedule := decodeWriteResult[types.Schedule](t, started.Code, started.Body.Bytes())
+	if !schedule.Saved {
+		t.Fatalf("schedule issues = %+v", schedule.Issues)
+	}
+	expression, _ := schedule.Result.Amount.Config["expression"].(string)
+	value, err := domain.EvaluateArithmetic(expression, map[string]float64{"growth": 1.05})
+	if err != nil || math.Abs(value-44.625) > 1e-12 {
+		t.Fatalf("schedule amount = %v, err %v, expression %q", value, err, expression)
 	}
 }
 

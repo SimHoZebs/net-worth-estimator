@@ -57,6 +57,20 @@ func TestLoanRejectsRulesTheFormCannotRepresent(t *testing.T) {
 	if _, _, _, err := LoanRuleTerms("p", b.Schedules[0], b.Schedules[1]); err == nil {
 		t.Fatal("accepted a calculated payment")
 	}
+	for _, tc := range []struct {
+		literal string
+		want    float64
+	}{
+		{literal: " 91.08 ", want: 91.08},
+		{literal: "9.108e1", want: 91.08},
+		{literal: "0", want: 0},
+	} {
+		b.Schedules[1].Amount.Config["expression"] = tc.literal
+		_, amount, _, err := LoanRuleTerms("p", b.Schedules[0], b.Schedules[1])
+		if err != nil || amount != tc.want {
+			t.Fatalf("payment %q = %v, err %v, want %v", tc.literal, amount, err, tc.want)
+		}
+	}
 	for _, literal := range []string{"+91.08", "91.081"} {
 		b.Schedules[1].Amount.Config["expression"] = literal
 		if _, _, _, err := LoanRuleTerms("p", b.Schedules[0], b.Schedules[1]); err == nil {

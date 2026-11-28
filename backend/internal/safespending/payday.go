@@ -56,7 +56,7 @@ func BuildAtCut(model *types.FinancialModel, settings *types.SafeSpendingSetting
 			}
 		}
 	}
-	buildObligations(st.s, model, settings, st.selected, st.ctx, st.cut, start, horizon, accountStarts)
+	buildObligations(st.s, model, settings, st.selected, st.ctx, st.claims, start, horizon, accountStarts)
 	flagPossibleHoldOverlap(st)
 	st.s.PrePaydayBills, st.s.PaydayBills = splitObligations(st.s, payoff)
 	st.s.StatementReserve = buildStatements(st, payoff)

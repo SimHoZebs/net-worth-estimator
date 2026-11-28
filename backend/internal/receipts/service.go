@@ -7,10 +7,10 @@ import (
 	"errors"
 	"math"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -259,7 +259,7 @@ func (s *Service) Diagnostics(receipt types.Receipt) []string {
 	if err == nil && transaction.Amount.Resolver == "expression" && len(transaction.Amount.Inputs) == 0 {
 		// Only a finite literal is comparable. Calculated amounts remain unknown.
 		if expression, ok := transaction.Amount.Config["expression"].(string); ok {
-			if amount, err := strconv.ParseFloat(strings.TrimSpace(expression), 64); err == nil && !math.IsNaN(amount) && !math.IsInf(amount, 0) && math.Abs(amount*100-float64(*details.TotalCents)) >= 1 {
+			if amount, err := domain.ParseNumericAmount(expression); err == nil && math.Abs(amount.Value*100-float64(*details.TotalCents)) >= 1 {
 				out = append(out, "The receipt total differs from the saved transaction amount.")
 			}
 		}

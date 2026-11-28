@@ -129,17 +129,7 @@ func (a *amounts) record(tx types.Transaction, value float64) {
 
 // Expand selected schedules first so claims enrich the same occurrence identity
 // even when a payment posts outside the period or for a different amount.
-func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, ctx *amounts, cut int64, start, end string, accountStarts map[string]string) *float64 {
-	claims := map[types.TransactionClaim]*types.Transaction{}
-	for i := range model.Transactions {
-		tx := &model.Transactions[i]
-		if tx.Claim != nil && recordedByCut(*tx, cut) {
-			prior := claims[*tx.Claim]
-			if prior == nil || (prior.Pending && !tx.Pending) {
-				claims[*tx.Claim] = tx
-			}
-		}
-	}
+func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel, settings *types.SafeSpendingSettings, selected map[string]bool, ctx *amounts, claims claimStateResult, start, end string, accountStarts map[string]string) *float64 {
 	// A posted settlement that happens inside the current payment window bars
 	// its exact occurrence even when that occurrence came due in an earlier
 	// period. Keeping the row prevents a payment the bar already knows about
@@ -147,8 +137,8 @@ func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel,
 	// such evidence and stays outside the forecast: its missing link says
 	// nothing about whether the bill was paid.
 	barred := map[types.TransactionClaim]bool{}
-	for claim, tx := range claims {
-		if tx.Pending || !posted(*tx, cut) {
+	for claim, tx := range claims.byClaim {
+		if tx.Pending {
 			continue
 		}
 		day := postingDay(*tx)
@@ -169,7 +159,7 @@ func buildObligations(s *types.SafeSpendingSummary, model *types.FinancialModel,
 			if earliest := accountStarts[*o.Rule.SourceAccountID]; earliest != "" && date < earliest && !barred[claim] {
 				continue
 			}
-			row, cause := billEvidence(o, date, claims[claim], selected, ctx)
+			row, cause := billEvidence(o, date, claims.byClaim[claim], selected, ctx)
 			if cause != "" {
 				reason(&s.Reasons, cause)
 				exact = false

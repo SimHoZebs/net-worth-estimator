@@ -86,6 +86,21 @@ func buildStatements(st *cutState, payoff string) *float64 {
 		if amounts == nil {
 			amounts = make([]*float64, len(closes))
 		}
+		// cardStatementRows prices outstanding payoffs, where post-close
+		// payments matter. Closed statement rows instead expose the billed
+		// balance at close from the same authoritative calculation as Statements.
+		statementAmounts := make([]*float64, len(closes))
+		copy(statementAmounts, amounts)
+		for i, close := range closes {
+			if !close.closed {
+				continue
+			}
+			statementAmounts[i] = closedStatementBalance(st.model, st.settings, card.ID, accountClosingDay(card), close.date, st.cut)
+			if statementAmounts[i] == nil {
+				known = false
+				reason(&st.s.Reasons, ReasonStatementBalanceUnavailable)
+			}
+		}
 		if !known {
 			exact = false
 		}
@@ -94,7 +109,7 @@ func buildStatements(st *cutState, payoff string) *float64 {
 			if close.closed {
 				kind = "closed"
 			}
-			if amounts[i] == nil && (close.closed || amounts[0] != nil) {
+			if statementAmounts[i] == nil && (close.closed || amounts[0] != nil) {
 				cause := ReasonStatementEstimateUnavailable
 				if close.closed {
 					cause = ReasonStatementBalanceUnavailable
@@ -106,7 +121,7 @@ func buildStatements(st *cutState, payoff string) *float64 {
 				Name:        card.Name,
 				ClosingDate: close.date,
 				Kind:        kind,
-				Amount:      amounts[i],
+				Amount:      statementAmounts[i],
 			})
 			if amounts[i] != nil {
 				total += *amounts[i]
@@ -267,6 +282,18 @@ func scheduledLeg(rule types.Schedule, cardID string, tracked map[string]bool) (
 // across all rows with the remainder carried forward.
 func cardStatementRows(st *cutState, cardID string, closes []statementClose, tracked map[string]bool, payoffs []string, carry *carriedStatementScope) ([]*float64, bool, float64) {
 	model, cut := st.model, st.cut
+	day := defaultClosingDay
+	for _, account := range model.Accounts {
+		if account.ID == cardID {
+			day = accountClosingDay(account)
+			break
+		}
+	}
+	for _, close := range closes {
+		if close.closed && closedStatementBalance(model, st.settings, cardID, day, close.date, cut) == nil {
+			return nil, false, 0
+		}
+	}
 	first := closes[0].date
 	closeCut := min(domain.DayCloseUnix(first), cut)
 	evidence := cashEvidence(model, st.settings, closeCut)
@@ -283,7 +310,7 @@ func cardStatementRows(st *cutState, cardID string, closes []statementClose, tra
 	pendingOutsideForecast := false
 	outsideHorizon := 0.0
 
-	claims := claimState(model, cut)
+	claims := st.claims
 	activities := []cardActivity{}
 	for _, tx := range model.Transactions {
 		if !recordedByCut(tx, cut) || !touches(tx, cardID) {

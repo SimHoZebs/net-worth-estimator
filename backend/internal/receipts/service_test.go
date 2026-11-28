@@ -208,6 +208,29 @@ func TestManualModeStalenessAndDiagnostics(t *testing.T) {
 	}
 }
 
+func TestReceiptDiagnosticsReadsPaddedNumericExpression(t *testing.T) {
+	db, svc, r := serviceFixture(t, nil)
+	model, err := db.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	model.Transactions[0].Amount.Config["expression"] = " 1e3 "
+	if _, err := db.UpdateTransaction(model.Transactions[0]); err != nil {
+		t.Fatal(err)
+	}
+	total := int64(90000)
+	r, err = svc.Review(r.ID, r.Revision, types.ReceiptDetails{Merchant: "Manual", Currency: "USD", Date: "2026-10-20", TotalCents: &total}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, diagnostic := range svc.Diagnostics(r) {
+		if strings.Contains(diagnostic, "receipt total differs") {
+			return
+		}
+	}
+	t.Fatal("padded numeric expression did not report the amount discrepancy")
+}
+
 func TestExtractionRecoveryReadsDoNotStartOrPersistAnAttempt(t *testing.T) {
 	var calls atomic.Int32
 	source, err := receipts.NewSource(types.ReceiptProvenance{Producer: "recovery", Version: "1"}, extractorFunc(func(ctx context.Context, input receipts.ExtractionInput) (receipts.ExtractionResult, error) {

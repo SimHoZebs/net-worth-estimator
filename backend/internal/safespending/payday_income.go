@@ -8,30 +8,38 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// claimState separates explicit settlement evidence from an authorization
-// that only makes an occurrence uncertain. Equal amounts or nearby dates
-// never establish settlement, so only TransactionClaim identities count.
+// claimState indexes one winning transaction per exact occurrence at the cut.
+// A posted settlement always wins over an authorization, regardless of input
+// order. The winning transaction and the settled/pending sets are derived
+// together so obligations, paydays, and statement replay cannot drift.
 type claimStateResult struct {
+	byClaim map[types.TransactionClaim]*types.Transaction
 	settled map[types.TransactionClaim]bool
 	pending map[types.TransactionClaim]bool
 }
 
 func claimState(model *types.FinancialModel, cut int64) claimStateResult {
-	settled := map[types.TransactionClaim]bool{}
-	pending := map[types.TransactionClaim]bool{}
-	for _, tx := range model.Transactions {
-		if tx.Claim == nil {
+	byClaim := map[types.TransactionClaim]*types.Transaction{}
+	for i := range model.Transactions {
+		tx := &model.Transactions[i]
+		if tx.Claim == nil || !recordedByCut(*tx, cut) {
 			continue
 		}
-		if posted(tx, cut) {
-			settled[*tx.Claim] = true
-			continue
-		}
-		if fact(tx) && tx.Pending && domain.TransactionInstant(&tx) <= cut {
-			pending[*tx.Claim] = true
+		prior := byClaim[*tx.Claim]
+		if prior == nil || (prior.Pending && !tx.Pending) {
+			byClaim[*tx.Claim] = tx
 		}
 	}
-	return claimStateResult{settled: settled, pending: pending}
+	settled := map[types.TransactionClaim]bool{}
+	pending := map[types.TransactionClaim]bool{}
+	for claim, tx := range byClaim {
+		if posted(*tx, cut) {
+			settled[claim] = true
+		} else if tx.Pending {
+			pending[claim] = true
+		}
+	}
+	return claimStateResult{byClaim: byClaim, settled: settled, pending: pending}
 }
 
 // incomeRules is the single selection of recurring inflows into selected cash.
@@ -65,7 +73,7 @@ type paydayForecast struct {
 func forecastPaydays(st *cutState, today, payoff string) ([]paydayForecast, bool) {
 	rules := incomeRules(st, st.model, st.settings)
 	occurrences := domain.ResolveOccurrences(rules, nil, today, domain.AddMonthsClamped(today, 12), true)
-	claims := claimState(st.model, st.cut)
+	claims := st.claims
 	var forecasts []paydayForecast
 	for date, rows := range occurrences.ByDate {
 		total := 0.0

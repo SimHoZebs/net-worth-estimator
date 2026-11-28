@@ -1,12 +1,11 @@
 package simplefin
 
 import (
-	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -53,9 +52,13 @@ type Translation struct {
 	Skipped     map[SkipReason]int
 }
 
-// parseBalance parses a bridge balance decimal.
+// parseBalance parses a finite bridge balance decimal.
 func parseBalance(raw string) (float64, error) {
-	return strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	balance, err := domain.ParseNumericAmount(raw)
+	if err != nil {
+		return 0, err
+	}
+	return balance.Value, nil
 }
 
 // parseAvailableBalance keeps an absent or invalid available balance as
@@ -65,26 +68,23 @@ func parseAvailableBalance(raw *string) *float64 {
 		return nil
 	}
 	value, err := parseBalance(*raw)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+	if err != nil {
 		return nil
 	}
 	return &value
 }
 
-// absDecimal returns the absolute decimal value without float formatting.
+// absDecimal returns the absolute arithmetic-compatible decimal spelling
+// without float formatting.
 func absDecimal(raw string) (string, error) {
-	digits := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(raw), "+"), "-")
-	if digits == "" {
-		return "", fmt.Errorf("empty amount")
-	}
-	value, err := strconv.ParseFloat(digits, 64)
+	amount, err := domain.ParseNumericAmount(raw)
 	if err != nil {
 		return "", err
 	}
-	if value == 0 {
+	if amount.Value == 0 {
 		return "0", nil
 	}
-	return digits, nil
+	return strings.TrimPrefix(amount.Literal, "-"), nil
 }
 
 // checkpointInstant preserves the bridge balance-date instant: the exact

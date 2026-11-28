@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -461,11 +460,11 @@ func literalValueOf(amount types.TransactionAmountResolution) *float64 {
 	if expression == "" {
 		return nil
 	}
-	parsed, err := strconv.ParseFloat(expression, 64)
+	parsed, err := domain.ParseNumericAmount(expression)
 	if err != nil {
 		return nil
 	}
-	return &parsed
+	return &parsed.Value
 }
 
 func (s *handler) deleteTransaction(_ context.Context, input *struct {

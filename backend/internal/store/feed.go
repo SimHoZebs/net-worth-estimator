@@ -6,26 +6,17 @@ package store
 
 import (
 	"math"
-	"regexp"
-	"strconv"
-	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// feedNumericExpression mirrors the record lists' literal detection: a
-// plain numeric recipe counts as fixed; anything else calculates.
-var feedNumericExpression = regexp.MustCompile(`(?i)^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$`)
-
 func parseFeedNumeric(text string) (float64, bool) {
-	if text == "" || !feedNumericExpression.MatchString(text) {
+	amount, err := domain.ParseNumericAmount(text)
+	if err != nil {
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(text, 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
-		return 0, false
-	}
-	return value, true
+	return amount.Value, true
 }
 
 func feedNumber(raw any) (float64, bool) {
@@ -60,7 +51,7 @@ func FeedLiteralAmount(amount types.TransactionAmountResolution) (float64, bool)
 	}
 	if expression, ok := amount.Config["expression"]; ok {
 		if text, ok := expression.(string); ok {
-			if value, ok := parseFeedNumeric(strings.TrimSpace(text)); ok {
+			if value, ok := parseFeedNumeric(text); ok {
 				return value, true
 			}
 		}

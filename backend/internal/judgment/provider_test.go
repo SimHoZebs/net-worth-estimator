@@ -36,9 +36,10 @@ func TestAssessmentValidatesExactRequestsAndDeferredStates(t *testing.T) {
 		{"unavailable", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "unavailable"}}, judgment.ErrUnavailable, "ready"},
 		{"missing response", []types.AnalysisJudgment{ready}, judgment.ErrUnavailable, "unavailable"},
 		{"duplicate response", []types.AnalysisJudgment{ready, ready}, judgment.ErrUnavailable, "unavailable"},
-		{"different request", []types.AnalysisJudgment{ready, {RequestID: "other", Status: "ready", Strength: "strong"}}, judgment.ErrUnavailable, "unavailable"},
+		{"different request", []types.AnalysisJudgment{ready, {RequestID: "other", Status: "ready", Decision: "supported", Strength: "strong"}}, judgment.ErrUnavailable, "unavailable"},
 		{"pending cannot invent strength", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "pending", Strength: "strong"}}, judgment.ErrUnavailable, "unavailable"},
-		{"invalid strength", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Strength: "certain"}}, judgment.ErrUnavailable, "unavailable"},
+		{"invalid strength", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Decision: "uncertain", Strength: "certain"}}, judgment.ErrUnavailable, "unavailable"},
+		{"empty strength", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Decision: "uncertain"}}, judgment.ErrUnavailable, "unavailable"},
 		{"bounded reason", []types.AnalysisJudgment{ready, {RequestID: "b", Status: "ready", Strength: "strong", Reason: strings.Repeat("x", 2001)}}, judgment.ErrUnavailable, "unavailable"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -47,6 +48,48 @@ func TestAssessmentValidatesExactRequestsAndDeferredStates(t *testing.T) {
 			}), requests)
 			if !errors.Is(err, tc.want) || len(decisions) != 2 || decisions[0].Status != tc.firstStatus {
 				t.Fatalf("decisions=%+v err=%v", decisions, err)
+			}
+		})
+	}
+}
+
+func TestDeferredErrorUsesUnavailablePrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		statuses []string
+		want     error
+	}{
+		{name: "empty"},
+		{name: "ready", statuses: []string{"ready", "ready"}},
+		{name: "pending", statuses: []string{"ready", "pending"}, want: judgment.ErrPending},
+		{name: "unavailable", statuses: []string{"unavailable", "ready"}, want: judgment.ErrUnavailable},
+		{name: "pending then unavailable", statuses: []string{"pending", "unavailable"}, want: judgment.ErrUnavailable},
+		{name: "unavailable then pending", statuses: []string{"unavailable", "pending"}, want: judgment.ErrUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := judgment.DeferredError(tc.statuses); !errors.Is(got, tc.want) {
+				t.Fatalf("error = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAggregateDeferredErrorsUsesUnavailablePrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		errs []error
+		want error
+	}{
+		{name: "empty"},
+		{name: "ready batches", errs: []error{nil, nil}},
+		{name: "pending", errs: []error{nil, judgment.ErrPending}, want: judgment.ErrPending},
+		{name: "unavailable", errs: []error{judgment.ErrUnavailable, nil}, want: judgment.ErrUnavailable},
+		{name: "pending then unavailable", errs: []error{judgment.ErrPending, judgment.ErrUnavailable}, want: judgment.ErrUnavailable},
+		{name: "unavailable then pending", errs: []error{judgment.ErrUnavailable, judgment.ErrPending}, want: judgment.ErrUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := judgment.AggregateDeferredErrors(tc.errs...); !errors.Is(got, tc.want) {
+				t.Fatalf("error = %v, want %v", got, tc.want)
 			}
 		})
 	}

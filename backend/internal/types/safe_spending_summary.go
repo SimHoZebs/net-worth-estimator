@@ -40,11 +40,13 @@ type SafeSpendingSummary struct {
 }
 
 type SafeSpendingStatement struct {
-	AccountID   string   `json:"accountId"`
-	Name        string   `json:"name"`
-	ClosingDate string   `json:"closingDate"`
-	Kind        string   `json:"kind" enum:"closed,estimated"`
-	Amount      *float64 `json:"amount"`
+	AccountID   string `json:"accountId"`
+	Name        string `json:"name"`
+	ClosingDate string `json:"closingDate"`
+	Kind        string `json:"kind" enum:"closed,estimated"`
+	// Closed rows carry the billed balance at close. Estimated rows carry the
+	// projected payoff after payments; post-close payments never rewrite a close.
+	Amount *float64 `json:"amount"`
 }
 
 type SafeSpendingBaseline struct {

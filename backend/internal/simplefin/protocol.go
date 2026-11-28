@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 )
 
 // ProtocolVersion is the only SimpleFIN protocol version this sync speaks.
@@ -139,11 +141,11 @@ func (t Transaction) PostedDay(now time.Time) string {
 
 // ParseAmount parses the decimal amount string.
 func (t Transaction) ParseAmount() (float64, error) {
-	amount, err := strconv.ParseFloat(strings.TrimSpace(t.Amount), 64)
+	amount, err := domain.ParseNumericAmount(t.Amount)
 	if err != nil {
 		return 0, fmt.Errorf("transaction amount %q: %w", t.Amount, err)
 	}
-	return amount, nil
+	return amount.Value, nil
 }
 
 // AuthError reports a Bridge or connection authentication failure. The user

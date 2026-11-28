@@ -96,11 +96,15 @@ func (m *MLClassifier) Classify(ctx context.Context, inputs []Input) (map[string
 			return nil, err
 		}
 		end := min(start+100, len(batch))
-		// Assess supplies ordered unavailable fallbacks for invalid or failed
-		// responses and preserves valid pending/unavailable decisions. Its error
-		// is represented by those statuses, so earlier successful chunks remain
-		// usable and no provider error text enters the outcome.
-		judgments, _ := judgment.Assess(ctx, session, batch[start:end])
+		// ValidateResponse supplies ordered unavailable fallbacks for invalid or
+		// failed responses and preserves valid pending/unavailable decisions. Its
+		// error is represented by those statuses, so earlier successful chunks
+		// remain usable and no provider error text enters the outcome.
+		decisions, evaluateErr := session.Evaluate(ctx, batch[start:end])
+		if evaluateErr != nil {
+			decisions = nil
+		}
+		judgments, _ := judgment.ValidateResponse(batch[start:end], decisions)
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}

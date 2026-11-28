@@ -251,6 +251,35 @@ func TestTransferSameProviderBonus(t *testing.T) {
 	}
 }
 
+func TestTransferAndPaymentPathsShareWindowBoundary(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		day  int
+		want bool
+	}{
+		{name: "seven days", day: 8, want: true},
+		{name: "eight days", day: 9, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			items := []types.AnalysisTransaction{
+				transferTransaction("out", "checking-bridge", "simplefin", "TRANSFER OUT", "-100.00", 1),
+				transferTransaction("in", "savings-bridge", "simplefin", "TRANSFER IN", "100.00", tc.day),
+			}
+			detections := analyzeTransfer(t, items)
+			pairs, err := paymentTransferPairs(context.Background(), items)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := len(detections) == 2; got != tc.want {
+				t.Fatalf("detector matched=%v, want %v: %+v", got, tc.want, detections)
+			}
+			if got := pairs["out"]["in"] && pairs["in"]["out"]; got != tc.want {
+				t.Fatalf("payment path matched=%v, want %v: %+v", got, tc.want, pairs)
+			}
+		})
+	}
+}
+
 func TestTransferContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

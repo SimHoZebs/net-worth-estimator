@@ -4,9 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -53,10 +51,8 @@ const analysisTransferLinkMembersDDL = `CREATE TABLE IF NOT EXISTS analysis_tran
 // server and one instance, so a process-wide mutex matches the deployment.
 var transferLinkMu sync.Mutex
 
-// transferMatchWindowDays bounds how far apart confirmed legs may post. It
-// mirrors the detector rule: both sides of one movement are logged apart,
-// so the records can be days apart. Change only with a new product decision.
-const transferMatchWindowDays = 7
+// transferMatchWindowDays and the complete opposite-leg predicate live in
+// domain so detection, payment exclusion, and confirmation share one rule.
 
 func sortedTransferLegs(first, second string) (string, string) {
 	if second < first {
@@ -70,11 +66,8 @@ func transferLinkInvalid(reason string) error {
 }
 
 type transferLegEvidence struct {
-	model   types.Transaction
-	account string
-	facts   types.TransactionFacts
-	cents   int64
-	day     int64
+	model types.Transaction
+	key   domain.TransferLegFacts
 }
 
 // loadTransferLeg reads one leg's current model route plus its saved bank
@@ -108,66 +101,44 @@ func loadTransferLeg(tx *userTx, id string) (transferLegEvidence, error) {
 	if err := json.Unmarshal([]byte(raw), &facts); err != nil {
 		return leg, err
 	}
-	amount, err := strconv.ParseFloat(facts.Amount, 64)
-	if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || math.Abs(amount) > 1e10 || amount == 0 {
+	key, ok := domain.TransferLegKey(facts)
+	if !ok {
 		return leg, transferLinkInvalid("Transfer legs must carry a valid non-zero amount.")
 	}
-	cents := int64(math.Round(math.Abs(amount) * 100))
-	if cents == 0 {
-		return leg, transferLinkInvalid("Transfer legs must carry a valid non-zero amount.")
-	}
-	stamp := facts.OccurredAt
-	if stamp <= 0 {
-		stamp = facts.PostedTime
-	}
-	if stamp <= 0 {
-		return leg, transferLinkInvalid("Both transfer legs need bank timestamps.")
-	}
-	leg = transferLegEvidence{model: model, facts: facts, cents: cents, day: stamp / 86400}
 	if model.SourceAccountID != nil {
-		leg.account = *model.SourceAccountID
+		key.AccountID = *model.SourceAccountID
 	} else if len(model.Destinations) > 0 {
-		leg.account = model.Destinations[0]
+		key.AccountID = model.Destinations[0]
 	}
+	key.Settled = !model.Pending && !model.Void
+	leg = transferLegEvidence{model: model, key: key}
 	return leg, nil
 }
 
 func invalidTransferPair(first, second transferLegEvidence) error {
-	if first.account == "" || second.account == "" || first.account == second.account {
+	problem := domain.CheckTransferLegPair(first.key, second.key)
+	switch problem {
+	case domain.TransferMatchAccount:
 		return transferLinkInvalid("Transfer legs must be on different accounts.")
-	}
-	if first.model.Pending || first.model.Void || second.model.Pending || second.model.Void {
+	case domain.TransferMatchUnsettled:
 		return transferLinkInvalid("Both transfer legs must be settled.")
-	}
-	if first.facts.Currency != "USD" || second.facts.Currency != "USD" {
+	case domain.TransferMatchCurrency:
 		return transferLinkInvalid("Both transfer legs must be in USD.")
-	}
-	if first.cents != second.cents {
+	case domain.TransferMatchCents:
 		return transferLinkInvalid("Transfer legs must match to the exact cent.")
-	}
-	firstAmount, _ := strconv.ParseFloat(first.facts.Amount, 64)
-	secondAmount, _ := strconv.ParseFloat(second.facts.Amount, 64)
-	if (firstAmount < 0) == (secondAmount < 0) {
+	case domain.TransferMatchDirection:
 		return transferLinkInvalid("Transfer pairs need opposite directions: both legs post the same sign, and same-sign pairs are not supported as one movement.")
 	}
-	// Validation mirrors the netting predicates in domain/flowgraph.go
-	// (netConfirmedTransferPairs) and domain/path.go (netLinkedAttempts):
-	// only an external outflow paired with an external inflow nets there.
-	// Same-route pairs stay split, so confirmation rejects them here instead
-	// of writing a link that changes nothing. This runs after the sign check
-	// so same-sign pairs keep their specific reason.
-	firstOut := domain.IsExternalOutflow(&first.model)
-	firstIn := domain.IsExternalInflow(&first.model)
-	secondOut := domain.IsExternalOutflow(&second.model)
-	secondIn := domain.IsExternalInflow(&second.model)
-	if !((firstOut && secondIn) || (firstIn && secondOut)) {
+	// Confirmation uses the same nettable-link predicate as projection rows and
+	// flows. Same-route pairs stay split, so they cannot back a link. The leg
+	// amounts already matched to the cent above; realized netting uses the
+	// projection's rounded-currency comparison.
+	firstAmount := float64(first.key.Cents) / 100
+	secondAmount := float64(second.key.Cents) / 100
+	if _, _, _, ok := domain.NettableTransferLink(&first.model, &second.model, firstAmount, secondAmount); !ok {
 		return transferLinkInvalid("Transfer pairs need one external outflow and one external inflow: same-route pairs stay split and cannot link as one movement.")
 	}
-	gap := first.day - second.day
-	if gap < 0 {
-		gap = -gap
-	}
-	if gap > transferMatchWindowDays {
+	if problem == domain.TransferMatchWindow {
 		return transferLinkInvalid("Transfer legs must post within 7 days of each other.")
 	}
 	return nil

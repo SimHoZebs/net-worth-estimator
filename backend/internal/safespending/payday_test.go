@@ -95,7 +95,7 @@ func TestPlannedCardPaymentReducesPayoffOnce(t *testing.T) {
 	assertMoney(t, summary.SafeToSpend, 400)
 	for _, statement := range summary.Statements {
 		if statement.AccountID == "card-a" && statement.Kind == "closed" {
-			assertMoney(t, statement.Amount, 350)
+			assertMoney(t, statement.Amount, 500)
 		}
 	}
 }
@@ -153,7 +153,7 @@ func TestCardPaymentReducesCashAndPayoffOnce(t *testing.T) {
 	assertMoney(t, summary.SafeToSpend, 400)
 	for _, statement := range summary.Statements {
 		if statement.AccountID == "card-a" && statement.Kind == "closed" {
-			assertMoney(t, statement.Amount, 300)
+			assertMoney(t, statement.Amount, 500)
 		}
 	}
 }
@@ -295,7 +295,7 @@ func TestExcessPlannedPaymentCarriesToNewerStatement(t *testing.T) {
 	model.Transactions = []types.Transaction{purchase}
 	model.Schedules = append(model.Schedules, paymentRule)
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 0)
+	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 100)
 	assertMoney(t, statementAmount(t, summary, "card-a", "estimated", "2026-11-19"), 30)
 	assertMoney(t, summary.StatementReserve, 30)
 	assertMoney(t, summary.PaydayBills, 150)
@@ -310,7 +310,7 @@ func TestPaymentFromUnselectedCashAccountSettlesDebt(t *testing.T) {
 	settlement.Destinations = []string{"card-a"}
 	model.Transactions = []types.Transaction{settlement}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 300)
+	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 500)
 }
 
 func TestSplitRoutingLeavesStatementPayoffUnavailable(t *testing.T) {
@@ -468,7 +468,7 @@ func TestCardToCardTransferFollowsBalanceApplication(t *testing.T) {
 	// destination is paid off, so both statements follow the applied balances.
 	assertMoney(t, statementAmount(t, summary, "cash-card-x", "closed", "2026-10-19"), 100)
 	assertMoney(t, statementAmount(t, summary, "cash-card-x", "estimated", "2026-11-19"), 100)
-	assertMoney(t, statementAmount(t, summary, "cash-card-y", "closed", "2026-10-19"), 0)
+	assertMoney(t, statementAmount(t, summary, "cash-card-y", "closed", "2026-10-19"), 100)
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 200)
 }
@@ -522,14 +522,15 @@ func TestIntercardTransferAppliesDatedLegsWithoutCashOutflow(t *testing.T) {
 	// reserve is unchanged, so the internal move spends no cash.
 	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 500)
 	assertMoney(t, statementAmount(t, summary, "card-a", "estimated", "2026-11-19"), 50)
-	assertMoney(t, statementAmount(t, summary, "card-b", "closed", "2026-10-19"), 100)
-	// Independent check against history application: A's -500 balance falls to -550,
-	// B's -150 rises to -100, and debt is max(0, -balance) on each card.
+	assertMoney(t, statementAmount(t, summary, "card-b", "closed", "2026-10-19"), 150)
+	// Card A's billed close plus its new-cycle charge is 550. Card B's
+	// billed close remains 150; the later 50 payment reduces the payoff
+	// reserve, not the already closed statement.
 	if got := statementTotal(t, summary, "card-a"); got != 550 {
-		t.Fatalf("card A payoff %v, want applied debt 550", got)
+		t.Fatalf("card A statement rows %v, want 550", got)
 	}
-	if got := statementTotal(t, summary, "card-b"); got != 100 {
-		t.Fatalf("card B payoff %v, want applied debt 100", got)
+	if got := statementTotal(t, summary, "card-b"); got != 150 {
+		t.Fatalf("card B statement rows %v, want billed 150", got)
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 650)
@@ -556,17 +557,17 @@ func TestIntercardTransferAcrossDifferentCloseDates(t *testing.T) {
 		Enabled: true, Source: "user",
 	}}
 	summary := BuildAtCut(model, settings, stamp(paydayCut))
-	// History application takes 50 from A (debt 550 on 11-19) and adds 50 to B (debt 50
-	// on 11-05). Both match max(0, -balance) after the transfer, and B has no
-	// estimated row because its next close is past payday.
+	// Card A's billed close plus its new-cycle charge is 550. Card B's
+	// 11-05 statement remains billed at 100; the later payment reduces only
+	// the outstanding payoff reserve.
 	assertMoney(t, statementAmount(t, summary, "card-a", "closed", "2026-10-19"), 500)
 	assertMoney(t, statementAmount(t, summary, "card-a", "estimated", "2026-11-19"), 50)
-	assertMoney(t, statementAmount(t, summary, "card-b", "closed", "2026-11-05"), 50)
+	assertMoney(t, statementAmount(t, summary, "card-b", "closed", "2026-11-05"), 100)
 	if got := statementTotal(t, summary, "card-a"); got != 550 {
-		t.Fatalf("card A payoff %v, want applied debt 550", got)
+		t.Fatalf("card A statement rows %v, want 550", got)
 	}
-	if got := statementTotal(t, summary, "card-b"); got != 50 {
-		t.Fatalf("card B payoff %v, want applied debt 50", got)
+	if got := statementTotal(t, summary, "card-b"); got != 100 {
+		t.Fatalf("card B statement rows %v, want billed 100", got)
 	}
 	assertMoney(t, summary.CheckingAvailable, 900)
 	assertMoney(t, summary.StatementReserve, 600)
@@ -589,7 +590,7 @@ func TestScheduledIntercardTransferMatchesClaimedTransfer(t *testing.T) {
 	projected := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, statementAmount(t, projected, "card-a", "closed", "2026-10-19"), 500)
 	assertMoney(t, statementAmount(t, projected, "card-a", "estimated", "2026-11-19"), 50)
-	assertMoney(t, statementAmount(t, projected, "card-b", "closed", "2026-10-19"), 100)
+	assertMoney(t, statementAmount(t, projected, "card-b", "closed", "2026-10-19"), 150)
 	assertMoney(t, projected.StatementReserve, 650)
 
 	claimed := payment("claimed-transfer", 50, "2026-11-10T10:00:00Z")
@@ -600,7 +601,7 @@ func TestScheduledIntercardTransferMatchesClaimedTransfer(t *testing.T) {
 	recorded := BuildAtCut(model, settings, stamp(paydayCut))
 	assertMoney(t, statementAmount(t, recorded, "card-a", "closed", "2026-10-19"), 500)
 	assertMoney(t, statementAmount(t, recorded, "card-a", "estimated", "2026-11-19"), 50)
-	assertMoney(t, statementAmount(t, recorded, "card-b", "closed", "2026-10-19"), 100)
+	assertMoney(t, statementAmount(t, recorded, "card-b", "closed", "2026-10-19"), 150)
 	assertMoney(t, recorded.StatementReserve, 650)
 	assertMoney(t, recorded.PrePaydayRoom, 650)
 }

@@ -191,6 +191,19 @@ func TestTransferPairRejectsAmountMismatch(t *testing.T) {
 	}
 }
 
+func TestTransferPairAcceptsWindowBoundary(t *testing.T) {
+	s := openSQLiteStore(t)
+	early := time.Date(2026, time.March, 1, 12, 0, 0, 0, time.UTC).Unix()
+	late := time.Date(2026, time.March, 8, 12, 0, 0, 0, time.UTC).Unix()
+	out := seedTransferLinkLeg(t, s, "PAY OUT", "checking", "bridge-a", "a-1", "-500.00", "USD", false, early)
+	in := seedTransferLinkLeg(t, s, "PAY IN", "loan", "bridge-b", "b-1", "500.00", "USD", true, late)
+	byTransaction := completeTransferPairAnalysis(t, s, []types.AnalysisDetection{
+		transferPairDetection(out, in, "outflow", []string{in}),
+		transferPairDetection(in, out, "inflow", []string{out}),
+	})
+	confirmTransferPair(t, s, byTransaction[out], in)
+}
+
 func TestTransferPairRejectsOutOfWindow(t *testing.T) {
 	s := openSQLiteStore(t)
 	early := time.Date(2026, time.March, 1, 12, 0, 0, 0, time.UTC).Unix()
