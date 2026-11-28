@@ -73,16 +73,7 @@ export function EvaluationCard({
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							title={
-								pinned
-									? `Unpin ${evaluation.name} from Outlook`
-									: `Pin ${evaluation.name} to Outlook`
-							}
-							aria-label={
-								pinned
-									? `Unpin ${evaluation.name} from Outlook`
-									: `Pin ${evaluation.name} to Outlook`
-							}
+							aria-label={`Pin ${evaluation.name} to Outlook`}
 							onClick={onPinChange}
 							disabled={pinDisabled}
 							aria-pressed={pinned}

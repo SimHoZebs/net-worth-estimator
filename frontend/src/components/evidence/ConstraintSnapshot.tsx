@@ -8,6 +8,7 @@ import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { transactionSelectionKey } from "../entrySelection.ts";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
+import { useTransferPeers } from "../activity/useTransferPeers.ts";
 
 // The failure month as the shared transaction table: real TransactionRow
 // entries with the failing savedTransaction riding inline, its Shortfall badge
@@ -36,6 +37,7 @@ export function ConstraintSnapshot({
 	// render, so a refresh keeps the detail open while a removed row (or a
 	// removed saved rule) renders as no selection and closes it.
 	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const transferState = useTransferPeers(transactions, accounts);
 	const selected =
 		selectedId === null
 			? null
@@ -64,6 +66,13 @@ export function ConstraintSnapshot({
 						key={transaction.id}
 						transaction={transaction}
 						savedTransaction={savedTransaction}
+						transferPeer={
+							transferState.peersById.get(transaction.transactionId) ?? null
+						}
+						hasTransferLink={transferState.linkedIds.has(
+							transaction.transactionId,
+						)}
+						transferLinksLoaded={transferState.loaded}
 						onEdit={() => setSelectedId(transactionSelectionKey(transaction))}
 						shortfallLabel={failing ? `Shortfall ${money(gap)}` : undefined}
 					/>

@@ -1,4 +1,3 @@
-import type { EditorTarget } from "../domain/accountEdits.ts";
 import {
 	DEFAULT_PROJECTION_YEARS,
 	useRemoteProjection,
@@ -24,7 +23,6 @@ export function EvidenceDialog({
 }: {
 	target: Exclude<EvidenceTarget, { kind: "position" }>;
 	onClose: () => void;
-	onEdit: (target: EditorTarget) => void;
 }) {
 	// Each evidence view subscribes to its own queries; only the target
 	// selection and UI callbacks arrive as props.

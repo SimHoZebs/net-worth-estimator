@@ -13,16 +13,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { useTransactionBNPL } from "../analysis/TransactionAnalysis.tsx";
-import { useTransferLinks } from "../../state/analyses.ts";
-import {
-	useSavedAccounts,
-	useSavedTransactions,
-} from "../../state/savedState.ts";
-import {
-	resolveTransferPeer,
-	type TransferPeerSummary,
-} from "./TransferLinkSection.tsx";
-import { transferLinkForEdge } from "../../pages/flows/TransferMatchNote.tsx";
+import type { TransferPeerSummary } from "./TransferLinkSection.tsx";
 import { findingLabel } from "../../domain/analysisFindings.ts";
 import { transactionAmountStyles } from "./activityStyles.ts";
 import { cn } from "@/lib/utils.ts";
@@ -37,6 +28,8 @@ export function TransactionRow({
 	onRemove,
 	removing,
 	transferPeer,
+	hasTransferLink,
+	transferLinksLoaded,
 }: {
 	transaction: AccountTransaction;
 	savedTransaction: Transaction | null;
@@ -47,33 +40,15 @@ export function TransactionRow({
 	/** Direct removal that keeps the row click-through intact. */
 	onRemove?: () => void;
 	removing?: boolean;
-	/**
-	 * Linked transfer peer drilled from the list. Undefined resolves the
-	 * link through the cached transfer-link query; null means the parent
-	 * has no resolved peer, while cached link membership still applies.
-	 */
-	transferPeer?: TransferPeerSummary | null;
+	/** Transfer display state resolved once by the owning list. */
+	transferPeer: TransferPeerSummary | null;
+	hasTransferLink: boolean;
+	transferLinksLoaded: boolean;
 }) {
-	const linksQuery = useTransferLinks();
-	const savedTransactions = useSavedTransactions();
-	const savedAccounts = useSavedAccounts();
-	const link = transferLinkForEdge(linksQuery.data?.links ?? [], [
-		transaction.transactionId,
-	]);
-	const resolved =
-		transferPeer !== undefined
-			? transferPeer
-			: savedTransaction
-				? resolveTransferPeer({
-						transactionId: savedTransaction.id,
-						link,
-						transactions: savedTransactions,
-						accounts: savedAccounts,
-					})
-				: null;
-	const linkedName = resolved?.accountName ?? resolved?.peerName ?? null;
+	const linkedName =
+		transferPeer?.accountName ?? transferPeer?.peerName ?? null;
 	const isTransfer =
-		Boolean(resolved || link) || transaction.flow === "transfer";
+		Boolean(transferPeer || hasTransferLink) || transaction.flow === "transfer";
 	const DirectionIcon = isTransfer
 		? ArrowRightLeft
 		: transaction.direction === "in"
@@ -81,7 +56,7 @@ export function TransactionRow({
 			: ArrowUpRight;
 	const directionIcon = <DirectionIcon size={16} aria-hidden="true" />;
 	const showBusinessLogo =
-		linksQuery.data !== undefined &&
+		transferLinksLoaded &&
 		!isTransfer &&
 		savedTransaction?.kind === "transaction" &&
 		Boolean(savedTransaction.recognizedBusinessKey);
@@ -163,19 +138,11 @@ export function TransactionRow({
 							</Badge>
 						) : (
 							transaction.excluded && (
-								<Badge
-									variant="secondary"
-									className="bg-warning-bg text-warning-text"
-								>
-									Excluded from account
-								</Badge>
+								<Badge variant="warning">Excluded from account</Badge>
 							)
 						)}
 						{transaction.shortfall > 0.01 && (
-							<Badge
-								variant="secondary"
-								className="bg-warning-bg text-warning-text"
-							>
+							<Badge variant="warning">
 								<TriangleAlert size={10} />
 								{shortfallLabel ?? "Shortfall"}
 							</Badge>

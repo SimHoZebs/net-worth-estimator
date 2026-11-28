@@ -1097,10 +1097,10 @@ export function TransactionDetail({
 												</Badge>
 											) : null}
 											{showExcluded && (
-												<Badge variant="secondary">Excluded from account</Badge>
+												<Badge variant="warning">Excluded from account</Badge>
 											)}
 											{showShortfall && (
-												<Badge variant="secondary">
+												<Badge variant="warning">
 													<TriangleAlert size={10} aria-hidden="true" />
 													{shortfallLabel ?? "Shortfall"}
 												</Badge>
@@ -1295,6 +1295,7 @@ export function TransactionDetail({
 						{savedTransaction.kind === "schedule" && (
 							<ScheduleHistory
 								transactions={scheduleHistory}
+								allTransactions={allTransactions}
 								accounts={fullAccounts}
 								startDate={savedTransaction.startDate}
 								onSelect={setHistorySelection}
@@ -1423,14 +1424,11 @@ export function TransactionDetail({
 					<SheetContent side="right">
 						<SheetHeader>
 							<SheetTitle>Suggestions</SheetTitle>
-							<SheetDescription className="sr-only">
+							<SheetDescription>
 								Small checks to improve future estimates
 							</SheetDescription>
 						</SheetHeader>
 						<SheetBody>
-							<p className="mt-0 mb-6 text-xs text-muted-foreground">
-								Small checks to improve future estimates
-							</p>
 							<TransactionInsightsPanel
 								suggestions={insightSuggestions}
 								names={insightNames}

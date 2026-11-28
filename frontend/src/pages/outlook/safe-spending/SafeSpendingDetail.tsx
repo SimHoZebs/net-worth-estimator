@@ -114,7 +114,10 @@ export function SafeSpendingDetail({
 								aria-busy={draft.saving}
 							>
 								{draft.saving ? (
-									<LoaderCircle className="animate-spin" aria-hidden="true" />
+									<LoaderCircle
+										className="motion-safe:animate-spin"
+										aria-hidden="true"
+									/>
 								) : (
 									<Save aria-hidden="true" />
 								)}

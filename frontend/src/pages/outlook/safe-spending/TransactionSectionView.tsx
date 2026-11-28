@@ -1,6 +1,6 @@
 import { TransactionRow } from "../../../components/activity/TransactionRow.tsx";
 import { TransactionTable } from "../../../components/activity/TransactionTable.tsx";
-import type { TransferPeerSummary } from "../../../components/activity/TransferLinkSection.tsx";
+import type { TransferListState } from "../../../components/activity/useTransferPeers.ts";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import type { Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
@@ -42,7 +42,7 @@ export function TransactionSectionView({
 	caption,
 	emptyMessage,
 	savedTransactions,
-	transferPeers,
+	transferState,
 	onInspect,
 	order,
 }: {
@@ -50,7 +50,7 @@ export function TransactionSectionView({
 	caption: string;
 	emptyMessage: string;
 	savedTransactions: Map<string, Transaction>;
-	transferPeers: Map<string, TransferPeerSummary>;
+	transferState: TransferListState;
 	onInspect: (transaction: AccountTransaction) => void;
 	order: TransactionOrder;
 }) {
@@ -73,7 +73,13 @@ export function TransactionSectionView({
 					savedTransaction={
 						savedTransactions.get(transaction.transactionId) ?? null
 					}
-					transferPeer={transferPeers.get(transaction.transactionId) ?? null}
+					transferPeer={
+						transferState.peersById.get(transaction.transactionId) ?? null
+					}
+					hasTransferLink={transferState.linkedIds.has(
+						transaction.transactionId,
+					)}
+					transferLinksLoaded={transferState.loaded}
 					onEdit={() => onInspect(transaction)}
 				/>
 			))}

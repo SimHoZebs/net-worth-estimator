@@ -4,9 +4,8 @@ import type {
 	FinancialModelResponse,
 	ServerStatus,
 } from "../api/index.ts";
-import { isLiability } from "../domain/accountKinds.ts";
+import type { AccountBalanceRow } from "../api/generated/model/accountBalanceRow.ts";
 import { isoDate, todayIso } from "../domain/format.ts";
-import { literalAmountOf } from "../domain/transactionRows.ts";
 import { ok } from "./fetch.ts";
 import { transactionResponse } from "./transactionResponse.ts";
 
@@ -76,9 +75,47 @@ export function modelFixture(): FinancialModel {
 	};
 }
 
-/** Current balance rows at one exact cut: the latest applicable checkpoint
- * plus later recorded actuals. Schedule occurrences stay projection-only. */
-export function balanceRowsAt(model: FinancialModel, cut = todayIso()) {
+/** Explicit balance responses for the default test model. */
+export const defaultAccountBalanceFixture: AccountBalanceRow[] = [
+	{
+		id: "cash",
+		name: "Cash",
+		kind: "cash",
+		enabled: true,
+		archived: false,
+		balance: 100,
+		minBalance: 0,
+		maxBalance: null,
+		observedOn: "2026-01-31",
+		hasCheckpoint: true,
+		observedBalance: 100,
+		observedAt: 1769903999,
+		displayBasis: "available",
+		statementClosingDay: 19,
+		readOnly: false,
+		syncOwned: false,
+	},
+	{
+		id: "loan",
+		name: "Loan",
+		kind: "debt",
+		enabled: true,
+		archived: false,
+		balance: -40,
+		minBalance: 0,
+		maxBalance: null,
+		observedOn: "2026-01-31",
+		hasCheckpoint: true,
+		observedBalance: -40,
+		observedAt: 1769903999,
+		displayBasis: "available",
+		statementClosingDay: 19,
+		readOnly: false,
+		syncOwned: false,
+	},
+];
+
+function normalizeBalanceCut(cut = todayIso()): string {
 	const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(cut);
 	const cutInstant = Math.floor(
 		Date.parse(dateOnly ? `${cut}T23:59:59Z` : cut) / 1000,
@@ -88,97 +125,34 @@ export function balanceRowsAt(model: FinancialModel, cut = todayIso()) {
 	const asOf = isoDate(new Date(cutInstant * 1000));
 	if (dateOnly && asOf !== cut)
 		throw new Error("as-of cut must be a valid date or timestamp");
-	const balances = new Map<string, number>();
-	const latestByAccount = new Map<
-		string,
-		FinancialModel["checkpoints"][number]
-	>();
-	for (const checkpoint of model.checkpoints) {
-		if (checkpoint.observedAt > cutInstant) continue;
-		const latest = latestByAccount.get(checkpoint.AccountId);
-		if (!latest || checkpoint.observedAt >= latest.observedAt)
-			latestByAccount.set(checkpoint.AccountId, checkpoint);
-	}
-	for (const account of model.accounts)
-		balances.set(account.id, latestByAccount.get(account.id)?.Balance ?? 0);
-	for (const transaction of model.transactions) {
-		if (!transaction.enabled) continue;
-		const instant =
-			transaction.transactionTime > 0
-				? transaction.transactionTime
-				: transaction.postedTime;
-		if (instant <= 0 || instant > cutInstant) continue;
-		const amount = literalAmountOf(transaction.amount);
-		if (amount === null) continue;
-		const destinations = transaction.destinations ?? [];
-		if (amount < 0 && !transaction.sourceAccountId) {
-			let remainingLoss = -amount;
-			for (const destination of destinations) {
-				if (remainingLoss <= 0) break;
-				const latest = latestByAccount.get(destination);
-				if (latest && instant <= latest.observedAt) continue;
-				balances.set(
-					destination,
-					(balances.get(destination) ?? 0) - remainingLoss,
-				);
-				remainingLoss = 0;
-			}
-			continue;
-		}
-		if (transaction.sourceAccountId) {
-			const latest = latestByAccount.get(transaction.sourceAccountId);
-			if (!latest || instant > latest.observedAt)
-				balances.set(
-					transaction.sourceAccountId,
-					(balances.get(transaction.sourceAccountId) ?? 0) - amount,
-				);
-		}
-		let remaining = amount;
-		for (const destination of destinations) {
-			if (remaining <= 0) break;
-			const latest = latestByAccount.get(destination);
-			if (latest && instant <= latest.observedAt) continue;
-			balances.set(destination, (balances.get(destination) ?? 0) + remaining);
-			remaining = 0;
-		}
-	}
-	const accounts = model.accounts.map((account) => {
-		const latest = latestByAccount.get(account.id);
-		const observedBalance = latest?.Balance ?? null;
-		const balance = Math.round((balances.get(account.id) ?? 0) * 100) / 100;
-		const checkpointOwned = model.checkpoints.some(
-			(row) =>
-				row.AccountId === account.id &&
-				typeof row.source === "string" &&
-				row.source !== "" &&
-				row.source !== "user",
-		);
-		const transactionOwned = model.transactions.some(
-			(row) =>
-				(row.sourceAccountId === account.id ||
-					(row.destinations ?? []).includes(account.id)) &&
-				typeof row.source === "string" &&
-				row.source !== "" &&
-				row.source !== "user",
-		);
-		const syncOwned = checkpointOwned || transactionOwned;
-		return {
-			...account,
-			balance,
-			observedOn: latest ? isoDate(new Date(latest.observedAt * 1000)) : asOf,
-			hasCheckpoint: latest !== undefined,
-			archived:
-				isLiability(account) &&
-				observedBalance !== null &&
-				Math.abs(observedBalance) < 0.005,
-			syncOwned,
-			readOnly: syncOwned,
-			observedBalance,
-			observedAt: latest?.observedAt ?? null,
-			availableBalance: latest?.availableBalance ?? null,
-		};
+	return asOf;
+}
+
+function balanceRowsForModel(
+	model: FinancialModel,
+	fixture: AccountBalanceRow[],
+): AccountBalanceRow[] {
+	const byId = new Map(fixture.map((row) => [row.id, row]));
+	return model.accounts.flatMap((account) => {
+		const row = byId.get(account.id);
+		if (!row) return [];
+		return [
+			{
+				...row,
+				id: account.id,
+				name: account.name,
+				kind: account.kind,
+				enabled: account.enabled,
+				minBalance: account.minBalance,
+				maxBalance: account.maxBalance,
+				color: account.color ?? row.color,
+				display: account.display ?? row.display,
+				displayBasis: account.displayBasis ?? row.displayBasis,
+				statementClosingDay:
+					account.statementClosingDay ?? row.statementClosingDay,
+			},
+		];
 	});
-	return { accounts, asOf };
 }
 
 export type PutCallback = (
@@ -191,10 +165,16 @@ export interface TestCall {
 	body?: unknown;
 }
 
-export function stubTestServer(put?: PutCallback, model = modelFixture()) {
+export function stubTestServer(
+	put?: PutCallback,
+	model = modelFixture(),
+	balanceFixture: AccountBalanceRow[] = defaultAccountBalanceFixture,
+) {
 	const current = structuredClone(model) as FinancialModel & {
 		[key: string]: unknown;
 	};
+	let balanceRows = structuredClone(balanceFixture);
+	const balanceCuts = new Map<string, AccountBalanceRow[]>();
 	const calls: TestCall[] = [];
 	const modelQueue: Array<Error | FinancialModelResponse> = [];
 	const statusQueue: Array<Error | ServerStatus> = [];
@@ -285,6 +265,65 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (at >= 0) rows[at] = checkpoint;
 		else rows.push(checkpoint);
 	};
+	const updateBalanceFixture = (
+		accountId: string,
+		body: Record<string, unknown>,
+	) => {
+		const account = current.accounts.find((row) => row.id === accountId);
+		if (!account) return;
+		const existing = balanceRows.find((row) => row.id === accountId);
+		const suppliedBalance =
+			typeof body.balance === "number" ? body.balance : undefined;
+		const suppliedObservedAt =
+			typeof body.observedAt === "number" ? body.observedAt : undefined;
+		const appliesToCurrent =
+			suppliedBalance !== undefined &&
+			suppliedObservedAt !== undefined &&
+			suppliedObservedAt <= Date.now() / 1000 &&
+			(existing?.observedAt === undefined ||
+				suppliedObservedAt >= existing.observedAt);
+		const observedAt = appliesToCurrent
+			? suppliedObservedAt
+			: existing?.observedAt;
+		const next: AccountBalanceRow = {
+			id: account.id,
+			name: account.name,
+			kind: account.kind,
+			enabled: account.enabled,
+			archived:
+				typeof body.archived === "boolean"
+					? body.archived
+					: (existing?.archived ?? false),
+			balance: appliesToCurrent ? suppliedBalance : (existing?.balance ?? 0),
+			minBalance: account.minBalance,
+			maxBalance: account.maxBalance,
+			color: account.color ?? undefined,
+			display: account.display,
+			displayBasis: account.displayBasis,
+			observedOn: observedAt
+				? isoDate(new Date(observedAt * 1000))
+				: (existing?.observedOn ?? todayIso()),
+			hasCheckpoint: appliesToCurrent || (existing?.hasCheckpoint ?? false),
+			observedBalance: appliesToCurrent
+				? suppliedBalance
+				: existing?.observedBalance,
+			observedAt,
+			availableBalance:
+				typeof body.availableBalance === "number"
+					? body.availableBalance
+					: existing?.availableBalance,
+			statementClosingDay: account.statementClosingDay,
+			readOnly:
+				typeof body.readOnly === "boolean"
+					? body.readOnly
+					: (existing?.readOnly ?? false),
+			syncOwned:
+				typeof body.syncOwned === "boolean"
+					? body.syncOwned
+					: (existing?.syncOwned ?? false),
+		};
+		balanceRows = [...balanceRows.filter((row) => row.id !== accountId), next];
+	};
 	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 		const method = init?.method ?? "GET";
 		const path = String(url);
@@ -345,8 +384,16 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		}
 		if (route === "/v1/accounts/balances" && method === "GET") {
 			try {
+				const requestedCut = query.get("asOf") || undefined;
+				const asOf = normalizeBalanceCut(requestedCut);
+				const fixture = requestedCut
+					? (balanceCuts.get(requestedCut) ??
+						balanceCuts.get(asOf) ??
+						balanceRows)
+					: balanceRows;
 				return ok({
-					...balanceRowsAt(current, query.get("asOf") || undefined),
+					accounts: balanceRowsForModel(current, fixture),
+					asOf,
 					revision: narrowRevision,
 				});
 			} catch (error) {
@@ -471,7 +518,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					(body as { id?: string }).id ||
 					`generated-${(globalThis.crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296).toString(36).slice(2, 10)}`,
 			};
-			return write(() => {
+			const response = write(() => {
 				(current.accounts as unknown[]).push(structuredClone(row));
 				upsertStubCheckpoint(
 					current,
@@ -480,6 +527,11 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					(row as { id: string }).id,
 				);
 			}, row);
+			updateBalanceFixture(
+				(row as { id: string }).id,
+				body as Record<string, unknown>,
+			);
+			return response;
 		}
 		let match = path.match(/^\/v1\/accounts\/([^/]+)$/);
 		if (match && method === "DELETE") {
@@ -521,7 +573,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				].filter((value): value is string => Boolean(value)),
 			);
 			revisionValue = '"sha256-test-deleted"';
-			return write(
+			const response = write(
 				() => {
 					current.accounts = accounts.filter((row) => !ids.has(row.id));
 					current.checkpoints = current.checkpoints.filter(
@@ -547,10 +599,12 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				},
 				{ deletedIds: [...ids] },
 			);
+			balanceRows = balanceRows.filter((row) => !ids.has(row.id));
+			return response;
 		}
 		if (match && method === "PATCH") {
 			const [, id] = match;
-			return write(() => {
+			const response = write(() => {
 				current.accounts = (current.accounts as unknown[]).map((item) =>
 					(item as { id: string }).id === id
 						? { ...structuredClone(body), id }
@@ -563,6 +617,8 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					id,
 				);
 			}, body);
+			updateBalanceFixture(id!, body as Record<string, unknown>);
+			return response;
 		}
 		if (path === "/v1/transactions" && method === "POST")
 			return write(() => {
@@ -585,11 +641,15 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			const document = structuredClone(
 				(body as { model: FinancialModel }).model,
 			);
-			return write(() => {
+			const response = write(() => {
 				for (const key of Object.keys(current)) delete current[key];
 				Object.assign(current, document);
 				statusValue = { ...statusValue, hasModel: true };
 			}, document);
+			const accountIds = new Set(current.accounts.map((account) => account.id));
+			balanceRows = balanceRows.filter((row) => accountIds.has(row.id));
+			balanceCuts.clear();
+			return response;
 		}
 		const categoryMatch = path.match(
 			/^\/v1\/transactions\/([^/]+)\/categorize$/,
@@ -945,6 +1005,15 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		},
 		setRevision: (revision: string) => {
 			revisionValue = revision;
+		},
+		setBalanceRows: (rows: AccountBalanceRow[]) => {
+			balanceRows = structuredClone(rows);
+		},
+		setBalanceRowsForCut: (cut: string, rows: AccountBalanceRow[]) => {
+			const asOf = normalizeBalanceCut(cut);
+			const fixture = structuredClone(rows);
+			balanceCuts.set(cut, fixture);
+			balanceCuts.set(asOf, fixture);
 		},
 		setSettleCandidates: (transactionId: string, candidates: unknown[]) => {
 			settleCandidates.set(transactionId, candidates);

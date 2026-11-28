@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import {
 	Field,
+	FieldContent,
 	FieldLabel,
 	FieldLegend,
 	FieldSet,
 } from "@/components/ui/field.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { useSavedAccounts } from "../state/savedState.ts";
@@ -72,10 +74,12 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	const setPolicy = useSetSharingPolicy();
 	const shareFromId = useId();
 	const shareUntilId = useId();
+	const noEndDateId = useId();
 
 	const [accountIds, setAccountIds] = useState<string[] | null>(null);
 	const [startDate, setStartDate] = useState<string | null>(null);
 	const [endDate, setEndDate] = useState<string | null>(null);
+	const [noEndDate, setNoEndDate] = useState<boolean | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [stopping, setStopping] = useState(false);
 	const [confirmStop, setConfirmStop] = useState(false);
@@ -96,13 +100,17 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	}, [accountIds, policy, accounts, ownedIds]);
 	const draftStart = startDate ?? policy?.startDate ?? todayDay();
 	const draftEnd = endDate ?? policy?.endDate ?? "";
+	const draftNoEndDate = noEndDate ?? (policy !== null && !policy.endDate);
+	const draftPolicyEnd = draftNoEndDate ? "" : draftEnd;
+	const endChoiceValid = draftNoEndDate || draftPolicyEnd.length > 0;
 
 	// The live preview follows the draft after a short pause so every
 	// keystroke does not start a server count.
 	const [debounced, setDebounced] = useState({
 		accounts: draftAccounts,
 		start: draftStart,
-		end: draftEnd,
+		end: draftPolicyEnd,
+		noEnd: draftNoEndDate,
 	});
 	useEffect(() => {
 		const timer = setTimeout(
@@ -110,17 +118,20 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				setDebounced({
 					accounts: draftAccounts,
 					start: draftStart,
-					end: draftEnd,
+					end: draftPolicyEnd,
+					noEnd: draftNoEndDate,
 				}),
 			350,
 		);
 		return () => clearTimeout(timer);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [draftAccounts.join(","), draftStart, draftEnd]);
+	}, [draftAccounts.join(","), draftStart, draftPolicyEnd, draftNoEndDate]);
 
 	const previewInput = useMemo<Omit<SharingPolicyInput, "enabled"> | null>(
 		() =>
-			debounced.accounts.length > 0
+			debounced.accounts.length > 0 &&
+			Boolean(debounced.start) &&
+			(debounced.noEnd || Boolean(debounced.end))
 				? {
 						accountIds: debounced.accounts,
 						startDate: debounced.start,
@@ -164,6 +175,18 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 		});
 	}
 
+	function draftPolicyInput(enabled: boolean): SharingPolicyInput {
+		return {
+			enabled,
+			accountIds: draftAccounts,
+			startDate: draftStart,
+			...(draftPolicyEnd ? { endDate: draftPolicyEnd } : {}),
+		};
+	}
+
+	const canApplyDraft =
+		draftAccounts.length > 0 && Boolean(draftStart) && endChoiceValid;
+
 	async function save(input: SharingPolicyInput, notice: string) {
 		setSaving(true);
 		try {
@@ -171,6 +194,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			setAccountIds(null);
 			setStartDate(null);
 			setEndDate(null);
+			setNoEndDate(null);
 			notifySuccess("groups-notice", notice);
 		} catch (cause) {
 			const message = serverMessage(cause, "Sharing could not be saved.");
@@ -181,40 +205,19 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	}
 
 	function onEnable() {
-		void save(
-			{
-				enabled: true,
-				accountIds: draftAccounts,
-				startDate: draftStart,
-				endDate: draftEnd || undefined,
-			},
-			"Sharing turned on.",
-		);
+		void save(draftPolicyInput(true), "Sharing turned on.");
 	}
 
 	function onSave() {
 		void save(
-			{
-				enabled: policy?.enabled ?? false,
-				accountIds: draftAccounts,
-				startDate: draftStart,
-				endDate: draftEnd || undefined,
-			},
+			draftPolicyInput(policy?.enabled ?? false),
 			"Sharing preferences saved.",
 		);
 	}
 
 	function onDisable() {
 		setConfirmStop(false);
-		void save(
-			{
-				enabled: false,
-				accountIds: draftAccounts,
-				startDate: draftStart,
-				endDate: draftEnd || undefined,
-			},
-			"Automatic sharing turned off.",
-		);
+		void save(draftPolicyInput(false), "Automatic sharing turned off.");
 	}
 
 	// Stop-sharing-with-everyone composes the normal revocations: the
@@ -229,12 +232,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 		try {
 			await setPolicy.mutateAsync({
 				groupId,
-				input: {
-					enabled: false,
-					accountIds: draftAccounts,
-					startDate: draftStart,
-					endDate: draftEnd || undefined,
-				},
+				input: draftPolicyInput(false),
 			});
 			for (const grant of sharedGrants) {
 				try {
@@ -256,6 +254,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			setAccountIds(null);
 			setStartDate(null);
 			setEndDate(null);
+			setNoEndDate(null);
 			setConfirmStop(false);
 			notifySuccess("groups-notice", "Stopped sharing with everyone.");
 		} catch (cause) {
@@ -291,11 +290,12 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 		accountIds !== null ||
 		startDate !== null ||
 		endDate !== null ||
+		noEndDate !== null ||
 		(policy !== null &&
 			(policy.enabled ||
 				persistedAccounts.join(",") !== draftAccounts.join(",") ||
 				policy.startDate !== draftStart ||
-				(policy.endDate ?? "") !== draftEnd));
+				(policy.endDate ?? "") !== draftPolicyEnd));
 
 	return (
 		<section aria-label="My sharing" className="grid gap-4">
@@ -360,18 +360,34 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					/>
 				</Field>
 				<Field>
-					<FieldLabel htmlFor={shareUntilId}>
-						Share until (empty for no end)
-					</FieldLabel>
+					<FieldLabel htmlFor={shareUntilId}>Share until</FieldLabel>
 					<Input
 						id={shareUntilId}
 						type="date"
-						value={draftEnd}
+						value={draftNoEndDate ? "" : draftEnd}
 						maxLength={10}
+						required={!draftNoEndDate}
+						disabled={draftNoEndDate || saving || stopping}
 						onChange={(event) => {
 							setEndDate(event.target.value);
+							setNoEndDate(false);
 						}}
 					/>
+				</Field>
+				<Field orientation="horizontal">
+					<Checkbox
+						id={noEndDateId}
+						checked={draftNoEndDate}
+						disabled={saving || stopping}
+						onCheckedChange={(checked) => {
+							const noEnd = checked === true;
+							setNoEndDate(noEnd);
+							if (noEnd) setEndDate("");
+						}}
+					/>
+					<FieldContent>
+						<FieldLabel htmlFor={noEndDateId}>No end date</FieldLabel>
+					</FieldContent>
 				</Field>
 			</div>
 
@@ -383,7 +399,12 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 							these dates are shared automatically, including older transactions
 							from later bank imports. No second review step.
 						</p>
-						{previewQuery.isPending ? (
+						{!endChoiceValid ? (
+							<p className="m-0 text-muted-foreground">
+								Choose an end date or No end date to preview matching
+								transactions.
+							</p>
+						) : previewQuery.isPending ? (
 							<p className="m-0 text-muted-foreground" role="status">
 								Counting matching transactions…
 							</p>
@@ -433,9 +454,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					<Button
 						variant="default"
 						size="sm"
-						disabled={
-							saving || stopping || draftAccounts.length === 0 || !draftStart
-						}
+						disabled={saving || stopping || !canApplyDraft}
 						onClick={onEnable}
 					>
 						{saving ? "Turning on…" : "Turn on sharing"}
@@ -467,7 +486,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					<Button
 						variant="secondary"
 						size="sm"
-						disabled={saving || stopping}
+						disabled={saving || stopping || !canApplyDraft}
 						onClick={onSave}
 					>
 						{saving ? "Saving…" : "Save changes"}

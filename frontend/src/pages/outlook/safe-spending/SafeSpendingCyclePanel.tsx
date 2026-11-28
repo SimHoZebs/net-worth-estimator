@@ -36,7 +36,7 @@ export function SafeSpendingCyclePanel({
 		() => new Map(transactions.map((saved) => [saved.id, saved])),
 		[transactions],
 	);
-	const transferPeers = useTransferPeers(transactions, accounts);
+	const transferState = useTransferPeers(transactions, accounts);
 	const visible = [...activity.spending, ...activity.cashPayments];
 	const { selected, inspect, close } = useTransactionSelection(
 		visible,
@@ -81,7 +81,7 @@ export function SafeSpendingCyclePanel({
 					caption="Spending this cycle"
 					emptyMessage="No spending this cycle yet."
 					savedTransactions={savedById}
-					transferPeers={transferPeers}
+					transferState={transferState}
 					onInspect={inspect}
 					order={transactionOrder}
 				/>
@@ -97,7 +97,7 @@ export function SafeSpendingCyclePanel({
 							caption="Cash payments this cycle"
 							emptyMessage="No recorded cash payments in this period."
 							savedTransactions={savedById}
-							transferPeers={transferPeers}
+							transferState={transferState}
 							onInspect={inspect}
 							order={transactionOrder}
 						/>

@@ -69,7 +69,6 @@
 
 /* Expose the non-preset semantic utilities without a second palette owner. */
 @theme inline {
-	--font-sans: var(--font-ui);
 	--font-mono: var(--font-code);
 	--color-success-bg: var(--success-bg);
 	--color-success-text: var(--success-text);

@@ -83,8 +83,8 @@ export function Transactions({
 		[rows],
 	);
 	// One cached link query for the list; each row receives its
-	// resolved peer instead of resolving the same edge independently.
-	const linkedById = useTransferPeers(rows, accounts);
+	// resolved peer, link membership, and load state explicitly.
+	const transferState = useTransferPeers(rows, accounts);
 	const { selected, inspect, close } = useTransactionSelection(
 		occurrences,
 		savedState,
@@ -180,8 +180,13 @@ export function Transactions({
 										savedState.get(transaction.transactionId) ?? null
 									}
 									transferPeer={
-										linkedById.get(transaction.transactionId) ?? null
+										transferState.peersById.get(transaction.transactionId) ??
+										null
 									}
+									hasTransferLink={transferState.linkedIds.has(
+										transaction.transactionId,
+									)}
+									transferLinksLoaded={transferState.loaded}
 									onEdit={() => {
 										const savedTransaction = savedState.get(
 											transaction.transactionId,

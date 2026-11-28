@@ -108,7 +108,7 @@ export async function setSharingPolicy(
 			enabled: input.enabled,
 			accountIds: input.accountIds,
 			startDate: input.startDate ?? "",
-			endDate: input.endDate ?? "",
+			...(input.endDate ? { endDate: input.endDate } : {}),
 		}),
 	});
 	return response.data.policy;
@@ -132,7 +132,7 @@ export async function previewSharingPolicy(
 			body: JSON.stringify({
 				accountIds: input.accountIds,
 				startDate: input.startDate ?? "",
-				endDate: input.endDate ?? "",
+				...(input.endDate ? { endDate: input.endDate } : {}),
 			}),
 			signal,
 		},

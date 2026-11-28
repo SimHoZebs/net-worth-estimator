@@ -1,30 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FinancialModel } from "../api/contracts.ts";
-import { modelFixture, stubTestServer } from "./waypointServer.ts";
-
-const instant = (value: string) => Date.parse(value) / 1000;
-
-function actual(
-	id: string,
-	amount: number,
-	at: string,
-	overrides: Partial<FinancialModel["transactions"][number]> = {},
-): FinancialModel["transactions"][number] {
-	return {
-		id,
-		name: id,
-		sourceAccountId: "cash",
-		destinations: null,
-		amount: { resolver: "expression", config: { expression: String(amount) } },
-		postedTime: instant(at),
-		transactionTime: instant(at),
-		enabled: true,
-		source: "user",
-		pending: false,
-		void: false,
-		...overrides,
-	} as FinancialModel["transactions"][number];
-}
+import type { AccountBalanceRow } from "../api/generated/model/accountBalanceRow.ts";
+import {
+	defaultAccountBalanceFixture,
+	modelFixture,
+	stubTestServer,
+} from "./waypointServer.ts";
 
 async function balances(
 	server: ReturnType<typeof stubTestServer>,
@@ -40,7 +20,7 @@ async function balances(
 
 afterEach(() => vi.useRealTimers());
 
-describe("mock balance rows", () => {
+describe("mock balance responses", () => {
 	it("defaults a date-insensitive read to today's UTC date", async () => {
 		vi.useFakeTimers({ toFake: ["Date"] });
 		vi.setSystemTime(new Date("2026-11-25T12:00:00Z"));
@@ -49,61 +29,71 @@ describe("mock balance rows", () => {
 		expect(body.asOf).toBe("2026-11-25");
 	});
 
-	it("replays only recorded actuals after each account's latest checkpoint", async () => {
+	it("serves explicit active and archived fixtures without replaying the model", async () => {
 		const model = modelFixture();
-		model.checkpoints = [
+		model.accounts.push({
+			...model.accounts[1]!,
+			id: "active-loan",
+			name: "Active loan",
+		});
+		const fixture: AccountBalanceRow[] = [
+			{ ...defaultAccountBalanceFixture[0]!, balance: 100 },
 			{
-				AccountId: "cash",
-				Balance: 100,
-				observedAt: instant("2026-01-01T10:00:00Z"),
+				...defaultAccountBalanceFixture[1]!,
+				balance: 0,
+				observedBalance: 0,
+				archived: true,
 			},
 			{
-				AccountId: "loan",
-				Balance: -40,
-				observedAt: instant("2026-01-01T10:00:00Z"),
+				...defaultAccountBalanceFixture[1]!,
+				id: "active-loan",
+				name: "Active loan",
+				balance: 0,
+				observedBalance: 0,
+				archived: false,
 			},
 		];
-		model.transactions = [
-			actual("before-checkpoint", 10, "2025-12-31T12:00:00Z"),
-			actual("same-instant", 5, "2026-01-01T10:00:00Z"),
-			actual("later-expense", 25, "2026-01-02T11:00:00Z"),
-			actual("later-income", 40, "2026-01-03T12:00:00Z", {
-				sourceAccountId: null,
-				destinations: ["cash"],
-			}),
-			actual("disabled", 999, "2026-01-04T12:00:00Z", { enabled: false }),
-		];
-		const server = stubTestServer(undefined, model);
+		const server = stubTestServer(undefined, model, fixture);
 
-		const before = await balances(server, "2026-01-02T10:59:59Z");
+		const body = await balances(server, "2026-11-25");
+		expect(body.accounts).toEqual(fixture);
 		expect(
-			before.accounts.find((row: { id: string }) => row.id === "cash"),
-		).toMatchObject({
+			body.accounts.find((row: AccountBalanceRow) => row.id === "loan"),
+		).toMatchObject({ archived: true, balance: 0 });
+		expect(
+			body.accounts.find((row: AccountBalanceRow) => row.id === "active-loan"),
+		).toMatchObject({ archived: false, balance: 0 });
+	});
+
+	it("serves an explicit fixture for a requested cut", async () => {
+		const server = stubTestServer();
+		server.setBalanceRowsForCut("2026-01-01T12:00:00Z", [
+			{
+				...defaultAccountBalanceFixture[0]!,
+				balance: 0,
+				observedBalance: 0,
+				hasCheckpoint: false,
+				observedAt: undefined,
+			},
+		]);
+		const body = await balances(server, "2026-01-01T12:00:00Z");
+		expect(body.asOf).toBe("2026-01-01");
+		expect(body.accounts[0]).toMatchObject({ id: "cash", balance: 0 });
+		expect((await balances(server)).accounts[0]).toMatchObject({
+			id: "cash",
 			balance: 100,
-			observedBalance: 100,
-			observedAt: instant("2026-01-01T10:00:00Z"),
 		});
+	});
 
-		const exact = await balances(server, "2026-01-02T11:00:00Z");
-		expect(
-			exact.accounts.find((row: { id: string }) => row.id === "cash"),
-		).toMatchObject({
-			balance: 75,
-			observedBalance: 100,
-		});
-
-		const current = await balances(server, "2026-01-31");
-		expect(
-			current.accounts.find((row: { id: string }) => row.id === "cash"),
-		).toMatchObject({
-			balance: 115,
-			observedBalance: 100,
-		});
-		expect(
-			current.accounts.find((row: { id: string }) => row.id === "loan"),
-		).toMatchObject({
-			balance: -40,
-			observedBalance: -40,
+	it("keeps malformed-cut errors at the transport boundary", async () => {
+		const server = stubTestServer();
+		const response = await server.fetcher(
+			"/v1/accounts/balances?asOf=not-a-cut",
+			{ method: "GET" },
+		);
+		expect(response.status).toBe(422);
+		expect(await response.json()).toMatchObject({
+			detail: "as-of cut must be a valid date or timestamp",
 		});
 	});
 });

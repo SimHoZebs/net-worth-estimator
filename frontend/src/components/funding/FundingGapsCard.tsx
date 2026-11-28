@@ -153,16 +153,7 @@ export function FundingGapsCard({
 							<Button
 								variant="ghost"
 								size="icon-sm"
-								title={
-									pin.pinned
-										? `Unpin ${item.name} from Outlook`
-										: `Pin ${item.name} to Outlook`
-								}
-								aria-label={
-									pin.pinned
-										? `Unpin ${item.name} from Outlook`
-										: `Pin ${item.name} to Outlook`
-								}
+								aria-label={`Pin ${item.name} to Outlook`}
 								onClick={pin.onPinChange}
 								disabled={pin.disabled}
 								aria-pressed={pin.pinned}

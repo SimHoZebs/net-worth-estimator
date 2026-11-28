@@ -75,6 +75,7 @@ export function SyncConnectForm({
 			</Field>
 			<div className="mt-2 flex justify-end">
 				<Button
+					type="button"
 					variant="link"
 					className="min-h-6"
 					aria-controls={inputId}
@@ -87,7 +88,7 @@ export function SyncConnectForm({
 					) : (
 						<Eye size={14} aria-hidden="true" />
 					)}
-					{visible ? "Hide token" : "Show token"}
+					Show token
 				</Button>
 			</div>
 			{error ? <FieldError id={errorId}>{error}</FieldError> : null}

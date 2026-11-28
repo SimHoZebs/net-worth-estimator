@@ -13,7 +13,7 @@ import {
 } from "./financialModel.ts";
 import { fixtureModel } from "./model.ts";
 import { transactionResponse } from "./transactionResponse.ts";
-import { balanceRowsAt } from "./waypointServer.ts";
+import { accountBalanceFixtureRow } from "./accountBalances.ts";
 
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
@@ -90,26 +90,9 @@ export function setServerModelFixture(
 		return revision;
 	}
 	const model = effectiveModel;
-	const current = balanceRowsAt(model);
 	serverQueryClient().setQueryData(balancesQueryKey(), {
-		accounts: current.accounts.map((row) => {
-			// Preserve display-fixture ownership and balance-check flags while
-			// balances follow the same actual-only replay as the HTTP fake.
-			const displayAccount = data.accounts.find(
-				(account) => account.id === row.id,
-			);
-			return {
-				...row,
-				hasCheckpoint: displayAccount?.balanceCheck ?? row.hasCheckpoint,
-				archived: displayAccount?.archived ?? row.archived,
-				syncOwned:
-					displayAccount?.syncOwned ??
-					displayAccount?.readOnly ??
-					row.syncOwned,
-				readOnly: displayAccount?.readOnly ?? row.readOnly,
-			};
-		}),
-		asOf: current.asOf,
+		accounts: data.accounts.map(accountBalanceFixtureRow),
+		asOf: todayIso(),
 		revision,
 	});
 	serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {

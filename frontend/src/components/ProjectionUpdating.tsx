@@ -5,7 +5,7 @@ export function ProjectionUpdating() {
 			role="status"
 		>
 			<span
-				className="size-3 animate-spin rounded-full border-2 border-solid border-input border-t-primary"
+				className="size-3 motion-safe:animate-spin rounded-full border-2 border-solid border-input border-t-primary"
 				aria-hidden="true"
 			/>
 			Updating projection…

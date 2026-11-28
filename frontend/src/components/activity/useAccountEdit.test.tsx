@@ -5,6 +5,7 @@ import type { AccountBalanceRow } from "../../api/generated/model/accountBalance
 import type { FinancialModel } from "../../api/contracts.ts";
 import type { Account } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
+import { accountBalanceFixtureRow } from "../../mocks/accountBalances.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import {
 	setupQueryScope,
@@ -50,7 +51,9 @@ function serverWith({
 }: {
 	transactions?: FinancialModel["transactions"];
 } = {}) {
-	const server = stubTestServer();
+	const server = stubTestServer(undefined, undefined, [
+		accountBalanceFixtureRow(account()),
+	]);
 	server.model.accounts = [server.model.accounts[0]!];
 	server.model.accounts[0]!.name = "Cash";
 	server.model.checkpoints = [
@@ -175,10 +178,19 @@ describe("authoritative balance editing", () => {
 	it("loads and saves a backdated balance at its own exact cut", async () => {
 		const server = serverWith();
 		seedLatestRows(100);
+		const selected = "2025-12-31T12:00:00";
+		server.setBalanceRowsForCut(`${selected}Z`, [
+			accountBalanceFixtureRow({
+				...account(0),
+				observedOn: "2025-12-31",
+				observedAt: null,
+				observedBalance: null,
+				balanceCheck: false,
+			}),
+		]);
 		const hook = renderHook(() => useAccountEdit(account(), false), {
 			wrapper: ServerQueryWrapper,
 		});
-		const selected = "2025-12-31T12:00:00";
 		act(() => hook.result.current.setObservedAt(selected));
 		act(() => hook.result.current.update({ balance: "80" }, "balance"));
 		await waitFor(() => {
@@ -191,6 +203,9 @@ describe("authoritative balance editing", () => {
 			balance: 80,
 			observedAt: Math.floor(Date.parse(`${selected}Z`) / 1000),
 		});
+		server.setBalanceRowsForCut(`${selected}Z`, [
+			accountBalanceFixtureRow({ ...account(80), observedBalance: 80 }),
+		]);
 		const historical = await server.fetcher(
 			`/v1/accounts/balances?asOf=${encodeURIComponent(`${selected}Z`)}`,
 			{ method: "GET" },
@@ -220,6 +235,17 @@ describe("authoritative balance editing", () => {
 			wrapper: ServerQueryWrapper,
 		});
 		const selected = "2026-01-01T12:00:00";
+		server.setBalanceRows([
+			accountBalanceFixtureRow({
+				...account(200),
+				observedOn: "2026-01-03",
+				observedAt: Date.parse("2026-01-03T12:00:00Z") / 1000,
+				observedBalance: 200,
+			}),
+		]);
+		server.setBalanceRowsForCut(`${selected}Z`, [
+			accountBalanceFixtureRow(account(100)),
+		]);
 		act(() => hook.result.current.setObservedAt(selected));
 		act(() => hook.result.current.update({ balance: "100" }, "balance"));
 		await waitFor(() => {

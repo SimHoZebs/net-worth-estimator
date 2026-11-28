@@ -85,9 +85,6 @@ export function useWorkspaceOverlays() {
 			...editorReturnSearch(evidence),
 		});
 	};
-	const editFromEvidence = (target: EditorTarget) => {
-		openEditor(target);
-	};
 	const closeEditor = () => {
 		if (search.detail !== undefined && search.editTransaction !== undefined) {
 			navigation.close(safeSpendingDetailSearch(search.tab ?? "transactions"));
@@ -117,7 +114,6 @@ export function useWorkspaceOverlays() {
 		safeSpendingDetail,
 		openEditor,
 		openEvidence,
-		editFromEvidence,
 		closeEditor,
 		closeEvidence,
 		openSafeSpendingDetail,

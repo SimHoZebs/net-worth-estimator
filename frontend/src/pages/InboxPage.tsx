@@ -71,26 +71,25 @@ const statusVariant: Record<
 	},
 };
 
-const emptyCopy: Record<InboxStatus, { title: string; description: string }> = {
-	pending: {
-		title: "Nothing waiting",
-		description:
-			"Shared transactions appear here; split requests are coming later.",
-	},
-	accepted: {
-		title: "Nothing accepted yet",
-		description: "Accepted shares are saved as independent copies.",
-	},
-	declined: {
-		title: "Nothing declined",
-		description:
-			"Declining a direct share removes you from the sender's sharing list.",
-	},
-	canceled: {
-		title: "Nothing taken back",
-		description: "Shares withdrawn before your decision appear here.",
-	},
-};
+const emptyCopy: Record<InboxStatus, { title: string; description?: string }> =
+	{
+		pending: {
+			title: "Nothing waiting",
+		},
+		accepted: {
+			title: "Nothing accepted yet",
+			description: "Accepted shares are saved as independent copies.",
+		},
+		declined: {
+			title: "Nothing declined",
+			description:
+				"Declining a direct share removes you from the sender's sharing list.",
+		},
+		canceled: {
+			title: "Nothing taken back",
+			description: "Shares withdrawn before your decision appear here.",
+		},
+	};
 
 function InboxItemCard({
 	item,
@@ -310,9 +309,6 @@ export function InboxPage() {
 		<section aria-label="Inbox" className="grid gap-6">
 			<div>
 				<h2 className="m-0 text-xl">Inbox</h2>
-				<p className="mb-0 text-sm text-muted-foreground">
-					Accept to save your own copy; decline to leave the sender&apos;s list.
-				</p>
 			</div>
 			{inboxQuery.isError ? (
 				<Alert variant="destructive">
@@ -367,7 +363,9 @@ export function InboxPage() {
 											<Inbox aria-hidden="true" />
 										</EmptyMedia>
 										<EmptyTitle>{empty.title}</EmptyTitle>
-										<EmptyDescription>{empty.description}</EmptyDescription>
+										{empty.description && (
+											<EmptyDescription>{empty.description}</EmptyDescription>
+										)}
 									</EmptyHeader>
 								</Empty>
 							) : (

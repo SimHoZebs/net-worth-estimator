@@ -1,30 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TransferLink } from "../../api/generated/model/transferLink.ts";
+import { describe, expect, it, vi } from "vitest";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
+import type { TransferPeerSummary } from "./TransferLinkSection.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
-
-const linkState = vi.hoisted(() => ({
-	links: [] as TransferLink[],
-	dataAvailable: true,
-	isError: false,
-}));
-
-vi.mock("../../state/analyses.ts", () => ({
-	useTransferLinks: () => ({
-		data: linkState.dataAvailable ? { links: linkState.links } : undefined,
-		isError: linkState.isError,
-	}),
-}));
-vi.mock("../../state/savedState.ts", () => ({
-	useSavedAccounts: () => [],
-	useSavedTransactions: () => [],
-}));
-vi.mock("../analysis/TransactionAnalysis.tsx", () => ({
-	useTransactionBNPL: () => undefined,
-}));
 
 function occurrence(
 	overrides: Partial<AccountTransaction> = {},
@@ -79,7 +59,11 @@ function savedTransaction(overrides: Partial<Transaction> = {}): Transaction {
 function renderRow(
 	transaction: AccountTransaction,
 	saved: Transaction | null = savedTransaction(),
-	transferPeer?: Parameters<typeof TransactionRow>[0]["transferPeer"],
+	transferState: {
+		peer?: TransferPeerSummary | null;
+		hasLink?: boolean;
+		loaded?: boolean;
+	} = {},
 ) {
 	return render(
 		<table>
@@ -87,19 +71,15 @@ function renderRow(
 				<TransactionRow
 					transaction={transaction}
 					savedTransaction={saved}
-					transferPeer={transferPeer}
+					transferPeer={transferState.peer ?? null}
+					hasTransferLink={transferState.hasLink ?? false}
+					transferLinksLoaded={transferState.loaded ?? true}
 					onEdit={vi.fn()}
 				/>
 			</tbody>
 		</table>,
 	);
 }
-
-beforeEach(() => {
-	linkState.links = [];
-	linkState.dataAvailable = true;
-	linkState.isError = false;
-});
 
 describe("transaction row business logos", () => {
 	it("keeps the direction arrow while loading, then shows the decorative logo", () => {
@@ -129,15 +109,12 @@ describe("transaction row business logos", () => {
 		).toBeTruthy();
 	});
 
-	it.each([
-		{ state: "pending", dataAvailable: false, isError: false },
-		{ state: "failed", dataAvailable: false, isError: true },
-	])(
-		"keeps the generic arrow while transfer links are $state",
-		({ dataAvailable, isError }) => {
-			linkState.dataAvailable = dataAvailable;
-			linkState.isError = isError;
-			const { container } = renderRow(occurrence());
+	it.each(["pending", "failed"])(
+		"keeps the generic arrow while transfer links are %s",
+		() => {
+			const { container } = renderRow(occurrence(), savedTransaction(), {
+				loaded: false,
+			});
 			expect(container.querySelector("[data-transaction-icon] img")).toBeNull();
 			expect(
 				container.querySelector("svg.lucide-arrow-up-right"),
@@ -146,20 +123,10 @@ describe("transaction row business logos", () => {
 		},
 	);
 
-	it("allows an unlinked logo from cached transfer data after an error", () => {
-		linkState.isError = true;
-		const { container } = renderRow(occurrence());
-		expect(
-			container
-				.querySelector("[data-transaction-icon] img")
-				?.getAttribute("src"),
-		).toBe("/v1/assets/business-logos/spotify");
-	});
-
 	it("uses confirmed link membership when the parent peer is null", () => {
-		linkState.isError = true;
-		linkState.links = [{ legA: "spotify", legB: "peer" } as TransferLink];
-		const { container } = renderRow(occurrence(), savedTransaction(), null);
+		const { container } = renderRow(occurrence(), savedTransaction(), {
+			hasLink: true,
+		});
 		const icon = container.querySelector(
 			"[data-transaction-icon]",
 		) as HTMLElement;
@@ -170,6 +137,19 @@ describe("transaction row business logos", () => {
 			screen.getByRole("button", { name: "View Spotify on Nov 20, 2026" }),
 		).toBeTruthy();
 		expect(screen.getByText("−$12.00")).toBeTruthy();
+	});
+
+	it("keeps the transfer arrow when the linked other side is missing", () => {
+		const { container } = renderRow(occurrence(), savedTransaction(), {
+			peer: { peerId: "missing", peerName: null, accountName: null },
+			hasLink: true,
+		});
+		const icon = container.querySelector(
+			"[data-transaction-icon]",
+		) as HTMLElement;
+		expect(icon.querySelector("img")).toBeNull();
+		expect(icon.querySelector("svg.lucide-arrow-right-left")).not.toBeNull();
+		expect(icon.className).toContain("bg-accent");
 	});
 
 	it("uses only recognized personal saved rows for logo eligibility", () => {
@@ -210,9 +190,12 @@ describe("transaction row business logos", () => {
 
 	it("keeps the transfer arrow, subtitle, tone, and signed amount for a resolved link", () => {
 		const { container } = renderRow(occurrence(), savedTransaction(), {
-			peerId: "peer",
-			peerName: "Card payment",
-			accountName: "Savings",
+			peer: {
+				peerId: "peer",
+				peerName: "Card payment",
+				accountName: "Savings",
+			},
+			hasLink: true,
 		});
 		const icon = container.querySelector(
 			"[data-transaction-icon]",

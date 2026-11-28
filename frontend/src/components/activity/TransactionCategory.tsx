@@ -157,7 +157,7 @@ export function TransactionCategory({
 							<LoaderCircle
 								size={16}
 								aria-hidden="true"
-								className="flex-none animate-spin text-muted-foreground"
+								className="flex-none motion-safe:animate-spin text-muted-foreground"
 							/>
 						)}
 					</SelectTrigger>

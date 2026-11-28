@@ -57,7 +57,50 @@ it("saves the preference with the member's own values", async () => {
 		enabled: true,
 		accountIds: ["checking"],
 		startDate: "2026-01-01",
-		endDate: "",
+	});
+});
+
+it("sends an explicitly chosen end date in saves and previews", async () => {
+	const fetcher = vi.fn(async () => ok({ policy: policy() }));
+	vi.stubGlobal("fetch", fetcher);
+	await setSharingPolicy("g1", {
+		enabled: true,
+		accountIds: ["checking"],
+		startDate: "2026-01-01",
+		endDate: "2026-01-31",
+	});
+	expect(
+		JSON.parse(
+			String(
+				(fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].body,
+			),
+		),
+	).toMatchObject({
+		endDate: "2026-01-31",
+	});
+
+	const preview = {
+		...policy(),
+		endDate: "2026-01-31",
+		eligibleTransactions: 4,
+		memberCount: 3,
+	};
+	fetcher.mockResolvedValueOnce(ok({ preview }));
+	await previewSharingPolicy("g1", {
+		accountIds: ["checking"],
+		startDate: "2026-01-01",
+		endDate: "2026-01-31",
+	});
+	expect(
+		JSON.parse(
+			String(
+				(fetcher.mock.calls[1] as unknown as [string, RequestInit])[1].body,
+			),
+		),
+	).toEqual({
+		accountIds: ["checking"],
+		startDate: "2026-01-01",
+		endDate: "2026-01-31",
 	});
 });
 
@@ -78,6 +121,10 @@ it("previews unsaved values without persisting", async () => {
 	const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(url).toBe("/v1/shared/policies/g1/preview");
 	expect(init.method).toBe("POST");
+	expect(JSON.parse(String(init.body))).toEqual({
+		accountIds: ["checking"],
+		startDate: "2026-01-01",
+	});
 });
 
 it("lists grants and shares, revokes, excludes, and removes", async () => {

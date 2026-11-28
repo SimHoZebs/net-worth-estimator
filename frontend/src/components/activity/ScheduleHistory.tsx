@@ -8,6 +8,7 @@ import { performSave } from "../../state/workspaceWrites.ts";
 import { Badge } from "@/components/ui/badge.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
+import { useTransferPeers } from "./useTransferPeers.ts";
 
 /**
  * Pending bank rows stay owner-editable for the occurrence claim even when
@@ -29,18 +30,21 @@ function canRemoveOccurrence(transaction: Transaction): boolean {
  */
 export function ScheduleHistory({
 	transactions,
+	allTransactions,
 	accounts,
 	startDate,
 	onSelect,
 	readOnly,
 }: {
 	transactions: Transaction[];
+	allTransactions: Transaction[];
 	accounts: Account[];
 	startDate: string;
 	onSelect: (transaction: Transaction) => void;
 	readOnly?: boolean;
 }) {
 	const [removingId, setRemovingId] = useState<string | null>(null);
+	const transferState = useTransferPeers(allTransactions, accounts);
 	const remove = async (transaction: Transaction) => {
 		if (removingId !== null || readOnly) return;
 		setRemovingId(transaction.id);
@@ -85,6 +89,9 @@ export function ScheduleHistory({
 								},
 							})}
 							savedTransaction={transaction}
+							transferPeer={transferState.peersById.get(transaction.id) ?? null}
+							hasTransferLink={transferState.linkedIds.has(transaction.id)}
+							transferLinksLoaded={transferState.loaded}
 							onEdit={onSelect}
 							onRemove={
 								!readOnly && canRemoveOccurrence(transaction)

@@ -176,7 +176,7 @@ function SessionErrorBody({
 						<LoaderCircle
 							size={16}
 							aria-hidden="true"
-							className="shrink-0 animate-spin"
+							className="shrink-0 motion-safe:animate-spin"
 						/>
 					)}
 					{retryPending ? "Checking…" : "Retry access check"}

@@ -26,7 +26,7 @@ export function ReceiptExtractionAction({
 					<LoaderCircle
 						size={16}
 						aria-hidden="true"
-						className="shrink-0 animate-spin"
+						className="shrink-0 motion-safe:animate-spin"
 					/>
 				) : complete ? (
 					<Check size={16} aria-hidden="true" />

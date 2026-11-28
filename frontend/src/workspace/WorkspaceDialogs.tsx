@@ -64,7 +64,6 @@ export function WorkspaceEvidence({
 			<EvidenceDialog
 				target={overlays.evidence}
 				onClose={overlays.closeEvidence}
-				onEdit={overlays.editFromEvidence}
 			/>
 		</Suspense>
 	);

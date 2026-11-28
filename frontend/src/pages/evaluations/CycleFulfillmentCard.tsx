@@ -65,16 +65,7 @@ export function CycleFulfillmentCard({
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							title={
-								pinned
-									? `Unpin ${item.name} from Outlook`
-									: `Pin ${item.name} to Outlook`
-							}
-							aria-label={
-								pinned
-									? `Unpin ${item.name} from Outlook`
-									: `Pin ${item.name} to Outlook`
-							}
+							aria-label={`Pin ${item.name} to Outlook`}
 							onClick={onPinChange}
 							disabled={pinDisabled}
 							aria-pressed={pinned}

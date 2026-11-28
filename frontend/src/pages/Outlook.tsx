@@ -5,7 +5,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import {
 	Empty,
 	EmptyContent,
-	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
@@ -64,10 +63,6 @@ function OutlookContent() {
 						<Wallet aria-hidden="true" />
 					</EmptyMedia>
 					<EmptyTitle>Your workspace is ready</EmptyTitle>
-					<EmptyDescription>
-						Start with an account and its current balance. Add income, expenses,
-						and goals at your own pace.
-					</EmptyDescription>
 				</EmptyHeader>
 				{!readOnly && (
 					<EmptyContent>

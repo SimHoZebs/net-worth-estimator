@@ -310,6 +310,7 @@ function GmailLookbackEditor({
 	onSave: (days: number) => void;
 }) {
 	const lookbackId = useId();
+	const lookbackHintId = useId();
 	const shown = draft ?? String(lookbackDays);
 	const parsed = Number.parseInt(shown, 10);
 	const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 365;
@@ -332,12 +333,16 @@ function GmailLookbackEditor({
 					max={365}
 					required
 					disabled={disabled}
+					aria-describedby={lookbackHintId}
 					value={shown}
 					onChange={(event) => onDraft(event.target.value)}
 				/>
 			</Field>
-			<p className="mt-1 mb-3 text-sm leading-relaxed text-muted-foreground">
-				How far back the first receipt scan looks, from 1 to 365 days.
+			<p
+				id={lookbackHintId}
+				className="mt-1 mb-3 text-sm leading-relaxed text-muted-foreground"
+			>
+				Allowed range: 1–365 days.
 			</p>
 			<Button
 				variant="secondary"

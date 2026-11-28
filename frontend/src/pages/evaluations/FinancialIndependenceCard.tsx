@@ -107,7 +107,7 @@ export function FinancialIndependenceCard({
 						aria-haspopup="dialog"
 						aria-label={`Inspect independence for ${item.name}`}
 						onClick={() => setInspector(true)}
-						className="absolute inset-0 cursor-pointer rounded-xl border-0 bg-transparent p-0"
+						className="absolute inset-0 cursor-pointer rounded-xl border-0 bg-transparent p-0 focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-ring focus-visible:outline-offset-[-3px]"
 					/>
 				)}
 				<CardHeader className="relative">
@@ -130,8 +130,7 @@ export function FinancialIndependenceCard({
 								type="button"
 								variant="ghost"
 								size="icon-sm"
-								title={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
-								aria-label={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
+								aria-label={`Pin ${item.name} to Outlook`}
 								onClick={pin.onPinChange}
 								disabled={pin.disabled}
 								aria-pressed={pin.pinned}

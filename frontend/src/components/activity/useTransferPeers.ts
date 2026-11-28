@@ -7,24 +7,38 @@ import {
 	type TransferPeerSummary,
 } from "./TransferLinkSection.tsx";
 
-/** Resolve every visible leg from the shared cached transfer-link query. */
+export interface TransferListState {
+	peersById: Map<string, TransferPeerSummary>;
+	linkedIds: Set<string>;
+	loaded: boolean;
+}
+
+/** Resolve transfer display state once from the shared cached link query. */
 export function useTransferPeers(
 	transactions: Transaction[],
-	accounts: Account[],
-): Map<string, TransferPeerSummary> {
+	accounts: Pick<Account, "id" | "name">[],
+): TransferListState {
 	const linksQuery = useTransferLinks();
 	return useMemo(() => {
 		const links = linksQuery.data?.links ?? [];
-		const resolved = new Map<string, TransferPeerSummary>();
+		const peersById = new Map<string, TransferPeerSummary>();
+		const linkedIds = new Set<string>();
 		for (const row of transactions) {
+			const link = transferLinkForEdge(links, [row.id]);
+			if (!link) continue;
+			linkedIds.add(row.id);
 			const peer = resolveTransferPeer({
 				transactionId: row.id,
-				link: transferLinkForEdge(links, [row.id]),
+				link,
 				transactions,
 				accounts,
 			});
-			if (peer) resolved.set(row.id, peer);
+			if (peer) peersById.set(row.id, peer);
 		}
-		return resolved;
-	}, [linksQuery.data?.links, transactions, accounts]);
+		return {
+			peersById,
+			linkedIds,
+			loaded: linksQuery.data !== undefined,
+		};
+	}, [linksQuery.data, transactions, accounts]);
 }

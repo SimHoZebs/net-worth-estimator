@@ -86,8 +86,7 @@ export function FinancialIndependenceModal({
 						<TabsContent value="configure">
 							<div className="grid content-start gap-3">
 								<p className="m-0 text-xs text-muted-foreground">
-									Minimum net worth, spending test duration, and funding
-									sources. Saving recalculates the projection.
+									Saving recalculates the projection.
 								</p>
 								<IndependenceConfigure instanceId={item.id} />
 							</div>

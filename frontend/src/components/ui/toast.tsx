@@ -164,7 +164,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
 		icon = (
 			<LoaderCircle
 				strokeWidth={2}
-				className="animate-spin"
+				className="motion-safe:animate-spin"
 				aria-hidden="true"
 			/>
 		);

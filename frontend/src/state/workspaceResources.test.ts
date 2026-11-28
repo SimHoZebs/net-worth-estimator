@@ -22,8 +22,9 @@ import {
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { fixtureModel } from "../mocks/model.ts";
-import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
+import { stubTestServer } from "../mocks/waypointServer.ts";
 
 beforeEach(() => {
 	acceptTestResource();
@@ -86,37 +87,40 @@ describe("direct Query ownership", () => {
 		).toHaveLength(1);
 	});
 
-	it("primes current balance rows with actual-only replay", () => {
-		const model = modelFixture();
-		model.checkpoints = [
-			{
-				AccountId: "cash",
-				Balance: 100,
-				observedAt: Date.parse("2026-01-01T10:00:00Z") / 1000,
-			},
-		];
-		model.transactions = [
-			{
-				id: "actual",
-				name: "Actual",
-				sourceAccountId: "cash",
-				destinations: null,
-				amount: { resolver: "expression", config: { expression: "25" } },
-				postedTime: Date.parse("2026-01-02T10:00:00Z") / 1000,
-				transactionTime: Date.parse("2026-01-02T10:00:00Z") / 1000,
-				enabled: true,
-				source: "user",
-				pending: false,
-				void: false,
-			} as (typeof model.transactions)[number],
-		];
-		setServerModelFixture(undefined, { model });
+	it("primes current balance rows from explicit active and archived account fixtures", () => {
+		const mortgage = financialModelFixture.accounts[5]!;
+		const data = {
+			...financialModelFixture,
+			accounts: [
+				...financialModelFixture.accounts,
+				{
+					...mortgage,
+					id: "active-loan",
+					name: "Active zero loan",
+					balance: 0,
+					observedBalance: 0,
+					archived: false,
+				},
+				{
+					...mortgage,
+					id: "archived-loan",
+					name: "Archived zero loan",
+					balance: 0,
+					observedBalance: 0,
+					archived: true,
+				},
+			],
+		};
+		setServerModelFixture(data);
 		expect(
-			getAccountBalances()?.accounts.find((row) => row.id === "cash"),
-		).toMatchObject({
-			balance: 75,
-			observedBalance: 100,
-		});
+			getAccountBalances()?.accounts.find((row) => row.id === "checking"),
+		).toMatchObject({ balance: 18250, archived: false });
+		expect(
+			getAccountBalances()?.accounts.find((row) => row.id === "active-loan"),
+		).toMatchObject({ balance: 0, archived: false });
+		expect(
+			getAccountBalances()?.accounts.find((row) => row.id === "archived-loan"),
+		).toMatchObject({ balance: 0, archived: true });
 	});
 
 	it("does not refetch cached workspace data on remount", async () => {

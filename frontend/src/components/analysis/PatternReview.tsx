@@ -369,9 +369,9 @@ export function PatternReview({
 					setOpenKey(null);
 				}}
 			>
-				<TabsList aria-label="Pattern review status">
+				<TabsList scrollable aria-label="Pattern review status">
 					{TABS.map((entry) => (
-						<TabsTrigger key={entry.id} value={entry.id}>
+						<TabsTrigger key={entry.id} value={entry.id} className="flex-none">
 							{entry.label} ({counts.get(entry.id) ?? 0})
 						</TabsTrigger>
 					))}
