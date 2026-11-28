@@ -2,7 +2,7 @@
 id: 080
 title: Apply the same judgment response validation to categorization
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -62,3 +62,5 @@ A malformed provider response — a duplicate request ID or a reason over 2000 b
 Verify with a table-driven test containing a duplicate `RequestID`, an overlong reason, a ready decision with empty strength, and an unmatched ID: assert no category is assigned and that both paths reject identically. Whether partial batches occur is a product decision that affects the batching choice.
 
 References: `backend/internal/judgment/assess.go:12-62`; `backend/internal/categorization/ml_classifier.go:82-109`; `backend/internal/analysis/payment_judgment.go:17-25`; `docs/analyses.md:188-195`.
+
+Implemented in commit `e9c8aaca`.

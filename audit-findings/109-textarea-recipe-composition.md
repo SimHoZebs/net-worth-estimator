@@ -2,7 +2,7 @@
 id: 109
 title: Compose the textarea from the shared input recipe
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -67,3 +67,5 @@ The duplicate chain stays. A future change to focus, invalid, disabled, or dark 
 Verify with typecheck and a comparison of rendered `Input` and `Textarea` class lists for identical focus, invalid, disabled, and dark tokens. Confirm `auth/better-auth/src/controls.ts` still uses `inputClassName`.
 
 References: `frontend/src/components/ui/textarea.tsx:9`; `frontend/src/components/ui/control-styles.ts:5-9,50-51`; `auth/better-auth/src/controls.ts:11,33`.
+
+Implemented in commit `e68bbbdc`.

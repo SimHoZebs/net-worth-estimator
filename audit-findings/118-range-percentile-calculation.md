@@ -2,7 +2,7 @@
 id: 118
 title: Calculate range percentiles in one place
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 A newly calculated range and a range served from saved results both describe the same distribution of scenarios. They use separate formulas to estimate percentiles between samples. The formulas are mathematically equivalent, but floating-point rounding can leave slightly different values in the API response for identical samples.
@@ -20,3 +20,5 @@ Have the storage builder call the existing `domain.ComputePercentiles` helper, w
 A read-only arithmetic probe found that the two formulas can produce adjacent floating-point values. No difference in displayed currency was measured.
 
 Verify exact equality between computed and stored API percentiles for the same samples, including a case where the current formulas produce different results. Cover empty and single-sample input in the builder.
+
+Implemented in commit `5439ddc0`.

@@ -2,7 +2,7 @@
 id: 078
 title: Price a closed statement with one engine
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -62,3 +62,5 @@ The card-statements API and transfer-pair analysis can price a closed cycle by b
 Verify with a differential test asserting closed balances from both paths match across a fixture with a checkpoint at every close, one with gaps, and one with intra-cycle payments, then run the existing derive-statements, payday, and evidence tests. One run observed no divergent value; production checkpoint density is unknown, so treat this as a drift risk rather than a proven wrong balance.
 
 References: `backend/internal/safespending/derive_statements.go:11-18,52-85`; `backend/internal/safespending/payday_statements.go:78-127,264-272`; `backend/internal/types/card_statement.go:5-18`; `backend/internal/api/model/safe_spending_summary.go:45`; `backend/internal/api/analyses/transfer_pair.go:112`.
+
+Implemented in commit `e9c8aaca`.

@@ -2,7 +2,7 @@
 id: 129
 title: Keep one working recipe for regenerating the ML seed
 scope: doc-audit-reference
-status: accepted
+status: implemented
 ---
 
 Two guides change into `ml/` and then export to `ml/seed.sqlite3`. That relative path resolves to `ml/ml/seed.sqlite3` in the checkout, so the instructions do not export where they say they do.
@@ -20,3 +20,5 @@ Make the evaluation README the owner of the full regeneration command. Write the
 From `ml/`, the read-only command `realpath -m ml/seed.sqlite3` resolves to the nested path. The export was not run because it writes a database.
 
 Resolve both paths from the documented working directory and confirm the staging path is outside the checkout and the copy destination is the canonical seed. Verify the seed after an authorized regeneration.
+
+Implemented in commit `f7042f67`.

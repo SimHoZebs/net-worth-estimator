@@ -2,7 +2,7 @@
 id: 083
 title: Record the posted-time repair script in the migration ledger
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -69,3 +69,5 @@ The script stays reachable only by manual README discovery, so it can be missed 
 Run the repair tool's tests, execute the migration body in verify mode against a fixture with a zeroed claimed row, and confirm the candidate copy has zero violating rows while the original is byte-identical. Verify mode in `deploy/migrate.sh` builds and checks the candidate without publishing it over the original database. These are proposed acceptance checks. No live database was inspected, so whether any target still holds corrupt rows is unknown.
 
 References: `backend/scripts/one-time/repair-claimed-posted-time/main.go:1-3,44-131`; `backend/scripts/one-time/repair-claimed-posted-time/README.md:1-18`; `backend/internal/store/adapters/sqlite/sync_pending.go:259-268`; `deploy/MIGRATIONS.md`.
+
+Implemented in commit `26ba7dbd`.

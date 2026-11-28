@@ -2,7 +2,7 @@
 id: 131
 title: Read only current schedule recurrence
 scope: frontend-domain
-status: accepted
+status: implemented
 ---
 
 The current API supplies schedule recurrence. The browser still converts an older representation into a recurrence. Its adapter also fills in some missing or invalid fields, which can make a malformed response look like a usable schedule in the editor.
@@ -21,3 +21,5 @@ Keep a reader that validates the current recurrence fields and remove the old ma
 Source inspection confirms the current contract does not have a `frequency` field. Migration completion was not verified for every target.
 
 Check schedule creation and editing, source timing and recurring-pattern previews with valid current recurrence values. Verify malformed current values do not prefill the form. Before deployment, verify the required one-time database upgrade on supported targets.
+
+Implemented in commit `91ac5165`.

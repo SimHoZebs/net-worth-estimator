@@ -2,7 +2,7 @@
 id: 112
 title: Bound transaction title truncation by the container
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -72,3 +72,5 @@ Long titles keep truncating inconsistently — too short on the desktop page, no
 Verify at narrow phone width and desktop with a long title in the page table and the detail sheet. These responsive claims are code-derived and require visual confirmation.
 
 References: `frontend/src/components/activity/TransactionItem.tsx:69-75`.
+
+Implemented in commit `e68bbbdc`.

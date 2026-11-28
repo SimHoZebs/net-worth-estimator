@@ -2,7 +2,7 @@
 id: 061
 title: Validate stream event payloads before typing them
 scope: contracts-types
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -62,3 +62,5 @@ A field rename or malformed event keeps reaching domain code unchecked, producin
 Verify that a malformed result event whose data object contains only an unrelated field fires `onParseError` and runs no typed callback, while valid progress, partial, result, and error events still drive the stream to a completed range. `sse.test.ts` and the stochastic query tests cover the valid paths. These are proposed acceptance checks; no result was recorded.
 
 References: `frontend/src/api/sse.ts:53-69,107-116`; `frontend/src/state/stochasticProjectionQuery.ts:62-81`; `backend/internal/api/projections/stochastic.go:40-53`; `backend/internal/api/projections/routes.go:46`.
+
+Implemented in commit `91ac5165`.

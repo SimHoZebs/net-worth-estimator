@@ -2,7 +2,7 @@
 id: 126
 title: Supply account balances directly in frontend tests
 scope: deploy-build-test
-status: accepted
+status: implemented
 ---
 
 The frontend test server calculates its own account balances and decides which debts are archived. Its rule archives a zero-balance liability even without payment terms; the real API requires payment terms. Frontend tests can therefore see a different account list from the one the API returns.
@@ -21,3 +21,5 @@ Use explicit balance response fixtures in the frontend test server and remove it
 Source comparison confirms the frontend fake and real API apply different archival rules.
 
 Run frontend unit tests with explicit archived and active account fixtures. Run the backend account balance and archival integration tests and confirm that the frontend fake no longer duplicates the calculation.
+
+Implemented in commit `e68bbbdc`.

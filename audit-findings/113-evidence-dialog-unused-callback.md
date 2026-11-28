@@ -2,7 +2,7 @@
 id: 113
 title: Remove the unused evidence edit callback
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -66,3 +66,5 @@ The unused `onEdit` prop keeps suggesting evidence rows are editable when they a
 Typecheck after removing the `onEdit` prop, and search the workspace to confirm no remaining consumer of `editFromEvidence` or the `onEdit` prop.
 
 References: `frontend/src/components/EvidenceDialog.tsx:21-28`; `frontend/src/workspace/WorkspaceDialogs.tsx:67`; `frontend/src/workspace/useWorkspaceOverlays.ts:88,120`.
+
+Implemented in commit `e68bbbdc`.

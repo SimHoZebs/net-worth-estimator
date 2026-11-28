@@ -2,7 +2,7 @@
 id: 067
 title: Register a shared run only after the stream is writable
 scope: backend-api-persist
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -75,3 +75,5 @@ A client whose writer is not an `http.Flusher` leaves a `sharedStochasticRun` in
 Use a writer that is not an `http.Flusher`. After the first request, a second request carrying the same model, overrides, settings, run count, and seed must not report `Projection-Source: shared`, must complete with its own result, and the registry must have no entry for that key. This is a proposed acceptance check; the finding does not record a real result yet.
 
 References: `backend/internal/api/projections/stochastic.go:82-91,107,174-180`; `backend/internal/api/projections/runs.go:38-50,97-104`; `backend/internal/api/projections/stochastic_test.go:87-99`.
+
+Implemented in commit `5439ddc0`.

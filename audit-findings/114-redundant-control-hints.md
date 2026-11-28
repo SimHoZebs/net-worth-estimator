@@ -2,7 +2,7 @@
 id: 114
 title: Remove hints that restate the control
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -69,3 +69,5 @@ Confirm the scan-window input still rejects values outside 1 through 365, the pa
 Check that the revised copy still communicates limits before submission, preserves the explanation of read-only mode where needed, and tells people when saving recalculates the projection.
 
 References: `frontend/src/pages/sources/GmailProviderPanel.tsx:340`; `auth/better-auth/src/pages.ts:53`; `frontend/src/pages/evaluations/IndependenceConfigure.tsx:368`; `frontend/src/pages/purchase-planner/PlannedPurchaseEditor.tsx:125`; `frontend/src/pages/evaluations/FinancialIndependenceModal.tsx:89`; `docs/UI_UX_PRINCIPLES.md`.
+
+Implemented in commit `e68bbbdc`.

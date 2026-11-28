@@ -2,7 +2,7 @@
 id: 128
 title: Correct the Analysis input retention guide
 scope: doc-audit-reference
-status: accepted
+status: implemented
 ---
 
 The Analysis guide says each run saves a reproducible input snapshot that can preserve deleted transaction evidence. The worker loads the input into memory for computation, but the run table retains the input revision and run metadata rather than a copy of that input.
@@ -21,3 +21,5 @@ Correct the lifecycle, persistence and privacy sections to distinguish the in-me
 Source comparison confirms the run schema has no input snapshot column. No production database was inspected.
 
 Cross-check the updated retention statements against the current schema, worker and migration contract.
+
+Implemented in commit `f7042f67`.

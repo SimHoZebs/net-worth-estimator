@@ -2,7 +2,7 @@
 id: 115
 title: Make an open-ended share an explicit choice
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -64,3 +64,5 @@ The field keeps relying on the parenthetical "(empty for no end)" to explain tha
 Confirm that with the "No end date" choice selected the save request still stores an empty end date and the preview sentence still reads "with no end"; selecting a date still sends a date string and the preview reads "to" followed by that date. This is a proposed acceptance check, not a recorded result.
 
 References: `frontend/src/pages/GroupSharingSection.tsx:364`; `docs/UI_UX_PRINCIPLES.md:338-345`.
+
+Implemented in commit `e68bbbdc`.

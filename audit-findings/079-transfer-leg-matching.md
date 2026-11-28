@@ -2,7 +2,7 @@
 id: 079
 title: Match transfer legs with one shared rule
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -61,3 +61,5 @@ A change to the seven-day window or sign rule must be made in three files. Missi
 Verify with one boundary case — an eight-day gap, exact cents, opposite accounts — asserting all paths agree, then run transfer-detector, payment-incremental, link, and netting tests. The shared helper must live in `domain` to avoid an import cycle; partial-window clipping was not inspected.
 
 References: `backend/internal/analysis/transfer.go:14-22,204-235`; `backend/internal/analysis/payment_transfers.go:11-100`; `backend/internal/store/adapters/sqlite/transfer_links.go:56-59,135-173`; `backend/internal/domain/path.go:161-215`; `backend/internal/domain/flowgraph.go:390-445`.
+
+Implemented in commit `e9c8aaca`.

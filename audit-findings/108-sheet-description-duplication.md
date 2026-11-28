@@ -2,7 +2,7 @@
 id: 108
 title: Remove the duplicated sheet description
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -66,3 +66,5 @@ Every screen reader user of the suggestions sheet hears the same sentence twice,
 With the Suggestions sheet open, verify that the phrase "Small checks to improve future estimates" occurs once in the DOM and that `SheetDescription` still publishes the sheet's accessible description.
 
 References: `frontend/src/components/activity/TransactionDetail.tsx:1433,1438`.
+
+Implemented in commit `e68bbbdc`.

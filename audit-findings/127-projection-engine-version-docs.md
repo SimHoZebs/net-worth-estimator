@@ -2,7 +2,7 @@
 id: 127
 title: Document the current projection engine version
 scope: doc-audit-reference
-status: accepted
+status: implemented
 ---
 
 The projection guide says the engine starts at `v1`. The runtime uses `v2` and checks saved engine versions so older results can be rebuilt. That behavior also invalidates the premise of finding [082](082-projection-engine-version.md).
@@ -21,3 +21,5 @@ Update the projection guide to describe `v2` as the runtime version and explain 
 Source and test inspection confirms the `v1` to `v2` transition is handled by the version check.
 
 Verify the guide against the type defaults, builder and version-bump test. Search current documentation for other assertions that only `v1` exists.
+
+Implemented in commit `5439ddc0`.

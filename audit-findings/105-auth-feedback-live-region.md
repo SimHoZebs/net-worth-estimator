@@ -2,7 +2,7 @@
 id: 105
 title: Make auth feedback announce errors assertively
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -68,3 +68,5 @@ A client-side passkey error can be missed entirely, and success versus error sta
 With a screen reader, confirm a failed sign-in and a failed passkey action both announce assertively. No test depends on the current strings, so wording can change freely. This is a proposed acceptance check; no screen-reader session was recorded for this audit.
 
 References: `auth/better-auth/src/pages.ts:44`; `auth/better-auth/src/client.ts:8-11`; `auth/better-auth/src/auth.css:23-31`.
+
+Implemented in commit `26ba7dbd`.

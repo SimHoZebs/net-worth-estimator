@@ -2,7 +2,7 @@
 id: 104
 title: Restore focus and announce passkey removal
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -67,3 +67,5 @@ Every removal sends keyboard focus to the document body and leaves screen-reader
 Walk the journey with a keyboard: tab to Remove, press Enter, confirm focus lands on a known control and the removal is announced. Keep `auth.test.ts` green. No screen-reader session was run for this audit, so the announcement failure is reasoned from markup rather than observed. This is a proposed acceptance check, not a recorded result.
 
 References: `auth/better-auth/src/client.ts:42-43,53-60`; `auth/better-auth/src/pages.ts:47`.
+
+Implemented in commit `26ba7dbd`.

@@ -2,7 +2,7 @@
 id: 117
 title: Price statements from the latest balance check
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 When you open a credit card's statements, the statement balance uses the last eligible balance check in its cycle. The lookup sorts by calendar day and then scans backward. Because the store keeps multiple balance checks per day, a morning balance entered after an evening balance can be picked as the latest.
@@ -20,3 +20,5 @@ Keep the exact observation time in the statement lookup and order balance checks
 Source inspection confirms the statement lookup discards the time when ordering checks. A read-only probe of the selection rule picked the morning balance of $100 instead of the evening balance of $200 when the evening check was supplied first.
 
 Add a statement test with those checks in both insertion orders and require the $200 balance in both cases. Also verify that a check after the cutoff does not affect the statement and that transfer matching still receives the corrected balance.
+
+Implemented in commit `e9c8aaca`.

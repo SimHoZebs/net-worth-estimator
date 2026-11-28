@@ -2,7 +2,7 @@
 id: 133
 title: Align the browser and server range scenario count
 scope: backend-api-persist
-status: accepted
+status: implemented
 ---
 
 The browser requests 400 scenarios for a range. New server state defaults to 1,000, and the server requires the counts to match before reading or building the saved range. Even when the remaining settings match, the normal browser request computes directly instead of reusing saved results.
@@ -20,3 +20,5 @@ Align the server's default and the browser's normal request around the current 4
 Source inspection confirms the defaults disagree. No production hit rate or compute time was measured.
 
 Verify with a fresh store and a fixture with unset range settings that the normal saved-model request persists results and an identical second request reuses them. Check that requests with a different scenario count still compute correctly.
+
+Implemented in commit `5439ddc0`.

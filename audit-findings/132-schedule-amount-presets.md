@@ -2,7 +2,7 @@
 id: 132
 title: Use saved amount presets when creating a schedule
 scope: frontend-domain
-status: accepted
+status: implemented
 ---
 
 The schedule creation form offers a hardcoded list of amounts. The Amounts catalog loads saved presets and supports user edits. Changes there do not appear in schedule creation, and Investment growth refers to different inputs in the two lists.
@@ -21,3 +21,5 @@ Use the existing Amounts preset catalog and builder when creating a schedule. Ca
 Source comparison confirms the lists are separate and differ for Investment growth.
 
 Create or rename a preset in Amounts and confirm schedule creation offers it and submits the stored definition. Compare Investment growth in both places. Exercise the existing schedule-specific options and their saved values.
+
+Implemented in commit `91ac5165`.

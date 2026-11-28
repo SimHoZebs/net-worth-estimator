@@ -2,7 +2,7 @@
 id: 110
 title: Keep font family strings in one owner
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -61,3 +61,5 @@ The literal in `index.css` stays shadowed and `font-heading` remains a separate 
 Verify with a grep that the Geist and Merriweather literals appear once in `frontend/src/styles` and that computed fonts for body, `h1`, and `font-heading` are unchanged in light and dark themes.
 
 References: `frontend/src/styles/index.css:99-100`; `frontend/src/styles/tokens.css:10-11,72`; `frontend/src/styles/typography.css:21,25`; `frontend/src/components/ui/card.tsx:40`.
+
+Implemented in commit `e68bbbdc`.

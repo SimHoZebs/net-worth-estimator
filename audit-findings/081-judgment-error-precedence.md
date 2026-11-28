@@ -2,7 +2,7 @@
 id: 081
 title: Decide judgment error precedence in one place
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -59,3 +59,5 @@ A change to which error wins — for example changing the order of unavailable a
 Verify with a parameterized regression over full recompute, incremental with more than 100 candidates, and incremental with carried findings, using a mix of ready, pending, and unavailable statuses. The existing full-versus-incremental parity test must stay green unchanged. Whether a carried finding can change status without a new request was not checked; if it can, cache invalidation also needs review.
 
 References: `backend/internal/judgment/assess.go:51-62`; `backend/internal/analysis/payment_judgment.go:15-27`; `backend/internal/analysis/payment_incremental.go:338-352,524-553`.
+
+Implemented in commit `e9c8aaca`.

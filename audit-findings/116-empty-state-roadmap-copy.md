@@ -2,7 +2,7 @@
 id: 116
 title: Remove tutorial and roadmap text from empty states
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -61,3 +61,5 @@ The Inbox keeps advertising split requests and restating its own Accept and Decl
 Confirm that the Accept and Decline buttons and the per-card copy still explain the actions, and that a repository search for "split requests are coming later" returns no match after the string is deleted. This is a proposed acceptance check, not a recorded result.
 
 References: `frontend/src/pages/InboxPage.tsx:78,314`; `frontend/src/pages/Outlook.tsx:63`.
+
+Implemented in commit `e68bbbdc`.

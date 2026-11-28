@@ -2,7 +2,7 @@
 id: 111
 title: Own the transaction warning badge in one place
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -67,3 +67,5 @@ The same excluded or shortfall transaction looks like a warning in the list but 
 Verify by rendering one excluded or shortfall transaction in the row and the detail sheet and comparing computed classes and labels. Confirm that both carry one warning style and label and that no hand-written warning color overrides remain. No browser render was performed for this audit.
 
 References: `frontend/src/components/activity/TransactionRow.tsx:155-170`; `frontend/src/components/activity/TransactionDetail.tsx:1084-1092`.
+
+Implemented in commit `e68bbbdc`.

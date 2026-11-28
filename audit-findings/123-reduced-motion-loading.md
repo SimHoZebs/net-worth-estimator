@@ -2,7 +2,7 @@
 id: 123
 title: Stop repeating loading animations with reduced motion
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 The reduced-motion stylesheet makes animations extremely short. Loading indicators that repeat indefinitely still repeat indefinitely, which can leave motion or flicker where a user asked for reduced motion.
@@ -19,3 +19,5 @@ Limit animations to one iteration in the existing reduced-motion rule so repeati
 Source inspection confirms the global override changes duration but does not change repetition. Visual behavior was not tested.
 
 Emulate reduced motion during loading, projection updates, and receipt extraction. Verify that animations settle, status text and busy-state announcements still work, and the default motion setting behaves as before.
+
+Implemented in commit `e68bbbdc`.

@@ -2,7 +2,7 @@
 id: 125
 title: Ship only the identity service runtime
 scope: deploy-build-test
-status: accepted
+status: implemented
 ---
 
 The identity service build installs all workspaces before building its sign-in assets, then copies the entire build tree into the final image. The running server serves its built public assets and imports two shared frontend recipes to render sign-in pages. One recipe uses `class-variance-authority`, currently installed as a frontend dependency.
@@ -21,3 +21,5 @@ Limit the final image to the identity service's runtime source, manifest, built 
 Source inspection confirms the final copy includes the whole build tree. The final image was not built or measured.
 
 Build and compare the images. Inspect the final filesystem for build-only files and dependencies. Cold-start the final image and verify `/healthz` and the rendered sign-in page, then run the disposable identity integration checks for sign-in, sign-out, passkeys and provider callbacks.
+
+Implemented in commit `26ba7dbd`.

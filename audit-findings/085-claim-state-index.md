@@ -2,7 +2,7 @@
 id: 085
 title: Build one claim-state index in the Safe Spending replay
 scope: backend-domain
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -72,3 +72,5 @@ Two indexes over the same data can classify the same claim differently, producin
 Use a case with a pending and a posted row claiming the same occurrence and assert both consumers classify it identically, then run claim, auto-claim, payday, and pending-statement tests. These are proposed acceptance checks. No disagreement was observed; the risk is drift and the two indexes returning different shapes.
 
 References: `backend/internal/safespending/obligations.go:132-158`; `backend/internal/safespending/payday_income.go:11-35`; `backend/internal/safespending/payday_statements.go:286,324-327`; `backend/internal/domain/auto_claim.go:184-301`.
+
+Implemented in commit `e9c8aaca`.

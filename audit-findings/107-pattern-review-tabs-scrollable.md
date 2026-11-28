@@ -2,7 +2,7 @@
 id: 107
 title: Make the pattern-review tab strip scrollable
 scope: ui-ux
-status: accepted
+status: implemented
 ---
 
 ## Scenario
@@ -71,3 +71,5 @@ The pattern-review strip stays the only consumer without the flag. At 360px the 
 With the Sources page open on the Analysis tab, narrow the viewport to 360px and confirm the pattern-review status strip scrolls horizontally and the underline and focus ring paint fully. No browser check was run for this audit, so the responsive claim is code-derived and requires visual confirmation.
 
 References: `frontend/src/components/analysis/PatternReview.tsx:372`; `frontend/src/components/ui/tabs.tsx:38-71`; `docs/ui-components.md:59-62`.
+
+Implemented in commit `e68bbbdc`.
