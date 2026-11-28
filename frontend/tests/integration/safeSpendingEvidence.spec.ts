@@ -22,6 +22,20 @@ const utcDayStart = () => {
 	);
 };
 
+// A closed statement needs its balance check inside that close's cycle. Use
+// noon on the latest close that has actually completed, never a fixed old date
+// or a future observation on the current closing day.
+const latestClosedObservation = (now: Date) => {
+	const close = new Date(
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 19, 23, 59, 59),
+	);
+	if (close.getTime() > now.getTime()) {
+		close.setUTCMonth(close.getUTCMonth() - 1);
+	}
+	close.setUTCHours(12, 0, 0, 0);
+	return close.getTime() / 1000;
+};
+
 // Synthetic reproduction: a newer investment observation must not advance the
 // checking cut, today's bills must survive, and Nov 30 income is not cash now.
 async function seedEvidence(api: APIRequestContext) {
@@ -247,7 +261,7 @@ async function seedTrackedCard(api: APIRequestContext, payday: string) {
 						AccountId: "evidence-synced-card",
 						Balance: -125,
 						source: "user",
-						observedAt: Date.parse("2026-01-01T00:00:00Z") / 1000,
+						observedAt: latestClosedObservation(new Date()),
 					},
 				],
 				transactions: [...baseline.transactions],
@@ -504,7 +518,11 @@ test("an explicitly tracked card keeps its statement payoff", async ({
 		const summary = await response.json();
 		expect(summary.status).toBe("available");
 		expect(summary.statements.length).toBeGreaterThan(0);
-		expect(summary.statementReserve).toBeGreaterThan(0);
+		expect(summary.statementReserve).toBe(125);
+		const closed = summary.statements.find(
+			(statement: { kind: string }) => statement.kind === "closed",
+		);
+		expect(closed?.amount).toBe(125);
 		for (const statement of summary.statements) {
 			expect(statement.accountId).toBe("evidence-synced-card");
 		}

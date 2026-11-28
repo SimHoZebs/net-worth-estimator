@@ -554,7 +554,7 @@ test("transaction row keeps the date column and icon on desktop", async ({
 	await expectNoHorizontalOverflow(page);
 });
 
-test("transaction title uses the mobile remainder beside an intrinsic amount", async ({
+test("transaction title truncates only when its container constrains it", async ({
 	page,
 }) => {
 	const title =
@@ -588,9 +588,9 @@ test("transaction title uses the mobile remainder beside an intrinsic amount", a
 	await expect(row).toBeVisible();
 
 	for (const viewport of [
-		{ width: 390, height: 844 },
-		{ width: 320, height: 700 },
-		{ width: 1440, height: 1080 },
+		{ width: 390, height: 844, truncates: true },
+		{ width: 320, height: 700, truncates: true },
+		{ width: 1440, height: 1080, truncates: false },
 	]) {
 		await page.setViewportSize(viewport);
 		await expect(row).toBeVisible();
@@ -647,34 +647,41 @@ test("transaction title uses the mobile remainder beside an intrinsic amount", a
 		expect(geometry.inlineDateDisplay).toBe(mobile ? "block" : "none");
 		expect(geometry.titleOverflow).toBe("hidden");
 		expect(geometry.titleTextOverflow).toBe("ellipsis");
-		expect(geometry.titleScrollWidth).toBeGreaterThan(
-			geometry.titleClientWidth,
-		);
+		// Container sizing replaces the retired character and viewport caps, so
+		// a wide row may fit the full title while narrow rows still ellipsize.
+		expect(geometry.titleMaxWidth).toBe("none");
+		expect(
+			Math.abs(geometry.titleWidth - geometry.titleColumnWidth),
+		).toBeLessThanOrEqual(1);
+		if (viewport.truncates) {
+			expect(geometry.titleScrollWidth).toBeGreaterThan(
+				geometry.titleClientWidth,
+			);
+		} else {
+			expect(geometry.titleScrollWidth).toBeLessThanOrEqual(
+				geometry.titleClientWidth + 1,
+			);
+		}
 		expect(geometry.rowOverflow).toBeLessThanOrEqual(1);
 		expect(geometry.tableOverflow).toBeLessThanOrEqual(1);
+		expect(geometry.amountTextAlign).toBe("right");
+		expect(geometry.amountContentWidth).toBeLessThanOrEqual(
+			geometry.amountWidth - geometry.amountPadding + 1,
+		);
+		expect(
+			Math.abs(
+				geometry.amountContentRight -
+					(geometry.amountRight - geometry.amountPaddingRight),
+			),
+		).toBeLessThanOrEqual(1);
 		if (mobile) {
-			expect(geometry.titleMaxWidth).toBe("none");
-			expect(
-				Math.abs(geometry.titleWidth - geometry.titleColumnWidth),
-			).toBeLessThanOrEqual(1);
 			expect(
 				Math.abs(
 					geometry.amountWidth -
 						(geometry.amountContentWidth + geometry.amountPadding),
 				),
 			).toBeLessThanOrEqual(1);
-			expect(geometry.amountTextAlign).toBe("right");
-			expect(
-				Math.abs(
-					geometry.amountContentRight -
-						(geometry.amountRight - geometry.amountPaddingRight),
-				),
-			).toBeLessThanOrEqual(1);
 		} else {
-			expect(geometry.titleMaxWidth).not.toBe("none");
-			expect(geometry.titleWidth).toBeLessThanOrEqual(
-				geometry.titleColumnWidth + 1,
-			);
 			expect(geometry.amountWidth).toBe(144);
 		}
 		await expectNoHorizontalOverflow(page);
