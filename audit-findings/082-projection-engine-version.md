@@ -65,4 +65,4 @@ References: `backend/internal/api/projections/builder.go:23,98-103`; `backend/in
 
 ## Decision
 
-Superseded by [127](127-projection-engine-version-docs.md). The engine now runs at `v2`, and the version check invalidates results built under `v1`. The premise for removing the check no longer holds.
+Superseded by finding 127 (`127-projection-engine-version-docs.md`, pruned after implementation). The engine now runs at `v2`, and the version check invalidates results built under `v1`. The premise for removing the check no longer holds.
