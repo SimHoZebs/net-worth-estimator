@@ -274,7 +274,7 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 	for range 2 {
 		privateTestPlan(t, d, "a")
 		b := privateTestPlan(t, d, "b")
-		if got, err := b.ListAmountPresets(); err != nil || len(got) != 8 {
+		if got, err := b.ListAmountPresets(); err != nil || len(got) != 10 {
 			t.Fatalf("new user presets = %d, %v", len(got), err)
 		}
 		if got, err := a.ListAmountPresets(); err != nil || len(got) != 0 {

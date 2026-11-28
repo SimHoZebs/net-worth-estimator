@@ -23,8 +23,8 @@ func TestAmountPresetsSeedDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list presets: %v", err)
 	}
-	if len(presets) != 8 {
-		t.Fatalf("seeded presets = %d, want 8", len(presets))
+	if len(presets) != 10 {
+		t.Fatalf("seeded presets = %d, want 10", len(presets))
 	}
 	names := map[string]bool{}
 	for _, preset := range presets {
@@ -36,9 +36,25 @@ func TestAmountPresetsSeedDefaults(t *testing.T) {
 		}
 		names[preset.Name] = true
 	}
-	for _, want := range []string{"fixed", "growth", "federal-tax"} {
+	for _, want := range []string{"fixed", "growth", "schedule-percent", "owed-balance", "federal-tax"} {
 		if !names[want] {
 			t.Fatalf("seed presets missing %s", want)
+		}
+	}
+	for _, preset := range presets {
+		switch preset.Name {
+		case "schedule-percent":
+			if preset.Amount.Inputs["base"].Provider != "model-value" {
+				t.Fatalf("schedule-percent provider = %q, want model-value", preset.Amount.Inputs["base"].Provider)
+			}
+		case "investment-growth":
+			if preset.Amount.Inputs["brokerage"].Provider != "account-balance" {
+				t.Fatalf("investment-growth provider = %q, want account-balance", preset.Amount.Inputs["brokerage"].Provider)
+			}
+		case "owed-balance":
+			if preset.Amount.Inputs["balance"].Provider != "account-balance" {
+				t.Fatalf("owed-balance provider = %q, want account-balance", preset.Amount.Inputs["balance"].Provider)
+			}
 		}
 	}
 }
@@ -144,8 +160,8 @@ func TestClearPreservesAmountPresets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list presets after clear: %v", err)
 	}
-	if len(presets) != 8 {
-		t.Fatalf("presets after clear = %d, want 8 seeds kept", len(presets))
+	if len(presets) != 10 {
+		t.Fatalf("presets after clear = %d, want 10 seeds kept", len(presets))
 	}
 	if exists, err := store.ModelExists(); err != nil || exists {
 		t.Fatalf("model exists after clear = %v, err %v", exists, err)

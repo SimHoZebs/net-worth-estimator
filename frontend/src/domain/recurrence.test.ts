@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
 	ensureStartWeekday,
 	recurrenceEqual,
-	recurrenceFromFrequency,
 	recurrenceFromScheduleLike,
 	recurrenceSentence,
 	validateRecurrence,
@@ -125,49 +124,72 @@ describe("recurrence validation", () => {
 	});
 });
 
-describe("recurrence migration helpers", () => {
-	it("maps legacy frequencies to recurrences", () => {
-		expect(recurrenceFromFrequency("daily", "2026-01-06")).toEqual({
-			unit: "day",
-			interval: 1,
-		});
-		expect(recurrenceFromFrequency("weekly", "2026-01-06")).toEqual({
-			unit: "week",
-			interval: 1,
-			weekdays: [2],
-		});
-		expect(recurrenceFromFrequency("monthly", "2026-01-06")).toEqual({
-			unit: "month",
-			interval: 1,
-			monthlyMode: "byDate",
-		});
-		expect(recurrenceFromFrequency("quarterly", "2026-01-06")).toEqual({
+describe("current schedule recurrence reader", () => {
+	it("preserves valid current recurrence fields", () => {
+		expect(
+			recurrenceFromScheduleLike({
+				recurrence: { unit: "week", interval: 2, weekdays: [4, 2] },
+				startDate: "2026-01-06",
+			}),
+		).toEqual({ unit: "week", interval: 2, weekdays: [4, 2] });
+		expect(
+			recurrenceFromScheduleLike({
+				recurrence: {
+					unit: "month",
+					interval: 3,
+					monthlyMode: "byNthWeekday",
+				},
+				startDate: "2026-01-20",
+			}),
+		).toEqual({
 			unit: "month",
 			interval: 3,
-			monthlyMode: "byDate",
+			monthlyMode: "byNthWeekday",
 		});
-		expect(recurrenceFromFrequency("annual", "2026-01-06")).toEqual({
-			unit: "year",
-			interval: 1,
-		});
+		expect(
+			recurrenceFromScheduleLike({
+				recurrence: { unit: "day", interval: 1 },
+				startDate: "2026-01-06",
+			}),
+		).toEqual({ unit: "day", interval: 1 });
 	});
-	it("reads stored schedules with recurrence or legacy frequency", () => {
-		const recurrence = { unit: "week", interval: 1, weekdays: [2] } as const;
+	it.each([
+		undefined,
+		null,
+		{},
+		{ frequency: "monthly" },
+		{ unit: "fortnight", interval: 1 },
+		{ unit: "day", interval: 0 },
+		{ unit: "day", interval: 100 },
+		{ unit: "day", interval: 1.5 },
+		{ unit: "day", interval: "1" },
+		{ unit: "week", interval: 1 },
+		{ unit: "week", interval: 1, weekdays: null },
+		{ unit: "week", interval: 1, weekdays: [] },
+		{ unit: "week", interval: 1, weekdays: [2, 2] },
+		{ unit: "week", interval: 1, weekdays: [2, 7] },
+		{ unit: "week", interval: 1, weekdays: [3] },
+		{ unit: "month", interval: 1 },
+		{ unit: "month", interval: 1, monthlyMode: "byWeek" },
+		{ unit: "day", interval: 1, weekdays: [2] },
+		{ unit: "year", interval: 1, monthlyMode: "byDate" },
+	])("rejects malformed current recurrence %#", (recurrence) => {
 		expect(
-			recurrenceFromScheduleLike({
-				recurrence,
-				frequency: "monthly",
-				startDate: "2026-01-06",
-			}),
-		).toEqual({ unit: "week", interval: 1, weekdays: [2] });
-		expect(
-			recurrenceFromScheduleLike({
-				frequency: "quarterly",
-				startDate: "2026-01-06",
-			}),
-		).toEqual({ unit: "month", interval: 3, monthlyMode: "byDate" });
+			recurrenceFromScheduleLike({ recurrence, startDate: "2026-01-06" }),
+		).toBeNull();
+	});
+	it("rejects missing schedules and invalid start dates", () => {
 		expect(recurrenceFromScheduleLike(null)).toBeNull();
+		expect(
+			recurrenceFromScheduleLike({
+				recurrence: { unit: "day", interval: 1 },
+				startDate: "2026-13-01",
+			}),
+		).toBeNull();
 	});
+});
+
+describe("recurrence helpers", () => {
 	it("compares recurrences ignoring weekday order", () => {
 		expect(
 			recurrenceEqual(

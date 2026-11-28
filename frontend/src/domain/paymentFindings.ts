@@ -103,10 +103,6 @@ export function findingStateLabel(
 	return `${kind}?`;
 }
 
-export function paymentLabel(finding: AnalysisFinding) {
-	return findingStateLabel(finding, "label");
-}
-
 export function paymentStatus(finding: AnalysisFinding) {
 	return findingStateLabel(finding, "status");
 }

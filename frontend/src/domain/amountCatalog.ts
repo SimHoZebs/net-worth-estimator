@@ -130,6 +130,26 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 		},
 	},
 	{
+		id: "schedule-percent",
+		label: "Percent of another schedule",
+		summary:
+			"Use a schedule's latest realized amount for employer match or automatic investing. Before its first occurrence, this amount is zero.",
+		whenToUse: "Contributions that scale with another scheduled payment.",
+		resolver: "expression",
+		amount: {
+			resolver: "expression",
+			config: { expression: "base * share" },
+			inputs: {
+				base: {
+					source: "provider",
+					provider: "model-value",
+					arguments: { id: "salary" },
+				},
+				share: { source: "literal", value: 0.1 },
+			},
+		},
+	},
+	{
 		id: "investment-growth",
 		label: "Investment growth",
 		summary:
@@ -142,13 +162,32 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 			inputs: {
 				brokerage: {
 					source: "provider",
-					provider: "model-value",
+					provider: "account-balance",
 					arguments: { id: "brokerage" },
 				},
 				rate: {
 					source: "provider",
 					provider: "occurrence-rate",
 					arguments: { annualRate: 0.07, volatility: 0.12 },
+				},
+			},
+		},
+	},
+	{
+		id: "owed-balance",
+		label: "Pay the balance owed",
+		summary:
+			"Pay the negative balance at each occurrence, or zero when nothing is owed. This is not a statement balance or a lender minimum.",
+		whenToUse: "Paying a card or loan down to zero.",
+		resolver: "expression",
+		amount: {
+			resolver: "expression",
+			config: { expression: "(abs(balance) - balance) / 2" },
+			inputs: {
+				balance: {
+					source: "provider",
+					provider: "account-balance",
+					arguments: { id: "prime_card" },
 				},
 			},
 		},

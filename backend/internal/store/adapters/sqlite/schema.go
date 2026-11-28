@@ -856,6 +856,19 @@ func seedAmountPresets() []types.AmountPreset {
 			},
 		},
 		{
+			Name: "schedule-percent", Label: "Percent of another schedule", Enabled: true,
+			Summary: "Use a schedule's latest realized amount for employer match or automatic investing. Before its first occurrence, this amount is zero.",
+			WhenUse: "Contributions that scale with another scheduled payment.",
+			Amount: types.TransactionAmountResolution{
+				Resolver: "expression",
+				Config:   map[string]any{"expression": "base * share"},
+				Inputs: map[string]types.AmountInputBinding{
+					"base":  {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "salary"}},
+					"share": {Source: "literal", Value: 0.1},
+				},
+			},
+		},
+		{
 			Name: "investment-growth", Label: "Investment growth", Enabled: true,
 			Summary: "Balance times a yearly rate, split across paychecks. Add wobble to model uncertainty ranges.",
 			WhenUse: "Brokerage or savings growth with optional volatility.",
@@ -863,8 +876,20 @@ func seedAmountPresets() []types.AmountPreset {
 				Resolver: "expression",
 				Config:   map[string]any{"expression": "brokerage * rate"},
 				Inputs: map[string]types.AmountInputBinding{
-					"brokerage": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "brokerage"}},
+					"brokerage": {Source: "provider", Provider: "account-balance", Arguments: map[string]any{"id": "brokerage"}},
 					"rate":      {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07, "volatility": 0.12}},
+				},
+			},
+		},
+		{
+			Name: "owed-balance", Label: "Pay the balance owed", Enabled: true,
+			Summary: "Pay the negative balance at each occurrence, or zero when nothing is owed. This is not a statement balance or a lender minimum.",
+			WhenUse: "Paying a card or loan down to zero.",
+			Amount: types.TransactionAmountResolution{
+				Resolver: "expression",
+				Config:   map[string]any{"expression": "(abs(balance) - balance) / 2"},
+				Inputs: map[string]types.AmountInputBinding{
+					"balance": {Source: "provider", Provider: "account-balance", Arguments: map[string]any{"id": "prime_card"}},
 				},
 			},
 		},

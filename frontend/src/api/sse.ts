@@ -1,9 +1,12 @@
-import { isRecord } from "../domain/guards.ts";
+import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import { projectStochastic } from "./generated/endpoints.ts";
 import type { StochasticRequest } from "./generated/model/stochasticRequest.ts";
 import type {
 	ErrorSSEData,
+	EvaluationResultEnvelope,
+	EvaluationResultTables,
 	PartialSSEData,
+	PercentileBands,
 	ProgressSSEData,
 	ResultSSEData,
 	StochasticProgress,
@@ -50,23 +53,161 @@ type StreamSource =
 	| AsyncIterable<Uint8Array | string>;
 export type SSEInput = Response | StreamSource | string;
 
-function eventPayload<T>(value: unknown): T {
-	return value as T;
+const PERCENTILE_KEYS = ["p10", "p25", "p50", "p75", "p90"] as const;
+
+function isPercentileBands(value: unknown): value is PercentileBands {
+	return (
+		isRecord(value) &&
+		PERCENTILE_KEYS.every((key) => finite(value[key]) !== null)
+	);
+}
+
+function isSafeInteger(value: unknown): value is number {
+	return finite(value) !== null && Number.isSafeInteger(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+	return isSafeInteger(value) && value >= 0;
+}
+
+function isStochasticProgress(value: unknown): value is StochasticProgress {
+	if (!isRecord(value)) return false;
+	const fraction = finite(value.fraction);
+	return (
+		isNonNegativeInteger(value.completedRuns) &&
+		isNonNegativeInteger(value.totalRuns) &&
+		fraction !== null &&
+		fraction >= 0 &&
+		fraction <= 1
+	);
+}
+
+function isStringArray(value: unknown): value is string[] {
+	return (
+		Array.isArray(value) && value.every((item) => stringValue(item) !== null)
+	);
+}
+
+function isEvaluationDiagnostic(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		stringValue(value.code) !== null &&
+		stringValue(value.severity) !== null &&
+		stringValue(value.message) !== null &&
+		(value.date === undefined || stringValue(value.date) !== null) &&
+		(value.relatedAccountIds === undefined ||
+			isStringArray(value.relatedAccountIds)) &&
+		(value.relatedTransactionIds === undefined ||
+			isStringArray(value.relatedTransactionIds))
+	);
+}
+
+function isEvaluationEnvelope(
+	value: unknown,
+): value is EvaluationResultEnvelope {
+	return (
+		isRecord(value) &&
+		stringValue(value.instanceId) !== null &&
+		typeof value.name === "string" &&
+		stringValue(value.status) !== null &&
+		Object.hasOwn(value, "deterministic") &&
+		Object.hasOwn(value, "probabilistic") &&
+		Array.isArray(value.diagnostics) &&
+		value.diagnostics.every(isEvaluationDiagnostic)
+	);
+}
+
+function isEvaluationRows(value: unknown): value is EvaluationResultEnvelope[] {
+	return Array.isArray(value) && value.every(isEvaluationEnvelope);
+}
+
+function isEvaluationTables(value: unknown): value is EvaluationResultTables {
+	if (!isRecord(value)) return false;
+	const required = [
+		"financialIndependence",
+		"netWorthThreshold",
+		"accountBalance",
+		"transactionFulfillment",
+	] as const;
+	const optional = ["cycleFulfillment", "plannedPurchases", "whatIf"] as const;
+	return (
+		required.every((key) => isEvaluationRows(value[key])) &&
+		optional.every(
+			(key) => value[key] === undefined || isEvaluationRows(value[key]),
+		)
+	);
+}
+
+function isStochasticProjectionResult(
+	value: unknown,
+): value is StochasticProjectionResult {
+	if (!isRecord(value) || !isRecord(value.config)) return false;
+	return (
+		isNonNegativeInteger(value.config.runCount) &&
+		value.config.runCount > 0 &&
+		(value.config.seed === null || isSafeInteger(value.config.seed)) &&
+		Array.isArray(value.bands) &&
+		value.bands.every(
+			(band) =>
+				isRecord(band) &&
+				stringValue(band.date) !== null &&
+				typeof band.isHistorical === "boolean" &&
+				isPercentileBands(band.netWorth),
+		) &&
+		isRecord(value.milestones) &&
+		isPercentileBands(value.milestones.finalNetWorthPercentiles) &&
+		isEvaluationTables(value.evaluations)
+	);
+}
+
+function isProgressSSEData(value: unknown): value is ProgressSSEData {
+	return isRecord(value) && isStochasticProgress(value.progress);
+}
+
+function isPartialSSEData(value: unknown): value is PartialSSEData {
+	return (
+		isRecord(value) &&
+		isStochasticProgress(value.progress) &&
+		isStochasticProjectionResult(value.partial)
+	);
+}
+
+function isResultSSEData(value: unknown): value is ResultSSEData {
+	return isRecord(value) && isStochasticProjectionResult(value.result);
+}
+
+function isErrorSSEData(value: unknown): value is ErrorSSEData {
+	return isRecord(value) && stringValue(value.error) !== null;
 }
 
 function dispatchEvent(
 	event: ParsedSSEEvent,
 	callbacks: SSEParserCallbacks,
-): void {
+): SSEParseError | null {
 	callbacks.onEvent?.(event);
-	if (event.event === "progress")
-		callbacks.onProgress?.(eventPayload<ProgressSSEData>(event.data));
-	if (event.event === "partial")
-		callbacks.onPartial?.(eventPayload<PartialSSEData>(event.data));
-	if (event.event === "result")
-		callbacks.onResult?.(eventPayload<ResultSSEData>(event.data));
-	if (event.event === "error")
-		callbacks.onError?.(eventPayload<ErrorSSEData>(event.data));
+	if (event.event === "progress") {
+		if (!isProgressSSEData(event.data)) return invalidEventPayload(event.event);
+		callbacks.onProgress?.(event.data);
+	}
+	if (event.event === "partial") {
+		if (!isPartialSSEData(event.data)) return invalidEventPayload(event.event);
+		callbacks.onPartial?.(event.data);
+	}
+	if (event.event === "result") {
+		if (!isResultSSEData(event.data)) return invalidEventPayload(event.event);
+		callbacks.onResult?.(event.data);
+	}
+	if (event.event === "error") {
+		if (!isErrorSSEData(event.data)) return invalidEventPayload(event.event);
+		callbacks.onError?.(event.data);
+	}
+	return null;
+}
+
+function invalidEventPayload(eventName: string): SSEParseError {
+	return new SSEParseError(
+		new Error(`The ${eventName} event payload has an invalid shape.`),
+	);
 }
 
 function parseBlock(
@@ -152,7 +293,12 @@ export class SSEParser {
 			return this.failure;
 		}
 		if (!parsed) return [];
-		dispatchEvent(parsed, this.callbacks);
+		const dispatchError = dispatchEvent(parsed, this.callbacks);
+		if (dispatchError) {
+			this.failure = dispatchError;
+			this.callbacks.onParseError?.(this.failure);
+			return this.failure;
+		}
 		return [parsed];
 	}
 

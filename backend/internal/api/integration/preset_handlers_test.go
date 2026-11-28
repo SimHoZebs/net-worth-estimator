@@ -67,8 +67,8 @@ func TestPresetListServesSeeds(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode preset list: %v", err)
 	}
-	if len(payload.Presets) != 8 {
-		t.Fatalf("seeded presets = %d, want 8", len(payload.Presets))
+	if len(payload.Presets) != 10 {
+		t.Fatalf("seeded presets = %d, want 10", len(payload.Presets))
 	}
 }
 

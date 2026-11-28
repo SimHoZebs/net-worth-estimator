@@ -5,7 +5,9 @@ import { buildFlowGraph } from "../api/generated/endpoints.ts";
 import type { FlowsOutputBody } from "../api/generated/model/index.ts";
 import type { FlowGraph } from "../api/flows.ts";
 import { readFlowGraph } from "../api/flows.ts";
+import { isIsoDate } from "../domain/format.ts";
 import type { FlowWindow } from "../domain/flowWindow.ts";
+import { horizonDate } from "../domain/result.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import {
 	projectionStartDateFromRows,
@@ -25,11 +27,14 @@ import { useUserScope } from "./useUserScope.ts";
  * range selects response dates; the horizon must still reach the window
  * end or its events never simulate. */
 export function flowHorizonYears(start: string, end: string): number {
-	if (end <= start) return 1;
+	if (!isIsoDate(start) || !isIsoDate(end) || end <= start) return 1;
 	const startYear = Number(start.slice(0, 4));
 	const endYear = Number(end.slice(0, 4));
-	if (!Number.isFinite(startYear) || !Number.isFinite(endYear)) return 1;
-	return Math.max(1, endYear - startYear + 1);
+	let years = Math.max(1, endYear - startYear);
+	while (horizonDate({ start, years }) < end) years += 1;
+	while (years > 1 && horizonDate({ start, years: years - 1 }) >= end)
+		years -= 1;
+	return years;
 }
 
 function flowGraphQueryKey(

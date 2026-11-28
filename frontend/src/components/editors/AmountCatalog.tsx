@@ -8,6 +8,7 @@ import {
 import {
 	useAmountPresets,
 	useAmountResolvers,
+	useSchedules,
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
 import { useUserReadOnly, useUserScope } from "../../state/useUserScope.ts";
@@ -149,9 +150,15 @@ export function AmountCatalog() {
 	const serverPresets = useAmountPresets({ enabled }).data ?? null;
 	const savedAccounts = useSavedAccounts();
 	const catalog = useTransactionCatalog().data;
+	const schedules = useSchedules().data?.schedules ?? [];
+	const scheduleOptions = schedules.map((schedule) => ({
+		id: schedule.id,
+		name: schedule.name,
+	}));
 	const accounts = (savedAccounts ?? []).map((account) => ({
 		id: account.id,
 		name: account.name,
+		kind: account.kind,
 	}));
 	const transactions = (catalog?.items ?? []).map((item) => ({
 		id: item.id,
@@ -373,6 +380,7 @@ export function AmountCatalog() {
 							<AmountBuilder
 								accounts={accounts}
 								transactions={transactions}
+								schedules={scheduleOptions}
 								templates={templates}
 								initialTemplateId="fixed"
 								onChange={setStagedAmount}
@@ -436,6 +444,7 @@ export function AmountCatalog() {
 								<AmountBuilder
 									accounts={accounts}
 									transactions={transactions}
+									schedules={scheduleOptions}
 									templates={templates}
 									initialTemplateId={
 										BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name)
@@ -496,6 +505,7 @@ export function AmountCatalog() {
 					key={selected.id}
 					accounts={accounts}
 					transactions={transactions}
+					schedules={scheduleOptions}
 					templates={templates}
 					initialTemplateId={selected.id}
 					hidePicker

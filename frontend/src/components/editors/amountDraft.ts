@@ -11,9 +11,16 @@ const paths: Record<string, Record<string, string[]>> = {
 		pct: ["inputs", "pct", "value"],
 	},
 	"investment-growth": {
-		refId: ["inputs", "ref", "arguments", "id"],
+		refId: ["inputs", "brokerage", "arguments", "id"],
 		annualRate: ["inputs", "rate", "arguments", "annualRate"],
 		volatility: ["inputs", "rate", "arguments", "volatility"],
+	},
+	"schedule-percent": {
+		reference: ["inputs", "base", "arguments", "id"],
+		percent: ["inputs", "share", "value"],
+	},
+	"owed-balance": {
+		accountId: ["inputs", "balance", "arguments", "id"],
 	},
 	"debt-minimum": { accountId: ["inputs", "minimum", "arguments", "id"] },
 	"late-fee": {
@@ -81,6 +88,10 @@ export function patchTemplateAmount(
 			target = target[key] as Record<string, unknown>;
 		}
 		target[path[path.length - 1]!] = readPath(built, path);
+	}
+	if (id === "investment-growth" && next.inputs?.brokerage) {
+		next.inputs.brokerage.source = "provider";
+		next.inputs.brokerage.provider = "account-balance";
 	}
 	return next;
 }

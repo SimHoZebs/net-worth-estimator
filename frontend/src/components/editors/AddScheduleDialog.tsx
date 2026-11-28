@@ -1,5 +1,7 @@
-import { useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { createSchedule } from "@/api/generated/endpoints.ts";
+import { isGroupedDisplay } from "../../domain/accountDisplay.ts";
+import { isLiability } from "../../domain/accountKinds.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
 import {
@@ -13,8 +15,13 @@ import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
 	useSchedules,
+	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
 import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
+import {
+	toGeneratedAmountResolution,
+	type TransactionAmountResolution,
+} from "../../api/contracts.ts";
 import {
 	scheduleTermsBody,
 	validateScheduleTerms,
@@ -30,13 +37,11 @@ import {
 	EditorSelect,
 	MoneyField,
 } from "./editorFields.tsx";
-import {
-	SCHEDULE_AMOUNT_RECIPES,
-	validateRecipe,
-	type AmountFields,
-} from "../../domain/scheduleAmounts.ts";
-import { ScheduleAmountFields } from "./ScheduleAmountFields.tsx";
 import { RecurrenceFields } from "./RecurrenceFields.tsx";
+import { templateFieldsFromAmount } from "./amountDraft.ts";
+import { AmountBuilder } from "./AmountBuilder.tsx";
+import { useAmountTemplates } from "./amountTemplates.ts";
+import { validateScheduleAmountDraft } from "../../domain/scheduleAmountValidation.ts";
 
 const DEFAULT_RECURRENCE: Recurrence = {
 	unit: "month",
@@ -60,23 +65,80 @@ export function AddScheduleDialog({
 	);
 	const fallbackStart = savedStartDate ?? todayIso();
 	const [name, setName] = useState("");
-	const [amountKind, setAmountKind] = useState("fixed");
-	const [amountDrafts, setAmountDrafts] = useState<
-		Record<string, AmountFields>
-	>({});
-	const recipe = SCHEDULE_AMOUNT_RECIPES.find(
-		(entry) => entry.id === amountKind,
-	)!;
-	const amountFields = amountDrafts[amountKind] ?? recipe.defaults;
+	const [error, setError] = useState<string | null>(null);
+	const templates = useAmountTemplates();
+	const [amountTemplateId, setAmountTemplateId] = useState("fixed");
+	const initialTemplate =
+		templates.find((entry) => entry.id === amountTemplateId) ?? templates[0];
+	const [amount, setAmount] = useState<TransactionAmountResolution | null>(
+		initialTemplate?.amount ?? null,
+	);
+	const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 	const schedules = useSchedules();
-	const [annualCap, setAnnualCap] = useState("");
-	const [priority, setPriority] = useState("");
+	const catalog = useTransactionCatalog();
+	const amountAccounts = useMemo(() => {
+		const assetTemplate =
+			amountTemplateId === "account-percent" ||
+			amountTemplateId === "investment-growth";
+		const debtTemplate = amountTemplateId === "owed-balance";
+		const accounts =
+			assetTemplate || debtTemplate
+				? savedAccounts.filter(
+						(account) =>
+							!isGroupedDisplay(account) &&
+							isLiability(account) === debtTemplate,
+					)
+				: savedAccounts;
+		return accounts.map((account) => ({
+			id: account.id,
+			name: account.name,
+			kind: account.kind,
+		}));
+	}, [amountTemplateId, savedAccounts]);
+	const amountSchedules = useMemo(
+		() =>
+			(schedules.data?.schedules ?? []).map((schedule) => ({
+				id: schedule.id,
+				name: schedule.name,
+			})),
+		[schedules.data],
+	);
+	const amountTransactions = useMemo(
+		() =>
+			(catalog.data?.items ?? []).map((transaction) => ({
+				id: transaction.id,
+				name: transaction.name,
+			})),
+		[catalog.data],
+	);
+	const amountFields = {
+		...templateFieldsFromAmount(amountTemplateId, initialTemplate?.amount),
+		...amountDrafts,
+	};
+	const changeAmountTemplate = useCallback(
+		(id: string) => {
+			if (id !== amountTemplateId) setAmountDrafts({});
+			setAmountTemplateId(id);
+			setError(null);
+		},
+		[amountTemplateId],
+	);
+	const changeAmount = useCallback((next: TransactionAmountResolution) => {
+		setAmount(next);
+		setError(null);
+	}, []);
+	const changeAmountFields = useCallback((fields: Record<string, string>) => {
+		setAmountDrafts(fields);
+		setError(null);
+	}, []);
 	const sourceSchedule =
-		amountKind === "schedule-percent"
+		amountTemplateId === "schedule-percent"
 			? schedules.data?.schedules.find(
 					(entry) => entry.id === amountFields.reference,
 				)
 			: undefined;
+	const [annualCap, setAnnualCap] = useState("");
+	const [priority, setPriority] = useState("");
 	const automaticPriority = sourceSchedule
 		? sourceSchedule.priority + 1
 		: undefined;
@@ -94,7 +156,6 @@ export function AddScheduleDialog({
 	const [endDate, setEndDate] = useState("");
 	const [enabled, setEnabled] = useState(true);
 	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const enabledId = useId();
 	const noEndDateId = useId();
 	const nameId = useId();
@@ -108,10 +169,14 @@ export function AddScheduleDialog({
 	const priorityId = useId();
 	const priorityHintId = `${priorityId}-hint`;
 
+	const amountChanged =
+		amount !== null &&
+		JSON.stringify(amount) !== JSON.stringify(initialTemplate?.amount);
 	const dirty =
 		name !== "" ||
 		Object.keys(amountDrafts).length > 0 ||
-		amountKind !== "fixed" ||
+		amountChanged ||
+		amountTemplateId !== "fixed" ||
 		annualCap !== "" ||
 		priority !== "" ||
 		!recurrenceEqual(recurrence, DEFAULT_RECURRENCE) ||
@@ -124,9 +189,18 @@ export function AddScheduleDialog({
 
 	const submit = async () => {
 		if (saving) return;
-		const amountError = validateRecipe(recipe, amountFields);
+		const amountError = validateScheduleAmountDraft({
+			templateId: amountTemplateId,
+			fields: amountFields,
+			accounts: savedAccounts,
+			schedules: schedules.data?.schedules ?? [],
+		});
 		if (amountError) {
 			setError(amountError);
+			return;
+		}
+		if (!amount) {
+			setError("Choose an amount.");
 			return;
 		}
 		const values: ScheduleTerms = {
@@ -161,7 +235,7 @@ export function AddScheduleDialog({
 			call: () =>
 				createSchedule({
 					...scheduleTermsBody(values),
-					amount: recipe.build(amountFields),
+					amount: toGeneratedAmountResolution(amount),
 					id,
 					...(effectivePriority !== undefined
 						? { priority: effectivePriority }
@@ -211,22 +285,16 @@ export function AddScheduleDialog({
 						/>
 					</EditorField>
 					<div className="col-span-full">
-						<ScheduleAmountFields
-							recipeId={amountKind}
-							values={amountFields}
-							accounts={savedAccounts}
-							schedules={schedules.data?.schedules ?? []}
-							onRecipe={(id) => {
-								setAmountKind(id);
-								setError(null);
-							}}
-							onChange={(key, value) => {
-								setAmountDrafts((old) => ({
-									...old,
-									[amountKind]: { ...amountFields, [key]: value },
-								}));
-								setError(null);
-							}}
+						<AmountBuilder
+							accounts={amountAccounts}
+							transactions={amountTransactions}
+							schedules={amountSchedules}
+							templates={templates}
+							initialTemplateId={amountTemplateId}
+							fields={amountDrafts}
+							onFieldsChange={changeAmountFields}
+							onTemplateChange={changeAmountTemplate}
+							onAmountChange={changeAmount}
 						/>
 						{sourceSchedule && (
 							<div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -259,10 +327,10 @@ export function AddScheduleDialog({
 								</Button>
 							</div>
 						)}
-						{amountKind === "schedule-percent" && schedules.isPending && (
+						{amountTemplateId === "schedule-percent" && schedules.isPending && (
 							<p role="status">Loading schedules…</p>
 						)}
-						{amountKind === "schedule-percent" && schedules.isError && (
+						{amountTemplateId === "schedule-percent" && schedules.isError && (
 							<Alert variant="destructive">
 								<AlertDescription>
 									Schedules could not be loaded.{" "}

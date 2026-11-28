@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
 	patchTemplateAmount,
@@ -13,6 +13,7 @@ import {
 	FALLBACK_TEMPLATES,
 	plainLanguageForAmount,
 } from "../../domain/amountCatalog.ts";
+import { isLiability } from "../../domain/accountKinds.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
@@ -46,7 +47,7 @@ function parseBrackets(value: string): JsonValue[] {
 	}
 }
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; kind?: string };
 
 function optionList(list: Option[]): EditorSelectOption[] {
 	return list.map((item) => ({ value: item.id, label: item.name }));
@@ -75,6 +76,22 @@ export function buildTemplateAmount(
 					},
 				},
 			};
+		case "schedule-percent":
+			return {
+				resolver: "expression",
+				config: { expression: "base * share" },
+				inputs: {
+					base: {
+						source: "provider",
+						provider: "model-value",
+						arguments: { id: get("reference", "salary") },
+					},
+					share: {
+						source: "literal",
+						value: numberOr(0.1, get("percent", "0.1")),
+					},
+				},
+			};
 		case "account-percent":
 			return {
 				resolver: "expression",
@@ -91,11 +108,11 @@ export function buildTemplateAmount(
 		case "investment-growth":
 			return {
 				resolver: "expression",
-				config: { expression: "ref * rate" },
+				config: { expression: "brokerage * rate" },
 				inputs: {
-					ref: {
+					brokerage: {
 						source: "provider",
-						provider: "model-value",
+						provider: "account-balance",
 						arguments: { id: get("refId", firstAccount) },
 					},
 					rate: {
@@ -105,6 +122,18 @@ export function buildTemplateAmount(
 							annualRate: numberOr(0.07, get("annualRate", "0.07")),
 							volatility: numberOr(0.12, get("volatility", "0.12")),
 						},
+					},
+				},
+			};
+		case "owed-balance":
+			return {
+				resolver: "expression",
+				config: { expression: "(abs(balance) - balance) / 2" },
+				inputs: {
+					balance: {
+						source: "provider",
+						provider: "account-balance",
+						arguments: { id: get("accountId", firstAccount) },
 					},
 				},
 			};
@@ -205,12 +234,14 @@ function TemplateFields({
 	templateId,
 	accounts,
 	transactions,
+	schedules,
 	fields,
 	onField,
 }: {
 	templateId: string;
 	accounts: Option[];
 	transactions: Option[];
+	schedules: Option[];
 	fields: Record<string, string>;
 	onField: (key: string, value: string) => void;
 }) {
@@ -277,6 +308,41 @@ function TemplateFields({
 								step="0.001"
 								placeholder="e.g. 0.03"
 								{...set("annualGrowthRate")}
+							/>
+						)}
+					</TemplateControl>
+				</>
+			);
+		case "schedule-percent":
+			return (
+				<>
+					<TemplateControl
+						label="Based on schedule"
+						inputKey="reference"
+						prefix={prefix}
+					>
+						{(id) => (
+							<EditorSelect
+								id={id}
+								emptyLabel="Pick a schedule"
+								options={optionList(schedules)}
+								{...select("reference")}
+							/>
+						)}
+					</TemplateControl>
+					<TemplateControl
+						label="Share (0.1 = 10%)"
+						inputKey="percent"
+						prefix={prefix}
+					>
+						{(id) => (
+							<Input
+								id={id}
+								name="percent"
+								type="number"
+								step="0.001"
+								placeholder="e.g. 0.1"
+								{...set("percent")}
 							/>
 						)}
 					</TemplateControl>
@@ -363,6 +429,27 @@ function TemplateFields({
 						)}
 					</TemplateControl>
 				</>
+			);
+		case "owed-balance":
+			return (
+				<TemplateControl
+					label="Debt account"
+					inputKey="accountId"
+					prefix={prefix}
+				>
+					{(id) => (
+						<EditorSelect
+							id={id}
+							emptyLabel="Pick a debt account"
+							options={optionList(
+								accounts.filter((account) =>
+									isLiability({ kind: account.kind }),
+								),
+							)}
+							{...select("accountId")}
+						/>
+					)}
+				</TemplateControl>
 			);
 		case "debt-minimum":
 			return (
@@ -542,42 +629,64 @@ function TemplateFields({
 export function AmountBuilder({
 	accounts,
 	transactions,
+	schedules = [],
 	templates,
 	initialTemplateId,
 	hidePicker,
 	fixedAmount,
 	initialAmount,
+	fields: controlledFields,
 	onChange,
+	onAmountChange,
+	onTemplateChange,
+	onFieldsChange,
 }: {
 	accounts: Option[];
 	transactions: Option[];
+	schedules?: Option[];
 	templates?: AmountTemplate[];
 	initialTemplateId?: string;
 	hidePicker?: boolean;
 	fixedAmount?: TransactionAmountResolution;
 	initialAmount?: TransactionAmountResolution;
+	fields?: Record<string, string>;
 	onChange?: (amount: TransactionAmountResolution) => void;
+	onAmountChange?: (amount: TransactionAmountResolution) => void;
+	onTemplateChange?: (templateId: string) => void;
+	onFieldsChange?: (fields: Record<string, string>) => void;
 }) {
 	const list = templates?.length ? templates : FALLBACK_TEMPLATES;
 	const [templateId, setTemplateId] = useState(initialTemplateId ?? "fixed");
-	const [fields, setFields] = useState<Record<string, string>>({});
+	const [internalFields, setInternalFields] = useState<Record<string, string>>(
+		{},
+	);
+	const fields = controlledFields ?? internalFields;
+	const updateFields = (next: Record<string, string>) => {
+		if (controlledFields === undefined) setInternalFields(next);
+		onFieldsChange?.(next);
+	};
 	const template = list.find((item) => item.id === templateId) ?? list[0]!;
 	const source = initialAmount ?? template.amount ?? undefined;
-	const currentFields = {
-		...templateFieldsFromAmount(template.id, source),
-		...fields,
-	};
+	const currentFields = useMemo(
+		() => ({
+			...templateFieldsFromAmount(template.id, source),
+			...fields,
+		}),
+		[fields, source, template.id],
+	);
 	const amount = useMemo(() => {
 		if (fixedAmount) return fixedAmount;
-		const built = buildTemplateAmount(
-			template.id,
-			{ ...templateFieldsFromAmount(template.id, source), ...fields },
-			accounts,
-		);
+		const built = buildTemplateAmount(template.id, currentFields, accounts);
 		return source
 			? patchTemplateAmount(template.id, source, built, fields)
 			: built;
-	}, [fixedAmount, source, template.id, fields, accounts]);
+	}, [currentFields, fixedAmount, fields, source, template.id, accounts]);
+	useEffect(() => {
+		onTemplateChange?.(template.id);
+	}, [onTemplateChange, template.id]);
+	useEffect(() => {
+		onAmountChange?.(amount);
+	}, [amount, onAmountChange]);
 	const plain = plainLanguageForAmount(amount);
 	const wire = JSON.stringify(amount, null, 2);
 	const templatePickerId = useId();
@@ -596,7 +705,7 @@ export function AmountBuilder({
 									value={template.id}
 									onValueChange={(next) => {
 										setTemplateId(next);
-										setFields({});
+										updateFields({});
 									}}
 									options={list.map((item) => ({
 										value: item.id,
@@ -619,9 +728,10 @@ export function AmountBuilder({
 							templateId={template.id}
 							accounts={accounts}
 							transactions={transactions}
+							schedules={schedules}
 							fields={currentFields}
 							onField={(key, value) =>
-								setFields((previous) => ({ ...previous, [key]: value }))
+								updateFields({ ...fields, [key]: value })
 							}
 						/>
 					</div>

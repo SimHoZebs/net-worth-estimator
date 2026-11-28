@@ -1619,7 +1619,9 @@ describe("remote projection mapping and SSE", () => {
 			await consumers[0].settle();
 			expect(client.projectStochastic).toHaveBeenCalledTimes(1);
 			await act(async () => {
-				stream().send("progress", { progress: { fraction: 0.25 } });
+				stream().send("progress", {
+					progress: { completedRuns: 100, totalRuns: 400, fraction: 0.25 },
+				});
 			});
 			await waitFor(() => {
 				for (const consumer of consumers)
@@ -1627,7 +1629,7 @@ describe("remote projection mapping and SSE", () => {
 			});
 			await act(async () => {
 				stream().send("partial", {
-					progress: { fraction: 0.5 },
+					progress: { completedRuns: 200, totalRuns: 400, fraction: 0.5 },
 					partial: stochasticFixture(),
 				});
 			});
@@ -1666,7 +1668,7 @@ describe("remote projection mapping and SSE", () => {
 		await first.settle();
 		await act(async () => {
 			stream().send("partial", {
-				progress: { fraction: 0.5 },
+				progress: { completedRuns: 200, totalRuns: 400, fraction: 0.5 },
 				partial: stochasticFixture(),
 			});
 		});
@@ -1690,7 +1692,7 @@ describe("remote projection mapping and SSE", () => {
 		await rendered.settle();
 		await act(async () => {
 			stream().send("partial", {
-				progress: { fraction: 0.5 },
+				progress: { completedRuns: 200, totalRuns: 400, fraction: 0.5 },
 				partial: stochasticFixture(),
 			});
 		});
@@ -1755,7 +1757,7 @@ describe("remote projection mapping and SSE", () => {
 			await first.settle();
 			await act(async () => {
 				stream().send("partial", {
-					progress: { fraction: 0.5 },
+					progress: { completedRuns: 200, totalRuns: 400, fraction: 0.5 },
 					partial: stochasticFixture(),
 				});
 				stream().send("error", { error: "range failed" });
@@ -1811,7 +1813,7 @@ describe("remote projection mapping and SSE", () => {
 		await first.settle();
 		await act(async () => {
 			stream().send("partial", {
-				progress: { fraction: 0.5 },
+				progress: { completedRuns: 200, totalRuns: 400, fraction: 0.5 },
 				partial: stochasticFixture(),
 			});
 		});

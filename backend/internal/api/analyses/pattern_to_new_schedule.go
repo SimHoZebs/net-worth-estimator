@@ -10,12 +10,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func patternToNewRuleError(err error) error {
-	return patternRuleError(err, store.ErrPatternToNewScheduleInvalid, store.ErrPatternToNewScheduleConflict, "The forecast preview is temporarily unavailable")
+func patternToNewScheduleError(err error) error {
+	return patternScheduleError(err, store.ErrPatternToNewScheduleInvalid, store.ErrPatternToNewScheduleConflict, "The forecast preview is temporarily unavailable")
 }
 
-func patternToNewRuleErrorAs(err error, unavailable string) error {
-	return patternRuleError(err, store.ErrPatternToNewScheduleInvalid, store.ErrPatternToNewScheduleConflict, unavailable)
+func patternToNewScheduleErrorAs(err error, unavailable string) error {
+	return patternScheduleError(err, store.ErrPatternToNewScheduleInvalid, store.ErrPatternToNewScheduleConflict, unavailable)
 }
 
 func (s *handler) previewPatternToNewSchedule(_ context.Context, input *struct {
@@ -28,7 +28,7 @@ func (s *handler) previewPatternToNewSchedule(_ context.Context, input *struct {
 }, error) {
 	preview, err := s.store.PreviewPatternToNewSchedule(input.ID)
 	if err != nil {
-		return nil, patternToNewRuleError(err)
+		return nil, patternToNewScheduleError(err)
 	}
 	output := &struct {
 		CacheControl string `header:"Cache-Control"`
@@ -54,30 +54,30 @@ func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct 
 	if err := s.requirePatternWrite(ctx); err != nil {
 		return nil, err
 	}
-	patternRuleMu.Lock()
-	defer patternRuleMu.Unlock()
+	patternScheduleMu.Lock()
+	defer patternScheduleMu.Unlock()
 	preview, err := s.store.PreviewPatternToNewSchedule(input.ID)
 	if err != nil {
-		return nil, patternToNewRuleErrorAs(err, "The forecast rule could not be saved.")
+		return nil, patternToNewScheduleErrorAs(err, "The forecast schedule could not be saved.")
 	}
 	if !preview.Creatable {
-		// A visible plan without a rule cannot become one yet. A visible
-		// plan with a rule permits at most one active rule per pattern.
+		// A visible plan without a schedule cannot become one yet. A visible
+		// plan with a schedule permits at most one active schedule per pattern.
 		if preview.Schedule == nil {
 			return nil, huma.Error422UnprocessableEntity(preview.Reason)
 		}
 		return nil, huma.Error409Conflict(preview.Reason)
 	}
-	ruleID, err := uuid.NewV7()
+	scheduleID, err := uuid.NewV7()
 	if err != nil {
-		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
+		return nil, huma.Error500InternalServerError("The forecast schedule could not be saved.")
 	}
-	rule := types.ProposedNewScheduleToSchedule(*preview.Schedule, ruleID.String())
+	schedule := types.ProposedNewScheduleToSchedule(*preview.Schedule, scheduleID.String())
 	actor := ""
 	if s.actor != nil {
 		actor = s.actor(ctx)
 	}
-	row, issues, saved, revision, err := model.PersistFinanceSchedule(s.store, rule, func(schedule types.Schedule) (types.Schedule, error) {
+	row, issues, saved, revision, err := model.PersistFinanceSchedule(s.store, schedule, func(schedule types.Schedule) (types.Schedule, error) {
 		return s.store.CreatePatternSchedule(input.ID, preview.PatternKey, preview.Merchant, actor, schedule)
 	})
 	if err != nil || !saved {

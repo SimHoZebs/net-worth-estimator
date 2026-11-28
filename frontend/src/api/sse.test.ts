@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseSSE, SSEParser } from "./sse.ts";
+import { parseSSE, SSEParseError, SSEParser } from "./sse.ts";
 
 const progress = {
 	completedRuns: 2,
@@ -15,6 +15,7 @@ const result = {
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
+		accountBalance: [],
 		transactionFulfillment: [],
 	},
 } as const;
@@ -66,6 +67,73 @@ describe("incremental POST-SSE parser", () => {
 		);
 		expect(error).toBeNull();
 		expect(onResult).toHaveBeenCalledWith({ result });
+	});
+
+	it("accepts an empty evaluation name from the server contract", async () => {
+		const onResult = vi.fn();
+		const emptyNameResult = {
+			...result,
+			evaluations: {
+				...result.evaluations,
+				netWorthThreshold: [
+					{
+						instanceId: "target",
+						name: "",
+						status: "satisfied",
+						deterministic: null,
+						probabilistic: {},
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const error = await parseSSE(
+			`event: result\ndata: ${JSON.stringify({ result: emptyNameResult })}\n\n`,
+			{ onResult },
+		);
+		expect(error).toBeNull();
+		expect(onResult).toHaveBeenCalledWith({ result: emptyNameResult });
+	});
+
+	it.each([
+		["progress", { progress: { completedRuns: 2, totalRuns: 4 } }],
+		["progress", { progress: { ...progress, fraction: "0.5" } }],
+		["partial", { progress, partial: { ...result, bands: "invalid" } }],
+		["result", { unrelated: true }],
+		["result", { result: { ...result, evaluations: {} } }],
+		["error", { error: 42 }],
+	] as const)(
+		"rejects a malformed %s payload before typed callbacks",
+		async (eventName, data) => {
+			const callbacks = {
+				onProgress: vi.fn(),
+				onPartial: vi.fn(),
+				onResult: vi.fn(),
+				onError: vi.fn(),
+				onParseError: vi.fn(),
+			};
+			const error = await parseSSE(
+				`event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`,
+				callbacks,
+			);
+			expect(error).toBeInstanceOf(SSEParseError);
+			expect(callbacks.onParseError).toHaveBeenCalledOnce();
+			expect(callbacks.onProgress).not.toHaveBeenCalled();
+			expect(callbacks.onPartial).not.toHaveBeenCalled();
+			expect(callbacks.onResult).not.toHaveBeenCalled();
+			expect(callbacks.onError).not.toHaveBeenCalled();
+		},
+	);
+
+	it("keeps unknown events available to the raw event callback", async () => {
+		const onEvent = vi.fn();
+		const error = await parseSSE('event: custom\ndata: {"anything":true}\n\n', {
+			onEvent,
+		});
+		expect(error).toBeNull();
+		expect(onEvent).toHaveBeenCalledWith(
+			expect.objectContaining({ event: "custom", data: { anything: true } }),
+		);
 	});
 
 	it("returns a parse error for malformed event JSON", async () => {

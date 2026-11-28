@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import {
+	findingStateLabel,
 	isMainIncome,
-	paymentLabel as incomeLabel,
 	paymentStatus as incomeStatus,
 	groupPaymentPatterns,
 	paymentAmount as incomeAmount,
 } from "./paymentFindings.ts";
+
+const incomeLabel = (finding: AnalysisFinding) =>
+	findingStateLabel(finding, "label");
 
 const finding = {
 	id: "one",

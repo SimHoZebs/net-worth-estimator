@@ -9,21 +9,21 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-// patternRuleMu serializes preview-then-mutate pattern actions within one
+// patternScheduleMu serializes preview-then-mutate pattern actions within one
 // server instance. Preview plus the finance write are separate store calls;
 // without this, two concurrent actions for one pattern could both pass
-// preview and each mint their own rule or overlapping claims. The store
+// preview and each mint their own schedule or overlapping claims. The store
 // contract already assumes one server and one instance, so a process-wide
 // mutex matches the deployment.
-var patternRuleMu sync.Mutex
+var patternScheduleMu sync.Mutex
 
 // patternPreviewCacheControl is the single preview envelope for both
 // pattern flows: previews never cache.
 const patternPreviewCacheControl = "private, no-store"
 
-// patternRuleError maps store failures to the shared forecast-schedule
+// patternScheduleError maps store failures to the shared forecast-schedule
 // contract, parameterized by the per-flow invalid/conflict sentinels.
-func patternRuleError(err error, invalid, conflict error, unavailable string) error {
+func patternScheduleError(err error, invalid, conflict error, unavailable string) error {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return huma.Error404NotFound("Finding not found")

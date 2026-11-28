@@ -9,12 +9,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func patternToExistingRuleError(err error) error {
-	return patternRuleError(err, store.ErrPatternToExistingScheduleInvalid, store.ErrPatternToExistingScheduleConflict, "The forecast preview is temporarily unavailable")
+func patternToExistingScheduleError(err error) error {
+	return patternScheduleError(err, store.ErrPatternToExistingScheduleInvalid, store.ErrPatternToExistingScheduleConflict, "The forecast preview is temporarily unavailable")
 }
 
-func patternToExistingRuleErrorAs(err error, unavailable string) error {
-	return patternRuleError(err, store.ErrPatternToExistingScheduleInvalid, store.ErrPatternToExistingScheduleConflict, unavailable)
+func patternToExistingScheduleErrorAs(err error, unavailable string) error {
+	return patternScheduleError(err, store.ErrPatternToExistingScheduleInvalid, store.ErrPatternToExistingScheduleConflict, unavailable)
 }
 
 func (s *handler) previewPatternToExistingSchedule(_ context.Context, input *struct {
@@ -31,7 +31,7 @@ func (s *handler) previewPatternToExistingSchedule(_ context.Context, input *str
 	}
 	preview, err := s.store.PreviewPatternToExistingSchedule(input.ID, input.ScheduleID)
 	if err != nil {
-		return nil, patternToExistingRuleError(err)
+		return nil, patternToExistingScheduleError(err)
 	}
 	output := &struct {
 		CacheControl string `header:"Cache-Control"`
@@ -64,17 +64,17 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	if input.Body.ScheduleID == "" {
 		return nil, huma.Error422UnprocessableEntity("scheduleId is required")
 	}
-	patternRuleMu.Lock()
-	defer patternRuleMu.Unlock()
+	patternScheduleMu.Lock()
+	defer patternScheduleMu.Unlock()
 	preview, err := s.store.PreviewPatternToExistingSchedule(input.ID, input.Body.ScheduleID)
 	if err != nil {
-		return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
+		return nil, patternToExistingScheduleErrorAs(err, "The forecast addition could not be saved.")
 	}
 	if !preview.Claimable {
 		// The adapter returns no assignments on any Claimable=false path, so
 		// every not-claimable preview is an invalid request: rejected
-		// patterns need review again, disabled rules need enabling, and
-		// mismatched schedules need a different rule.
+		// patterns need review again, disabled schedules need enabling, and
+		// mismatched schedules need a different schedule.
 		if preview.Reason == "" {
 			return nil, huma.Error422UnprocessableEntity("This pattern cannot be added yet.")
 		}
@@ -89,19 +89,19 @@ func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struc
 	if err != nil {
 		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
 	}
-	// Re-check the rule is still enabled: rule writes do not take patternRuleMu, so
+	// Re-check the schedule is still enabled: schedule writes do not take patternScheduleMu, so
 	// a disable landing between preview and persist must not mint claims the
-	// preview calls un-claimable. A deleted rule falls through to finance
-	// validation, which reports the missing rule as 422.
-	ruleFound, ruleEnabled := false, false
+	// preview calls un-claimable. A deleted schedule falls through to finance
+	// validation, which reports the missing schedule as 422.
+	scheduleFound, scheduleEnabled := false, false
 	for i := range storedModel.Schedules {
 		if storedModel.Schedules[i].ID == preview.ScheduleID {
-			ruleFound, ruleEnabled = true, storedModel.Schedules[i].Enabled
+			scheduleFound, scheduleEnabled = true, storedModel.Schedules[i].Enabled
 			break
 		}
 	}
-	if ruleFound && !ruleEnabled {
-		return nil, huma.Error422UnprocessableEntity("That forecast rule is disabled. Enable it before adding payments to it.")
+	if scheduleFound && !scheduleEnabled {
+		return nil, huma.Error422UnprocessableEntity("That forecast schedule is disabled. Enable it before adding payments to it.")
 	}
 	byID := make(map[string]bool, len(storedModel.Transactions))
 	for i := range storedModel.Transactions {

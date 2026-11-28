@@ -1,10 +1,10 @@
+import { isRecord, parseUnion } from "./guards.ts";
 import { isIsoDate, utcDate } from "./format.ts";
 
 /**
  * Google Calendar-lite recurrence. A schedule repeats every `interval`
  * `unit`s anchored on its start date, and ends never (endDate null) or on
- * a date. There is no occurrence count. This replaces the legacy schedule
- * `frequency` vocabulary (daily/weekly/monthly/quarterly/annual).
+ * a date. There is no occurrence count.
  */
 export type RecurrenceUnit = "day" | "week" | "month" | "year";
 
@@ -16,7 +16,7 @@ export interface Recurrence {
 	/** Repeat step, 1..99. */
 	interval: number;
 	/** Weekly only: 0=Sun..6=Sat. Must include the start-date weekday. */
-	weekdays?: number[];
+	weekdays?: number[] | null;
 	/** Monthly only: calendar-date anchor or nth-weekday anchor. */
 	monthlyMode?: MonthlyMode;
 }
@@ -238,86 +238,66 @@ export function recurrenceEqual(left: Recurrence, right: Recurrence): boolean {
 	return true;
 }
 
-/**
- * Legacy schedule frequency mapped to the new recurrence vocabulary:
- * daily to every day, weekly to every week on the start weekday, monthly
- * to every month on the date, quarterly to every 3 months on the date,
- * annual to every year.
- */
-export function recurrenceFromFrequency(
-	frequency: unknown,
-	startDate: string,
-): Recurrence {
-	const startWeekday = isIsoDate(startDate) ? weekdayOfIsoDate(startDate) : 1;
-	switch (frequency) {
-		case "daily":
-			return { unit: "day", interval: 1 };
-		case "weekly":
-			return { unit: "week", interval: 1, weekdays: [startWeekday] };
-		case "biweekly":
-			return { unit: "week", interval: 2, weekdays: [startWeekday] };
-		case "quarterly":
-			return { unit: "month", interval: 3, monthlyMode: "byDate" };
-		case "annual":
-		case "yearly":
-			return { unit: "year", interval: 1 };
-		case "monthly":
-		default:
-			return { unit: "month", interval: 1, monthlyMode: "byDate" };
-	}
+function validWeekdays(value: unknown): value is number[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(day) =>
+				typeof day === "number" &&
+				Number.isInteger(day) &&
+				day >= 0 &&
+				day <= 6,
+		) &&
+		new Set(value).size === value.length
+	);
 }
 
-function coerceRecurrence(
-	value: unknown,
-	startDate: string,
-): Recurrence | null {
-	if (typeof value !== "object" || value === null || Array.isArray(value))
-		return null;
-	const record = value as Record<string, unknown>;
-	if (
-		typeof record.unit !== "string" ||
-		!(RECURRENCE_UNITS as readonly string[]).includes(record.unit)
-	)
-		return null;
-	const unit = record.unit as RecurrenceUnit;
-	const recurrence: Recurrence = {
-		unit,
-		interval: validInterval(record.interval) ?? 1,
-	};
-	if (unit === "week") {
-		const days = sortedWeekdays(record.weekdays);
-		recurrence.weekdays = days.length
-			? days
-			: [isIsoDate(startDate) ? weekdayOfIsoDate(startDate) : 1];
-	}
-	if (unit === "month")
-		recurrence.monthlyMode =
-			record.monthlyMode === "byNthWeekday" ? "byNthWeekday" : "byDate";
-	return recurrence;
-}
-
-/**
- * Stored schedule cadence during the frequency-to-recurrence migration:
- * prefers an explicit recurrence payload, otherwise maps the legacy
- * frequency string. Null when the schedule carries neither.
- */
+/** Read the current schedule recurrence without supplying missing values. */
 export function recurrenceFromScheduleLike(
 	schedule:
 		| {
 				recurrence?: unknown;
-				frequency?: unknown;
 				startDate: string;
 		  }
 		| null
 		| undefined,
 ): Recurrence | null {
-	if (!schedule || typeof schedule.startDate !== "string") return null;
-	return (
-		coerceRecurrence(schedule.recurrence, schedule.startDate) ??
-		(typeof schedule.frequency === "string"
-			? recurrenceFromFrequency(schedule.frequency, schedule.startDate)
-			: null)
-	);
+	if (
+		!schedule ||
+		typeof schedule.startDate !== "string" ||
+		!isIsoDate(schedule.startDate) ||
+		!isRecord(schedule.recurrence)
+	)
+		return null;
+	const value = schedule.recurrence;
+	const unit = parseUnion(value.unit, RECURRENCE_UNITS);
+	const interval = validInterval(value.interval);
+	if (unit === null || interval === null) return null;
+	if (
+		value.weekdays !== undefined &&
+		value.weekdays !== null &&
+		!validWeekdays(value.weekdays)
+	)
+		return null;
+	if (
+		value.monthlyMode !== undefined &&
+		value.monthlyMode !== "byDate" &&
+		value.monthlyMode !== "byNthWeekday"
+	)
+		return null;
+	const recurrence: Recurrence = {
+		unit,
+		interval,
+		...(value.weekdays === undefined
+			? {}
+			: { weekdays: value.weekdays as number[] | null }),
+		...(value.monthlyMode === undefined
+			? {}
+			: { monthlyMode: value.monthlyMode }),
+	};
+	return validateRecurrence(recurrence, schedule.startDate) === null
+		? recurrence
+		: null;
 }
 
 /**
