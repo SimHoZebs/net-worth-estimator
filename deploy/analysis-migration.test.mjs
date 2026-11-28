@@ -56,18 +56,19 @@ const migrate = async (db, env = {}) => {
   });
 };
 const backups = async (directory) => (await readdir(directory)).filter((name) => name.includes(".analysis-backup."));
+const dropAnalysisSchema = `DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
+    DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
+    DROP TABLE analysis_transfer_link_members; DROP TABLE analysis_transfer_links;
+    DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
+    DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
+    DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1','analysis-transfer-links-v1');`;
 async function sourceDatabase() {
   const directory = await mkdtemp(join(tmpdir(), "bnpl-migration-db-"));
   owned.add(directory);
   const db = join(directory, "application.db");
   await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "owner"]);
   const owner = await sql(db, "SELECT id FROM users;");
-  await sql(db, `DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
-    DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
-    DROP TABLE analysis_transfer_link_members; DROP TABLE analysis_transfer_links;
-    DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
-    DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
-    DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1','analysis-transfer-links-v1');`);
+  await sql(db, dropAnalysisSchema);
   await sql(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
     ('${owner}','checking',0,'Fixture checking','cash',1);`);
   return { directory, db, owner };
@@ -336,11 +337,7 @@ sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO accounts(user_id,id,position,name
   INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('$owner',1,0,'checking',100,'user',1773187199);
   INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('$owner','settled-a','Groceries','checking','null','{}',1773140400,1773140400,'simplefin',0,0);
   INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES ('$owner','settled-a',0,1,1);"
-sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER IF EXISTS analysis_transaction_lifecycle;
-  DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
-  DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
-  DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
-  DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');"
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "${dropAnalysisSchema}"
 /app/migrate.sh >/dev/null
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT observed_at FROM checkpoints;')" = 1773187199
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT COUNT(*) FROM analysis_feedback;')" = 0
@@ -367,10 +364,7 @@ test "$(sha256sum "$NET_WORTH_ESTIMATOR_DB")" = "$sha_before"
 export SECOND_DB='/tmp/analysis second.db'
 /app/setupdb --db "$SECOND_DB" --issuer https://fixture.invalid --subject owner >/dev/null
 owner2="$(sqlite3 "$SECOND_DB" 'SELECT id FROM users;')"
-sqlite3 "$SECOND_DB" "DROP TRIGGER analysis_transaction_lifecycle;
-  DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
-  DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
-  DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');
+sqlite3 "$SECOND_DB" "${dropAnalysisSchema}
   INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('$owner2','checking',0,'Second','cash',1);
   INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('$owner2',1,0,'checking',50,'user',1773187199);"
 mkdir -p /tmp/failbin
