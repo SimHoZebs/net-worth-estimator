@@ -41,7 +41,7 @@ export function page(path: string, query: string, message = "", nonce = "") {
 <header><a class="${brand.link}" href="/sign-in${search}" aria-label="Waypoint sign in"><span class="${brand.mark}"><svg class="${brand.icon}" viewBox="0 0 32 32" aria-hidden="true"><path d="${brand.path}" /></svg></span><span>waypoint<span class="text-primary">.</span></span></a></header>
 <section class="grid gap-5 rounded-xl border border-solid border-border bg-card p-5 sm:p-6" aria-labelledby="auth-title">
 <div class="grid gap-2"><h1 id="auth-title" class="text-2xl font-semibold">${title}</h1><p>${description}</p></div>
-<p id="feedback" role="status" aria-live="polite">${escapeHTML(message)}</p>
+<p id="feedback" role="${message ? "alert" : "status"}" aria-live="${message ? "assertive" : "polite"}" aria-atomic="true" data-tone="${message ? "error" : "success"}">${message ? `Error: ${escapeHTML(message)}` : ""}</p>
 ${
   account
     ? `<p>Keep a backup passkey or your password so you can still sign in if you lose a device.</p><button class="${primary}" id="add-passkey" type="button">Add a passkey</button><ul id="passkeys"></ul><a class="text-sm font-semibold text-primary hover:underline" href="/sign-in">Back to sign in</a>`

@@ -23,7 +23,7 @@ export async function passkeyJourneys(ctx, ownerBundle) {
     });
     await page.goto(`${ctx.issuer}/account`);
     await page.getByRole("button", { name: "Add a passkey", exact: true }).click();
-    await expect(page.getByRole("status")).toHaveText("Passkey added.");
+    await expect(page.getByRole("status")).toHaveText("Success: Passkey added.");
 
     await context.clearCookies();
     await page.goto(`${ctx.origin}/v1/auth/login`);
@@ -51,7 +51,30 @@ export async function passkeyJourneys(ctx, ownerBundle) {
     assert.equal(tokens.status, "complete");
     assert.equal(tokens.subject, ctx.ownerSubject);
     assert.ok(tokens.accessToken && tokens.refreshToken);
-    console.log("e2e: passkey enrollment, OIDC continuation, and device approval PASS");
+
+    await page.goto(`${ctx.issuer}/account`);
+    const lastRemove = page.getByRole("button", { name: /^Remove / });
+    await page.route("**/passkey/delete-passkey", (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Could not remove the passkey." }),
+      }),
+    );
+    await lastRemove.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("alert")).toHaveText("Error: Could not remove the passkey.");
+    await expect(lastRemove).toHaveCount(1);
+    await page.unroute("**/passkey/delete-passkey");
+
+    await lastRemove.focus();
+    await page.keyboard.press("Enter");
+    await expect(lastRemove).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add a passkey", exact: true })).toBeFocused();
+    await expect(page.getByRole("status")).toHaveText("Success: Passkey removed.");
+    console.log(
+      "e2e: passkey enrollment, removal focus, OIDC continuation, and device approval PASS",
+    );
   } finally {
     await context.close();
   }

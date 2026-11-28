@@ -14,9 +14,24 @@ COPY frontend/src/components/ui/control-styles.ts frontend/src/components/ui/con
 COPY frontend/src/components/ui/brand.ts frontend/src/components/ui/brand.ts
 RUN bun --filter @waypoint/auth build
 
+FROM oven/bun:1.4.4-slim AS runtime-deps
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY auth/better-auth/package.json auth/better-auth/package.json
+# The server imports the shared React-free recipes, so class-variance-authority
+# is an identity runtime dependency. Optional framework peers and dev workspaces
+# do not belong in the running service.
+RUN bun install --frozen-lockfile --production --filter @waypoint/auth --linker=hoisted \
+    --omit=optional --omit=peer --no-progress
+
 FROM oven/bun:1.4.4-slim
 WORKDIR /app
-COPY --from=build --chown=bun:bun /app /app
+COPY --from=runtime-deps --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=build --chown=bun:bun /app/auth/better-auth/package.json ./auth/better-auth/package.json
+COPY --from=build --chown=bun:bun /app/auth/better-auth/src ./auth/better-auth/src
+COPY --from=build --chown=bun:bun /app/auth/better-auth/public ./auth/better-auth/public
+COPY --from=build --chown=bun:bun /app/frontend/src/components/ui/control-styles.ts ./frontend/src/components/ui/control-styles.ts
+COPY --from=build --chown=bun:bun /app/frontend/src/components/ui/brand.ts ./frontend/src/components/ui/brand.ts
 ENV HOST=0.0.0.0 PORT=8000 AUTH_DATABASE=/data/identity.db
 USER bun
 EXPOSE 8000

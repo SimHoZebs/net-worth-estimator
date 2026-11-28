@@ -76,11 +76,11 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv export --frozen --no-dev --no-hashes --no-emit-project --project /app/ml -o /tmp/requirements.txt && \
     uv pip install --system --no-cache --compile-bytecode -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
-# Copy only the runtime binaries the Sandbox needs. refreshmodel,
-# upgrade-transaction-rename, and repair-claimed-posted-time are operator
-# tools that migrate.sh and api-boot.sh never invoke; leaving them out of
-# the northflank target keeps the pull smaller without changing behavior.
-COPY --from=standalone --chown=app:app /app/server /app/setupdb /app/authzctl /app/upgrade-transaction-sim-split /app/upgrade-planned-purchases /app/simplefin-v2-keys /app/prune-noop-checkpoints /app/upgrade-statement-closing-day /app/upgrade-provisional-postings /app/api-boot.sh /app/migrate.sh /app/analysis-schema.sql /app/
+# Copy only the runtime binaries the Sandbox needs. refreshmodel and
+# upgrade-transaction-rename stay operator-only outside the migration body;
+# repair-claimed-posted-time is included because migrate.sh runs it on the
+# verified candidate.
+COPY --from=standalone --chown=app:app /app/server /app/setupdb /app/authzctl /app/upgrade-transaction-sim-split /app/upgrade-planned-purchases /app/simplefin-v2-keys /app/prune-noop-checkpoints /app/repair-claimed-posted-time /app/upgrade-statement-closing-day /app/upgrade-provisional-postings /app/api-boot.sh /app/migrate.sh /app/analysis-schema.sql /app/
 # Runtime imports only server, model, and evidence. Test modules stay out
 # of the image.
 COPY ml/server.py ml/model.py ml/evidence.py /app/ml/

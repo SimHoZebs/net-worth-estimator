@@ -112,13 +112,13 @@ jobs:
           set -euo pipefail
           case "$COMPONENT" in
             backend)
-              paths=(backend deploy/migrate.sh deploy/analysis-schema.sql deploy/api-boot.sh)
+              paths=(.dockerignore backend deploy/migrate.sh deploy/analysis-schema.sql deploy/api-boot.sh)
               ;;
             backend-northflank)
-              paths=(backend ml deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql deploy/api-boot.sh)
+              paths=(.dockerignore backend ml deploy/northflank deploy/migrate.sh deploy/analysis-schema.sql deploy/api-boot.sh)
               ;;
             frontend)
-              paths=(frontend package.json bun.lock extension/package.json)
+              paths=(.dockerignore frontend package.json bun.lock extension/package.json auth/better-auth/package.json)
               ;;
             auth)
               # Auth reuse paths derive from auth/better-auth/Dockerfile COPY

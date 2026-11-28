@@ -1,6 +1,8 @@
 // This standalone, one-time operator script repairs settled bank rows whose
 // posted instant was cleared to zero by a pending bank refresh while the row
 // was claimed as a recorded occurrence. Neither setupdb nor the server calls it.
+// deploy/migrate.sh runs it on the verified candidate copy before provisional
+// posting backfill.
 package main
 
 import (
@@ -13,6 +15,8 @@ import (
 
 	_ "modernc.org/sqlite"
 )
+
+const settledBankWithoutPostedTime = `source NOT IN ('user', 'model', '', 'projected') AND pending = 0 AND void = 0 AND posted_time <= 0`
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
@@ -55,13 +59,16 @@ func upgrade(path string, dryRun bool) (int, error) {
 	}
 	if _, err := os.Lstat(abs + "-journal"); err == nil {
 		return 0, fmt.Errorf("database has a hot rollback journal; stop every writer and retry")
+	} else if !os.IsNotExist(err) {
+		return 0, err
 	}
 	db, err := sql.Open("sqlite", abs)
 	if err != nil {
 		return 0, err
 	}
 	defer db.Close()
-	rows, err := db.Query(`SELECT user_id, id, posted_time, transaction_time FROM transactions WHERE posted_time <= 0 AND pending = 0 AND void = 0`)
+	db.SetMaxOpenConns(1)
+	rows, err := db.Query(`SELECT user_id, id, posted_time, transaction_time FROM transactions WHERE ` + settledBankWithoutPostedTime)
 	if err != nil {
 		return 0, err
 	}
@@ -101,11 +108,11 @@ func upgrade(path string, dryRun bool) (int, error) {
 	if _, err := tx.Exec(`PRAGMA foreign_keys=ON`); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(`UPDATE transactions SET posted_time = transaction_time WHERE posted_time <= 0 AND pending = 0 AND void = 0 AND transaction_time > 0`); err != nil {
+	if _, err := tx.Exec(`UPDATE transactions SET posted_time = transaction_time WHERE ` + settledBankWithoutPostedTime + ` AND transaction_time > 0`); err != nil {
 		return 0, err
 	}
 	var remaining int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM transactions WHERE posted_time <= 0 AND pending = 0 AND void = 0`).Scan(&remaining); err != nil {
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM transactions WHERE ` + settledBankWithoutPostedTime).Scan(&remaining); err != nil {
 		return 0, err
 	}
 	if remaining != 0 {

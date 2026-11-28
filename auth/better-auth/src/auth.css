@@ -21,7 +21,7 @@
     overflow-wrap: anywhere;
   }
   #feedback:empty {
-    display: none;
+    @apply sr-only;
   }
   #feedback:not(:empty) {
     @apply rounded-md border border-solid border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger-text;

@@ -41,6 +41,10 @@ await run("go", ["build", "-o", join(tools, "upgrade-provisional-postings"), "./
   cwd: new URL("../backend/", import.meta.url).pathname,
   env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "repair-claimed-posted-time"), "./scripts/one-time/repair-claimed-posted-time"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
 
 const sqlite = (db, sql) => run("sqlite3", [db, sql]);
 const rows = async (db, sql) => (await sqlite(db, sql)).stdout.trim();
@@ -549,6 +553,96 @@ test("legacy provisional-posting satellite is created once and later marker rows
   assert.equal(await sha256File(db), hashAfter);
   assert.deepEqual(await backups(directory), names);
   assert.equal(await rows(db, "SELECT COUNT(*) FROM transaction_provisional_postings;"), "0");
+});
+
+async function seedClaimedZeroPostedTime(db, owner) {
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
+    ('${owner}','checking',0,'Checking','cash',1);
+    INSERT INTO account_displays(user_id,account_id,display_json) VALUES
+    ('${owner}','checking','{"name":"Checking","components":[{"accountId":"checking","role":"primary"}],"interestScheduleId":"","paymentScheduleId":""}');
+    INSERT INTO recurrence_rules(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,recurrence_unit,recurrence_interval,recurrence_weekdays,recurrence_month_mode,start_date,end_date,annual_cap,priority,enabled)
+      VALUES ('${owner}','rent',0,'Rent','checking','null','{}','month',1,'[]','byDate','2026-04-01',NULL,NULL,0,1);
+    INSERT INTO transactions(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES
+      ('${owner}','claimed-zero','Claimed settled','checking','null','{}',0,1773140400,'simplefin',0,0),
+      ('${owner}','pending-zero','Pending hold','checking','null','{}',0,1773140400,'simplefin',1,0),
+      ('${owner}','owner-zero','Owner actual','checking','null','{}',0,1773140400,'user',0,0);
+    INSERT INTO transaction_sim(user_id,transaction_id,position,enabled,execution_order) VALUES
+      ('${owner}','claimed-zero',0,0,1),
+      ('${owner}','pending-zero',1,0,2),
+      ('${owner}','owner-zero',2,1,3);
+    INSERT INTO transaction_claims(user_id,transaction_id,fulfills_rule_id,fulfills_occurrence_date) VALUES
+      ('${owner}','claimed-zero','rent','2026-04-01');`);
+}
+
+test("current target repairs a claimed posted time on the candidate and then repeats read-only", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-posted-time-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await seedClaimedZeroPostedTime(db, owner);
+  const originalHash = await sha256File(db);
+
+  const result = await migrate(db);
+
+  assert.match(result.stdout, /repair claimed posted time complete \(1 rows repaired\)/);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+  assert.notEqual(await sha256File(db), originalHash);
+  assert.equal(await rows(db, "SELECT id,posted_time,transaction_time FROM transactions ORDER BY id;"),
+    "claimed-zero|1773140400|1773140400\nowner-zero|0|1773140400\npending-zero|0|1773140400");
+  assert.equal(await rows(db, "SELECT transaction_id,enabled FROM transaction_sim ORDER BY transaction_id;"),
+    "claimed-zero|0\nowner-zero|1\npending-zero|0");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  assert.equal(await rows(join(directory, names[0], "before.db"), "SELECT posted_time FROM transactions WHERE id='claimed-zero';"), "0");
+
+  const completedHash = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), completedHash);
+  assert.deepEqual(await backups(directory), names);
+});
+
+test("legacy checkpoint conversion repairs a zeroed bank posted time before timestamp normalization", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-posted-time-convert-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await toLegacyCheckpoints(db);
+  await seedBankRows(db, owner, await secondUser(db));
+  await sqlite(db, `UPDATE transactions SET posted_time = 0 WHERE user_id = '${owner}' AND id = 'settled-a';`);
+
+  const result = await migrate(db);
+
+  assert.match(result.stdout, /repair claimed posted time complete \(1 rows repaired\)/);
+  assert.equal(await rows(db, `SELECT posted_time,transaction_time FROM transactions WHERE user_id = '${owner}' AND id = 'settled-a';`), "1773129600|1773129600");
+  assert.equal(await rows(db, `SELECT s.enabled FROM transactions p JOIN transaction_sim s ON s.user_id=p.user_id AND s.transaction_id=p.id WHERE p.user_id = '${owner}' AND p.id = 'settled-a';`), "1");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  assert.equal(await rows(join(directory, names[0], "before.db"), "SELECT posted_time FROM transactions WHERE id='settled-a';"), "0");
+});
+
+test("failed claimed posted-time repair leaves the original byte-identical and retains the candidate backup", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-posted-time-failure-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await seedClaimedZeroPostedTime(db, owner);
+  const stub = join(directory, "stub");
+  const args = join(stub, "args");
+  await mkdir(stub);
+  await writeFile(join(stub, "repair-claimed-posted-time"), `#!/bin/sh\nprintf '%s\\n' "$@" > '${args}'\nexit 23\n`, { mode: 0o700 });
+  const before = await sha256File(db);
+
+  const error = await migrateFails(db, { PATH: `${stub}${delimiter}${tools}${delimiter}${process.env.PATH}` });
+
+  assert.match(error.stderr, /Candidate claimed posted time repair failed/);
+  assert.equal(await sha256File(db), before);
+  assert.equal(await rows(db, "SELECT posted_time FROM transactions WHERE id='claimed-zero';"), "0");
+  assert.match(await readFile(args, "utf8"), /\.analysis-backup\.[^\n]+\/candidate\.db/);
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  assert.equal(await rows(join(directory, names[0], "before.db"), "SELECT posted_time FROM transactions WHERE id='claimed-zero';"), "0");
 });
 
 test("partial provisional-posting satellite fails closed before backup", async (t) => {
@@ -1311,7 +1405,7 @@ test("invalid dates, posted instants, and shapes fail closed with the original u
   const cases = [
     ["bad-date", `UPDATE checkpoints SET date = 'not-a-date' WHERE id = 1 AND user_id = '${owner}';`, /invent timestamps/],
     ["normalized-date", `UPDATE checkpoints SET date = '2026-02-30' WHERE id = 1 AND user_id = '${owner}';`, /invent timestamps/],
-    ["zero-posted", `UPDATE transactions SET posted_time = 0 WHERE id = 'settled-a';`, /posted instant/],
+    ["unrepairable-zero-posted", `UPDATE transactions SET posted_time = 0, transaction_time = 0 WHERE id = 'settled-a';`, /posted instant/],
     ["text-posted", `UPDATE transactions SET posted_time = 'not-a-time' WHERE id = 'settled-a';`, /posted instant/],
     ["mixed-shape", `ALTER TABLE checkpoints ADD COLUMN observed_at INTEGER NOT NULL DEFAULT 0;`, /unexpected shape/],
     ["partial-analysis", `CREATE TABLE analysis_inputs(user_id TEXT PRIMARY KEY, revision INTEGER);`, /Partial Analysis/],

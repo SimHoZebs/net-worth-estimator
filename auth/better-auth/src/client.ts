@@ -5,9 +5,12 @@ import { ghostButton } from "./controls";
 
 const client = createAuthClient({ plugins: [oauthProviderClient()] });
 const feedback = document.querySelector("#feedback")!;
-const report = (message: string, tone = "error") => {
-  feedback.textContent = message;
+const report = (message: string, tone: "error" | "success" = "error") => {
+  const error = tone === "error";
   feedback.setAttribute("data-tone", tone);
+  feedback.setAttribute("role", error ? "alert" : "status");
+  feedback.setAttribute("aria-live", error ? "assertive" : "polite");
+  feedback.textContent = `${error ? "Error" : "Success"}: ${message}`;
 };
 document.querySelector("#show-password")?.addEventListener("click", (event) => {
   const input = document.querySelector<HTMLInputElement>("#password")!;
@@ -56,7 +59,14 @@ async function listPasskeys() {
         body: { id: key.id },
       });
       if (result.error) report(result.error.message || "Could not remove the passkey.");
-      else await listPasskeys();
+      else {
+        const nextButton =
+          item.nextElementSibling?.querySelector<HTMLButtonElement>("button") ??
+          document.querySelector<HTMLButtonElement>("#add-passkey");
+        item.remove();
+        nextButton?.focus();
+        report("Passkey removed.", "success");
+      }
     });
     item.append(label, button);
     list.append(item);

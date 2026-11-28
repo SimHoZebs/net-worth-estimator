@@ -3,7 +3,89 @@ import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const workflow = readFileSync(new URL("../.github/workflows/images.yml", import.meta.url), "utf8");
-const auth = readFileSync(new URL("../auth/better-auth/Dockerfile", import.meta.url), "utf8");
+const dockerfiles = {
+  backend: readFileSync(new URL("../backend/Dockerfile", import.meta.url), "utf8"),
+  frontend: readFileSync(new URL("../frontend/Dockerfile", import.meta.url), "utf8"),
+  "backend-northflank": readFileSync(new URL("../backend/Dockerfile", import.meta.url), "utf8"),
+  auth: readFileSync(new URL("../auth/better-auth/Dockerfile", import.meta.url), "utf8"),
+};
+const auth = dockerfiles.auth;
+
+const imageTargets = {
+  backend: "",
+  frontend: "",
+  "backend-northflank": "northflank",
+  auth: "",
+};
+
+function reusePaths(component) {
+  const match = workflow.match(new RegExp(`${component}\\)[\\s\\S]*?paths=\\(([^)]+)\\)`));
+  assert.ok(match, `workflow must list reuse paths for ${component}`);
+  return match[1].trim().split(/\s+/);
+}
+
+function contextCopySources(dockerfile, target = "") {
+  // Join backslash continuations so multiline COPYs are covered.
+  const logicalLines = dockerfile.split("\n").reduce((out, raw) => {
+    const line = raw.replace(/\s+$/, "");
+    if (out.length > 0 && out[out.length - 1].endsWith("\\")) {
+      out[out.length - 1] = `${out[out.length - 1].slice(0, -1)} ${line.trim()}`;
+    } else {
+      out.push(line);
+    }
+    return out;
+  }, []);
+  const stages = [];
+  for (const line of logicalLines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("FROM ")) {
+      const tokens = trimmed.slice(5).split(/\s+/);
+      const aliasIndex = tokens.findIndex((token) => token.toUpperCase() === "AS");
+      stages.push({
+        name: aliasIndex >= 0 ? tokens[aliasIndex + 1] : `stage-${stages.length}`,
+        base: tokens[0],
+        copies: [],
+      });
+      continue;
+    }
+    if (!trimmed.startsWith("COPY ") || stages.length === 0) continue;
+    const rest = trimmed.slice(5).trim();
+    const tokens = rest.match(/"([^"]+)"|'([^']+)'|\S+/g) ?? [];
+    const from = tokens.find((token) => token.startsWith("--from="))?.slice("--from=".length);
+    const clean = tokens.filter((token) => !token.startsWith("--"));
+    if (clean.length < 2) continue;
+    stages.at(-1).copies.push({
+      from,
+      sources: clean.slice(0, -1).map((source) => source.replace(/^["']|["']$/g, "")),
+    });
+  }
+
+  const selected = target ? stages.find((stage) => stage.name === target) : stages.at(-1);
+  assert.ok(selected, `Dockerfile target must exist: ${target || "default"}`);
+  const stagesByName = new Map(stages.map((stage) => [stage.name, stage]));
+  const visited = new Set();
+  const sources = new Set();
+  const visit = (stage) => {
+    if (visited.has(stage.name)) return;
+    visited.add(stage.name);
+    if (stagesByName.has(stage.base)) visit(stagesByName.get(stage.base));
+    for (const copy of stage.copies) {
+      if (!copy.from) for (const source of copy.sources) sources.add(source);
+      else if (stagesByName.has(copy.from)) visit(stagesByName.get(copy.from));
+    }
+  };
+  visit(selected);
+  assert.ok(sources.size > 0, "Dockerfile target must have build-context COPY sources");
+  return [...sources];
+}
+
+function covers(path, roots) {
+  return roots.some(
+    (root) => path === root || path.startsWith(root.endsWith("/") ? root : `${root}/`),
+  );
+}
+
+const changesInput = (roots, changed) => changed.some((path) => covers(path, roots));
 
 test("publishes commit-addressed images only after a green main Tests run", () => {
   assert.match(workflow, /workflows: \["Tests"\]/);
@@ -20,96 +102,100 @@ test("publishes commit-addressed images only after a green main Tests run", () =
   for (const [, ref] of workflow.matchAll(/uses: (\S+)/g)) assert.match(ref, /@[a-f0-9]{40}$/);
 });
 
-test("reuses the last immutable image when a component did not change", () => {
+test("build exclusions and Dockerfile inputs invalidate every image while unrelated Markdown can reuse", () => {
   assert.match(workflow, /fetch-depth: 0/);
   assert.match(workflow, /docker buildx imagetools inspect/);
   assert.match(workflow, /git diff --name-only/);
   assert.match(workflow, /docker buildx imagetools create --tag/);
   assert.match(workflow, /steps\.reuse\.outputs\.reuse != 'true'/);
-  assert.match(
-    workflow,
-    /paths=\(backend deploy\/migrate\.sh deploy\/analysis-schema\.sql deploy\/api-boot\.sh\)/,
-  );
-  assert.match(workflow, /paths=\(frontend package\.json bun\.lock extension\/package\.json\)/);
-  // Auth reuse paths derive from auth/better-auth/Dockerfile COPY sources.
-  // Dockerfile is the single source; the workflow list must include every
-  // COPY source from the build stage (excluding the final COPY --from
-  // stage). This check parses the Dockerfile instead of repeating literals.
-  // Join backslash continuations so multiline COPYs are covered.
-  const logicalLines = auth.split("\n").reduce((out, raw) => {
-    const line = raw.replace(/\s+$/, "");
-    if (out.length > 0 && out[out.length - 1].endsWith("\\")) {
-      out[out.length - 1] = `${out[out.length - 1].slice(0, -1)} ${line.trim()}`;
-    } else {
-      out.push(line);
-    }
-    return out;
-  }, []);
-  const copySources = [];
-  for (const line of logicalLines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("COPY ")) continue;
-    // Strip "COPY " and split. Handle JSON-array form by extracting quoted tokens.
-    const rest = trimmed.slice(5).trim();
-    const tokens = rest.match(/"([^"]+)"|'([^']+)'|\S+/g) ?? [];
-    // Remove flags like --chown=... and --from=...
-    const clean = tokens.filter((t) => !t.startsWith("--"));
-    if (clean.length < 2) continue;
-    // Last token is destination; all prior are sources. For --from stages,
-    // sources are inside the build image, not the build context, so skip.
-    if (rest.startsWith("--from=")) continue;
-    for (const src of clean.slice(0, -1)) {
-      // Normalize: strip quotes if any remain
-      copySources.push(src.replace(/^["']|["']$/g, ""));
+
+  for (const [component, dockerfile] of Object.entries(dockerfiles)) {
+    const paths = reusePaths(component);
+    const dockerfilePath =
+      component === "backend-northflank"
+        ? "backend/Dockerfile"
+        : component === "auth"
+          ? "auth/better-auth/Dockerfile"
+          : `${component}/Dockerfile`;
+    assert.ok(
+      paths.includes(".dockerignore"),
+      `${component} reuse must include the shared build exclusions`,
+    );
+    assert.ok(covers(dockerfilePath, paths), `${component} reuse must include its Dockerfile`);
+    assert.ok(
+      changesInput(paths, [".dockerignore"]),
+      `${component} must rebuild for .dockerignore`,
+    );
+    assert.equal(
+      changesInput(paths, ["README.md"]),
+      false,
+      `${component} must reuse for unrelated Markdown`,
+    );
+
+    for (const source of contextCopySources(dockerfile, imageTargets[component])) {
+      assert.ok(
+        existsSync(new URL(`../${source}`, import.meta.url)),
+        `Dockerfile COPY source must exist: ${source}`,
+      );
+      assert.ok(
+        covers(source, paths),
+        `workflow ${component} reuse paths must include Dockerfile COPY source: ${source} (got ${paths.join(" ")})`,
+      );
     }
   }
-  assert.ok(copySources.length > 0, "Dockerfile must have COPY sources");
-  // Extract the workflow auth paths array
-  const authPathsMatch = workflow.match(/paths=\(auth\/better-auth[^)]+\)/);
-  assert.ok(authPathsMatch, "workflow must list auth reuse paths");
-  const authPathsLiteral = authPathsMatch[0];
-  const authPathTokens = authPathsLiteral.slice(7, -1).split(" ");
-  for (const src of copySources) {
+
+  // Shared frontend recipes are copied individually so each file invalidates
+  // identity reuse without pulling the whole frontend workspace into its inputs.
+  const authPaths = reusePaths("auth");
+  for (const source of contextCopySources(auth).filter((path) =>
+    path.startsWith("frontend/src/components/"),
+  )) {
     assert.ok(
-      existsSync(new URL(`../${src}`, import.meta.url)),
-      `Dockerfile COPY source must exist: ${src}`,
-    );
-    const covered = authPathTokens.some((token) => src === token || src.startsWith(`${token}/`));
-    assert.ok(
-      covered,
-      `workflow auth reuse paths must include Dockerfile COPY source: ${src} (got ${authPathsLiteral})`,
-    );
-  }
-  // frontend components copied individually in the Dockerfile must appear
-  // as individual paths so a change to one file invalidates reuse.
-  for (const src of copySources.filter((path) => path.startsWith("frontend/src/components/"))) {
-    assert.ok(
-      authPathTokens.includes(src),
-      `shared component source must invalidate auth reuse explicitly: ${src}`,
+      authPaths.includes(source),
+      `shared component source must invalidate auth reuse explicitly: ${source}`,
     );
   }
 });
 
-test("publishes both app images and the Bun identity runtime", () => {
-  for (const image of ["backend", "frontend", "auth"]) {
+test("publishes all four images and a production-only Bun identity runtime", () => {
+  for (const image of ["backend", "frontend", "backend-northflank", "auth"]) {
     assert.match(workflow, new RegExp(`image: ${image}\\n`));
   }
+  const identity = JSON.parse(
+    readFileSync(new URL("../auth/better-auth/package.json", import.meta.url), "utf8"),
+  );
+  const frontend = JSON.parse(
+    readFileSync(new URL("../frontend/package.json", import.meta.url), "utf8"),
+  );
+  assert.equal(
+    identity.dependencies["class-variance-authority"],
+    frontend.dependencies["class-variance-authority"],
+  );
+  assert.match(
+    auth,
+    /bun install --frozen-lockfile --production --filter @waypoint\/auth --linker=hoisted \\\s+--omit=optional --omit=peer/,
+  );
   assert.match(auth, /FROM oven\/bun:1\.4\.4-slim/);
-  assert.match(auth, /CMD \["bun", "run", "auth\/better-auth\/src\/server.ts"\]/);
+  assert.match(auth, /COPY --from=build[^\n]*\/app\/auth\/better-auth\/src/);
+  assert.match(auth, /COPY --from=build[^\n]*\/app\/auth\/better-auth\/public/);
+  assert.match(auth, /COPY --from=build[^\n]*control-styles\.ts/);
+  assert.match(auth, /COPY --from=build[^\n]*brand\.ts/);
+  assert.doesNotMatch(auth, /COPY --from=build --chown=bun:bun \/app \/app/);
+  assert.match(auth, /CMD \["bun", "run", "auth\/better-auth\/src\/server\.ts"\]/);
 });
 
 test("Northflank co-location is an explicit image target, not the default backend", () => {
-  const backend = readFileSync(new URL("../backend/Dockerfile", import.meta.url), "utf8");
+  const backend = dockerfiles.backend;
   const release = readFileSync(
     new URL("../.github/workflows/northflank-release.yml", import.meta.url),
     "utf8",
   );
   assert.match(backend, /FROM python:3\.12-slim AS northflank/);
   assert.match(backend, /FROM standalone AS default\s*$/);
+  assert.match(backend, /COPY --from=standalone[^\n]*\/app\/repair-claimed-posted-time/);
   assert.match(workflow, /image: backend-northflank[\s\S]*?target: northflank/);
-  assert.match(
-    workflow,
-    /paths=\(backend ml deploy\/northflank deploy\/migrate\.sh deploy\/analysis-schema\.sql deploy\/api-boot\.sh\)/,
-  );
+  const paths = reusePaths("backend-northflank");
+  assert.ok(paths.includes("ml"));
+  assert.ok(paths.includes("deploy/northflank"));
   assert.match(release, /repository\}-backend-northflank:sha-/);
 });

@@ -8,27 +8,30 @@
 #      observation instants (23:59:59 UTC of their own Gregorian day), and
 #      legacy default-disabled settled bank rows recover their posted-time
 #      event times, all inside a single candidate transaction.
-#   2. Retired schedule frequencies convert to recurrences (daily to every
+#   2. Settled bank rows whose posted instant was cleared to zero recover the
+#      positive transaction instant on the candidate. Owner, pending, and void
+#      rows stay unchanged.
+#   3. Retired schedule frequencies convert to recurrences (daily to every
 #      day, weekly to the start weekday, monthly to the clamped start day,
 #      quarterly to every third month, annual to the yearly date) inside a
 #      single candidate transaction with mapping postconditions.
-#   3. Frozen SQL provisions Analysis on that candidate when needed, and the
+#   4. Frozen SQL provisions Analysis on that candidate when needed, and the
 #      promotion merchant-key column is added additively when absent.
-#   4. The standalone purchase tool converts retired purchase policies.
-#   4. The additive unified projection tables and columns are provisioned
+#   5. The standalone purchase tool converts retired purchase policies.
+#   6. The additive unified projection tables and columns are provisioned
 #      when absent; a partial group fails closed.
-#   5. The completed transaction-ID migration audit table is removed.
-#   6. The account_links institution column is provisioned when absent.
-#   7. The account_displays table is provisioned when absent.
-#   8. The suppression-key and checkpoint available-balance sidecars are
+#   7. The completed transaction-ID migration audit table is removed.
+#   8. The account_links institution column is provisioned when absent.
+#   9. The account_displays table is provisioned when absent.
+#  10. The suppression-key and checkpoint available-balance sidecars are
 #      provisioned when absent.
-#   9. The card-statement, statement-allocation, and statement-allocation-event
+#  11. The card-statement, statement-allocation, and statement-allocation-event
 #      tables and their marker are provisioned when absent; a partial group
 #      fails closed. These tables start empty on existing databases.
-#  10. Historical forward no-op bank checkpoints are pruned: posted balances
+#  12. Historical forward no-op bank checkpoints are pruned: posted balances
 #      that match the modeled balance need no row. Owner rows, first
 #      observations, and changed available balances survive.
-#  11. The provisional-posting satellite is created when absent, with a
+#  13. The provisional-posting satellite is created when absent, with a
 #      one-time evidence-based backfill: equality candidates are marked only
 #      when persisted source facts carry pending=true and numeric postedTime=0.
 #      Legacy facts without both signals stay unknown and normally backfill zero.
@@ -49,10 +52,11 @@
 # partial recurrence shapes, unknown schedule frequencies, undated weekly
 # schedules, unknown checkpoint shapes (including a date+observed_at mix,
 # which was never deployed), pre-user-scope tables, malformed or NULL or
-# normalized-invalid dates, and missing or non-integer or non-positive posted
-# instants all fail closed before any backup or mutation. A complete target
-# (final checkpoints plus the full Analysis schema) repeats read-only checks
-# only and never reactivates a post-upgrade owner disable. An absent database
+# normalized-invalid dates, and missing or non-integer posted instants fail
+# closed before any backup or mutation. A repairable non-positive bank posted
+# instant is restored on a verified candidate. A complete target without work
+# to apply repeats read-only checks and never reactivates a post-upgrade owner
+# disable. An absent database
 # file fails: provisioning fresh storage is `setupdb` and `api-boot.sh`, not
 # this hook.
 #
@@ -99,6 +103,13 @@ check_integrity() {
   test "$integrity" = ok || return 1
   violations=$(sqlite3 -readonly "$1" 'SELECT COUNT(*) FROM pragma_foreign_key_check;') || return 1
   test "$violations" = 0
+}
+
+check_posted_times() {
+  bad=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM transactions
+    WHERE source NOT IN ('user', 'model', '', 'projected') AND pending = 0 AND void = 0
+      AND (posted_time IS NULL OR typeof(posted_time) != 'integer' OR posted_time <= 0);") || return 1
+  test "$bad" = 0
 }
 
 # Freeze the supported shared base here, not in a backend migration chain.
@@ -422,7 +433,7 @@ provisional_postings_state() {
 
 check_provisional_postings() {
   test "$(provisional_postings_state "$1")" = current || return 1
-  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM transaction_provisional_postings pp JOIN transactions p ON p.user_id = pp.user_id AND p.id = pp.transaction_id LEFT JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id WHERE p.source IN ('user', 'model', '') OR c.transaction_id IS NULL OR p.pending != 0 OR p.void != 0 OR p.posted_time <= 0 OR p.posted_time != p.transaction_time;")" = 0
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM transaction_provisional_postings pp JOIN transactions p ON p.user_id = pp.user_id AND p.id = pp.transaction_id LEFT JOIN transaction_claims c ON c.user_id = p.user_id AND c.transaction_id = p.id WHERE p.source IN ('user', 'model', '', 'projected') OR c.transaction_id IS NULL OR p.pending != 0 OR p.void != 0 OR p.posted_time <= 0 OR p.posted_time != p.transaction_time;")" = 0
 }
 
 # Card statements are derived from closing-day cadence plus bank evidence, so
@@ -571,6 +582,12 @@ fi
 transactions_destination=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name IN ('destinations','destination_account_ids');") \
   || fail "Cannot inspect transactions columns; refusing to guess."
 test "$transactions_destination" -ge 1 || fail "Transactions lack a destination column; refusing automatic repair."
+bad_posted=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM transactions
+  WHERE source NOT IN ('user', 'model', '', 'projected') AND pending = 0 AND void = 0
+    AND (posted_time IS NULL OR typeof(posted_time) != 'integer'
+      OR (posted_time <= 0 AND (transaction_time IS NULL OR typeof(transaction_time) != 'integer' OR transaction_time <= 0)));") \
+  || fail "Cannot validate bank posted instants; refusing to guess."
+test "$bad_posted" = 0 || fail "$bad_posted settled bank rows lack a usable posted instant; refusing to invent event times."
 purchases=$(sqlite3 -readonly "$db" "SELECT group_concat(name, ',') FROM (SELECT name FROM sqlite_schema WHERE type='table' AND name IN ('purchase_policies','planned_purchases') ORDER BY name);")
 case "$purchases" in
   purchase_policies)
@@ -596,9 +613,6 @@ fi
 suppressed=$(suppressed_state "$db") || fail "Cannot inspect suppression-key schema; refusing to guess."
 available=$(available_state "$db") || fail "Cannot inspect available-balance schema; refusing to guess."
 provisional_postings=$(provisional_postings_state "$db") || fail "Cannot inspect provisional posting schema; refusing to guess."
-if [ "$provisional_postings" = current ]; then
-  check_provisional_postings "$db" || fail "Invalid provisional posting markers; refusing automatic repair."
-fi
 card_statements=$(card_statements_state "$db") || fail "Cannot inspect card statement schema; refusing to guess."
 if [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
@@ -657,9 +671,6 @@ if [ "$mode" = convert ]; then
   bad_dates=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM checkpoints WHERE \"date\" IS NULL OR \"date\" NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR date(\"date\") IS NULL OR date(\"date\") != \"date\" OR CAST(strftime('%s', \"date\" || ' 23:59:59') AS INTEGER) IS NULL OR CAST(strftime('%s', \"date\" || ' 23:59:59') AS INTEGER) <= 0 OR date(CAST(strftime('%s', \"date\" || ' 23:59:59') AS INTEGER), 'unixepoch') != \"date\";") \
     || fail "Cannot validate checkpoint dates; refusing to guess."
   test "$bad_dates" = 0 || fail "Refusing to invent timestamps: $bad_dates checkpoint rows lack a calendar day."
-  bad_posted=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM transactions WHERE source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND (posted_time IS NULL OR typeof(posted_time) != 'integer' OR posted_time <= 0);") \
-    || fail "Cannot validate bank posted instants; refusing to guess."
-  test "$bad_posted" = 0 || fail "$bad_posted settled bank rows lack a posted instant; refusing to invent event times."
 else
   pk=$(scoped_pk "$db") || fail "Cannot inspect checkpoints key; refusing to guess."
   test "$pk" = 1 || fail "Checkpoints lack the scoped row key; refusing to guess."
@@ -673,17 +684,15 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-# A schema-complete target may still hold historical no-op checkpoints, so a
-# dry run must also report zero deletable rows before exiting early. The dry
-# run executes on a private read-only backup copy so the original database
-# and its WAL sidecars stay byte-identical.
-# The dry run binary comes from the target image and validates the complete
-# current schema at open time against requiredSchemaColumns, the analysis
-# triggers, and the receipt/blob objects. A source that predates any of those
-# requirements cannot be dry run, so the gate below must carry every additive
-# one and a failed dry run falls through to the full path instead of stranding
-# the window. The full path provisions the candidate and keeps a verified
-# backup either way.
+# A schema-complete target may still hold repairable posted times or historical
+# no-op checkpoints, so both dry runs must report zero before exiting early.
+# They execute on a private read-only backup copy so the original database and
+# its WAL sidecars stay byte-identical. The posted-time tool validates no
+# application schema; the checkpoint tool validates the complete current schema
+# at open time. A source that predates any requirement cannot be dry run, so the
+# gate below carries every additive one and a failed dry run falls through to
+# the full path instead of stranding the window. The full path provisions the
+# candidate and keeps a verified backup either way.
 if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purchases ] && [ "$transaction_audit" = 0 ] && [ "$transactions_split" = 1 ] && [ "$friendships" = 1 ] && [ "$displays" = 1 ] && [ "$undisplayed" = 0 ] && [ "$suppressed" = 1 ] && [ "$available" = 1 ] && [ "$provisional_postings" = current ] && [ "$card_statements" = current ] && [ "$legacy_cards" = 0 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ] && [ "$institution_count" = 1 ] && [ "$basis_count" = 1 ] && [ "$recurrence" = current ] && [ "$statement_closing" = current ] && [ "$safe_spending_missing" = 0 ] && [ "$safe_spending_reserve" = 0 ]; then
   dry_dir=$(mktemp -d "${db}.noop-dry.XXXXXX") || fail "Cannot create a private dry-run directory."
   dry_copy="$dry_dir/dry.db"
@@ -691,20 +700,28 @@ if [ "$mode" = verify ] && [ "$analysis" = 8 ] && [ "$purchases" = planned_purch
     rm -rf "$dry_dir"
     fail "Candidate no-op dry-run backup failed; refusing to report verified."
   fi
+  repair_out=""
+  repair_ok=0
+  if repair_out=$(repair-claimed-posted-time --db "$dry_copy" --dry-run 2>&1); then
+    repair_ok=1
+  else
+    printf 'migrate: candidate no-op dry run failed, using the full path: %s\n' "$repair_out" >&2
+  fi
   dry_out=""
   dry_ok=0
-  if dry_out=$(prune-noop-checkpoints --db "$dry_copy" --dry-run 2>&1); then
+  if [ "$repair_ok" = 1 ] && dry_out=$(prune-noop-checkpoints --db "$dry_copy" --dry-run 2>&1); then
     dry_ok=1
-  else
+  elif [ "$repair_ok" = 1 ]; then
     printf 'migrate: candidate no-op dry run failed, using the full path: %s\n' "$dry_out" >&2
   fi
-  rm -rf "$dry_dir"
-  if [ "$dry_ok" = 1 ]; then
-    case "$dry_out" in
-      *" 0 deletable,"*) info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+  if [ "$dry_ok" = 1 ] && check_posted_times "$dry_copy" && check_provisional_postings "$dry_copy"; then
+    case "$repair_out:$dry_out" in
+      *"(0 rows repairable)"*" 0 deletable,"*) info "Application schema, posted times, provisional postings, and checkpoints verified, nothing to do."
+        rm -rf "$dry_dir"
         exit 0 ;;
     esac
   fi
+  rm -rf "$dry_dir"
 fi
 
 # Snapshot the original with the SQLite backup API into a new private
@@ -727,6 +744,16 @@ if ! upgrade-transaction-sim-split --db "$candidate" > "$backup/transaction-sim.
   printf 'migrate: transaction split failed: %s\n' "$(cat "$backup/transaction-sim.log")" >&2
   fail "Candidate transaction split failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
+# Repair the old pending-refresh damage before provisional-posting backfill so
+# a recovered transaction_time can also prove the provisional posted instant.
+# The tool touches only settled bank rows and publishes nothing: it mutates the
+# private candidate, and every failure leaves the original byte-identical.
+if ! repair-claimed-posted-time --db "$candidate" > "$backup/claimed-posted-time.log" 2>&1; then
+  printf 'migrate: claimed posted time repair failed: %s\n' "$(cat "$backup/claimed-posted-time.log")" >&2
+  fail "Candidate claimed posted time repair failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+info "$(cat "$backup/claimed-posted-time.log")"
+check_posted_times "$candidate" || fail "Candidate settled bank rows still lack posted instants. Original unchanged; backup retained at $backup. Keep the API stopped."
 # Explicit provisional-posting state is a sparse satellite. Create and backfill
 # it only on the actual legacy upgrade, and only when facts prove pending=true
 # plus numeric postedTime=0; legacy facts without both normally backfill zero.
@@ -785,8 +812,8 @@ DROP TABLE checkpoints;
 ALTER TABLE checkpoints_new RENAME TO checkpoints;
 DROP TRIGGER IF EXISTS analysis_transaction_sim_lifecycle;
 UPDATE transaction_sim SET enabled = 1
-WHERE EXISTS (SELECT 1 FROM transactions p WHERE p.user_id = transaction_sim.user_id AND p.id = transaction_sim.transaction_id AND p.source NOT IN ('user', 'model', '') AND p.pending = 0 AND p.void = 0 AND transaction_sim.enabled = 0);
-UPDATE transactions SET transaction_time = posted_time WHERE source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND transaction_time != posted_time;
+WHERE EXISTS (SELECT 1 FROM transactions p WHERE p.user_id = transaction_sim.user_id AND p.id = transaction_sim.transaction_id AND p.source NOT IN ('user', 'model', '', 'projected') AND p.pending = 0 AND p.void = 0 AND transaction_sim.enabled = 0);
+UPDATE transactions SET transaction_time = posted_time WHERE source NOT IN ('user', 'model', '', 'projected') AND pending = 0 AND void = 0 AND transaction_time != posted_time;
 CREATE TRIGGER analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON transaction_sim
 		WHEN (OLD.enabled != NEW.enabled)
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND transaction_id = NEW.transaction_id)
@@ -794,10 +821,10 @@ CREATE TRIGGER analysis_transaction_sim_lifecycle AFTER UPDATE OF enabled ON tra
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END;
 INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
   SELECT 1 FROM transaction_sim s JOIN transactions p ON p.user_id = s.user_id AND p.id = s.transaction_id
-  WHERE p.source NOT IN ('user', 'model', '') AND p.pending = 0 AND p.void = 0 AND s.enabled = 0
+  WHERE p.source NOT IN ('user', 'model', '', 'projected') AND p.pending = 0 AND p.void = 0 AND s.enabled = 0
 ) OR EXISTS (
   SELECT 1 FROM transactions
-  WHERE source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND transaction_time != posted_time
+  WHERE source NOT IN ('user', 'model', '', 'projected') AND pending = 0 AND void = 0 AND transaction_time != posted_time
 ) THEN 0 ELSE 1 END;
 INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (SELECT 1 FROM pragma_integrity_check WHERE integrity_check != 'ok') THEN 0 ELSE 1 END;
 INSERT INTO assert_ok(ok) SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_foreign_key_check) != 0 THEN 0 ELSE 1 END;
@@ -1607,33 +1634,49 @@ if [ "$mode" = convert ]; then
   post_same=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
     SELECT EXISTS (
       SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
-      FROM main.transactions WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0
+      FROM main.transactions WHERE source IN ('user', 'model', '', 'projected') OR pending != 0 OR void != 0
       EXCEPT
       SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
-      FROM before.transactions WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0)
+      FROM before.transactions WHERE source IN ('user', 'model', '', 'projected') OR pending != 0 OR void != 0)
         OR EXISTS (
       SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
-      FROM before.transactions WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0
+      FROM before.transactions WHERE source IN ('user', 'model', '', 'projected') OR pending != 0 OR void != 0
       EXCEPT
       SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
-      FROM main.transactions WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0);") \
+      FROM main.transactions WHERE source IN ('user', 'model', '', 'projected') OR pending != 0 OR void != 0);") \
     || fail "Cannot verify candidate transactions; refusing to publish."
   test "$post_same" = 0 || fail "Candidate changed non-settled transactions. Original unchanged; backup retained at $backup. Keep the API stopped."
   post_repair=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (
     SELECT 1 FROM before.transactions o LEFT JOIN main.transactions n ON n.user_id = o.user_id AND n.id = o.id
     LEFT JOIN main.transaction_sim s ON s.user_id = o.user_id AND s.transaction_id = o.id
-    WHERE o.source NOT IN ('user', 'model', '') AND o.pending = 0 AND o.void = 0
+    WHERE o.source NOT IN ('user', 'model', '', 'projected') AND o.pending = 0 AND o.void = 0
       AND (n.id IS NULL OR n.transaction_time != n.posted_time
         OR n.name IS NOT o.name
         OR n.source_account_id IS NOT o.source_account_id
         OR n.amount_resolution_json IS NOT o.amount_resolution_json
-        OR n.posted_time IS NOT o.posted_time
+        OR n.posted_time IS NOT CASE WHEN o.posted_time <= 0 THEN o.transaction_time ELSE o.posted_time END
         OR n.source IS NOT o.source OR n.pending IS NOT o.pending OR n.void IS NOT o.void
         OR s.transaction_id IS NULL OR s.enabled != 1));") \
     || fail "Cannot verify candidate transactions; refusing to publish."
   test "$post_repair" = 0 || fail "Candidate bank repair is incomplete or overreached. Original unchanged; backup retained at $backup. Keep the API stopped."
 else
   verify_same checkpoints || fail "Candidate changed final checkpoints. Original unchanged; backup retained at $backup. Keep the API stopped."
+  post_count=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT (SELECT COUNT(*) FROM main.transactions) != (SELECT COUNT(*) FROM before.transactions);") \
+    || fail "Cannot verify candidate transactions; refusing to publish."
+  test "$post_count" = 0 || fail "Candidate changed transaction row count. Original unchanged; backup retained at $backup. Keep the API stopped."
+  post_repair=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT EXISTS (
+      SELECT 1 FROM before.transactions o LEFT JOIN main.transactions n ON n.user_id = o.user_id AND n.id = o.id
+      WHERE n.id IS NULL OR n.name IS NOT o.name
+        OR n.source_account_id IS NOT o.source_account_id
+        OR n.amount_resolution_json IS NOT o.amount_resolution_json
+        OR n.transaction_time IS NOT o.transaction_time
+        OR n.posted_time IS NOT CASE
+          WHEN o.source NOT IN ('user', 'model', '', 'projected') AND o.pending = 0 AND o.void = 0 AND o.posted_time <= 0
+          THEN o.transaction_time ELSE o.posted_time END
+        OR n.source IS NOT o.source OR n.pending IS NOT o.pending OR n.void IS NOT o.void);") \
+    || fail "Cannot verify candidate transactions; refusing to publish."
+  test "$post_repair" = 0 || fail "Candidate posted-time repair is incomplete or overreached. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 
 if [ "$analysis" = 5 ] || [ "$analysis" = 6 ] || [ "$analysis" = 8 ]; then
@@ -2149,6 +2192,7 @@ test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM accounts WHERE display_bas
 test "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('analysis_promotions') WHERE name='merchant_key';")" = 1 \
   || fail "Published database is missing the analysis_promotions merchant_key column. Recover from the verified backup at $backup. Keep the API stopped."
 check_recurrence "$db" || fail "Published database failed schedule recurrence verification. Recover from the verified backup at $backup. Keep the API stopped."
+check_posted_times "$db" || fail "Published database failed settled bank posted-time verification. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
 if [ "$recurrence" = legacy ]; then
