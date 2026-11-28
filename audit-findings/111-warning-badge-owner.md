@@ -2,7 +2,7 @@
 id: 111
 title: Own the transaction warning badge in one place
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

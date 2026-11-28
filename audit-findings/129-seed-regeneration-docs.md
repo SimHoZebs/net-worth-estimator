@@ -2,7 +2,7 @@
 id: 129
 title: Keep one working recipe for regenerating the ML seed
 scope: doc-audit-reference
-status: needs-review
+status: accepted
 ---
 
 Two guides change into `ml/` and then export to `ml/seed.sqlite3`. That relative path resolves to `ml/ml/seed.sqlite3` in the checkout, so the instructions do not export where they say they do.

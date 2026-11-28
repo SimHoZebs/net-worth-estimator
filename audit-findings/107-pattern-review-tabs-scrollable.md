@@ -2,7 +2,7 @@
 id: 107
 title: Make the pattern-review tab strip scrollable
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

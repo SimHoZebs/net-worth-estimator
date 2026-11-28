@@ -2,7 +2,7 @@
 id: 125
 title: Ship only the identity service runtime
 scope: deploy-build-test
-status: needs-review
+status: accepted
 ---
 
 The identity service build installs all workspaces before building its sign-in assets, then copies the entire build tree into the final image. The running server serves its built public assets and imports two shared frontend recipes to render sign-in pages. One recipe uses `class-variance-authority`, currently installed as a frontend dependency.

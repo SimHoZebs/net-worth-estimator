@@ -2,7 +2,7 @@
 id: 115
 title: Make an open-ended share an explicit choice
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario
@@ -31,7 +31,7 @@ Open-ended sharing is encoded in a label instead of in a control: the field read
 
 ## Recommended action
 
-Change the label from "Share until (empty for no end)" to "Share until" and introduce a "No end date" choice that owns the open-ended state. When that choice is selected, hide or disable the date input. This reuses the existing "Share until" field and the existing preview and save requests; no new screen is needed.
+Change the label from "Share until (empty for no end)" to "Share until" and introduce a "No end date" choice. For new sharing, require a date or an explicit selection of "No end date" before enabling sharing. When editing existing settings, show the saved choice. Reuse the existing preview and save requests.
 
 ## Before and after
 

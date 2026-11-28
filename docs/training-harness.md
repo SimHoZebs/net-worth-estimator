@@ -82,13 +82,10 @@ precision/recall/F1 plus strict exact-set accuracy), `signal_support`
 trips/warnings, per-event train/eval latency, peak RSS), and
 `shift_probe` (synthetic flipped-label drift response).
 
-Train and seed exports a deployable learner database:
-
-```bash
-uv run --with pyarrow --with pandas --with openpyxl eval/harness.py \
-  --source all --moneydata-path <path/to/xlsx> --mitul-path <path/to/parquet> \
-  --slice 5000 --export-seed /tmp/opencode/seed.sqlite3
-```
+Train and seed exports use the
+[canonical seed procedure](../ml/eval/README.md#regenerate-the-canonical-seed).
+It keeps the export and verification probe in a private task scratch directory,
+then requires a separate deliberate copy to the versioned seed.
 
 The canonical recipe trains every source's interleaved payment baseline
 order in sequence (mitul payments excluded: single occurrences carry no
@@ -98,10 +95,10 @@ dismiss-and-retry so one shift never wipes the seed. Export fails loudly
 unless every payment classifier kind and every mapped category kind clears
 its coverage minimum; a probe set verifies that a fresh load of the seed
 evaluates identically to the in-memory trained state. The canonical seed
-is versioned at `ml/seed.sqlite3` (see `docs/eval-datasets.md` for
-provenance); regenerate it with the documented command rather than
-hand-editing it. Real-vs-synthesized accounting lives in
-`ml/eval/README.md`.
+is versioned at `ml/seed.sqlite3`; its provenance is recorded in
+`docs/eval-datasets.md`, and the regeneration and copy procedure lives in
+[the evaluation harness README](../ml/eval/README.md#regenerate-the-canonical-seed).
+Real-vs-synthesized accounting lives in `ml/eval/README.md`.
 
 ## Ownership boundaries
 

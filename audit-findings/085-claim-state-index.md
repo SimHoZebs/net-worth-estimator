@@ -2,7 +2,7 @@
 id: 085
 title: Build one claim-state index in the Safe Spending replay
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

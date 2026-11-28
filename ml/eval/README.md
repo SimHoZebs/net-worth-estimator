@@ -97,12 +97,14 @@ uv run --with pyarrow --with pandas eval/harness.py --full   # all 68k rows
 uv run --with pyarrow --with pandas --with openpyxl eval/harness.py \
   --source all --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
   --mitul-path <path/to/transaction-categorization/default/train/0000.parquet> \
-  --slice 5000 --export-seed /tmp/opencode/seed.sqlite3
+  --slice 5000 --export-seed /absolute/path/to/task-scratch/seed.sqlite3
 ```
 
 `--source` selects `hf-v2` (default), `moneydata` (needs `--moneydata-path`),
 `mitul` (needs `--mitul-path`, defaults to the path above), or `all`
 (per-source reports plus a combined seed phase).
+
+## Regenerate the canonical seed
 
 Seed export (canonical recipe: per-source interleaved payment baseline
 orders — mitul excluded, its single occurrences carry no recurrence signal —
@@ -117,12 +119,46 @@ The harness also writes a probe set (`--seed-probe`)
 covering payment, HF/MoneyData category, and mitul category requests (200
 each) and verifies that a fresh load of
 the seed evaluates the probe identically to the in-memory trained state. The canonical seed is versioned at `ml/seed.sqlite3` (see
-`docs/eval-datasets.md` for provenance); regenerate with the command
-above rather than hand-editing it. Standalone use:
+`docs/eval-datasets.md` for provenance). Reproducibility covers weights,
+counts, revision, and decisions; the `generation` UUID is preserved verbatim
+and differs per export.
+
+Run the full recipe from the repository root. It writes the export and probe
+to a private task scratch directory outside the checkout, never directly over
+the versioned seed.
+
+```bash
+repo=$PWD
+scratch_root="$HOME/.local/share/opencode/scratch"
+umask 077
+mkdir -p "$scratch_root"
+scratch=$(mktemp -d "$scratch_root/nwe-seed.XXXXXX")
+cd ml
+uv run --with pyarrow --with pandas --with openpyxl \
+  eval/harness.py --source all \
+  --moneydata-path /absolute/path/to/laramee26openBankTransactionData.xlsx \
+  --mitul-path /absolute/path/to/transaction-categorization/default/train/0000.parquet \
+  --full --cache-dir "$scratch/evalboth" \
+  --export-seed "$scratch/seed.sqlite3"
+uv run python eval/seed_export.py verify \
+  --seed "$scratch/seed.sqlite3" \
+  --probe "$scratch/evalboth/seed-probe.json"
+```
+
+Review the combined seed summary and verification before replacing the
+repository artifact. After explicit authorization, copy the verified export
+deliberately from the same `ml/` working directory:
+
+```bash
+install -m 0600 "$scratch/seed.sqlite3" "$repo/ml/seed.sqlite3"
+sha256sum "$repo/ml/seed.sqlite3"
+```
+
+Then update the seed hash and size in `eval/store/manifest.json` and any changed
+provenance counts in `docs/eval-datasets.md`. Run `python3 eval/store/verify.py`
+from `ml/` after those records match the copied seed. Standalone use remains
 `python eval/seed_export.py export --src ... --dest ...` and
 `python eval/seed_export.py verify --seed ... --probe ...`.
-Reproducibility covers weights, counts, revision, and decisions; the
-`generation` UUID is preserved verbatim and differs per export.
 
 Stages: (1) download parquet, (2) sample + build fixture (rows + alias
 table), (3) Go harness expands each descriptor into a monthly occurrence

@@ -2,7 +2,7 @@
 id: 110
 title: Keep font family strings in one owner
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

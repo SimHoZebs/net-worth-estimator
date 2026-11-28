@@ -2,7 +2,7 @@
 id: 121
 title: Keep confirmation dialog actions within reach
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 Delete account and End schedule open confirmation dialogs. The shared dialog centers its contents without a maximum height or a scroll area. If the contents exceed the available height, a user can lose access to the buttons at the bottom.

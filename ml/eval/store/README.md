@@ -15,16 +15,9 @@ cd ml && uv run --with pyarrow --with pandas -- python3 -c "from pathlib import 
 ```
 
 Expect 48,003 rows: UNIQUE descriptions per mapped key, 4,000 per key
-(TRANSFER_OUT has 3), seed 7, keys sorted. Full seed recipe:
-
-```bash
-cd ml && uv run --with pyarrow --with pandas --with openpyxl \
-  eval/harness.py --source all \
-  --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
-  --mitul-path <path/to/transaction-categorization/default/train/0000.parquet> \
-  --full --cache-dir /tmp/opencode/evalboth \
-  --export-seed ml/seed.sqlite3
-```
+(TRANSFER_OUT has 3), seed 7, keys sorted. The full seed recipe and the
+separate, authorized copy to `ml/seed.sqlite3` are owned by the
+[evaluation harness README](../README.md#regenerate-the-canonical-seed).
 
 Verify the manifest:
 

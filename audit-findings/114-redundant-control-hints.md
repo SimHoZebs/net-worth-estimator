@@ -2,7 +2,7 @@
 id: 114
 title: Remove hints that restate the control
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario
@@ -15,7 +15,7 @@ In the purchase planner, opening the Add purchase or Edit purchase dialog for a 
 
 In the Financial Independence detail view, the Configure tab shows a note reading "Minimum net worth, spending test duration, and funding sources. Saving recalculates the projection." The Configure form renders those fields and a "Save configuration" button directly below the note. In read-only mode the Configure form disables its field sets and its "Save configuration" button and shows a second note reading "Read-only mode blocks configuration changes."
 
-All five passages are static copy: four are rendered by React components under `frontend/src/pages/` and one is written into the HTML template in the identity service. No parser is involved because no data format is being decoded. The values that actually cross an API boundary are the selected scan-window day count, the sign-up password, and the saved configuration fields. The passages were written to teach on first use, but each one renders on every visit and repeats what the label, the bounds, the browser's own validation, or the disabled state already says.
+All five passages are static copy. Some parts restate labels or controls; others explain limits, access, or what saving does. Native input bounds and disabled controls do not necessarily communicate those details before someone tries to proceed.
 
 ```mermaid
 flowchart LR
@@ -29,20 +29,20 @@ flowchart LR
 
 ## Executive summary
 
-Five persistent helper passages repeat what the control beside each one already communicates. The Gmail scan-window paragraph restates the input's label and its 1-through-365 bounds. The sign-up note duplicates the browser's built-in 8-character minimum for the password field. The planned-purchase alert and the Configure tab's read-only note restate disabled fields and a disabled save button, and the Configure tab's other note lists the form's own field labels and the effect of saving. The UI principles state that a disabled control, a lock icon, and a status readout together say "read-only" and that a sentence saying it again is not information, and they allow hint text only for non-obvious behavior or consequential qualifications. The cost is a small attention tax on every viewing and five strings that must be updated whenever a label or bound changes. Delete the five passages and keep the native validation and disabled-state cues that already carry the same information.
+Five helper passages repeat some information already communicated by the controls. Shorten them where the same information is already visible, and keep any instruction that tells people something new.
 
 ## Recommended action
 
-Delete the five exact sentences: the Gmail "How far back the first receipt scan looks, from 1 to 365 days." paragraph, the "Use 8–72 characters." note, the "These planned purchases are read-only." alert, the "Read-only mode blocks configuration changes." note, and the "Minimum net worth, spending test duration, and funding sources. Saving recalculates the projection." note. Keep the input bounds, the password input's native minimum length, the disabled field sets, the disabled buttons, and any lock cue the view already shows as the state signals. Nothing new must be created.
+Remove only the repeated information from the five passages. Preserve limits people cannot see before submitting, any read-only explanation that is otherwise missing, and consequences of saving that the control does not communicate. Keep the existing validation and read-only behavior.
 
 ## Before and after
 
 | Screen | Before | After |
 | --- | --- | --- |
-| Gmail scan window | Paragraph repeats the input's label and its 1-through-365 bounds | Label and bounded input only |
-| Create an account | Note restates the password's 8-to-72-character rule | Native validation only |
-| Planned purchase dialog | Alert restates disabled fields and a disabled save button | Disabled fields and disabled save button only |
-| Financial Independence Configure tab | Notes restate the read-only state and list the form's own field labels | Field labels and Save configuration button only |
+| Gmail scan window | Paragraph repeats the input's label and explains the bounds | Keep the bounds visible and remove the repeated description |
+| Create an account | Note explains the password length rule | Keep the rule available before submission |
+| Planned purchase dialog | Alert explains the disabled state | Keep the explanation if the dialog has no other read-only cue |
+| Financial Independence Configure tab | Notes list fields, explain read-only mode and describe the effect of saving | Remove the repeated field list and preserve information the controls do not communicate |
 
 ```mermaid
 flowchart LR
@@ -51,19 +51,21 @@ flowchart LR
 
 ## Expected improvement
 
-Each screen carries less repeated text, so the member sees the control and its state instead of a sentence restating them, and there are five fewer strings to keep in step with their labels, bounds, and disabled states. This is a structural improvement only. No benchmarks were run, so no speed, line-count, or bundle savings are claimed.
+Each screen carries less repeated text while keeping information needed to enter valid values or understand what the controls do.
 
 ## Alternatives considered
 
 - Leave as is: the sentences are harmless on their own but keep charging attention on every view and must be updated whenever a label or bound changes.
-- Rewrite the hints to add new information instead of deleting them: this adds copy rather than removing it and works against the UI principles' rule that most hint text should not exist.
+- Delete every hint: that would also remove rules and explanations people may need before interacting with the controls.
 
 ## Downside of rejecting
 
-The five sentences stay on every viewing, and each is a string that must be updated in step with its label, bound, or disabled state; when they drift, the helper text contradicts the control it describes.
+Repeated text can drift from the control it describes.
 
 ## Verification
 
 Confirm the scan-window input still rejects values outside 1 through 365, the password field still enforces the 8-character minimum, and the planned-purchase dialog and Configure form still block edits and saving after the copy is removed. This is a proposed acceptance check, not a recorded result; no existing test asserts these strings.
+
+Check that the revised copy still communicates limits before submission, preserves the explanation of read-only mode where needed, and tells people when saving recalculates the projection.
 
 References: `frontend/src/pages/sources/GmailProviderPanel.tsx:340`; `auth/better-auth/src/pages.ts:53`; `frontend/src/pages/evaluations/IndependenceConfigure.tsx:368`; `frontend/src/pages/purchase-planner/PlannedPurchaseEditor.tsx:125`; `frontend/src/pages/evaluations/FinancialIndependenceModal.tsx:89`; `docs/UI_UX_PRINCIPLES.md`.

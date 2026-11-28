@@ -2,7 +2,7 @@
 id: 116
 title: Remove tutorial and roadmap text from empty states
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

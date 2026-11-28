@@ -2,7 +2,7 @@
 id: 108
 title: Remove the duplicated sheet description
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

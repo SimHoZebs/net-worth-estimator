@@ -2,7 +2,7 @@
 id: 128
 title: Correct the Analysis input retention guide
 scope: doc-audit-reference
-status: needs-review
+status: accepted
 ---
 
 The Analysis guide says each run saves a reproducible input snapshot that can preserve deleted transaction evidence. The worker loads the input into memory for computation, but the run table retains the input revision and run metadata rather than a copy of that input.

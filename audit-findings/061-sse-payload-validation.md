@@ -2,7 +2,7 @@
 id: 061
 title: Validate stream event payloads before typing them
 scope: contracts-types
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

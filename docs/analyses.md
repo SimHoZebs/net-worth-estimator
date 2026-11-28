@@ -10,12 +10,14 @@ never calls an analyzer. The independent backend worker checks durable evidence
 revisions every 15 seconds, including an immediate pass at startup. Balance-only
 updates and identical repeat feeds do not change that revision.
 
-The worker claims one user-scoped run, saves its input snapshot, releases the
-database transaction, and computes. It publishes findings in a separate
-transaction only if the input revision still matches. Changed inputs supersede
-the run. Failed analysis does not roll back sync or remove previous findings.
-Expired one-minute leases permit recovery after interruption. Failed runs retry
-after at least 30 seconds. Computation receives a 20-second context deadline.
+The worker claims one user-scoped run, loads the current evidence into an
+in-memory `AnalysisSnapshot`, releases the database transaction, and computes.
+It publishes findings in a separate transaction only if the input revision still
+matches. Changed inputs supersede the run. Failed analysis does not roll back
+sync or remove previous findings. Expired one-minute leases permit recovery after
+interruption. Failed runs retry after at least 30 seconds. Computation receives a
+20-second context deadline. The in-memory snapshot is not saved as a per-run
+database record or exposed as a snapshot by the public API.
 
 `backend/internal/analysis` owns definitions and the worker. Its persistence port
 is `store.AnalysisStore`. Add a definition to `analysis.Definitions()` to reuse
@@ -33,16 +35,17 @@ revisions skip the user without loading prior findings. It does not require a br
   string metadata fields are allowlisted. Owner label edits do not rewrite it.
 - `analysis_inputs` holds a monotonic user-scoped revision. Fact changes,
   deletion, and pending/void lifecycle changes invalidate analysis.
-- `analysis_runs` records execution, producer version, input revision, and a
-  private reproducible input snapshot. Retain 128 recent runs plus runs that
-  findings or feedback still reference. Raw snapshots never appear in the public API.
+- `analysis_runs` records execution metadata: analysis type, producer version,
+  input revision, state, timestamps, lease, and problem. Retain 128 recent runs
+  plus runs that findings or feedback still reference. It does not retain the
+  input snapshot, so a historical run cannot reconstruct deleted input.
 - `analysis_findings` holds one current finding per analysis, transaction, and
   finding kind. Rechecks preserve identity, first detection, dismissal, and user review.
   Unsupported findings become withdrawn. Their original detection provenance
   stays intact. Active findings become stale when relevant evidence changes.
 - `analysis_feedback` is an append-only answer history. Each event records its
   verified actor, action, original prediction, detector version, run, input revision,
-  and resulting review. Referenced input snapshots survive ordinary run pruning.
+  and resulting review. Referenced run metadata survives ordinary run pruning.
   Feedback is private evidence for later evaluation, not automatic retraining.
 - `analysis_transfer_links` plus `analysis_transfer_link_members` hold one
   user-confirmed opposite-leg pair per two rows: legs store normalized with
@@ -58,11 +61,10 @@ removes its dependent facts, findings, feedback, and transfer links. A user clea
 retaining the monotonic input revision. Model replacement preserves evidence for
 bank rows that the import contract preserves. Other users remain untouched.
 Private refreshes copy evidence including transfer links. Financial-only sample publication excludes it.
-Database backups contain sensitive descriptions and analysis input snapshots.
-Historical run snapshots can retain deleted transaction evidence until run
-retention or user clearing removes them. Feedback for other transactions can keep
-a shared run snapshot beyond the ordinary 128-run limit. SQLite WAL files and backups can retain
-deleted data; this feature does not promise secure erasure from those locations.
+Database backups contain sensitive source descriptions and retained Analysis
+findings and feedback. Historical run rows retain revisions and metadata, not
+copies of transaction input. SQLite WAL files and backups can retain deleted
+data; this feature does not promise secure erasure from those locations.
 
 Evidence capture starts on the next ordinary sync. Known settled transaction
 keys can receive metadata without overwriting owner edits. The existing 90-day

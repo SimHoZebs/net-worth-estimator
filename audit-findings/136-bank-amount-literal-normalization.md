@@ -2,7 +2,7 @@
 id: 136
 title: Normalize numeric amounts before saving bank data
 scope: contracts-types
-status: needs-review
+status: accepted
 ---
 
 SimpleFIN checks incoming numbers with Go's floating-point parser, then stores the original transaction spelling as an arithmetic expression. The expression evaluator accepts a narrower syntax. A number such as `1e3` can therefore pass sync translation but fail when the saved model evaluates it. Other readers disagree about surrounding spaces, including when a transaction is used to create a schedule.

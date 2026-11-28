@@ -2,7 +2,7 @@
 id: 078
 title: Price a closed statement with one engine
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 ## Scenario
@@ -32,13 +32,13 @@ The recommended action is to choose one close-pricing rule and have both surface
 
 ## Recommended action
 
-Make the observed-balance rule authoritative. Have `buildStatements` call `DeriveStatements` for closed cycles and delete its checkpoint-replay branch for those cycles, so the Safe Spending summary prices a closed statement the same way as the card statements API and transfer-pair analysis. Keep `cardStatementRows` as the replay engine only for estimated cycles, keep the `card_statements` drop-and-rekey migration body until every target verifies, and update the `DerivedStatement` documentation to describe the observed-balance rule. This deletes one derivation path rather than extending a framework.
+Use one closed-statement calculation for Safe Spending, the Statements tab, and transfer-pair analysis. Start from the latest eligible balance check in that statement's cycle and apply posted activity after the check through the close. Keep the statement balance unknown when there is no balance check in the cycle.
 
 ## Before and after
 
 Before: two close-cycle pricing rules — balance negation and checkpoint replay — feed different surfaces, and the doc disagrees with the function for closed cycles.
 
-After: one rule is authoritative and both surfaces call it. `cardStatementRows` remains only for estimated-cycle replay, and the migration body stays until every target verifies.
+After: both surfaces use the latest eligible balance check in the cycle plus posted activity through the close. The migration body stays until every target verifies.
 
 ```mermaid
 flowchart LR
@@ -51,7 +51,7 @@ Structural: it removes a drift risk and leaves one rule to maintain and document
 
 ## Alternatives considered
 
-Leave as is: keeps two close-pricing rules and a doc that disagrees with the code; rejected because a future rule change can silently desynchronize the card-statements API from the Safe Spending summary. Make `buildStatements` the single owner by dropping `DeriveStatements` for closed cycles: viable, but the finding leaves which rule wins open since neither is proven wrong. Delete the `card_statements` migration body now: rejected; it must stay until every target verifies the drop-and-rekey.
+Using the balance check alone would ignore any activity that posts after the check and before closing. Continuing to use separate calculations would allow the surfaces to disagree.
 
 ## Downside of rejecting
 

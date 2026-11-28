@@ -2,7 +2,7 @@
 id: 106
 title: Keep a stable name on pin and reveal toggles
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

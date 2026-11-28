@@ -2,7 +2,7 @@
 id: 133
 title: Align the browser and server range scenario count
 scope: backend-api-persist
-status: needs-review
+status: accepted
 ---
 
 The browser requests 400 scenarios for a range. New server state defaults to 1,000, and the server requires the counts to match before reading or building the saved range. Even when the remaining settings match, the normal browser request computes directly instead of reusing saved results.

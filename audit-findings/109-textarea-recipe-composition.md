@@ -2,7 +2,7 @@
 id: 109
 title: Compose the textarea from the shared input recipe
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

@@ -2,7 +2,7 @@
 id: 117
 title: Price statements from the latest balance check
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 When you open a credit card's statements, the statement balance uses the last eligible balance check in its cycle. The lookup sorts by calendar day and then scans backward. Because the store keeps multiple balance checks per day, a morning balance entered after an evening balance can be picked as the latest.

@@ -2,7 +2,7 @@
 id: 126
 title: Supply account balances directly in frontend tests
 scope: deploy-build-test
-status: needs-review
+status: accepted
 ---
 
 The frontend test server calculates its own account balances and decides which debts are archived. Its rule archives a zero-balance liability even without payment terms; the real API requires payment terms. Frontend tests can therefore see a different account list from the one the API returns.

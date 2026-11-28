@@ -2,7 +2,7 @@
 id: 079
 title: Match transfer legs with one shared rule
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

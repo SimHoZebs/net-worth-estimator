@@ -2,7 +2,7 @@
 id: 118
 title: Calculate range percentiles in one place
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 A newly calculated range and a range served from saved results both describe the same distribution of scenarios. They use separate formulas to estimate percentiles between samples. The formulas are mathematically equivalent, but floating-point rounding can leave slightly different values in the API response for identical samples.

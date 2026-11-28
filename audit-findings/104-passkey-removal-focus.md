@@ -2,7 +2,7 @@
 id: 104
 title: Restore focus and announce passkey removal
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

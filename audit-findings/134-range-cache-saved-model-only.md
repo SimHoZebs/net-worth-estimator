@@ -2,7 +2,7 @@
 id: 134
 title: Restrict the saved range to saved-model requests
 scope: backend-api-persist
-status: needs-review
+status: accepted
 ---
 
 A saved range represents the saved model. The deterministic projection checks that the request uses the saved model without overrides before consulting stored results. The range endpoint lacks that check, so it can use saved results for computations with different inputs.

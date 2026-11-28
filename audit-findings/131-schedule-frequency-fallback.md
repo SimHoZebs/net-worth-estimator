@@ -2,7 +2,7 @@
 id: 131
 title: Read only current schedule recurrence
 scope: frontend-domain
-status: needs-review
+status: accepted
 ---
 
 The current API supplies schedule recurrence. The browser still converts an older representation into a recurrence. Its adapter also fills in some missing or invalid fields, which can make a malformed response look like a usable schedule in the editor.

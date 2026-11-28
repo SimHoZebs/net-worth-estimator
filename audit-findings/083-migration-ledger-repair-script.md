@@ -2,7 +2,7 @@
 id: 083
 title: Record the posted-time repair script in the migration ledger
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

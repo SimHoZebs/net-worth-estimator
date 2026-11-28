@@ -2,7 +2,7 @@
 id: 067
 title: Register a shared run only after the stream is writable
 scope: backend-api-persist
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

@@ -2,7 +2,7 @@
 id: 123
 title: Stop repeating loading animations with reduced motion
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 The reduced-motion stylesheet makes animations extremely short. Loading indicators that repeat indefinitely still repeat indefinitely, which can leave motion or flicker where a user asked for reduced motion.

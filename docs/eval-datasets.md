@@ -114,20 +114,11 @@ production-outcome correct, so the model generalizes rather than
 memorizing. Keyword-first ordering (learner can add, never replace) plus
 the ML_CATEGORIES=0 kill switch is the shipped default on that evidence.
 
-Regenerate (deterministic):
-
-```bash
-cd ml && uv run --with pyarrow --with pandas --with openpyxl \
-  eval/harness.py --source all \
-  --moneydata-path <path/to/laramee26openBankTransactionData.xlsx> \
-  --mitul-path <path/to/transaction-categorization/default/train/0000.parquet> \
-  --full --cache-dir /tmp/opencode/evalboth \
-  --export-seed ml/seed.sqlite3
-```
-
-Then copy the export over `ml/seed.sqlite3` deliberately — never as a
-drive-by. Removing the seed requires removing the Dockerfile `COPY` and
-the `ML_SEED_PATH` env together, or every image build fails.
+Regenerate through the [canonical seed procedure](../ml/eval/README.md#regenerate-the-canonical-seed).
+It exports to a private task scratch directory, verifies the seed and probe, and
+requires a separate deliberate copy to `ml/seed.sqlite3`. Never export directly
+over the versioned seed as a drive-by. Removing the seed requires removing the
+Dockerfile `COPY` and the `ML_SEED_PATH` env together, or every image build fails.
 
 Generalization check (held-out distribution, not train-set accuracy):
 a learner trained on HF-only baseline findings scores 10/11 on

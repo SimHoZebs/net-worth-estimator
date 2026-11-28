@@ -242,9 +242,9 @@ write path:
 1. Export matured journal labels (quarantined, latest-per-transaction).
 2. Train a candidate model off-deployment.
 3. Verify the gates (quarantine, supersession).
-4. Seed swap with a backup of the replaced database, pointing at the
-   existing recipe (`ml/eval/seed_export.py`, canonical seed
-   `ml/seed.sqlite3`, provenance as documented in `ml/README.md`).
+4. Seed swap with a backup of the replaced database, following the
+   [canonical seed procedure](../ml/eval/README.md#regenerate-the-canonical-seed)
+   for `ml/seed.sqlite3`; provenance is recorded in `docs/eval-datasets.md`.
 
 The learner never writes its own seed; an operator performs the swap.
 

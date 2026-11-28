@@ -2,7 +2,7 @@
 id: 135
 title: Publish saved range results atomically
 scope: backend-api-persist
-status: needs-review
+status: accepted
 ---
 
 Rebuilding a saved range deletes the previous statistics, writes the new statistics slice by slice, and records completion separately. The reader accepts a nonempty set of statistics for the stored slices. A failed or concurrent rebuild can leave a range with only part of its dates available.

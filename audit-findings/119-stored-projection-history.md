@@ -2,7 +2,7 @@
 id: 119
 title: Replay only recorded history when reading a saved projection
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 When the server serves saved projection results, it reconstructs the recorded portion of the timeline from the current saved model. The preparation routine also replays historical schedule occurrences to build a transaction ledger and spending-cap state. The saved-result reader uses only the recorded timeline and its balances.

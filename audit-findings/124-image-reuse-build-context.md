@@ -2,7 +2,7 @@
 id: 124
 title: Rebuild images when build exclusions change
 scope: deploy-build-test
-status: needs-review
+status: accepted
 ---
 
 The image workflow can reuse an earlier image if none of the listed build inputs changed. The root `.dockerignore` controls which files enter the build context for all four images, but only the identity service lists it. An exclusions-only change can therefore reuse an image built with the previous file set.

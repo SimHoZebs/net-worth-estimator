@@ -2,7 +2,7 @@
 id: 120
 title: Resolve transfer information once per transaction list
 scope: frontend-state
-status: needs-review
+status: accepted
 ---
 
 Account activity already gives each visible transaction its transfer information. The row still subscribes to the full set of saved transactions, accounts and transfer links. It also looks up its transfer link independently to decide whether to show a transfer arrow or a business logo.

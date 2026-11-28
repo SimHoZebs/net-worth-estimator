@@ -2,7 +2,7 @@
 id: 130
 title: Request only the projection years Flows needs
 scope: frontend-domain
-status: needs-review
+status: accepted
 ---
 
 Flows requests a projection long enough to cover the selected dates. It counts calendar years touched by the window, but the server measures whole years from the projection start. A window from January 2, 2026 through January 1, 2027 therefore requests two years even though one reaches January 2, 2027.

@@ -2,7 +2,7 @@
 id: 122
 title: Show keyboard focus on the Financial Independence card
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 The button that opens the Financial Independence inspector covers the full card. It has no explicit focus ring, and the card clips overflow at the button edge. That makes an outline drawn outside the button unreliable as a keyboard focus indicator.

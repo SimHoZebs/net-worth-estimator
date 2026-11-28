@@ -2,7 +2,7 @@
 id: 081
 title: Decide judgment error precedence in one place
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

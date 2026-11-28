@@ -2,7 +2,7 @@
 id: 080
 title: Apply the same judgment response validation to categorization
 scope: backend-domain
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

@@ -2,7 +2,7 @@
 id: 105
 title: Make auth feedback announce errors assertively
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario

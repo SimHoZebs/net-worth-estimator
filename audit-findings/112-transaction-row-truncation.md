@@ -2,7 +2,7 @@
 id: 112
 title: Bound transaction title truncation by the container
 scope: ui-ux
-status: needs-review
+status: accepted
 ---
 
 ## Scenario
