@@ -1148,6 +1148,7 @@ test("final checkpoints gain the additive unified projection schema", async (t) 
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('checkpoints') WHERE name='provider';"), "1");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name IN ('projection_slice_id','event_json','applied_amount','outcome');"), "4");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM projection_states;"), "0");
+  assert.equal(await rows(db, "SELECT dflt_value FROM pragma_table_info('projection_states') WHERE name='trial_count';"), "400");
   assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
   assert.equal(await rows(db, "SELECT user_id,id,name,source_account_id,amount_resolution_json,posted_time,transaction_time,source,pending,void FROM transactions;"), transactionsBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");

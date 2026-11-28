@@ -1805,7 +1805,7 @@ CREATE TABLE IF NOT EXISTS projection_states (
 			horizon_end TEXT NOT NULL DEFAULT '',
 			calendar_timezone TEXT NOT NULL DEFAULT 'UTC',
 			engine_version TEXT NOT NULL DEFAULT 'v1',
-			trial_count INTEGER NOT NULL DEFAULT 1000,
+			trial_count INTEGER NOT NULL DEFAULT 400,
 			stochastic_seed INTEGER,
 			det_evaluations_json TEXT NOT NULL DEFAULT '',
 			stoch_evaluations_json TEXT NOT NULL DEFAULT '',

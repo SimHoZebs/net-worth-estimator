@@ -11,6 +11,35 @@ func newProjectionSlice(fromAt, toAt string, builtRevision int64) types.Projecti
 	return types.ProjectionSlice{ProjectionStateID: "default", FromAt: dirtyDay(fromAt), ToAt: dirtyDay(toAt), BuiltRevision: builtRevision, Status: "ready"}
 }
 
+func TestProjectionStateTrialCountDefaults(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	s := privateTestPlan(t, d, "trial-default")
+	state, err := s.GetProjectionState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if types.DefaultProjectionTrialCount != 400 {
+		t.Fatalf("default trial count constant = %d, want 400", types.DefaultProjectionTrialCount)
+	}
+	if state.TrialCount != types.DefaultProjectionTrialCount {
+		t.Fatalf("fresh trial count = %d, want 400", state.TrialCount)
+	}
+	state, err = s.SaveProjectionState(types.ProjectionState{ID: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.TrialCount != 400 {
+		t.Fatalf("unset trial count = %d, want 400", state.TrialCount)
+	}
+	state, err = s.SaveProjectionState(types.ProjectionState{ID: "default", TrialCount: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.TrialCount != 3 {
+		t.Fatalf("deliberate trial count = %d, want 3", state.TrialCount)
+	}
+}
+
 func TestInitializeProjectionStateFreezesOnce(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "initialize")

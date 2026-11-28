@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sort"
 	"time"
 
@@ -21,6 +20,18 @@ import (
 // Slice validity is revision-scoped; the dirty date scopes the rewrite.
 
 const unifiedEngineVersion = "v2"
+
+// States created before the 400-scenario default persisted 1000 even when no
+// range had ever been requested. A seed or evaluation fingerprint marks a
+// deliberately frozen range and always wins over default synchronization.
+const legacyDefaultProjectionTrialCount = 1000
+
+func canSyncStochasticSettings(state types.ProjectionState) bool {
+	if state.StochasticSeed != nil || state.StochEvaluationsJSON != "" {
+		return false
+	}
+	return state.TrialCount <= 0 || state.TrialCount == types.DefaultProjectionTrialCount || state.TrialCount == legacyDefaultProjectionTrialCount
+}
 
 // canonicalEvalJSON serializes evaluation tables in struct field order.
 func canonicalEvalJSON(tables *types.EvaluationTables) (string, error) {
@@ -443,43 +454,61 @@ func marshalJSON(value types.JsonValue) string {
 	return string(encoded)
 }
 
-// writeEvaluationOutputs persists one typed row per instance.
+// writeEvaluationOutputs persists one typed row per instance for deterministic
+// builds. Stochastic builds use the same conversion and publish atomically.
 func (s *handler) writeEvaluationOutputs(stateID, kind string, tables types.EvaluationResultTables, builtRevision int64) error {
+	outputs, err := s.buildEvaluationOutputs(stateID, kind, tables, builtRevision)
+	if err != nil {
+		return err
+	}
+	if err := s.store.SaveNetWorthThresholdOutputs(stateID, kind, outputs.NetWorthThreshold, builtRevision); err != nil {
+		return err
+	}
+	if err := s.store.SaveAccountBalanceOutputs(stateID, kind, outputs.AccountBalance, builtRevision); err != nil {
+		return err
+	}
+	if err := s.store.SaveTransactionFulfillmentOutputs(stateID, kind, outputs.TransactionFulfillment, builtRevision); err != nil {
+		return err
+	}
+	if err := s.store.SaveCycleFulfillmentOutputs(stateID, kind, outputs.CycleFulfillment, builtRevision); err != nil {
+		return err
+	}
+	if err := s.store.SavePlannedPurchasesOutputs(stateID, kind, outputs.PlannedPurchases, builtRevision); err != nil {
+		return err
+	}
+	if err := s.store.SaveFinancialIndependenceOutputs(stateID, kind, outputs.FinancialIndependence, builtRevision); err != nil {
+		return err
+	}
+	return s.store.SaveWhatIfOutputs(stateID, kind, outputs.WhatIf, builtRevision)
+}
+
+func (s *handler) buildEvaluationOutputs(stateID, kind string, tables types.EvaluationResultTables, builtRevision int64) (store.StochasticEvaluationOutputs, error) {
+	outputs := store.StochasticEvaluationOutputs{}
 	for _, table := range tables.Tables() {
+		var err error
 		switch table.Type {
 		case types.EvaluationTypeNetWorthThreshold:
-			if err := s.writeThresholdOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.NetWorthThreshold, err = s.buildThresholdOutputs(stateID, kind, *table.Rows, builtRevision)
 		case types.EvaluationTypeAccountBalance:
-			if err := s.writeBalanceOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.AccountBalance, err = s.buildBalanceOutputs(stateID, kind, *table.Rows, builtRevision)
 		case types.EvaluationTypeTransactionFulfillment:
-			if err := s.writeFulfillmentOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.TransactionFulfillment, err = s.buildFulfillmentOutputs(stateID, kind, *table.Rows, builtRevision)
 		case types.EvaluationTypeCycleFulfillment:
-			if err := s.writeCycleOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.CycleFulfillment, err = s.buildCycleOutputs(stateID, kind, *table.Rows, builtRevision)
 		case types.EvaluationTypePlannedPurchases:
-			if err := s.writePurchasesOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.PlannedPurchases, err = s.buildPurchasesOutputs(stateID, kind, *table.Rows, builtRevision)
 		case types.EvaluationTypeFinancialIndependence:
-			if err := s.writeFIOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.FinancialIndependence, err = s.buildFIOutputs(stateID, kind, *table.Rows, builtRevision)
 		case types.EvaluationTypeWhatIf:
-			if err := s.writeWhatIfOutputs(stateID, kind, *table.Rows, builtRevision); err != nil {
-				return err
-			}
+			outputs.WhatIf, err = s.buildWhatIfOutputs(stateID, kind, *table.Rows, builtRevision)
 		default:
-			return fmt.Errorf("unknown evaluation type %q", table.Type)
+			return outputs, fmt.Errorf("unknown evaluation type %q", table.Type)
+		}
+		if err != nil {
+			return outputs, err
 		}
 	}
-	return nil
+	return outputs, nil
 }
 
 func baseFromEnvelope(stateID, kind string, envelope types.EvaluationResultEnvelope, position int, builtRevision int64) (types.EvaluationOutputBase, error) {
@@ -505,25 +534,25 @@ func assignReachedDate(reached **bool, firstDate **string, detReached bool, detF
 	}
 }
 
-func (s *handler) writeThresholdOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildThresholdOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.NetWorthThresholdOutput, error) {
 	outputs := make([]types.NetWorthThresholdOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.NetWorthThresholdOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.NetWorthThresholdPathResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			assignReachedDate(&output.Reached, &output.FirstReachedDate, det.Reached, det.FirstReachedDate)
 		}
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[domain.NetWorthThresholdProbabilisticResult](envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbProbability = &prob.Probability
 			output.ProbP10Date = prob.P10ReachedDate
@@ -532,28 +561,28 @@ func (s *handler) writeThresholdOutputs(stateID, kind string, rows []types.Evalu
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SaveNetWorthThresholdOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
 }
 
-func (s *handler) writeBalanceOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildBalanceOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.AccountBalanceOutput, error) {
 	outputs := make([]types.AccountBalanceOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.AccountBalanceOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.AccountBalancePathResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			assignReachedDate(&output.Reached, &output.FirstReachedDate, det.Reached, det.FirstReachedDate)
 		}
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[domain.AccountBalanceProbabilisticResult](envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbProbability = &prob.Probability
 			output.ProbP10Date = prob.P10ReachedDate
@@ -562,7 +591,7 @@ func (s *handler) writeBalanceOutputs(stateID, kind string, rows []types.Evaluat
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SaveAccountBalanceOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
 }
 
 type fulfillmentProbabilistic struct {
@@ -579,18 +608,18 @@ type cycleProbabilistic struct {
 	SpentPercentiles        types.PercentileBands `json:"spentPercentiles"`
 }
 
-func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildFulfillmentOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.TransactionFulfillmentOutput, error) {
 	outputs := make([]types.TransactionFulfillmentOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.TransactionFulfillmentOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.TransactionFulfillmentPathResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.RequestedAmount = &det.RequestedAmount
 			output.RealizedAmount = &det.RealizedAmount
@@ -604,7 +633,7 @@ func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.Eva
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[fulfillmentProbabilistic](envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbRunCount = &prob.RunCount
 			output.ProbFulfilledCount = &prob.FulfilledRunCount
@@ -617,25 +646,25 @@ func (s *handler) writeFulfillmentOutputs(stateID, kind string, rows []types.Eva
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SaveTransactionFulfillmentOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
 }
 
-func (s *handler) writeCycleOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildCycleOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.CycleFulfillmentOutput, error) {
 	outputs := make([]types.CycleFulfillmentOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.CycleFulfillmentOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.CycleFulfillmentPathResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			accountIDs, err := json.Marshal(det.AccountIDs)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.AccountIDsJSON = string(accountIDs)
 			output.StatementDay = &det.StatementDay
@@ -659,7 +688,7 @@ func (s *handler) writeCycleOutputs(stateID, kind string, rows []types.Evaluatio
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[cycleProbabilistic](envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbRunCount = &prob.RunCount
 			output.ProbWithinCount = &prob.WithinBudgetRunCount
@@ -672,7 +701,7 @@ func (s *handler) writeCycleOutputs(stateID, kind string, rows []types.Evaluatio
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SaveCycleFulfillmentOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
 }
 
 type reachedDateProbabilistic struct {
@@ -682,22 +711,22 @@ type reachedDateProbabilistic struct {
 	P90ReachedDate    *string `json:"p90ReachedDate"`
 }
 
-func (s *handler) writePurchasesOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildPurchasesOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.PlannedPurchasesOutput, error) {
 	outputs := make([]types.PlannedPurchasesOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.PlannedPurchasesOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.PlannedPurchasesPathResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			purchases, err := json.Marshal(det.Purchases)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.AllFunded = &det.AllFunded
 			if det.FirstReachedDate != nil {
@@ -709,7 +738,7 @@ func (s *handler) writePurchasesOutputs(stateID, kind string, rows []types.Evalu
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[reachedDateProbabilistic](envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbProbability = &prob.Probability
 			output.ProbP10Date = prob.P10ReachedDate
@@ -718,21 +747,21 @@ func (s *handler) writePurchasesOutputs(stateID, kind string, rows []types.Evalu
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SavePlannedPurchasesOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
 }
 
-func (s *handler) writeFIOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildFIOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.FinancialIndependenceOutput, error) {
 	outputs := make([]types.FinancialIndependenceOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.FinancialIndependenceOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.FIAnalysisResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if det.Milestones.FirstCoverageDate != nil {
 				date := string(*det.Milestones.FirstCoverageDate)
@@ -747,7 +776,7 @@ func (s *handler) writeFIOutputs(stateID, kind string, rows []types.EvaluationRe
 		if envelope.Probabilistic != nil {
 			prob, err := decodeResult[domain.FIProbabilisticResult](envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbSuccess = &prob.FiCycleSuccessProbability
 			if prob.MedianCoverageDate != nil {
@@ -762,21 +791,21 @@ func (s *handler) writeFIOutputs(stateID, kind string, rows []types.EvaluationRe
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SaveFinancialIndependenceOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
 }
 
-func (s *handler) writeWhatIfOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) error {
+func (s *handler) buildWhatIfOutputs(stateID, kind string, rows []types.EvaluationResultEnvelope, builtRevision int64) ([]types.WhatIfOutput, error) {
 	outputs := make([]types.WhatIfOutput, 0, len(rows))
 	for i, envelope := range rows {
 		base, err := baseFromEnvelope(stateID, kind, envelope, i, builtRevision)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		output := types.WhatIfOutput{EvaluationOutputBase: base}
 		if envelope.Deterministic != nil {
 			det, err := decodeResult[domain.WhatIfPathResult](envelope.Deterministic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			output.FinalNetWorth = &det.FinalNetWorth
 			output.TransactionCount = &det.TransactionCount
@@ -793,21 +822,63 @@ func (s *handler) writeWhatIfOutputs(stateID, kind string, rows []types.Evaluati
 			}
 			encoded, err := json.Marshal(envelope.Probabilistic)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if err := json.Unmarshal(encoded, &prob); err != nil {
-				return err
+				return nil, err
 			}
 			output.ProbFullProbability = &prob.FullFundingProbability
 			output.ProbSampleCount = &prob.SampleCount
 		}
 		outputs = append(outputs, output)
 	}
-	return s.store.SaveWhatIfOutputs(stateID, kind, outputs, builtRevision)
+	return outputs, nil
+}
+
+// evaluationOutputReader lets stored and snapshot-backed ranges share the same
+// completeness and revision checks while assembling evaluation envelopes.
+type evaluationOutputReader interface {
+	ListNetWorthThresholdOutputs(stateID, kind string) ([]types.NetWorthThresholdOutput, error)
+	ListAccountBalanceOutputs(stateID, kind string) ([]types.AccountBalanceOutput, error)
+	ListTransactionFulfillmentOutputs(stateID, kind string) ([]types.TransactionFulfillmentOutput, error)
+	ListCycleFulfillmentOutputs(stateID, kind string) ([]types.CycleFulfillmentOutput, error)
+	ListPlannedPurchasesOutputs(stateID, kind string) ([]types.PlannedPurchasesOutput, error)
+	ListFinancialIndependenceOutputs(stateID, kind string) ([]types.FinancialIndependenceOutput, error)
+	ListWhatIfOutputs(stateID, kind string) ([]types.WhatIfOutput, error)
+}
+
+type stochasticSnapshotReader struct {
+	outputs store.StochasticEvaluationOutputs
+}
+
+func (r stochasticSnapshotReader) ListNetWorthThresholdOutputs(string, string) ([]types.NetWorthThresholdOutput, error) {
+	return r.outputs.NetWorthThreshold, nil
+}
+func (r stochasticSnapshotReader) ListAccountBalanceOutputs(string, string) ([]types.AccountBalanceOutput, error) {
+	return r.outputs.AccountBalance, nil
+}
+func (r stochasticSnapshotReader) ListTransactionFulfillmentOutputs(string, string) ([]types.TransactionFulfillmentOutput, error) {
+	return r.outputs.TransactionFulfillment, nil
+}
+func (r stochasticSnapshotReader) ListCycleFulfillmentOutputs(string, string) ([]types.CycleFulfillmentOutput, error) {
+	return r.outputs.CycleFulfillment, nil
+}
+func (r stochasticSnapshotReader) ListPlannedPurchasesOutputs(string, string) ([]types.PlannedPurchasesOutput, error) {
+	return r.outputs.PlannedPurchases, nil
+}
+func (r stochasticSnapshotReader) ListFinancialIndependenceOutputs(string, string) ([]types.FinancialIndependenceOutput, error) {
+	return r.outputs.FinancialIndependence, nil
+}
+func (r stochasticSnapshotReader) ListWhatIfOutputs(string, string) ([]types.WhatIfOutput, error) {
+	return r.outputs.WhatIf, nil
 }
 
 // assembleEvaluations rebuilds result tables from stored typed rows.
 func (s *handler) assembleEvaluations(stateID, kind string, tables *types.EvaluationTables, revision int64) (types.EvaluationResultTables, bool, error) {
+	return assembleEvaluationRows(s.store, stateID, kind, tables, revision)
+}
+
+func assembleEvaluationRows(reader evaluationOutputReader, stateID, kind string, tables *types.EvaluationTables, revision int64) (types.EvaluationResultTables, bool, error) {
 	empty := types.EvaluationResultTables{
 		FinancialIndependence:  []types.EvaluationResultEnvelope{},
 		NetWorthThreshold:      []types.EvaluationResultEnvelope{},
@@ -841,7 +912,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 			Diagnostics: diagnostics,
 		}, nil
 	}
-	thresholds, err := s.store.ListNetWorthThresholdOutputs(stateID, kind)
+	thresholds, err := reader.ListNetWorthThresholdOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -862,7 +933,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.NetWorthThreshold = append(out.NetWorthThreshold, envelope)
 		count++
 	}
-	balances, err := s.store.ListAccountBalanceOutputs(stateID, kind)
+	balances, err := reader.ListAccountBalanceOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -883,7 +954,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.AccountBalance = append(out.AccountBalance, envelope)
 		count++
 	}
-	fulfillments, err := s.store.ListTransactionFulfillmentOutputs(stateID, kind)
+	fulfillments, err := reader.ListTransactionFulfillmentOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -915,7 +986,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.TransactionFulfillment = append(out.TransactionFulfillment, envelope)
 		count++
 	}
-	cycles, err := s.store.ListCycleFulfillmentOutputs(stateID, kind)
+	cycles, err := reader.ListCycleFulfillmentOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -950,7 +1021,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.CycleFulfillment = append(out.CycleFulfillment, envelope)
 		count++
 	}
-	purchases, err := s.store.ListPlannedPurchasesOutputs(stateID, kind)
+	purchases, err := reader.ListPlannedPurchasesOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -974,7 +1045,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.PlannedPurchases = append(out.PlannedPurchases, envelope)
 		count++
 	}
-	fis, err := s.store.ListFinancialIndependenceOutputs(stateID, kind)
+	fis, err := reader.ListFinancialIndependenceOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -998,7 +1069,7 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 		out.FinancialIndependence = append(out.FinancialIndependence, envelope)
 		count++
 	}
-	whatifs, err := s.store.ListWhatIfOutputs(stateID, kind)
+	whatifs, err := reader.ListWhatIfOutputs(stateID, kind)
 	if err != nil {
 		return out, false, err
 	}
@@ -1154,12 +1225,6 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 		}
 		return nil, err
 	}
-	if config.RunCount != state.TrialCount && state.TrialCount != 0 {
-		return nil, fmt.Errorf("run count %d does not match canonical %d", config.RunCount, state.TrialCount)
-	}
-	if state.TrialCount == 0 {
-		state.TrialCount = config.RunCount
-	}
 	if state.DirtyFrom > 0 {
 		// Route through the shared build flight: the stochastic path and the
 		// deterministic endpoint can request the same rebuild concurrently,
@@ -1171,6 +1236,13 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 		if err != nil {
 			return nil, err
 		}
+	}
+	previousTrialCount := state.TrialCount
+	allowSettingsSync := canSyncStochasticSettings(state)
+	if allowSettingsSync {
+		state.TrialCount = config.RunCount
+	} else if config.RunCount != state.TrialCount {
+		return nil, fmt.Errorf("run count %d does not match canonical %d", config.RunCount, state.TrialCount)
 	}
 	seed := state.StochasticSeed
 	if seed != nil && config.Seed != nil && *config.Seed != *seed {
@@ -1186,10 +1258,6 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 			drawn := int64(value >> 1)
 			frozen = &drawn
 		}
-		state.StochasticSeed = frozen
-		if _, err := s.store.SaveProjectionState(state); err != nil {
-			return nil, err
-		}
 		seed = frozen
 	}
 	slices, err := s.store.ListProjectionSlices()
@@ -1203,93 +1271,102 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 		}
 		slices = append(slices, fresh...)
 	}
+	if !currentRevision(slices, state.Revision) {
+		return nil, fmt.Errorf("projection slices do not match revision %d", state.Revision)
+	}
 	effective := types.StochasticConfig{RunCount: state.TrialCount, Seed: seed}
 	result, samples, err := domain.StochasticNetWorthSamples(context.Background(), model, settings, types.ModelOverrides{}, effective, nil)
 	if err != nil {
 		return nil, err
 	}
 	result.Config = effective
-	ids := make([]string, 0, len(slices))
-	for _, slice := range slices {
-		ids = append(ids, slice.ID)
-	}
-	if err := s.store.DeleteMonteCarloStatistics(ids); err != nil {
-		return nil, err
-	}
-	if err := s.writeNetWorthStatistics(slices, samples, state.ProjectionStart); err != nil {
-		return nil, err
-	}
 	evalJSON, err := canonicalEvalJSON(&settings.Evaluations)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.writeEvaluationOutputs(state.ID, "stochastic", result.Evaluations, state.Revision); err != nil {
-		return nil, err
-	}
-	latest, err := s.store.GetProjectionState()
+	outputs, err := s.buildEvaluationOutputs(state.ID, "stochastic", result.Evaluations, state.Revision)
 	if err != nil {
 		return nil, err
 	}
-	if latest.Revision != state.Revision || latest.DirtyFrom != state.DirtyFrom {
-		return nil, fmt.Errorf("projection inputs changed while building; skipping the stale write")
-	}
-	state.StochEvaluationsJSON = evalJSON
-	if _, err := s.store.SaveProjectionState(state); err != nil {
+	statistics, err := netWorthStatistics(slices, samples, state.ProjectionStart, result.Bands)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.PublishProjection(state.Revision); err != nil {
+	published, err := s.store.SaveStochasticProjection(store.StochasticProjectionWrite{
+		StateID: state.ID, Revision: state.Revision, DirtyFrom: state.DirtyFrom,
+		TrialCount: state.TrialCount, Seed: seed, EvaluationsJSON: evalJSON,
+		PreviousTrialCount: previousTrialCount, AllowSettingsSync: allowSettingsSync,
+		Statistics: statistics, Outputs: outputs,
+	})
+	if err != nil {
 		return nil, err
+	}
+	if !published {
+		return nil, fmt.Errorf("projection inputs or range settings changed while building; skipping the stale write")
 	}
 	return result, nil
 }
 
-// writeNetWorthStatistics persists portfolio bands per projected date.
-func (s *handler) writeNetWorthStatistics(slices []types.ProjectionSlice, samples map[string][]float64, projectionStart string) error {
+// netWorthStatistics prepares portfolio bands and verifies that every projected
+// result date has exactly one portfolio summary before publication.
+func netWorthStatistics(slices []types.ProjectionSlice, samples map[string][]float64, projectionStart string, bands []types.StochasticBandRow) ([]types.MonteCarloStatistic, error) {
 	if len(slices) == 0 {
-		return fmt.Errorf("no slices for statistics")
+		return nil, fmt.Errorf("no slices for statistics")
 	}
-	bySlice := map[string][]types.MonteCarloStatistic{}
+	statistics := []types.MonteCarloStatistic{}
 	for date, values := range samples {
 		if date < projectionStart {
 			continue
 		}
 		sliceID := sliceForDate(slices, date)
 		if sliceID == "" {
-			continue
+			return nil, fmt.Errorf("no projection slice for statistic date %s", date)
 		}
-		bySlice[sliceID] = append(bySlice[sliceID], summarizeSamples(sliceID, date, values))
+		statistics = append(statistics, summarizeSamples(sliceID, date, values))
 	}
-	for _, stats := range bySlice {
-		if err := s.store.SaveMonteCarloStatistics(stats); err != nil {
-			return err
+	dates := make([]string, 0, len(bands))
+	for _, band := range bands {
+		if !band.IsHistorical {
+			dates = append(dates, string(band.Date))
 		}
 	}
-	return nil
+	if !statisticsCoverDates(statistics, dates) {
+		return nil, fmt.Errorf("stochastic statistics do not cover every projected date")
+	}
+	sort.Slice(statistics, func(i, j int) bool {
+		if statistics[i].AsOfAt != statistics[j].AsOfAt {
+			return statistics[i].AsOfAt < statistics[j].AsOfAt
+		}
+		return statistics[i].ProjectionSliceID < statistics[j].ProjectionSliceID
+	})
+	return statistics, nil
+}
+
+func statisticsCoverDates(statistics []types.MonteCarloStatistic, dates []string) bool {
+	covered := map[string]bool{}
+	for _, stat := range statistics {
+		if stat.AccountID == "" && len(stat.AsOfAt) >= 10 {
+			covered[stat.AsOfAt[:10]] = true
+		}
+	}
+	for _, date := range dates {
+		if !covered[date] {
+			return false
+		}
+	}
+	return true
 }
 
 func summarizeSamples(sliceID, date string, values []float64) types.MonteCarloStatistic {
-	sorted := append([]float64{}, values...)
-	sort.Float64s(sorted)
-	quantile := func(p float64) float64 {
-		if len(sorted) == 0 {
-			return 0
-		}
-		rank := p * float64(len(sorted)-1)
-		low := int(math.Floor(rank))
-		high := int(math.Ceil(rank))
-		if low == high {
-			return sorted[low]
-		}
-		return sorted[low] + (rank-float64(low))*(sorted[high]-sorted[low])
-	}
+	bands := domain.ComputePercentiles(values)
 	return types.MonteCarloStatistic{
 		ProjectionSliceID: sliceID,
 		AsOfAt:            midnightRFC3339(date),
-		P10:               quantile(0.10),
-		P25:               quantile(0.25),
-		P50:               quantile(0.5),
-		P75:               quantile(0.75),
-		P90:               quantile(0.90),
+		P10:               bands.P10,
+		P25:               bands.P25,
+		P50:               bands.P50,
+		P75:               bands.P75,
+		P90:               bands.P90,
 	}
 }
 
@@ -1315,34 +1392,33 @@ func (s *handler) readStochastic(model *types.FinancialModel, settings *types.Pr
 	if evalJSON != state.StochEvaluationsJSON {
 		return nil, false, nil
 	}
-	slices, err := s.store.ListProjectionSlices()
-	if err != nil {
-		return nil, false, err
+	snapshot, served, err := s.store.ReadStochasticProjection(state.ID, "stochastic", state.Revision, evalJSON)
+	if err != nil || !served {
+		return nil, served, err
 	}
-	if !slicesCover(slices, state.ProjectionStart, state.HorizonEnd) || !currentRevision(slices, state.Revision) {
+	state = snapshot.State
+	if config.RunCount != state.TrialCount {
 		return nil, false, nil
 	}
-	ids := make([]string, 0, len(slices))
-	for _, slice := range slices {
-		ids = append(ids, slice.ID)
+	if config.Seed != nil && (state.StochasticSeed == nil || *config.Seed != *state.StochasticSeed) {
+		return nil, false, nil
 	}
-	all := []types.MonteCarloStatistic{}
-	for _, id := range ids {
-		stats, err := s.store.ListMonteCarloStatistics(id)
-		if err != nil {
-			return nil, false, err
-		}
-		all = append(all, stats...)
+	if !slicesCover(snapshot.Slices, state.ProjectionStart, state.HorizonEnd) || !currentRevision(snapshot.Slices, state.Revision) {
+		return nil, false, nil
 	}
-	if len(all) == 0 {
+	all := snapshot.Statistics
+	if len(all) == 0 || !statisticsCoverDates(all, snapshot.ProjectionDates) {
 		return nil, false, nil
 	}
 	byDate := map[string][]types.MonteCarloStatistic{}
 	for _, stat := range all {
+		if len(stat.AsOfAt) < 10 {
+			return nil, false, nil
+		}
 		date := stat.AsOfAt[:10]
 		byDate[date] = append(byDate[date], stat)
 	}
-	tables, served, err := s.assembleEvaluations(state.ID, "stochastic", &settings.Evaluations, state.Revision)
+	tables, served, err := assembleEvaluationRows(stochasticSnapshotReader{outputs: snapshot.Outputs}, state.ID, "stochastic", &settings.Evaluations, state.Revision)
 	if err != nil {
 		return nil, false, err
 	}

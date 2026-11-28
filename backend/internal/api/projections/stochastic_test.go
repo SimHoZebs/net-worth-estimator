@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/apitest"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -50,10 +51,37 @@ func resetSharedRunsForTest() {
 
 func projectionTestHandler(t *testing.T) http.Handler {
 	t.Helper()
+	return projectionTestHandlerWithStore(t, apitest.OpenStore(t))
+}
+
+func projectionTestHandlerWithStore(t *testing.T, st store.Store) http.Handler {
 	router := chi.NewRouter()
 	api := humachi.New(router, huma.DefaultConfig("Test", "1.0.0"))
-	Register(api, apitest.OpenStore(t), t.Name())
+	Register(api, st, t.Name())
 	return router
+}
+
+type recordingStochasticStore struct {
+	store.Store
+	reads     int
+	hits      int
+	writes    int
+	lastWrite store.StochasticProjectionWrite
+}
+
+func (s *recordingStochasticStore) ReadStochasticProjection(stateID, kind string, revision int64, evaluationsJSON string) (*store.StochasticProjectionRead, bool, error) {
+	s.reads++
+	snapshot, served, err := s.Store.ReadStochasticProjection(stateID, kind, revision, evaluationsJSON)
+	if served {
+		s.hits++
+	}
+	return snapshot, served, err
+}
+
+func (s *recordingStochasticStore) SaveStochasticProjection(write store.StochasticProjectionWrite) (bool, error) {
+	s.writes++
+	s.lastWrite = write
+	return s.Store.SaveStochasticProjection(write)
 }
 
 func TestStochasticSSEAttachJoinsInFlightRun(t *testing.T) {
@@ -125,6 +153,205 @@ func TestStochasticSSEUnseededBypassesRegistry(t *testing.T) {
 	sharedStochasticRegistry.Unlock()
 	if inflight != 0 {
 		t.Fatalf("unseeded run leaked %d registry entries", inflight)
+	}
+}
+
+type nonFlushingResponseWriter struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (w *nonFlushingResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *nonFlushingResponseWriter) WriteHeader(status int) { w.status = status }
+func (w *nonFlushingResponseWriter) Write(p []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.body.Write(p)
+}
+
+func TestStochasticSSENonWritableStreamNeverRegistersRun(t *testing.T) {
+	resetSharedRunsForTest()
+	t.Cleanup(resetSharedRunsForTest)
+	handler := projectionTestHandler(t)
+	seed := int64(7)
+	body := volatileStochasticBody(t, 2, &seed)
+	request := httptest.NewRequest(http.MethodPost, "/v1/projections/stochastic", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := &nonFlushingResponseWriter{}
+	handler.ServeHTTP(response, request)
+	if response.status != http.StatusInternalServerError || response.body.String() != "streaming unsupported\n" {
+		t.Fatalf("non-writable stream = %d %q", response.status, response.body.String())
+	}
+	if got := response.Header().Get("Projection-Source"); got != "" {
+		t.Fatalf("failed stream committed Projection-Source %q", got)
+	}
+	sharedStochasticRegistry.Lock()
+	inflight := len(sharedStochasticRegistry.byKey)
+	sharedStochasticRegistry.Unlock()
+	if inflight != 0 {
+		t.Fatalf("non-writable stream leaked %d registry entries", inflight)
+	}
+
+	writable := apitest.PostStochastic(t, handler, body)
+	if got := writable.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("later Projection-Source = %q, want computed", got)
+	}
+	if len(apitest.SSEEvents(t, writable.Body.String())["result"]) != 1 {
+		t.Fatalf("later stream has no result: %s", writable.Body.String())
+	}
+}
+
+func savedRangeBody(t *testing.T, model *types.FinancialModel, overrides types.ModelOverrides, runCount int, seed int64) []byte {
+	t.Helper()
+	body := map[string]any{
+		"settings": types.ProjectionRuntimeSettings{
+			FallbackProjectionStartDate: "2026-06-01", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables(),
+		},
+		"overrides": overrides,
+		"config":    types.StochasticConfig{RunCount: runCount, Seed: &seed},
+	}
+	if model != nil {
+		body["model"] = model
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func stochasticResult(t *testing.T, response *httptest.ResponseRecorder) *types.StochasticProjectionResult {
+	t.Helper()
+	if response.Code != http.StatusOK {
+		t.Fatalf("stochastic status = %d, body %s", response.Code, response.Body.String())
+	}
+	events := apitest.SSEEvents(t, response.Body.String())
+	if len(events["result"]) != 1 {
+		t.Fatalf("stochastic result count = %d, body %s", len(events["result"]), response.Body.String())
+	}
+	var payload struct {
+		Result *types.StochasticProjectionResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(events["result"][0]), &payload); err != nil || payload.Result == nil {
+		t.Fatalf("decode stochastic result: result=%+v err=%v", payload.Result, err)
+	}
+	return payload.Result
+}
+
+func TestSavedProjectionEligibility(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		model     *types.FinancialModel
+		overrides types.ModelOverrides
+		want      bool
+	}{
+		{name: "saved model", want: true},
+		{name: "empty slices", overrides: types.EmptyModelOverrides(), want: true},
+		{name: "supplied model", model: &types.FinancialModel{}},
+		{name: "added account", overrides: types.ModelOverrides{AddedAccounts: []types.Account{{ID: "a"}}}},
+		{name: "added transaction", overrides: types.ModelOverrides{AddedTransactions: []types.Transaction{{ID: "t"}}}},
+		{name: "added schedule", overrides: types.ModelOverrides{AddedRules: []types.Schedule{{ID: "s"}}}},
+		{name: "disabled account", overrides: types.ModelOverrides{DisabledAccountIDs: []string{"a"}}},
+		{name: "disabled transaction", overrides: types.ModelOverrides{DisabledTransactionIDs: []string{"t"}}},
+		{name: "disabled schedule", overrides: types.ModelOverrides{DisabledScheduleIDs: []string{"s"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := savedProjectionEligible(test.model, test.overrides); got != test.want {
+				t.Fatalf("savedProjectionEligible = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestStochasticSSESavedRangeEligibilityAndCountSynchronization(t *testing.T) {
+	resetSharedRunsForTest()
+	t.Cleanup(resetSharedRunsForTest)
+	for _, test := range []struct {
+		name         string
+		initialCount int
+		runCount     int
+		otherCount   int
+	}{
+		{name: "fresh default", runCount: 400, otherCount: 3},
+		{name: "legacy unset default", initialCount: 1000, runCount: 400, otherCount: 3},
+		{name: "deliberate frozen count", initialCount: 3, runCount: 3, otherCount: 400},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			base := apitest.OpenStore(t)
+			model, err := base.ImportModel(apitest.StochasticModel())
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, err := base.GetProjectionState()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.initialCount != 0 {
+				state.TrialCount = test.initialCount
+				if _, err := base.SaveProjectionState(state); err != nil {
+					t.Fatal(err)
+				}
+			}
+			recording := &recordingStochasticStore{Store: base}
+			handler := projectionTestHandlerWithStore(t, recording)
+			body := savedRangeBody(t, nil, types.EmptyModelOverrides(), test.runCount, 42)
+			first := stochasticResult(t, apitest.PostStochastic(t, handler, body))
+			if recording.writes != 1 || recording.lastWrite.TrialCount != test.runCount {
+				t.Fatalf("first build writes=%d trial=%d, want one write at %d", recording.writes, recording.lastWrite.TrialCount, test.runCount)
+			}
+			second := stochasticResult(t, apitest.PostStochastic(t, handler, body))
+			if recording.reads != 1 || recording.hits != 1 || recording.writes != 1 {
+				t.Fatalf("second request reads=%d hits=%d writes=%d, want one saved hit and no rewrite", recording.reads, recording.hits, recording.writes)
+			}
+			if first.Config.RunCount != test.runCount || second.Config.RunCount != test.runCount || len(first.Bands) != len(second.Bands) {
+				t.Fatalf("saved range config/coverage changed: first=%+v second=%+v", first.Config, second.Config)
+			}
+			for i := range first.Bands {
+				if first.Bands[i] != second.Bands[i] {
+					t.Fatalf("saved band %d differs: %+v vs %+v", i, first.Bands[i], second.Bands[i])
+				}
+			}
+
+			reads, writes := recording.reads, recording.writes
+			explicit := savedRangeBody(t, model, types.EmptyModelOverrides(), test.runCount, 42)
+			if got := stochasticResult(t, apitest.PostStochastic(t, handler, explicit)); got.Config.RunCount != test.runCount {
+				t.Fatalf("supplied-model run count = %d", got.Config.RunCount)
+			}
+			if recording.reads != reads || recording.writes != writes {
+				t.Fatalf("supplied model used saved range: reads %d->%d writes %d->%d", reads, recording.reads, writes, recording.writes)
+			}
+			overrides := types.ModelOverrides{DisabledScheduleIDs: []string{"salary"}}
+			overridden := savedRangeBody(t, nil, overrides, test.runCount, 42)
+			if got := stochasticResult(t, apitest.PostStochastic(t, handler, overridden)); got.Config.RunCount != test.runCount {
+				t.Fatalf("override run count = %d", got.Config.RunCount)
+			}
+			if recording.reads != reads || recording.writes != writes {
+				t.Fatalf("overrides used saved range: reads %d->%d writes %d->%d", reads, recording.reads, writes, recording.writes)
+			}
+
+			other := savedRangeBody(t, nil, types.EmptyModelOverrides(), test.otherCount, 42)
+			if got := stochasticResult(t, apitest.PostStochastic(t, handler, other)); got.Config.RunCount != test.otherCount {
+				t.Fatalf("different-count run count = %d, want %d", got.Config.RunCount, test.otherCount)
+			}
+			if recording.writes != writes {
+				t.Fatalf("different count rewrote frozen range: writes %d->%d", writes, recording.writes)
+			}
+			state, err = base.GetProjectionState()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if state.TrialCount != test.runCount || state.StochasticSeed == nil || *state.StochasticSeed != 42 {
+				t.Fatalf("frozen range settings changed: %+v", state)
+			}
+		})
 	}
 }
 

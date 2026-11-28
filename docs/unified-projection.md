@@ -13,11 +13,12 @@ Rendered visuals live in `docs/diagrams/` (`.mmd` sources plus Pele-generated `.
 - `evaluation-plugins` is the reader plus simulator flow.
 - `unified-read-api` is the ProjectionReader decision flow.
 
-## Defaults (single owner for trial count, timezone, and engine version)
+## Runtime defaults and engine version
 
 - Source enum is `user`, `banksync`, `projected`. Lowercase. Single spelling. `user` plus `banksync` are facts. `projected` is engine output. Provider identity lives in sync keys plus the checkpoint provider column, never in the source value.
-- Trial count default is `1000`. The first stochastic build freezes the seed: an explicit request seed wins, otherwise a random seed draws once and persists. Repeat builds reuse it. This document owns the trial-count default; `TECHNICAL_OVERVIEW.md` points here and does not restate the default.
-- Calendar timezone default is `UTC`. Engine version starts at `v1`. This document owns the timezone and engine-version defaults.
+- The default range uses 400 scenarios. The first saved range publication freezes the request's seed and the configured scenario count. Older state with an unused 1,000-scenario default can adopt 400 when the browser first requests it. Saved ranges with a frozen seed retain their configured count. `TECHNICAL_OVERVIEW.md` points here for the default.
+- Calendar timezone default is `UTC`. The runtime projection engine version is `v2`. This document owns the timezone and runtime engine-version values.
+- The SQLite `projection_states.engine_version` column still defaults to `v1`. That storage fallback is not the runtime version: Go creates states with `v2` explicitly. When a saved state carries an older version such as `v1`, the builder reinitializes it to `v2`, increments the revision, and marks the projection start dirty. Slices built under the old version no longer match the current revision, so the reader rebuilds them before serving saved results.
 - One `default` projection state exists per user. Projection start freezes on first build from the requesting fallback date. Horizon end is start plus horizon years. Trial count and frozen seed are canonical: requests with different settings, run counts, or seeds bypass the stored rows and compute directly.
 - Slices partition the canonical window into calendar years. Slice identity is stable: state plus start date.
 - Revision increments on each dirty write. Built rows carry the revision they were built at. Slices are valid when their built revision equals the state revision. The dirty date scopes the rewrite: prefix slices adopt onto the new revision, suffix slices rebuild.

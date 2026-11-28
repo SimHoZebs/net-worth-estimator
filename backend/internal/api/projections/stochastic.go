@@ -78,8 +78,9 @@ func startSSEHeartbeat(w io.Writer, flusher http.Flusher, writeMu *sync.Mutex, d
 	}()
 }
 
-// stochasticStream commits source headers only after request preparation.
-func stochasticStream(source string, heartbeat bool, serve func(context.Context, sseEventWriter)) *huma.StreamResponse {
+// stochasticStream commits source headers only after the stream is writable and
+// request preparation has selected the run owner.
+func stochasticStream(heartbeat bool, prepareSource func() string, serve func(context.Context, sseEventWriter)) *huma.StreamResponse {
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
 		writer := ctx.BodyWriter()
 		flusher, ok := writer.(http.Flusher)
@@ -89,6 +90,7 @@ func stochasticStream(source string, heartbeat bool, serve func(context.Context,
 			_, _ = io.WriteString(writer, "streaming unsupported\n")
 			return
 		}
+		source := prepareSource()
 		ctx.SetHeader("Content-Type", "text/event-stream")
 		ctx.SetHeader("Cache-Control", "no-store")
 		ctx.SetHeader("Projection-Source", source)
@@ -141,26 +143,30 @@ func (s *handler) sharedRunKey(descriptor any) string {
 
 func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasticRequest }) (*huma.StreamResponse, error) {
 	body := input.Body
+	body.Config = domain.NormalizeStochasticConfig(body.Config)
 	model, err := s.resolveModel(body.Model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
+	useSavedRange := savedProjectionEligible(body.Model, body.Overrides)
 
 	// Unseeded results are fresh random draws: they cancel on disconnect
 	// and are never shared or stored.
 	if body.Config.Seed == nil {
-		return stochasticStream(projectionSourceComputed, true, func(ctx context.Context, writeEvent sseEventWriter) {
+		return stochasticStream(true, func() string { return projectionSourceComputed }, func(ctx context.Context, writeEvent sseEventWriter) {
 			s.serveStochasticInline(ctx, writeEvent, model, body.Settings, body.Overrides, body.Config)
 		}), nil
 	}
-	if result, served, err := s.readStochastic(model, &body.Settings, body.Config); err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	} else if served {
-		return stochasticStream(projectionSourceComputed, false, func(_ context.Context, writeEvent sseEventWriter) {
-			if err := writeEvent("done", "result", map[string]any{"result": result}); err != nil {
-				log.Printf("stochastic sse: stored result write failed: %v", err)
-			}
-		}), nil
+	if useSavedRange {
+		if result, served, err := s.readStochastic(model, &body.Settings, body.Config); err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		} else if served {
+			return stochasticStream(false, func() string { return projectionSourceComputed }, func(_ context.Context, writeEvent sseEventWriter) {
+				if err := writeEvent("done", "result", map[string]any{"result": result}); err != nil {
+					log.Printf("stochastic sse: stored result write failed: %v", err)
+				}
+			}), nil
+		}
 	}
 	resultKey := s.sharedRunKey(map[string]any{
 		"model":     model,
@@ -171,23 +177,33 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 			"seed":     body.Config.Seed,
 		},
 	})
-	run, owner := getOrStartSharedRun(resultKey)
-	source := projectionSourceShared
-	if owner {
-		source = projectionSourceComputed
-	}
+	var run *sharedStochasticRun
+	var owner bool
 
-	return stochasticStream(source, true, func(ctx context.Context, writeEvent sseEventWriter) {
+	return stochasticStream(true, func() string {
+		run, owner = getOrStartSharedRun(resultKey)
+		if owner {
+			return projectionSourceComputed
+		}
+		return projectionSourceShared
+	}, func(ctx context.Context, writeEvent sseEventWriter) {
 		if owner {
 			// The computation is detached from the request context: this
 			// stream dropping must never cancel the shared run.
 			computeCtx := context.WithoutCancel(ctx)
 			go func() {
-				result, runErr := s.buildStochastic(model, &body.Settings, body.Config)
-				if runErr != nil {
-					// Canonical build refused (non-canonical config): fall
-					// back to inline compute inside the shared run so
-					// attachers still converge on one result.
+				var result *types.StochasticProjectionResult
+				var runErr error
+				if useSavedRange {
+					result, runErr = s.buildStochastic(model, &body.Settings, body.Config)
+					if runErr != nil {
+						log.Printf("stochastic saved build failed, computing directly: %v", runErr)
+					}
+				}
+				if !useSavedRange || runErr != nil {
+					// Canonical build refused (for example, stale state or a
+					// non-canonical config): compute the supplied inputs inline
+					// inside the shared run so attachers still converge.
 					progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
 						run.publish(stochasticStreamEvent{progress: progress, partial: partial})
 					}

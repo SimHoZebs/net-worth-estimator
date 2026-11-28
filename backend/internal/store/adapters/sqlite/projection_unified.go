@@ -26,23 +26,34 @@ func sliceIDArgs(sliceIDs []string) (string, []any) {
 	return strings.Join(placeholders, ","), args
 }
 
-// GetProjectionState returns the single state row, creating it on first use.
-func (s *sqliteStore) GetProjectionState() (types.ProjectionState, error) {
+type projectionStateScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanProjectionState(scanner projectionStateScanner) (types.ProjectionState, error) {
 	var state types.ProjectionState
 	var seed sql.NullInt64
-	err := s.db.QueryRow(`SELECT id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json FROM projection_states WHERE id = ? AND user_id = :user_id`, defaultProjectionStateID).Scan(
-		&state.ID, &state.ScopeID, &state.Revision, &state.PublishedRevision, &state.DirtyFrom, &state.ProjectionStart, &state.HorizonEnd, &state.CalendarTimezone, &state.EngineVersion, &state.TrialCount, &seed, &state.DetEvaluationsJSON, &state.StochEvaluationsJSON)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			fresh := types.UnifiedProjectionDefaults()
-			fresh.ID = defaultProjectionStateID
-			return s.SaveProjectionState(fresh)
-		}
-		return types.ProjectionState{}, fmt.Errorf("read projection state: %w", err)
+	if err := scanner.Scan(
+		&state.ID, &state.ScopeID, &state.Revision, &state.PublishedRevision, &state.DirtyFrom, &state.ProjectionStart, &state.HorizonEnd, &state.CalendarTimezone, &state.EngineVersion, &state.TrialCount, &seed, &state.DetEvaluationsJSON, &state.StochEvaluationsJSON); err != nil {
+		return types.ProjectionState{}, err
 	}
 	if seed.Valid {
 		v := seed.Int64
 		state.StochasticSeed = &v
+	}
+	return state, nil
+}
+
+// GetProjectionState returns the single state row, creating it on first use.
+func (s *sqliteStore) GetProjectionState() (types.ProjectionState, error) {
+	state, err := scanProjectionState(s.db.QueryRow(`SELECT id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json FROM projection_states WHERE id = ? AND user_id = :user_id`, defaultProjectionStateID))
+	if errors.Is(err, sql.ErrNoRows) {
+		fresh := types.UnifiedProjectionDefaults()
+		fresh.ID = defaultProjectionStateID
+		return s.SaveProjectionState(fresh)
+	}
+	if err != nil {
+		return types.ProjectionState{}, fmt.Errorf("read projection state: %w", err)
 	}
 	return state, nil
 }
@@ -59,7 +70,7 @@ func (s *sqliteStore) SaveProjectionState(state types.ProjectionState) (types.Pr
 		state.EngineVersion = "v2"
 	}
 	if state.TrialCount <= 0 {
-		state.TrialCount = 1000
+		state.TrialCount = types.DefaultProjectionTrialCount
 	}
 	var seed any
 	if state.StochasticSeed != nil {
@@ -228,12 +239,20 @@ func (s *sqliteStore) DeleteProjectionSlicesFrom(fromAt int64) error {
 
 // ListMonteCarloStatistics returns statistics for one slice.
 func (s *sqliteStore) ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error) {
-	rows, err := s.db.Query(`SELECT id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90 FROM monte_carlo_statistics WHERE projection_slice_id = ? AND user_id = :user_id ORDER BY account_id, as_of_at`, sliceID)
+	return listMonteCarloStatistics(s.db, []string{sliceID})
+}
+
+func listMonteCarloStatistics(db projectionQueryer, sliceIDs []string) ([]types.MonteCarloStatistic, error) {
+	out := []types.MonteCarloStatistic{}
+	if len(sliceIDs) == 0 {
+		return out, nil
+	}
+	placeholders, args := sliceIDArgs(sliceIDs)
+	rows, err := db.Query(`SELECT id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90 FROM monte_carlo_statistics WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id ORDER BY account_id, as_of_at`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list statistics: %w", err)
 	}
 	defer rows.Close()
-	out := []types.MonteCarloStatistic{}
 	for rows.Next() {
 		var st types.MonteCarloStatistic
 		if err := rows.Scan(&st.ID, &st.ProjectionSliceID, &st.AccountID, &st.AsOfAt, &st.P10, &st.P25, &st.P50, &st.P75, &st.P90); err != nil {
@@ -251,6 +270,10 @@ func (s *sqliteStore) ListMonteCarloStatistics(sliceID string) ([]types.MonteCar
 // Callers rebuild a slice by deleting suffix slices first with
 // DeleteProjectionSlicesFrom, then saving fresh slices and statistics.
 func (s *sqliteStore) SaveMonteCarloStatistics(stats []types.MonteCarloStatistic) error {
+	return saveMonteCarloStatistics(s.db, stats)
+}
+
+func saveMonteCarloStatistics(db projectionExecer, stats []types.MonteCarloStatistic) error {
 	for _, st := range stats {
 		id := st.ID
 		if id == "" {
@@ -260,7 +283,7 @@ func (s *sqliteStore) SaveMonteCarloStatistics(stats []types.MonteCarloStatistic
 			}
 			id = newID.String()
 		}
-		if _, err := s.db.Exec(`INSERT INTO monte_carlo_statistics (id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90, user_id)
+		if _, err := db.Exec(`INSERT INTO monte_carlo_statistics (id, projection_slice_id, account_id, as_of_at, p10, p25, p50, p75, p90, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)
 			ON CONFLICT(user_id, id) DO UPDATE SET projection_slice_id = excluded.projection_slice_id, account_id = excluded.account_id, as_of_at = excluded.as_of_at, p10 = excluded.p10, p25 = excluded.p25, p50 = excluded.p50, p75 = excluded.p75, p90 = excluded.p90`,
 			id, st.ProjectionSliceID, st.AccountID, st.AsOfAt, st.P10, st.P25, st.P50, st.P75, st.P90); err != nil {
@@ -471,11 +494,15 @@ func (s *sqliteStore) DeleteProjectionRows(sliceIDs []string) error {
 
 // DeleteMonteCarloStatistics removes statistics rows for slices.
 func (s *sqliteStore) DeleteMonteCarloStatistics(sliceIDs []string) error {
+	return deleteMonteCarloStatistics(s.db, sliceIDs)
+}
+
+func deleteMonteCarloStatistics(db projectionExecer, sliceIDs []string) error {
 	if len(sliceIDs) == 0 {
 		return nil
 	}
 	placeholders, args := sliceIDArgs(sliceIDs)
-	if _, err := s.db.Exec(`DELETE FROM monte_carlo_statistics WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
+	if _, err := db.Exec(`DELETE FROM monte_carlo_statistics WHERE projection_slice_id IN (`+placeholders+`) AND user_id = :user_id`, args...); err != nil {
 		return fmt.Errorf("delete statistics: %w", err)
 	}
 	return nil

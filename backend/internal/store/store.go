@@ -188,6 +188,15 @@ type Store interface {
 	ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error)
 	SaveMonteCarloStatistics(stats []types.MonteCarloStatistic) error
 	DeleteMonteCarloStatistics(sliceIDs []string) error
+	// SaveStochasticProjection replaces statistics, evaluation outputs, and the
+	// completion fingerprint in one revision-guarded transaction. It reports
+	// false when the model revision, dirty marker, or frozen range settings no
+	// longer match, leaving the previously published range untouched.
+	SaveStochasticProjection(write StochasticProjectionWrite) (bool, error)
+	// ReadStochasticProjection reads state, slices, statistics, evaluation
+	// outputs, and projected dates from one snapshot. It serves only a clean,
+	// published revision with the requested evaluation fingerprint.
+	ReadStochasticProjection(stateID, kind string, revision int64, evaluationsJSON string) (*StochasticProjectionRead, bool, error)
 	// SaveGeneratedTransactions replaces every touched slice's stored
 	// engine-output transactions atomically. Generated rows never enter
 	// model reads: every model query filters them by null slice.

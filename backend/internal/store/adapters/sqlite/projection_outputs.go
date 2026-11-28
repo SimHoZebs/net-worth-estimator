@@ -124,11 +124,15 @@ func (b *evalBaseRow) fill(out *types.EvaluationOutputBase) {
 
 // SaveNetWorthThresholdOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SaveNetWorthThresholdOutputs(stateID, kind string, outputs []types.NetWorthThresholdOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM net_worth_threshold_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return saveNetWorthThresholdOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func saveNetWorthThresholdOutputs(db projectionExecer, stateID, kind string, outputs []types.NetWorthThresholdOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM net_worth_threshold_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear threshold outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO net_worth_threshold_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date, user_id)
+		if _, err := db.Exec(`INSERT INTO net_worth_threshold_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			nullBoolPtr(output.Reached), nullStringPtr(output.FirstReachedDate), nullFloatPtr(output.ProbProbability), nullStringPtr(output.ProbP10Date), nullStringPtr(output.ProbMedianDate), nullStringPtr(output.ProbP90Date)); err != nil {
@@ -140,8 +144,12 @@ func (s *sqliteStore) SaveNetWorthThresholdOutputs(stateID, kind string, outputs
 
 // ListNetWorthThresholdOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListNetWorthThresholdOutputs(stateID, kind string) ([]types.NetWorthThresholdOutput, error) {
+	return listNetWorthThresholdOutputs(s.db, stateID, kind)
+}
+
+func listNetWorthThresholdOutputs(db projectionQueryer, stateID, kind string) ([]types.NetWorthThresholdOutput, error) {
 	out := []types.NetWorthThresholdOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM net_worth_threshold_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM net_worth_threshold_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list threshold outputs: %w", err)
 	}
@@ -173,11 +181,15 @@ func (s *sqliteStore) ListNetWorthThresholdOutputs(stateID, kind string) ([]type
 
 // SaveAccountBalanceOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SaveAccountBalanceOutputs(stateID, kind string, outputs []types.AccountBalanceOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM account_balance_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return saveAccountBalanceOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func saveAccountBalanceOutputs(db projectionExecer, stateID, kind string, outputs []types.AccountBalanceOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM account_balance_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear account balance outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO account_balance_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date, user_id)
+		if _, err := db.Exec(`INSERT INTO account_balance_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			nullBoolPtr(output.Reached), nullStringPtr(output.FirstReachedDate), nullFloatPtr(output.ProbProbability), nullStringPtr(output.ProbP10Date), nullStringPtr(output.ProbMedianDate), nullStringPtr(output.ProbP90Date)); err != nil {
@@ -189,8 +201,12 @@ func (s *sqliteStore) SaveAccountBalanceOutputs(stateID, kind string, outputs []
 
 // ListAccountBalanceOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListAccountBalanceOutputs(stateID, kind string) ([]types.AccountBalanceOutput, error) {
+	return listAccountBalanceOutputs(s.db, stateID, kind)
+}
+
+func listAccountBalanceOutputs(db projectionQueryer, stateID, kind string) ([]types.AccountBalanceOutput, error) {
 	out := []types.AccountBalanceOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM account_balance_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM account_balance_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list account balance outputs: %w", err)
 	}
@@ -222,11 +238,15 @@ func (s *sqliteStore) ListAccountBalanceOutputs(stateID, kind string) ([]types.A
 
 // SaveTransactionFulfillmentOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SaveTransactionFulfillmentOutputs(stateID, kind string, outputs []types.TransactionFulfillmentOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM transaction_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return saveTransactionFulfillmentOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func saveTransactionFulfillmentOutputs(db projectionExecer, stateID, kind string, outputs []types.TransactionFulfillmentOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM transaction_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear fulfillment outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO transaction_fulfillment_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90, user_id)
+		if _, err := db.Exec(`INSERT INTO transaction_fulfillment_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			nullFloatPtr(output.RequestedAmount), nullFloatPtr(output.RealizedAmount), nullFloatPtr(output.UnfulfilledAmount), nullFloatPtr(output.CompletionRate), nullStringPtr(output.FirstUnderfulfilledDate),
@@ -240,8 +260,12 @@ func (s *sqliteStore) SaveTransactionFulfillmentOutputs(stateID, kind string, ou
 
 // ListTransactionFulfillmentOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListTransactionFulfillmentOutputs(stateID, kind string) ([]types.TransactionFulfillmentOutput, error) {
+	return listTransactionFulfillmentOutputs(s.db, stateID, kind)
+}
+
+func listTransactionFulfillmentOutputs(db projectionQueryer, stateID, kind string) ([]types.TransactionFulfillmentOutput, error) {
 	out := []types.TransactionFulfillmentOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90 FROM transaction_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90 FROM transaction_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list fulfillment outputs: %w", err)
 	}
@@ -280,11 +304,15 @@ func (s *sqliteStore) ListTransactionFulfillmentOutputs(stateID, kind string) ([
 
 // SaveCycleFulfillmentOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SaveCycleFulfillmentOutputs(stateID, kind string, outputs []types.CycleFulfillmentOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM cycle_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return saveCycleFulfillmentOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func saveCycleFulfillmentOutputs(db projectionExecer, stateID, kind string, outputs []types.CycleFulfillmentOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM cycle_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear cycle outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO cycle_fulfillment_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90, user_id)
+		if _, err := db.Exec(`INSERT INTO cycle_fulfillment_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			orJSON(output.AccountIDsJSON, "[]"), nullIntPtr(output.StatementDay), nullFloatPtr(output.Budget), nullStringPtr(output.CycleStart), nullStringPtr(output.CycleEnd), nullStringPtr(output.WindowStart),
@@ -300,8 +328,12 @@ func (s *sqliteStore) SaveCycleFulfillmentOutputs(stateID, kind string, outputs 
 
 // ListCycleFulfillmentOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListCycleFulfillmentOutputs(stateID, kind string) ([]types.CycleFulfillmentOutput, error) {
+	return listCycleFulfillmentOutputs(s.db, stateID, kind)
+}
+
+func listCycleFulfillmentOutputs(db projectionQueryer, stateID, kind string) ([]types.CycleFulfillmentOutput, error) {
 	out := []types.CycleFulfillmentOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90 FROM cycle_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90 FROM cycle_fulfillment_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list cycle outputs: %w", err)
 	}
@@ -348,11 +380,15 @@ func (s *sqliteStore) ListCycleFulfillmentOutputs(stateID, kind string) ([]types
 
 // SavePlannedPurchasesOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SavePlannedPurchasesOutputs(stateID, kind string, outputs []types.PlannedPurchasesOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM planned_purchases_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return savePlannedPurchasesOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func savePlannedPurchasesOutputs(db projectionExecer, stateID, kind string, outputs []types.PlannedPurchasesOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM planned_purchases_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear purchases outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO planned_purchases_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date, user_id)
+		if _, err := db.Exec(`INSERT INTO planned_purchases_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			nullBoolPtr(output.AllFunded), nullStringPtr(output.FirstReachedDate), orJSON(output.PurchasesJSON, "[]"),
@@ -365,8 +401,12 @@ func (s *sqliteStore) SavePlannedPurchasesOutputs(stateID, kind string, outputs 
 
 // ListPlannedPurchasesOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListPlannedPurchasesOutputs(stateID, kind string) ([]types.PlannedPurchasesOutput, error) {
+	return listPlannedPurchasesOutputs(s.db, stateID, kind)
+}
+
+func listPlannedPurchasesOutputs(db projectionQueryer, stateID, kind string) ([]types.PlannedPurchasesOutput, error) {
 	out := []types.PlannedPurchasesOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM planned_purchases_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM planned_purchases_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list purchases outputs: %w", err)
 	}
@@ -398,11 +438,15 @@ func (s *sqliteStore) ListPlannedPurchasesOutputs(stateID, kind string) ([]types
 
 // SaveFinancialIndependenceOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SaveFinancialIndependenceOutputs(stateID, kind string, outputs []types.FinancialIndependenceOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM financial_independence_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return saveFinancialIndependenceOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func saveFinancialIndependenceOutputs(db projectionExecer, stateID, kind string, outputs []types.FinancialIndependenceOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM financial_independence_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear FI outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO financial_independence_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob, user_id)
+		if _, err := db.Exec(`INSERT INTO financial_independence_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			nullStringPtr(output.FirstCoverageDate), nullStringPtr(output.FirstSelfSustainingDate), orJSON(output.DetailJSON, "{}"),
@@ -415,8 +459,12 @@ func (s *sqliteStore) SaveFinancialIndependenceOutputs(stateID, kind string, out
 
 // ListFinancialIndependenceOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListFinancialIndependenceOutputs(stateID, kind string) ([]types.FinancialIndependenceOutput, error) {
+	return listFinancialIndependenceOutputs(s.db, stateID, kind)
+}
+
+func listFinancialIndependenceOutputs(db projectionQueryer, stateID, kind string) ([]types.FinancialIndependenceOutput, error) {
 	out := []types.FinancialIndependenceOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob FROM financial_independence_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob FROM financial_independence_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list FI outputs: %w", err)
 	}
@@ -447,11 +495,15 @@ func (s *sqliteStore) ListFinancialIndependenceOutputs(stateID, kind string) ([]
 
 // SaveWhatIfOutputs replaces all stored rows for one state and kind.
 func (s *sqliteStore) SaveWhatIfOutputs(stateID, kind string, outputs []types.WhatIfOutput, builtRevision int64) error {
-	if _, err := s.db.Exec(`DELETE FROM whatif_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
+	return saveWhatIfOutputs(s.db, stateID, kind, outputs, builtRevision)
+}
+
+func saveWhatIfOutputs(db projectionExecer, stateID, kind string, outputs []types.WhatIfOutput, builtRevision int64) error {
+	if _, err := db.Exec(`DELETE FROM whatif_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id`, stateID, kind); err != nil {
 		return fmt.Errorf("clear what-if outputs: %w", err)
 	}
 	for _, output := range outputs {
-		if _, err := s.db.Exec(`INSERT INTO whatif_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count, user_id)
+		if _, err := db.Exec(`INSERT INTO whatif_outputs (projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count, user_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			stateID, kind, output.InstanceID, output.Position, output.Name, output.Status, output.DiagnosticsJSON, builtRevision, boolInt(output.HasDeterministic), boolInt(output.HasProbabilistic),
 			nullFloatPtr(output.FinalNetWorth), nullIntPtr(output.TransactionCount), nullStringPtr(output.FirstUnfulfilledDate), nullBoolPtr(output.AllFunded),
@@ -464,8 +516,12 @@ func (s *sqliteStore) SaveWhatIfOutputs(stateID, kind string, outputs []types.Wh
 
 // ListWhatIfOutputs returns stored rows for one state and kind in order.
 func (s *sqliteStore) ListWhatIfOutputs(stateID, kind string) ([]types.WhatIfOutput, error) {
+	return listWhatIfOutputs(s.db, stateID, kind)
+}
+
+func listWhatIfOutputs(db projectionQueryer, stateID, kind string) ([]types.WhatIfOutput, error) {
 	out := []types.WhatIfOutput{}
-	rows, err := s.db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count FROM whatif_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
+	rows, err := db.Query(`SELECT projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count FROM whatif_outputs WHERE projection_state_id = ? AND kind = ? AND user_id = :user_id ORDER BY position`, stateID, kind)
 	if err != nil {
 		return nil, fmt.Errorf("list what-if outputs: %w", err)
 	}

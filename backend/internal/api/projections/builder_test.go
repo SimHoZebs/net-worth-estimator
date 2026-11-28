@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/apitest"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -82,6 +83,26 @@ func TestSummarizeSamples(t *testing.T) {
 	}
 	if stat.P10 != 120 || stat.P25 != 150 || stat.P50 != 200 || stat.P75 != 250 || stat.P90 != 280 {
 		t.Fatalf("quantile bands wrong: %+v", stat)
+	}
+}
+
+func TestSummarizeSamplesUsesDomainPercentilesExactly(t *testing.T) {
+	for _, values := range [][]float64{
+		nil,
+		{42},
+		{-731271.5117751976, 694867.4738744653},
+		{9, 1, 5, 3},
+	} {
+		stat := summarizeSamples("s", "2026-06-01", values)
+		want := domain.ComputePercentiles(values)
+		got := types.PercentileBands{P10: stat.P10, P25: stat.P25, P50: stat.P50, P75: stat.P75, P90: stat.P90}
+		if got != want {
+			t.Fatalf("samples %v: bands = %+v, want %+v", values, got, want)
+		}
+	}
+	stat := summarizeSamples("s", "2026-06-01", []float64{-731271.5117751976, 694867.4738744653})
+	if stat.P25 != -374736.7653627819 {
+		t.Fatalf("rounding-sensitive P25 = %v, want domain helper result", stat.P25)
 	}
 }
 

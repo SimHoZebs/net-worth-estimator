@@ -310,18 +310,18 @@ func ProjectRawFinancialModelWithLinks(model *types.FinancialModel, settings *ty
 // unrounded historical rows plus the applied initial balances. The unified
 // reader serves history live and projected dates from slices.
 func HistoricalProjectionRows(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides) ([]types.ProjectionRow, map[string]float64, error) {
-	prepared, err := orchestratedPrepare(model, settings, overrides, nil)
+	position, err := prepareRecordedProjectionPosition(model, settings, overrides)
 	if err != nil {
 		return nil, nil, err
 	}
-	rows := make([]types.ProjectionRow, 0, len(prepared.HistoricalSnapshots))
-	for _, snapshot := range prepared.HistoricalSnapshots {
+	rows := make([]types.ProjectionRow, 0, len(position.snapshots))
+	for _, snapshot := range position.snapshots {
 		rows = append(rows, createRow(
-			snapshot.Date, true, snapshot.Balances, prepared.EffectiveModel.Accounts,
+			snapshot.Date, true, snapshot.Balances, position.model.Accounts,
 			map[string][]types.AccountDelta{}, 0, 0, 0,
 		))
 	}
-	return rows, prepared.Request.InitialState.Balances, nil
+	return rows, position.state.Balances, nil
 }
 
 // RenderProjectionResult assembles the public result from unrounded rows and

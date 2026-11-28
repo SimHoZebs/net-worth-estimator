@@ -66,7 +66,7 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 	}
 
 	// Unified read path: canonical requests assemble from stored slices.
-	if input.Body.Model == nil && isEmptyOverrides(input.Body.Overrides) {
+	if savedProjectionEligible(input.Body.Model, input.Body.Overrides) {
 		if _, canonical, err := s.ensureCanonicalState(&input.Body.Settings); err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		} else if canonical {
@@ -109,6 +109,13 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 	}
 	output.Body.Result = clipProjectionRange(result, input.Body.Range)
 	return output, nil
+}
+
+// savedProjectionEligible is the shared canonical-model gate for stored
+// deterministic and stochastic results. Supplied models and overrides compute
+// directly from their own inputs and never read or replace saved output.
+func savedProjectionEligible(requested *types.FinancialModel, overrides types.ModelOverrides) bool {
+	return requested == nil && isEmptyOverrides(overrides)
 }
 
 func isEmptyOverrides(overrides types.ModelOverrides) bool {

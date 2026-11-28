@@ -298,26 +298,45 @@ type preparedPosition struct {
 	appliedHistory         *appliedHistory
 }
 
-func preparePosition(model *types.FinancialModel, startDate string, overrides types.ModelOverrides) (*preparedPosition, error) {
-	return preparePositionAt(model, startDate, dayCloseUnix(startDate), overrides)
+// prepareRecordedProjectionPosition applies only recorded actuals and observations.
+// Saved-result reads and full projection preparation share this validation,
+// cutoff, and historical timeline. Modeled schedule replay is deliberately separate.
+func prepareRecordedProjectionPosition(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides) (*preparedPosition, error) {
+	startDate := string(settings.FallbackProjectionStartDate)
+	if !IsValidIsoDate(startDate) {
+		return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
+			Severity: types.SeverityError,
+			Code:     "settings.projection-start.format",
+			Message:  fmt.Sprintf("fallbackProjectionStartDate must be a YYYY-MM-DD calendar date (got %q).", startDate),
+			Path:     []any{"fallbackProjectionStartDate"},
+		}}}
+	}
+	cutInstant := dayCloseUnix(startDate)
+	if settings.AsOfInstant != nil {
+		cutInstant = *settings.AsOfInstant
+		if FormatIsoDate(time.Unix(cutInstant, 0).UTC()) != startDate {
+			return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
+				Severity: types.SeverityError,
+				Code:     "settings.asOfInstant.day-mismatch",
+				Message:  fmt.Sprintf("asOfInstant must fall on the projection start date %s.", startDate),
+				Path:     []any{"asOfInstant"},
+			}}}
+		}
+	}
+	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinancialModel, false)
 }
 
-func preparePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
-	position, err := preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinancialModel, false)
-	if err != nil {
-		return nil, err
-	}
-	// Modeled rule replay contributes transaction ledgers, latest-realized
-	// amounts, and annual-cap state. Historical snapshots and balance authority
-	// stay actual-only so the timeline converges to the projection baseline.
+// applyModeledHistory adds schedule occurrences for transaction ledgers and
+// spending-cap state. Recorded actuals remain the balance and timeline authority.
+func applyModeledHistory(position *preparedPosition, startDate string, cutInstant int64) error {
 	modeled, err := applyChronologicalHistoryAt(&position.model, startDate, cutInstant)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	state := CloneSimulationState(*modeled.state)
 	state.Balances = SnapshotBalances(position.state.Balances)
 	position.state = &state
-	return position, nil
+	return nil
 }
 
 // prepareFinancePositionAt applies recorded history for ordinary finance reads
@@ -381,28 +400,15 @@ func PrepareSimulationRequest(model *types.FinancialModel, settings *types.Proje
 		return nil, err
 	}
 	startDate := string(settings.FallbackProjectionStartDate)
-	if !IsValidIsoDate(startDate) {
-		return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
-			Severity: types.SeverityError,
-			Code:     "settings.projection-start.format",
-			Message:  fmt.Sprintf("fallbackProjectionStartDate must be a YYYY-MM-DD calendar date (got %q).", startDate),
-			Path:     []any{"fallbackProjectionStartDate"},
-		}}}
+	position, err := prepareRecordedProjectionPosition(model, settings, overrides)
+	if err != nil {
+		return nil, err
 	}
 	cutInstant := dayCloseUnix(startDate)
 	if settings.AsOfInstant != nil {
 		cutInstant = *settings.AsOfInstant
-		if FormatIsoDate(time.Unix(cutInstant, 0).UTC()) != startDate {
-			return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
-				Severity: types.SeverityError,
-				Code:     "settings.asOfInstant.day-mismatch",
-				Message:  fmt.Sprintf("asOfInstant must fall on the projection start date %s.", startDate),
-				Path:     []any{"asOfInstant"},
-			}}}
-		}
 	}
-	position, err := preparePositionAt(model, startDate, cutInstant, overrides)
-	if err != nil {
+	if err := applyModeledHistory(position, startDate, cutInstant); err != nil {
 		return nil, err
 	}
 	effectiveModel := position.model

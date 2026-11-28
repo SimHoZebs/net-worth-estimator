@@ -184,10 +184,12 @@ type WhatIfOutput struct {
 }
 
 // UnifiedProjectionDefaults owns assumed defaults for fresh states.
+const DefaultProjectionTrialCount = 400
+
 func UnifiedProjectionDefaults() ProjectionState {
 	return ProjectionState{
 		CalendarTimezone: "UTC",
 		EngineVersion:    "v2",
-		TrialCount:       1000,
+		TrialCount:       DefaultProjectionTrialCount,
 	}
 }
